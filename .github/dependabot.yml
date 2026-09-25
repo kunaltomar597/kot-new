@@ -1,0 +1,48 @@
+# Automated dependency updates (NFR-M07, SEC-013). Weekly, grouped and capped so update pull
+# requests stay reviewable. Every update PR runs ci.yml and security.yml like any other PR.
+version: 2
+updates:
+  - package-ecosystem: npm # also covers pnpm workspaces (pnpm-lock.yaml)
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    # Let new releases age a few days before proposing them (compromised releases are usually
+    # caught and pulled within that time). Security updates are not delayed.
+    cooldown:
+      default-days: 5
+      semver-major-days: 14
+    versioning-strategy: increase
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+    groups:
+      # One PR for all minor and patch updates of development tooling.
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+      # One PR for all minor and patch updates of runtime dependencies.
+      runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      # Security fixes grouped into one PR as well.
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']

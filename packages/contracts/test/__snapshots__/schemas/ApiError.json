@@ -1,0 +1,31 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string", "minLength": 1 },
+      "message": { "type": "string", "minLength": 1 },
+      "details": {
+        "type": "object",
+        "propertyNames": { "type": "string" },
+        "additionalProperties": {}
+      },
+      "correlationId": { "type": "string" }
+    },
+    "required": ["code", "message"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string", "minLength": 1 },
+      "message": { "type": "string", "minLength": 1 },
+      "details": {
+        "type": "object",
+        "propertyNames": { "type": "string" },
+        "additionalProperties": {}
+      },
+      "correlationId": { "type": "string" }
+    },
+    "required": ["code", "message"],
+    "additionalProperties": false
+  }
+}
