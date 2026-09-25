@@ -67,13 +67,49 @@ of truth for the restaurant.
 - `@Audited({ action, entityType, entityIdParam? })`: records after the handler succeeds, in its
   own transaction. Only for simple administrative actions; money actions call `record` inside their
   business transaction.
-- `src/auth`: the global `PermissionGuard` (deny by default, AUTH-010, SEC-003) with `@Public()`
-  and `@RequireCapability()`. Every route declares one or the other; undeclared routes answer 403.
-  ALLOW passes, OWN passes with `request.ownershipRequired` set for the service to check, OVERRIDE
-  answers `OVERRIDE_REQUIRED` until P0-10 adds override tokens, DENY answers 403. The request
-  principal (`src/auth/principal.ts`) is set by authentication in P0-10; until then protected
-  routes answer 401. Tests authenticate through `createTestApp({ authenticate })`.
+- `src/auth/permission.guard.ts`: the global guard (deny by default, AUTH-010, SEC-003). Every route
+  declares its access with `@Public()`, `@RequireDevice()` (paired device, nobody signed in),
+  `@RequireSession()` (any signed-in person; the service checks more) or `@RequireCapability(c)`;
+  undeclared routes answer 403. For capabilities: ALLOW passes (Owner-only capabilities also need
+  a fresh step-up), OWN passes with `request.ownershipRequired` for the service to check, OVERRIDE
+  needs a manager override token in `x-override-token`, DENY answers 403.
 - `src/common/request-context.ts`: per-request values (correlation ID) via AsyncLocalStorage.
+
+## Authentication (P0-10)
+
+- Devices: `AuthenticationMiddleware` asks the `DEVICE_AUTHENTICATOR` who the calling device is.
+  The default `NoDeviceAuthenticator` recognises nothing, so nobody can sign in until device
+  pairing (P0-11) provides the real one. Tests use `TestDeviceAuthenticator` (`x-test-device`
+  header) through `createTestApp`.
+- PIN login (`POST /api/v1/auth/pin-login`): Argon2id of the PIN with the pepper as Argon2's secret
+  (`CredentialHasher`, AUTH-002); 5 failures within 10 minutes lock the login for 15 minutes, a
+  manager can unlock it (`POST /api/v1/auth/unlock`); 10 attempts per device per minute
+  (`RateLimiter`, SEC-009). Kitchen staff sign in only when `auth.kitchenIndividualLogins` is on
+  (otherwise KDS works in station mode, AUTH-005). Staff tiles: `GET /api/v1/auth/staff-tiles`.
+- Sessions (`SessionService`): refresh token stored as SHA-256, rotated on every refresh; reusing a
+  replaced refresh token revokes the session. Access token: JWT HS256 (`jose`), at most 15 minutes,
+  bound to staff, role, restaurant, device and session; checked on every request together with the
+  session (revoked, absolute expiry 16 h, inactivity 10 min on POS/waiter devices, 30 min on manager
+  browsers, person still active). The current role applies at once.
+- Owner (AUTH-006): password (Argon2id, 12+ characters) + TOTP (RFC 6238, secret sealed with
+  AES-256-GCM, codes never reusable) or one-time recovery codes. `owner-login` and `step-up` give a
+  5-minute step-up required for `OWNER_SECOND_FACTOR_CAPABILITIES`. The first password and TOTP
+  can be set from the Owner's PIN session (setup); replacing them needs a fresh step-up, and a
+  password change signs the Owner out elsewhere.
+- Manager override (AUTH-011): `POST /api/v1/auth/override` with a manager's PIN returns a
+  single-use token for one capability (and entity) of the requester's session on this device,
+  valid 2 minutes; the guard consumes it and exposes `request.override` (approver) for the audit
+  entry of the action.
+- Secrets (`SecretStore`): pepper, token signing key and TOTP key. `FileSecretStore` keeps them in
+  `<RP_DATA_DIR>/secrets` (or `RP_SECRET_*` variables); the installer swaps in DPAPI (P0-16).
+- Settings (`AuthSettingsService`, keys `auth.*` in the settings table, defaults in
+  `auth-settings.ts`): PIN length, lockout, rate limit, token and inactivity times, session length,
+  step-up and override validity, kitchen logins. P1-01 moves them into the settings registry.
+- Audit (AUTH-013): LOGIN, LOGIN_FAILED, LOGIN_LOCKED, LOGOUT, STAFF_UNLOCKED, STEP_UP,
+  OVERRIDE_GRANTED, OVERRIDE_DENIED, REFRESH_TOKEN_REUSED, OWNER_PASSWORD_SET/CHANGED,
+  TOTP_ENROLMENT_STARTED, TOTP_ENROLLED. PINs, passwords, codes and tokens are redacted from logs.
+- Development PINs from `db:seed`: Owner 1111, Manager 2222, Cashier 3333, waiters 4444 and 5555,
+  kitchen 6666 (development only).
 
 Feature modules are added to `src/app.module.ts` by later work packages, one Nest module per area:
 audit, auth, devices, realtime, settings, floor, menu, orders, kitchen, billing, payments, reports,

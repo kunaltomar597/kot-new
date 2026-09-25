@@ -29,7 +29,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-10 Authentication, sessions, RBAC and manager override (P0-08 and P0-09 done).
+- P0-11 Device pairing and device credentials (replaces `NoDeviceAuthenticator`; until then nobody can sign in).
 - P0-12 Real-time and domain-event infrastructure (outbox table exists).
 - P0-15 LAN TLS decision and implementation.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -47,7 +47,7 @@ Recommended next WPs (dependencies met):
 - [x] P0-07 Local server skeleton
 - [x] P0-08 Database schema v1 and least-privilege roles
 - [x] P0-09 Audit log service
-- [ ] P0-10 Authentication, sessions, RBAC, manager override
+- [x] P0-10 Authentication, sessions, RBAC, manager override
 - [ ] P0-11 Device pairing and device credentials
 - [ ] P0-12 Real-time and domain-event infrastructure
 - [x] P0-13 Design tokens and web UI library
@@ -181,7 +181,8 @@ Decided 2026-09-25:
    in their WPs (P0-H1 to P0-H4, P3-01, P0-15).
 10. TypeScript stays on 6.0 until typescript-eslint supports 7 (ADR-0002).
 
-Security-sensitive PRs for the P8-03 human review: (none merged yet)
+Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
+(P0-09 audit hash chain and permission guard), P0-10 authentication (this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -189,6 +190,40 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-25: P0-10 authentication, sessions, RBAC and manager override
+
+Built `apps/server/src/auth` (see the server README "Authentication"): PIN login with Argon2id +
+pepper, lockout and manager unlock, per-device rate limiting, sessions with rotating refresh tokens
+and reuse detection, 15-minute JWT access tokens bound to device and session, inactivity and
+absolute expiry, Owner password + TOTP + recovery codes with 5-minute step-up for Owner-only
+capabilities, single-use manager override tokens consumed by the guard, staff tiles, secret store,
+auth settings with defaults, audit entries for every sign-in event, and log redaction of every
+secret. Route access levels `DEVICE` and `SESSION` added to the contract registry. 84 new tests,
+including the full role × capability matrix (150 cases), and a test that every served route is in
+the contract registry with the same access.
+
+Decisions (defaults; each is a setting):
+
+- Manager browsers time out after 30 idle minutes (the BRD fixes 10 minutes only for POS and waiter
+  devices); sessions end after 16 hours whatever the activity; step-up lasts 5 minutes; override
+  approvals last 2 minutes; 10 login/override attempts per device per minute.
+- The pepper is Argon2's secret input for PINs and passwords.
+- With individual kitchen logins off (default), kitchen staff PIN login is refused
+  (`KITCHEN_STATION_MODE`); KDS actions are attributed to the station device (P0-11).
+- The first Owner password and TOTP can be set from the Owner's PIN session (first setup, guided by
+  the wizard in P7-07); replacing either needs a fresh step-up.
+- An override token is used up when the guard accepts it, even if the action then fails.
+- Requesting an override for something the requester may already do answers `OVERRIDE_NOT_NEEDED`.
+
+Notes for the next session:
+
+- P0-11: implement `DeviceAuthenticator` and bind it to `DEVICE_AUTHENTICATOR`; revoke sessions of
+  an unpaired device (`sessions.device_id`).
+- `POST /api/v1/orders` is registered but not served yet; the registry test lists it as pending
+  (P1-06 removes it from `notYetServed`).
+- Services that act on OWN grants must check `request.ownershipRequired`; overridden actions
+  should record `request.override.approverId` as the audit approver.
 
 ### 2026-09-25: P0-09 audit log service
 

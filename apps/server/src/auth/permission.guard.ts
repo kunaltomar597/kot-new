@@ -1,66 +1,97 @@
 import { type CanActivate, type ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { type Capability, grantFor } from '@rp/domain';
-import { AppError } from '../errors/app-error.js';
-import { PUBLIC_ROUTE, REQUIRED_CAPABILITY } from './decorators.js';
-import type { RequestWithPrincipal } from './principal.js';
+import { OVERRIDE_TOKEN_HEADER } from '@rp/contracts';
+import { grantFor, OWNER_SECOND_FACTOR_CAPABILITIES } from '@rp/domain';
+import { authErrors } from './auth-errors.js';
+import { AuthSettingsService } from './auth-settings.js';
+import { AuthService } from './auth.service.js';
+import { ROUTE_ACCESS, type RouteAccess } from './decorators.js';
+import type { AuthenticatedRequest, Principal } from './principal.js';
 
 /**
- * Global guard: deny by default (AUTH-010, SEC-003).
+ * Global guard: deny by default (AUTH-010, SEC-003). Every route declares its access:
  *
- * - `@Public()` routes pass.
- * - `@RequireCapability(c)` routes need a principal (401 otherwise) whose role is granted `c` in
- *   the permission matrix. ALLOW passes; OWN passes with `request.ownershipRequired` set so the
- *   service checks the table or shift belongs to the person; OVERRIDE needs a manager override
- *   token (P0-10) and is refused until one is presented; DENY is refused.
- * - Routes that declare neither are refused and logged: a missing declaration is a bug.
+ * - `@Public()` passes.
+ * - `@RequireDevice()` needs a paired device.
+ * - `@RequireSession()` needs a signed-in person (on the device their token was issued to).
+ * - `@RequireCapability(c)` needs a signed-in person whose role is granted `c` in the BRD §4.2
+ *   matrix. ALLOW passes, and Owner-only capabilities (AUTH-006) also need a fresh password + TOTP
+ *   step-up. OWN passes with `request.ownershipRequired` set, so the service checks the table or
+ *   shift belongs to the person. OVERRIDE needs a manager's single-use override token in the
+ *   `x-override-token` header (AUTH-011). DENY is refused.
+ * - Routes that declare nothing are refused and logged: a missing declaration is a bug.
  */
 @Injectable()
 export class PermissionGuard implements CanActivate {
   private readonly logger = new Logger(PermissionGuard.name);
 
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly auth: AuthService,
+    private readonly settings: AuthSettingsService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const targets = [context.getHandler(), context.getClass()];
-    if (this.reflector.getAllAndOverride<boolean>(PUBLIC_ROUTE, targets)) return true;
-
-    const request = context.switchToHttp().getRequest<RequestWithPrincipal>();
-    const capability = this.reflector.getAllAndOverride<Capability | undefined>(
-      REQUIRED_CAPABILITY,
-      targets,
-    );
-    if (capability === undefined) {
-      this.logger.error(
-        { path: request.originalUrl },
-        'Route declares neither @Public() nor @RequireCapability(); refusing the request',
-      );
-      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to do this.');
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const access = this.reflector.getAllAndOverride<RouteAccess | undefined>(ROUTE_ACCESS, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    switch (access?.kind) {
+      case 'PUBLIC':
+        return true;
+      case 'DEVICE':
+        if (request.device === undefined) throw authErrors.deviceNotRecognised();
+        return true;
+      case 'SESSION':
+        this.principal(request);
+        return true;
+      case 'CAPABILITY':
+        return this.checkCapability(request, access.capability);
+      case undefined:
+        this.logger.error(
+          { path: request.originalUrl },
+          'Route declares no access decorator; refusing the request',
+        );
+        throw authErrors.forbidden();
     }
+  }
 
-    const principal = request.principal;
-    if (principal === undefined) {
-      throw new AppError(401, 'UNAUTHENTICATED', 'Please log in to continue.');
-    }
+  private principal(request: AuthenticatedRequest): Principal {
+    if (request.principal !== undefined) return request.principal;
+    if (request.authFailure !== undefined) throw request.authFailure;
+    if (request.device === undefined) throw authErrors.deviceNotRecognised();
+    throw authErrors.unauthenticated();
+  }
 
-    const grant = grantFor(principal.role, capability);
-    switch (grant) {
+  private async checkCapability(
+    request: AuthenticatedRequest,
+    capability: Extract<RouteAccess, { kind: 'CAPABILITY' }>['capability'],
+  ): Promise<boolean> {
+    const principal = this.principal(request);
+    switch (grantFor(principal.role, capability)) {
       case 'ALLOW':
+        if (OWNER_SECOND_FACTOR_CAPABILITIES.has(capability)) {
+          const settings = await this.settings.get(principal.restaurantId);
+          if (!this.auth.hasFreshStepUp(principal, settings)) {
+            throw authErrors.secondFactorRequired();
+          }
+        }
         return true;
       case 'OWN':
         request.ownershipRequired = true;
         return true;
-      case 'OVERRIDE':
-        throw new AppError(
-          403,
-          'OVERRIDE_REQUIRED',
-          'A manager must approve this. Ask a manager to enter their PIN.',
-          { capability },
-        );
+      case 'OVERRIDE': {
+        const header = request.headers[OVERRIDE_TOKEN_HEADER];
+        const token = Array.isArray(header) ? header[0] : header;
+        if (token === undefined || token === '') throw authErrors.overrideRequired(capability);
+        const override = await this.auth.consumeOverride(principal, capability, token);
+        if (override === null) throw authErrors.overrideInvalid();
+        request.override = override;
+        return true;
+      }
       case 'DENY':
-        throw new AppError(403, 'FORBIDDEN', 'You do not have permission to do this.', {
-          capability,
-        });
+        throw authErrors.forbidden();
     }
   }
 }

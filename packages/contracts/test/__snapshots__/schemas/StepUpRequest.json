@@ -1,0 +1,62 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "password": { "type": "string", "minLength": 12, "maxLength": 256 },
+      "secondFactor": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "TOTP" },
+              "code": { "type": "string", "pattern": "^\\d{6}$" }
+            },
+            "required": ["kind", "code"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "RECOVERY_CODE" },
+              "code": { "type": "string", "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$" }
+            },
+            "required": ["kind", "code"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "required": ["password", "secondFactor"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "password": { "type": "string", "minLength": 12, "maxLength": 256 },
+      "secondFactor": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "TOTP" },
+              "code": { "type": "string", "pattern": "^\\d{6}$" }
+            },
+            "required": ["kind", "code"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "RECOVERY_CODE" },
+              "code": { "type": "string", "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$" }
+            },
+            "required": ["kind", "code"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "required": ["password", "secondFactor"],
+    "additionalProperties": false
+  }
+}

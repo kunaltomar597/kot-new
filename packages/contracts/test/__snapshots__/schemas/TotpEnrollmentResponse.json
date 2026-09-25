@@ -1,0 +1,27 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "secret": { "type": "string", "pattern": "^[A-Z2-7]+$" },
+      "otpauthUri": {
+        "type": "string",
+        "format": "starts_with",
+        "pattern": "^otpauth:\\/\\/totp\\/.*"
+      }
+    },
+    "required": ["secret", "otpauthUri"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "secret": { "type": "string", "pattern": "^[A-Z2-7]+$" },
+      "otpauthUri": {
+        "type": "string",
+        "format": "starts_with",
+        "pattern": "^otpauth:\\/\\/totp\\/.*"
+      }
+    },
+    "required": ["secret", "otpauthUri"],
+    "additionalProperties": false
+  }
+}

@@ -187,6 +187,10 @@ Deliverables:
 - Device authentication: each request carries a device token obtained by signing a server
   challenge with the device key (works for browsers with non-exportable WebCrypto keys, Android
   Keystore and ESP32). Staff tokens are only accepted together with a valid device token.
+  (As built in P0-10: implement `DeviceAuthenticator` from `apps/server/src/auth/device.ts` and
+  bind it to `DEVICE_AUTHENTICATOR` in `AuthModule`, replacing `NoDeviceAuthenticator`; the
+  middleware, guard and sessions already require the device. KDS station mode means KDS actions
+  are attributed to the device when no kitchen staff is signed in.)
 - Unpair / deactivate: revokes device and staff tokens and closes live sockets within 5 s
   (uses the P0-12 gateway once it exists; until then, token revocation list).
 - Tablet ↔ table binding changes need a manager override.
