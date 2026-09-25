@@ -1,6 +1,6 @@
 # ADR-0003: Money and tax computation rules
 
-Status: Accepted (items marked "confirm" need the restaurant CA's confirmation)
+Status: Accepted (decided 2026-09-25; the pilot CA reviews invoice templates during onboarding)
 Date: 2026-09-25
 Work package: P0-03
 Requirements: BRD §9.4, BILL-001, BILL-004 to BILL-007, ORD-014, RPT-006
@@ -25,8 +25,9 @@ Implemented in `packages/domain` (`money.ts`, `tax.ts`, `discount.ts`, `bill.ts`
       - exclusive prices: each component (CGST, SGST, ...) = rate × taxable value, rounded separately;
       - inclusive prices: taxable value = amount × 10000 / (10000 + total rate), rounded once; tax =
         amount − taxable value, split over components in proportion to their rates;
-   5. service charge (if enabled) = rate × total taxable value of items, taxed with its own
-      configurable tax group as an exclusive amount (confirm with CA);
+   5. service charge (if enabled; off by default, BILL-006) = rate × total taxable value of items,
+      taxed as an exclusive amount with a configurable tax group that defaults to the restaurant's
+      default food tax group (under GST the service charge is part of the value of the service);
    6. round-off to the configured unit (default nearest rupee); the adjustment is shown separately.
 4. Line-level taxable values are derived by allocating each group's taxable value over its lines,
    for item-wise reports. They always add up to the invoice's taxable value.
@@ -35,8 +36,8 @@ Implemented in `packages/domain` (`money.ts`, `tax.ts`, `discount.ts`, `bill.ts`
 ## Alternatives considered
 
 - Per-line tax rounding then summing: common, but the invoice tax summary then differs from
-  rate × taxable value by a few paise; rejected (confirm with CA that group-level computation is
-  acceptable for their filings; it matches GST's per-rate summary).
+  rate × taxable value by a few paise; rejected. Group-level computation matches GST's per-rate
+  summary; the pilot restaurant's CA reviews the invoice template during onboarding.
 - Decimal library: unnecessary with integer paise and basis points; adds weight to mobile bundles.
 
 ## Consequences

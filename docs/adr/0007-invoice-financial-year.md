@@ -1,6 +1,6 @@
 # ADR-0007: Financial year used for invoice numbering
 
-Status: Proposed (confirm with the restaurant's CA)
+Status: Accepted (decided 2026-09-25; the pilot CA reviews invoice templates during onboarding)
 Date: 2026-09-25
 Work package: P0-04
 Requirements: BILL-003, BRD §9.4 (business date), §12 (GST invoicing)

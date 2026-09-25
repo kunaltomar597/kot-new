@@ -1,6 +1,6 @@
 # ADR-0006: State-machine transitions beyond BRD Appendix B
 
-Status: Proposed (awaiting Business Owner confirmation; see PROGRESS.md)
+Status: Accepted (decided 2026-09-25 under delegated ownership; see PROGRESS.md "Decisions")
 Date: 2026-09-25
 Work package: P0-04
 Requirements: ORD-002, ORD-010, ORD-011, TBL-004, KDS-005, WTR-007

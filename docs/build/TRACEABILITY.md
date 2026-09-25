@@ -41,7 +41,6 @@ Must: 31 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 
 ## Must requirements without a test
 
-
 ### AUTH
 
 - AUTH-001: Staff log in on shared devices by selecting their name/photo tile, then entering a numeric PIN (4 digits by de…

@@ -9,6 +9,7 @@ person, `[B]` blocked (reason given).
 Last updated: 2026-09-25.
 
 What exists:
+
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
   state machines, permissions, menu selection, KOT split. 89 tests, ~99 % line coverage.
@@ -17,6 +18,7 @@ What exists:
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
 Recommended next WPs (dependencies met):
+
 - P0-07 Local server skeleton (Lane A, unblocks most of the plan). Start here.
 - P0-06 CI security baseline and contract docs (Lane C, independent).
 - P0-13 Design tokens and web UI library (Lane B, independent).
@@ -25,6 +27,7 @@ Recommended next WPs (dependencies met):
 ## Work packages
 
 ### Phase 0: Foundations and risk spikes
+
 - [x] P0-01 Monorepo and tooling
 - [x] P0-02 Requirements catalogue and traceability
 - [x] P0-03 Domain: money, tax, discounts, bill
@@ -48,6 +51,7 @@ Recommended next WPs (dependencies met):
 - [ ] P0-H4 Thermal printer compatibility [H]
 
 ### Phase 1: Core POS and kitchen
+
 - [ ] P1-01 Settings registry and restaurant setup APIs
 - [ ] P1-02 Floor, tables, sessions, move table, takeaway tokens
 - [ ] P1-03 Menu management API
@@ -64,6 +68,7 @@ Recommended next WPs (dependencies met):
 - [ ] P1-14 Phase 1 exit test
 
 ### Phase 2: Waiter app, notifications, pagers
+
 - [ ] P2-01 React Native foundation
 - [ ] P2-02 Waiter app: tables and order taking
 - [ ] P2-03 Notification and escalation engine
@@ -73,6 +78,7 @@ Recommended next WPs (dependencies met):
 - [ ] P2-07 Phase 2 exit test on the lab rig [H]
 
 ### Phase 3: Table tablet and recommendations v1
+
 - [ ] P3-01 Table tablet app: kiosk, pairing, lifecycle, health
 - [ ] P3-02 Service requests end to end
 - [ ] P3-03 Customer ordering and waiter approval
@@ -81,6 +87,7 @@ Recommended next WPs (dependencies met):
 - [ ] P3-06 Phase 3 exit test (S6)
 
 ### Phase 4: Manager dashboard and reports
+
 - [ ] P4-01 Dashboard shell and live views
 - [ ] P4-02 Staff, device and menu management UI
 - [ ] P4-03 Configuration screens
@@ -90,6 +97,7 @@ Recommended next WPs (dependencies met):
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
 
 ### Phase 5: QR menu and cloud relay
+
 - [ ] P5-01 Relay database, RLS, isolation tests (needs Supabase org)
 - [ ] P5-02 Relay edge functions
 - [ ] P5-03 Sync agent
@@ -98,6 +106,7 @@ Recommended next WPs (dependencies met):
 - [ ] P5-06 Phase 5 exit test
 
 ### Phase 6: Advanced menu and intelligence
+
 - [ ] P6-01 Combo and modifier parity on every surface
 - [ ] P6-02 Learned recommendations
 - [ ] P6-03 Voice search [H]
@@ -105,6 +114,7 @@ Recommended next WPs (dependencies met):
 - [ ] P6-05 Should-have operations batch
 
 ### Phase 7: Commercial readiness
+
 - [ ] P7-01 Licensing module
 - [ ] P7-02 Control Plane: tenants, subscriptions, licences
 - [ ] P7-03 Fleet monitoring
@@ -117,6 +127,7 @@ Recommended next WPs (dependencies met):
 - [ ] P7-10 Phase 7 exit test
 
 ### Phase 8: Hardening and pilot
+
 - [ ] P8-01 Load and capacity tests
 - [ ] P8-02 Failure drills [H]
 - [ ] P8-03 Security hardening and pentest readiness
@@ -124,41 +135,59 @@ Recommended next WPs (dependencies met):
 - [ ] P8-05 Runbooks, manuals, training
 - [ ] P8-06 Pilot readiness
 
-## Decisions awaiting confirmation (Business Owner)
+## Decisions
 
-Claude made these calls to keep moving. Each is easy to change. Confirm or correct them.
+On 2026-09-25 the Business Owner delegated product and engineering decisions to Claude ("you are
+the owner; decide and execute"). Decisions below are final unless the Business Owner reverses one.
+Each is easy to change; the ADR or code location is given.
 
-1. ADR-0006: order items may go SENT → READY in one KDS tap, and READY → SERVED directly; tables may
-   return from BILL_REQUESTED to OCCUPIED when more items are ordered; CLOSE_WITHOUT_BILL frees a
-   table opened by mistake (only with no billable items, reason required).
-2. ADR-0007: invoice numbering resets on the financial year of the invoice's calendar date in IST,
-   not its business date (an invoice at 01:00 on 1 April belongs to the new financial year even
-   though the business date is 31 March). Confirm with the restaurant's CA.
-3. ADR-0003: service charge is calculated on the taxable value of items after discounts and taxed
-   with its own configurable tax group. Confirm with the CA.
-4. ADR-0003: tax is computed once per tax group on the group's total rather than per line (exact
-   invoice totals, no per-line rounding drift). Line-level taxable values are derived for reports.
-5. Owner and Manager have no discount limit (BRD §4.2 shows ✓ for "above limit"); only the Cashier
-   has a limit (default 10 %). Waiters cannot discount.
-6. The BRD's stakeholder table names only Kshitij as Business Owner, while the cover page says
-   "Kunal & Kshitij". Fix in the BRD before sign-off.
-7. MENU-006 says stock decreases "with each approved order". Staff orders are never approved (they
-   go straight to the kitchen), so the plan decrements stock when an order is approved *or* sent.
+Decided 2026-09-25:
 
-## Open questions for the team
+1. State-machine shortcuts accepted (ADR-0006, Accepted): SENT → READY in one KDS tap, READY →
+   SERVED directly, BILL_REQUESTED → OCCUPIED when more items are ordered, CLOSE_WITHOUT_BILL for
+   tables opened by mistake (no billable items, reason required). Reason: fewer taps at peak; the
+   server keeps implied timestamps so kitchen reports stay accurate.
+2. Invoice financial year follows the invoice date (date of issue in IST), not the business date
+   (ADR-0007, Accepted). Reason: CGST Rule 46 ties numbering to the invoice's date of issue.
+   Operational reports keep using the business date.
+3. Service charge is calculated on the taxable value of items after discounts and taxed with a
+   configurable tax group that defaults to the restaurant's default food tax group (ADR-0003).
+   Reason: under GST the service charge is part of the value of the restaurant service. The setting
+   stays off by default (BILL-006).
+4. Tax is computed once per tax group on the group total (ADR-0003, Accepted). Exact invoice totals;
+   line values derived for reports.
+5. Owner and Manager have no discount limit; the Cashier limit defaults to 10 %; waiters and kitchen
+   cannot discount (BRD §4.2, `@rp/domain` discount.ts).
+6. Business Owners are Kunal and Kshitij (the BRD cover page governs; the stakeholder table is a typo).
+7. Stock decrements when a customer order is approved or a staff order is sent (MENU-006 reading).
+8. Build governance (ADR-0008): every WP ships as a pull request to `main`, merged by Claude only when
+   CI is green and a self-review is done; security-sensitive PRs are listed below for the human
+   security review in P8-03.
+9. Open items take the BRD defaults: OI-01 working name "Restaurant Operations Platform" (`@rp/`
+   scope); OI-02 N = 60 s, R = 60 s; OI-03 bar/VAT billing excluded; OI-06 WhatsApp first; OI-08
+   7-day grace; OI-09 no third-party POS in v1; OI-10 escrow released on the Owner's authenticated
+   request; OI-11 kitchen may mark out of stock; OI-12 service charge off; OI-13 no missing blueprint
+   requirements assumed. OI-04 (hardware models), OI-05 (MDM vendor) and OI-07 (LAN TLS) are decided
+   in their WPs (P0-H1 to P0-H4, P3-01, P0-15).
+10. TypeScript stays on 6.0 until typescript-eslint supports 7 (ADR-0002).
 
-- OI-13: are there blueprint sections with requirements not captured in the BRD? (Assumed none.)
-- TypeScript 7 is released but typescript-eslint supports only < 6.1; the repo pins TypeScript 6.0
-  (ADR-0002). Revisit when typescript-eslint supports 7.
+Security-sensitive PRs for the P8-03 human review: (none merged yet)
+
+Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
+
+- Set `main` as the repository's default branch (GitHub → Settings → General → Default branch) and
+  add branch protection requiring the CI check.
 
 ## Session log (newest first)
 
 ### 2026-09-25: foundations (P0-01 to P0-05)
 
 Built the monorepo, the domain and contracts packages, the BRD catalogue and traceability tooling,
-the complete build plan, ADRs 0001 to 0007, CLAUDE.md, the `/next-step` skill and CI.
+the complete build plan, ADRs 0001 to 0008, CLAUDE.md, the `/next-step` skill and CI. Settled all
+pending decisions under delegated ownership (see "Decisions") and created `main`.
 
 Notes for the next session:
+
 - Packages build with `tsc` to `dist/` (ESM). Turborepo builds dependencies before typecheck/test,
   so `pnpm check` works from a clean clone. Apps must import `@rp/domain` / `@rp/contracts` via the
   workspace (`"@rp/domain": "workspace:*"`).

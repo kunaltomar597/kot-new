@@ -12,6 +12,7 @@ Requirements: NFR-U01 (native library), WTR-001 (signed APK, paired device, PIN)
 (offline drafts), AUTH-007 (Keystore credential), SEC-010, NFR-L02.
 Depends on: P0-11, P0-12, P0-13, P0-14 (api-client, i18n).
 Deliverables:
+
 - `packages/ui-native`: React Native components matching `ui-web` (same tokens and behaviour): PinPad,
   Button, Sheet, Toast, StatusChip, menu item card, variant/modifier popup and combo picker using
   `@rp/domain` menu-selection (MENU-012).
@@ -22,6 +23,7 @@ Deliverables:
   typed socket with resync, offline banner, persistent outbox of unsent submissions keyed by
   idempotency key (never silently discarded), menu cache with version refresh (MENU-013).
 - Maestro smoke flows for both apps.
+
 Notes: the Android signing keystore belongs to the Business Owner (OWNER_CHECKLIST item 8). CI builds
 use EAS secrets; never commit keystores.
 Acceptance: both apps build as development APKs in CI (EAS or local Gradle), pair with a local

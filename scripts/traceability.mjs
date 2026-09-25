@@ -10,6 +10,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as prettier from 'prettier';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const strict = process.argv.includes('--strict');
@@ -91,7 +92,8 @@ lines.push('', '## Must requirements without a test', '');
 let lastArea = '';
 for (const requirement of uncoveredMust) {
   if (requirement.area !== lastArea) {
-    lines.push('', `### ${requirement.area}`, '');
+    if (lines.at(-1) !== '') lines.push('');
+    lines.push(`### ${requirement.area}`, '');
     lastArea = requirement.area;
   }
   lines.push(
@@ -102,7 +104,13 @@ if (unknown.size > 0) {
   lines.push('', '## References to unknown requirement IDs (fix these)', '');
   for (const [id, files] of unknown) lines.push(`- ${id}: ${[...files].sort().join(', ')}`);
 }
-writeFileSync(join(root, 'docs', 'build', 'TRACEABILITY.md'), `${lines.join('\n')}\n`);
+// Format with Prettier so the generated file always passes `pnpm format:check` in CI.
+const outputPath = join(root, 'docs', 'build', 'TRACEABILITY.md');
+const prettierOptions = (await prettier.resolveConfig(outputPath)) ?? {};
+writeFileSync(
+  outputPath,
+  await prettier.format(`${lines.join('\n')}\n`, { ...prettierOptions, parser: 'markdown' }),
+);
 
 process.stdout.write(
   `Traceability: Must ${byPriority.M.covered}/${byPriority.M.total}, Should ${byPriority.S.covered}/${byPriority.S.total}, Could ${byPriority.C.covered}/${byPriority.C.total}.\n`,

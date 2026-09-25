@@ -54,6 +54,7 @@ Goal: every pull request is scanned, and API/event contracts are published as do
 Requirements: SEC-013, NFR-M07, INT-002, NFR-M06.
 Depends on: P0-01, P0-05.
 Deliverables:
+
 - `.github/workflows/security.yml`: CodeQL (JavaScript/TypeScript), `pnpm audit --audit-level high`
   (fails on high/critical), gitleaks secret scanning, SBOM generation (CycloneDX, e.g.
   `@cyclonedx/cdxgen`) uploaded as an artefact, licence check that fails on GPL/AGPL/SSPL in
@@ -64,6 +65,7 @@ Deliverables:
   catalogue). Add `pnpm contracts:docs` and a CI step that fails if the committed docs are stale.
 - A contract test in CI (`packages/contracts/test/snapshot.test.ts`): JSON-schema snapshot of every
   exported schema so breaking changes are visible in review (UPD-006 N-1 discipline).
+
 Notes: keep the security workflow separate from `ci.yml` so it can run on a schedule as well.
 Acceptance: workflows pass on a clean PR; a deliberately added fake secret fails gitleaks locally;
 docs regenerate deterministically.
@@ -75,6 +77,7 @@ Requirements: NFR-O01, NFR-O02 (reporter interface only), NFR-O04, NFR-A03 (tran
 NFR-M01, SEC-004 (validation), DATA-001 (localhost DB).
 Depends on: P0-05.
 Deliverables in `apps/server`:
+
 - NestJS 12 app (`src/main.ts`, `src/app.module.ts`), SWC or tsc build, `pnpm --filter @rp/server dev`.
 - `config/`: typed configuration loaded from environment variables with Zod validation;
   `.env.example`. Distinguish deployment config (ports, DB URL, data dir) from restaurant settings
@@ -95,6 +98,7 @@ Deliverables in `apps/server`:
   applies migrations, and gives each test file its own database. Vitest config for unit and
   integration tests (`*.int.test.ts`).
 - CI: add a Postgres 16 service container to the test job.
+
 Notes: PostgreSQL listens on localhost only (DATA-001). Keep modules framework-idiomatic (Nest
 modules per area). Business rules stay in `@rp/domain`.
 Acceptance: `pnpm --filter @rp/server test` runs unit + integration tests green locally and in CI;
@@ -106,6 +110,7 @@ Goal: the core data model for Phases 0 and 1, with database-level protection of 
 Requirements: AUD-004, SEC-005 (restaurant ID on every record), SEC-007, BRD §9.1, §9.4, INT-005.
 Depends on: P0-07.
 Deliverables:
+
 - Prisma models (UUIDv7 ids per ADR-0005; `restaurantId` on every table; `businessDate` on every
   business record; money columns `Int`/`BigInt` paise; `createdAt/updatedAt` UTC; `externalId`
   on items, tables, staff; `externalRef` + `source` on orders):
@@ -126,6 +131,7 @@ Deliverables:
   Postgres SEQUENCE, because sequences can skip values on rollback; BILL-003).
 - Seed script for development: one restaurant, GST 5 % and 18 % groups, 2 stations, 10 tables,
   staff of each role, 30 menu items with variants/modifiers/combos.
+
 Acceptance: migrations apply on an empty DB; integration test proves `rp_app` cannot DELETE from
 protected tables and cannot UPDATE audit rows; seed runs; `prisma validate` passes.
 
@@ -135,6 +141,7 @@ Goal: a tamper-evident, append-only audit trail every module writes to.
 Requirements: AUD-001, AUD-002, AUD-003 (local part), AUD-004, AUTH-013.
 Depends on: P0-08.
 Deliverables in `apps/server/src/audit`:
+
 - `AuditService.record(entry)` inside the caller's transaction: server timestamp, business date,
   actor, approver, device, action, entity type/id, before/after (JSON), reason, correlation ID.
 - Hash chain: `hash = SHA-256(canonicalJSON(entry without hash) + previousHash)`; single writer
@@ -142,6 +149,7 @@ Deliverables in `apps/server/src/audit`:
 - `@Audited()` decorator/interceptor for simple cases; explicit calls for money actions.
 - `GET /api/v1/audit/verify` (Owner/Manager): recomputes the chain and reports the first broken link.
 - Chain-head accessor for heartbeats (P0-17/P7-03).
+
 Acceptance: tests show entries chain correctly, an edited row is detected by verify, concurrent
 writers still produce a valid chain, and audit writes roll back with their business transaction.
 
@@ -152,6 +160,7 @@ Requirements: AUTH-001 to AUTH-006, AUTH-010, AUTH-011, AUTH-013, SEC-003, SEC-0
 DPAPI on Windows; env/keyfile in dev), SEC-009.
 Depends on: P0-08, P0-09.
 Deliverables in `apps/server/src/auth`:
+
 - Staff tiles endpoint (names/photos for the device's restaurant; no PIN hints).
 - PIN login: Argon2id (or bcrypt cost ≥ 12) of `pepper + PIN`; 4 digits default, 6 configurable;
   lockout after 5 failures in 10 minutes for 15 minutes (settings); per-device rate limit;
@@ -167,6 +176,7 @@ Deliverables in `apps/server/src/auth`:
   and returns a single-use override token scoped to one capability and entity; both people audited.
 - `SecretStore` interface: DPAPI implementation for Windows (P0-16 wires it), file/env for dev.
 - Audit entries for login, logout, failures, lockouts, overrides.
+
 Acceptance: integration tests for lockout, token expiry and revocation, every capability row in the
 matrix (table-driven), override single-use, TOTP step-up; no PIN or token appears in logs.
 
@@ -176,6 +186,7 @@ Goal: only paired devices can talk to the server.
 Requirements: AUTH-007, AUTH-008, AUTH-009, SEC-003, SEC-006.
 Depends on: P0-10.
 Deliverables:
+
 - `POST /api/v1/devices/pairing-codes` (Manager): one-time code + QR payload, valid 10 min (setting).
 - `POST /api/v1/devices/pair`: device submits the code and its public key (Ed25519 or P-256);
   server stores the device, type, binding (table for tablets, station for KDS, staff for pagers).
@@ -185,6 +196,7 @@ Deliverables:
 - Unpair / deactivate: revokes device and staff tokens and closes live sockets within 5 s
   (uses the P0-12 gateway once it exists; until then, token revocation list).
 - Tablet ↔ table binding changes need a manager override.
+
 Acceptance: unpaired device rejected even with a valid PIN; revoked device's socket closed ≤ 5 s
 (integration test); tablet can only access its own table.
 
@@ -195,6 +207,7 @@ Requirements: ORD-010 (broadcast), NTF-006 (at-least-once, resync), NFR-P11, INT
 BRD §10.1 principle 3, §10.4.
 Depends on: P0-09, P0-10 (socket auth), P0-11 (device auth).
 Deliverables:
+
 - In-process `EventBus` publishing typed `DomainEvent`s from `@rp/contracts` after commit.
 - Transactional outbox: events written to `Outbox` in the same transaction as the state change;
   a dispatcher delivers to in-process subscribers and to external channels (Socket.io now, MQTT in
@@ -204,6 +217,7 @@ Deliverables:
 - Resync protocol: every event has a monotonic sequence; clients send their last sequence on
   reconnect and receive what they missed (or a "full refresh" signal if too old).
 - A test client utility for integration tests.
+
 Acceptance: integration tests prove events are not lost when a consumer fails and retries, not
 duplicated for idempotent consumers, delivered to the right rooms only, and replayed on reconnect.
 
@@ -213,6 +227,7 @@ Goal: one design system across all apps (NFR-U01), built before feature screens.
 Requirements: NFR-U01 to NFR-U05, KDS-011 (large touch targets), AUTH-004 (PIN pad).
 Depends on: P0-01. Can run in parallel with Lane A.
 Deliverables:
+
 - `packages/design-tokens`: colour (light, dark, KDS dark), typography, spacing, radius, elevation,
   motion; exported as TS objects and CSS variables; restaurant accent colour slot.
 - `packages/ui-web`: React 19 + TypeScript components with accessible defaults: Button, IconButton,
@@ -221,6 +236,7 @@ Deliverables:
   Card, Table, Money (formats paise via `@rp/domain`). Touch targets ≥ 48 px.
 - A component workbench (Storybook 9 or Ladle) and Vitest + Testing Library tests; axe checks for
   accessibility on key components.
+
 Notes: pick CSS approach in an ADR (recommended: CSS modules or vanilla-extract with the token CSS
 variables; avoid runtime CSS-in-JS for KDS performance).
 Acceptance: components render in light/dark; PinPad fully keyboard and touch operable; tests green.
@@ -231,6 +247,7 @@ Goal: the React web console skeleton that POS, dashboard and KDS modes live in.
 Requirements: MGR-001, KDS-001, NFR-L02, NFR-U04, AUTH-004, AUTH-005 (client side), NFR-P11.
 Depends on: P0-10, P0-12, P0-13.
 Deliverables:
+
 - `packages/i18n`: typed English catalogue, `t()` helper, ICU plural support, lint rule or test that
   flags string literals in JSX.
 - `packages/api-client`: typed REST client generated from/aligned with contracts (fetch based, works
@@ -239,6 +256,7 @@ Deliverables:
 - `apps/console`: Vite + React 19 + React Router, device pairing screen, staff tile + PIN login,
   role-based modes (`/pos`, `/kds`, `/manage`), connection banner, empty/loading/error states,
   session inactivity handling.
+
 Acceptance: Playwright test pairs a browser device, logs in with a PIN and lands in the right mode
 for each role; offline banner shows when the server stops.
 
@@ -262,6 +280,7 @@ Requirements: ONB-001, ONB-002, NFR-A04, NFR-I01, NFR-I02, UPD-001 (Windows part
 SEC-011, BRD §10.2 (server as Windows service).
 Depends on: P0-07; P0-14 for the Electron shell to show the console.
 Deliverables:
+
 - `infra/installer`: bundled Node runtime + server build, WinSW (or equivalent) service definition
   for the server, bundled PostgreSQL 16 binaries initialised as a Windows service on the chosen
   data drive, watchdog service that restarts the server within 10 s, firewall rules for the staff
@@ -274,6 +293,7 @@ Deliverables:
   automatically, electron-updater wired to the update channel from P0-17.
 - `windows-latest` CI job that builds the installer (unsigned in CI until the code-signing
   certificate exists; signing step behind a secret) and runs a smoke test.
+
 People needed: someone runs the installer on a clean Windows 11 PC and reports results (see
 `docs/runbooks/` checklist created in this WP).
 Acceptance: installer builds in CI; on a clean PC it installs, services start at boot before login,
@@ -305,11 +325,12 @@ Goal: prove PGR-002 (≥ 14 h at ≤ 60 alerts/hour) on real hardware before bui
 Requirements: PGR-001, PGR-002, PGR-004, PGR-009, risk R-01.
 Claude prepares: `firmware/pager` ESP-IDF project (ESP32-S3, LilyGO T-Watch S3 board support):
 Wi-Fi with power save, MQTT over TLS (esp-mqtt, QoS 1), subscribe to one topic, on message vibrate
-+ show text + wait for button ack, heartbeat every 30 s with battery %; a Node script that sends 60
-alerts/hour to a local Mosquitto/Aedes broker and logs acks and latency; test procedure document.
-Person runs: flash 2 devices, run 14 h on a full charge, record battery curve and latency.
-Decision: pass → continue with PGR design; fail → evaluate alternatives (BLE/sub-GHz with a base
-station) and get Business Owner approval.
+
+- show text + wait for button ack, heartbeat every 30 s with battery %; a Node script that sends 60
+  alerts/hour to a local Mosquitto/Aedes broker and logs acks and latency; test procedure document.
+  Person runs: flash 2 devices, run 14 h on a full charge, record battery curve and latency.
+  Decision: pass → continue with PGR design; fail → evaluate alternatives (BLE/sub-GHz with a base
+  station) and get Business Owner approval.
 
 ### P0-H2 Wi-Fi coverage test kit
 

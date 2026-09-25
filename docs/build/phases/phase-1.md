@@ -19,6 +19,7 @@ Requirements: ONB-004 steps 1 to 3 (API side), BILL-002, BILL-003, BILL-004, BIL
 charge off by default), MGR-007 (storage side), UPD-010 (vendor-pushed settings visible), NFR-L03.
 Depends on: P0-10.
 Deliverables:
+
 - `packages/contracts/src/settings.ts`: a settings catalogue. Each entry: key, Zod schema, BRD
   default, scope (restaurant / vendor-controlled), who may change it (capability), description and
   requirement ID. Include at least every `⚙` in the BRD (timers N and R, lockout, session timeouts,
@@ -31,6 +32,7 @@ Deliverables:
   FSSAI number, logo, contact, business hours, cut-off), tax groups CRUD (rates entered, never
   hard-coded), invoice series CRUD using `@rp/domain` `validateInvoiceSeries`.
 - Owner-only (with second factor) for tax and invoice settings (AUTH-006).
+
 Acceptance: every catalogue entry has a default and validation test; GSTIN validator tests; tax and
 invoice endpoints require the Owner step-up.
 
@@ -40,6 +42,7 @@ Goal: the table side of service.
 Requirements: TBL-001 to TBL-005, TBL-007 (API + live events), TBL-008, WTR-008 (move), ORD-009.
 Depends on: P1-01, P0-12.
 Deliverables:
+
 - Sections and tables CRUD (number/name, capacity, section, optional paired tablet).
 - Shift assignment: waiters to sections and optionally tables; responsible waiter resolution with
   per-session override.
@@ -51,6 +54,7 @@ Deliverables:
 - Takeaway orders get a token number sequence per business day, optional name/phone.
 - Table overview query for TBL-007 (state, seated time, amount so far, responsible waiter, pending
   approvals, active service requests; last two filled in by later phases).
+
 Acceptance: integration tests for the whole table state machine including invalid transitions,
 move table with open KOTs (scenario S7 at API level), concurrent open of the same table (one wins).
 
@@ -61,6 +65,7 @@ Requirements: MENU-001 to MENU-007 (MENU-007 time windows as data only), MENU-00
 MGR-005 (API side), INT-005.
 Depends on: P1-01.
 Deliverables:
+
 - CRUD for categories (one sub-level), items (all MENU-002 attributes), variants, reusable modifier
   groups, combos (fixed components and choice slots, date range, time window), tags, synonyms,
   stations reference, channel visibility.
@@ -71,6 +76,7 @@ Deliverables:
 - Menu versioning: publishing produces a `MenuSnapshot` (contracts) with a version number and a
   `MenuPublished` event; clients cache and refresh on change (MENU-013).
 - Search index data (names, synonyms, tags) for later fuzzy search.
+
 Acceptance: integration tests for CRUD validation, archive-not-delete, stock countdown to zero,
 snapshot matches contract schema, audit entries for price changes.
 
@@ -103,6 +109,7 @@ Requirements: ORD-001, ORD-002, ORD-006 to ORD-015, ORD-017, MENU-006 (stock dec
 AUD-001 (orders), INT-004 events, NFR-P01 (latency budget).
 Depends on: P1-02, P1-03.
 Deliverables:
+
 - `POST /api/v1/orders` accepting `SubmitOrderRequest`: idempotency (store key + response;
   replay returns the original result), server-side pricing with `@rp/domain` `unitPriceOf`,
   availability and channel checks (ORD-017 partial rejection), stock decrement in the same
@@ -116,6 +123,7 @@ Deliverables:
 - Modifications after a KOT (quantity, instruction) create a MODIFIED delta KOT; cancellations
   create a CANCELLED KOT slip; nothing changes silently (ORD-012).
 - Special instructions per item and order with the configured max length.
+
 Acceptance: integration tests for idempotent replay (same key twice → one order, one KOT set, one
 stock deduction), partial rejection, KOT split, modify/cancel/void rules per state and role, price
 change not affecting open orders, events emitted after commit only.
@@ -170,6 +178,7 @@ Requirements: BILL-001 to BILL-007, BILL-009 to BILL-011, BILL-014, BILL-015 (st
 (money), RPT-006 (data), BRD §12 GST rows.
 Depends on: P1-06.
 Deliverables:
+
 - Bill preview for a table session or takeaway: billable items only (`isBillable`), priced with
   `@rp/domain` `computeBill` using the restaurant's price mode, tax groups, rounding and service
   charge settings.
@@ -182,6 +191,7 @@ Deliverables:
 - Reprint marked DUPLICATE (audited); edit after print (manager PIN, reason, before/after); void
   and re-issue (voided keeps its number with status Cancelled; new number for the new invoice).
 - ESC/POS bill template (logo, header, footer) and on-screen preview data.
+
 Acceptance: integration tests: invoice numbers consecutive with no gaps under concurrency and
 rollback, cancelled invoices stay in the series, split bill totals equal the original, edit/void
 flows audited with approver, DUPLICATE marking.
