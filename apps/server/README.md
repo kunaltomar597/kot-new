@@ -22,6 +22,32 @@ of truth for the restaurant.
 - `src/health`: `GET /api/v1/health` (200 ok / 503 degraded for the watchdog) and `GET /api/v1/version`.
 - `src/common/ids.ts`: UUIDv7 ids (ADR-0005).
 
+## Data model and database protection (P0-08)
+
+- `prisma/schema.prisma`: the core model for Phases 0 and 1 (restaurant, settings, business days,
+  staff, roles, credentials, sessions, devices, floor, menu, orders, KOTs, approvals, idempotency,
+  invoices, payments, shifts, day-end, audit log, outbox, inbox). Every table has `id` (UUIDv7),
+  `restaurant_id`, `created_at`, `updated_at`; business records have `business_date`; money is `Int`
+  paise (`BigInt` for day and shift totals). `restaurant_id` has no foreign key: the local database
+  holds one restaurant (SEC-005). Names: `DiningTable` (table `tables`), `OutboxEvent` (`outbox`),
+  `InboxMessage` (`inbox`).
+- `prisma/migrations/*_roles_and_protection`: hand-written SQL for the roles `rp_owner`
+  (migrations), `rp_app` (runtime: no DELETE on orders, order items, KOTs, approvals, invoices and
+  their lines, discounts, payments, shifts, cash movements, business days, day-ends or the audit log;
+  no UPDATE on the audit log) and `rp_purge` (archive-then-purge, P7-06), plus triggers that make the
+  audit log append-only for everyone and freeze settled or voided invoices (AUD-004, BILL-010).
+  **A later migration that adds a table which may be deleted must `GRANT DELETE ... TO rp_app`
+  explicitly**; financial and audit tables must not get it. The roles are NOLOGIN; the installer
+  (P0-16) creates login users as members. Always run migrations as the same owner login: the
+  default privileges that give rp_app access to new tables apply to objects that login creates.
+- `src/database/numbering.ts`: `allocateDailyNumber` (order, KOT, takeaway token per business day)
+  and `allocateInvoiceSequence` (per series and financial year). Gap-free: a locked counter row
+  inside the caller's transaction, never a PostgreSQL SEQUENCE (BILL-003, ADR-0005).
+- `src/database/dev-seed.ts`: development data (one restaurant, GST 5 % and 18 %, 2 stations,
+  10 tables, staff of every role, 30 items with variants, modifiers and a combo). Run with
+  `pnpm --filter @rp/server build && DATABASE_URL=... pnpm --filter @rp/server db:seed`. It refuses
+  to run on a database that already has a restaurant. Staff PINs come with P0-10.
+
 Feature modules are added to `src/app.module.ts` by later work packages, one Nest module per area:
 audit, auth, devices, realtime, settings, floor, menu, orders, kitchen, billing, payments, reports,
 notifications, mqtt, service-requests, recommendations, sync, licensing, backup, updates, diagnostics.

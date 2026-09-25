@@ -109,6 +109,9 @@ Deliverables:
   OrderItemModifier, OrderEvent, Kot, KotLine, Approval, IdempotencyRecord; Invoice, InvoiceLine,
   TaxLine, Discount, Payment, Shift, CashMovement, DayEnd; AuditLog; Outbox, Inbox.
   Later phases add their own tables (notifications, recommendations, licences, backups, sync).
+  As built: `Table` is `DiningTable`, `Outbox`/`Inbox` are `OutboxEvent`/`InboxMessage`; combo choice
+  slots use `ComboChoiceOption`, tags use `ItemTag`, day counters use `DailyCounter` and invoice
+  numbers `InvoiceSequence`.
 - SQL migration creating roles: `rp_owner` (migrations), `rp_app` (runtime) with
   SELECT/INSERT/UPDATE on everything, **no DELETE** on orders, order items, KOTs, invoices,
   invoice lines, tax lines, payments, cash movements, shifts, day-ends, audit log; `rp_purge`
