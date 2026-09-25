@@ -8,7 +8,13 @@
   "servers": [
     { "url": "/", "description": "The restaurant's local server (address set at installation)" }
   ],
-  "tags": [{ "name": "audit" }, { "name": "auth" }, { "name": "orders" }, { "name": "system" }],
+  "tags": [
+    { "name": "audit" },
+    { "name": "auth" },
+    { "name": "devices" },
+    { "name": "orders" },
+    { "name": "system" }
+  ],
   "paths": {
     "/api/v1/audit/verify": {
       "get": {
@@ -493,6 +499,348 @@
         "x-requirements": ["AUTH-003", "AUTH-013"]
       }
     },
+    "/api/v1/devices": {
+      "get": {
+        "operationId": "listDevices",
+        "summary": "Paired and revoked devices of the restaurant",
+        "tags": ["devices"],
+        "responses": {
+          "200": {
+            "description": "Devices.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeviceListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["AUTH-007", "AUTH-008"]
+      }
+    },
+    "/api/v1/devices/{deviceId}/revoke": {
+      "post": {
+        "operationId": "revokeDevice",
+        "summary": "Unpair a device: its tokens and sessions stop working at once",
+        "tags": ["devices"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RevokeDeviceRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DeviceSummary" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["AUTH-008"]
+      }
+    },
+    "/api/v1/devices/{deviceId}/table": {
+      "put": {
+        "operationId": "bindTabletTable",
+        "summary": "Move a table tablet to another table",
+        "description": "Needs a manager (AUTH-009); the tablet then serves only the new table.",
+        "tags": ["devices"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/BindTableRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rebound.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DeviceSummary" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["AUTH-009"]
+      }
+    },
+    "/api/v1/devices/challenge": {
+      "post": {
+        "operationId": "createDeviceChallenge",
+        "summary": "A one-time challenge for a paired device to sign",
+        "description": "Public because it is the first step of device authentication; a challenge alone grants nothing (AUTH-007).",
+        "tags": ["devices"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeviceChallengeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Challenge valid for 60 seconds.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeviceChallengeResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many attempts.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["AUTH-007"]
+      }
+    },
+    "/api/v1/devices/pair": {
+      "post": {
+        "operationId": "pairDevice",
+        "summary": "A device pairs with a one-time code and its public key",
+        "description": "Public because the device has no credential yet: the one-time code is the credential. The device proves it holds the private key by signing the code. Rate-limited (SEC-009).",
+        "tags": ["devices"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PairDeviceRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Paired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PairedDevice" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown, used or expired code, or a bad proof.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many attempts.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["AUTH-007", "SEC-006", "SEC-009"]
+      }
+    },
+    "/api/v1/devices/pairing-codes": {
+      "post": {
+        "operationId": "createPairingCode",
+        "summary": "Prepare the pairing of a device: a one-time code and QR payload",
+        "description": "The code is valid for 10 minutes (setting) and pairs exactly one device (AUTH-007).",
+        "tags": ["devices"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreatePairingCodeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pairing code.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PairingCodeResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["AUTH-007", "AUTH-009"]
+      }
+    },
+    "/api/v1/devices/pairing-codes/bootstrap": {
+      "post": {
+        "operationId": "createBootstrapPairingCode",
+        "summary": "Pairing code for the first device, from the server PC itself",
+        "description": "Public because no device exists yet to sign in on. Only answers requests from the server PC's loopback address, and only while the restaurant has no paired device; the installer uses it to pair the POS on the server PC (ONB-001).",
+        "tags": ["devices"],
+        "responses": {
+          "201": {
+            "description": "Pairing code for a POS.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PairingCodeResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Not from the server PC, or a device is already paired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["AUTH-007", "ONB-001"]
+      }
+    },
+    "/api/v1/devices/token": {
+      "post": {
+        "operationId": "issueDeviceToken",
+        "summary": "Exchange a signed challenge for a device token",
+        "description": "Public because it is how a device authenticates: the signature over the challenge with the paired key is the credential (AUTH-007).",
+        "tags": ["devices"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/DeviceTokenRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device token.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeviceTokenResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or revoked device, or a bad signature.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many attempts.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["AUTH-007", "SEC-006"]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "getHealth",
@@ -782,6 +1130,12 @@
         ],
         "additionalProperties": false
       },
+      "BindTableRequest": {
+        "type": "object",
+        "properties": { "tableId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["tableId"],
+        "additionalProperties": false
+      },
       "Capability": {
         "type": "string",
         "enum": [
@@ -900,6 +1254,79 @@
         "required": ["id", "itemId", "components"],
         "additionalProperties": false
       },
+      "CreatePairingCodeRequest": {
+        "type": "object",
+        "properties": {
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "tableId": { "$ref": "#/components/schemas/Id" },
+          "stationId": { "$ref": "#/components/schemas/Id" },
+          "staffId": { "$ref": "#/components/schemas/Id" }
+        },
+        "required": ["type", "name"],
+        "additionalProperties": false
+      },
+      "DeviceChallengeRequest": {
+        "type": "object",
+        "properties": { "deviceId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["deviceId"],
+        "additionalProperties": false
+      },
+      "DeviceChallengeResponse": {
+        "type": "object",
+        "properties": {
+          "challenge": { "type": "string", "minLength": 16 },
+          "expiresAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["challenge", "expiresAt"],
+        "additionalProperties": false
+      },
+      "DeviceKeyAlgorithm": { "type": "string", "enum": ["Ed25519", "ES256"] },
+      "DeviceListResponse": {
+        "type": "object",
+        "properties": {
+          "devices": { "type": "array", "items": { "$ref": "#/components/schemas/DeviceSummary" } }
+        },
+        "required": ["devices"],
+        "additionalProperties": false
+      },
+      "DeviceRevoked": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "DeviceRevoked" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "deviceId": { "$ref": "#/components/schemas/Id" },
+              "deviceType": { "$ref": "#/components/schemas/DeviceType" },
+              "reason": { "type": "string", "maxLength": 200 }
+            },
+            "required": ["deviceId", "deviceType", "reason"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceStatus": { "type": "string", "enum": ["PENDING", "ACTIVE", "REVOKED"] },
       "DeviceStatusChanged": {
         "type": "object",
         "properties": {
@@ -937,6 +1364,57 @@
         ],
         "additionalProperties": false
       },
+      "DeviceSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/DeviceStatus" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "pairedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastSeenAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "appVersion": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "status",
+          "tableId",
+          "stationId",
+          "staffId",
+          "pairedAt",
+          "lastSeenAt",
+          "appVersion"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceTokenRequest": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "$ref": "#/components/schemas/Id" },
+          "challenge": { "type": "string", "minLength": 16, "maxLength": 128 },
+          "signature": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z0-9+/]+={0,2}$" }
+        },
+        "required": ["deviceId", "challenge", "signature"],
+        "additionalProperties": false
+      },
+      "DeviceTokenResponse": {
+        "type": "object",
+        "properties": {
+          "deviceToken": { "type": "string", "minLength": 1 },
+          "expiresAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["deviceToken", "expiresAt"],
+        "additionalProperties": false
+      },
       "DeviceType": {
         "type": "string",
         "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
@@ -961,7 +1439,8 @@
           { "$ref": "#/components/schemas/BillPrinted" },
           { "$ref": "#/components/schemas/BillSettled" },
           { "$ref": "#/components/schemas/AlertEscalated" },
-          { "$ref": "#/components/schemas/DeviceStatusChanged" }
+          { "$ref": "#/components/schemas/DeviceStatusChanged" },
+          { "$ref": "#/components/schemas/DeviceRevoked" }
         ]
       },
       "ExternalId": { "type": "string", "minLength": 1, "maxLength": 128 },
@@ -1665,6 +2144,43 @@
         "required": ["newPassword"],
         "additionalProperties": false
       },
+      "PairDeviceRequest": {
+        "type": "object",
+        "properties": {
+          "code": { "$ref": "#/components/schemas/PairingCode" },
+          "algorithm": { "$ref": "#/components/schemas/DeviceKeyAlgorithm" },
+          "publicKey": { "type": "string", "maxLength": 1024, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+          "proof": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+          "appVersion": { "type": "string", "maxLength": 40 }
+        },
+        "required": ["code", "algorithm", "publicKey", "proof"],
+        "additionalProperties": false
+      },
+      "PairedDevice": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "$ref": "#/components/schemas/Id" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["deviceId", "restaurantId", "type", "name", "tableId", "stationId", "staffId"],
+        "additionalProperties": false
+      },
+      "PairingCode": { "type": "string", "pattern": "^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$" },
+      "PairingCodeResponse": {
+        "type": "object",
+        "properties": {
+          "code": { "$ref": "#/components/schemas/PairingCode" },
+          "expiresAt": { "$ref": "#/components/schemas/Timestamp" },
+          "qrPayload": { "type": "string" }
+        },
+        "required": ["code", "expiresAt", "qrPayload"],
+        "additionalProperties": false
+      },
       "Paise": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
       "PaymentMode": { "type": "string", "enum": ["CASH", "CARD", "UPI", "OTHER"] },
       "Pin": { "type": "string", "pattern": "^\\d{4,8}$" },
@@ -1705,6 +2221,12 @@
           "message": { "type": "string" }
         },
         "required": ["clientLineId", "code", "message"],
+        "additionalProperties": false
+      },
+      "RevokeDeviceRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "Role": { "type": "string", "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"] },

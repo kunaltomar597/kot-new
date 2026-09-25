@@ -11,6 +11,10 @@ export interface AuthenticatedDevice {
   readonly type: DeviceType;
   /** The table a table tablet is bound to (AUTH-009). */
   readonly tableId: string | null;
+  /** The station a kitchen screen shows (KDS-002). */
+  readonly stationId: string | null;
+  /** The person a pager belongs to. */
+  readonly staffId: string | null;
 }
 
 /**
@@ -20,14 +24,4 @@ export interface AuthenticatedDevice {
 export interface DeviceAuthenticator {
   /** The paired device, or undefined when the request carries no valid device credential. */
   authenticate(request: Request): Promise<AuthenticatedDevice | undefined>;
-}
-
-/**
- * Default until device pairing (P0-11) provides the real authenticator: no device is recognised,
- * so nobody can sign in. Deny by default (SEC-003).
- */
-export class NoDeviceAuthenticator implements DeviceAuthenticator {
-  authenticate(): Promise<undefined> {
-    return Promise.resolve(undefined);
-  }
 }

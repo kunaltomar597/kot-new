@@ -101,6 +101,11 @@ channels:
     messages:
       DeviceStatusChanged:
         $ref: '#/components/messages/DeviceStatusChanged'
+  DeviceRevoked:
+    address: DeviceRevoked
+    messages:
+      DeviceRevoked:
+        $ref: '#/components/messages/DeviceRevoked'
 operations:
   receiveMenuPublished:
     action: receive
@@ -216,6 +221,12 @@ operations:
       $ref: '#/channels/DeviceStatusChanged'
     messages:
       - $ref: '#/channels/DeviceStatusChanged/messages/DeviceStatusChanged'
+  receiveDeviceRevoked:
+    action: receive
+    channel:
+      $ref: '#/channels/DeviceRevoked'
+    messages:
+      - $ref: '#/channels/DeviceRevoked/messages/DeviceRevoked'
 components:
   messages:
     MenuPublished:
@@ -332,6 +343,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/DeviceStatusChanged'
+    DeviceRevoked:
+      name: DeviceRevoked
+      title: DeviceRevoked v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeviceRevoked'
   schemas:
     AlertEscalated:
       type: object
@@ -508,6 +525,52 @@ components:
           required:
             - invoiceId
             - grandTotal
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    DeviceRevoked:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: DeviceRevoked
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            deviceId:
+              $ref: '#/components/schemas/Id'
+            deviceType:
+              $ref: '#/components/schemas/DeviceType'
+            reason:
+              type: string
+              maxLength: 200
+          required:
+            - deviceId
+            - deviceType
+            - reason
           additionalProperties: false
       required:
         - eventId

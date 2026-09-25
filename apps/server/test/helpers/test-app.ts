@@ -5,10 +5,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { configureApp, NEST_APP_OPTIONS } from '../../src/app.factory.js';
-import { DEVICE_AUTHENTICATOR } from '../../src/auth/device.js';
 import { LOG_DESTINATION, type LogDestination } from '../../src/config/config.module.js';
-import { PrismaService } from '../../src/database/prisma.service.js';
-import { TestDeviceAuthenticator } from './test-devices.js';
 import { AppModule } from '../../src/app.module.js';
 import { type AppConfig, AppConfigSchema } from '../../src/config/app-config.js';
 
@@ -41,12 +38,6 @@ export async function createTestApp(options: {
     ],
     controllers: options.controllers ?? [],
   })
-    // Devices prove themselves with a test header until device pairing exists (P0-11).
-    .overrideProvider(DEVICE_AUTHENTICATOR)
-    .useFactory({
-      factory: (prisma: PrismaService) => new TestDeviceAuthenticator(prisma),
-      inject: [PrismaService],
-    })
     .overrideProvider(LOG_DESTINATION)
     .useValue(options.logDestination ?? null)
     .compile();

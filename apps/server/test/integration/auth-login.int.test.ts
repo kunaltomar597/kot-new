@@ -3,7 +3,6 @@ import { ApiError, LoginResponse, StaffTilesResponse } from '@rp/contracts';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { authSettingKey, AuthSettingsService } from '../../src/auth/auth-settings.js';
-import { NoDeviceAuthenticator } from '../../src/auth/device.js';
 import { newId } from '../../src/common/ids.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import {
@@ -64,10 +63,6 @@ describe('[AUTH-007] only paired devices reach the login screen', () => {
     const deviceId = await addDevice(app, kit);
     await prisma.device.update({ where: { id: deviceId }, data: { status: 'REVOKED' } });
     expect((await pinLogin(deviceId, kit.staff.CASHIER, TEST_PINS.CASHIER)).status).toBe(401);
-  });
-
-  it('recognises no device at all until device pairing is installed (P0-11)', async () => {
-    await expect(new NoDeviceAuthenticator().authenticate()).resolves.toBeUndefined();
   });
 });
 

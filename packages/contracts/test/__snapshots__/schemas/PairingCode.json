@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "pattern": "^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$" },
+  "output": { "type": "string", "pattern": "^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$" }
+}

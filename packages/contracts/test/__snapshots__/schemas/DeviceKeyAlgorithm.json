@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["Ed25519", "ES256"] },
+  "output": { "type": "string", "enum": ["Ed25519", "ES256"] }
+}

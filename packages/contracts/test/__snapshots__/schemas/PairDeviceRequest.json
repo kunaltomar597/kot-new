@@ -1,0 +1,26 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string", "pattern": "^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$" },
+      "algorithm": { "type": "string", "enum": ["Ed25519", "ES256"] },
+      "publicKey": { "type": "string", "maxLength": 1024, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+      "proof": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+      "appVersion": { "type": "string", "maxLength": 40 }
+    },
+    "required": ["code", "algorithm", "publicKey", "proof"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string", "pattern": "^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$" },
+      "algorithm": { "type": "string", "enum": ["Ed25519", "ES256"] },
+      "publicKey": { "type": "string", "maxLength": 1024, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+      "proof": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+      "appVersion": { "type": "string", "maxLength": 40 }
+    },
+    "required": ["code", "algorithm", "publicKey", "proof"],
+    "additionalProperties": false
+  }
+}
