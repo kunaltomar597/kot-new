@@ -5,6 +5,12 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { AuthenticatedDevice, DeviceAuthenticator } from './device.js';
 import { DeviceTokenService } from './device-token.service.js';
 
+/** The device token header's value; empty when missing. */
+function deviceTokenOf(request: Request): string {
+  const header = request.headers[DEVICE_TOKEN_HEADER];
+  return (Array.isArray(header) ? header[0] : header) ?? '';
+}
+
 /** `last_seen_at` is written at most this often per device. */
 const SEEN_INTERVAL_MS = 60_000;
 
@@ -20,10 +26,8 @@ export class DeviceTokenAuthenticator implements DeviceAuthenticator {
   ) {}
 
   async authenticate(request: Request): Promise<AuthenticatedDevice | undefined> {
-    const header = request.headers[DEVICE_TOKEN_HEADER];
-    const token = Array.isArray(header) ? header[0] : header;
-    if (token === undefined || token === '') return undefined;
-    const claims = await this.tokens.verify(token);
+    // Always verified; a missing token simply fails verification (CWE-807).
+    const claims = await this.tokens.verify(deviceTokenOf(request));
     if (claims === undefined) return undefined;
     const device = await this.prisma.device.findFirst({
       where: { id: claims.deviceId, restaurantId: claims.restaurantId, status: 'ACTIVE' },
