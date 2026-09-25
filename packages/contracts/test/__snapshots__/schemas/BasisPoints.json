@@ -1,0 +1,4 @@
+{
+  "input": { "type": "integer", "minimum": 0, "maximum": 10000 },
+  "output": { "type": "integer", "minimum": 0, "maximum": 10000 }
+}

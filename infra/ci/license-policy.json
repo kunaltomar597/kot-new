@@ -1,0 +1,21 @@
+{
+  "$comment": "Licence policy for production dependencies (NFR-M07). Deny by default: a licence must be in 'allowed'. Licences matching 'blocked' can never be accepted, not even by an exception. 'exceptions' accept one package whose licence is not on the allow-list; each needs a reason. Checked by infra/ci/check-licenses.mjs (`pnpm licenses:check`).",
+  "allowed": [
+    "0BSD",
+    "Apache-2.0",
+    "BlueOak-1.0.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC-BY-4.0",
+    "CC0-1.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Python-2.0",
+    "Unlicense",
+    "Zlib"
+  ],
+  "blocked": ["^AGPL", "^GPL", "^SSPL"],
+  "exceptions": {}
+}

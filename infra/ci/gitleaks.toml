@@ -1,0 +1,14 @@
+# gitleaks rules for this repository (SEC-002, SEC-013). Run with `pnpm secrets:scan`.
+# Starts from gitleaks' built-in rules; add narrow allow-list entries here only for proven false
+# positives, each with a comment saying why. Never allow-list a real credential: rotate it instead.
+title = "Restaurant Operations Platform"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated files that contain hashes, not secrets"
+paths = [
+  # Package integrity hashes (sha512) look like high-entropy tokens.
+  '''(^|/)pnpm-lock\.yaml$''',
+]
