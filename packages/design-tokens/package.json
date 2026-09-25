@@ -1,0 +1,27 @@
+{
+  "name": "@rp/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design tokens shared by web and native apps: colour themes (light, dark, KDS dark), typography, spacing, radius, elevation, motion and the restaurant accent slot (NFR-U01, NFR-U02).",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tokens.css": "./dist/tokens.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/write-css.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist coverage"
+  }
+}

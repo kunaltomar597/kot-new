@@ -21,6 +21,8 @@ android/app/build/
 # Next.js
 .next/
 out/
+# Storybook workbench build (packages/ui-web)
+storybook-static/
 # ESP-IDF
 firmware/**/build/
 firmware/**/sdkconfig.old

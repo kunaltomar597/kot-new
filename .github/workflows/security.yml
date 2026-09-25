@@ -1,0 +1,163 @@
+# Supply-chain and security baseline (SEC-013, NFR-M07). Kept separate from ci.yml so it also runs
+# on a schedule: new advisories appear without any change to this repository.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays 02:23 UTC (07:53 IST), before the working week starts.
+    - cron: '23 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # SBOM generator; bump deliberately (Dependabot does not see versions pinned here).
+  CDXGEN_VERSION: 12.8.4
+
+jobs:
+  codeql:
+    name: CodeQL (JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - '**/dist/**'
+              - '**/coverage/**'
+              - docs/**
+
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: /language:javascript-typescript
+
+  audit:
+    name: Dependency audit (high and critical)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Reads pnpm-lock.yaml; fails on any high or critical advisory, production or development.
+      # An accepted advisory goes in the pnpm `auditConfig.ignoreGhsas` setting, with its reason in infra/ci/README.md.
+      - run: pnpm audit --audit-level high
+
+  dependency-review:
+    name: Dependency review
+    # Needs the repository's Dependency graph (Settings > Code security). Once it is on, set the
+    # repository variable DEPENDENCY_REVIEW=true; until then pnpm audit above is the gate.
+    if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Blocks pull requests that add a dependency with a known high/critical vulnerability.
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history: a secret removed in a later commit is still leaked.
+          fetch-depth: 0
+
+      - name: gitleaks
+        run: bash infra/ci/gitleaks.sh git . --report-format sarif --report-path gitleaks.sarif
+
+      - name: Upload findings to code scanning
+        if: failure() && hashFiles('gitleaks.sarif') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+  licenses:
+    name: Licence check (production dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Licence policy tests
+        run: pnpm ci:test
+
+      - name: Fail on GPL, AGPL, SSPL or unreviewed licences
+        run: pnpm licenses:check
+
+  sbom:
+    name: SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate SBOM
+        run: >-
+          pnpm dlx @cyclonedx/cdxgen@${CDXGEN_VERSION}
+          --type js --no-install-deps --spec-version 1.7
+          --output sbom.cdx.json .
+
+      - name: Check the SBOM lists the workspace dependencies
+        run: node -e "const s=require('./sbom.cdx.json'); if (!(s.components?.length > 0)) { console.error('SBOM has no components'); process.exit(1); } console.log(s.components.length + ' components')"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-cyclonedx-${{ github.sha }}
+          path: sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90

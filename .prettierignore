@@ -8,3 +8,4 @@ docs/brd/*.pdf
 docs/brd/requirements.json
 docs/brd/requirements.md
 firmware
+storybook-static

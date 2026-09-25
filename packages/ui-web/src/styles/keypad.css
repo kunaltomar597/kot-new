@@ -1,0 +1,114 @@
+.rp-pin-pad,
+.rp-number-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--rp-space-4);
+  width: 100%;
+  max-width: calc(var(--rp-touch-target) * 3 * 1.5 + var(--rp-space-3) * 2);
+  margin-inline: auto;
+  border-radius: var(--rp-radius-lg);
+}
+
+.rp-pin-pad[aria-disabled='true'],
+.rp-number-pad[aria-disabled='true'] {
+  opacity: 0.6;
+}
+
+.rp-pin-pad__dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--rp-space-3);
+  padding-block: var(--rp-space-2);
+}
+
+.rp-pin-pad__dot {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-full);
+  transition: background-color var(--rp-duration-fast) var(--rp-easing-standard);
+}
+
+.rp-pin-pad__dot[data-filled='true'] {
+  border-color: var(--rp-color-primary);
+  background: var(--rp-color-primary);
+}
+
+.rp-pin-pad__dots[data-invalid] .rp-pin-pad__dot {
+  border-color: var(--rp-color-danger);
+}
+
+.rp-pin-pad__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rp-space-2);
+  margin: 0;
+  color: var(--rp-color-danger-text);
+  font-weight: var(--rp-font-weight-medium);
+  text-align: center;
+}
+
+.rp-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--rp-space-3);
+}
+
+.rp-keypad__key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rp-space-2);
+  min-height: calc(var(--rp-touch-target) * 1.25);
+  border: 2px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+  color: var(--rp-color-text);
+  font: inherit;
+  font-size: var(--rp-font-size-2xl);
+  font-weight: var(--rp-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--rp-duration-fast) var(--rp-easing-standard),
+    transform var(--rp-duration-fast) var(--rp-easing-standard);
+}
+
+.rp-keypad__key:hover:not(:disabled) {
+  background: var(--rp-color-surface-sunken);
+}
+
+.rp-keypad__key:active:not(:disabled) {
+  background: var(--rp-color-neutral-subtle);
+  transform: scale(0.96);
+}
+
+.rp-keypad__key:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.rp-keypad__key[data-variant='action'] {
+  background: var(--rp-color-surface-sunken);
+  font-size: var(--rp-font-size-md);
+}
+
+.rp-keypad__key[data-variant='submit'] {
+  border-color: transparent;
+  background: var(--rp-color-primary);
+  color: var(--rp-color-on-primary);
+  font-size: var(--rp-font-size-lg);
+}
+
+.rp-keypad__key[data-variant='submit']:hover:not(:disabled) {
+  background: var(--rp-color-primary-hover);
+}
+
+.rp-keypad__key[data-wide] {
+  grid-column: 1 / -1;
+}

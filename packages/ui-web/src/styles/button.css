@@ -1,0 +1,98 @@
+.rp-button {
+  --rp-button-bg: var(--rp-color-primary);
+  --rp-button-bg-hover: var(--rp-color-primary-hover);
+  --rp-button-bg-active: var(--rp-color-primary-active);
+  --rp-button-fg: var(--rp-color-on-primary);
+  --rp-button-border: transparent;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rp-space-2);
+  min-width: var(--rp-touch-target);
+  min-height: var(--rp-touch-target);
+  padding: 0 var(--rp-space-5);
+  border: 2px solid var(--rp-button-border);
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-button-bg);
+  color: var(--rp-button-fg);
+  font: inherit;
+  font-weight: var(--rp-font-weight-semibold);
+  line-height: var(--rp-line-height-tight);
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--rp-duration-fast) var(--rp-easing-standard),
+    transform var(--rp-duration-fast) var(--rp-easing-standard);
+}
+
+.rp-button:hover:not(:disabled) {
+  background: var(--rp-button-bg-hover);
+}
+
+.rp-button:active:not(:disabled) {
+  background: var(--rp-button-bg-active);
+  transform: scale(0.98);
+}
+
+.rp-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.rp-button[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.rp-button[data-size='lg'] {
+  min-height: calc(var(--rp-touch-target) + var(--rp-space-2));
+  padding: 0 var(--rp-space-6);
+  font-size: var(--rp-font-size-lg);
+}
+
+.rp-button--full {
+  width: 100%;
+}
+
+.rp-button[data-variant='secondary'] {
+  --rp-button-bg: var(--rp-color-surface);
+  --rp-button-bg-hover: var(--rp-color-surface-sunken);
+  --rp-button-bg-active: var(--rp-color-neutral-subtle);
+  --rp-button-fg: var(--rp-color-text);
+  --rp-button-border: var(--rp-color-border-strong);
+}
+
+.rp-button[data-variant='ghost'] {
+  --rp-button-bg: transparent;
+  --rp-button-bg-hover: var(--rp-color-surface-sunken);
+  --rp-button-bg-active: var(--rp-color-neutral-subtle);
+  --rp-button-fg: var(--rp-color-text);
+}
+
+.rp-button[data-variant='danger'] {
+  --rp-button-bg: var(--rp-color-danger);
+  --rp-button-bg-hover: var(--rp-color-danger-text);
+  --rp-button-bg-active: var(--rp-color-danger-text);
+  --rp-button-fg: var(--rp-color-on-danger);
+}
+
+.rp-button[data-variant='accent'] {
+  --rp-button-bg: var(--rp-color-accent);
+  --rp-button-bg-hover: var(--rp-color-accent);
+  --rp-button-bg-active: var(--rp-color-accent);
+  --rp-button-fg: var(--rp-color-on-accent);
+}
+
+.rp-icon-button {
+  width: var(--rp-touch-target);
+  padding: 0;
+}
+
+.rp-icon-button[data-size='lg'] {
+  width: calc(var(--rp-touch-target) + var(--rp-space-2));
+  padding: 0;
+}

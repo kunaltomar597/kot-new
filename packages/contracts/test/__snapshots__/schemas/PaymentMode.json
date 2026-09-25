@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["CASH", "CARD", "UPI", "OTHER"] },
+  "output": { "type": "string", "enum": ["CASH", "CARD", "UPI", "OTHER"] }
+}
