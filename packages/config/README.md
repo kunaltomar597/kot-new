@@ -8,3 +8,7 @@ Shared tool presets. The base configs live at the repository root (`tsconfig.bas
 
 React ESLint rules (hooks, React Compiler checks, jsx-a11y) are in the root `eslint.config.mjs` and
 apply to every `.tsx` file. A React Native preset is added in P2-01.
+
+- `eslint/ui-text.mjs`: the `no-restricted-syntax` selectors that keep UI text out of JSX literals
+  (NFR-L02), applied by the root config to app and UI-library sources and tested in
+  `packages/i18n/test/ui-text-rule.test.ts`.

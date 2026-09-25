@@ -254,13 +254,30 @@ Acceptance: components render in light/dark; PinPad fully keyboard and touch ope
 Goal: the React web console skeleton that POS, dashboard and KDS modes live in.
 Requirements: MGR-001, KDS-001, NFR-L02, NFR-U04, AUTH-004, AUTH-005 (client side), NFR-P11.
 Depends on: P0-10, P0-12, P0-13.
-Deliverables:
+Split into two pull requests: P0-14a (packages) and P0-14b (the console app).
+
+### P0-14a API client and i18n
 
 - `packages/i18n`: typed English catalogue, `t()` helper, ICU plural support, lint rule or test that
   flags string literals in JSX.
 - `packages/api-client`: typed REST client generated from/aligned with contracts (fetch based, works
   in browser, Electron and React Native), auth token handling with refresh, idempotency key helper,
   error mapping to `ApiError`; typed Socket.io client with resync.
+
+Acceptance: unit tests for both packages; the client passes an end-to-end test against the real
+server (pair, sign in, refresh, device-token renewal, live events, resume, unpairing).
+
+As built: `t()` implements an ICU subset (arguments, plural, select, number, apostrophe quoting) on
+`Intl.PluralRules` with no dependency; keys are a typed union, other catalogues must match English
+key for key. The JSX rule is `no-restricted-syntax` with selectors from
+`packages/config/eslint/ui-text.mjs` (text children and text props such as `label`, `title`,
+`aria-label`). The client is typed from the contract route registry (no generated code): one method
+per `operationId`, inputs and answers checked against the schemas. WebCrypto device keys (ECDSA
+P-256, non-extractable) work in browsers only on https:// or localhost, so pairing browsers on other
+LAN devices needs P0-15.
+
+### P0-14b Web console shell
+
 - `apps/console`: Vite + React 19 + React Router, device pairing screen, staff tile + PIN login,
   role-based modes (`/pos`, `/kds`, `/manage`), connection banner, empty/loading/error states,
   session inactivity handling.

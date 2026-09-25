@@ -11,15 +11,15 @@ Must: 73 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - AUTH-002 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/unit/auth-primitives.test.ts, packages/ui-web/test/PinPad.test.tsx
 - AUTH-003 (M): apps/server/test/integration/auth-login.int.test.ts
 - AUTH-004 (M): packages/ui-web/test/PinPad.test.tsx
-- AUTH-005 (M): apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/auth-sessions.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/auth-primitives.test.ts
+- AUTH-005 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/auth-sessions.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/auth-primitives.test.ts, packages/api-client/test/client.test.ts
 - AUTH-006 (M): apps/server/test/integration/auth-owner.int.test.ts, apps/server/test/unit/auth-primitives.test.ts, packages/domain/test/permissions.test.ts
-- AUTH-007 (M): apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/contracts/test/devices.test.ts
-- AUTH-008 (M): apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/contracts/test/devices.test.ts
+- AUTH-007 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/api-client/test/client.test.ts, packages/contracts/test/devices.test.ts
+- AUTH-008 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/contracts/test/devices.test.ts
 - AUTH-009 (M): apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/devices.test.ts
 - AUTH-010 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/integration/auth-guard.int.test.ts, packages/domain/test/permissions.test.ts
 - AUTH-011 (M): apps/server/test/integration/auth-guard.int.test.ts, packages/domain/test/permissions.test.ts
 - AUTH-013 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/auth-sessions.int.test.ts
-- ONB-001 (M): apps/server/test/integration/devices.int.test.ts
+- ONB-001 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/devices.int.test.ts
 - ONB-004 (M): packages/domain/test/dates-and-invoices.test.ts
 - MENU-002 (M): packages/contracts/test/contracts.test.ts
 - MENU-003 (M): packages/domain/test/menu-and-kot.test.ts
@@ -34,7 +34,7 @@ Must: 73 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - ORD-008 (M): apps/server/test/integration/schema.int.test.ts
 - ORD-010 (M): apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts
 - ORD-011 (M): packages/domain/test/state-machines.test.ts
-- ORD-013 (M): packages/contracts/test/contracts.test.ts
+- ORD-013 (M): packages/api-client/test/client.test.ts, packages/contracts/test/contracts.test.ts
 - ORD-014 (M): apps/server/test/integration/errors.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/docs.test.ts, packages/domain/test/tax-and-bill.test.ts
 - ORD-015 (M): packages/contracts/test/contracts.test.ts
 - ORD-017 (M): packages/contracts/test/contracts.test.ts
@@ -49,14 +49,14 @@ Must: 73 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - BILL-010 (M): apps/server/test/integration/schema.int.test.ts
 - TAB-004 (M): packages/domain/test/state-machines.test.ts
 - QR-006 (M): packages/contracts/test/contracts.test.ts
-- NTF-006 (M): apps/server/test/integration/event-bus.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/contracts/test/realtime.test.ts
+- NTF-006 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/event-bus.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/api-client/test/realtime.test.ts, packages/contracts/test/realtime.test.ts
 - AUD-002 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/unit/audit-hash.test.ts
 - AUD-003 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/unit/audit-hash.test.ts, packages/domain/test/canonical-json.test.ts
 - AUD-004 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/integration/schema.int.test.ts
 - DATA-001 (M): apps/server/test/unit/app-config.test.ts
 - LIC-005 (M): packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/state-machines.test.ts
 - UPD-006 (M): packages/contracts/test/snapshot.test.ts
-- INT-002 (M): apps/server/test/integration/auth-guard.int.test.ts, packages/contracts/test/docs.test.ts, packages/contracts/test/snapshot.test.ts
+- INT-002 (M): apps/server/test/integration/auth-guard.int.test.ts, packages/api-client/test/client.test.ts, packages/contracts/test/docs.test.ts, packages/contracts/test/snapshot.test.ts
 - INT-004 (M): apps/server/test/integration/event-bus.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/docs.test.ts
 - INT-005 (M): apps/server/test/integration/schema.int.test.ts
 - NFR-A03 (M): apps/server/test/integration/database.int.test.ts
@@ -64,9 +64,9 @@ Must: 73 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - NFR-U01 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/Button.test.tsx, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Tabs.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/styles.test.ts
 - NFR-U02 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-U03 (M): packages/design-tokens/test/themes.test.ts, packages/ui-web/test/NumberPad.test.tsx, packages/ui-web/test/styles.test.ts
-- NFR-U04 (M): apps/server/test/unit/error-mapping.test.ts, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Toast.test.tsx, packages/ui-web/test/display.test.tsx
+- NFR-U04 (M): apps/server/test/unit/error-mapping.test.ts, packages/api-client/test/client.test.ts, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Toast.test.tsx, packages/ui-web/test/display.test.tsx
 - NFR-U05 (M): packages/design-tokens/test/color.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/display.test.tsx, packages/ui-web/test/fields.test.tsx
-- NFR-L02 (M): packages/ui-web/test/display.test.tsx
+- NFR-L02 (M): packages/i18n/test/message-format.test.ts, packages/i18n/test/translator.test.ts, packages/i18n/test/ui-text-rule.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-L03 (M): packages/contracts/test/contracts.test.ts, packages/domain/test/money.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-M01 (M): packages/ui-web/test/display.test.tsx
 - NFR-M06 (M): packages/contracts/test/docs.test.ts
@@ -75,11 +75,11 @@ Must: 73 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - SEC-003 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts
 - SEC-004 (M): apps/server/test/integration/errors.int.test.ts, apps/server/test/unit/correlation-and-validation.test.ts, apps/server/test/unit/error-mapping.test.ts
 - SEC-005 (M): apps/server/test/integration/schema.int.test.ts
-- SEC-006 (M): apps/server/test/unit/auth-primitives.test.ts
+- SEC-006 (M): apps/server/test/unit/auth-primitives.test.ts, packages/api-client/test/client.test.ts
 - SEC-007 (M): apps/server/test/integration/schema.int.test.ts
 - SEC-009 (M): apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/unit/auth-primitives.test.ts
 - SEC-015 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/unit/correlation-and-validation.test.ts
-- NFR-P11 (M): apps/server/test/integration/event-bus.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/contracts/test/realtime.test.ts
+- NFR-P11 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/event-bus.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/api-client/test/realtime.test.ts, packages/contracts/test/realtime.test.ts
 
 ## Must requirements without a test
 
