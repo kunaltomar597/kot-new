@@ -4,20 +4,28 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "package.json", "tsconfig*.json"],
+      "inputs": ["src/**", "scripts/**", "package.json", "tsconfig*.json"],
       "outputs": ["dist/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "package.json", "tsconfig*.json"]
+      "inputs": [
+        "src/**",
+        "test/**",
+        "fixtures/**",
+        "stories/**",
+        ".storybook/**",
+        "package.json",
+        "tsconfig*.json"
+      ]
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "package.json", "vitest.config.*"]
+      "inputs": ["src/**", "test/**", "fixtures/**", "package.json", "vitest.config.*"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "package.json", "vitest.config.*"],
+      "inputs": ["src/**", "test/**", "fixtures/**", "package.json", "vitest.config.*"],
       "outputs": ["coverage/**"]
     },
     "clean": {
