@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] },
+  "output": { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] }
+}
