@@ -1291,9 +1291,12 @@ model AuditLog {
   after         Json?
   reason        String?
   correlationId String?  @map("correlation_id")
-  /// Hash chain for tamper evidence, filled by the audit service (P0-09).
-  prevHash      String?  @map("prev_hash")
-  hash          String?
+  /// Position in the hash chain (1, 2, 3, ...), allocated under an advisory lock (P0-09).
+  chainSeq      BigInt   @unique @map("chain_seq")
+  /// Hash of the previous entry (64 zeros for the first); see src/audit/audit-hash.ts.
+  prevHash      String   @map("prev_hash")
+  /// SHA-256 of the canonical entry plus prevHash (AUD-003).
+  hash          String
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

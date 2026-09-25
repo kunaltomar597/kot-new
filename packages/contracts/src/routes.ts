@@ -1,5 +1,6 @@
 import type { Capability } from '@rp/domain';
 import type { z } from 'zod';
+import { AuditVerifyResponse } from './audit.js';
 import { ApiError } from './common.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
 import { HealthResponse, VersionResponse } from './system.js';
@@ -100,6 +101,22 @@ export const ROUTES = [
     capability: 'PUBLIC',
     responses: {
       200: { description: 'Component and API version.', schema: VersionResponse },
+    },
+  },
+  {
+    operationId: 'verifyAuditChain',
+    method: 'GET',
+    path: '/api/v1/audit/verify',
+    summary: 'Recompute the audit hash chain and report the first broken link',
+    description:
+      'Walks the whole audit log in order, recomputing every hash (AUD-003). A valid chain returns ' +
+      'its head, which heartbeats also send to the Control Plane. Owner and Manager only.',
+    tags: ['audit'],
+    requirements: ['AUD-003', 'AUD-004'],
+    capability: 'AUDIT_VIEW',
+    responses: {
+      200: { description: 'Verification result.', schema: AuditVerifyResponse },
+      ...standardErrors,
     },
   },
 ] as const satisfies readonly RouteDefinition[];

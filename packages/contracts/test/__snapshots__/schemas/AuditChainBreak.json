@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["HASH_MISMATCH", "PREV_HASH_MISMATCH", "SEQUENCE_GAP"] },
+  "output": { "type": "string", "enum": ["HASH_MISMATCH", "PREV_HASH_MISMATCH", "SEQUENCE_GAP"] }
+}

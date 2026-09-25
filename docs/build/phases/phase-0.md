@@ -162,7 +162,10 @@ Deliverables in `apps/server/src/auth`:
 - Owner account: password (≥ 12 chars, Argon2id) + TOTP (RFC 6238, works offline) with recovery
   codes; step-up check for `OWNER_SECOND_FACTOR_CAPABILITIES`.
 - Global `PermissionGuard` using `@rp/domain` `evaluatePermission`; `@RequireCapability()`
-  decorator; object-level checks helper (own tables/shift).
+  decorator; object-level checks helper (own tables/shift). (Built early in P0-09 to protect the
+  audit verify endpoint: the guard, `@Public()`, `@RequireCapability()` and the `Principal` type
+  exist in `apps/server/src/auth`; P0-10 adds authentication that sets the principal, override
+  tokens for OVERRIDE grants and the object-level helper.)
 - Manager override: `POST /api/v1/auth/override` validates a manager PIN on the current device
   and returns a single-use override token scoped to one capability and entity; both people audited.
 - `SecretStore` interface: DPAPI implementation for Windows (P0-16 wires it), file/env for dev.
