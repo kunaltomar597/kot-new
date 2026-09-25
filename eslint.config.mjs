@@ -6,6 +6,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import { uiTextRestrictions } from './packages/config/eslint/ui-text.mjs';
 
 export default tseslint.config(
   {
@@ -18,6 +19,8 @@ export default tseslint.config(
       '**/.expo/**',
       '**/generated/**',
       '**/storybook-static/**',
+      // Hand-written declarations for the shared ESLint helpers (not part of a TS project).
+      'packages/config/eslint/*.d.mts',
       'firmware/**',
     ],
   },
@@ -59,6 +62,15 @@ export default tseslint.config(
       // login screen); on raw DOM elements it stays forbidden.
       'jsx-a11y/no-autofocus': ['error', { ignoreNonDOM: true }],
     },
+  },
+  {
+    // NFR-L02: UI text comes from @rp/i18n, never from literals in JSX (tests and stories may).
+    files: [
+      'apps/*/src/**/*.tsx',
+      'packages/ui-web/src/**/*.tsx',
+      'packages/ui-native/src/**/*.tsx',
+    ],
+    rules: { 'no-restricted-syntax': ['error', ...uiTextRestrictions] },
   },
   {
     // Tests may use non-null assertions for brevity.

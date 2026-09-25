@@ -1,0 +1,24 @@
+{
+  "name": "@rp/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UI string catalogues and the t() helper with ICU plural and select (NFR-L02). English only in v1.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist coverage"
+  }
+}

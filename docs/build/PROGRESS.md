@@ -23,6 +23,9 @@ What exists:
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
   rooms, resync and revocation (P0-12). 387 tests.
+- `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
+  literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
+  error mapping, and the resuming Socket.io connection) (P0-14a).
 - `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
   React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
   Storybook 10 workbench (P0-13, ADR-0009).
@@ -33,7 +36,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-14 API client, i18n and web console shell (P0-10, P0-12 and P0-13 are done).
+- P0-14b Web console shell (P0-14a is done).
 - P0-15 LAN TLS decision and implementation.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -54,7 +57,8 @@ Recommended next WPs (dependencies met):
 - [x] P0-11 Device pairing and device credentials
 - [x] P0-12 Real-time and domain-event infrastructure
 - [x] P0-13 Design tokens and web UI library
-- [ ] P0-14 API client, i18n and web console shell
+- [x] P0-14a API client and i18n
+- [ ] P0-14b Web console shell
 - [ ] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
 - [ ] P0-17 Minimal Vendor Control Plane (needs hosting account)
@@ -186,8 +190,8 @@ Decided 2026-09-25:
 
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
-(P0-11 device pairing and device tokens), P0-12 (socket authentication, room filtering and
-revocation; this PR).
+(P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
+revocation), P0-14a (client-side token storage and renewal; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -195,6 +199,48 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-25: P0-14a API client and i18n
+
+Split P0-14 into P0-14a (packages) and P0-14b (console app, Playwright) in the phase file. Built:
+
+- `packages/i18n`: English catalogue (app, roles, `ui` strings for `@rp/ui-web`, connection,
+  pairing, login, session, modes, states, errors), `createTranslator()` with typed keys, and an
+  ICU MessageFormat subset (arguments, plural with `=N` and CLDR categories, select, number,
+  apostrophe quoting) on `Intl.PluralRules`. 36 tests, 100 % lines.
+- NFR-L02 lint rule: `packages/config/eslint/ui-text.mjs` selectors for `no-restricted-syntax`,
+  applied to `apps/*/src/**/*.tsx`, `packages/ui-web/src` and `packages/ui-native/src`, and tested
+  with ESLint's `Linter` (flags text children and text props, allows `t()` and class names).
+  `packages/ui-web` already passes it.
+- `packages/api-client`: `ApiClient` typed from the contract route registry (`client.api.<op>`),
+  request and answer checked against the schemas, device-token renewal with the device key,
+  access-token refresh (proactive and after `TOKEN_EXPIRED`, single flight), session-end and
+  unpairing callbacks, clock skew from the `Date` header, timeouts and cancellation, error classes,
+  `newIdempotencyKey()`, WebCrypto device keys, and `RealtimeConnection` (resume point, de-duplication
+  by event id, status for the connection banner, recovery from refused handshakes, reconnect
+  without the person when their session ends, stop when unpaired). 36 unit tests.
+- `apps/server/test/integration/api-client.int.test.ts`: 7 end-to-end tests of the client against
+  the real server (bootstrap pairing with a WebCrypto key, PIN sign-in, refused PIN, refresh after
+  an expired token, device-token renewal, live events and resume after a restart, session revoked
+  on the server, unpairing).
+
+Decisions:
+
+- No i18n library: the ICU subset covers v1 UI text and keeps the React Native bundle small; a full
+  library can replace `message-format.ts` behind the same `t()` if needed.
+- The API client is typed from the route registry rather than generated, so a new contract route is
+  usable without a build step.
+- Idempotency keys and correlation ids are built from `crypto.getRandomValues`, because
+  `crypto.randomUUID` is missing in browsers on plain http:// (the LAN until P0-15).
+- WebCrypto device keys (ECDSA P-256) need a secure context: until P0-15 a browser can pair only on
+  the server PC (localhost). P0-15 must give the LAN an https:// address for KDS and manager
+  browsers.
+
+Notes for the next session:
+
+- P0-14b: build `UiStrings` for `@rp/ui-web` from `t('ui.…')` (the catalogue has the same English
+  text as `packages/ui-web/fixtures/en-strings.ts`); keep the device key pair in IndexedDB and the
+  credentials in storage; show `ApiRequestError.message` to people.
 
 ### 2026-09-25: P0-12 real-time and domain-event infrastructure
 

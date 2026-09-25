@@ -85,7 +85,12 @@ code is written, organised, tested and committed.
 - Use `packages/ui-web` / `packages/ui-native` components and design tokens; no ad-hoc colours or
   spacing.
 - Every screen has empty, loading and error states; destructive actions ask for confirmation.
-- All text through `packages/i18n`.
+- All text through `packages/i18n`: `t('area.key', values)` with ICU plural/select messages in
+  `packages/i18n/src/catalogues/en.ts`. ESLint flags literal text in JSX children and text props
+  (`label`, `title`, `placeholder`, `aria-label`, ...) in app and UI-library sources (NFR-L02).
+- Apps talk to the server only through `@rp/api-client` (typed from the contracts; it handles
+  device and staff tokens, refresh and errors). Show `ApiRequestError.message` to people; branch on
+  `code`.
 - Touch targets ≥ 48 px/dp; colour is never the only signal.
 
 ## Git and pull requests
