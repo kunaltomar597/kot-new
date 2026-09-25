@@ -77,10 +77,8 @@ of truth for the restaurant.
 
 ## Authentication (P0-10)
 
-- Devices: `AuthenticationMiddleware` asks the `DEVICE_AUTHENTICATOR` who the calling device is.
-  The default `NoDeviceAuthenticator` recognises nothing, so nobody can sign in until device
-  pairing (P0-11) provides the real one. Tests use `TestDeviceAuthenticator` (`x-test-device`
-  header) through `createTestApp`.
+- Devices: `AuthenticationMiddleware` asks the `DEVICE_AUTHENTICATOR` (the device-token
+  authenticator of P0-11) who the calling device is; staff tokens only work from their device.
 - PIN login (`POST /api/v1/auth/pin-login`): Argon2id of the PIN with the pepper as Argon2's secret
   (`CredentialHasher`, AUTH-002); 5 failures within 10 minutes lock the login for 15 minutes, a
   manager can unlock it (`POST /api/v1/auth/unlock`); 10 attempts per device per minute
@@ -114,6 +112,31 @@ of truth for the restaurant.
 Feature modules are added to `src/app.module.ts` by later work packages, one Nest module per area:
 audit, auth, devices, realtime, settings, floor, menu, orders, kitchen, billing, payments, reports,
 notifications, mqtt, service-requests, recommendations, sync, licensing, backup, updates, diagnostics.
+
+## Devices (P0-11)
+
+- Pairing (AUTH-007): a manager creates a one-time code (`POST /api/v1/devices/pairing-codes`,
+  8 characters, valid 10 minutes, stored hashed) for a device type, name and binding (table for a
+  table tablet, station for a KDS, person for a pager). The device generates its key pair
+  (Ed25519 or ECDSA P-256) in secure storage and calls `POST /api/v1/devices/pair` with the code,
+  its public key (SPKI, base64) and a signature of `rp-pair:v1:<code>` proving it holds the private
+  key. Pairing attempts are rate-limited per client.
+- First device: the installer asks `POST /api/v1/devices/pairing-codes/bootstrap` from the server
+  PC (loopback only, and only while no device is paired) for the POS code (ONB-001).
+- Device authentication: `POST /api/v1/devices/challenge` returns a 60-second one-time challenge;
+  the device signs `rp-device-token:v1:<deviceId>:<challenge>` and exchanges it at
+  `POST /api/v1/devices/token` for a device token (JWT, HS256 with its own key, 60 minutes) sent as
+  `x-device-token` on every request. `DeviceTokenAuthenticator` also checks the device row on every
+  request, so unpairing is immediate.
+- Unpairing (AUTH-008): `POST /api/v1/devices/:deviceId/revoke` marks the device REVOKED, revokes
+  every staff session on it and appends a `DeviceRevoked` event to the outbox
+  (`src/events/outbox.ts`) for the real-time gateway (P0-12) to close its connections. A manager
+  cannot unpair the device they are using.
+- Table tablets (AUTH-009): `PUT /api/v1/devices/:deviceId/table` (manager) moves a tablet to
+  another table; `assertTableAccess(device, tableId)` (`src/devices/device-scope.ts`) is the
+  object-level check every table-scoped endpoint must call.
+- Tests: `test/helpers/auth-kit.ts` registers devices with an Ed25519 key and gets real device
+  tokens through the challenge flow; `authHeaders(deviceId, accessToken)` sends both.
 
 ## Commands
 

@@ -1,12 +1,18 @@
+import { generateKeyPairSync, type KeyObject, sign } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { LoginResponse } from '@rp/contracts';
+import {
+  DEVICE_TOKEN_HEADER,
+  DeviceChallengeResponse,
+  DeviceTokenResponse,
+  deviceTokenMessage,
+  LoginResponse,
+} from '@rp/contracts';
 import { ROLES, type Role } from '@rp/domain';
 import request from 'supertest';
 import { authSettingKey, AuthSettingsService } from '../../src/auth/auth-settings.js';
 import { CredentialHasher } from '../../src/auth/credential-hasher.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { httpServer } from './test-app.js';
-import { TEST_DEVICE_HEADER } from './test-devices.js';
 
 export const TEST_PINS: Readonly<Record<Role, string>> = {
   OWNER: '1111',
@@ -15,6 +21,72 @@ export const TEST_PINS: Readonly<Record<Role, string>> = {
   WAITER: '4444',
   KITCHEN: '6666',
 };
+
+/** Device tokens (and keys) of the devices tests registered, by device id. */
+const deviceCredentials = new Map<string, { token: string; privateKey: KeyObject }>();
+
+/** Signs like a device: raw 64-byte signatures (r‖s for ECDSA P-256, as WebCrypto gives), base64. */
+export function signAsDevice(privateKey: KeyObject, message: string): string {
+  const data = Buffer.from(message, 'utf8');
+  const signature =
+    privateKey.asymmetricKeyType === 'ec'
+      ? sign('sha256', data, { key: privateKey, dsaEncoding: 'ieee-p1363' })
+      : sign(null, data, privateKey);
+  return signature.toString('base64');
+}
+
+/** Gets a device token for a registered device through the real challenge/token endpoints. */
+export async function authenticateDevice(
+  app: INestApplication,
+  deviceId: string,
+  privateKey: KeyObject,
+): Promise<string> {
+  const { challenge } = DeviceChallengeResponse.parse(
+    (await request(httpServer(app)).post('/api/v1/devices/challenge').send({ deviceId })).body,
+  );
+  const response = await request(httpServer(app))
+    .post('/api/v1/devices/token')
+    .send({
+      deviceId,
+      challenge,
+      signature: signAsDevice(privateKey, deviceTokenMessage(deviceId, challenge)),
+    });
+  if (response.status !== 200) {
+    throw new Error(
+      `Device token failed: ${String(response.status)} ${JSON.stringify(response.body)}`,
+    );
+  }
+  const { deviceToken } = DeviceTokenResponse.parse(response.body);
+  deviceCredentials.set(deviceId, { token: deviceToken, privateKey });
+  return deviceToken;
+}
+
+/**
+ * A device as if a manager had paired it (its public key registered), authenticated through the
+ * real device-token flow. Pairing itself is tested in devices.int.test.ts.
+ */
+export async function registerDevice(
+  app: INestApplication,
+  restaurantId: string,
+  type: 'POS' | 'WAITER_PHONE' | 'MANAGER_BROWSER' | 'KDS' | 'TABLE_TABLET' = 'POS',
+  binding: { tableId?: string } = {},
+): Promise<string> {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const device = await app.get(PrismaService).device.create({
+    data: {
+      restaurantId,
+      type,
+      name: `Test ${type}`,
+      status: 'ACTIVE',
+      pairedAt: new Date(),
+      publicKey: publicKey.export({ format: 'pem', type: 'spki' }).toString(),
+      keyAlgorithm: 'Ed25519',
+      tableId: binding.tableId ?? null,
+    },
+  });
+  await authenticateDevice(app, device.id, privateKey);
+  return device.id;
+}
 
 export interface AuthKit {
   readonly restaurantId: string;
@@ -58,32 +130,33 @@ export async function createAuthKit(
     });
     staff[role] = person.id;
   }
-  if (options.kitchenLogins !== false) {
+  const settings: [string, unknown][] = [
+    // Tests move the clock by hours; device tokens should not be the thing that expires.
+    [authSettingKey('deviceTokenMinutes'), 24 * 60],
+    ...(options.kitchenLogins !== false
+      ? [[authSettingKey('kitchenIndividualLogins'), true] as [string, unknown]]
+      : []),
+  ];
+  for (const [key, value] of settings) {
     await prisma.setting.upsert({
-      where: {
-        restaurantId_key: { restaurantId, key: authSettingKey('kitchenIndividualLogins') },
-      },
-      create: { restaurantId, key: authSettingKey('kitchenIndividualLogins'), value: true },
-      update: { value: true },
+      where: { restaurantId_key: { restaurantId, key } },
+      create: { restaurantId, key, value: value as number | boolean },
+      update: { value: value as number | boolean },
     });
-    app.get(AuthSettingsService).invalidate();
   }
-  const device = await prisma.device.create({
-    data: { restaurantId, type: 'POS', name: 'Test POS', status: 'ACTIVE', pairedAt: new Date() },
-  });
-  return { restaurantId, deviceId: device.id, staff: staff as Record<Role, string> };
+  app.get(AuthSettingsService).invalidate();
+  const deviceId = await registerDevice(app, restaurantId);
+  return { restaurantId, deviceId, staff: staff as Record<Role, string> };
 }
 
-/** A second paired device of the kit's restaurant. */
-export async function addDevice(
+/** Another paired device of the kit's restaurant. */
+export function addDevice(
   app: INestApplication,
   kit: AuthKit,
-  type: 'POS' | 'WAITER_PHONE' | 'MANAGER_BROWSER' | 'KDS' = 'POS',
+  type: 'POS' | 'WAITER_PHONE' | 'MANAGER_BROWSER' | 'KDS' | 'TABLE_TABLET' = 'POS',
+  binding: { tableId?: string } = {},
 ): Promise<string> {
-  const device = await app.get(PrismaService).device.create({
-    data: { restaurantId: kit.restaurantId, type, name: `Test ${type}`, status: 'ACTIVE' },
-  });
-  return device.id;
+  return registerDevice(app, kit.restaurantId, type, binding);
 }
 
 /** Signs in with the role's PIN on the kit's device (or another one) and returns the tokens. */
@@ -95,7 +168,7 @@ export async function signIn(
 ): Promise<LoginResponse> {
   const response = await request(httpServer(app))
     .post('/api/v1/auth/pin-login')
-    .set(TEST_DEVICE_HEADER, deviceId)
+    .set(authHeaders(deviceId))
     .send({ staffId: kit.staff[role], pin: TEST_PINS[role] });
   if (response.status !== 200) {
     throw new Error(
@@ -105,10 +178,14 @@ export async function signIn(
   return LoginResponse.parse(response.body);
 }
 
-/** Headers of an authenticated request from a device. */
+/**
+ * Headers of a request from a device (its device token, when the device was registered by the
+ * kit) and, optionally, a signed-in person.
+ */
 export function authHeaders(deviceId: string, accessToken?: string): Record<string, string> {
+  const credentials = deviceCredentials.get(deviceId);
   return {
-    [TEST_DEVICE_HEADER]: deviceId,
+    ...(credentials !== undefined && { [DEVICE_TOKEN_HEADER]: credentials.token }),
     ...(accessToken !== undefined && { authorization: `Bearer ${accessToken}` }),
   };
 }

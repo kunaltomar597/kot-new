@@ -29,7 +29,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-11 Device pairing and device credentials (replaces `NoDeviceAuthenticator`; until then nobody can sign in).
+- P0-12 Real-time and domain-event infrastructure (outbox exists; must close sockets on `DeviceRevoked`).
 - P0-12 Real-time and domain-event infrastructure (outbox table exists).
 - P0-15 LAN TLS decision and implementation.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -48,7 +48,7 @@ Recommended next WPs (dependencies met):
 - [x] P0-08 Database schema v1 and least-privilege roles
 - [x] P0-09 Audit log service
 - [x] P0-10 Authentication, sessions, RBAC, manager override
-- [ ] P0-11 Device pairing and device credentials
+- [x] P0-11 Device pairing and device credentials
 - [ ] P0-12 Real-time and domain-event infrastructure
 - [x] P0-13 Design tokens and web UI library
 - [ ] P0-14 API client, i18n and web console shell
@@ -191,6 +191,33 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
 
 ## Session log (newest first)
 
+### 2026-09-25: P0-11 device pairing and device credentials
+
+Built `apps/server/src/devices` and the device-token authentication in `apps/server/src/auth`
+(see the server README "Devices"): one-time pairing codes with bindings, pairing with Ed25519 or
+ECDSA P-256 keys and a proof of possession, a loopback-only bootstrap code for the first POS,
+challenge-response device tokens checked against the device row on every request, unpairing that
+revokes sessions at once and emits `DeviceRevoked` to the outbox, table-tablet rebinding and the
+`assertTableAccess` object-level check. New contract `DeviceRevoked` event and 8 device routes.
+The test kit now uses real device credentials everywhere. 14 new integration tests.
+
+Decisions:
+
+- The first device is paired with a bootstrap code only the server PC can request, and only while
+  no device is paired (the installer will call it, P0-16).
+- Device tokens last 60 minutes, challenges 60 seconds, pairing codes 10 minutes (settings).
+- Moving a tablet to another table needs a signed-in manager (`DEVICE_PAIR`); from the tablet
+  itself this means a manager signs in there, which already requires their PIN (AUTH-009).
+- A manager cannot unpair the device they are using (avoids locking themselves out).
+- KDS station mode: a KDS device is bound to a station; attributing KDS actions to the station is
+  implemented with the KDS in P1-09.
+
+Notes for the next session:
+
+- P0-12: consume `DeviceRevoked` from the outbox and close that device's sockets within 5 seconds;
+  authenticate sockets with the device token (and staff access token) at connection time.
+- Every table-scoped endpoint must call `assertTableAccess(request.device, tableId)`.
+
 ### 2026-09-25: P0-10 authentication, sessions, RBAC and manager override
 
 Built `apps/server/src/auth` (see the server README "Authentication"): PIN login with Argon2id +
@@ -210,7 +237,7 @@ Decisions (defaults; each is a setting):
   approvals last 2 minutes; 10 login/override attempts per device per minute.
 - The pepper is Argon2's secret input for PINs and passwords.
 - With individual kitchen logins off (default), kitchen staff PIN login is refused
-  (`KITCHEN_STATION_MODE`); KDS actions are attributed to the station device (P0-11).
+  (`KITCHEN_STATION_MODE`); KDS actions are attributed to the station device (P1-09).
 - The first Owner password and TOTP can be set from the Owner's PIN session (first setup, guided by
   the wizard in P7-07); replacing either needs a fresh step-up.
 - An override token is used up when the guard accepts it, even if the action then fails.

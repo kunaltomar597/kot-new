@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module.js';
 import type { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { DevicesModule } from './devices/devices.module.js';
 import { ApiExceptionFilter } from './errors/api-exception.filter.js';
 import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
@@ -26,6 +27,7 @@ export class AppModule {
         DatabaseModule,
         AuthModule,
         AuditModule,
+        DevicesModule,
         HealthModule,
       ],
       providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

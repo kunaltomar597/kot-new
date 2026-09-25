@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["PENDING", "ACTIVE", "REVOKED"] },
+  "output": { "type": "string", "enum": ["PENDING", "ACTIVE", "REVOKED"] }
+}

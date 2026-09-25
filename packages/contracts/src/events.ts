@@ -133,6 +133,12 @@ export const DeviceStatusChanged = event(
   }),
 );
 
+/** A device was unpaired: its tokens stop working and its live connections close (AUTH-008). */
+export const DeviceRevoked = event(
+  'DeviceRevoked',
+  z.object({ deviceId: Id, deviceType: DeviceType, reason: z.string().max(200) }),
+);
+
 export const DomainEvent = z.discriminatedUnion('type', [
   MenuPublished,
   ItemAvailabilityChanged,
@@ -153,6 +159,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   BillSettled,
   AlertEscalated,
   DeviceStatusChanged,
+  DeviceRevoked,
 ]);
 export type DomainEvent = z.infer<typeof DomainEvent>;
 export type DomainEventType = DomainEvent['type'];

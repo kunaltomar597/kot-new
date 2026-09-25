@@ -29,6 +29,10 @@ export interface AuthSettings {
   readonly overrideSeconds: number;
   /** AUTH-005: kitchen staff sign in individually instead of station mode. */
   readonly kitchenIndividualLogins: boolean;
+  /** AUTH-007: how long a pairing code can be used. */
+  readonly pairingCodeMinutes: number;
+  /** AUTH-007: how long a device token lasts before the device signs a new challenge. */
+  readonly deviceTokenMinutes: number;
 }
 
 export const AUTH_SETTING_DEFAULTS: AuthSettings = {
@@ -44,6 +48,8 @@ export const AUTH_SETTING_DEFAULTS: AuthSettings = {
   stepUpMinutes: 5,
   overrideSeconds: 120,
   kitchenIndividualLogins: false,
+  pairingCodeMinutes: 10,
+  deviceTokenMinutes: 60,
 };
 
 const minutes = (max: number) => z.int().min(1).max(max);
@@ -61,6 +67,11 @@ const SCHEMAS: { readonly [K in keyof AuthSettings]: z.ZodType<AuthSettings[K]> 
   stepUpMinutes: minutes(60),
   overrideSeconds: z.int().min(30).max(900),
   kitchenIndividualLogins: z.boolean(),
+  pairingCodeMinutes: minutes(60),
+  deviceTokenMinutes: z
+    .int()
+    .min(5)
+    .max(24 * 60),
 };
 
 /** Settings-table key of each setting, e.g. `auth.lockoutMaxFailures`. */

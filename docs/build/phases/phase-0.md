@@ -195,6 +195,8 @@ Deliverables:
   (uses the P0-12 gateway once it exists; until then, token revocation list).
 - Tablet ↔ table binding changes need a manager override.
 
+As built: the socket part of AUTH-008 waits for the P0-12 gateway, which must close a device's
+connections when it reads the `DeviceRevoked` outbox event (and test ≤ 5 s).
 Acceptance: unpaired device rejected even with a valid PIN; revoked device's socket closed ≤ 5 s
 (integration test); tablet can only access its own table.
 

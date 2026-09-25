@@ -6,7 +6,12 @@ import { join } from 'node:path';
 export const SECRET_STORE = Symbol('SECRET_STORE');
 
 /** Local secrets that never live in the database or the source (SEC-002, SEC-006). */
-export const SECRET_NAMES = ['pin-pepper', 'token-signing-key', 'totp-encryption-key'] as const;
+export const SECRET_NAMES = [
+  'pin-pepper',
+  'token-signing-key',
+  'device-token-key',
+  'totp-encryption-key',
+] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 
 const SECRET_BYTES = 32;

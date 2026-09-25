@@ -1,5 +1,5 @@
 import type { Capability } from '@rp/domain';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { AuditVerifyResponse } from './audit.js';
 import {
   LoginResponse,
@@ -17,7 +17,21 @@ import {
   TotpEnrollmentResponse,
   UnlockStaffRequest,
 } from './auth.js';
-import { ApiError } from './common.js';
+import { ApiError, Id } from './common.js';
+import {
+  BindTableRequest,
+  CreatePairingCodeRequest,
+  DeviceChallengeRequest,
+  DeviceChallengeResponse,
+  DeviceListResponse,
+  DeviceSummary,
+  DeviceTokenRequest,
+  DeviceTokenResponse,
+  PairDeviceRequest,
+  PairedDevice,
+  PairingCodeResponse,
+  RevokeDeviceRequest,
+} from './devices.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
 import { HealthResponse, VersionResponse } from './system.js';
 
@@ -299,5 +313,130 @@ export const ROUTES = [
     capability: 'SESSION',
     request: { body: OwnerPasswordRequest },
     responses: { 204: { description: 'Password saved.' }, ...standardErrors },
+  },
+  {
+    operationId: 'createPairingCode',
+    method: 'POST',
+    path: '/api/v1/devices/pairing-codes',
+    summary: 'Prepare the pairing of a device: a one-time code and QR payload',
+    description:
+      'The code is valid for 10 minutes (setting) and pairs exactly one device (AUTH-007).',
+    tags: ['devices'],
+    requirements: ['AUTH-007', 'AUTH-009'],
+    capability: 'DEVICE_PAIR',
+    request: { body: CreatePairingCodeRequest },
+    responses: {
+      201: { description: 'Pairing code.', schema: PairingCodeResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'createBootstrapPairingCode',
+    method: 'POST',
+    path: '/api/v1/devices/pairing-codes/bootstrap',
+    summary: 'Pairing code for the first device, from the server PC itself',
+    description:
+      'Public because no device exists yet to sign in on. Only answers requests from the server ' +
+      "PC's loopback address, and only while the restaurant has no paired device; the installer " +
+      'uses it to pair the POS on the server PC (ONB-001).',
+    tags: ['devices'],
+    requirements: ['AUTH-007', 'ONB-001'],
+    capability: 'PUBLIC',
+    responses: {
+      201: { description: 'Pairing code for a POS.', schema: PairingCodeResponse },
+      403: {
+        description: 'Not from the server PC, or a device is already paired.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'pairDevice',
+    method: 'POST',
+    path: '/api/v1/devices/pair',
+    summary: 'A device pairs with a one-time code and its public key',
+    description:
+      'Public because the device has no credential yet: the one-time code is the credential. ' +
+      'The device proves it holds the private key by signing the code. Rate-limited (SEC-009).',
+    tags: ['devices'],
+    requirements: ['AUTH-007', 'SEC-006', 'SEC-009'],
+    capability: 'PUBLIC',
+    request: { body: PairDeviceRequest },
+    responses: {
+      201: { description: 'Paired.', schema: PairedDevice },
+      400: standardErrors[400],
+      401: { description: 'Unknown, used or expired code, or a bad proof.', schema: ApiError },
+      429: { description: 'Too many attempts.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'createDeviceChallenge',
+    method: 'POST',
+    path: '/api/v1/devices/challenge',
+    summary: 'A one-time challenge for a paired device to sign',
+    description:
+      'Public because it is the first step of device authentication; a challenge alone grants ' +
+      'nothing (AUTH-007).',
+    tags: ['devices'],
+    requirements: ['AUTH-007'],
+    capability: 'PUBLIC',
+    request: { body: DeviceChallengeRequest },
+    responses: {
+      200: { description: 'Challenge valid for 60 seconds.', schema: DeviceChallengeResponse },
+      400: standardErrors[400],
+      429: { description: 'Too many attempts.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'issueDeviceToken',
+    method: 'POST',
+    path: '/api/v1/devices/token',
+    summary: 'Exchange a signed challenge for a device token',
+    description:
+      'Public because it is how a device authenticates: the signature over the challenge with ' +
+      'the paired key is the credential (AUTH-007).',
+    tags: ['devices'],
+    requirements: ['AUTH-007', 'SEC-006'],
+    capability: 'PUBLIC',
+    request: { body: DeviceTokenRequest },
+    responses: {
+      200: { description: 'Device token.', schema: DeviceTokenResponse },
+      400: standardErrors[400],
+      401: { description: 'Unknown or revoked device, or a bad signature.', schema: ApiError },
+      429: { description: 'Too many attempts.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listDevices',
+    method: 'GET',
+    path: '/api/v1/devices',
+    summary: 'Paired and revoked devices of the restaurant',
+    tags: ['devices'],
+    requirements: ['AUTH-007', 'AUTH-008'],
+    capability: 'DEVICE_PAIR',
+    responses: { 200: { description: 'Devices.', schema: DeviceListResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'revokeDevice',
+    method: 'POST',
+    path: '/api/v1/devices/:deviceId/revoke',
+    summary: 'Unpair a device: its tokens and sessions stop working at once',
+    tags: ['devices'],
+    requirements: ['AUTH-008'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }), body: RevokeDeviceRequest },
+    responses: { 200: { description: 'Revoked.', schema: DeviceSummary }, ...standardErrors },
+  },
+  {
+    operationId: 'bindTabletTable',
+    method: 'PUT',
+    path: '/api/v1/devices/:deviceId/table',
+    summary: 'Move a table tablet to another table',
+    description: 'Needs a manager (AUTH-009); the tablet then serves only the new table.',
+    tags: ['devices'],
+    requirements: ['AUTH-009'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }), body: BindTableRequest },
+    responses: { 200: { description: 'Rebound.', schema: DeviceSummary }, ...standardErrors },
   },
 ] as const satisfies readonly RouteDefinition[];

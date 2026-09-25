@@ -54,7 +54,9 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
 
   it('documents every registered route', () => {
     for (const registered of contracts.ROUTES) {
-      expect(openapi.paths[registered.path]?.[registered.method.toLowerCase()]).toBeDefined();
+      // OpenAPI writes Express-style `:param` as `{param}`.
+      const path = registered.path.replace(/:([A-Za-z0-9_]+)/g, '{$1}');
+      expect(openapi.paths[path]?.[registered.method.toLowerCase()], path).toBeDefined();
     }
   });
 

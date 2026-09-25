@@ -311,6 +311,7 @@ model Staff {
   credentials      Credential[]
   sessions         Session[]
   recoveryCodes    RecoveryCode[]
+  pagers           Device[]
   shiftAssignments ShiftAssignment[]
   shifts           Shift[]
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -353,8 +354,10 @@ model Device {
   type                   DeviceType
   name                   String
   status                 DeviceStatus @default(PENDING)
-  /// Device public key (PEM) or certificate fingerprint issued at pairing (AUTH-007).
+  /// Device public key (SPKI PEM) registered at pairing (AUTH-007).
   publicKey              String?      @map("public_key")
+  /// "Ed25519" or "ES256".
+  keyAlgorithm           String?      @map("key_algorithm")
   certificateFingerprint String?      @map("certificate_fingerprint")
   pairedAt               DateTime?    @map("paired_at") @db.Timestamptz(3)
   pairedById             String?      @map("paired_by_id") @db.Uuid
@@ -364,6 +367,12 @@ model Device {
   /// Table a table tablet is bound to (AUTH-009).
   tableId                String?      @map("table_id") @db.Uuid
   table                  DiningTable? @relation(fields: [tableId], references: [id])
+  /// Station a kitchen screen shows (KDS-002).
+  stationId              String?      @map("station_id") @db.Uuid
+  station                Station?     @relation(fields: [stationId], references: [id])
+  /// Person wearing a pager.
+  staffId                String?      @map("staff_id") @db.Uuid
+  staff                  Staff?       @relation(fields: [staffId], references: [id])
   sessions               Session[]
   createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -435,6 +444,30 @@ model OverrideGrant {
   @@index([restaurantId])
   @@index([expiresAt])
   @@map("override_grants")
+}
+
+/// A manager's one-time code for pairing one device (AUTH-007).
+model PairingCode {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  /// SHA-256 of the code; the code itself is shown once and never stored.
+  codeHash     String     @unique @map("code_hash")
+  type         DeviceType
+  name         String
+  tableId      String?    @map("table_id") @db.Uuid
+  stationId    String?    @map("station_id") @db.Uuid
+  staffId      String?    @map("staff_id") @db.Uuid
+  /// Manager who created the code; null for the installer's bootstrap code.
+  createdById  String?    @map("created_by_id") @db.Uuid
+  expiresAt    DateTime   @map("expires_at") @db.Timestamptz(3)
+  usedAt       DateTime?  @map("used_at") @db.Timestamptz(3)
+  deviceId     String?    @map("device_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId])
+  @@index([expiresAt])
+  @@map("pairing_codes")
 }
 
 // ---------------------------------------------------------------- floor
@@ -568,6 +601,7 @@ model Station {
   archivedAt   DateTime?   @map("archived_at") @db.Timestamptz(3)
   items        Item[]
   kots         Kot[]
+  devices      Device[]
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
