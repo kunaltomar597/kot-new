@@ -16,7 +16,8 @@
     "test:coverage": "vitest run --coverage",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "clean": "rm -rf dist coverage src/generated"
+    "clean": "rm -rf dist coverage src/generated",
+    "db:seed": "node --env-file-if-exists=.env dist/database/seed-cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",

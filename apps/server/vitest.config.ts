@@ -26,7 +26,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/generated/**', 'src/main.ts'],
+      exclude: ['src/generated/**', 'src/main.ts', 'src/database/seed-cli.ts'],
       // NFR-M04: at least 70 % line coverage for the backend.
       thresholds: { lines: 70, statements: 70, functions: 70 },
     },

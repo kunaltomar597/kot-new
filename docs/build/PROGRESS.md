@@ -17,22 +17,22 @@ What exists:
   and version. 16 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
-  harness. 31 tests, 93 % line coverage.
+  harness; core data model (54 tables), least-privilege roles, audit/invoice protection triggers,
+  gap-free numbering and a development seed (P0-08). 67 tests.
+- `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
+  React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
+  Storybook 10 workbench (P0-13, ADR-0009).
+- CI security baseline: secret scan, dependency audit, licence policy, SBOM, CodeQL, Dependabot,
+  generated OpenAPI/AsyncAPI docs (P0-06, ADR-0010).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
-In progress in parallel sessions (started 2026-09-25 by the orchestrating session):
-
-- P0-13 Design tokens and web UI library: session `session_01PoVJDi85NBEHm3tQLoEm2w`, branch
-  `wp/p0-13-ui-library`.
-- P0-06 CI security baseline and contract docs: session `session_018YSsgXSus3f81EJVEjMARc`,
-  branch `wp/p0-06-security-ci`.
-
 Recommended next WPs (dependencies met):
 
-- P0-08 Database schema v1 and least-privilege roles (Lane A).
-- P0-15 LAN TLS decision and implementation (Lane C, independent of P0-08).
-- P0-H1 Pager battery prototype firmware (Lane E; Claude can write it, a person must run it).
+- P0-09 Audit log service (needs P0-08).
+- P0-12 Real-time and domain-event infrastructure (outbox table exists).
+- P0-15 LAN TLS decision and implementation.
+- P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
 
@@ -43,14 +43,14 @@ Recommended next WPs (dependencies met):
 - [x] P0-03 Domain: money, tax, discounts, bill
 - [x] P0-04 Domain: dates, invoices, state machines, permissions, selection, KOT
 - [x] P0-05 Contracts v1
-- [~] P0-06 CI security baseline and contract docs (parallel session)
+- [x] P0-06 CI security baseline and contract docs
 - [x] P0-07 Local server skeleton
-- [ ] P0-08 Database schema v1 and least-privilege roles
+- [x] P0-08 Database schema v1 and least-privilege roles
 - [ ] P0-09 Audit log service
 - [ ] P0-10 Authentication, sessions, RBAC, manager override
 - [ ] P0-11 Device pairing and device credentials
 - [ ] P0-12 Real-time and domain-event infrastructure
-- [~] P0-13 Design tokens and web UI library (parallel session)
+- [x] P0-13 Design tokens and web UI library
 - [ ] P0-14 API client, i18n and web console shell
 - [ ] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
@@ -189,6 +189,57 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-25: P0-08 database schema v1 and least-privilege roles
+
+Built the core data model in `apps/server/prisma/schema.prisma` (54 tables for Phases 0 and 1), a
+generated migration, a hand-written roles-and-protection migration, `src/database/numbering.ts`
+(gap-free day counters and invoice sequences) and `src/database/dev-seed.ts` (+ `db:seed`). 36 new
+integration tests: rp_app cannot DELETE any protected table, audit rows cannot be updated by anyone
+or deleted except by rp_purge, settled invoices are frozen, numbering is gap-free under concurrency
+and after rollback, schema conventions (ids, restaurant_id, business_date, integer money), enums
+match `@rp/domain`, seed runs.
+
+Decisions:
+
+- `restaurant_id` is an indexed column without a foreign key (one restaurant per local database;
+  avoids a relation from every model). SEC-005 needs the column, not the constraint.
+- Protected from DELETE (beyond the spec's list): order item modifiers, order events, KOT lines,
+  approvals, discounts and business days, because they are financial or audit evidence too.
+- The audit-log and invoice triggers apply to every role, including owners.
+- Money columns are `Int` paise (max ₹2.1 crore per value); day and shift aggregates are `BigInt`.
+
+Notes for the next session:
+
+- New tables get SELECT/INSERT/UPDATE for rp_app automatically (default privileges) but never
+  DELETE; grant it in the migration when a table is operational. The test "never lets rp_app DELETE
+  financial or audit records" lists the protected tables.
+- Raw SQL inserts must supply `id` (UUIDv7 comes from the Prisma client, not a database default).
+- A settled invoice's lines cannot be inserted after settling: write lines while ISSUED.
+- Staff have no credentials yet; P0-10 adds PIN hashing and seeds PINs.
+
+### 2026-09-25: P0-13 design tokens and web UI library (PR #4)
+
+`packages/design-tokens` (themes light/dark/KDS with contrast tests, tokens as TS and generated
+`tokens.css`, accent slot) and `packages/ui-web` (React 19 components, plain layered CSS on token
+variables, Vitest + Testing Library + axe, Storybook 10 workbench). ADR-0009. Root ESLint gained
+react-hooks and jsx-a11y rules for `.tsx`.
+
+Notes for later WPs:
+
+- P0-14: move the English `UiStrings` in `packages/ui-web/fixtures/en-strings.ts` into `@rp/i18n`;
+  apps import `@rp/design-tokens/tokens.css` and `@rp/ui-web/styles.css` once.
+- Inside `Dialog`, use `data-autofocus`, not `autoFocus` (React focuses before `showModal`).
+- P1-08 adds the menu item card and modifier/combo selection to `@rp/ui-web`; P2-01 `ui-native`
+  should reuse the TS tokens, `ORDER_ITEM_STATE_STYLES` and icon names.
+
+### 2026-09-25: P0-06 CI security baseline (PR #2) and merge follow-ups
+
+Security workflow (gitleaks, `pnpm audit`, licence policy, CycloneDX SBOM, CodeQL, dependency
+review), Dependabot, generated OpenAPI/AsyncAPI docs (ADR-0010). When merging P0-07: health and
+version were added to the contract route registry; `elkjs` (EPL-2.0, via Prisma Studio) got a
+licence exception; `mysql2` and `deepmerge-ts` are overridden in `pnpm-workspace.yaml` to patched
+versions until Prisma ships them (remove the overrides then).
 
 ### 2026-09-25: P0-07 local server skeleton
 
