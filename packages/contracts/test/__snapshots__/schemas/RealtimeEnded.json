@@ -1,0 +1,17 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "reason": { "type": "string", "enum": ["DEVICE_REVOKED", "DEVICE_CHANGED", "SESSION_ENDED"] }
+    },
+    "required": ["reason"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "reason": { "type": "string", "enum": ["DEVICE_REVOKED", "DEVICE_CHANGED", "SESSION_ENDED"] }
+    },
+    "required": ["reason"],
+    "additionalProperties": false
+  }
+}

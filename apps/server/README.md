@@ -129,14 +129,53 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   `x-device-token` on every request. `DeviceTokenAuthenticator` also checks the device row on every
   request, so unpairing is immediate.
 - Unpairing (AUTH-008): `POST /api/v1/devices/:deviceId/revoke` marks the device REVOKED, revokes
-  every staff session on it and appends a `DeviceRevoked` event to the outbox
-  (`src/events/outbox.ts`) for the real-time gateway (P0-12) to close its connections. A manager
+  every staff session on it and appends a `DeviceRevoked` event to the outbox; the real-time
+  gateway closes the device's live connections when it publishes that event (P0-12). A manager
   cannot unpair the device they are using.
 - Table tablets (AUTH-009): `PUT /api/v1/devices/:deviceId/table` (manager) moves a tablet to
   another table; `assertTableAccess(device, tableId)` (`src/devices/device-scope.ts`) is the
   object-level check every table-scoped endpoint must call.
 - Tests: `test/helpers/auth-kit.ts` registers devices with an Ed25519 key and gets real device
   tokens through the challenge flow; `authHeaders(deviceId, accessToken)` sends both.
+
+## Domain events and real time (P0-12)
+
+- Producing (BRD §10.1 principle 3, INT-004): write the event in the transaction that makes the
+  change, `appendEvent(tx, event, { aggregate: { type, id }, audience? })`
+  (`src/events/outbox.ts`). The event exists if and only if the change committed. `audience` adds
+  tables, stations, sections or people the event itself does not name (an item status change names
+  neither its table nor its station), so their tablets, kitchen screens and phones hear it.
+- Dispatching (`src/events/event-bus.ts`): a trigger on `outbox` sends `NOTIFY rp_outbox` at
+  commit; the dispatcher LISTENs on its own connection (and polls every 2 s in case a notification
+  is lost). It numbers committed events with a gap-free `sequence` under an advisory lock, in write
+  order, so whoever has seen sequence N has seen everything before it. Then it hands each batch, in
+  order, to live listeners (the gateway) and to durable consumers.
+- Durable consumers: `EventBus.subscribe({ name, types, handle })` from a constructor or
+  `onModuleInit`. Each has a cursor (`event_consumer_cursors`); `handle(event, { tx })` runs in a
+  transaction together with an inbox record (`inbox`, source `consumer:<name>`) and the cursor
+  update, so database effects happen once even when an event is delivered again. A handler that
+  throws is retried with exponential backoff (1 s to 60 s) and later events wait: nothing is lost.
+  `maxAttempts` optionally sets an event aside (kept in the inbox with the error) instead.
+- Socket.io (`src/realtime/realtime.gateway.ts`, protocol in `@rp/contracts` `realtime.ts`): path
+  `/socket.io`, namespace `/rt`, WebSocket only. The handshake `auth` carries the device token and,
+  optionally, the signed-in person's access token (an invalid one is refused). Connections join
+  rooms (`src/realtime/rooms.ts`): everyone, device, role, person, today's sections, a KDS's station,
+  a tablet's own table only. Each event goes to the roles the permission matrix lets see its type
+  plus the tables, stations, sections and people it concerns. Pagers are refused (MQTT, P2-04).
+- Resync (NTF-006, NFR-P11): a reconnecting device sends `lastSequence` and `streamId`; the server
+  replays what that connection may see, then sends `sync`. Too old (over 1,000 events or already
+  cleaned up), another stream (restored database) or no resume point means `fullRefresh`: reload
+  over REST. Every 15 s `head` tells connections how far they are up to date. Clients de-duplicate
+  by `eventId`.
+- Revocation (AUTH-008): the `DeviceRevoked` event closes the device's connections at once; every
+  3 s the gateway re-checks each connection's device (paired, same binding) and session (live, same
+  role) and closes the rest with an `ended` message. Server shutdown drops connections at the
+  transport, so clients reconnect by themselves.
+- Clean-up: published events stay 24 hours for replay and until every consumer has handled them;
+  the newest is always kept so sequences never restart. `system_meta` `events.stream_id` identifies
+  the history; a database restore (DATA-004) must replace it.
+- Tests: `test/helpers/events.ts` builds and produces events; `test/helpers/realtime-client.ts` is a
+  Socket.io client that records messages and waits for them (`createTestApp({ listen: true })`).
 
 ## Commands
 

@@ -6,14 +6,16 @@ import type { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DevicesModule } from './devices/devices.module.js';
+import { EventsModule } from './events/events.module.js';
 import { ApiExceptionFilter } from './errors/api-exception.filter.js';
 import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { ObservabilityModule } from './observability/error-reporter.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
 
 /**
- * Root module. Feature modules (audit, auth, devices, realtime, settings, floor, menu, orders,
- * kitchen, billing, ...) are added here by later work packages.
+ * Root module. Feature modules (settings, floor, menu, orders, kitchen, billing, ...) are added here
+ * by later work packages.
  */
 @Module({})
 export class AppModule {
@@ -28,6 +30,8 @@ export class AppModule {
         AuthModule,
         AuditModule,
         DevicesModule,
+        EventsModule,
+        RealtimeModule,
         HealthModule,
       ],
       providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

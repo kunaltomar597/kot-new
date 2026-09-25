@@ -195,8 +195,8 @@ Deliverables:
   (uses the P0-12 gateway once it exists; until then, token revocation list).
 - Tablet ↔ table binding changes need a manager override.
 
-As built: the socket part of AUTH-008 waits for the P0-12 gateway, which must close a device's
-connections when it reads the `DeviceRevoked` outbox event (and test ≤ 5 s).
+As built: the socket part of AUTH-008 landed with the P0-12 gateway, which closes a device's
+connections when it publishes the `DeviceRevoked` outbox event (tested ≤ 5 s).
 Acceptance: unpaired device rejected even with a valid PIN; revoked device's socket closed ≤ 5 s
 (integration test); tablet can only access its own table.
 
@@ -220,6 +220,14 @@ Deliverables:
 
 Acceptance: integration tests prove events are not lost when a consumer fails and retries, not
 duplicated for idempotent consumers, delivered to the right rooms only, and replayed on reconnect.
+
+As built: plain Socket.io on Nest's HTTP server (no `@nestjs/websockets`: the socket only pushes,
+commands stay on REST). Sequences are assigned at dispatch, gap-free, so a client's last sequence
+is a safe resume point; producers pass `audience` hints (tables, stations, sections, people) to
+`appendEvent`. The gateway also re-checks live connections every 3 s, so sign-out, session expiry,
+role changes and tablet re-binding end connections too (AUTH-005, AUTH-009). P2-04 (MQTT) and
+P5-03 (relay) plug in as durable consumers; later feature WPs refine `rooms.ts` routing (for
+example, waiters' OWN tables) as their events land.
 
 ## P0-13 Design tokens and web UI component library
 

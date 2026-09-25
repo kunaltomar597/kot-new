@@ -103,7 +103,10 @@ describe('[SEC-005] [INT-005] schema conventions', () => {
       SELECT table_name, array_agg(column_name::text) AS columns
       FROM information_schema.columns
       WHERE table_schema = 'public'
-        AND table_name NOT IN ('_prisma_migrations', 'system_meta', 'restaurants')
+        -- Installation-level: they exist before the restaurant is set up (event cursors, P0-12).
+        AND table_name NOT IN (
+          '_prisma_migrations', 'system_meta', 'restaurants', 'event_consumer_cursors'
+        )
       GROUP BY table_name`);
     expect(rows.length).toBeGreaterThanOrEqual(50);
     for (const row of rows) {

@@ -4,6 +4,7 @@ import type { Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { authErrors } from './auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
 import type { AuthenticatedDevice } from './device.js';
@@ -12,6 +13,9 @@ import { AccessTokenError, randomToken, sha256Hex, TokenService } from './tokens
 
 /** Writes of `lastActiveAt` are skipped within this interval to save a write per request. */
 const TOUCH_INTERVAL_MS = 30_000;
+
+const SESSION_STAFF = { staff: { include: { role: true } } } satisfies Prisma.SessionInclude;
+type SessionWithStaff = Prisma.SessionGetPayload<{ include: typeof SESSION_STAFF }>;
 
 export interface SessionStaff {
   readonly id: string;
@@ -144,22 +148,13 @@ export class SessionService {
     const now = new Date();
     const session = await this.prisma.session.findUnique({
       where: { id: claims.sessionId },
-      include: { staff: { include: { role: true } } },
+      include: SESSION_STAFF,
     });
     if (session === null) return { failure: authErrors.sessionRevoked() };
-    if (session.revokedAt !== null || session.deviceId !== device.deviceId) {
-      return { failure: authErrors.sessionRevoked() };
-    }
     const settings = await this.settings.get(session.restaurantId);
+    const failure = await this.check(session, device, settings, now);
+    if (failure !== undefined) return { failure };
     const idleFor = now.getTime() - session.lastActiveAt.getTime();
-    if (session.expiresAt <= now || idleFor > this.inactivityMs(settings, device)) {
-      await this.revoke(session.id, session.expiresAt <= now ? 'EXPIRED' : 'INACTIVITY');
-      return { failure: authErrors.sessionExpired() };
-    }
-    if (!session.staff.active || session.staff.archivedAt !== null) {
-      await this.revoke(session.id, 'STAFF_DEACTIVATED');
-      return { failure: authErrors.sessionRevoked() };
-    }
     if (idleFor > TOUCH_INTERVAL_MS) {
       await this.prisma.session.update({ where: { id: session.id }, data: { lastActiveAt: now } });
     }
@@ -174,6 +169,63 @@ export class SessionService {
         secondFactorAt: session.secondFactorAt,
       },
     };
+  }
+
+  /**
+   * The sessions among `entries` that can still be used, with the person's current role. Live
+   * sockets are re-checked with this (P0-12): a sign-out, revocation, expiry, inactivity timeout or
+   * role change ends them. Does not count as activity.
+   */
+  async liveSessions(
+    entries: readonly { readonly sessionId: string; readonly device: AuthenticatedDevice }[],
+    now: Date = new Date(),
+  ): Promise<Map<string, Role>> {
+    const live = new Map<string, Role>();
+    if (entries.length === 0) return live;
+    const sessions = await this.prisma.session.findMany({
+      where: { id: { in: [...new Set(entries.map((entry) => entry.sessionId))] } },
+      include: SESSION_STAFF,
+    });
+    const byId = new Map(sessions.map((session) => [session.id, session]));
+    const settingsOf = new Map<string, AuthSettings>();
+    for (const { sessionId, device } of entries) {
+      const session = byId.get(sessionId);
+      if (session === undefined) continue;
+      let settings = settingsOf.get(session.restaurantId);
+      if (settings === undefined) {
+        settings = await this.settings.get(session.restaurantId);
+        settingsOf.set(session.restaurantId, settings);
+      }
+      if ((await this.check(session, device, settings, now)) === undefined) {
+        live.set(sessionId, session.staff.role.baseRole);
+      }
+    }
+    return live;
+  }
+
+  /**
+   * Why a session can no longer be used on `device`, or undefined when it can. A session found
+   * expired, idle or belonging to a deactivated person is revoked on the spot.
+   */
+  private async check(
+    session: SessionWithStaff,
+    device: AuthenticatedDevice,
+    settings: AuthSettings,
+    now: Date,
+  ): Promise<AppError | undefined> {
+    if (session.revokedAt !== null || session.deviceId !== device.deviceId) {
+      return authErrors.sessionRevoked();
+    }
+    const idleFor = now.getTime() - session.lastActiveAt.getTime();
+    if (session.expiresAt <= now || idleFor > this.inactivityMs(settings, device)) {
+      await this.revoke(session.id, session.expiresAt <= now ? 'EXPIRED' : 'INACTIVITY');
+      return authErrors.sessionExpired();
+    }
+    if (!session.staff.active || session.staff.archivedAt !== null) {
+      await this.revoke(session.id, 'STAFF_DEACTIVATED');
+      return authErrors.sessionRevoked();
+    }
+    return undefined;
   }
 
   /**

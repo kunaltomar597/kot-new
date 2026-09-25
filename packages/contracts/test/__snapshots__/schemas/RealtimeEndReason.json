@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["DEVICE_REVOKED", "DEVICE_CHANGED", "SESSION_ENDED"] },
+  "output": { "type": "string", "enum": ["DEVICE_REVOKED", "DEVICE_CHANGED", "SESSION_ENDED"] }
+}

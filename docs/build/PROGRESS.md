@@ -13,12 +13,16 @@ What exists:
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
   state machines, permissions, menu selection, KOT split. 89 tests, ~99 % line coverage.
-- `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, health
-  and version. 16 tests.
+- `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
+  devices, the real-time protocol, health and version; route registry with generated
+  OpenAPI/AsyncAPI docs. 140 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
-  harness; core data model (54 tables), least-privilege roles, audit/invoice protection triggers,
-  gap-free numbering and a development seed (P0-08). 67 tests.
+  harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
+  gap-free numbering and a development seed (P0-08); audit hash chain (P0-09); authentication,
+  sessions, permission guard and manager override (P0-10); device pairing and device tokens
+  (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
+  rooms, resync and revocation (P0-12). 387 tests.
 - `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
   React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
   Storybook 10 workbench (P0-13, ADR-0009).
@@ -29,8 +33,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-12 Real-time and domain-event infrastructure (outbox exists; must close sockets on `DeviceRevoked`).
-- P0-12 Real-time and domain-event infrastructure (outbox table exists).
+- P0-14 API client, i18n and web console shell (P0-10, P0-12 and P0-13 are done).
 - P0-15 LAN TLS decision and implementation.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -49,7 +52,7 @@ Recommended next WPs (dependencies met):
 - [x] P0-09 Audit log service
 - [x] P0-10 Authentication, sessions, RBAC, manager override
 - [x] P0-11 Device pairing and device credentials
-- [ ] P0-12 Real-time and domain-event infrastructure
+- [x] P0-12 Real-time and domain-event infrastructure
 - [x] P0-13 Design tokens and web UI library
 - [ ] P0-14 API client, i18n and web console shell
 - [ ] P0-15 LAN TLS decision and implementation
@@ -182,7 +185,9 @@ Decided 2026-09-25:
 10. TypeScript stays on 6.0 until typescript-eslint supports 7 (ADR-0002).
 
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
-(P0-09 audit hash chain and permission guard), P0-10 authentication (this PR).
+(P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
+(P0-11 device pairing and device tokens), P0-12 (socket authentication, room filtering and
+revocation; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -190,6 +195,55 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-25: P0-12 real-time and domain-event infrastructure
+
+Built `apps/server/src/events` and `apps/server/src/realtime` (see the server README "Domain events
+and real time"): `appendEvent` with audience hints; a commit trigger (`NOTIFY rp_outbox`) and a
+dispatcher that numbers committed events gap-free under an advisory lock and publishes them in
+order; durable consumers with cursors, inbox de-duplication, exponential-backoff retry and optional
+set-aside; outbox clean-up; the Socket.io gateway on `/rt` with handshake authentication (device
+token plus optional access token), rooms per restaurant, device, role, person, section, station and
+table, a permission filter per event type, replay on reconnect with full-refresh fallback, head
+heartbeats, and connection ending on unpairing (event, ≤ 5 s tested) and on sign-out, expiry, role
+change or tablet re-binding (3 s sweep). The real-time protocol is a contract (`realtime.ts`). New
+test helpers: `produce`/`domainEvent`, `RealtimeTestClient`, `createTestApp({ listen, overrides,
+beforeInit })`. 13 event-bus and 20 real-time integration tests, 16 routing unit tests.
+
+Decisions:
+
+- Plain Socket.io on Nest's HTTP server rather than `@nestjs/websockets`: the socket only pushes
+  (commands stay on REST, BRD §10.4), so the Nest gateway layer adds nothing. WebSocket transport
+  only; the main namespace refuses everything; pagers are refused (they use MQTT, P2-04).
+- Sequences are assigned when the dispatcher publishes, not when events are written, so they are
+  gap-free and follow commit order; one sequence per installation (assumption A-01: one server per
+  outlet). `event_consumer_cursors` is installation-level like `system_meta` (no restaurant_id; it
+  exists before onboarding), and the schema convention test exempts it.
+- Routing: each event type is visible to the roles the §4.2 matrix grants its capability (floor
+  events: ORDER_CREATE; bills: BILL_REQUEST; devices: DEVICE_PAIR; escalations: Owner and Manager;
+  menu: everyone), plus the tables, stations, sections and people named by the event or the
+  producer's `audience`. KOTs reach kitchen screens through station rooms, not the kitchen role, so
+  a bar screen never shows tandoor KOTs; a KDS without a station sees all stations. A table tablet
+  only ever joins its own table.
+- Durable consumers retry forever by default (nothing is lost; later events wait); `maxAttempts`
+  lets a consumer set a poison event aside into the inbox instead.
+- Defaults (code constants, not BRD ⚙ settings): replay up to 1,000 events, keep published events
+  24 h (and until every consumer is past them), head every 15 s, connection re-check every 3 s,
+  ping 10 s / 10 s, 10 resyncs per connection per minute, poll every 2 s.
+- A live socket is not activity: an idle session (AUTH-005) ends its socket too, like the REST
+  timeout.
+- A database restore must rotate the event stream id (added to the P7-05 spec).
+
+Notes for the next session:
+
+- Producers of order, KOT and item events (P1-06, P1-07, P1-09) must pass `audience` with the
+  table and station ids so tablets and kitchen screens hear them.
+- P0-14 web client: connect with the device token (and access token), keep the highest sequence
+  seen and the stream id, resume with them, de-duplicate by `eventId`, reload on `fullRefresh`,
+  reconnect after `ended` with the credentials the device now has.
+- Section rooms are joined at connection time; the WP that edits shift assignments (P2) should end
+  the affected connections so they rejoin.
+- P2-04 (MQTT) and P5-03 (relay) plug in as durable consumers (`EventBus.subscribe`).
 
 ### 2026-09-25: P0-11 device pairing and device credentials
 
