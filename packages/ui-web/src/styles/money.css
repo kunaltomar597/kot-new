@@ -1,0 +1,24 @@
+.rp-money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rp-money[data-size='sm'] {
+  font-size: var(--rp-font-size-sm);
+}
+
+.rp-money[data-size='lg'] {
+  font-size: var(--rp-font-size-xl);
+}
+
+.rp-money[data-size='xl'] {
+  font-size: var(--rp-font-size-3xl);
+}
+
+.rp-money[data-strong] {
+  font-weight: var(--rp-font-weight-bold);
+}
+
+.rp-money[data-negative] {
+  color: var(--rp-color-danger-text);
+}
