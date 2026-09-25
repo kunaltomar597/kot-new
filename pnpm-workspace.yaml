@@ -7,3 +7,11 @@ onlyBuiltDependencies:
   - '@prisma/engines'
   - '@swc/core'
   - prisma
+
+# Security overrides for transitive dependencies with no fixed parent release yet (SEC-013).
+# Remove each one when the parent ships the fix.
+overrides:
+  # GHSA-3f6p-5ww8-9rcr, via prisma 7.10.0.
+  mysql2@<3.22.0: ^3.22.0
+  # GHSA-ggr8-5vv4-36mx, via @prisma/config 7.10.0.
+  deepmerge-ts@<8.0.0: ^8.0.0
