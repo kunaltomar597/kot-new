@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.turbo
+pnpm-lock.yaml
+docs/brd/*.txt
+docs/brd/*.pdf
+docs/brd/requirements.json
+docs/brd/requirements.md
+firmware

@@ -1,0 +1,24 @@
+{
+  "name": "@rp/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework-free business logic: money, tax, billing, business dates, invoice numbering, state machines, permissions, KOT routing (NFR-M02).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist coverage"
+  }
+}
