@@ -1,0 +1,89 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "valid": { "type": "boolean" },
+      "checkedEntries": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "head": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            },
+            "required": ["seq", "hash"]
+          },
+          { "type": "null" }
+        ]
+      },
+      "firstBreak": {
+        "type": "object",
+        "properties": {
+          "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "entryId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["HASH_MISMATCH", "PREV_HASH_MISMATCH", "SEQUENCE_GAP"]
+          }
+        },
+        "required": ["seq", "entryId", "reason"]
+      },
+      "verifiedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      }
+    },
+    "required": ["valid", "checkedEntries", "head", "verifiedAt"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "valid": { "type": "boolean" },
+      "checkedEntries": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "head": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            },
+            "required": ["seq", "hash"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "firstBreak": {
+        "type": "object",
+        "properties": {
+          "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "entryId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["HASH_MISMATCH", "PREV_HASH_MISMATCH", "SEQUENCE_GAP"]
+          }
+        },
+        "required": ["seq", "entryId", "reason"],
+        "additionalProperties": false
+      },
+      "verifiedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      }
+    },
+    "required": ["valid", "checkedEntries", "head", "verifiedAt"],
+    "additionalProperties": false
+  }
+}

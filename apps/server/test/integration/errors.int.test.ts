@@ -3,11 +3,14 @@ import { ApiError, SubmitOrderRequest } from '@rp/contracts';
 import { DomainError } from '@rp/domain';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Public } from '../../src/auth/decorators.js';
 import { AppError } from '../../src/errors/app-error.js';
 import { ZodValidationPipe } from '../../src/validation/zod-validation.pipe.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
 
+// Public: these probes exercise error mapping, not authorisation.
+@Public()
 @Controller('probe')
 class ProbeController {
   @Get('domain')

@@ -1,0 +1,19 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "required": ["seq", "hash"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "required": ["seq", "hash"],
+    "additionalProperties": false
+  }
+}

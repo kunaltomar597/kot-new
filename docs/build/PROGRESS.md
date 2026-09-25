@@ -29,7 +29,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-09 Audit log service (needs P0-08).
+- P0-10 Authentication, sessions, RBAC and manager override (P0-08 and P0-09 done).
 - P0-12 Real-time and domain-event infrastructure (outbox table exists).
 - P0-15 LAN TLS decision and implementation.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -46,7 +46,7 @@ Recommended next WPs (dependencies met):
 - [x] P0-06 CI security baseline and contract docs
 - [x] P0-07 Local server skeleton
 - [x] P0-08 Database schema v1 and least-privilege roles
-- [ ] P0-09 Audit log service
+- [x] P0-09 Audit log service
 - [ ] P0-10 Authentication, sessions, RBAC, manager override
 - [ ] P0-11 Device pairing and device credentials
 - [ ] P0-12 Real-time and domain-event infrastructure
@@ -189,6 +189,30 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-25: P0-09 audit log service
+
+Built `apps/server/src/audit` (service with hash chain under an advisory lock, verify, chain head,
+`@Audited()` interceptor, `GET /api/v1/audit/verify`), `canonicalJson` in `@rp/domain`, the
+`AuditVerifyResponse` contract and route, and the global deny-by-default `PermissionGuard` with
+`@Public()` / `@RequireCapability()` in `apps/server/src/auth` (pulled forward from P0-10 because the
+verify endpoint needed protection). Migration `*_audit_hash_chain` adds `chain_seq` and makes the
+hashes required. Tests: entries chain; business date follows the 04:00 IST cut-off; before/after
+survive the JSONB round trip; audit writes roll back with their transaction and the position is
+reused; 25 concurrent writers give one valid chain; verify detects an edited row, a re-hashed
+forgery (at the next link), a removed middle row and a wrong genesis link, accepts purged prefixes
+and chains longer than one batch; 401/403/200 on the endpoint; undeclared routes, OVERRIDE and OWN
+grants behave as documented; `@Audited` records actor/device/entity/correlation and nothing on
+failure.
+
+Notes for the next session:
+
+- P0-10: set `request.principal` in an authentication middleware or guard that runs before
+  `PermissionGuard`; replace the `OVERRIDE_REQUIRED` refusal with override-token validation; add
+  the object-level ownership helper for `request.ownershipRequired`.
+- Use `AuditService.record(tx, ...)` inside the business transaction for every money action; the
+  interceptor is only for simple admin actions.
+- Test controllers need `@Public()` or `@RequireCapability()` now (see `errors.int.test.ts`).
 
 ### 2026-09-25: P0-08 database schema v1 and least-privilege roles
 

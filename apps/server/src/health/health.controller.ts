@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { Controller, Get, Inject, Res } from '@nestjs/common';
 import type { HealthResponse, VersionResponse } from '@rp/contracts';
 import type { Response } from 'express';
+import { Public } from '../auth/decorators.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 
@@ -23,7 +24,11 @@ function readPackageVersion(): { name: string; version: string } {
 
 const PACKAGE = readPackageVersion();
 
-/** Liveness, readiness and version endpoints. Public: they reveal no business data. */
+/**
+ * Liveness, readiness and version endpoints. Public: the watchdog and devices call them before
+ * anyone signs in, and they reveal no business data.
+ */
+@Public()
 @Controller()
 export class HealthController {
   constructor(

@@ -13,3 +13,4 @@ export * from './machines/service-request.js';
 export * from './machines/license.js';
 export * from './menu-selection.js';
 export * from './kot.js';
+export * from './canonical-json.js';

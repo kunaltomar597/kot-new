@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { runWithRequestContext } from '../common/request-context.js';
 import { isBodyParserError, mapError } from '../errors/error-mapping.js';
 import { CORRELATION_HEADER, resolveCorrelationId } from '../logging/correlation.js';
 
@@ -6,7 +7,8 @@ type RequestWithId = Request & { id?: unknown };
 
 /**
  * First middleware of every request: assigns the correlation ID before anything else can fail,
- * so even body-parsing errors carry one (NFR-O01). The logger reuses `req.id`.
+ * so even body-parsing errors carry one (NFR-O01). The logger reuses `req.id`; services (for
+ * example the audit log) read it from the request context.
  */
 export function correlationMiddleware(
   request: Request,
@@ -16,7 +18,7 @@ export function correlationMiddleware(
   const id = resolveCorrelationId(request.headers[CORRELATION_HEADER]);
   (request as RequestWithId).id = id;
   response.setHeader(CORRELATION_HEADER, id);
-  next();
+  runWithRequestContext({ correlationId: id }, next);
 }
 
 /**

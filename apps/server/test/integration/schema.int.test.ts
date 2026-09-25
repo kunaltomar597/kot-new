@@ -1,6 +1,7 @@
 import { CAPABILITIES, ORDER_ITEM_STATES, ORDER_SOURCES, ROLES, TABLE_STATES } from '@rp/domain';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { AuditService } from '../../src/audit/audit.service.js';
 import { newId } from '../../src/common/ids.js';
 import { seedDevelopmentData, type SeedSummary } from '../../src/database/dev-seed.js';
 import { allocateDailyNumber, allocateInvoiceSequence } from '../../src/database/numbering.js';
@@ -201,25 +202,25 @@ describe('[AUD-004] append-only audit log', () => {
   let auditId: string;
 
   beforeAll(async () => {
-    const entry = await prisma.auditLog.create({
-      data: {
-        restaurantId: seed.restaurantId,
-        businessDate: new Date('2026-09-25'),
+    const audit = new AuditService(prisma);
+    const entry = await prisma.transaction((tx) =>
+      audit.record(tx, {
         action: 'TEST_ENTRY',
         entityType: 'restaurant',
         entityId: seed.restaurantId,
         after: { ok: true },
-      },
-    });
+      }),
+    );
     auditId = entry.id;
   });
 
   it('lets rp_app insert and read audit rows but not update them', async () => {
     await asRole('rp_app', async (client) => {
       await client.query(
-        `INSERT INTO audit_log (id, restaurant_id, business_date, action, entity_type)
-         VALUES ($1, $2, '2026-09-25', 'APP_ENTRY', 'restaurant')`,
-        [newId(), seed.restaurantId],
+        `INSERT INTO audit_log
+           (id, restaurant_id, business_date, action, entity_type, chain_seq, prev_hash, hash)
+         VALUES ($1, $2, '2026-09-25', 'APP_ENTRY', 'restaurant', 999999, $3, $3)`,
+        [newId(), seed.restaurantId, '0'.repeat(64)],
       );
       await expect(
         client.query(`UPDATE audit_log SET reason = 'x' WHERE id = $1`, [auditId]),

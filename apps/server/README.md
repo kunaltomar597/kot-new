@@ -48,6 +48,33 @@ of truth for the restaurant.
   `pnpm --filter @rp/server build && DATABASE_URL=... pnpm --filter @rp/server db:seed`. It refuses
   to run on a database that already has a restaurant. Staff PINs come with P0-10.
 
+## Audit log and authorisation (P0-09)
+
+- `src/audit/audit.service.ts`: `AuditService.record(tx, entry)` appends an entry inside the
+  caller's transaction (AUD-001, AUD-002): server time, business date (restaurant cut-off and time
+  zone), actor, approver, device, action (`UPPER_SNAKE`), entity type (`lower_snake`) and id,
+  before/after JSON, reason, correlation ID (from the request context). Never put PINs, tokens or
+  secrets in before/after.
+- Hash chain (AUD-003): `hash = SHA-256(canonicalJson(entry without hash) + prevHash)`
+  (`src/audit/audit-hash.ts`, `canonicalJson` from `@rp/domain`); the first entry points at 64
+  zeros. Writers take `pg_advisory_xact_lock(AUDIT_CHAIN_LOCK)`, so the chain stays linear under
+  concurrency; `chain_seq` is unique, so a writer in a REPEATABLE READ or SERIALIZABLE transaction
+  that raced another fails instead of forking the chain (retry it).
+- `verify()` recomputes the chain in batches of 500 and reports the first `HASH_MISMATCH`,
+  `PREV_HASH_MISMATCH` or `SEQUENCE_GAP`; entries purged from the start (P7-06) are expected.
+  `chainHead()` returns `{ seq, hash }` for heartbeats (P0-17, P7-03).
+  `GET /api/v1/audit/verify` needs `AUDIT_VIEW` (Owner, Manager).
+- `@Audited({ action, entityType, entityIdParam? })`: records after the handler succeeds, in its
+  own transaction. Only for simple administrative actions; money actions call `record` inside their
+  business transaction.
+- `src/auth`: the global `PermissionGuard` (deny by default, AUTH-010, SEC-003) with `@Public()`
+  and `@RequireCapability()`. Every route declares one or the other; undeclared routes answer 403.
+  ALLOW passes, OWN passes with `request.ownershipRequired` set for the service to check, OVERRIDE
+  answers `OVERRIDE_REQUIRED` until P0-10 adds override tokens, DENY answers 403. The request
+  principal (`src/auth/principal.ts`) is set by authentication in P0-10; until then protected
+  routes answer 401. Tests authenticate through `createTestApp({ authenticate })`.
+- `src/common/request-context.ts`: per-request values (correlation ID) via AsyncLocalStorage.
+
 Feature modules are added to `src/app.module.ts` by later work packages, one Nest module per area:
 audit, auth, devices, realtime, settings, floor, menu, orders, kitchen, billing, payments, reports,
 notifications, mqtt, service-requests, recommendations, sync, licensing, backup, updates, diagnostics.
