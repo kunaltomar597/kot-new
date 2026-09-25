@@ -36,7 +36,10 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       'no-console': 'error',
       eqeqeq: ['error', 'always'],
     },
@@ -58,8 +61,14 @@ export default tseslint.config(
         {
           patterns: [
             { group: ['node:*'], message: 'packages/domain must not use Node built-ins.' },
-            { group: ['@nestjs/*', 'react', 'react-*', '@prisma/*', 'zod'], message: 'packages/domain is framework-free.' },
-            { group: ['@rp/*'], message: 'packages/domain must not depend on other workspace packages.' },
+            {
+              group: ['@nestjs/*', 'react', 'react-*', '@prisma/*', 'zod'],
+              message: 'packages/domain is framework-free.',
+            },
+            {
+              group: ['@rp/*'],
+              message: 'packages/domain must not depend on other workspace packages.',
+            },
           ],
         },
       ],

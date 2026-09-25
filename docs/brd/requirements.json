@@ -1,0 +1,2237 @@
+{
+  "source": "BRD v1.0 (25 Sep 2026)",
+  "generatedBy": "scripts/brd/build-requirements-catalog.mjs",
+  "counts": {
+    "M": 287,
+    "S": 24,
+    "C": 7
+  },
+  "requirements": [
+    {
+      "id": "AUTH-001",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Staff log in on shared devices by selecting their name/photo tile, then entering a numeric PIN (4 digits by default; the owner may require 6 ⚙ ). Choosing a name first means PINs need not be unique, and setting a PIN can never reveal someone else's."
+    },
+    {
+      "id": "AUTH-002",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "PINs shall never be stored, transmitted in logs or displayed in plain text. They shall be hashed with bcrypt (cost ≥ 12) or Argon2id (blueprint). Before hashing, they are combined with a server-side secret (\"pepper\") kept outside the database and protected by Windows DPAPI. A 4-digit PIN has only 10,000 combinations, so without the pepper a stolen database could be brute-forced in seconds."
+    },
+    {
+      "id": "AUTH-003",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "After 5 failed attempts within 10 minutes (blueprint) a staff login is locked for 15 minutes ⚙ or until a manager unlocks it. Attempts are also rate-limited per device."
+    },
+    {
+      "id": "AUTH-004",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "One reusable PIN-pad component is used for login and manager overrides across the POS, KDS, waiter app and table tablet (blueprint)."
+    },
+    {
+      "id": "AUTH-005",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "On successful login the server issues a short-lived signed access token (≤ 15 min ⚙ ) bound to staff member, role, restaurant and device, plus a refresh mechanism (blueprint: JWT). Sessions expire after inactivity (POS and waiter devices: 10 min ⚙ ) and are renewed automatically while the person is actively using the app (blueprint). KDS screens run in device-authenticated station mode: actions are attributed to the station. Individual kitchen logins can be switched on ⚙."
+    },
+    {
+      "id": "AUTH-006",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "The Owner account uses a strong password (≥ 12 characters) plus a TOTP second factor, which works offline. Both are required for: archive and purge, backup restore, full data export, license/subscription screens, tax and invoice settings, and creating or removing managers."
+    },
+    {
+      "id": "AUTH-007",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Device pairing. Every device (KDS screen, waiter phone, table tablet, pager, manager's browser) must be paired by a manager before it can talk to the server. 1. The manager generates a one-time pairing QR code (valid 10 min ⚙ ). 2. The device presents it. 3. The server issues a per-device credential (key pair or client certificate), stored in the device's secure storage (Android Keystore, ESP32 encrypted storage, browser non- exportable key). Requests from unpaired devices are rejected even when a valid PIN is entered."
+    },
+    {
+      "id": "AUTH-008",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Unpairing a device, or deactivating a staff member, revokes their tokens and closes their live connections within 5 seconds."
+    },
+    {
+      "id": "AUTH-009",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Each table tablet is paired to one table; re-assigning it requires a manager PIN. A tablet can only read or act on its own table."
+    },
+    {
+      "id": "AUTH-010",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Role-based access control per §4.2 is enforced on the server for every REST call, socket event and MQTT topic. Hiding buttons in the UI is not a security control."
+    },
+    {
+      "id": "AUTH-011",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Manager override: actions marked PIN in §4.2 prompt for a manager's PIN on the current device. The audit log records both the requester and the approver."
+    },
+    {
+      "id": "AUTH-012",
+      "area": "AUTH",
+      "priority": "S",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "The Owner can create custom roles by combining permissions."
+    },
+    {
+      "id": "AUTH-013",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Logins, logouts, failed attempts, lockouts and overrides are written to the audit log (AUD)."
+    },
+    {
+      "id": "AUTH-014",
+      "area": "AUTH",
+      "priority": "M",
+      "section": "6.1 Authentication, sessions and device pairing (AUTH)",
+      "text": "Vendor staff have no standing access to a restaurant's local system (see UPD-008, UPD-009)."
+    },
+    {
+      "id": "ONB-001",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "A single signed Windows installer sets up: the Local Server and PostgreSQL as auto-starting Windows services; the watchdog; the POS/Manager desktop app. No manual database setup is needed (blueprint)."
+    },
+    {
+      "id": "ONB-002",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "Data drive selection. The installer lists local fixed drives with free space and defaults to the first non-system drive (e.g., D:) if one exists. Otherwise it uses C: and shows a warning. It refuses network and removable drives and requires ≥ 20 GB ⚙ free space."
+    },
+    {
+      "id": "ONB-003",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "Activation requires a one-time activation code issued from the Vendor Control Plane. It binds the license to the restaurant and the PC (LIC-004)."
+    },
+    {
+      "id": "ONB-004",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "The first-run setup wizard is usable by a non-technical manager, saves progress and can be resumed. Steps: 1. Restaurant profile: legal name, display name, address, state, GSTIN, FSSAI license number, logo, contact, business hours, business-day cut-off time (default 04:00 ⚙ ). 2. Tax setup: tax groups (e.g., \"GST 5 %\" = CGST 2.5 % + SGST 2.5 %; rates entered by the restaurant, never hard-coded), SAC code, prices tax-inclusive or tax-exclusive ⚙, rounding rule. 3. Invoice settings: series prefix, financial-year reset, header/footer, service charge (off by default). 4. Accounts: Owner (password + 2FA), managers. 5. Floor: sections and tables (number/name, capacity). Visual drag-and-drop layout is S. 6. Stations and printers: kitchen stations; network printer auto-discovery (S) or manual IP (blueprint); test print; station ↔ printer mapping; per-station mode screen / print / both (blueprint). 7. Menu import (ONB-005, ONB-006). 8. Staff and PINs, section assignment. 9. Device pairing: tablets, waiter phones, KDS screens, pagers. 10. QR codes: generate and print table tents (PDF, A6/A5). 11. Go-live check: a guided test order through every path (waiter, tablet, QR, KDS, pager, bill) before going live."
+    },
+    {
+      "id": "ONB-005",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "Excel/CSV menu import using a vendor-provided template: categories, items, prices, tax group, veg/non-veg/egg, tags, station, description, synonyms. Variants, modifiers and combos go in companion sheets. A validation report lists every error before anything is committed."
+    },
+    {
+      "id": "ONB-006",
+      "area": "ONB",
+      "priority": "S",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "AI-assisted menu import. Upload photos or a PDF of the printed menu. A Vendor Control Plane service extracts it into the template structure. A mandatory human review screen shows every item before commit. Requires internet; the AI provider's API key is held only in the vendor cloud."
+    },
+    {
+      "id": "ONB-007",
+      "area": "ONB",
+      "priority": "S",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "Bulk photo upload, matched automatically to items by file name or item code, with manual correction."
+    },
+    {
+      "id": "ONB-008",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "Onboarding can be done on-site or remotely. Remote onboarding uses a screen-sharing session started by the restaurant (UPD-009)."
+    },
+    {
+      "id": "ONB-009",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "Target: a restaurant with ≤ 150 items and ≤ 40 tables is fully operational within one business day, with the menu imported in ≤ 1 hour."
+    },
+    {
+      "id": "ONB-010",
+      "area": "ONB",
+      "priority": "S",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "Export and import of settings, for moving to a new PC or reinstalling."
+    },
+    {
+      "id": "ONB-011",
+      "area": "ONB",
+      "priority": "M",
+      "section": "6.2 Installation and onboarding (ONB)",
+      "text": "A printable site-readiness checklist covering PC spec, UPS, staff Wi-Fi separated from guest Wi-Fi, 2.4 GHz coverage in kitchen and floor, printer network, tablet offline speech pack (TAB-007) and BitLocker (SEC-007)."
+    },
+    {
+      "id": "MENU-001",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Structure: Menu → Categories (ordered, one level of sub-categories) → Items."
+    },
+    {
+      "id": "MENU-002",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Item attributes: name, short code, description, photo, base price, tax group; food type (veg / non-veg / egg), spice level (0-3), tags (Jain, bestseller, chef's special, allergens, custom); kitchen station, estimated prep time; availability, optional stock count, display order; visibility per channel (POS, waiter app, tablet, QR); external ID (INT-005)."
+    },
+    {
+      "id": "MENU-003",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Variants (e.g., Half/Full, Regular/Large), each with its own price."
+    },
+    {
+      "id": "MENU-004",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Modifier groups (e.g., \"Roti type\", \"Spice level\", \"Add-ons\") with required/optional, minimum/maximum selections and price deltas (+/−). A group can be reused across many items (blueprint)."
+    },
+    {
+      "id": "MENU-005",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Combos: a bundle of existing items and/or choice slots (e.g., \"any 1 beverage\") at a fixed price, with an optional active date range and time window for festivals or seasonal promotions (blueprint). Kitchen tickets always show each component item separately (blueprint)."
+    },
+    {
+      "id": "MENU-006",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Availability and stock (blueprint): Authorised roles (§4.2) can mark an item out of stock, or set a remaining quantity. The quantity decreases with each approved order and the item switches to out of stock at 0. Changes reach every in-restaurant device within 2 s, and the QR menu within 30 s when online. Items become non-orderable immediately."
+    },
+    {
+      "id": "MENU-007",
+      "area": "MENU",
+      "priority": "S",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Time-based availability (e.g., breakfast items 07:00-11:00 ⚙ )."
+    },
+    {
+      "id": "MENU-008",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Photos are stored locally, auto-resized into standard renditions (WebP) and served to in-restaurant devices. They are mirrored to cloud storage for the QR menu (blueprint). Uploads up to 5 MB, compressed automatically; metadata (EXIF) stripped."
+    },
+    {
+      "id": "MENU-009",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Price changes apply only to new order lines; open orders keep the price at the time of ordering. Every price change is audited."
+    },
+    {
+      "id": "MENU-010",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Items that have ever been ordered cannot be deleted, only archived (hidden), to preserve reports."
+    },
+    {
+      "id": "MENU-011",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Each item can have search synonyms (e.g., \"panir\", \"cottage cheese\"), used by text and voice search."
+    },
+    {
+      "id": "MENU-012",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Every ordering surface (POS, waiter app, tablet, QR menu) uses the same menu data and the same variant/modifier/combo selection logic and UI behaviour, built from shared components (blueprint)."
+    },
+    {
+      "id": "MENU-013",
+      "area": "MENU",
+      "priority": "M",
+      "section": "6.3 Menu management (MENU)",
+      "text": "Menus are versioned. Tablets and waiter apps cache the current menu locally and refresh when a change event arrives, or on reconnection."
+    },
+    {
+      "id": "TBL-001",
+      "area": "TBL",
+      "priority": "M",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Sections (e.g., Ground floor, Terrace) contain tables. A table has a number/name, capacity, section, QR code and, optionally, a paired tablet."
+    },
+    {
+      "id": "TBL-002",
+      "area": "TBL",
+      "priority": "M",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Waiter assignment: at shift start the manager assigns waiters to sections, and optionally to individual tables. The responsible waiter for a table is its assigned waiter; this can be overridden per table session."
+    },
+    {
+      "id": "TBL-003",
+      "area": "TBL",
+      "priority": "M",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Table session: a waiter (app) or cashier/manager (POS) opens a table, which records seated-at time, number of guests (covers) and responsible waiter, and unlocks the table tablet. The session ends when the bill is settled and the table closed; the tablet then resets (TAB-003)."
+    },
+    {
+      "id": "TBL-004",
+      "area": "TBL",
+      "priority": "M",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Table states: Free → Occupied → Bill requested → Bill printed → Settled/Free. \"Needs cleaning\" is S."
+    },
+    {
+      "id": "TBL-005",
+      "area": "TBL",
+      "priority": "M",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Move table (blueprint): moves an open session and all its orders from one table to a free table. Kitchen tickets update in place with a note such as \"Moved from T4 to T7\". No duplicate tickets. The old table's tablet resets; the new table's tablet unlocks."
+    },
+    {
+      "id": "TBL-006",
+      "area": "TBL",
+      "priority": "S",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Merge tables into one bill; transfer individual items between tables."
+    },
+    {
+      "id": "TBL-007",
+      "area": "TBL",
+      "priority": "M",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Table overview on the POS and manager dashboard, updated live without refresh (blueprint). For each table it shows: state, time seated, amount spent so far, responsible waiter; pending approvals and active service requests. Tapping a table opens its current order and running total (blueprint). From there the cashier can print the bill and close the table."
+    },
+    {
+      "id": "TBL-008",
+      "area": "TBL",
+      "priority": "M",
+      "section": "6.4 Tables, sections and sessions (TBL)",
+      "text": "Takeaway orders are created at the POS (waiter app is S) with a token number and optional customer name/phone. No table is involved."
+    },
+    {
+      "id": "ORD-001",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Order sources: POS, waiter app, table tablet, QR menu. Each order records its source, device and creating user (for staff) or table (for customers)."
+    },
+    {
+      "id": "ORD-002",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Orders and order items follow the state machine in Appendix B."
+    },
+    {
+      "id": "ORD-003",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Customer-originated orders (tablet and QR) require approval by a waiter, or by a cashier/manager, before reaching the kitchen. The approver can change quantities or remove items (with the diner's agreement) before approving, or reject with a reason. The diner's screen shows the status throughout."
+    },
+    {
+      "id": "ORD-004",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Approval can be given from: the waiter app; the POS; the table tablet itself, by the waiter entering their PIN (\"Approve at table\"), so approval happens while talking to the diner."
+    },
+    {
+      "id": "ORD-005",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "A pending approval alerts the responsible waiter (pager + app) and escalates to the manager if not acknowledged within N seconds ⚙ (NTF-005)."
+    },
+    {
+      "id": "ORD-006",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Staff-originated orders (POS, waiter app) go to the kitchen directly when \"Send KOT\" is pressed."
+    },
+    {
+      "id": "ORD-007",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "When an order is approved or sent: items are split by kitchen station, and one KOT is produced per station (screen, print or both per station setting); combos are exploded into their components; variants, modifiers and instructions appear under each item."
+    },
+    {
+      "id": "ORD-008",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "KOT numbers are sequential per business day. Each KOT shows table/token, waiter, source, time, KOT number and order number."
+    },
+    {
+      "id": "ORD-009",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "A table session can contain multiple orders and KOTs (rounds). The bill aggregates all of them."
+    },
+    {
+      "id": "ORD-010",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Item status (Pending approval → Sent → Preparing → Ready → Picked up → Served, or Rejected / Cancelled / Voided) is broadcast in real time to the POS, manager dashboard, waiter app, KDS and the table's tablet (blueprint)."
+    },
+    {
+      "id": "ORD-011",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Cancellation rules. Before submission, the diner or waiter can freely edit the cart. After submission but before approval, the approver can edit or reject. After Sent but before Preparing, a waiter can cancel with a reason. The KDS shows the cancellation prominently, and a \"CANCELLED\" slip prints if the station prints. After Preparing, only a void is possible, needing a manager PIN and a reason. It appears in the voids/wastage report."
+    },
+    {
+      "id": "ORD-012",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Changes after a KOT (quantity, instruction) generate a \"MODIFIED\" delta ticket. Nothing changes silently."
+    },
+    {
+      "id": "ORD-013",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Idempotency (blueprint). Every submission carries a client-generated unique ID. Retries, double taps and relay replays never create duplicate orders, KOTs or stock deductions."
+    },
+    {
+      "id": "ORD-014",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "The server recomputes all prices, taxes, discounts and availability from its own data. Prices sent by any client are ignored."
+    },
+    {
+      "id": "ORD-015",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Special instructions per item (≤ 140 characters ⚙ ) and per order."
+    },
+    {
+      "id": "ORD-016",
+      "area": "ORD",
+      "priority": "S",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "Hold and fire: a waiter can hold items (e.g., mains) and release them to the kitchen later."
+    },
+    {
+      "id": "ORD-017",
+      "area": "ORD",
+      "priority": "M",
+      "section": "6.5 Order management, all channels (ORD)",
+      "text": "If an item becomes unavailable between adding it to the cart and submission, the server rejects that line with a clear message. The user can confirm submission of the rest."
+    },
+    {
+      "id": "KDS-001",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "The KDS is a browser-based mode of the web console, served by the local server. It runs full-screen on any modern browser device (Android tablet/TV, mini-PC) that has been paired as a KDS device."
+    },
+    {
+      "id": "KDS-002",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Each KDS device is assigned one or more stations and shows only their tickets. An \"Expo/Pass\" view of all stations is S."
+    },
+    {
+      "id": "KDS-003",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "A ticket card shows: KOT number, table/token, waiter, source, live time since sent; items with quantity, variant, modifiers and instructions, with combo components grouped under the combo name; badges for Moved, Modified and Cancelled."
+    },
+    {
+      "id": "KDS-004",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Ticket age uses colour thresholds ⚙ (default green < 10 min, amber 10-20 min, red > 20 min), always paired with an icon or text, not colour alone."
+    },
+    {
+      "id": "KDS-005",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Per-item and per-ticket actions: Mark preparing and Mark ready (blueprint). \"Ready\" triggers the notification to the responsible waiter (NTF). Bump removes a completed ticket; Recall restores recently bumped tickets."
+    },
+    {
+      "id": "KDS-006",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Ready-not-collected (blueprint): if ready items are not picked up within X minutes ⚙ (default 3), the ticket flashes and shows a \"Notify manager\" button that sends an alert to the manager on duty. Automatic escalation without pressing the button is S ⚙."
+    },
+    {
+      "id": "KDS-007",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Items are marked picked up at the pass on the KDS, or by the waiter in the app."
+    },
+    {
+      "id": "KDS-008",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Printing (blueprint): Each station's mode is screen, print or both ⚙. Printers can be network (IP) or USB, ESC/POS, 80 mm or 58 mm. KOTs can be reprinted. If a printer is offline, the POS and manager are alerted. In print-only mode KOTs are queued and printed on recovery, or reprinted on another printer chosen by the manager."
+    },
+    {
+      "id": "KDS-009",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Audible chime for new tickets; a distinct sound for cancellations and modifications; volume ⚙."
+    },
+    {
+      "id": "KDS-010",
+      "area": "KDS",
+      "priority": "S",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "All-day summary: total quantity of each item pending across open tickets."
+    },
+    {
+      "id": "KDS-011",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Dark theme by default, readable from 2 m, touch targets ≥ 48 px, usable with wet or gloved hands."
+    },
+    {
+      "id": "KDS-012",
+      "area": "KDS",
+      "priority": "M",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "On connection loss the KDS shows a full-screen \"Disconnected\" banner, reconnects automatically and resynchronises without losing or duplicating tickets."
+    },
+    {
+      "id": "KDS-013",
+      "area": "KDS",
+      "priority": "C",
+      "section": "6.6 Kitchen Display System and kitchen printing (KDS)",
+      "text": "Bump-bar hardware support."
+    },
+    {
+      "id": "BILL-001",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "A bill for a table session or takeaway order shows: itemised lines (variants, modifiers, combos), quantity, unit price, line total; subtotal, discounts, service charge (if enabled); taxes per tax group with the CGST/SGST split; round-off and grand total; amount in words is S."
+    },
+    {
+      "id": "BILL-002",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Bills carry GST invoice particulars, with templates configurable to the restaurant CA's guidance: legal name, address, GSTIN, FSSAI license number; invoice number and date/time, SAC code, place of supply (state), tax breakdown; customer name and GSTIN, when given (B2B)."
+    },
+    {
+      "id": "BILL-003",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Invoice numbering. Unique and consecutive within each financial year, ≤ 16 characters, with a configurable prefix. Numbers are never reused or skipped. Cancelled invoices stay in the series with status Cancelled."
+    },
+    {
+      "id": "BILL-004",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Tax rates are configured per tax group and never hard-coded. Prices can be tax-inclusive or tax-exclusive ⚙."
+    },
+    {
+      "id": "BILL-005",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Discounts: item-level or bill-level, percentage or flat, with a mandatory reason. Each role has a limit ⚙ (e.g., cashier ≤ 10 %); above the limit needs a manager PIN. Complimentary (100 %) items need a manager PIN."
+    },
+    {
+      "id": "BILL-006",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Service charge is disabled by default. If enabled, it is labelled voluntary on the bill and can be removed at the diner's request (audited), consistent with consumer- protection guidelines (§12)."
+    },
+    {
+      "id": "BILL-007",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Split bill by items or into equal parts. Each part gets its own invoice number."
+    },
+    {
+      "id": "BILL-008",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Payment recording (no integration): Modes: Cash, Card, UPI, Other ⚙, with split across modes allowed. Cash tendered and change due are recorded; a reference number for card/UPI is optional. A bill is settled when recorded payments equal the total."
+    },
+    {
+      "id": "BILL-009",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Reprints are marked \"DUPLICATE\" and audited."
+    },
+    {
+      "id": "BILL-010",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Editing a printed bill (items, discount) needs a manager PIN and a reason, and the audit log stores before/after values. A settled bill cannot be edited: it can only be voided and re-issued, which needs a manager PIN. The voided invoice keeps its number and the new invoice gets a new number."
+    },
+    {
+      "id": "BILL-011",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Customer details are optional: name, phone (with an explicit consent checkbox for digital bill/feedback), GSTIN."
+    },
+    {
+      "id": "BILL-012",
+      "area": "BILL",
+      "priority": "S",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Digital bill by WhatsApp or SMS through a vendor-configured provider, sent only with consent and queued while offline. Bill content leaves the restaurant only for this purpose, and any hosted copy expires ⚙ (default 30 days)."
+    },
+    {
+      "id": "BILL-013",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Shift and day-end. Open a shift with an opening cash float; record cash in/out with a reason. Close the shift with expected vs. counted cash (denomination count is S); the variance is recorded. Day-end produces the Z-report and closes the business date. Open tables block day- end unless a manager carries them forward with a PIN."
+    },
+    {
+      "id": "BILL-014",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Bill printing on an ESC/POS printer (80 mm/58 mm) with a configurable template (logo, header, footer) and on-screen preview."
+    },
+    {
+      "id": "BILL-015",
+      "area": "BILL",
+      "priority": "M",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "A bill request from the tablet or waiter notifies the cashier (POS) and the responsible waiter, and sets the table state to Bill requested."
+    },
+    {
+      "id": "BILL-016",
+      "area": "BILL",
+      "priority": "S",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Cash-drawer kick through the receipt printer. \"No-sale\" drawer openings are audited."
+    },
+    {
+      "id": "BILL-017",
+      "area": "BILL",
+      "priority": "C",
+      "section": "6.7 POS billing, payments and day-end (BILL)",
+      "text": "Dynamic UPI QR with the amount on the bill; card-terminal and payment- gateway integration."
+    },
+    {
+      "id": "WTR-001",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "An Android app delivered as a signed APK, installed and updated through MDM or an in-app updater (UPD-001). It runs only on paired devices, with PIN login."
+    },
+    {
+      "id": "WTR-002",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Home: \"My tables\" (assigned section) showing table state, seated time, pending-approval badge and active service requests. A toggle shows all tables."
+    },
+    {
+      "id": "WTR-003",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Order taking: open a table (covers, waiter); browse categories, text search, item details; variant/modifier popup (shared component, MENU-012), combos, quantity, special instructions; Send KOT."
+    },
+    {
+      "id": "WTR-004",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Approvals inbox: tablet and QR orders for the waiter's tables. The waiter can view, edit, approve, or reject with a reason."
+    },
+    {
+      "id": "WTR-005",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Service-request inbox: Water / Waiter / Bill requests with table and age. Actions: acknowledge, resolve (clears the request, same as Cancel on the tablet). Alerts use a banner, sound and vibration that are hard to miss even when the app is in the background or the screen is locked (Android foreground service, high-priority notification) (blueprint)."
+    },
+    {
+      "id": "WTR-006",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "The app receives every alert the waiter's pager receives (order ready, new order to approve, manager nudges), and acknowledging in either place acknowledges both."
+    },
+    {
+      "id": "WTR-007",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Live item status per table; mark picked up / served."
+    },
+    {
+      "id": "WTR-008",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Move table (TBL-005) (blueprint); request the bill, which notifies the cashier. Printing the bill to the POS printer from the app is S."
+    },
+    {
+      "id": "WTR-009",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Cancellations and voids follow ORD-011. When needed, a manager enters their PIN on the waiter's device."
+    },
+    {
+      "id": "WTR-010",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Out-of-stock items are shown as unavailable in real time (blueprint)."
+    },
+    {
+      "id": "WTR-011",
+      "area": "WTR",
+      "priority": "S",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Upsell prompts: the top recommendations (REC) for the table's current order."
+    },
+    {
+      "id": "WTR-012",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Connectivity: A persistent \"Offline\" indicator shows when the server can't be reached. Unsent orders are kept as drafts on the device and resent on reconnection with the same idempotency key. They are never silently discarded. The waiter always sees clearly whether each KOT reached the kitchen."
+    },
+    {
+      "id": "WTR-013",
+      "area": "WTR",
+      "priority": "S",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Create takeaway orders."
+    },
+    {
+      "id": "WTR-014",
+      "area": "WTR",
+      "priority": "M",
+      "section": "6.8 Waiter (Captain) app (WTR)",
+      "text": "Shows the waiter's own pager with battery and connection status, and warns when the pager is offline or low on battery."
+    },
+    {
+      "id": "TAB-001",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Android app locked in kiosk mode (Android device-owner lock-task mode, managed by MDM). Diners cannot leave the app, change settings or open other apps. Staff exit through a hidden gesture plus a manager PIN."
+    },
+    {
+      "id": "TAB-002",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Each tablet is paired to one table (AUTH-009)."
+    },
+    {
+      "id": "TAB-003",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Session lifecycle. While the table is not open, the tablet shows an idle screen (restaurant branding, promotions ⚙, \"Please wait to be seated\"). It unlocks when a table session is opened (TBL-003). When the session closes, the cart, order history, feedback and any customer data on the device are wiped."
+    },
+    {
+      "id": "TAB-004",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Home screen with four large labelled buttons: Water, Waiter, Bill, Cancel (blueprint), plus the entry to the menu. Water / Waiter / Bill each raise a service request to the table's responsible waiter (pager + app). Bill also notifies the cashier (BILL-015). A raised request stays active, with the button showing \"Requested, waiter notified\" and the elapsed time, until it is cancelled or resolved. Cancel works like a flight-cabin call button. It cancels the table's active request(s): The waiter presses it on arrival (resolving the request). The diner presses it if the request is no longer needed. If more than one request is active, the tablet asks which to cancel. With one active request, Cancel clears it directly. While active, the request re-alerts the waiter every R seconds ⚙ until acknowledged. If it is not acknowledged within N seconds ⚙ it escalates directly to the manager (NTF- 005). After acknowledgement the tablet shows \"Waiter is on the way\". The same request type cannot be raised again while one is active (anti-spam)."
+    },
+    {
+      "id": "TAB-005",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Menu browsing: categories, and item cards with photo, price, veg/non-veg/egg marker, spice level, tags and bestseller badge; item detail with description; filters (veg only, Jain, spicy, bestseller) and sorting; a note on whether prices include or exclude taxes."
+    },
+    {
+      "id": "TAB-006",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Search: fuzzy text matching over names, synonyms (MENU-011) and tags. So \"something spicy\" returns items tagged spicy, and \"paneer dishes\" returns items whose name, synonyms or tags mention paneer (blueprint, extended)."
+    },
+    {
+      "id": "TAB-007",
+      "area": "TAB",
+      "priority": "S",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Voice search (blueprint): a microphone button uses Android's on-device speech recognition (English) and feeds the recognised text into TAB-006. It works offline only if the tablet has Android's offline English speech pack installed, which is a site-readiness checklist item (ONB-011). If recognition isn't available, the button explains this and the diner can type instead."
+    },
+    {
+      "id": "TAB-008",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Cart: variant/modifier popup (shared component), quantity, special instructions, and a review screen with the subtotal and estimated taxes."
+    },
+    {
+      "id": "TAB-009",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Submit → status \"Waiting for waiter confirmation\" and the waiter is notified (ORD-003, ORD-005). After approval, each item's status is shown live: Received → Preparing → Ready → Served (blueprint note)."
+    },
+    {
+      "id": "TAB-010",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "My order: all items ordered in this session, their status and the running total."
+    },
+    {
+      "id": "TAB-011",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Recommendations (REC) on the menu, item and cart screens, each with its reason (e.g., \"Goes well with Butter Chicken\", \"Bestseller\")."
+    },
+    {
+      "id": "TAB-012",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Out-of-stock items become unavailable in real time (blueprint)."
+    },
+    {
+      "id": "TAB-013",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "If the tablet can't reach the server, ordering and service buttons are disabled with the message \"Please call a waiter\", and the tablet recovers automatically."
+    },
+    {
+      "id": "TAB-014",
+      "area": "TAB",
+      "priority": "S",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Feedback after the bill: food and service ratings (1-5) plus an optional comment. The diner can optionally give a phone number, with explicit consent, for a digital bill and feedback follow-up."
+    },
+    {
+      "id": "TAB-015",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Device health (battery %, charging, connectivity, app version) is reported to the manager dashboard. A low-battery alert fires at 20 % ⚙."
+    },
+    {
+      "id": "TAB-016",
+      "area": "TAB",
+      "priority": "M",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Diner-friendly design: large text, high contrast, plain language, no login, and first order placed unaided within 2 minutes (§7.4)."
+    },
+    {
+      "id": "TAB-017",
+      "area": "TAB",
+      "priority": "S",
+      "section": "6.9 Customer table tablet (TAB)",
+      "text": "Estimated preparation time per order, from item prep times and current kitchen load."
+    },
+    {
+      "id": "QR-001",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Each table has a unique QR code (printable table tent) encoding the restaurant, the table and an unguessable token. Regenerating a table's code invalidates the old one."
+    },
+    {
+      "id": "QR-002",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "A public, mobile-first website (no app, no login) shows the restaurant's live menu: items, photos, prices, tags, availability, variants, modifiers and combos. It uses the same data model and selection behaviour as every other surface (MENU-012) (blueprint)."
+    },
+    {
+      "id": "QR-003",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Menu sync (blueprint): menu, price and availability changes are pushed from the local server to the cloud within 30 s when online. While offline, changes are queued in a local outbox and retried automatically with backoff, never silently dropped."
+    },
+    {
+      "id": "QR-004",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Browse, search (with synonyms and tags), filter, cart, special instructions and recommendations: best sellers and rules, plus learned pairings from the nightly snapshot."
+    },
+    {
+      "id": "QR-005",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Dine-in only. No payment before ordering. Customer name is optional."
+    },
+    {
+      "id": "QR-006",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Orders are submitted to the relay through a server-side function, never by writing to the database directly from the browser. The function: validates the table token; validates items against the latest menu snapshot; enforces rate limits (default 5 submissions per 10 minutes per table and per browser ⚙ ); stores the order with its idempotency key."
+    },
+    {
+      "id": "QR-007",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Customer-visible status (blueprint): 1. \"Sending your order to the restaurant...\" 2. \"Received, waiting for waiter confirmation\" 3. \"Your order has been sent to the kitchen\" 4. Item-level statuses (S). If the restaurant has not picked up the order within T seconds ⚙ (default 60), the page shows \"We couldn't reach the restaurant right now. Please call a waiter.\" The relay marks the order expired, and the local server rejects expired orders if they arrive later. This way no diner waits for an order that was never received."
+    },
+    {
+      "id": "QR-008",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "The local server sends a presence signal to the relay every 30 s ⚙. If none arrives for 2 minutes ⚙, the QR site switches to read-only menu mode with a banner and ordering disabled."
+    },
+    {
+      "id": "QR-009",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Once received locally, a QR order becomes a normal order (source = QR) that needs waiter approval (ORD-003). The rest of the system treats it like any other order (blueprint)."
+    },
+    {
+      "id": "QR-010",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "If a QR order arrives for a table that isn't open, it still enters pending approval, routed to the responsible waiter of that table's section. Approving it opens the table."
+    },
+    {
+      "id": "QR-011",
+      "area": "QR",
+      "priority": "S",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Call waiter / request bill from the QR page, using the same service-request flow as the tablet, for tables without tablets."
+    },
+    {
+      "id": "QR-012",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Performance: the first menu view's Largest Contentful Paint is ≤ 2.5 s on a mid-range Android phone over 4G. Photos are served through a CDN in responsive sizes."
+    },
+    {
+      "id": "QR-013",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "A privacy notice and terms are linked on the page. No advertising or third- party tracking; only essential, anonymous usage metrics."
+    },
+    {
+      "id": "QR-014",
+      "area": "QR",
+      "priority": "M",
+      "section": "6.10 QR online menu and dine-in ordering (QR)",
+      "text": "Tenant isolation. No QR code, token or credential of one restaurant can read or write another restaurant's menu or orders. This is verified by automated tests (SEC- 005) (blueprint: dedicated isolation test)."
+    },
+    {
+      "id": "REC-001",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "A three-layer engine runs inside the local server. Results are served to the tablet and waiter app, and published as a snapshot to the QR relay."
+    },
+    {
+      "id": "REC-002",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Layer 1, manual rules (highest priority). The restaurant defines rules such as \"if the order contains item/category X, suggest item/category Y\", each with a priority, an optional time-of-day window, an optional date range and target channels. Rules are managed on the dashboard."
+    },
+    {
+      "id": "REC-003",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Layer 2, learned \"frequently ordered together\" (machine learning). Association-rule mining (e.g., FP-Growth/Apriori, or co-occurrence with lift) over that restaurant's own orders in a rolling window (90 days ⚙ ). Retrained nightly on the local server; no cloud required. Minimum support, confidence and lift thresholds ⚙. Activated only after a minimum order volume (300 orders ⚙ ) to avoid noisy suggestions."
+    },
+    {
+      "id": "REC-004",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Layer 3, best sellers. Used when nothing has been ordered yet or no rule applies. Ranked by quantity over the last 30 days ⚙ and segmented by time of day (breakfast / lunch / evening / dinner windows ⚙ )."
+    },
+    {
+      "id": "REC-005",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Filters applied to all layers: exclude out-of-stock items; exclude items already in the order, unless the item is marked \"repeatable\" (e.g., beverages, breads) ⚙; respect the table's veg-only filter; course awareness: favour the next course in a configurable category sequence (starters → mains → breads → desserts → beverages ⚙ )."
+    },
+    {
+      "id": "REC-006",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Every recommendation carries a human-readable reason label."
+    },
+    {
+      "id": "REC-007",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Recommendations are table-level only: no personal profiles and no cross- visit history in v1."
+    },
+    {
+      "id": "REC-008",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Tracking per layer and per item: impressions, taps, add-to-cart, ordered. This feeds the recommendation-performance report (RPT-012)."
+    },
+    {
+      "id": "REC-009",
+      "area": "REC",
+      "priority": "S",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "The manager can boost or pin items (e.g., high margin, overstocked) and block items from being recommended."
+    },
+    {
+      "id": "REC-010",
+      "area": "REC",
+      "priority": "C",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Personalised recommendations with the diner's consent; A/B testing of strategies."
+    },
+    {
+      "id": "REC-011",
+      "area": "REC",
+      "priority": "M",
+      "section": "6.11 Recommendation engine (REC)",
+      "text": "Recommendations are returned in ≤ 200 ms on the LAN."
+    },
+    {
+      "id": "NTF-001",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "A central notification service in the local server turns events into alerts using rules that decide recipients and channels. Channels: pager, waiter app, POS, manager dashboard, KDS, table tablet display."
+    },
+    {
+      "id": "NTF-002",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "The manager can configure rules on the dashboard (brief: \"notifications as per the configurations made\"). For each event type: recipients: responsible waiter, all waiters in the section, all waiters, manager(s) on duty, cashier, or a station; channels; escalation timeout N ⚙ and repeat interval R ⚙. Factory defaults are in Appendix C."
+    },
+    {
+      "id": "NTF-003",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "Event types (minimum): customer order pending approval; item/ticket ready (blueprint); service request Water / Waiter / Bill (blueprint); ready-not-collected, via the kitchen's \"Notify manager\" button (blueprint); manager nudge to a waiter (blueprint); order cancelled/modified (to kitchen); device offline or low battery (pager, tablet, KDS, printer); disk space, backup failure, license state change, update available/installed."
+    },
+    {
+      "id": "NTF-004",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "Acknowledgement. The recipient acknowledges on the pager button or in the app. Acknowledging stops repeats and escalation; the acknowledgement time is recorded for reports."
+    },
+    {
+      "id": "NTF-005",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "Escalation. If an alert is not acknowledged within N seconds ⚙ (default 60), it goes directly to the manager(s) on duty (on the POS, the manager dashboard, and the manager's pager/app if one is assigned). Escalations are logged and appear in staff reports."
+    },
+    {
+      "id": "NTF-006",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "Delivery. Alerts are delivered at least once and de-duplicated on the device. Devices resynchronise missed alerts on reconnection. Latency is ≤ 2 s (95th percentile) from event to pager vibration on the LAN."
+    },
+    {
+      "id": "NTF-007",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "If the responsible waiter's pager and app are both offline, the alert goes to the manager immediately, without waiting N seconds."
+    },
+    {
+      "id": "NTF-008",
+      "area": "NTF",
+      "priority": "M",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "Manager nudge: choose one or more waiters, then a preset message (e.g., \"Come to counter\", \"Check T7\") or short text of ≤ 40 characters so it fits the pager display."
+    },
+    {
+      "id": "NTF-009",
+      "area": "NTF",
+      "priority": "S",
+      "section": "6.12 Notifications, alerts and escalation (NTF)",
+      "text": "A waiter can set \"On break\". Their alerts then go to the manager until they return."
+    },
+    {
+      "id": "PGR-001",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "A wrist-worn device based on the ESP32 family (ESP32-S3 or equivalent), using a pre-certified radio module, with: a vibration motor and an LED; a display showing at least 2 lines × 12 characters, legible indoors (e.g., \"T7 READY\"); at least one physical button (acknowledge); a rechargeable battery with USB-C or dock charging."
+    },
+    {
+      "id": "PGR-002",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Battery life ≥ 14 hours of shift use at a typical load (≤ 60 alerts per hour). This is a prototype gate: it must be demonstrated on real hardware before pager development goes beyond the prototype (§17)."
+    },
+    {
+      "id": "PGR-003",
+      "area": "PGR",
+      "priority": "S",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Splash resistance (target IP54), a comfortable strap, and operation at 0-45 °C (kitchen environment)."
+    },
+    {
+      "id": "PGR-004",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "The pilot may use off-the-shelf ESP32 watch hardware (for example LilyGO T-Watch S3) if it meets PGR-001 and PGR-002. Custom hardware is future scope."
+    },
+    {
+      "id": "PGR-005",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Connects to the staff Wi-Fi (WPA2/WPA3) and to the local MQTT broker over TLS with a per-device credential. The pager subscribes only to its own topic, and broker access rules stop any pager reading another's messages."
+    },
+    {
+      "id": "PGR-006",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "On an alert the pager: vibrates with a pattern per alert type ⚙ (e.g., ready = one long, service request = two short, manager/escalation = three); lights the LED and shows short text (\"T7 READY\", \"T4 WATER\", \"T5 NEW ORDER\", \"MGR: COME TO COUNTER\"). Several alerts are queued and a count is shown. A short press acknowledges the current alert; a long press scrolls through queued alerts."
+    },
+    {
+      "id": "PGR-007",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Heartbeat every 30 s ⚙ with battery %, signal strength (RSSI) and firmware version. The server marks a pager offline after 3 missed heartbeats. The pager shows a \"no connection\" icon and vibrates once when it loses the connection."
+    },
+    {
+      "id": "PGR-008",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Reliable delivery: MQTT QoS 1 with message IDs for de-duplication. Unacknowledged alerts are delivered again after reconnection."
+    },
+    {
+      "id": "PGR-009",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Power management (Wi-Fi power save / light sleep between messages) sufficient to meet PGR-002 without breaking NTF-006 latency."
+    },
+    {
+      "id": "PGR-010",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Production devices enable secure boot and flash encryption. Credentials live in encrypted storage. The debug/serial console is disabled or locked. There are no default passwords."
+    },
+    {
+      "id": "PGR-011",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Over-the-air firmware updates are signed, use A/B partitions and roll back automatically if the new firmware fails to boot. They are distributed through the local server from firmware released in the Vendor Control Plane."
+    },
+    {
+      "id": "PGR-012",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "Pairing and assignment: the manager pairs a pager (scan its QR code/serial) and assigns it to a waiter. The server stores which pager belongs to which waiter (blueprint). Re-assignment at shift start takes ≤ 30 s."
+    },
+    {
+      "id": "PGR-013",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "At low battery (≤ 15 % ⚙ ) the pager alerts both the wearer and the manager."
+    },
+    {
+      "id": "PGR-014",
+      "area": "PGR",
+      "priority": "M",
+      "section": "6.13 Wrist pager (PGR)",
+      "text": "A manager can also wear a pager to receive escalations."
+    },
+    {
+      "id": "MGR-001",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "A web app served by the local server, from the same codebase as the POS. It opens on the restaurant PC and on any paired browser device (phone, laptop) on the staff network, for Manager and Owner roles only (blueprint)."
+    },
+    {
+      "id": "MGR-002",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Live table overview (TBL-007) (blueprint)."
+    },
+    {
+      "id": "MGR-003",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Live order feed across the restaurant with kitchen status, filterable by station, waiter and source, with delayed items highlighted (blueprint)."
+    },
+    {
+      "id": "MGR-004",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Staff management (blueprint): add, edit and deactivate staff (never delete, to keep audit history); roles; set/reset PINs; section assignment per shift; pager assignment."
+    },
+    {
+      "id": "MGR-005",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Menu management (MENU), including photos, descriptions, variants, modifiers, combos, availability and stock counts (blueprint)."
+    },
+    {
+      "id": "MGR-006",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Device management: every paired device with type, assigned table/station/person, status, battery, app/firmware version and last seen. Actions: pair, unpair, rename. \"Locate\" (make a tablet beep or a pager vibrate) is S."
+    },
+    {
+      "id": "MGR-007",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Configuration: notification rules, recommendation rules, stations and printers, service charge, discount limits, and all ⚙ timers and thresholds in this BRD. Tax and invoice settings are Owner only."
+    },
+    {
+      "id": "MGR-008",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Alert centre: escalations, kitchen flags, device and system alerts, each with acknowledge."
+    },
+    {
+      "id": "MGR-009",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Reports and exports (RPT); audit log viewer (AUD)."
+    },
+    {
+      "id": "MGR-010",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "System: storage usage, backup status, archive and purge (Owner, DATA), license status and reminders (LIC), update status and \"install now\" approval (UPD), \"send diagnostics to support\"."
+    },
+    {
+      "id": "MGR-011",
+      "area": "MGR",
+      "priority": "M",
+      "section": "6.14 Manager dashboard (MGR)",
+      "text": "Responsive layout, usable on a 360 px-wide phone and on desktop."
+    },
+    {
+      "id": "RPT-001",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Sales summary by day, by hour and by business-date range (blueprint)."
+    },
+    {
+      "id": "RPT-002",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Item-wise and category-wise sales: quantity, gross, discounts, net, tax (blueprint: by menu item)."
+    },
+    {
+      "id": "RPT-003",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Waiter-wise (blueprint): orders created and approved, sales; average acknowledgement time for service requests and alerts; escalations, cancellation/void requests."
+    },
+    {
+      "id": "RPT-004",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Source-wise (POS / waiter / tablet / QR) and order-type (dine-in / takeaway) sales."
+    },
+    {
+      "id": "RPT-005",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Payment-mode report, shift report with cash variance, and Z-report (day- end)."
+    },
+    {
+      "id": "RPT-006",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "GST reports: tax summary: taxable value, CGST and SGST by rate and SAC; invoice register: every invoice number in sequence, including cancelled ones. Both are made for the restaurant's CA to file returns."
+    },
+    {
+      "id": "RPT-007",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Discounts and complimentary items: who requested, who approved, the reason and the value."
+    },
+    {
+      "id": "RPT-008",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Cancellations and voids: item or bill, the stage at which it happened, who, approver, reason and value (wastage)."
+    },
+    {
+      "id": "RPT-009",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Reprints and post-print bill edits."
+    },
+    {
+      "id": "RPT-010",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Kitchen performance: average prep time by item and station, ready-to- pickup time, \"Notify manager\" events."
+    },
+    {
+      "id": "RPT-011",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Table metrics: covers, table turnover, average seated duration, average spend per cover."
+    },
+    {
+      "id": "RPT-012",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Recommendation performance: attach rate and revenue from recommended items, per layer (REC-008)."
+    },
+    {
+      "id": "RPT-013",
+      "area": "RPT",
+      "priority": "S",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Customer feedback: ratings trend and comments."
+    },
+    {
+      "id": "RPT-014",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Suspicious activity report (AUD-006)."
+    },
+    {
+      "id": "RPT-015",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Audit details (brief: \"which waiter generated the order etc.\"). Order-level report rows and drill-downs show: created by, source device, approved by; KOT times and each status timestamp; modified/cancelled/voided by, and the bill printed/settled by."
+    },
+    {
+      "id": "RPT-016",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Dashboard charts for key metrics (blueprint), with table views and drill- down to individual orders and bills."
+    },
+    {
+      "id": "RPT-017",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Export to PDF, Excel (.xlsx) and CSV. Every export is stamped with the restaurant, the filters, \"generated by\" and \"generated at\". Exports are audited. This is how the owner receives reports remotely: staff export and send them (decision Q2)."
+    },
+    {
+      "id": "RPT-018",
+      "area": "RPT",
+      "priority": "M",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Any report over 12 months of data at design capacity (§7.2) is generated in ≤ 5 s."
+    },
+    {
+      "id": "RPT-019",
+      "area": "RPT",
+      "priority": "C",
+      "section": "6.15 Reports and exports (RPT)",
+      "text": "Scheduled daily summary e-mailed to the owner."
+    },
+    {
+      "id": "AUD-001",
+      "area": "AUD",
+      "priority": "M",
+      "section": "6.16 Audit trail and anti-fraud (AUD)",
+      "text": "An append-only audit log records every security-relevant and money- relevant action: Access: login, logout, failures, lockouts, overrides. Orders: create, approve, reject, modify, cancel, void. Money: discounts, complimentary items, service-charge removal; bill print, reprint, edit, void; payments; cash in/out; shift close; day-end. Menu: price, menu and stock changes. Administration: staff, role and permission changes; device pairing; settings changes. System: exports, backup, restore, archive, purge; license and update events."
+    },
+    {
+      "id": "AUD-002",
+      "area": "AUD",
+      "priority": "M",
+      "section": "6.16 Audit trail and anti-fraud (AUD)",
+      "text": "Each entry records: server timestamp and business date; actor, approver (for overrides) and device; action, entity, before/after values and reason."
+    },
+    {
+      "id": "AUD-003",
+      "area": "AUD",
+      "priority": "M",
+      "section": "6.16 Audit trail and anti-fraud (AUD)",
+      "text": "Tamper-evident: entries are hash-chained (each includes the hash of the previous one). The current chain-head hash is sent to the Vendor Control Plane with each heartbeat, so later tampering with the local database can be detected. A verification tool is available on the dashboard."
+    },
+    {
+      "id": "AUD-004",
+      "area": "AUD",
+      "priority": "M",
+      "section": "6.16 Audit trail and anti-fraud (AUD)",
+      "text": "Orders, bills, payments and audit records can never be hard-deleted through the application. The database role used by the application has no DELETE permission on these tables. Only the archive-and-purge process (DATA-008) can remove them, and it writes a purge record with checksums."
+    },
+    {
+      "id": "AUD-005",
+      "area": "AUD",
+      "priority": "M",
+      "section": "6.16 Audit trail and anti-fraud (AUD)",
+      "text": "Audit viewer with filters and export."
+    },
+    {
+      "id": "AUD-006",
+      "area": "AUD",
+      "priority": "M",
+      "section": "6.16 Audit trail and anti-fraud (AUD)",
+      "text": "Daily suspicious-activity report ⚙, flagging for example: voids after the bill was printed; bill edits after printing; discounts above threshold; repeated reprints; cash variance above threshold; items cancelled after preparation started; items sent to the kitchen that never appeared on a settled bill; \"no-sale\" cash-drawer openings."
+    },
+    {
+      "id": "AUD-007",
+      "area": "AUD",
+      "priority": "M",
+      "section": "6.16 Audit trail and anti-fraud (AUD)",
+      "text": "Audit records are retained like financial records (§9.3)."
+    },
+    {
+      "id": "DATA-001",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "The PostgreSQL data directory and photo store sit on the drive chosen at installation (ONB-002). PostgreSQL listens on localhost only."
+    },
+    {
+      "id": "DATA-002",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Automatic local backups: continuous or hourly ⚙ incremental backup (WAL archiving); a nightly full backup to a second location (second disk, external USB drive or NAS ⚙ ). Every backup is integrity-checked. Default retention: 14 daily + 8 weekly ⚙."
+    },
+    {
+      "id": "DATA-003",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Encrypted cloud backup: a nightly backup, encrypted (AES-256) on the restaurant PC before upload, stored in India. The encryption key is generated at installation and stored locally (DPAPI). A copy is escrowed in the Vendor Control Plane, wrapped by a vendor KMS key and released only on the Owner's authenticated restore request (audited). The policy is open item OI-10. On by default. The Owner may opt out (recorded in the audit log)."
+    },
+    {
+      "id": "DATA-004",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Restore: one-click restore from a local or cloud backup onto the same or a new PC (after license re-binding, LIC-004). Targets: RTO ≤ 2 hours once replacement hardware is available. RPO ≤ 1 hour when local backups survive; ≤ 24 hours when only the cloud backup survives. The restore procedure is documented and rehearsed before the pilot."
+    },
+    {
+      "id": "DATA-005",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Backup failures alert the manager and are reported to the Vendor Control Plane."
+    },
+    {
+      "id": "DATA-006",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Storage monitoring: the dashboard shows disk usage by category (transactions, audit, logs, photos, backups). Warnings at 80 % and 90 % ⚙ of the drive."
+    },
+    {
+      "id": "DATA-007",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Operational data is purged automatically after 90 days ⚙: notifications, device heartbeats, debug logs, temporary files, unused photo renditions."
+    },
+    {
+      "id": "DATA-008",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Archive-then-purge for business records (brief: \"clear some data periodically\"). Business records are orders, bills, payments, audit and derived report data. Steps: 1. The Owner (password + 2FA) selects a period (whole financial years ⚙ ). 2. The system writes an encrypted, checksummed archive, plus a human-readable export (invoice register CSV and invoice PDFs), to a chosen location, and adds it to the cloud backup set. 3. It verifies the archive by reading it back. 4. Only then does it delete that period from the live database, and writes a purge record. The purge screen warns clearly if the period is still within the statutory retention period (§12). The restaurant must keep the archive for that period."
+    },
+    {
+      "id": "DATA-009",
+      "area": "DATA",
+      "priority": "S",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Archive viewer: open an archive read-only to view or print historical invoices and reports without restoring it into the live database."
+    },
+    {
+      "id": "DATA-010",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Full data export in open formats (CSV/JSON plus invoice PDFs) is available to the Owner at any time, including in restricted license mode (LIC-005)."
+    },
+    {
+      "id": "DATA-011",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Personal-data erasure: on a diner's request, their phone number/name is erased or anonymised in non-invoice records. Invoices are kept as tax law requires."
+    },
+    {
+      "id": "DATA-012",
+      "area": "DATA",
+      "priority": "M",
+      "section": "6.17 Storage, backup, archive and purge (DATA)",
+      "text": "Sizing target: 5 years of transactions for a restaurant at design capacity (§7.2), excluding photos and backups, fit in ≤ 100 GB. The development team validates this with a data-volume test."
+    },
+    {
+      "id": "LIC-001",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "Each installation holds a license file signed by the vendor (Ed25519 or equivalent) containing: restaurant ID, installation ID and PC fingerprint; plan, entitled modules (all modules in v1), device limits (tablets, pagers, waiter devices, KDS screens); issue date, valid-until date, grace days and state."
+    },
+    {
+      "id": "LIC-002",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "Rolling validity: a license is valid for 30 days ⚙ from issue and renewed automatically (at least daily) while online. The restaurant works fully offline until valid- until (blueprint: cached license)."
+    },
+    {
+      "id": "LIC-003",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "The local server verifies the license at start-up and periodically, and client apps get their entitlements from the server. The vendor's public key is embedded in the software; a missing, unsigned or tampered file puts the installation into Restricted state."
+    },
+    {
+      "id": "LIC-004",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "Machine binding: the license is bound to a PC fingerprint that tolerates minor hardware changes (e.g., 3 of 5 identifiers must match). Moving to a new PC is a support action in the Vendor Control Plane (audited)."
+    },
+    {
+      "id": "LIC-005",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "License states (brief: \"remotely stop its functioning if payment is not made\"): State Entered when Restaurant experience Active Subscription paid Full functionality Payment due Invoice overdue (recorded in Control Plane) Daily polite reminder on POS and dashboard; no restriction Grace Vendor moves to grace, or overdue beyond N days ⚙ Banner on all staff screens with days remaining (7 days ⚙ ) Restricted Grace ends, license expires while offline, license invalid/tampered, or vendor suspension No new table sessions, orders or KOTs. Can still: finish and bill already open tables, print, view reports, export all data. Backups continue. Terminated Contract ended As Restricted; data export stays available; nothing deleted Rules that always apply: A move into Restricted takes effect only at the start of the next business day, never in the middle of service. The platform never deletes, encrypts or withholds the restaurant's data. All state changes are logged in the Control Plane and locally."
+    },
+    {
+      "id": "LIC-006",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "Reactivation takes effect within 1 minute of payment being recorded in the Control Plane (when online). For offline sites, a signed reactivation code can be entered by the Owner (e.g., received by phone)."
+    },
+    {
+      "id": "LIC-007",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "Anti-tamper measures: clock-rollback detection (last-seen time stored and signed, compared with the server time in heartbeats); signed binaries, integrity checks and obfuscation of the license module (SEC-011). Tamper events are reported to the Control Plane."
+    },
+    {
+      "id": "LIC-008",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "The license state and remaining days are always visible to the Owner. Reminder wording is polite and precise."
+    },
+    {
+      "id": "LIC-009",
+      "area": "LIC",
+      "priority": "M",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "Timelines and behaviours in LIC-005 must match the subscription agreement (Business Owner, §19)."
+    },
+    {
+      "id": "LIC-010",
+      "area": "LIC",
+      "priority": "C",
+      "section": "6.18 Licensing and subscription enforcement (LIC)",
+      "text": "Selling modules separately, using the entitlement fields already in the license."
+    },
+    {
+      "id": "UPD-001",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "All components can be updated remotely (blueprint): Windows app + local server + web console: signed installer or delta update. Waiter and tablet apps: over-the-air JavaScript updates (e.g., Expo EAS Update); native changes through a new APK pushed by MDM or the in-app updater. Pager firmware: OTA via the local server (PGR-011)."
+    },
+    {
+      "id": "UPD-002",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Release channels: Stable and Pilot/Beta, plus per-restaurant pinning, managed in the Vendor Control Plane. A single restaurant can be given a hotfix build or held on a specific version (brief: \"code fixes remotely for a specific restaurant\")."
+    },
+    {
+      "id": "UPD-003",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Staged rollout by percentage or cohort, with pause and halt. Rollout halts automatically if error rates or heartbeat failures spike after an update."
+    },
+    {
+      "id": "UPD-004",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Installation timing: updates download in the background but install only inside a maintenance window ⚙ (default 03:00-06:00), or when a manager presses \"Install now\". Never while tables are open, unless the update is flagged security-critical and a manager approves."
+    },
+    {
+      "id": "UPD-005",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Safe updates: a full database backup and integrity check before every update; forward-only migrations, tested against production-like data; a health check after the update; automatic rollback (application and database) if the health check fails."
+    },
+    {
+      "id": "UPD-006",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Compatibility: the server supports the current and previous minor version of its client API (N-1), so tablets, phones and pagers that update later keep working. A component version matrix is published with every release."
+    },
+    {
+      "id": "UPD-007",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Every update artefact is signed (Authenticode for Windows, APK signature, EAS Update code signing, firmware signature) and verified before installation. Downloads are over HTTPS only."
+    },
+    {
+      "id": "UPD-008",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Remote diagnostics: the manager can \"Send diagnostics to support\" (logs, versions, configuration without secrets, device list). Support can request diagnostics from the Control Plane, which prompts the manager to allow it."
+    },
+    {
+      "id": "UPD-009",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "No remote shell or hidden access. Remote screen sharing is only possible through a session started by the restaurant with a standard tool. Every vendor support action is audited."
+    },
+    {
+      "id": "UPD-010",
+      "area": "UPD",
+      "priority": "M",
+      "section": "6.19 Remote updates and support (UPD)",
+      "text": "Vendor-controlled remote configuration (feature flags, vendor thresholds) can be pushed from the Control Plane. Such settings are visible to the manager and recorded in the audit log."
+    },
+    {
+      "id": "VCP-001",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "A cloud web application for vendor staff with roles Super Admin, Onboarding, Support, Finance and Read-only. Multi-factor authentication is mandatory; every action is audited."
+    },
+    {
+      "id": "VCP-002",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Tenant management: create a restaurant (contacts, GSTIN, plan, device limits); generate activation codes; re-bind an installation to a new PC; provision the restaurant in the QR relay with its own scoped credentials."
+    },
+    {
+      "id": "VCP-003",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Subscriptions and licenses: plan catalogue, billing cycles, manual payment recording (v1), overdue tracking, license state changes (LIC-005) with a reason, issuing/revoking licenses, offline reactivation codes."
+    },
+    {
+      "id": "VCP-004",
+      "area": "VCP",
+      "priority": "S",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Automated subscription collection through a payment gateway (e.g., UPI Autopay/e-mandate), and the vendor's own GST invoices."
+    },
+    {
+      "id": "VCP-005",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Fleet monitoring from heartbeats (every 5 min ⚙ ). Per restaurant: online/offline and last seen; versions of every component, disk usage, backup status; device counts and health, error counts; license state, audit chain head. Alerts fire when a restaurant is offline > 30 min during its business hours ⚙, a backup fails, or disk usage passes 90 %."
+    },
+    {
+      "id": "VCP-006",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Release management: builds come from CI already signed. Define channels, rollouts and per-restaurant pinning; halt and roll back (UPD)."
+    },
+    {
+      "id": "VCP-007",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Support tools: view diagnostics bundles, keep notes per restaurant, request diagnostics. There is no access to a restaurant's business data except through diagnostics or backups, under a documented access policy."
+    },
+    {
+      "id": "VCP-008",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Onboarding services: the AI menu-import pipeline (ONB-006), activation, QR tenant provisioning."
+    },
+    {
+      "id": "VCP-009",
+      "area": "VCP",
+      "priority": "M",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Hosted in an India region, with separate development, staging and production environments."
+    },
+    {
+      "id": "VCP-010",
+      "area": "VCP",
+      "priority": "C",
+      "section": "6.20 Vendor Control Plane (VCP)",
+      "text": "Reseller/partner accounts."
+    },
+    {
+      "id": "INT-001",
+      "area": "INT",
+      "priority": "M",
+      "section": "6.21 Modularity and integration readiness (INT)",
+      "text": "The platform is divided into modules with explicit boundaries: Core POS (menu, tables, orders, billing); Notifications and Pager; Table Tablet; QR and Relay; Sync; Recommendations; Reporting; Licensing. Modules communicate only through versioned, documented contracts (internal APIs and domain events). A module never reads or writes another module's tables directly."
+    },
+    {
+      "id": "INT-002",
+      "area": "INT",
+      "priority": "M",
+      "section": "6.21 Modularity and integration readiness (INT)",
+      "text": "Contracts are defined once in a shared package (Zod schemas) (blueprint). They are published as OpenAPI (REST) and AsyncAPI (events) documents and checked by contract tests in CI."
+    },
+    {
+      "id": "INT-003",
+      "area": "INT",
+      "priority": "M",
+      "section": "6.21 Modularity and integration readiness (INT)",
+      "text": "Ports and adapters. The peripheral modules (Tablet, Pager/Notifications, QR, Recommendations) depend only on provider interfaces: Menu Provider, Table Provider, Order Sink, Order Status Source. In v1 the Core POS implements these interfaces. A future adapter for a third-party POS can implement them without changing the peripheral modules."
+    },
+    {
+      "id": "INT-004",
+      "area": "INT",
+      "priority": "M",
+      "section": "6.21 Modularity and integration readiness (INT)",
+      "text": "Domain event catalogue (minimum): Menu: MenuPublished, ItemAvailabilityChanged. Tables: TableOpened, TableMoved, TableClosed. Orders: OrderSubmitted, OrderApproved, OrderRejected, KotCreated, ItemStatusChanged. Service requests: ServiceRequestRaised, ServiceRequestAcknowledged, ServiceRequestCancelled. Billing: BillRequested, BillPrinted, BillSettled. System: AlertEscalated, DeviceStatusChanged."
+    },
+    {
+      "id": "INT-005",
+      "area": "INT",
+      "priority": "M",
+      "section": "6.21 Modularity and integration readiness (INT)",
+      "text": "Orders carry source and externalRef; menu items, tables and staff carry an externalId. This lets them be mapped to other POS or aggregator systems later."
+    },
+    {
+      "id": "INT-006",
+      "area": "INT",
+      "priority": "S",
+      "section": "6.21 Modularity and integration readiness (INT)",
+      "text": "A public Integration API (authenticated, rate-limited) and outbound webhooks, documented but disabled by default in v1."
+    },
+    {
+      "id": "INT-007",
+      "area": "INT",
+      "priority": "C",
+      "section": "6.21 Modularity and integration readiness (INT)",
+      "text": "\"Module mode\" installation (only some modules licensed); adapters for specific third-party POS systems; aggregator integration; accounting export."
+    },
+    {
+      "id": "NFR-A01",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.3 Availability, resilience and offline behaviour",
+      "text": "In-restaurant operations never depend on internet access."
+    },
+    {
+      "id": "NFR-A02",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.3 Availability, resilience and offline behaviour",
+      "text": "Local system availability ≥ 99.9 % during trading hours, excluding site power loss and hardware failure."
+    },
+    {
+      "id": "NFR-A03",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.3 Availability, resilience and offline behaviour",
+      "text": "No committed order, KOT, bill or payment is lost on a crash or power cut. All state changes are transactional and durable before they are acknowledged to the client."
+    },
+    {
+      "id": "NFR-A04",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.3 Availability, resilience and offline behaviour",
+      "text": "The watchdog restarts a failed server process within 10 s. Services start automatically at boot, before any user logs in, and the POS window reopens automatically. Expected behaviour by failure scenario: Failure Expected behaviour Internet down Everything inside the restaurant works. QR ordering shows read-only mode (QR-008). Cloud backups, e-bills, menu sync and heartbeats queue and resume automatically. License stays valid until valid-until. Staff Wi-Fi / LAN down Devices show a clear offline state. Waiter-app drafts are kept (WTR-012). The POS on the server PC keeps working and can print KOTs for orders entered there. A tablet, phone or KDS fails Only that device is affected. Replace it and pair a new device in ≤ 5 min. Printer fails Alert shown. KOTs queued or redirected (KDS-008). Pager offline or battery flat Alerts still reach the waiter app; if both are unavailable, the manager (NTF-007). Server process crash Watchdog restart ≤ 10 s; clients reconnect and resync (NFR-P11). Server PC reboot or power cut UPS gives ≥ 15 min (§11). Graceful shutdown on UPS low-battery signal is S. Full recovery on power-up without manual steps. Disk failure / PC destroyed Restore to a new PC (DATA-004). QR relay or vendor cloud outage QR ordering unavailable (read-only menu or error page). No effect on in- restaurant service or the license."
+    },
+    {
+      "id": "NFR-U01",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.4 Usability and user interface (Business Owner assumption",
+      "text": "One design system across every app: shared tokens (colour, typography, spacing, radius, elevation), a component library for web and one for React Native with matching look and behaviour, iconography and motion guidelines. The design system is built in Phase 0 (§17)."
+    },
+    {
+      "id": "NFR-U02",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.4 Usability and user interface (Business Owner assumption",
+      "text": "Clean, modern visual design, with light and dark themes. The KDS defaults to dark. Restaurant branding (logo, accent colour) applies to the customer-facing tablet and QR menu."
+    },
+    {
+      "id": "NFR-U03",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.4 Usability and user interface (Business Owner assumption",
+      "text": "Touch targets ≥ 48 dp. Primary flows are short: calling for water: 1 tap; reordering a known item and sending the KOT from the waiter app: ≤ 5 taps; approving a pending order: ≤ 2 taps."
+    },
+    {
+      "id": "NFR-U04",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.4 Usability and user interface (Business Owner assumption",
+      "text": "Every screen has designed empty, loading and error states. Error messages are in plain language and say what to do next. Destructive actions ask for confirmation."
+    },
+    {
+      "id": "NFR-U05",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.4 Usability and user interface (Business Owner assumption",
+      "text": "The QR menu and manager dashboard meet WCAG 2.2 AA (contrast, focus, labels, scalable text). Colour is never the only carrier of meaning, on any surface."
+    },
+    {
+      "id": "NFR-U06",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.4 Usability and user interface (Business Owner assumption",
+      "text": "Usability targets, tested in the pilot with at least 5 users per role: a new waiter is proficient in ≤ 30 min; a first-time diner places an order on the tablet unaided in ≤ 2 min; a cashier settles a split bill in ≤ 1 min."
+    },
+    {
+      "id": "NFR-U07",
+      "area": "NFR",
+      "priority": "S",
+      "section": "7.4 Usability and user interface (Business Owner assumption",
+      "text": "Contextual help and short in-app tips for first use; downloadable training videos."
+    },
+    {
+      "id": "NFR-L01",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.5 Localisation",
+      "text": "v1 ships in English only."
+    },
+    {
+      "id": "NFR-L02",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.5 Localisation",
+      "text": "All UI strings are externalised in resource files, so languages can be added later without code changes."
+    },
+    {
+      "id": "NFR-L03",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.5 Localisation",
+      "text": "Formats: currency ₹ with Indian digit grouping (1,00,000.00); dates DD-MM- YYYY; 12/24-hour time ⚙; time zone Asia/Kolkata (stored as UTC)."
+    },
+    {
+      "id": "NFR-M01",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.7 Maintainability and code quality",
+      "text": "Object-oriented design and SOLID principles (brief: \"OOPS principles\"): clear domain models and services in the backend; dependency injection (NestJS modules); reusable components so the same code is used everywhere it applies (PIN pad, menu item card, modifier popup, order status chip, etc.)."
+    },
+    {
+      "id": "NFR-M02",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.7 Maintainability and code quality",
+      "text": "Pricing, tax, discount, order state machines and recommendation logic live in a framework-free domain package with unit tests. They are shared by the server and, where useful, the clients."
+    },
+    {
+      "id": "NFR-M03",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.7 Maintainability and code quality",
+      "text": "TypeScript strict mode everywhere (blueprint). Linting and formatting are enforced in CI. any is not allowed without a documented reason."
+    },
+    {
+      "id": "NFR-M04",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.7 Maintainability and code quality",
+      "text": "Test coverage: ≥ 85 % of lines in the domain package and ≥ 70 % overall for the backend. End-to-end tests cover every critical scenario in §18."
+    },
+    {
+      "id": "NFR-M05",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.7 Maintainability and code quality",
+      "text": "Every change goes through a pull request with at least one reviewer, and two for security-sensitive code (auth, licensing, billing, crypto, sync)."
+    },
+    {
+      "id": "NFR-M06",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.7 Maintainability and code quality",
+      "text": "Documentation: ADRs for significant decisions; generated API/event docs (INT-002); runbooks for installation, restore, update, rollback and incident response; an onboarding guide for new developers."
+    },
+    {
+      "id": "NFR-M07",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.7 Maintainability and code quality",
+      "text": "Dependency hygiene: lockfiles, automated update PRs, and a license check that blocks licenses incompatible with commercial distribution."
+    },
+    {
+      "id": "NFR-O01",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.8 Observability",
+      "text": "Structured (JSON) logs with correlation IDs across devices, server and cloud. Local log rotation by size and age."
+    },
+    {
+      "id": "NFR-O02",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.8 Observability",
+      "text": "Crash and error reporting from every component to a vendor error- monitoring service, with personal data and secrets scrubbed before sending."
+    },
+    {
+      "id": "NFR-O03",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.8 Observability",
+      "text": "Health metrics are sent in heartbeats (VCP-005)."
+    },
+    {
+      "id": "NFR-O04",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.8 Observability",
+      "text": "The server PC's clock is synchronised by NTP. Devices take their time from the server, and all business timestamps use server time."
+    },
+    {
+      "id": "NFR-I01",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.9 Installability and supportability",
+      "text": "Installing on a PC that meets the spec takes ≤ 30 minutes, excluding menu set-up."
+    },
+    {
+      "id": "NFR-I02",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.9 Installability and supportability",
+      "text": "The installer can repair an installation. Uninstalling keeps the data unless the Owner explicitly chooses to delete it (password + 2FA)."
+    },
+    {
+      "id": "NFR-I03",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.9 Installability and supportability",
+      "text": "A single \"Support\" screen shows versions, service status, disk, backup and license state, and connected devices."
+    },
+    {
+      "id": "SEC-000",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.1 Standards and baseline",
+      "text": "A threat model (STRIDE) is produced for each component during design and updated at each major release. It covers the LAN, the pager channel, the relay, the update pipeline and the license mechanism."
+    },
+    {
+      "id": "SEC-001",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Encryption in transit everywhere. Cloud: TLS 1.2+ (1.3 preferred) with HSTS. LAN: HTTPS/WSS for apps and browsers, MQTTS for pagers. How LAN certificates are issued is decided in an ADR (open item OI-07). Options: (a) a per-installation private certificate authority, trusted and pinned in the vendor's own apps and installed on paired manager browsers; or (b) publicly trusted certificates for a per-restaurant hostname resolving to the LAN IP, issued via DNS validation by the Control Plane."
+    },
+    {
+      "id": "SEC-002",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Secrets are never in source code or in app bundles. API keys for cloud services live only in vendor cloud secret stores and CI. Restaurant installations get per- tenant, scoped credentials from the Control Plane. Clients get short-lived tokens."
+    },
+    {
+      "id": "SEC-003",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Authorisation: deny by default, checked on the server, including object- level checks (a tablet may act only on its own table, a waiter only on permitted tables, a pager only on its own topic)."
+    },
+    {
+      "id": "SEC-004",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Input handling: validation at every boundary with shared Zod schemas; output encoding; parameterised queries only (Prisma), with no string-built SQL; uploads checked by content type and size, images re-encoded and EXIF stripped."
+    },
+    {
+      "id": "SEC-005",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Cloud tenant isolation (blueprint: per-restaurant filtering as a dedicated test): Row-Level Security on every relay/Control Plane table, deny by default. Local servers use per-tenant credentials, never a service-role key. Browsers never write tables directly (QR-006). Automated cross-tenant access tests run in CI. Each local database holds only one restaurant, but still stores the restaurant ID on every record for consistency with the cloud."
+    },
+    {
+      "id": "SEC-006",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Key management: The license-signing private key is in a cloud KMS/HSM and is never on a developer machine. Code-signing keys are on hardware tokens or cloud HSM. Local secrets (pepper, backup key, TLS keys) are protected by Windows DPAPI. Device credentials are in Android Keystore or ESP32 encrypted storage."
+    },
+    {
+      "id": "SEC-007",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Data at rest: PostgreSQL bound to localhost, with a dedicated service account and least-privilege database roles (AUD-004). BitLocker recommended on the server PC (site-readiness checklist). Backups and archives encrypted with AES-256. Diner phone numbers encrypted at application level (S)."
+    },
+    {
+      "id": "SEC-008",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Network: Staff devices on a network separate from guest Wi-Fi (§11). The server firewall allows only the required ports, from the staff subnet only. No inbound connections from the internet; outbound traffic only to an allow-list of vendor/relay domains."
+    },
+    {
+      "id": "SEC-009",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Abuse protection: rate limiting on login, pairing, QR submission and service requests; lockouts (AUTH-003)."
+    },
+    {
+      "id": "SEC-010",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Mobile: no secrets or personal data in logs; pinned certificates for server connections; kiosk lock (TAB-001); MDM policies: USB debugging off, app installation blocked, remote lock/wipe. Root/tamper detection on waiter devices and screenshot blocking on PIN screens are S."
+    },
+    {
+      "id": "SEC-011",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Desktop (Electron): contextIsolation on, nodeIntegration off, sandboxed renderers; strict Content-Security-Policy; no remote content in privileged windows; IPC allow-list; Electron fuses configured (RunAsNode disabled, ASAR integrity where supported); Electron kept on a supported version."
+    },
+    {
+      "id": "SEC-012",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Pager: PGR-005, PGR-010 and PGR-011; unique per-device credentials; broker access rules."
+    },
+    {
+      "id": "SEC-013",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Software supply chain: lockfiles; dependency vulnerability scanning; static analysis (SAST); secret scanning in CI; an SBOM for every release; protected branches; mandatory 2FA on the code host; least-privilege CI secrets; builds and signing only in CI, never on developer laptops."
+    },
+    {
+      "id": "SEC-014",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Signed updates (UPD-007)."
+    },
+    {
+      "id": "SEC-015",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Security logging: Security events are audited (AUTH-013, AUD-001). No PINs, tokens or unnecessary personal data in logs. Cloud security logs are kept for at least 180 days, in India (§12). The Control Plane alerts on anomalies (repeated tamper events, mass failed logins, cross-tenant access attempts)."
+    },
+    {
+      "id": "SEC-016",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Incident response plan before the pilot: severity levels, contacts and on-call; regulatory reporting (CERT-In within 6 hours for reportable incidents; data-breach notifications under DPDP, §12); templates for communicating with restaurants; an annual tabletop exercise."
+    },
+    {
+      "id": "SEC-017",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Security testing: automated authorisation tests; DAST on the QR site, relay and Control Plane; an independent penetration test covering web, API, Android, desktop, LAN and pager, before the first paid rollout and then annually or at each major release; zero open Critical/High findings at go-live; Medium findings have a dated remediation plan."
+    },
+    {
+      "id": "SEC-018",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Vendor access: MFA on all vendor systems, least privilege, quarterly access reviews, and all production access audited."
+    },
+    {
+      "id": "SEC-019",
+      "area": "SEC",
+      "priority": "M",
+      "section": "8.2 Requirements",
+      "text": "Privacy by design: collect the minimum personal data, record consent with its purpose and timestamp, and support erasure (DATA-011)."
+    },
+    {
+      "id": "NFR-P01",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Approved/sent order → visible on KDS ≤ 1 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P02",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "KOT printed after sending ≤ 3 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P03",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Kitchen \"Ready\" / service request → pager vibrates ≤ 2 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P04",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Availability change → all in-restaurant devices ≤ 2 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P05",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Availability or menu change → QR menu (online) ≤ 30 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P06",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "QR order submitted → received by local server (online) ≤ 5 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P07",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "UI response to a tap (visual feedback) ≤ 100 ms; screen transitions ≤ 300 ms."
+    },
+    {
+      "id": "NFR-P08",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Bill generation and print ≤ 3 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P09",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Recommendations returned ≤ 200 ms (95th percentile)."
+    },
+    {
+      "id": "NFR-P10",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Report over 12 months of data ≤ 5 s (95th percentile)."
+    },
+    {
+      "id": "NFR-P11",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "Client reconnection after server restart ≤ 30 s, with full resynchronisation."
+    },
+    {
+      "id": "NFR-P12",
+      "area": "NFR",
+      "priority": "M",
+      "section": "7.1 Performance",
+      "text": "QR menu first view (mid-range Android, 4G) LCP ≤ 2.5 s."
+    }
+  ]
+}
