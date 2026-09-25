@@ -14,6 +14,7 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/.next/**',
       '**/.expo/**',
+      '**/generated/**',
       'firmware/**',
     ],
   },
@@ -49,6 +50,18 @@ export default tseslint.config(
     files: ['**/*.test.ts', '**/test/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+  {
+    // NestJS apps: modules are decorated empty classes, and constructor parameter types are
+    // runtime values for dependency injection (emitDecoratorMetadata), so they must stay value
+    // imports; telling the parser keeps consistent-type-imports from breaking DI.
+    files: ['apps/server/**/*.ts', 'apps/control-plane/**/*.ts'],
+    languageOptions: {
+      parserOptions: { emitDecoratorMetadata: true, experimentalDecorators: true },
+    },
+    rules: {
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
     },
   },
   {
