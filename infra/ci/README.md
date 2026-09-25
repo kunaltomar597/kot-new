@@ -13,7 +13,8 @@ Built by: P0-06, P0-16, P7-04. Decisions: ADR-0010.
   blocked; any other licence not on the allow-list needs an entry in `exceptions` with a reason.
 
 Workflows (`.github/workflows/security.yml`): CodeQL, `pnpm audit --audit-level high`, dependency
-review, gitleaks, licence check and a CycloneDX SBOM artefact, on every PR, on `main` and weekly.
+review (only when the repository variable `DEPENDENCY_REVIEW` is `true`, which needs the
+Dependency graph setting), gitleaks, licence check and a CycloneDX SBOM artefact, on every PR, on `main` and weekly.
 
 Accepted audit advisories: none. If a high advisory has no fix yet, prefer a `pnpm.overrides` entry
 that forces a patched version; otherwise add its GHSA ID to pnpm's `auditConfig.ignoreGhsas` and

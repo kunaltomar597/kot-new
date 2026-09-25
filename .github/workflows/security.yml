@@ -68,7 +68,9 @@ jobs:
 
   dependency-review:
     name: Dependency review
-    if: github.event_name == 'pull_request'
+    # Needs the repository's Dependency graph (Settings > Code security). Once it is on, set the
+    # repository variable DEPENDENCY_REVIEW=true; until then pnpm audit above is the gate.
+    if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

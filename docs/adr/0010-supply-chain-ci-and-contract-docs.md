@@ -62,5 +62,7 @@ and why.
   records the enforced permission until then.
 - The cdxgen version is pinned in `security.yml` and bumped by hand. Release pipelines (P7) attach
   the SBOM to each release.
+- Dependency review needs the repository's Dependency graph setting; the job runs only when the
+  repository variable `DEPENDENCY_REVIEW` is `true` (set it after enabling the graph).
 - If GitHub's CodeQL "default setup" is switched on for the repository it conflicts with this
   advanced workflow; keep default setup off.
