@@ -2,6 +2,7 @@ import type { Capability } from '@rp/domain';
 import type { z } from 'zod';
 import { ApiError } from './common.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
+import { HealthResponse, VersionResponse } from './system.js';
 
 /**
  * REST route registry (INT-002). Each entry ties an endpoint to the contract schemas it accepts
@@ -67,6 +68,38 @@ export const ROUTES = [
     responses: {
       200: { description: 'Order accepted or lines rejected.', schema: SubmitOrderResponse },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getHealth',
+    method: 'GET',
+    path: '/api/v1/health',
+    summary: 'Server liveness and database status',
+    description:
+      'Public because the watchdog and the support screen call it without a session; it reveals ' +
+      'no business data. Returns 503 when the database is down so the watchdog restarts the ' +
+      'server (NFR-A04).',
+    tags: ['system'],
+    requirements: ['NFR-A04', 'NFR-O01'],
+    capability: 'PUBLIC',
+    responses: {
+      200: { description: 'Server and database are up.', schema: HealthResponse },
+      503: { description: 'The database is down.', schema: HealthResponse },
+    },
+  },
+  {
+    operationId: 'getVersion',
+    method: 'GET',
+    path: '/api/v1/version',
+    summary: 'Server component version',
+    description:
+      'Public because devices check compatibility (UPD-006) before signing in; it reveals only ' +
+      'version numbers.',
+    tags: ['system'],
+    requirements: ['UPD-006'],
+    capability: 'PUBLIC',
+    responses: {
+      200: { description: 'Component and API version.', schema: VersionResponse },
     },
   },
 ] as const satisfies readonly RouteDefinition[];

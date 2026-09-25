@@ -13,15 +13,25 @@ What exists:
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
   state machines, permissions, menu selection, KOT split. 89 tests, ~99 % line coverage.
-- `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events. 16 tests.
-- BRD catalogue (318 requirements) and traceability report (31 of 287 Must requirements have tests).
+- `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, health
+  and version. 16 tests.
+- `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
+  IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
+  harness. 31 tests, 93 % line coverage.
+- BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
+
+In progress in parallel sessions (started 2026-09-25 by the orchestrating session):
+
+- P0-13 Design tokens and web UI library: session `session_01PoVJDi85NBEHm3tQLoEm2w`, branch
+  `wp/p0-13-ui-library`.
+- P0-06 CI security baseline and contract docs: session `session_018YSsgXSus3f81EJVEjMARc`,
+  branch `wp/p0-06-security-ci`.
 
 Recommended next WPs (dependencies met):
 
-- P0-07 Local server skeleton (Lane A, unblocks most of the plan). Start here.
-- P0-06 CI security baseline and contract docs (Lane C, independent).
-- P0-13 Design tokens and web UI library (Lane B, independent).
+- P0-08 Database schema v1 and least-privilege roles (Lane A).
+- P0-15 LAN TLS decision and implementation (Lane C, independent of P0-08).
 - P0-H1 Pager battery prototype firmware (Lane E; Claude can write it, a person must run it).
 
 ## Work packages
@@ -33,14 +43,14 @@ Recommended next WPs (dependencies met):
 - [x] P0-03 Domain: money, tax, discounts, bill
 - [x] P0-04 Domain: dates, invoices, state machines, permissions, selection, KOT
 - [x] P0-05 Contracts v1
-- [ ] P0-06 CI security baseline and contract docs
-- [ ] P0-07 Local server skeleton
+- [~] P0-06 CI security baseline and contract docs (parallel session)
+- [x] P0-07 Local server skeleton
 - [ ] P0-08 Database schema v1 and least-privilege roles
 - [ ] P0-09 Audit log service
 - [ ] P0-10 Authentication, sessions, RBAC, manager override
 - [ ] P0-11 Device pairing and device credentials
 - [ ] P0-12 Real-time and domain-event infrastructure
-- [ ] P0-13 Design tokens and web UI library
+- [~] P0-13 Design tokens and web UI library (parallel session)
 - [ ] P0-14 API client, i18n and web console shell
 - [ ] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
@@ -179,6 +189,30 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-25: P0-07 local server skeleton
+
+Built `apps/server` (see its README and the P0-07 section of `phase-0.md`): NestJS 12 (ESM, Express
+5), Zod config, correlation-ID middleware, own JSON parser, pino logging with redaction, `mapError`
+and the global `ApiExceptionFilter`, `ZodValidationPipe`, health/version endpoints with contracts,
+Prisma 7 with the pg adapter and the first migration, and the PostgreSQL test harness. CI now runs a
+`postgres:16` service container.
+
+Notes for the next session:
+
+- Prisma 7: the database URL is in `apps/server/prisma.config.ts`; the generator is `prisma-client`
+  with ESM output in `src/generated/prisma` (gitignored, created by the `generate` turbo task).
+  Create migrations with `prisma migrate dev` or `prisma migrate diff --from-migrations ... --script`
+  (needs `SHADOW_DATABASE_URL`); the drift test in `test/integration/database.int.test.ts` fails if
+  you forget one.
+- Nest 12 converts body-parser errors to a generic 400, so the server installs its own JSON parser
+  (`src/http/request-pipeline.ts`) and creates the app with `bodyParser: false` (`NEST_APP_OPTIONS`).
+- Tests run through SWC (`unplugin-swc`) for decorator metadata; keep constructor-injected classes as
+  value imports (ESLint is configured for this in `apps/server`).
+- Turborepo runs tasks in strict env mode: new environment variables that tests need must be listed
+  under `env` in `turbo.json`.
+- Started parallel sessions for P0-13 and P0-06 (see "Current state"). They put their notes in their
+  PR descriptions; copy them here when merging.
 
 ### 2026-09-25: foundations (P0-01 to P0-05)
 

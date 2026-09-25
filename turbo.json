@@ -3,12 +3,12 @@
   "ui": "stream",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**", "scripts/**", "package.json", "tsconfig*.json"],
+      "dependsOn": ["^build", "generate"],
+      "inputs": ["src/**", "scripts/**", "prisma/**", "package.json", "tsconfig*.json"],
       "outputs": ["dist/**"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate"],
       "inputs": [
         "src/**",
         "test/**",
@@ -20,16 +20,36 @@
       ]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "fixtures/**", "package.json", "vitest.config.*"]
+      "dependsOn": ["^build", "generate"],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "fixtures/**",
+        "prisma/**",
+        "package.json",
+        "vitest.config.*"
+      ],
+      "env": ["TEST_DATABASE_URL", "PG_BIN"]
     },
     "test:coverage": {
-      "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "fixtures/**", "package.json", "vitest.config.*"],
-      "outputs": ["coverage/**"]
+      "dependsOn": ["^build", "generate"],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "fixtures/**",
+        "prisma/**",
+        "package.json",
+        "vitest.config.*"
+      ],
+      "outputs": ["coverage/**"],
+      "env": ["TEST_DATABASE_URL", "PG_BIN"]
     },
     "clean": {
       "cache": false
+    },
+    "generate": {
+      "inputs": ["prisma/**", "prisma.config.ts"],
+      "outputs": ["src/generated/**"]
     }
   }
 }

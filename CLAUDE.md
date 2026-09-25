@@ -48,7 +48,7 @@ the right WP rather than widening the change.
 
 ```
 apps/
-  server/          NestJS local server (Windows service): REST, Socket.io, MQTT, engines   [P0-07+]
+  server/          NestJS local server (Windows service): REST, Socket.io, MQTT, engines   [skeleton done]
   console/         React web console: POS, manager dashboard and KDS modes                [P0-14+]
   desktop/         Electron shell and installer config                                    [P0-16]
   waiter-app/      React Native (Expo) waiter app                                         [P2]
@@ -119,8 +119,10 @@ These come from the BRD. Breaking one is a bug even if tests pass.
 
 - Cloud sessions: Node 22 is installed; production targets Node 24 LTS (`.nvmrc`). CI runs Node 24.
 - PostgreSQL 16 binaries are at `/usr/lib/postgresql/16/bin` in the cloud container; the session-start
-  hook adds them to PATH.
-  Integration tests start a throwaway cluster; see `apps/server/README.md` once P0-07 lands.
+  hook adds them to PATH. Server integration tests start a throwaway cluster automatically; on
+  Windows/macOS set `TEST_DATABASE_URL` to an installed PostgreSQL 16 (see `apps/server/README.md`).
+- pnpm 10 blocks dependency install scripts; packages that need one are listed under
+  `onlyBuiltDependencies` in `pnpm-workspace.yaml`.
 - Windows-only steps (Windows service, installer, Electron packaging) cannot run in the Linux
   container. Write them so they run in the `windows-latest` CI job and document how to test on a PC.
 - Hardware steps (pager, printers, tablets, Wi-Fi) need a person with the device. The WP spec says

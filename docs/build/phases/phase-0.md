@@ -70,39 +70,27 @@ Notes: keep the security workflow separate from `ci.yml` so it can run on a sche
 Acceptance: workflows pass on a clean PR; a deliberately added fake secret fails gitleaks locally;
 docs regenerate deterministically.
 
-## P0-07 Local server skeleton
+## P0-07 Local server skeleton (done)
 
 Goal: a running NestJS server with the cross-cutting pieces every module needs.
 Requirements: NFR-O01, NFR-O02 (reporter interface only), NFR-O04, NFR-A03 (transactions),
-NFR-M01, SEC-004 (validation), DATA-001 (localhost DB).
-Depends on: P0-05.
-Deliverables in `apps/server`:
+NFR-A04 (health for the watchdog), NFR-M01, SEC-004 (validation), SEC-015 (redaction), DATA-001.
+Delivered in `apps/server` (details in its README): NestJS 12 ESM app with Express 5; Zod-validated
+environment config (`.env.example`; production requires a localhost database); request pipeline
+(correlation ID middleware first, own JSON parser with 1 MB limit and ApiError-shaped parser errors);
+pino JSON logs with `correlationId` on every request line and secret redaction; `mapError` +
+global `ApiExceptionFilter` producing the `ApiError` contract (no internals leaked); `ZodValidationPipe`;
+`GET /api/v1/health` (503 when the database is down) and `GET /api/v1/version`, with contracts in
+`packages/contracts/src/system.ts`; Prisma 7 (`prisma-client` generator, ESM, `pg` driver adapter,
+`prisma.config.ts`), initial migration, `PrismaService.transaction()` and `ping()`; `ErrorReporter`
+interface (no-op); UUIDv7 ids. Test harness: `TEST_DATABASE_URL` (CI service container, Windows/macOS
+developers) or a throwaway `initdb` cluster (run as the `postgres` user when root); migrated template
+database cloned per test file; a test that fails when `schema.prisma` and migrations drift. Turborepo
+`generate` task runs `prisma generate` before build/typecheck/test. 31 tests, 93 % line coverage.
 
-- NestJS 12 app (`src/main.ts`, `src/app.module.ts`), SWC or tsc build, `pnpm --filter @rp/server dev`.
-- `config/`: typed configuration loaded from environment variables with Zod validation;
-  `.env.example`. Distinguish deployment config (ports, DB URL, data dir) from restaurant settings
-  (P1-01 settings registry, stored in the database).
-- `logging/`: structured JSON logger (pino via `nestjs-pino`), correlation ID middleware that reads
-  `x-correlation-id` or creates one, propagates it to logs and responses; secrets and PINs redacted.
-- `errors/`: global exception filter mapping `DomainError` codes and Zod errors to the `ApiError`
-  contract with HTTP status; unknown errors → 500 with correlation ID, no stack to clients.
-- `validation/`: a `ZodValidationPipe` that validates bodies/queries/params against contract schemas.
-- `health/`: `GET /api/v1/health` (process, DB) and `GET /api/v1/version`.
-- `database/`: Prisma 7 client module, `prisma/schema.prisma` with only a `Restaurant` placeholder
-  and `_meta` table, migration scripts, transaction helper (`runInTransaction`).
-- `observability/`: `ErrorReporter` interface with a no-op implementation (Sentry wiring later in
-  P7-08 when the account exists).
-- Graceful shutdown (close HTTP, sockets, DB) and a `/api/v1` global prefix.
-- Test harness: `test/setup/postgres.ts` that starts a throwaway PostgreSQL cluster
-  (`initdb` + `pg_ctl` from `/usr/lib/postgresql/16/bin` locally, service container in CI),
-  applies migrations, and gives each test file its own database. Vitest config for unit and
-  integration tests (`*.int.test.ts`).
-- CI: add a Postgres 16 service container to the test job.
-
-Notes: PostgreSQL listens on localhost only (DATA-001). Keep modules framework-idiomatic (Nest
-modules per area). Business rules stay in `@rp/domain`.
-Acceptance: `pnpm --filter @rp/server test` runs unit + integration tests green locally and in CI;
-health endpoint returns 200 with DB status; logs are JSON with correlation IDs.
+Notes for later WPs: create new modules under `src/<module>` and add them to `AppModule.forRoot`;
+use `createTestApp()` and `httpServer(app)` in integration tests; `PrismaService` extends the
+generated client, so models are available as `prisma.<model>`.
 
 ## P0-08 Database schema v1 and least-privilege roles
 
