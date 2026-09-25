@@ -6,6 +6,11 @@ import { SessionService } from './session.service.js';
 
 const BEARER = /^Bearer ([A-Za-z0-9._~+/=-]+)$/;
 
+/** The token of an `Authorization: Bearer` header; empty when missing or malformed. */
+function bearerToken(header: string | undefined): string {
+  return BEARER.exec(header ?? '')?.[1] ?? '';
+}
+
 /**
  * Works out who is calling, before any route runs: the paired device from its device credential
  * (P0-11) and the signed-in person from the access token (AUTH-005). It never rejects a request
@@ -21,16 +26,15 @@ export class AuthenticationMiddleware implements NestMiddleware {
   async use(request: Request, _response: Response, next: NextFunction): Promise<void> {
     try {
       const target = request as AuthenticatedRequest;
+      // Both checks always run; what the request carries only decides what they conclude, never
+      // whether they run (CWE-807).
       const device = await this.devices.authenticate(request);
-      if (device !== undefined) target.device = device;
-      const header = request.headers.authorization;
-      if (header !== undefined) {
-        const token = BEARER.exec(header)?.[1];
-        const result =
-          token === undefined ? undefined : await this.sessions.authenticate(token, device);
-        if (result !== undefined && 'principal' in result) target.principal = result.principal;
-        else target.authFailure = result?.failure;
-      }
+      const token = bearerToken(request.headers.authorization);
+      const result = await this.sessions.authenticate(token, device);
+      target.device = device;
+      if ('principal' in result) target.principal = result.principal;
+      // Without a bearer token, a protected route simply answers "please sign in".
+      else if (token !== '') target.authFailure = result.failure;
       next();
     } catch (error) {
       next(error);
