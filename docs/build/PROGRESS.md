@@ -224,6 +224,12 @@ Notes for the next session:
   (P1-06 removes it from `notYetServed`).
 - Services that act on OWN grants must check `request.ownershipRequired`; overridden actions
   should record `request.override.approverId` as the audit approver.
+- CodeQL (`security-extended`) flags a user-controlled condition that decides whether a call named
+  like _auth_, _login_ or _verify_ runs (`js/user-controlled-bypass`), and a check-then-use of a
+  file path (`js/file-system-race`). Run such checks unconditionally and branch on their result;
+  do file work through one open handle. To reproduce CodeQL locally, download the CodeQL bundle
+  and run `codeql database create --build-mode=none` + `database analyze` with the
+  `javascript-security-extended.qls` suite.
 
 ### 2026-09-25: P0-09 audit log service
 

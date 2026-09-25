@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, open, readFile } from 'node:fs/promises';
+import { mkdir, open } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /** Injection token for the `SecretStore`. */
@@ -57,22 +57,20 @@ export class FileSecretStore implements SecretStore {
       return bytes;
     }
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    const file = join(this.directory, `${name}.key`);
+    // One open, then everything through the handle: no check-then-use on the path that another
+    // process could exploit (CWE-367). 'a+' creates the file if missing. If two processes start at
+    // once, both append 32 random bytes (appends are atomic) and both read the first 32, so they
+    // agree on the same secret.
+    const handle = await open(join(this.directory, `${name}.key`), 'a+', 0o600);
     try {
-      // 'wx' fails if the file exists, so two processes never write different secrets.
-      const handle = await open(file, 'wx', 0o600);
-      const bytes = randomBytes(SECRET_BYTES);
-      try {
-        await handle.writeFile(bytes);
-      } finally {
-        await handle.close();
-      }
+      if (process.platform !== 'win32') await handle.chmod(0o600);
+      if ((await handle.stat()).size === 0) await handle.appendFile(randomBytes(SECRET_BYTES));
+      const bytes = Buffer.alloc(SECRET_BYTES);
+      const { bytesRead } = await handle.read(bytes, 0, SECRET_BYTES, 0);
+      if (bytesRead < SECRET_BYTES) throw new Error(`Secret file for ${name} is too short`);
       return bytes;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    } finally {
+      await handle.close();
     }
-    const bytes = await readFile(file);
-    if (bytes.length < SECRET_BYTES) throw new Error(`Secret file ${file} is too short`);
-    return bytes;
   }
 }
