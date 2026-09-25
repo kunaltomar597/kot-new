@@ -1,7 +1,9 @@
 // Root ESLint flat config shared by every TypeScript package and app.
-// Apps may add their own framework rules (React, NestJS) in later work packages.
+// React rules (hooks + accessibility) apply to every .tsx file; NestJS rules come with the server.
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -15,6 +17,7 @@ export default tseslint.config(
       '**/.next/**',
       '**/.expo/**',
       '**/generated/**',
+      '**/storybook-static/**',
       'firmware/**',
     ],
   },
@@ -46,8 +49,20 @@ export default tseslint.config(
     },
   },
   {
+    // React (web and native): rules of hooks, React Compiler checks and accessible JSX
+    // (NFR-U05). jsx-a11y is the static half; axe-core tests in each UI package are the other.
+    files: ['**/*.tsx'],
+    extends: [reactHooks.configs.flat['recommended-latest'], jsxA11y.flatConfigs.recommended],
+    rules: {
+      'react-hooks/exhaustive-deps': 'error',
+      // Focus on mount is a deliberate prop of our own components (e.g. the PIN pad on a kiosk
+      // login screen); on raw DOM elements it stays forbidden.
+      'jsx-a11y/no-autofocus': ['error', { ignoreNonDOM: true }],
+    },
+  },
+  {
     // Tests may use non-null assertions for brevity.
-    files: ['**/*.test.ts', '**/test/**/*.ts'],
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/test/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
     },

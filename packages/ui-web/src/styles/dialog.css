@@ -1,0 +1,119 @@
+.rp-dialog {
+  width: min(100% - var(--rp-space-8), 480px);
+  max-height: min(100% - var(--rp-space-8), 90dvh);
+  padding: 0;
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-xl);
+  background: var(--rp-color-surface-raised);
+  color: var(--rp-color-text);
+  box-shadow: var(--rp-elevation-3);
+  font-family: var(--rp-font-sans);
+}
+
+.rp-dialog::backdrop {
+  background: var(--rp-color-overlay);
+}
+
+.rp-dialog[data-size='sm'] {
+  width: min(100% - var(--rp-space-8), 400px);
+}
+
+.rp-dialog[data-size='lg'] {
+  width: min(100% - var(--rp-space-8), 720px);
+}
+
+.rp-dialog[open] {
+  animation: rp-dialog-in var(--rp-duration-normal) var(--rp-easing-enter);
+}
+
+.rp-dialog__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+  padding: var(--rp-space-6);
+}
+
+.rp-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rp-space-4);
+}
+
+.rp-dialog__title {
+  margin: 0;
+  padding-top: var(--rp-space-2);
+  font-size: var(--rp-font-size-xl);
+  font-weight: var(--rp-font-weight-semibold);
+  line-height: var(--rp-line-height-snug);
+}
+
+.rp-dialog__close {
+  margin: calc(var(--rp-space-2) * -1) calc(var(--rp-space-2) * -1) 0 0;
+}
+
+.rp-dialog__description {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
+.rp-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--rp-space-3);
+}
+
+/* Sheets */
+.rp-dialog[data-variant='sheet'] {
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border-radius: 0;
+}
+
+.rp-dialog[data-variant='sheet'][data-side='bottom'] {
+  inset: auto 0 0;
+  width: 100%;
+  max-height: 90dvh;
+  border-radius: var(--rp-radius-xl) var(--rp-radius-xl) 0 0;
+  animation-name: rp-sheet-up;
+}
+
+.rp-dialog[data-variant='sheet'][data-side='end'] {
+  inset: 0 0 0 auto;
+  width: min(100%, 480px);
+  height: 100dvh;
+  animation-name: rp-sheet-in;
+}
+
+@keyframes rp-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes rp-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes rp-sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 600px) {
+  .rp-dialog__footer > * {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-dialog[open] {
+    animation: none;
+  }
+}

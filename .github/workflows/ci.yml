@@ -51,6 +51,9 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Contract docs are up to date
+        run: pnpm contracts:docs:check
+
       - name: Lint
         run: pnpm lint
 

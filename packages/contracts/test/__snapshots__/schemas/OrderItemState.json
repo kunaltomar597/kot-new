@@ -1,0 +1,30 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "PENDING_APPROVAL",
+      "SENT",
+      "PREPARING",
+      "READY",
+      "PICKED_UP",
+      "SERVED",
+      "REJECTED",
+      "CANCELLED",
+      "VOIDED"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "PENDING_APPROVAL",
+      "SENT",
+      "PREPARING",
+      "READY",
+      "PICKED_UP",
+      "SERVED",
+      "REJECTED",
+      "CANCELLED",
+      "VOIDED"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] },
+  "output": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] }
+}

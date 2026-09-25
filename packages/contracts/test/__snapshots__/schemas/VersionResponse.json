@@ -1,0 +1,25 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1 },
+      "version": { "type": "string", "minLength": 1 },
+      "apiVersion": { "type": "string", "const": "v1" },
+      "node": { "type": "string", "minLength": 1 },
+      "buildId": { "type": "string" }
+    },
+    "required": ["name", "version", "apiVersion", "node"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1 },
+      "version": { "type": "string", "minLength": 1 },
+      "apiVersion": { "type": "string", "const": "v1" },
+      "node": { "type": "string", "minLength": 1 },
+      "buildId": { "type": "string" }
+    },
+    "required": ["name", "version", "apiVersion", "node"],
+    "additionalProperties": false
+  }
+}

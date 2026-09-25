@@ -19,10 +19,17 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist coverage",
+    "docs": "tsx scripts/generate-docs.ts",
+    "docs:check": "tsx scripts/generate-docs.ts --check"
   },
   "dependencies": {
     "@rp/domain": "workspace:*",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "yaml": "^2.9.1"
   }
 }
