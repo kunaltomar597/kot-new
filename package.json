@@ -17,7 +17,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm format:check && pnpm build && pnpm lint && pnpm typecheck && pnpm test",
     "brd:catalog": "node scripts/brd/build-requirements-catalog.mjs",
     "trace": "node scripts/traceability.mjs",
     "clean": "turbo run clean && rm -rf node_modules/.cache"

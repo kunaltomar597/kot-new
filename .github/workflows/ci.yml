@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Format, lint, typecheck, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test with coverage thresholds
+        run: pnpm test:coverage
+
+      - name: Requirements catalogue is up to date
+        run: |
+          pnpm brd:catalog
+          git diff --exit-code -- docs/brd/requirements.json docs/brd/requirements.md
+
+      - name: Traceability report
+        run: |
+          pnpm trace
+          git diff --exit-code -- docs/build/TRACEABILITY.md || (echo "Run 'pnpm trace' and commit docs/build/TRACEABILITY.md" && exit 1)

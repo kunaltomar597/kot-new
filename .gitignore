@@ -1,6 +1,7 @@
 node_modules/
 dist/
-build/
+apps/*/build/
+packages/*/build/
 coverage/
 .turbo/
 *.tsbuildinfo
