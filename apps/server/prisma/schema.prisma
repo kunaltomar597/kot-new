@@ -310,6 +310,7 @@ model Staff {
   archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
   credentials      Credential[]
   sessions         Session[]
+  recoveryCodes    RecoveryCode[]
   shiftAssignments ShiftAssignment[]
   shifts           Shift[]
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -320,18 +321,26 @@ model Staff {
 }
 
 model Credential {
-  id             String         @id @default(uuid(7)) @db.Uuid
-  restaurantId   String         @map("restaurant_id") @db.Uuid
-  staffId        String         @map("staff_id") @db.Uuid
-  staff          Staff          @relation(fields: [staffId], references: [id])
-  kind           CredentialKind
+  id                     String         @id @default(uuid(7)) @db.Uuid
+  restaurantId           String         @map("restaurant_id") @db.Uuid
+  staffId                String         @map("staff_id") @db.Uuid
+  staff                  Staff          @relation(fields: [staffId], references: [id])
+  kind                   CredentialKind
   /// bcrypt/Argon2id hash of PIN + pepper, or password hash, or encrypted TOTP secret (AUTH-002).
-  secretHash     String         @map("secret_hash")
-  failedAttempts Int            @default(0) @map("failed_attempts")
-  lockedUntil    DateTime?      @map("locked_until") @db.Timestamptz(3)
-  rotatedAt      DateTime       @default(now()) @map("rotated_at") @db.Timestamptz(3)
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  secretHash             String         @map("secret_hash")
+  failedAttempts         Int            @default(0) @map("failed_attempts")
+  /// Start of the current failure window (AUTH-003: 5 failures within 10 minutes lock the login).
+  failureWindowStartedAt DateTime?      @map("failure_window_started_at") @db.Timestamptz(3)
+  lockedUntil            DateTime?      @map("locked_until") @db.Timestamptz(3)
+  /// TOTP only: encrypted secret waiting for its first code (enrolment in progress).
+  pendingSecret          String?        @map("pending_secret")
+  /// TOTP only: when the current secret was confirmed; unconfirmed TOTP is not a second factor.
+  confirmedAt            DateTime?      @map("confirmed_at") @db.Timestamptz(3)
+  /// TOTP only: last accepted 30-second step, so a code can never be used twice.
+  lastTotpStep           BigInt?        @map("last_totp_step")
+  rotatedAt              DateTime       @default(now()) @map("rotated_at") @db.Timestamptz(3)
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([staffId, kind])
   @@index([restaurantId])
@@ -364,24 +373,68 @@ model Device {
 }
 
 model Session {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  restaurantId      String    @map("restaurant_id") @db.Uuid
+  staffId           String    @map("staff_id") @db.Uuid
+  staff             Staff     @relation(fields: [staffId], references: [id])
+  deviceId          String    @map("device_id") @db.Uuid
+  device            Device    @relation(fields: [deviceId], references: [id])
+  /// SHA-256 of the current refresh token; the token itself is never stored.
+  tokenHash         String    @unique @map("token_hash")
+  /// SHA-256 of the refresh token this one replaced; presenting it again revokes the session.
+  previousTokenHash String?   @unique @map("previous_token_hash")
+  /// When the Owner last confirmed password + second factor in this session (AUTH-006 step-up).
+  secondFactorAt    DateTime? @map("second_factor_at") @db.Timestamptz(3)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  lastActiveAt      DateTime  @default(now()) @map("last_active_at") @db.Timestamptz(3)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokeReason      String?   @map("revoke_reason")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId])
+  @@index([staffId])
+  @@map("sessions")
+}
+
+/// One-time Owner recovery codes, usable instead of a TOTP code (AUTH-006).
+model RecoveryCode {
   id           String    @id @default(uuid(7)) @db.Uuid
   restaurantId String    @map("restaurant_id") @db.Uuid
   staffId      String    @map("staff_id") @db.Uuid
   staff        Staff     @relation(fields: [staffId], references: [id])
-  deviceId     String    @map("device_id") @db.Uuid
-  device       Device    @relation(fields: [deviceId], references: [id])
-  /// SHA-256 of the session token; the token itself is never stored.
-  tokenHash    String    @unique @map("token_hash")
-  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
-  lastActiveAt DateTime  @default(now()) @map("last_active_at") @db.Timestamptz(3)
-  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
-  revokeReason String?   @map("revoke_reason")
+  /// SHA-256 of the code; codes are random, so a fast hash is enough.
+  codeHash     String    @unique @map("code_hash")
+  usedAt       DateTime? @map("used_at") @db.Timestamptz(3)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId])
   @@index([staffId])
-  @@map("sessions")
+  @@map("recovery_codes")
+}
+
+/// A manager's single-use approval of one action on one device (AUTH-011).
+model OverrideGrant {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  restaurantId       String    @map("restaurant_id") @db.Uuid
+  deviceId           String    @map("device_id") @db.Uuid
+  requesterId        String    @map("requester_id") @db.Uuid
+  requesterSessionId String    @map("requester_session_id") @db.Uuid
+  approverId         String    @map("approver_id") @db.Uuid
+  capability         String
+  entityType         String?   @map("entity_type")
+  entityId           String?   @map("entity_id") @db.Uuid
+  /// SHA-256 of the override token; the token itself is never stored.
+  tokenHash          String    @unique @map("token_hash")
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt             DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId])
+  @@index([expiresAt])
+  @@map("override_grants")
 }
 
 // ---------------------------------------------------------------- floor

@@ -1,0 +1,27 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "recoveryCodes": {
+        "minItems": 10,
+        "maxItems": 10,
+        "type": "array",
+        "items": { "type": "string", "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$" }
+      }
+    },
+    "required": ["recoveryCodes"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "recoveryCodes": {
+        "minItems": 10,
+        "maxItems": 10,
+        "type": "array",
+        "items": { "type": "string", "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$" }
+      }
+    },
+    "required": ["recoveryCodes"],
+    "additionalProperties": false
+  }
+}

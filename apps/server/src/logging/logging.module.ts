@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
+import { LOG_DESTINATION, type LogDestination } from '../config/config.module.js';
 import { CORRELATION_HEADER, redactionPaths, resolveCorrelationId } from './correlation.js';
 
 /**
@@ -10,9 +11,9 @@ import { CORRELATION_HEADER, redactionPaths, resolveCorrelationId } from './corr
 @Module({
   imports: [
     LoggerModule.forRootAsync({
-      inject: [APP_CONFIG],
-      useFactory: (config: AppConfig) => ({
-        pinoHttp: {
+      inject: [APP_CONFIG, LOG_DESTINATION],
+      useFactory: (config: AppConfig, destination: LogDestination) => {
+        const options = {
           level: config.logLevel,
           // correlationMiddleware (src/http/request-pipeline.ts) normally assigned req.id already.
           genReqId: (request: IncomingMessage, response: ServerResponse) => {
@@ -33,11 +34,12 @@ import { CORRELATION_HEADER, redactionPaths, resolveCorrelationId } from './corr
             return 'info';
           },
           redact: { paths: redactionPaths(), censor: '[REDACTED]' },
-          ...(config.logPretty && config.nodeEnv !== 'production'
+          ...(config.logPretty && config.nodeEnv !== 'production' && destination === null
             ? { transport: { target: 'pino-pretty', options: { singleLine: true } } }
             : {}),
-        },
-      }),
+        };
+        return { pinoHttp: destination === null ? options : [options, destination] };
+      },
     }),
   ],
 })

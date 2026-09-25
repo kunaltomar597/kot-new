@@ -7,6 +7,21 @@ import { newId } from '../common/ids.js';
  * combo. Staff get no PINs here; P0-10 adds credentials. Refuses to run on a database that
  * already has a restaurant, so it can never touch real data.
  */
+export interface SeedOptions {
+  /** Hashes a PIN with the server's pepper; when given, every person gets the PIN listed below. */
+  readonly hashPin?: (pin: string) => Promise<string>;
+}
+
+/** Development PINs (never used outside development and tests). */
+export const DEV_PINS = {
+  'Asha (Owner)': '1111',
+  'Vikram (Manager)': '2222',
+  'Neha (Cashier)': '3333',
+  Ravi: '4444',
+  Sunita: '5555',
+  'Chef Imran': '6666',
+} as const;
+
 export interface SeedSummary {
   readonly restaurantId: string;
   readonly items: number;
@@ -221,7 +236,10 @@ const ITEMS: readonly ItemSpec[] = [
   { name: 'Veg Thali Combo', category: 'Combos', price: 349 * R, food: 'VEG', station: 'kitchen' },
 ];
 
-export async function seedDevelopmentData(prisma: PrismaClient): Promise<SeedSummary> {
+export async function seedDevelopmentData(
+  prisma: PrismaClient,
+  options: SeedOptions = {},
+): Promise<SeedSummary> {
   if ((await prisma.restaurant.count()) > 0) {
     throw new Error(
       'The database already has a restaurant; the development seed only runs on an empty database.',
@@ -326,13 +344,21 @@ export async function seedDevelopmentData(prisma: PrismaClient): Promise<SeedSum
         ['WAITER', 'Sunita'],
         ['KITCHEN', 'Chef Imran'],
       ] as const;
-      await tx.staff.createMany({
-        data: people.map(([role, displayName]) => ({
-          ...base,
-          roleId: roleIds.get(role) ?? '',
-          displayName,
-        })),
-      });
+      for (const [role, displayName] of people) {
+        const staff = await tx.staff.create({
+          data: { ...base, roleId: roleIds.get(role) ?? '', displayName },
+        });
+        if (options.hashPin !== undefined) {
+          await tx.credential.create({
+            data: {
+              ...base,
+              staffId: staff.id,
+              kind: 'PIN',
+              secretHash: await options.hashPin(DEV_PINS[displayName]),
+            },
+          });
+        }
+      }
 
       // Menu.
       const categoryIds = new Map<string, string>();

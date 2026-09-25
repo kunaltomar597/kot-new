@@ -1,0 +1,110 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "approverStaffId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "pin": { "type": "string", "pattern": "^\\d{4,8}$" },
+      "capability": {
+        "type": "string",
+        "enum": [
+          "ORDER_CREATE",
+          "ORDER_APPROVE_CUSTOMER",
+          "ITEM_CANCEL_BEFORE_PREP",
+          "ITEM_VOID_AFTER_PREP",
+          "ITEM_MARK_PREPARING_READY",
+          "ITEM_MARK_PICKED_UP",
+          "ITEM_MARK_SERVED",
+          "STOCK_MANAGE",
+          "TABLE_MOVE_MERGE",
+          "BILL_REQUEST",
+          "BILL_PRINT_AND_PAYMENT",
+          "DISCOUNT_WITHIN_LIMIT",
+          "DISCOUNT_ABOVE_LIMIT",
+          "SERVICE_CHARGE_REMOVE",
+          "BILL_REPRINT",
+          "BILL_EDIT_AFTER_PRINT",
+          "INVOICE_VOID",
+          "CASH_MOVEMENT_AND_SHIFT_CLOSE",
+          "DAY_END_CLOSE",
+          "MENU_MANAGE",
+          "STAFF_MANAGE",
+          "DEVICE_PAIR",
+          "OPERATIONS_CONFIGURE",
+          "TAX_AND_INVOICE_SETTINGS",
+          "REPORTS_VIEW_EXPORT",
+          "AUDIT_VIEW",
+          "DATA_ADMIN",
+          "LICENSE_VIEW",
+          "LICENSE_MANAGE",
+          "UPDATE_INSTALL_NOW"
+        ]
+      },
+      "entityType": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+      "entityId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      }
+    },
+    "required": ["approverStaffId", "pin", "capability"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "approverStaffId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "pin": { "type": "string", "pattern": "^\\d{4,8}$" },
+      "capability": {
+        "type": "string",
+        "enum": [
+          "ORDER_CREATE",
+          "ORDER_APPROVE_CUSTOMER",
+          "ITEM_CANCEL_BEFORE_PREP",
+          "ITEM_VOID_AFTER_PREP",
+          "ITEM_MARK_PREPARING_READY",
+          "ITEM_MARK_PICKED_UP",
+          "ITEM_MARK_SERVED",
+          "STOCK_MANAGE",
+          "TABLE_MOVE_MERGE",
+          "BILL_REQUEST",
+          "BILL_PRINT_AND_PAYMENT",
+          "DISCOUNT_WITHIN_LIMIT",
+          "DISCOUNT_ABOVE_LIMIT",
+          "SERVICE_CHARGE_REMOVE",
+          "BILL_REPRINT",
+          "BILL_EDIT_AFTER_PRINT",
+          "INVOICE_VOID",
+          "CASH_MOVEMENT_AND_SHIFT_CLOSE",
+          "DAY_END_CLOSE",
+          "MENU_MANAGE",
+          "STAFF_MANAGE",
+          "DEVICE_PAIR",
+          "OPERATIONS_CONFIGURE",
+          "TAX_AND_INVOICE_SETTINGS",
+          "REPORTS_VIEW_EXPORT",
+          "AUDIT_VIEW",
+          "DATA_ADMIN",
+          "LICENSE_VIEW",
+          "LICENSE_MANAGE",
+          "UPDATE_INSTALL_NOW"
+        ]
+      },
+      "entityType": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+      "entityId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      }
+    },
+    "required": ["approverStaffId", "pin", "capability"],
+    "additionalProperties": false
+  }
+}

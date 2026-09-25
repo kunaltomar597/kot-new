@@ -8,10 +8,10 @@ import { AuditService } from '../../src/audit/audit.service.js';
 import { Audited } from '../../src/audit/audited.decorator.js';
 import { computeAuditHash, GENESIS_HASH, hashFieldsOfRow } from '../../src/audit/audit-hash.js';
 import { RequireCapability } from '../../src/auth/decorators.js';
-import type { Principal } from '../../src/auth/principal.js';
 import { newId } from '../../src/common/ids.js';
 import { runWithRequestContext } from '../../src/common/request-context.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer, testConfig } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
 
@@ -323,50 +323,39 @@ class AuditProbeController {
 describe('[AUD-003] [AUTH-010] [SEC-003] audit HTTP API and permission guard', () => {
   let f: Fixture;
   let app: INestApplication;
-  const deviceId = newId();
-  const staffIds = Object.fromEntries(ROLES.map((role) => [role, newId()])) as Record<Role, string>;
+  let kit: AuthKit;
+  const tokens = {} as Record<Role, string>;
 
   beforeAll(async () => {
     f = await fixture();
-    app = await createTestApp({
-      databaseUrl: f.database.url,
-      controllers: [AuditProbeController],
-      authenticate: (req): Principal | undefined => {
-        const role = req.headers['x-test-role'];
-        if (typeof role !== 'string' || !(ROLES as readonly string[]).includes(role))
-          return undefined;
-        return {
-          staffId: staffIds[role as Role],
-          role: role as Role,
-          restaurantId: f.restaurantId,
-          deviceId,
-        };
-      },
-    });
+    app = await createTestApp({ databaseUrl: f.database.url, controllers: [AuditProbeController] });
+    kit = await createAuthKit(app, { restaurantId: f.restaurantId });
+    for (const role of ROLES) tokens[role] = (await signIn(app, kit, role)).accessToken;
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  const as = (role?: Role) => (req: request.Test) =>
-    role === undefined ? req : req.set('x-test-role', role);
+  const as = (role: Role) => authHeaders(kit.deviceId, tokens[role]);
 
   it('answers 401 without a signed-in person', async () => {
-    const response = await request(httpServer(app)).get('/api/v1/audit/verify');
+    const response = await request(httpServer(app))
+      .get('/api/v1/audit/verify')
+      .set(authHeaders(kit.deviceId));
     expect(response.status).toBe(401);
     expect(ApiError.parse(response.body).code).toBe('UNAUTHENTICATED');
   });
 
   it.each(['CASHIER', 'WAITER', 'KITCHEN'] as const)('refuses %s (403)', async (role) => {
-    const response = await as(role)(request(httpServer(app)).get('/api/v1/audit/verify'));
+    const response = await request(httpServer(app)).get('/api/v1/audit/verify').set(as(role));
     expect(response.status).toBe(403);
     expect(ApiError.parse(response.body).code).toBe('FORBIDDEN');
   });
 
   it.each(['OWNER', 'MANAGER'] as const)('lets %s verify the chain', async (role) => {
     await record(f);
-    const response = await as(role)(request(httpServer(app)).get('/api/v1/audit/verify'));
+    const response = await request(httpServer(app)).get('/api/v1/audit/verify').set(as(role));
     expect(response.status).toBe(200);
     const body = AuditVerifyResponse.parse(response.body);
     expect(body.valid).toBe(true);
@@ -377,36 +366,38 @@ describe('[AUD-003] [AUTH-010] [SEC-003] audit HTTP API and permission guard', (
     expect((await request(httpServer(app)).get('/api/v1/health')).status).toBe(200);
   });
 
-  it('denies a route that declares no capability, whoever asks', async () => {
-    const response = await as('OWNER')(
-      request(httpServer(app)).post('/api/v1/probe-audit/undeclared'),
-    );
+  it('denies a route that declares no access, whoever asks', async () => {
+    const response = await request(httpServer(app))
+      .post('/api/v1/probe-audit/undeclared')
+      .set(as('OWNER'));
     expect(response.status).toBe(403);
   });
 
   it('asks for a manager override instead of allowing an OVERRIDE grant', async () => {
-    const response = await as('CASHIER')(request(httpServer(app)).post('/api/v1/probe-audit/void'));
+    const response = await request(httpServer(app))
+      .post('/api/v1/probe-audit/void')
+      .set(as('CASHIER'));
     expect(response.status).toBe(403);
     expect(ApiError.parse(response.body).code).toBe('OVERRIDE_REQUIRED');
-    expect(
-      (await as('MANAGER')(request(httpServer(app)).post('/api/v1/probe-audit/void'))).status,
-    ).toBe(201);
+    const manager = await request(httpServer(app))
+      .post('/api/v1/probe-audit/void')
+      .set(as('MANAGER'));
+    expect(manager.status).toBe(201);
   });
 
   it('passes an OWN grant on to the service to check ownership', async () => {
-    const response = await as('WAITER')(
-      request(httpServer(app)).post('/api/v1/probe-audit/approve'),
-    );
+    const response = await request(httpServer(app))
+      .post('/api/v1/probe-audit/approve')
+      .set(as('WAITER'));
     expect(response.status).toBe(201);
   });
 
   it('@Audited records who changed what, with the id from the route or the response', async () => {
     const itemId = newId();
-    const response = await as('MANAGER')(
-      request(httpServer(app))
-        .post(`/api/v1/probe-audit/menu/${itemId}/price`)
-        .set('x-correlation-id', 'price-change-1'),
-    );
+    const response = await request(httpServer(app))
+      .post(`/api/v1/probe-audit/menu/${itemId}/price`)
+      .set(as('MANAGER'))
+      .set('x-correlation-id', 'price-change-1');
     expect(response.status).toBe(201);
     const entry = await f.prisma.auditLog.findFirstOrThrow({
       where: { action: 'MENU_PRICE_CHANGED' },
@@ -414,13 +405,15 @@ describe('[AUD-003] [AUTH-010] [SEC-003] audit HTTP API and permission guard', (
     expect(entry).toMatchObject({
       entityType: 'item',
       entityId: itemId,
-      actorId: staffIds.MANAGER,
-      deviceId,
+      actorId: kit.staff.MANAGER,
+      deviceId: kit.deviceId,
       restaurantId: f.restaurantId,
       correlationId: 'price-change-1',
     });
 
-    const created = await as('OWNER')(request(httpServer(app)).post('/api/v1/probe-audit/staff'));
+    const created = await request(httpServer(app))
+      .post('/api/v1/probe-audit/staff')
+      .set(as('OWNER'));
     const staffEntry = await f.prisma.auditLog.findFirstOrThrow({
       where: { action: 'STAFF_CREATED' },
     });
@@ -429,7 +422,9 @@ describe('[AUD-003] [AUTH-010] [SEC-003] audit HTTP API and permission guard', (
   });
 
   it('@Audited writes nothing when the action fails', async () => {
-    const response = await as('OWNER')(request(httpServer(app)).post('/api/v1/probe-audit/fail'));
+    const response = await request(httpServer(app))
+      .post('/api/v1/probe-audit/fail')
+      .set(as('OWNER'));
     expect(response.status).toBe(500);
     expect(await f.prisma.auditLog.count({ where: { action: 'MENU_ITEM_ARCHIVED' } })).toBe(0);
   });

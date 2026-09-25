@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "code": { "type": "string", "pattern": "^\\d{6}$" } },
+    "required": ["code"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "code": { "type": "string", "pattern": "^\\d{6}$" } },
+    "required": ["code"],
+    "additionalProperties": false
+  }
+}

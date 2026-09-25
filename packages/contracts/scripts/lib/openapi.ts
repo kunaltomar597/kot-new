@@ -100,7 +100,9 @@ export function buildOpenApi({ namespace, routes, version }: OpenApiOptions): Js
       description:
         'Generated from @rp/contracts by `pnpm contracts:docs`; do not edit by hand. Money is ' +
         'integer paise, rates are basis points, dates are YYYY-MM-DD and instants are ISO-8601 ' +
-        'UTC. `x-capability` names the permission the server enforces (AUTH-010); ' +
+        'UTC. `x-capability` names the permission the server enforces (AUTH-010): a capability, ' +
+        '`SESSION` (any signed-in person), `DEVICE` (a paired device, nobody signed in) or ' +
+        '`PUBLIC`; ' +
         '`x-requirements` lists the BRD requirement IDs. Components cover every exported contract ' +
         'schema, including those not yet used by a route. A `<Name>Input` component describes ' +
         'what a client may send when it differs from the parsed form (for example omitted ' +

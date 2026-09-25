@@ -1,0 +1,74 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "staff": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "staffId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "displayName": { "type": "string", "minLength": 1 },
+            "role": {
+              "type": "string",
+              "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"]
+            },
+            "photoId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["staffId", "displayName", "role", "photoId"]
+        }
+      }
+    },
+    "required": ["staff"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "staff": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "staffId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "displayName": { "type": "string", "minLength": 1 },
+            "role": {
+              "type": "string",
+              "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"]
+            },
+            "photoId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["staffId", "displayName", "role", "photoId"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["staff"],
+    "additionalProperties": false
+  }
+}

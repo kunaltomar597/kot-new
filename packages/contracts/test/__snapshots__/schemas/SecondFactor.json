@@ -1,0 +1,46 @@
+{
+  "input": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "const": "TOTP" },
+          "code": { "type": "string", "pattern": "^\\d{6}$" }
+        },
+        "required": ["kind", "code"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "const": "RECOVERY_CODE" },
+          "code": { "type": "string", "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$" }
+        },
+        "required": ["kind", "code"],
+        "additionalProperties": false
+      }
+    ]
+  },
+  "output": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "const": "TOTP" },
+          "code": { "type": "string", "pattern": "^\\d{6}$" }
+        },
+        "required": ["kind", "code"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "const": "RECOVERY_CODE" },
+          "code": { "type": "string", "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$" }
+        },
+        "required": ["kind", "code"],
+        "additionalProperties": false
+      }
+    ]
+  }
+}

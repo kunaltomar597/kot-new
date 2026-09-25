@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "refreshToken": { "type": "string", "minLength": 20, "maxLength": 200 } },
+    "required": ["refreshToken"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "refreshToken": { "type": "string", "minLength": 20, "maxLength": 200 } },
+    "required": ["refreshToken"],
+    "additionalProperties": false
+  }
+}
