@@ -65,6 +65,8 @@ checks, retention 14 daily + 8 weekly; nightly encrypted (AES-256-GCM) cloud bac
 key generated at install (DPAPI) and escrowed wrapped by a vendor KMS key, released only on the
 Owner's authenticated restore request; opt-out recorded in audit; one-click restore onto the same or
 a new PC after licence re-binding; backup failure alerts; restore runbook and rehearsal checklist.
+A restore must delete `system_meta` key `events.stream_id` before the server starts, so every
+device does a full refresh instead of resuming from sequences of the lost timeline (P0-12).
 Acceptance: automated backup → wipe → restore test with RPO/RTO measured; tampered backup detected.
 
 ## P7-06 Data lifecycle

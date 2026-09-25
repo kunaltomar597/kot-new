@@ -3,6 +3,7 @@ import type { AuditChainBreak, AuditChainHead, AuditVerifyResponse } from '@rp/c
 import { businessDateOf } from '@rp/domain';
 import { newId } from '../common/ids.js';
 import { currentRequestContext } from '../common/request-context.js';
+import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
 import { AppError } from '../errors/app-error.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
@@ -16,7 +17,7 @@ import {
 } from './audit-hash.js';
 
 /** Advisory-lock key that serialises audit writers so the chain stays linear. */
-export const AUDIT_CHAIN_LOCK = 7_261_000_001n;
+export const AUDIT_CHAIN_LOCK = ADVISORY_LOCKS.auditChain;
 
 const ACTION = /^[A-Z][A-Z0-9_]{1,63}$/;
 const ENTITY_TYPE = /^[a-z][a-z0-9_]{1,63}$/;

@@ -65,11 +65,21 @@ export async function authenticateDevice(
  * A device as if a manager had paired it (its public key registered), authenticated through the
  * real device-token flow. Pairing itself is tested in devices.int.test.ts.
  */
+export type TestDeviceType =
+  'POS' | 'WAITER_PHONE' | 'MANAGER_BROWSER' | 'KDS' | 'TABLE_TABLET' | 'PAGER';
+
+/** What a device is bound to: a tablet's table, a kitchen screen's station, a pager's wearer. */
+export interface TestDeviceBinding {
+  readonly tableId?: string;
+  readonly stationId?: string;
+  readonly staffId?: string;
+}
+
 export async function registerDevice(
   app: INestApplication,
   restaurantId: string,
-  type: 'POS' | 'WAITER_PHONE' | 'MANAGER_BROWSER' | 'KDS' | 'TABLE_TABLET' = 'POS',
-  binding: { tableId?: string } = {},
+  type: TestDeviceType = 'POS',
+  binding: TestDeviceBinding = {},
 ): Promise<string> {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const device = await app.get(PrismaService).device.create({
@@ -82,6 +92,8 @@ export async function registerDevice(
       publicKey: publicKey.export({ format: 'pem', type: 'spki' }).toString(),
       keyAlgorithm: 'Ed25519',
       tableId: binding.tableId ?? null,
+      stationId: binding.stationId ?? null,
+      staffId: binding.staffId ?? null,
     },
   });
   await authenticateDevice(app, device.id, privateKey);
@@ -153,8 +165,8 @@ export async function createAuthKit(
 export function addDevice(
   app: INestApplication,
   kit: AuthKit,
-  type: 'POS' | 'WAITER_PHONE' | 'MANAGER_BROWSER' | 'KDS' | 'TABLE_TABLET' = 'POS',
-  binding: { tableId?: string } = {},
+  type: TestDeviceType = 'POS',
+  binding: TestDeviceBinding = {},
 ): Promise<string> {
   return registerDevice(app, kit.restaurantId, type, binding);
 }
@@ -176,6 +188,14 @@ export async function signIn(
     );
   }
   return LoginResponse.parse(response.body);
+}
+
+/** The device token of a device the kit registered (for socket handshakes). */
+export function deviceTokenOf(deviceId: string): string {
+  const credentials = deviceCredentials.get(deviceId);
+  if (credentials === undefined)
+    throw new Error(`Device ${deviceId} was not registered by the kit`);
+  return credentials.token;
 }
 
 /**

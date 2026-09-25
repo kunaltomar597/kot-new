@@ -1362,6 +1362,21 @@ model DayEnd {
 
 // ---------------------------------------------------------------- audit and messaging
 
+/// How far each durable event consumer has got (P0-12). Consumers handle events in sequence order,
+/// at least once, de-duplicated through the inbox. Installation-level, like the outbox sequence
+/// (one installation per outlet, BRD assumption A-01).
+model EventConsumerCursor {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  consumer     String   @unique
+  lastSequence BigInt   @default(0) @map("last_sequence")
+  attempts     Int      @default(0)
+  lastError    String?  @map("last_error")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("event_consumer_cursors")
+}
+
 model AuditLog {
   id            String   @id @default(uuid(7)) @db.Uuid
   restaurantId  String   @map("restaurant_id") @db.Uuid
@@ -1404,6 +1419,13 @@ model OutboxEvent {
   payload       Json
   occurredAt    DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(3)
   publishedAt   DateTime? @map("published_at") @db.Timestamptz(3)
+  /// Delivery order: gap-free, assigned by the event dispatcher when the committed event is
+  /// published, so clients can resume from the last sequence they saw (NFR-P11, NTF-006).
+  sequence      BigInt?   @unique
+  /// Order in which rows were written (keeps a transaction's events in order); not commit order.
+  writeOrder    BigInt    @default(autoincrement()) @map("write_order")
+  /// Routing hints from the producer (tables, stations, sections, staff) for real-time rooms.
+  audience      Json?
   attempts      Int       @default(0)
   lastError     String?   @map("last_error")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)

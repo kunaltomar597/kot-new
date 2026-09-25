@@ -26,6 +26,7 @@ import type { Principal } from '../auth/principal.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
 import { sha256Hex } from '../auth/tokens.js';
 import { newId } from '../common/ids.js';
+import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
@@ -152,7 +153,7 @@ export class DevicesService {
   async createBootstrapCode(loopback: boolean): Promise<PairingCodeResponse> {
     if (!loopback) throw errors.bootstrapClosed();
     return this.prisma.transaction(async (tx) => {
-      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(7261000002)`;
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(${ADVISORY_LOCKS.pairingBootstrap})`;
       if ((await tx.device.count({ where: { status: 'ACTIVE' } })) > 0) {
         throw errors.bootstrapClosed();
       }
@@ -318,7 +319,7 @@ export class DevicesService {
           }),
           payload: { deviceId: device.id, deviceType: device.type, reason },
         },
-        { type: 'device', id: device.id },
+        { aggregate: { type: 'device', id: device.id } },
       );
       await this.audit.record(tx, {
         action: 'DEVICE_REVOKED',

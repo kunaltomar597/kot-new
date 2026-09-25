@@ -31,23 +31,44 @@ export async function createTestApp(options: {
   controllers?: Type[];
   /** Receives every log line (default: none are written). */
   logDestination?: LogDestination;
+  /** Replaces provider values, e.g. shorter real-time intervals. */
+  overrides?: readonly {
+    readonly provide: string | symbol | Type;
+    readonly useValue: unknown;
+  }[];
+  /** Runs before start-up hooks, e.g. to subscribe test consumers to the event bus. */
+  beforeInit?: (app: INestApplication) => void;
+  /** Listens on a random localhost port (Socket.io clients need a real port). */
+  listen?: boolean;
 }): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({
+  let builder = Test.createTestingModule({
     imports: [
       AppModule.forRoot(testConfig({ databaseUrl: options.databaseUrl, ...options.config })),
     ],
     controllers: options.controllers ?? [],
   })
     .overrideProvider(LOG_DESTINATION)
-    .useValue(options.logDestination ?? null)
-    .compile();
+    .useValue(options.logDestination ?? null);
+  for (const { provide, useValue } of options.overrides ?? []) {
+    builder = builder.overrideProvider(provide).useValue(useValue);
+  }
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication(NEST_APP_OPTIONS);
   configureApp(app);
+  options.beforeInit?.(app);
   await app.init();
+  if (options.listen === true) await app.listen(0, '127.0.0.1');
   return app;
 }
 
 /** The underlying HTTP server, typed for supertest (Nest returns `any`). */
 export function httpServer(app: INestApplication): Server {
   return app.getHttpServer() as Server;
+}
+
+/** The base URL of an app created with `listen: true`. */
+export function appUrl(app: INestApplication): string {
+  const address = httpServer(app).address();
+  if (address === null || typeof address === 'string') throw new Error('The app is not listening');
+  return `http://127.0.0.1:${String(address.port)}`;
 }

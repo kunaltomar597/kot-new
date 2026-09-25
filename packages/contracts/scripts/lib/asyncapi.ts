@@ -72,7 +72,9 @@ export function buildAsyncApi({ namespace, events, version }: AsyncApiOptions): 
         'businessDate, correlationId, payload) and is versioned so consumers can support the ' +
         'current and previous version (UPD-006). Channel addresses are event types; the ' +
         'transports that carry them (Socket.io to apps, MQTT to pagers, the outbox to the cloud) ' +
-        'map these names to their own rooms and topics.',
+        'map these names to their own rooms and topics. On Socket.io (namespace /rt) each event ' +
+        'arrives as a RealtimeEvent message { sequence, event }, filtered to the rooms allowed to ' +
+        'see it; the handshake, resync and full-refresh protocol is in @rp/contracts realtime.ts.',
     },
     defaultContentType: 'application/json',
     channels,

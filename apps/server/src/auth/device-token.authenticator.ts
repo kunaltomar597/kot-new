@@ -26,8 +26,15 @@ export class DeviceTokenAuthenticator implements DeviceAuthenticator {
   ) {}
 
   async authenticate(request: Request): Promise<AuthenticatedDevice | undefined> {
-    // Always verified; a missing token simply fails verification (CWE-807).
-    const claims = await this.tokens.verify(deviceTokenOf(request));
+    return this.authenticateToken(deviceTokenOf(request));
+  }
+
+  /**
+   * The paired device a device token belongs to; also used for socket handshakes (P0-12). Always
+   * verified; a missing token simply fails verification (CWE-807).
+   */
+  async authenticateToken(token: string): Promise<AuthenticatedDevice | undefined> {
+    const claims = await this.tokens.verify(token);
     if (claims === undefined) return undefined;
     const device = await this.prisma.device.findFirst({
       where: { id: claims.deviceId, restaurantId: claims.restaurantId, status: 'ACTIVE' },

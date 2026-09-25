@@ -3,7 +3,7 @@ asyncapi: 3.1.0
 info:
   title: 'Restaurant Operations Platform: domain events'
   version: 0.1.0
-  description: Generated from @rp/contracts by `pnpm contracts:docs`; do not edit by hand. Every domain event shares one envelope (eventId, type, version, occurredAt, restaurantId, businessDate, correlationId, payload) and is versioned so consumers can support the current and previous version (UPD-006). Channel addresses are event types; the transports that carry them (Socket.io to apps, MQTT to pagers, the outbox to the cloud) map these names to their own rooms and topics.
+  description: Generated from @rp/contracts by `pnpm contracts:docs`; do not edit by hand. Every domain event shares one envelope (eventId, type, version, occurredAt, restaurantId, businessDate, correlationId, payload) and is versioned so consumers can support the current and previous version (UPD-006). Channel addresses are event types; the transports that carry them (Socket.io to apps, MQTT to pagers, the outbox to the cloud) map these names to their own rooms and topics. On Socket.io (namespace /rt) each event arrives as a RealtimeEvent message { sequence, event }, filtered to the rooms allowed to see it; the handshake, resync and full-refresh protocol is in @rp/contracts realtime.ts.
 defaultContentType: application/json
 channels:
   MenuPublished:
