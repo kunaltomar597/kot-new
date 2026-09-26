@@ -1,0 +1,147 @@
+.rp-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--rp-space-1);
+  min-height: calc(var(--rp-touch-target) * 1.75);
+  padding: var(--rp-space-3);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+  color: var(--rp-color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rp-menu-item:hover:not(:disabled) {
+  background: var(--rp-color-neutral-subtle);
+}
+
+.rp-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rp-menu-item__top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--rp-space-2);
+}
+
+.rp-menu-item__name {
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.rp-menu-item__note {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.rp-menu-item__note[data-unavailable] {
+  color: var(--rp-color-danger-text);
+  font-weight: var(--rp-font-weight-medium);
+}
+
+/* The Indian veg / non-veg / egg mark: a square with a dot, in the food's colour. */
+.rp-food-mark {
+  --rp-food-colour: var(--rp-color-success);
+
+  display: inline-grid;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  margin-top: 0.2em;
+  border: 2px solid var(--rp-food-colour);
+  border-radius: 2px;
+  place-items: center;
+}
+
+.rp-food-mark::after {
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: var(--rp-food-colour);
+  content: '';
+}
+
+.rp-food-mark[data-food='NON_VEG'] {
+  --rp-food-colour: var(--rp-color-danger);
+}
+
+.rp-food-mark[data-food='EGG'] {
+  --rp-food-colour: var(--rp-color-warning);
+}
+
+.rp-choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rp-choice-group__legend {
+  padding: 0;
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.rp-choice-group__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--rp-space-2);
+}
+
+.rp-choice-group__option {
+  display: flex;
+  align-items: center;
+  gap: var(--rp-space-2);
+  min-height: var(--rp-touch-target);
+  padding: 0 var(--rp-space-3);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-md);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rp-choice-group__option[data-checked] {
+  border-color: var(--rp-color-primary);
+  background: var(--rp-color-info-subtle);
+}
+
+.rp-choice-group__option input {
+  width: 1.25em;
+  height: 1.25em;
+  margin: 0;
+}
+
+.rp-choice-group__label {
+  flex: 1;
+}
+
+.rp-choice-group__detail {
+  color: var(--rp-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-item-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+}
+
+.rp-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rp-space-2);
+}
+
+.rp-stepper__value {
+  min-width: 2ch;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}

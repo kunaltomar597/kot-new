@@ -3805,6 +3805,41 @@
         "x-requirements": ["ORD-009", "ORD-010"]
       }
     },
+    "/api/v1/orders/takeaway": {
+      "get": {
+        "operationId": "listTakeawayOrders",
+        "summary": "Today's open takeaway orders with their tokens and item states",
+        "tags": ["orders"],
+        "responses": {
+          "200": {
+            "description": "The orders, oldest first.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["TBL-008", "ORD-010"]
+      }
+    },
     "/api/v1/print-queue": {
       "get": {
         "operationId": "getPrintQueue",
@@ -5681,6 +5716,59 @@
         },
         "x-capability": "TABLE_MOVE_MERGE",
         "x-requirements": ["TBL-005", "WTR-008", "AUD-001"]
+      }
+    },
+    "/api/v1/table-sessions/{sessionId}/orders": {
+      "get": {
+        "operationId": "listSessionOrders",
+        "summary": "The orders of a table session with their item states",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The orders, oldest first.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such table session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["TBL-007", "ORD-010"]
       }
     },
     "/api/v1/table-sessions/{sessionId}/request-bill": {
@@ -9508,6 +9596,14 @@
           "instructions": { "type": "string", "maxLength": 500 }
         },
         "required": ["clientLineId", "itemId", "quantity"],
+        "additionalProperties": false
+      },
+      "OrderListResponse": {
+        "type": "object",
+        "properties": {
+          "orders": { "type": "array", "items": { "$ref": "#/components/schemas/OrderView" } }
+        },
+        "required": ["orders"],
         "additionalProperties": false
       },
       "OrderParams": {

@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router';
 import { useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { homeFor, isStationMode, type Mode, modesFor } from '../app/modes.js';
-import { TableOverview } from '../pos/TableOverview.js';
+import { PosHome } from '../pos/PosHome.js';
 
 /**
  * A mode's start screen: the POS floor (P1-08); the KDS (P1-09) and dashboard (P4-01) screens
@@ -42,7 +42,7 @@ export function ModeHome({ mode }: { mode: Mode }) {
         {name}
       </h1>
       {mode === 'pos' ? (
-        <TableOverview />
+        <PosHome />
       ) : (
         <EmptyState title={name} description={t('modes.comingSoon', { mode: name })} />
       )}

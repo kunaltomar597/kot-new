@@ -28,6 +28,12 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
 - POS floor (`/pos`, P1-08a, TBL-007): `src/pos/` shows every table by section with its state,
   guests, time seated, waiter and amount so far, and reads the overview again after table, order
   and bill events. A free table opens (guests, optional waiter); an occupied one moves.
+- POS order entry (`/pos/table/:sessionId`, `/pos/takeaway`, P1-08b): `src/pos/OrderEntry.tsx`
+  browses and searches the menu (`menu-view.ts`), chooses options in `ItemDialog` (rules and
+  estimated prices from `@rp/domain` menu-selection), keeps the cart (`cart.ts`, never sends
+  prices), sends it with one idempotency key per cart (a retry cannot duplicate the order), marks
+  refused lines, and lists what was sent with live item states. `src/app/use-live.ts` reads data
+  again after the events that change it and after a reconnect.
 - `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
   screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
 

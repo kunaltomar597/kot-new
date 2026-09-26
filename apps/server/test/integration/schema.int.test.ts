@@ -1,3 +1,4 @@
+import { MenuSnapshot } from '@rp/contracts';
 import { CAPABILITIES, ORDER_ITEM_STATES, ORDER_SOURCES, ROLES, TABLE_STATES } from '@rp/domain';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -91,6 +92,10 @@ describe('development seed', () => {
     const roles = await prisma.role.findMany({ include: { staff: true } });
     expect(roles.map((role) => role.baseRole).sort()).toEqual([...ROLES].sort());
     expect(roles.every((role) => role.staff.length > 0)).toBe(true);
+    // The demo menu is published, so ordering surfaces work at once (MENU-013).
+    const version = await prisma.menuVersion.findFirstOrThrow();
+    expect(version.version).toBe(1);
+    expect(MenuSnapshot.parse(version.snapshot).items).toHaveLength(30);
   });
 
   it('refuses to run on a database that already has a restaurant', async () => {

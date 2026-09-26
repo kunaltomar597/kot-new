@@ -2,6 +2,7 @@ import type { TableOverviewEntry } from '@rp/contracts';
 import { grantFor } from '@rp/domain';
 import { Button, Dialog, EmptyState, ErrorState, LoadingState, Money, TableTile } from '@rp/ui-web';
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
@@ -27,6 +28,7 @@ export function TableOverview() {
   const { data, reload } = useFloor();
   const now = useNow(30_000);
   const [panel, setPanel] = useState<Panel | undefined>();
+  const navigate = useNavigate();
 
   if (data.status === 'loading') return <LoadingState title={t('states.loading')} />;
   if (data.status === 'error') {
@@ -38,7 +40,7 @@ export function TableOverview() {
     );
   }
 
-  const sections = floorSections(data.floor, data.overview);
+  const sections = floorSections(data.value.floor, data.value.overview);
   const tables = sections.flatMap((section) => section.tables);
   const free = tables.filter((table) => table.state === 'FREE');
   const selected = tables.find((table) => table.tableId === panel?.tableId);
@@ -55,9 +57,19 @@ export function TableOverview() {
 
   return (
     <div className="pos-floor">
-      <p className="pos-floor__summary">
-        {t('pos.summary', { free: free.length, total: tables.length })}
-      </p>
+      <div className="pos-floor__bar">
+        <p className="pos-floor__summary">
+          {t('pos.summary', { free: free.length, total: tables.length })}
+        </p>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            void navigate('takeaway');
+          }}
+        >
+          {t('pos.takeaway')}
+        </Button>
+      </div>
       {sections.map((section) => (
         <section
           key={section.id}
@@ -98,6 +110,9 @@ export function TableOverview() {
           onMove={() => {
             setPanel({ kind: 'move', tableId: selected.tableId });
           }}
+          onTakeOrder={(sessionId) => {
+            void navigate(`table/${sessionId}?label=${encodeURIComponent(selected.label)}`);
+          }}
         />
       ) : null}
       {selected !== undefined && panel?.kind === 'move' ? (
@@ -113,12 +128,14 @@ function TableDetails({
   canMove,
   onClose,
   onMove,
+  onTakeOrder,
 }: {
   table: TableOverviewEntry;
   now: number;
   canMove: boolean;
   onClose: () => void;
   onMove: () => void;
+  onTakeOrder: (sessionId: string) => void;
 }) {
   const t = useT();
   const session = table.session;
@@ -130,11 +147,22 @@ function TableDetails({
       onClose={onClose}
       title={t('pos.table.title', { table: table.label })}
       footer={
-        canMove && session !== null ? (
-          <Button variant="secondary" onClick={onMove}>
-            {t('pos.table.move')}
-          </Button>
-        ) : null
+        session === null ? null : (
+          <>
+            {canMove ? (
+              <Button variant="secondary" onClick={onMove}>
+                {t('pos.table.move')}
+              </Button>
+            ) : null}
+            <Button
+              onClick={() => {
+                onTakeOrder(session.id);
+              }}
+            >
+              {t('pos.table.takeOrder')}
+            </Button>
+          </>
+        )
       }
     >
       <p>{t(`pos.tableState.${table.state}`)}</p>

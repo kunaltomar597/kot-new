@@ -4,10 +4,12 @@ import {
   OrderItemEndRequest,
   OrderItemParams,
   OrderItemStatusRequest,
+  type OrderListResponse,
   OrderParams,
   type OrderView,
   SubmitOrderRequest,
   type SubmitOrderResponse,
+  TableSessionParams,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability, RequireSession } from '../auth/decorators.js';
@@ -53,6 +55,13 @@ export class OrdersController {
     );
   }
 
+  // Declared before `:orderId` so "takeaway" is not read as an order id.
+  @Get('takeaway')
+  @RequireCapability('ORDER_CREATE')
+  takeaway(@Req() request: AuthenticatedRequest): Promise<OrderListResponse> {
+    return this.orders.listOpenTakeaway(principalOf(request).restaurantId);
+  }
+
   @Get(':orderId')
   @RequireCapability('ORDER_CREATE')
   get(
@@ -60,6 +69,21 @@ export class OrdersController {
     @Param(new ZodValidationPipe(OrderParams)) params: OrderParams,
   ): Promise<OrderView> {
     return this.orders.get(principalOf(request).restaurantId, params.orderId);
+  }
+}
+
+/** A table session's orders, for the POS and the waiter app (P1-08b, TBL-007). */
+@Controller('table-sessions')
+export class SessionOrdersController {
+  constructor(private readonly orders: OrdersService) {}
+
+  @Get(':sessionId/orders')
+  @RequireCapability('ORDER_CREATE')
+  list(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(TableSessionParams)) params: TableSessionParams,
+  ): Promise<OrderListResponse> {
+    return this.orders.listForSession(principalOf(request).restaurantId, params.sessionId);
   }
 }
 
