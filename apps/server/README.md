@@ -8,7 +8,7 @@ of truth for the restaurant.
 
 - `src/config`: deployment configuration from environment variables, validated with Zod
   (`.env.example` lists every variable). In production the database must be on this PC (DATA-001).
-  Restaurant settings (every ⚙ value) come later from the database settings registry (P1-01).
+  Restaurant settings (every ⚙ value) come from the database settings registry (P1-01a, below).
 - `src/http/request-pipeline.ts`: correlation ID middleware (first), JSON body parser (1 MB), and
   body-parser error handling, installed by `configureApp` in `src/app.factory.ts`.
 - `src/logging`: structured JSON logs (pino via nestjs-pino) with a `correlationId` on every line of
@@ -47,7 +47,8 @@ of truth for the restaurant.
   10 tables, staff of every role, 30 items with variants, modifiers and an all-day combo, and the
   menu published as version 1 through `src/menu/menu-content.ts`, as publishing does). Run with
   `pnpm --filter @rp/server build && DATABASE_URL=... pnpm --filter @rp/server db:seed`. It refuses
-  to run on a database that already has a restaurant. Staff PINs come with P0-10.
+  to run on a database that already has a restaurant. The seeded staff PINs are listed under
+  Authentication.
 
 ## Audit log and authorisation (P0-09)
 
@@ -103,16 +104,15 @@ of truth for the restaurant.
   `<RP_DATA_DIR>/secrets` (or `RP_SECRET_*` variables); the installer swaps in DPAPI (P0-16).
 - Settings (`AuthSettingsService`, keys `auth.*` in the settings table, defaults in
   `auth-settings.ts`): PIN length, lockout, rate limit, token and inactivity times, session length,
-  step-up and override validity, kitchen logins. P1-01 moves them into the settings registry.
+  step-up and override validity, kitchen logins. Since P1-01a they are settings registry keys.
 - Audit (AUTH-013): LOGIN, LOGIN_FAILED, LOGIN_LOCKED, LOGOUT, STAFF_UNLOCKED, STEP_UP,
   OVERRIDE_GRANTED, OVERRIDE_DENIED, REFRESH_TOKEN_REUSED, OWNER_PASSWORD_SET/CHANGED,
   TOTP_ENROLMENT_STARTED, TOTP_ENROLLED. PINs, passwords, codes and tokens are redacted from logs.
 - Development PINs from `db:seed`: Owner 1111, Manager 2222, Cashier 3333, waiters 4444 and 5555,
   kitchen 6666 (development only).
 
-Feature modules are added to `src/app.module.ts` by later work packages, one Nest module per area:
-audit, auth, devices, realtime, settings, floor, menu, orders, kitchen, billing, payments, reports,
-notifications, mqtt, service-requests, recommendations, sync, licensing, backup, updates, diagnostics.
+Each area is one Nest module registered in `src/app.module.ts`. Still to come: mqtt,
+service-requests, recommendations, sync, licensing, backup, updates and diagnostics.
 
 ## Devices (P0-11)
 
@@ -386,8 +386,8 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `src/kitchen/kds.service.ts`: `GET /api/v1/kds/tickets` (open tickets with each item's live
   state, the "moved from" label, whether the manager was notified, tickets bumped in the last
   hour, and the KDS settings), bump and recall (`KotBumped` to the station and managers), and
-  "Notify manager", which writes an `alerts` row (READY_NOT_COLLECTED) and `AlertEscalated` for the
-  managers until the notification engine (P2-03) routes alerts.
+  "Notify manager", which raises a READY_NOT_COLLECTED alert through the notification engine
+  (P2-03a, below) so it reaches the managers on duty until acknowledged.
 - Migration `20260927040000_kds`: `kots.bumped_at`, `bumped_by_id`, `bumped_by_device_id` and the
   `alerts` table (no DELETE for the app).
 
@@ -428,9 +428,19 @@ pnpm --filter @rp/server build         compile to dist/
 pnpm --filter @rp/server test          unit + integration tests
 pnpm --filter @rp/server test:unit     unit tests only (no database)
 pnpm --filter @rp/server test:int      integration tests (PostgreSQL)
+pnpm --filter @rp/server test:coverage tests with the 70 % coverage threshold (NFR-M04)
 pnpm --filter @rp/server start         run dist/main.js (needs DATABASE_URL)
+pnpm --filter @rp/server dev           run dist/main.js with --watch and .env (build first)
+pnpm --filter @rp/server db:migrate:deploy   apply pending migrations (what the installer runs)
+pnpm --filter @rp/server db:seed       load the development seed (build first)
+pnpm --filter @rp/server menu:template write the vendor menu import template (build first)
+pnpm --filter @rp/server scenario:service-day   Phase 1 exit scenario against RP_SCENARIO_URL
 pnpm --filter @rp/server control-plane:enrol <code>   enrol this PC with the Control Plane
+pnpm --filter @rp/server clean         remove dist, coverage and the generated Prisma client
 ```
+
+For `dev`, `start`, `db:seed` and `control-plane:enrol`, copy `.env.example` to `.env`; it lists
+every variable.
 
 Schema changes: edit `prisma/schema.prisma`, then create a migration against a development database
 with `pnpm --filter @rp/server db:migrate:dev --name <change>` (or `prisma migrate diff --from-migrations
@@ -439,7 +449,9 @@ fails if the schema and the migrations drift apart.
 
 ## Integration tests and PostgreSQL
 
-`test/setup/postgres.ts` provides the database:
+The harness is the shared `@rp/test-postgres` package (also used by the Control Plane);
+`test/setup/postgres.ts` points it at this app's migrations and `test/setup/global-setup.ts` starts
+it once per run:
 
 - If `TEST_DATABASE_URL` is set, it is used as an admin connection (CI uses a `postgres:16` service
   container; on Windows or macOS point it at an installed PostgreSQL 16, for example
@@ -448,11 +460,13 @@ fails if the schema and the migrations drift apart.
   `/usr/lib/postgresql/16/bin`, on a random localhost port. As root (cloud containers) it runs as the
   `postgres` system user.
 
-A template database gets every migration once; each test file clones it (`createTestDatabase()`),
-so files are isolated and fast. Use `createTestApp()` to boot the real app against it, and
-`httpServer(app)` with supertest.
+A template database gets every migration once; each test file clones it (`createTestDatabase()` in
+`test/helpers/test-database.ts`), so files are isolated and fast. Use `createTestApp()` from
+`test/helpers/test-app.ts` to boot the real app against it, and `httpServer(app)` or `api(app)` with
+supertest.
 
 ## Conventions
 
-Business rules live in `@rp/domain`; request/response/event shapes in `@rp/contracts`. Every endpoint
-will declare its capability once auth lands (P0-10). See `docs/build/CONVENTIONS.md`.
+Business rules live in `@rp/domain`; request/response/event shapes in `@rp/contracts`. Every route
+declares its access (`@Public()`, `@RequireDevice()`, `@RequireSession()` or
+`@RequireCapability()`), or the permission guard answers 403. See `docs/build/CONVENTIONS.md`.

@@ -12,16 +12,21 @@ What exists:
 
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
-  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment, bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export.
-  140 tests.
+  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment,
+  bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export, menu
+  import planning (P1-05) and notification rules (P2-03a). 169 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down (P1-13). 430 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions
+  (P1-02); the menu (P1-03); photos (P1-04); menu import (P1-05); orders and item changes (P1-06);
+  stations, printers and the print queue (P1-07); the KDS (P1-09a); bills and invoices (P1-10);
+  shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down
+  (P1-13); alerts (P2-03a). 458 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
-  harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
+  harness; core data model (61 tables after the later migrations), least-privilege roles, audit/invoice protection triggers,
   gap-free numbering and a development seed (P0-08); audit hash chain (P0-09); authentication,
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
@@ -30,7 +35,17 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills (P1-10d); shifts, cash and payments with table settlement (P1-11a); day-end with the Z-report and carry-forward (P1-11b); the core reports, stamped and audited CSV export and the order drill-down (P1-13). 588 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft
+  menu, combos, live availability and published versions (P1-03); menu photos (P1-04); Excel/CSV
+  menu import (P1-05); the order engine: submission, KOTs, item status, cancel, void and modify
+  (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts,
+  redirect and reprint (P1-07); KDS station mode, tickets, bump, recall and notify manager
+  (P1-09a); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints,
+  void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills
+  (P1-10d); shifts, cash and payments with table settlement (P1-11a); day-end with the Z-report
+  and carry-forward (P1-11b); the core reports, stamped and audited CSV export and the order
+  drill-down (P1-13); the Phase 1 exit scenario (P1-14); the notification engine core with
+  acknowledgement, repeats and escalation (P2-03a). 629 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -538,23 +553,35 @@ Decided 2026-09-26 (P1-08b):
 73. The development seed publishes its menu as version 1 and its combo sells all day, so demos and
     end-to-end tests do not depend on the clock. Real restaurants still publish from Manage.
 
-Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
-(P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
-(P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
-revocation), #12 (P0-14a client-side token handling), #13 (P0-14b console storage of keys and
-sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning), #16 (P0-17a
-installation identity, signed requests and enrolment of the Control Plane), #17 (P0-17b the
-installation key on the PC and its signing client), #18 (P1-01a who may change which setting,
-including the Owner's second factor for tax and data settings), P1-01b (the Owner-only tax,
-invoice series and invoice particulars endpoints, #19), P1-10a (billing: discounts, overrides,
-invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-M05), P1-10b
-(invoice void with override, DUPLICATE marking), P1-10c (editing a printed invoice under its
-number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts), P1-13b (who may export which report, CSV formula
-neutralising), #38 (P1-09a station mode: device-only kitchen access
-in the permission guard), #40 (P1-12a manager approval prompt and payment
-idempotency on the POS), P1-12b (void and edit-after-print approvals on the POS), P1-04 (upload checks, image decoding
-of untrusted files, the public rendition route), P1-05 (spreadsheet parsing of untrusted files and
-the ZIP size guard).
+Security-sensitive PRs for the P8-03 human review:
+
+- #2 P0-06: CI security baseline (secret scan, dependency audit, licence policy, CodeQL).
+- #3 P0-07: log redaction of PINs, passwords and tokens (SEC-015).
+- #7 P0-08: database roles and protection triggers.
+- #8 P0-09: audit hash chain and permission guard.
+- #9 P0-10: authentication, sessions, manager override.
+- #10 P0-11: device pairing and device tokens.
+- #11 P0-12: socket authentication, room filtering and revocation.
+- #12 P0-14a: client-side token handling.
+- #13 P0-14b: console storage of keys and sessions, CSP.
+- #14 P0-15: LAN CA, key storage, certificate renewal and pinning.
+- #16 P0-17a: installation identity, signed requests and enrolment on the Control Plane.
+- #17 P0-17b: the installation key on the PC and its signing client.
+- #18 P1-01a: who may change which setting, including the Owner's second factor for tax and data
+  settings.
+- #19 P1-01b: the Owner-only tax, invoice series and invoice particulars endpoints.
+- #28 P1-10a: discounts, overrides, invoice numbering and the invoice snapshot (the BRD asks for
+  two reviewers, NFR-M05).
+- #29 P1-10b: invoice void with override, DUPLICATE marking.
+- #30 P1-10c: editing a printed invoice under its number, with override.
+- #31 P1-10d: split bills, allocation and numbering.
+- #32 P1-11a: payments and cash shifts.
+- #35 P1-13b: who may export which report, CSV formula neutralising.
+- #38 P1-09a: station mode, device-only kitchen access in the permission guard.
+- #40 P1-12a: manager approval prompt and payment idempotency on the POS.
+- #41 P1-12b: void and edit-after-print approvals on the POS.
+- #42 P1-04: upload checks, image decoding of untrusted files, the public rendition route.
+- #43 P1-05: spreadsheet parsing of untrusted files and the ZIP size guard.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -562,6 +589,16 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: docs review of PROGRESS.md and the server README
+
+Checked both against the code on `main` (after PR #45). PROGRESS "Current state": test counts
+re-run (domain 169, contracts 458, server 629), the table count is 61, and the items built since
+P1-13 (photos, menu import, KDS server, exit scenario, notifications) are listed. The
+security-review list now gives every PR number, with P0-06 (#2) and P0-07 (#3) added. Server
+README: removed "comes later" notes for things that exist (settings registry, PINs, capability
+declarations, alert routing), listed every package script, and pointed the test-harness notes at
+`@rp/test-postgres` and `test/helpers`. No code changed.
 
 ### 2026-09-26: P2-03a Notification engine core
 
