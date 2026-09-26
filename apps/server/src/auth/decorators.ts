@@ -7,8 +7,17 @@ export const ROUTE_ACCESS = 'rp:access';
 export type RouteAccess =
   | { readonly kind: 'PUBLIC' }
   | { readonly kind: 'DEVICE' }
-  | { readonly kind: 'SESSION' }
-  | { readonly kind: 'CAPABILITY'; readonly capability: Capability };
+  | {
+      readonly kind: 'SESSION';
+      /** A kitchen screen in station mode may call it with nobody signed in (AUTH-005). */
+      readonly stationMode?: boolean;
+    }
+  | {
+      readonly kind: 'CAPABILITY';
+      readonly capability: Capability;
+      /** A kitchen screen in station mode may call it with nobody signed in (AUTH-005). */
+      readonly stationMode?: boolean;
+    };
 
 type RouteDecorator = MethodDecorator & ClassDecorator;
 
@@ -24,13 +33,23 @@ export const RequireDevice = (): RouteDecorator =>
   SetMetadata(ROUTE_ACCESS, { kind: 'DEVICE' } satisfies RouteAccess);
 
 /** Any signed-in person may call it; the service checks anything further (e.g. Owner only). */
-export const RequireSession = (): RouteDecorator =>
-  SetMetadata(ROUTE_ACCESS, { kind: 'SESSION' } satisfies RouteAccess);
+export const RequireSession = (options: { stationMode?: boolean } = {}): RouteDecorator =>
+  SetMetadata(ROUTE_ACCESS, {
+    kind: 'SESSION',
+    ...(options.stationMode === true && { stationMode: true }),
+  } satisfies RouteAccess);
 
 /**
  * The capability from the BRD §4.2 matrix (`@rp/domain` permissions) a route needs. Every route
  * must declare its access with one of these decorators; anything else is denied (AUTH-010,
  * SEC-003).
  */
-export const RequireCapability = (capability: Capability): RouteDecorator =>
-  SetMetadata(ROUTE_ACCESS, { kind: 'CAPABILITY', capability } satisfies RouteAccess);
+export const RequireCapability = (
+  capability: Capability,
+  options: { stationMode?: boolean } = {},
+): RouteDecorator =>
+  SetMetadata(ROUTE_ACCESS, {
+    kind: 'CAPABILITY',
+    capability,
+    ...(options.stationMode === true && { stationMode: true }),
+  } satisfies RouteAccess);

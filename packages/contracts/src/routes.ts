@@ -38,6 +38,13 @@ import {
   UnlockStaffRequest,
 } from './auth.js';
 import { ApiError, Id } from './common.js';
+import {
+  KdsTicket,
+  KdsTicketsQuery,
+  KdsTicketParams,
+  KdsTicketsResponse,
+  NotifyManagerResponse,
+} from './kds.js';
 import { CloseDayRequest, DayEndParams, DayEndPreview, DayEndView } from './day-end.js';
 import {
   BindTableRequest,
@@ -290,6 +297,77 @@ export const ROUTES = [
       200: { description: 'The order.', schema: OrderView },
       ...standardErrors,
       404: { description: 'No such order.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getKdsTickets',
+    method: 'GET',
+    path: '/api/v1/kds/tickets',
+    summary: "A station's open kitchen tickets, recently bumped ones and the screen settings",
+    description:
+      'A kitchen screen in station mode (nobody signed in, AUTH-005) sees its own station and ' +
+      'cannot choose another; a signed-in person may pass `stationId`, or see every station.',
+    tags: ['kitchen'],
+    requirements: ['KDS-001', 'KDS-002', 'KDS-003', 'KDS-004', 'KDS-012'],
+    capability: 'ITEM_MARK_PREPARING_READY',
+    request: { query: KdsTicketsQuery },
+    responses: {
+      200: { description: 'The tickets.', schema: KdsTicketsResponse },
+      ...standardErrors,
+      404: { description: 'No such station.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'bumpKot',
+    method: 'POST',
+    path: '/api/v1/kds/tickets/:kotId/bump',
+    summary: 'Take a finished ticket off the kitchen screen',
+    description:
+      'Refused while an item on it is still waiting or being prepared. Change and cancellation ' +
+      'slips can be bumped once seen.',
+    tags: ['kitchen'],
+    requirements: ['KDS-005'],
+    capability: 'ITEM_MARK_PREPARING_READY',
+    request: { params: KdsTicketParams },
+    responses: {
+      200: { description: 'The ticket, bumped.', schema: KdsTicket },
+      ...standardErrors,
+      404: { description: 'No such ticket at this station.', schema: ApiError },
+      409: { description: 'Items on it are not ready yet.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'recallKot',
+    method: 'POST',
+    path: '/api/v1/kds/tickets/:kotId/recall',
+    summary: 'Bring a bumped ticket back to the kitchen screen',
+    tags: ['kitchen'],
+    requirements: ['KDS-005'],
+    capability: 'ITEM_MARK_PREPARING_READY',
+    request: { params: KdsTicketParams },
+    responses: {
+      200: { description: 'The ticket, back on the screen.', schema: KdsTicket },
+      ...standardErrors,
+      404: { description: 'No such ticket at this station.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'notifyManagerForKot',
+    method: 'POST',
+    path: '/api/v1/kds/tickets/:kotId/notify-manager',
+    summary: 'Ready food is not being collected: alert the manager',
+    description:
+      'Raises a READY_NOT_COLLECTED alert for the managers (KDS-006). Pressing it again while the ' +
+      'alert is open returns the same alert. Delivery rules and escalation arrive with P2-03.',
+    tags: ['kitchen'],
+    requirements: ['KDS-006', 'NTF-003'],
+    capability: 'ITEM_MARK_PREPARING_READY',
+    request: { params: KdsTicketParams },
+    responses: {
+      200: { description: 'The alert.', schema: NotifyManagerResponse },
+      ...standardErrors,
+      404: { description: 'No such ticket at this station.', schema: ApiError },
+      409: { description: 'Nothing on the ticket is ready and waiting.', schema: ApiError },
     },
   },
   {
@@ -1543,9 +1621,11 @@ export const ROUTES = [
     summary: 'Move an item along: preparing, ready, picked up, served',
     description:
       'Each step needs its own grant (BRD §4.2): the kitchen marks preparing and ready, the floor ' +
-      'picks up and serves. A combo line moves its parts with it. Returns the order.',
+      'picks up and serves. A combo line moves its parts with it. Returns the order. A kitchen ' +
+      'screen in station mode (nobody signed in, AUTH-005) acts with the kitchen grants on its ' +
+      "own station's items only.",
     tags: ['orders'],
-    requirements: ['ORD-010', 'ORD-002'],
+    requirements: ['ORD-010', 'ORD-002', 'KDS-005', 'KDS-007'],
     capability: 'SESSION',
     request: { params: OrderItemParams, body: OrderItemStatusRequest },
     responses: {

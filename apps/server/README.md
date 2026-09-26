@@ -349,6 +349,21 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `src/payments/payments.service.ts`: idempotent payment recording, settlement, and freeing the
   table when its last bill is paid.
 
+## Kitchen display (P1-09a)
+
+- Station mode (AUTH-005): routes declared with `{ stationMode: true }` admit a paired KDS with
+  nobody signed in when kitchen staff do not sign in individually. The guard sets
+  `request.station`; `actorOf(request)` gives services one `Actor` (person or screen) with the
+  kitchen role, `staffId` null and the screen's station. A screen bound to a station only sees and
+  changes that station's tickets and items; its steps are recorded against the device.
+- `src/kitchen/kds.service.ts`: `GET /api/v1/kds/tickets` (open tickets with each item's live
+  state, the "moved from" label, whether the manager was notified, tickets bumped in the last
+  hour, and the KDS settings), bump and recall (`KotBumped` to the station and managers), and
+  "Notify manager", which writes an `alerts` row (READY_NOT_COLLECTED) and `AlertEscalated` for the
+  managers until the notification engine (P2-03) routes alerts.
+- Migration `20260927040000_kds`: `kots.bumped_at`, `bumped_by_id`, `bumped_by_device_id` and the
+  `alerts` table (no DELETE for the app).
+
 ## Reports (P1-13)
 
 - `src/reports/reports.service.ts` (P1-13a): sales, items and categories, payment modes, shifts, the

@@ -1098,30 +1098,70 @@ model OrderEvent {
 }
 
 model Kot {
-  id            String         @id @default(uuid(7)) @db.Uuid
-  restaurantId  String         @map("restaurant_id") @db.Uuid
-  businessDate  DateTime       @map("business_date") @db.Date
+  id               String         @id @default(uuid(7)) @db.Uuid
+  restaurantId     String         @map("restaurant_id") @db.Uuid
+  businessDate     DateTime       @map("business_date") @db.Date
   /// Sequential per business day (ORD-008).
-  kotNumber     Int            @map("kot_number")
-  orderId       String         @map("order_id") @db.Uuid
-  order         Order          @relation(fields: [orderId], references: [id])
-  stationId     String         @map("station_id") @db.Uuid
-  station       Station        @relation(fields: [stationId], references: [id])
-  kind          KotKind        @default(NEW)
-  printStatus   KotPrintStatus @default(NOT_REQUIRED) @map("print_status")
-  printedAt     DateTime?      @map("printed_at") @db.Timestamptz(3)
-  printAttempts Int            @default(0) @map("print_attempts")
-  lines         KotLine[]
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  kotNumber        Int            @map("kot_number")
+  orderId          String         @map("order_id") @db.Uuid
+  order            Order          @relation(fields: [orderId], references: [id])
+  stationId        String         @map("station_id") @db.Uuid
+  station          Station        @relation(fields: [stationId], references: [id])
+  kind             KotKind        @default(NEW)
+  printStatus      KotPrintStatus @default(NOT_REQUIRED) @map("print_status")
+  printedAt        DateTime?      @map("printed_at") @db.Timestamptz(3)
+  printAttempts    Int            @default(0) @map("print_attempts")
+  /// Bumped off the kitchen screen (KDS-005); cleared again by Recall.
+  bumpedAt         DateTime?      @map("bumped_at") @db.Timestamptz(3)
+  /// Who bumped it: the signed-in person, or none in station mode (the device is recorded).
+  bumpedById       String?        @map("bumped_by_id") @db.Uuid
+  bumpedByDeviceId String?        @map("bumped_by_device_id") @db.Uuid
+  lines            KotLine[]
+  alerts           Alert[]
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([restaurantId, businessDate, kotNumber])
   @@index([restaurantId])
   @@index([orderId])
   @@index([stationId, businessDate])
+  /// The kitchen screen lists a station's tickets not yet bumped (KDS-002).
+  @@index([stationId, bumpedAt])
   /// The print queue (P1-07b) scans PENDING and FAILED tickets.
   @@index([restaurantId, printStatus])
   @@map("kots")
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  CLEARED
+}
+
+/// Something a person must act on (NTF-001). P1-09 raises "ready, not collected" from the KDS
+/// (KDS-006); the notification engine (P2-03) adds rules, delivery, acknowledgement and escalation.
+model Alert {
+  id               String      @id @default(uuid(7)) @db.Uuid
+  restaurantId     String      @map("restaurant_id") @db.Uuid
+  businessDate     DateTime    @map("business_date") @db.Date
+  /// e.g. "READY_NOT_COLLECTED".
+  type             String
+  status           AlertStatus @default(OPEN)
+  kotId            String?     @map("kot_id") @db.Uuid
+  kot              Kot?        @relation(fields: [kotId], references: [id])
+  tableId          String?     @map("table_id") @db.Uuid
+  raisedById       String?     @map("raised_by_id") @db.Uuid
+  raisedByDeviceId String?     @map("raised_by_device_id") @db.Uuid
+  /// What the alert says, e.g. the table and the items waiting.
+  payload          Json        @default("{}")
+  acknowledgedAt   DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
+  acknowledgedById String?     @map("acknowledged_by_id") @db.Uuid
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, status])
+  @@index([kotId])
+  @@map("alerts")
 }
 
 /// A note printed at a station that is not a kitchen ticket, e.g. "Moved from T4 to T7" when a

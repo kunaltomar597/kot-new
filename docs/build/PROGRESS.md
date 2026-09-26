@@ -57,7 +57,7 @@ Recommended next WPs (dependencies met):
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-12 POS billing UI (P1-10 and P1-11 done).
-- P1-09 KDS UI (P1-06, P1-07 done).
+- P1-09b KDS screen (P1-09a done).
 - P1-12 POS billing UI (P1-10, P1-11 done).
 - P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -108,7 +108,8 @@ Recommended next WPs (dependencies met):
 - [x] P1-07b Print queue, offline alert, redirect and reprint
 - [x] P1-08a POS floor: live table overview, open and move table
 - [x] P1-08b POS order entry, send KOT, takeaway, live item status
-- [ ] P1-09 KDS UI
+- [x] P1-09a KDS server support (station mode, tickets, bump, recall, notify manager)
+- [ ] P1-09b KDS screen
 - [x] P1-10a Bill preview, discounts and invoice issue
 - [x] P1-10b Bill printing, reprint and void
 - [x] P1-10c Edit after print
@@ -427,6 +428,20 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P1-09a):
+
+74. A kitchen screen in station mode acts with the kitchen role's grants and only on its own
+    station (a screen without a station sees all). Its actions have no person, only the device;
+    reports show the station screen as the actor. With individual kitchen logins on, a person must
+    sign in on the screen.
+75. A NEW ticket stays on the screen while any of its items is waiting, cooking or ready at the
+    pass, and leaves by itself once everything is picked up or ended. Bump takes it off earlier
+    only when nothing is waiting or cooking. Change and cancellation slips stay until bumped, on
+    their business day.
+76. "Notify manager" writes an alert (READY_NOT_COLLECTED) and tells every manager's screen;
+    pressing it again while the alert is open returns the same alert. The notification engine
+    (P2-03) takes over delivery, acknowledgement and escalation.
+
 Decided 2026-09-26 (P1-08b):
 
 71. The POS keeps one idempotency key per cart: a failed or unanswered send keeps the cart and the
@@ -450,7 +465,8 @@ invoice series and invoice particulars endpoints, #19), P1-10a (billing: discoun
 invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-M05), P1-10b
 (invoice void with override, DUPLICATE marking), P1-10c (editing a printed invoice under its
 number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts), P1-13b (who may export which report, CSV formula
-neutralising).
+neutralising), #38 (P1-09a station mode: device-only kitchen access
+in the permission guard).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -458,6 +474,27 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-09a KDS server support
+
+P1-09 was split into P1-09a (this) and P1-09b (the KDS screen).
+
+Built:
+
+- Station mode: `RequireCapability(c, { stationMode: true })` and `RequireSession({ stationMode:
+true })`, `request.station`, `Actor` and `actorOf`; `OrderItemsService.setStatus` takes an
+  actor and holds a station screen to its station.
+- `KdsService` and `KdsController` (`src/kitchen/`), contracts `kds.ts` and `KotBumped`, room
+  routing for it, migration `20260927040000_kds` (bump columns, `alerts`).
+- Tests: 8 integration tests (station scoping, settings, steps attributed to the screen, bump
+  refused while cooking, notify manager once, bump and recall with events, pick-up at the pass,
+  moved-from label, station mode refused when individual logins are on) and a routing unit test.
+
+  Totals: contracts 439 tests, server 599.
+
+Next: P1-09b, the KDS screen in the console.
+
+Decisions: 74 to 76.
 
 ### 2026-09-26: P1-08b POS order entry (P1-08 done)
 

@@ -13,7 +13,11 @@ import type { AuthenticatedRequest, Principal } from './principal.js';
  *
  * - `@Public()` passes.
  * - `@RequireDevice()` needs a paired device.
- * - `@RequireSession()` needs a signed-in person (on the device their token was issued to).
+ * - `@RequireSession()` needs a signed-in person (on the device their token was issued to);
+ *   `{ stationMode: true }` also admits a kitchen screen in station mode (see below).
+ * - `@RequireCapability(c, { stationMode: true })` also lets a kitchen screen with nobody signed in
+ *   act for the kitchen (station mode, AUTH-005), when kitchen staff do not sign in individually
+ *   and the kitchen role is granted `c`; the guard sets `request.station`.
  * - `@RequireCapability(c)` needs a signed-in person whose role is granted `c` in the BRD §4.2
  *   matrix. ALLOW passes, and Owner-only capabilities (AUTH-006) also need a fresh password + TOTP
  *   step-up. OWN passes with `request.ownershipRequired` set, so the service checks the table or
@@ -44,9 +48,13 @@ export class PermissionGuard implements CanActivate {
         if (request.device === undefined) throw authErrors.deviceNotRecognised();
         return true;
       case 'SESSION':
+        if (access.stationMode === true && (await this.stationMode(request))) return true;
         this.principal(request);
         return true;
       case 'CAPABILITY':
+        if (access.stationMode === true && (await this.stationMode(request, access.capability))) {
+          return true;
+        }
         return this.checkCapability(request, access.capability);
       case undefined:
         this.logger.error(
@@ -55,6 +63,28 @@ export class PermissionGuard implements CanActivate {
         );
         throw authErrors.forbidden();
     }
+  }
+
+  /**
+   * Whether a kitchen screen with nobody signed in may act for its station here: with a
+   * capability, the kitchen role must be granted it; without one, the service checks the step.
+   */
+  private async stationMode(
+    request: AuthenticatedRequest,
+    capability?: Extract<RouteAccess, { kind: 'CAPABILITY' }>['capability'],
+  ): Promise<boolean> {
+    const device = request.device;
+    if (request.principal !== undefined || request.authFailure !== undefined) return false;
+    if (device?.type !== 'KDS') return false;
+    const settings = await this.settings.get(device.restaurantId);
+    if (settings.kitchenIndividualLogins) return false;
+    if (capability !== undefined && grantFor('KITCHEN', capability) !== 'ALLOW') return false;
+    request.station = {
+      restaurantId: device.restaurantId,
+      deviceId: device.deviceId,
+      stationId: device.stationId,
+    };
+    return true;
   }
 
   private principal(request: AuthenticatedRequest): Principal {

@@ -213,6 +213,21 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     );
   });
 
+  it('[KDS-005] sends a bump to its station and managers, not to other stations', () => {
+    const station = randomUUID();
+    const targets = roomsForEvent(
+      domainEvent('KotBumped', rid, { kotId: randomUUID(), stationId: station, bumped: true }),
+    );
+    expect(targets.sort()).toEqual(
+      [
+        rooms.role(rid, 'OWNER'),
+        rooms.role(rid, 'MANAGER'),
+        rooms.station(rid, station),
+        rooms.allStations(rid),
+      ].sort(),
+    );
+  });
+
   it('sends an escalation to managers and the people it names', () => {
     const targets = roomsForEvent(
       domainEvent('AlertEscalated', rid, {
@@ -287,6 +302,8 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
         orderId: id(),
         kind: 'NEW',
       });
+    case 'KotBumped':
+      return domainEvent(type, rid, { kotId: id(), stationId: id(), bumped: true });
     case 'ItemStatusChanged':
       return domainEvent(type, rid, {
         orderId: id(),

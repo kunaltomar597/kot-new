@@ -16,7 +16,7 @@ import {
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { authErrors } from '../auth/auth-errors.js';
-import type { ConsumedOverride, Principal } from '../auth/principal.js';
+import type { Actor, ConsumedOverride, Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { allocateDailyNumber } from '../database/numbering.js';
@@ -81,14 +81,22 @@ export class OrderItemsService {
     private readonly orders: OrdersService,
   ) {}
 
+  /**
+   * A kitchen or floor step. A kitchen screen in station mode acts with the kitchen's grants and
+   * only on its own station's items; its steps are attributed to the device (AUTH-005).
+   */
   async setStatus(
-    principal: Principal,
+    principal: Actor,
     orderItemId: string,
     event: OrderItemStatusRequest['event'],
   ): Promise<OrderView> {
     if (grantFor(principal.role, STEP_CAPABILITY[event]) !== 'ALLOW') throw authErrors.forbidden();
     const orderId = await this.prisma.transaction(async (tx) => {
       const item = await this.lock(tx, principal.restaurantId, orderItemId);
+      const station = principal.stationId ?? null;
+      if (station !== null && item.stationId !== station) {
+        throw authErrors.forbidden();
+      }
       const now = new Date();
       for (const target of [item, ...item.components]) {
         // Parts follow their combo where they can; the line itself must be able to move.
@@ -334,7 +342,7 @@ export class OrderItemsService {
 
   private async changed(
     tx: TransactionClient,
-    principal: Principal,
+    principal: Actor,
     order: ItemWithOrder['order'],
     item: OrderItem,
     to: OrderItemState,
@@ -368,7 +376,7 @@ export class OrderItemsService {
           orderItemId: item.id,
           from: item.state,
           to,
-          actorId: principal.staffId,
+          ...(principal.staffId !== null && { actorId: principal.staffId }),
           deviceId: principal.deviceId,
         },
       },
@@ -378,7 +386,7 @@ export class OrderItemsService {
 
   private async orderEvent(
     tx: TransactionClient,
-    principal: Principal,
+    principal: Actor,
     item: OrderItem,
     type: string,
     from: OrderItemState,

@@ -13,7 +13,7 @@ import {
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability, RequireSession } from '../auth/decorators.js';
-import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
+import { actorOf, type AuthenticatedRequest, type Principal } from '../auth/principal.js';
 import { AppError } from '../errors/app-error.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { OrderItemsService } from './order-items.service.js';
@@ -93,15 +93,18 @@ export class OrderItemsController {
   constructor(private readonly items: OrderItemsService) {}
 
   // Each step checks its own §4.2 grant in the service (kitchen marks, floor serves).
+  // A kitchen screen in station mode marks its own station's items (AUTH-005, KDS-005).
   @Post(':orderItemId/status')
   @HttpCode(200)
-  @RequireSession()
+  @RequireSession({ stationMode: true })
   status(
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(OrderItemParams)) params: OrderItemParams,
     @Body(new ZodValidationPipe(OrderItemStatusRequest)) body: OrderItemStatusRequest,
   ): Promise<OrderView> {
-    return this.items.setStatus(principalOf(request), params.orderItemId, body.event);
+    const actor = actorOf(request);
+    if (actor === undefined) throw authErrors.unauthenticated();
+    return this.items.setStatus(actor, params.orderItemId, body.event);
   }
 
   // Waiters: their own tables only (OWN), which the guard marks for the service.
