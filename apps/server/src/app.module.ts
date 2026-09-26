@@ -1,6 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { AuditModule } from './audit/audit.module.js';
+import { BillingModule } from './billing/billing.module.js';
 import { CloudModule } from './cloud/cloud.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import type { AppConfig } from './config/app-config.js';
@@ -43,6 +44,7 @@ export class AppModule {
         MenuModule,
         OrdersModule,
         PrintingModule,
+        BillingModule,
         DevicesModule,
         EventsModule,
         RealtimeModule,

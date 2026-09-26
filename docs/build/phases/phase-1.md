@@ -476,6 +476,52 @@ rollback, cancelled invoices stay in the series, split bill totals equal the ori
 flows audited with approver, DUPLICATE marking.
 Flag for two human reviewers (billing).
 
+P1-10 is split in two.
+
+### P1-10a Bill preview, discounts and invoice issue
+
+- A bill per table session or takeaway order (`bills` table), priced on the server.
+- Item and bill discounts with limits and override; complimentary items; service charge removal;
+  customer details.
+- Issuing the GST invoice: a gap-free number, a snapshot of the particulars, lines and tax lines,
+  `BillPrinted`, and the table moving to BILL_PRINTED.
+
+As built: `apps/server/src/billing/` and migration `20260926200000_bills`.
+
+- `bill-calculation.ts` builds the `computeBill` input from the stored order items.
+  - Billable, top-level items only. A combo is billed as its parent line.
+  - Tax uses the rates stored on each item when it was ordered.
+  - The service charge is dine-in only, and taxed with the tax group that carries the most value.
+- `bills.service.ts`: `POST /api/v1/bills` (open or return), `GET /api/v1/bills/:id`, discounts,
+  revoke, service charge and customer.
+  - Every change locks the table (dine-in) and then the bill row, and is audited.
+  - A discount is checked against `decideDiscount` with `billing.cashierDiscountLimitBp`, on its
+    effective rate over its own base (the item, or what is left after item discounts).
+  - Above the limit, or complimentary, it needs an override token for `DISCOUNT_ABOVE_LIMIT`
+    (bound to the bill when the grant names one). The approver is audited.
+  - A bill has at most one item discount per item and one bill discount. Discounts are revoked,
+    never deleted.
+- `invoices.service.ts`: `POST /api/v1/bills/:id/invoice` and `GET /api/v1/invoices/:id`.
+  - It refuses a closed session, items awaiting approval and an empty bill.
+  - The series is the one given or the default. The number comes from `allocateInvoiceSequence`,
+    with the invoice date (IST) deciding the financial year. A series without the year uses one
+    continuous counter (`0000-00`).
+  - It snapshots the particulars (legal name, address, GSTIN, FSSAI, place of supply, header and
+    footer), and writes lines with SAC codes, a service-charge line and tax lines per component.
+  - Discounts get their final amounts and the invoice id, and the bill becomes INVOICED.
+  - The table goes to BILL_PRINTED (`TableStateChanged`), with `BillPrinted` and an audit entry,
+    all in one transaction.
+
+### P1-10b Split, reprint, edit, void and the printed bill
+
+- Split a bill by items or into equal parts, each part with its own invoice number (BILL-007).
+- Reprint marked DUPLICATE, audited (BILL-009), on the POS printer through the P1-07 transport.
+- Edit a printed, unsettled invoice (manager PIN, reason, before/after), and void and re-issue
+  (BILL-010).
+- The ESC/POS bill template (logo, header, footer) (BILL-014).
+- Acceptance: split totals equal the original; cancelled invoices stay in the series; edit and
+  void audited with the approver; DUPLICATE marking.
+
 ## P1-11 Payments, shifts and day-end
 
 Goal: record payments manually and close the day.

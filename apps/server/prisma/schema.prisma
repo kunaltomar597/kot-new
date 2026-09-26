@@ -156,6 +156,12 @@ enum ApprovalStatus {
   EXPIRED
 }
 
+/// A bill is OPEN while it can still change before printing, INVOICED once printed (P1-10).
+enum BillStatus {
+  OPEN
+  INVOICED
+}
+
 enum InvoiceStatus {
   ISSUED
   SETTLED
@@ -538,6 +544,7 @@ model TableSession {
   invoices           Invoice[]
   createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  bill               Bill?
 
   @@index([restaurantId, businessDate])
   @@index([tableId, status])
@@ -990,6 +997,7 @@ model Order {
   invoices       Invoice[]
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  bill           Bill?
 
   @@unique([restaurantId, businessDate, orderNumber])
   @@index([tableSessionId])
@@ -1201,56 +1209,91 @@ model IdempotencyRecord {
 
 // ---------------------------------------------------------------- billing and cash
 
+/// What a table session (dine-in) or a takeaway order will be billed for (P1-10, BILL-001):
+/// discounts, the service charge choice and the customer's details before the invoice is issued.
+model Bill {
+  id                   String        @id @default(uuid(7)) @db.Uuid
+  restaurantId         String        @map("restaurant_id") @db.Uuid
+  businessDate         DateTime      @map("business_date") @db.Date
+  tableSessionId       String?       @unique @map("table_session_id") @db.Uuid
+  tableSession         TableSession? @relation(fields: [tableSessionId], references: [id])
+  /// A takeaway order is billed on its own.
+  orderId              String?       @unique @map("order_id") @db.Uuid
+  order                Order?        @relation(fields: [orderId], references: [id])
+  status               BillStatus    @default(OPEN)
+  /// Removed at the diner's request (BILL-006), audited.
+  serviceChargeRemoved Boolean       @default(false) @map("service_charge_removed")
+  customerName         String?       @map("customer_name")
+  customerPhone        String?       @map("customer_phone")
+  /// Explicit consent to a digital bill or feedback on this number (BILL-011).
+  customerPhoneConsent Boolean       @default(false) @map("customer_phone_consent")
+  customerGstin        String?       @map("customer_gstin")
+  discounts            Discount[]
+  invoices             Invoice[]
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, businessDate])
+  @@map("bills")
+}
+
 model Invoice {
-  id                String        @id @default(uuid(7)) @db.Uuid
-  restaurantId      String        @map("restaurant_id") @db.Uuid
-  businessDate      DateTime      @map("business_date") @db.Date
+  id                   String        @id @default(uuid(7)) @db.Uuid
+  restaurantId         String        @map("restaurant_id") @db.Uuid
+  businessDate         DateTime      @map("business_date") @db.Date
   /// Date of issue in IST; decides the financial year (ADR-0007).
-  invoiceDate       DateTime      @map("invoice_date") @db.Date
-  financialYear     String        @map("financial_year")
-  seriesId          String        @map("series_id") @db.Uuid
-  series            InvoiceSeries @relation(fields: [seriesId], references: [id])
-  sequence          Int
-  invoiceNumber     String        @map("invoice_number")
-  status            InvoiceStatus @default(ISSUED)
-  orderId           String?       @map("order_id") @db.Uuid
-  order             Order?        @relation(fields: [orderId], references: [id])
-  tableSessionId    String?       @map("table_session_id") @db.Uuid
-  tableSession      TableSession? @relation(fields: [tableSessionId], references: [id])
-  priceMode         PriceMode     @map("price_mode")
-  subtotal          Int
-  discountTotal     Int           @default(0) @map("discount_total")
-  serviceCharge     Int           @default(0) @map("service_charge")
-  taxTotal          Int           @map("tax_total")
+  invoiceDate          DateTime      @map("invoice_date") @db.Date
+  financialYear        String        @map("financial_year")
+  seriesId             String        @map("series_id") @db.Uuid
+  series               InvoiceSeries @relation(fields: [seriesId], references: [id])
+  sequence             Int
+  invoiceNumber        String        @map("invoice_number")
+  status               InvoiceStatus @default(ISSUED)
+  orderId              String?       @map("order_id") @db.Uuid
+  order                Order?        @relation(fields: [orderId], references: [id])
+  tableSessionId       String?       @map("table_session_id") @db.Uuid
+  tableSession         TableSession? @relation(fields: [tableSessionId], references: [id])
+  billId               String?       @map("bill_id") @db.Uuid
+  bill                 Bill?         @relation(fields: [billId], references: [id])
+  /// The seller's invoice particulars as printed (BILL-002): legal name, address, GSTIN, FSSAI,
+  /// place of supply, header and footer. Later profile changes never alter an issued invoice.
+  particulars          Json          @default("{}")
+  priceMode            PriceMode     @map("price_mode")
+  subtotal             Int
+  discountTotal        Int           @default(0) @map("discount_total")
+  serviceCharge        Int           @default(0) @map("service_charge")
+  taxTotal             Int           @map("tax_total")
   /// Signed rounding adjustment.
-  roundOff          Int           @default(0) @map("round_off")
-  grandTotal        Int           @map("grand_total")
-  customerName      String?       @map("customer_name")
-  customerGstin     String?       @map("customer_gstin")
-  customerPhone     String?       @map("customer_phone")
-  issuedById        String        @map("issued_by_id") @db.Uuid
-  issuedAt          DateTime      @default(now()) @map("issued_at") @db.Timestamptz(3)
-  settledAt         DateTime?     @map("settled_at") @db.Timestamptz(3)
-  voidedAt          DateTime?     @map("voided_at") @db.Timestamptz(3)
-  voidReason        String?       @map("void_reason")
+  roundOff             Int           @default(0) @map("round_off")
+  grandTotal           Int           @map("grand_total")
+  customerName         String?       @map("customer_name")
+  customerGstin        String?       @map("customer_gstin")
+  customerPhone        String?       @map("customer_phone")
+  customerPhoneConsent Boolean       @default(false) @map("customer_phone_consent")
+  issuedById           String        @map("issued_by_id") @db.Uuid
+  issuedAt             DateTime      @default(now()) @map("issued_at") @db.Timestamptz(3)
+  settledAt            DateTime?     @map("settled_at") @db.Timestamptz(3)
+  voidedAt             DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidReason           String?       @map("void_reason")
   /// A re-issued invoice points at the voided one it replaces (BILL-010).
-  replacesInvoiceId String?       @map("replaces_invoice_id") @db.Uuid
-  replaces          Invoice?      @relation("Reissue", fields: [replacesInvoiceId], references: [id])
-  replacedBy        Invoice[]     @relation("Reissue")
-  printCount        Int           @default(0) @map("print_count")
+  replacesInvoiceId    String?       @map("replaces_invoice_id") @db.Uuid
+  replaces             Invoice?      @relation("Reissue", fields: [replacesInvoiceId], references: [id])
+  replacedBy           Invoice[]     @relation("Reissue")
+  printCount           Int           @default(0) @map("print_count")
   /// Bumped by every edit of a printed bill (BILL-010), for optimistic locking.
-  version           Int           @default(1)
-  lines             InvoiceLine[]
-  taxLines          TaxLine[]
-  discounts         Discount[]
-  payments          Payment[]
-  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  version              Int           @default(1)
+  lines                InvoiceLine[]
+  taxLines             TaxLine[]
+  discounts            Discount[]
+  payments             Payment[]
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([restaurantId, invoiceNumber])
   @@unique([seriesId, financialYear, sequence])
   @@index([restaurantId, businessDate])
   @@index([tableSessionId])
+  @@index([billId])
   @@map("invoices")
 }
 
@@ -1301,6 +1344,9 @@ model Discount {
   businessDate DateTime     @map("business_date") @db.Date
   invoiceId    String?      @map("invoice_id") @db.Uuid
   invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
+  billId       String?      @map("bill_id") @db.Uuid
+  bill         Bill?        @relation(fields: [billId], references: [id])
+  /// Item discount when set; a bill discount otherwise.
   orderItemId  String?      @map("order_item_id") @db.Uuid
   orderItem    OrderItem?   @relation(fields: [orderItemId], references: [id])
   kind         DiscountKind
@@ -1311,10 +1357,14 @@ model Discount {
   reason       String
   appliedById  String       @map("applied_by_id") @db.Uuid
   approvedById String?      @map("approved_by_id") @db.Uuid
+  /// Discounts are never deleted: one taken back before printing is revoked, audited.
+  revokedAt    DateTime?    @map("revoked_at") @db.Timestamptz(3)
+  revokedById  String?      @map("revoked_by_id") @db.Uuid
   createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([invoiceId])
+  @@index([billId])
   @@index([restaurantId, businessDate])
   @@map("discounts")
 }

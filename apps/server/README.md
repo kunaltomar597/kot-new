@@ -328,6 +328,15 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 To try a real printer on a PC: add it under Printers with its IP address and port 9100, then use
 "Test print" (`POST /api/v1/printers/:id/test`). The answer says why it did not print.
 
+## Billing (P1-10)
+
+- `src/billing/bill-calculation.ts` (P1-10a) prices a bill with `@rp/domain` `computeBill` from
+  the stored order items.
+- `src/billing/bills.service.ts`: the bill before printing (discounts with limits and manager
+  override, service charge removal, customer details).
+- `src/billing/invoices.service.ts`: issues the GST invoice with a gap-free number and snapshots
+  what was printed.
+
 ## Commands
 
 ```

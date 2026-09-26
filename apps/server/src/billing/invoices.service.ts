@@ -1,0 +1,379 @@
+import { Injectable } from '@nestjs/common';
+import { type InvoiceParticulars, type InvoiceView } from '@rp/contracts';
+import {
+  calendarDateOf,
+  financialYearOf,
+  formatInvoiceNumber,
+  maxSequenceFor,
+  tableMachine,
+  transition,
+} from '@rp/domain';
+import { AuditService } from '../audit/audit.service.js';
+import type { Principal } from '../auth/principal.js';
+import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
+import { newId } from '../common/ids.js';
+import { allocateInvoiceSequence } from '../database/numbering.js';
+import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
+import { AppError } from '../errors/app-error.js';
+import { appendEvent } from '../events/outbox.js';
+import type { Invoice, InvoiceLine, TaxLine } from '../generated/prisma/client.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { describeItem } from './bill-calculation.js';
+import { BillsService } from './bills.service.js';
+
+/** Sequence key of a series that runs on across financial years (PROGRESS decision 17). */
+export const CONTINUOUS_SEQUENCE = '0000-00';
+
+type InvoiceRow = Invoice & {
+  lines: InvoiceLine[];
+  taxLines: TaxLine[];
+  tableSession: { table: { label: string } } | null;
+};
+
+function toParticulars(value: unknown): InvoiceParticulars {
+  const stored = (typeof value === 'object' && value !== null ? value : {}) as Partial<
+    Record<keyof InvoiceParticulars, unknown>
+  >;
+  const text = (field: unknown): string | null => (typeof field === 'string' ? field : null);
+  const lines = (field: unknown): string[] =>
+    Array.isArray(field) ? field.filter((line): line is string => typeof line === 'string') : [];
+  return {
+    displayName: text(stored.displayName) ?? '',
+    legalName: text(stored.legalName),
+    address: (stored.address ?? null) as InvoiceParticulars['address'],
+    gstin: text(stored.gstin),
+    fssaiNumber: text(stored.fssaiNumber),
+    placeOfSupply: text(stored.placeOfSupply),
+    phone: text(stored.phone),
+    headerLines: lines(stored.headerLines),
+    footerLines: lines(stored.footerLines),
+  };
+}
+
+/**
+ * GST invoices (P1-10a, BILL-002, BILL-003). Printing a bill issues its invoice in one
+ * transaction: the next number of the series (a row-locked counter, so numbers are consecutive
+ * and a rolled-back issue gives its number back), the seller's particulars as they are now, the
+ * lines and the tax lines per component, the final discount amounts, the table moving to Bill
+ * printed, the audit entry and `BillPrinted`.
+ */
+@Injectable()
+export class InvoicesService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly settings: SettingsService,
+    private readonly bills: BillsService,
+  ) {}
+
+  async issue(principal: Principal, billId: string, seriesId: string | null): Promise<InvoiceView> {
+    const invoiceId = await this.prisma.transaction(async (tx) => {
+      const context = await this.bills.lockedOpenBill(tx, principal.restaurantId, billId);
+      const { bill, calculated } = context;
+      const { result } = calculated;
+      if (bill.tableSessionId !== null) {
+        const session = await tx.tableSession.findUniqueOrThrow({
+          where: { id: bill.tableSessionId },
+          select: { status: true },
+        });
+        if (session.status !== 'OPEN') {
+          throw new AppError(409, 'SESSION_CLOSED', 'This table session is already closed.');
+        }
+      }
+      if (context.awaitingApproval > 0) {
+        throw new AppError(
+          409,
+          'ITEMS_AWAITING_APPROVAL',
+          `${String(context.awaitingApproval)} items are waiting for approval. Approve or reject them first.`,
+          { awaitingApproval: context.awaitingApproval },
+        );
+      }
+      if (result.lines.length === 0) {
+        throw new AppError(409, 'NOTHING_TO_BILL', 'There is nothing on this bill yet.');
+      }
+
+      const series = await this.series(tx, principal.restaurantId, seriesId);
+      const [restaurant, snapshot] = await Promise.all([
+        tx.restaurant.findUniqueOrThrow({ where: { id: principal.restaurantId } }),
+        this.settings.snapshot(principal.restaurantId),
+      ]);
+      const now = new Date();
+      const invoiceDate = calendarDateOf(now, restaurant.timeZone);
+      const financialYear = financialYearOf(invoiceDate);
+      const config = {
+        prefix: series.prefix,
+        includeFinancialYear: series.includeFinancialYear,
+        separator: series.separator === '-' ? ('-' as const) : ('/' as const),
+        sequencePadding: series.sequencePadding,
+      };
+      const sequence = await allocateInvoiceSequence(tx, {
+        restaurantId: principal.restaurantId,
+        seriesId: series.id,
+        financialYear: config.includeFinancialYear ? financialYear.label : CONTINUOUS_SEQUENCE,
+      });
+      if (sequence > maxSequenceFor(config)) {
+        throw new AppError(
+          422,
+          'SERIES_FULL',
+          `Series ${series.name} has used every number it can print. Add a new series.`,
+        );
+      }
+      const invoiceNumber = formatInvoiceNumber(config, financialYear, sequence);
+      const businessDate = await currentBusinessDate(tx, principal.restaurantId, now);
+
+      const particulars: InvoiceParticulars = {
+        displayName: restaurant.displayName,
+        legalName: restaurant.legalName,
+        address: (restaurant.address ?? null) as InvoiceParticulars['address'],
+        gstin: restaurant.gstin,
+        fssaiNumber: restaurant.fssaiNumber,
+        placeOfSupply: restaurant.stateCode,
+        phone: restaurant.phone,
+        headerLines: snapshot.get('bills.headerLines'),
+        footerLines: snapshot.get('bills.footerLines'),
+      };
+      const itemsById = new Map(context.items.map((item) => [item.id, item]));
+      const realGroup = (key: string) => calculated.groupIdOf.get(key) ?? key;
+      const sacOf = (groupId: string) => context.taxGroups.get(groupId)?.sacCode ?? null;
+
+      const lines: {
+        restaurantId: string;
+        orderItemId: string | null;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        lineTotal: number;
+        discount: number;
+        taxableValue: number;
+        taxGroupId: string;
+        sacCode: string | null;
+      }[] = result.lines.map((line) => {
+        const item = itemsById.get(line.id);
+        const taxGroupId = realGroup(line.taxGroupId);
+        return {
+          restaurantId: principal.restaurantId,
+          orderItemId: line.id,
+          description: item === undefined ? '' : describeItem(item),
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          lineTotal: line.grossAmount,
+          discount: line.itemDiscount + line.billDiscountShare,
+          taxableValue: line.taxableValue,
+          taxGroupId,
+          sacCode: sacOf(taxGroupId),
+        };
+      });
+      const serviceChargeTax = result.taxLines.find((line) => line.source === 'SERVICE_CHARGE');
+      if (result.serviceCharge > 0 && serviceChargeTax !== undefined) {
+        const taxGroupId = realGroup(serviceChargeTax.taxGroupId);
+        lines.push({
+          restaurantId: principal.restaurantId,
+          orderItemId: null,
+          description: 'Service charge (voluntary)',
+          quantity: 1,
+          unitPrice: result.serviceCharge,
+          lineTotal: result.serviceCharge,
+          discount: 0,
+          taxableValue: serviceChargeTax.taxableValue,
+          taxGroupId,
+          sacCode: sacOf(taxGroupId),
+        });
+      }
+      const taxLines = result.taxLines.flatMap((line) =>
+        line.components.map((component) => ({
+          restaurantId: principal.restaurantId,
+          taxGroupId: realGroup(line.taxGroupId),
+          code: component.code,
+          rateBp: component.rateBp,
+          taxableValue: line.taxableValue,
+          amount: component.amount,
+        })),
+      );
+
+      const invoice = await tx.invoice.create({
+        data: {
+          id: newId(),
+          restaurantId: principal.restaurantId,
+          businessDate: dbDate(businessDate),
+          invoiceDate: dbDate(invoiceDate),
+          financialYear: financialYear.label,
+          seriesId: series.id,
+          sequence,
+          invoiceNumber,
+          billId,
+          tableSessionId: bill.tableSessionId,
+          orderId: bill.orderId,
+          particulars,
+          priceMode: result.priceMode,
+          subtotal: result.subtotal,
+          discountTotal: result.discountTotal,
+          serviceCharge: result.serviceCharge,
+          taxTotal: result.taxTotal,
+          roundOff: result.roundOff,
+          grandTotal: result.grandTotal,
+          customerName: bill.customerName,
+          customerGstin: bill.customerGstin,
+          customerPhone: bill.customerPhone,
+          customerPhoneConsent: bill.customerPhoneConsent,
+          issuedById: principal.staffId,
+          issuedAt: now,
+          printCount: 1,
+          lines: { create: lines },
+          taxLines: { create: taxLines },
+        },
+      });
+      for (const discount of context.discounts) {
+        await tx.discount.update({
+          where: { id: discount.id },
+          data: { invoiceId: invoice.id, amount: this.bills.discountAmount(context, discount.id) },
+        });
+      }
+      await tx.bill.update({ where: { id: billId }, data: { status: 'INVOICED' } });
+
+      const envelope = {
+        version: 1 as const,
+        occurredAt: now.toISOString(),
+        restaurantId: principal.restaurantId,
+        businessDate,
+      };
+      const options = {
+        aggregate: { type: 'invoice', id: invoice.id },
+        ...(context.tableId !== null && { audience: { tableIds: [context.tableId] } }),
+      };
+      if (context.tableId !== null) {
+        const table = await tx.diningTable.findUniqueOrThrow({ where: { id: context.tableId } });
+        if (table.state !== 'BILL_PRINTED') {
+          const to = transition(tableMachine, table.state, 'PRINT_BILL').to;
+          await tx.diningTable.update({ where: { id: table.id }, data: { state: to } });
+          await appendEvent(
+            tx,
+            {
+              ...envelope,
+              eventId: newId(),
+              type: 'TableStateChanged',
+              payload: { tableId: table.id, state: to },
+            },
+            options,
+          );
+        }
+      }
+      await appendEvent(
+        tx,
+        {
+          ...envelope,
+          eventId: newId(),
+          type: 'BillPrinted',
+          payload: {
+            invoiceId: invoice.id,
+            invoiceNumber,
+            grandTotal: result.grandTotal,
+            duplicate: false,
+          },
+        },
+        options,
+      );
+      await this.audit.record(tx, {
+        action: 'INVOICE_ISSUED',
+        entityType: 'invoice',
+        entityId: invoice.id,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: null,
+        after: {
+          invoiceNumber,
+          billId,
+          subtotal: result.subtotal,
+          discountTotal: result.discountTotal,
+          serviceCharge: result.serviceCharge,
+          taxTotal: result.taxTotal,
+          roundOff: result.roundOff,
+          grandTotal: result.grandTotal,
+        },
+        reason: null,
+      });
+      return invoice.id;
+    });
+    return this.view(principal.restaurantId, invoiceId);
+  }
+
+  async view(restaurantId: string, invoiceId: string): Promise<InvoiceView> {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, restaurantId },
+      include: {
+        lines: { orderBy: { createdAt: 'asc' } },
+        taxLines: { orderBy: { createdAt: 'asc' } },
+        tableSession: { select: { table: { select: { label: true } } } },
+      },
+    });
+    if (invoice === null) {
+      throw new AppError(404, 'INVOICE_NOT_FOUND', 'There is no such invoice.');
+    }
+    return this.toView(invoice);
+  }
+
+  private toView(invoice: InvoiceRow): InvoiceView {
+    return {
+      id: invoice.id,
+      billId: invoice.billId,
+      invoiceNumber: invoice.invoiceNumber,
+      status: invoice.status,
+      invoiceDate: isoDateOf(invoice.invoiceDate),
+      financialYear: invoice.financialYear,
+      businessDate: isoDateOf(invoice.businessDate),
+      issuedAt: invoice.issuedAt.toISOString(),
+      issuedById: invoice.issuedById,
+      tableLabel: invoice.tableSession?.table.label ?? null,
+      particulars: toParticulars(invoice.particulars),
+      customer: {
+        name: invoice.customerName,
+        phone: invoice.customerPhone,
+        phoneConsent: invoice.customerPhoneConsent,
+        gstin: invoice.customerGstin,
+      },
+      priceMode: invoice.priceMode,
+      lines: invoice.lines.map((line) => ({
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        lineTotal: line.lineTotal,
+        discount: line.discount,
+        taxableValue: line.taxableValue,
+        sacCode: line.sacCode,
+      })),
+      taxLines: invoice.taxLines.map((line) => ({
+        taxGroupId: line.taxGroupId,
+        code: line.code,
+        rateBp: line.rateBp,
+        taxableValue: line.taxableValue,
+        amount: line.amount,
+      })),
+      subtotal: invoice.subtotal,
+      discountTotal: invoice.discountTotal,
+      serviceCharge: invoice.serviceCharge,
+      taxTotal: invoice.taxTotal,
+      roundOff: invoice.roundOff,
+      grandTotal: invoice.grandTotal,
+      printCount: invoice.printCount,
+    };
+  }
+
+  private async series(tx: TransactionClient, restaurantId: string, seriesId: string | null) {
+    const series = await tx.invoiceSeries.findFirst({
+      where:
+        seriesId === null
+          ? { restaurantId, isDefault: true, archivedAt: null }
+          : { id: seriesId, restaurantId, archivedAt: null },
+    });
+    if (series === null) {
+      throw new AppError(
+        422,
+        'SERIES_NOT_FOUND',
+        seriesId === null
+          ? 'There is no default invoice series. Set one up first.'
+          : 'There is no such active invoice series.',
+      );
+    }
+    return series;
+  }
+}

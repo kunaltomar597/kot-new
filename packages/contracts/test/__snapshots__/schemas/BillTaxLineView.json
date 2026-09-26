@@ -1,0 +1,58 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "taxGroupId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "name": { "type": "string" },
+      "source": { "type": "string", "enum": ["ITEMS", "SERVICE_CHARGE"] },
+      "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "components": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "rateBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["code", "rateBp", "amount"]
+        }
+      },
+      "taxTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["taxGroupId", "name", "source", "taxableValue", "components", "taxTotal"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "taxGroupId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "name": { "type": "string" },
+      "source": { "type": "string", "enum": ["ITEMS", "SERVICE_CHARGE"] },
+      "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "components": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "rateBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["code", "rateBp", "amount"],
+          "additionalProperties": false
+        }
+      },
+      "taxTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["taxGroupId", "name", "source", "taxableValue", "components", "taxTotal"],
+    "additionalProperties": false
+  }
+}
