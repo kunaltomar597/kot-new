@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { InvoiceView, PrintInvoiceResponse } from '@rp/contracts';
+import type { BillView, InvoiceView, PrintInvoiceResponse } from '@rp/contracts';
 import { tableMachine, transition } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import type { ConsumedOverride, Principal } from '../auth/principal.js';
@@ -12,6 +12,7 @@ import { paperWidthOf, renderBill } from '../printing/escpos.js';
 import { PrinterStatusService } from '../printing/printer-status.service.js';
 import { PrintFailure, PrinterTransport } from '../printing/printer-transport.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { BillsService } from './bills.service.js';
 import { InvoicesService } from './invoices.service.js';
 
 function invoiceNotFound(): AppError {
@@ -30,6 +31,7 @@ export class InvoiceActionsService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly invoices: InvoicesService,
+    private readonly bills: BillsService,
     private readonly transport: PrinterTransport,
     private readonly printerStatus: PrinterStatusService,
   ) {}
@@ -173,7 +175,17 @@ export class InvoiceActionsService {
         data: { status: 'VOIDED', voidedAt: now, voidReason: reason },
       });
       if (invoice.billId !== null) {
-        await tx.bill.update({ where: { id: invoice.billId }, data: { status: 'OPEN' } });
+        await tx.bill.update({
+          where: { id: invoice.billId },
+          data: {
+            status: 'OPEN',
+            // An edit in progress on this invoice ends with it; the bill is issued anew.
+            editingInvoiceId: null,
+            editReason: null,
+            editRequestedById: null,
+            editApprovedById: null,
+          },
+        });
       }
       await this.audit.record(tx, {
         action: 'INVOICE_VOIDED',
@@ -216,5 +228,104 @@ export class InvoiceActionsService {
       }
     });
     return this.invoices.view(principal.restaurantId, invoiceId);
+  }
+
+  /**
+   * Reopens a printed, unsettled invoice for editing (BILL-010). The bill can then change as
+   * before printing; issuing it again updates this invoice under the same number, with the reason,
+   * the approver and the values before and after in the audit log. The table waits again.
+   */
+  async reopen(
+    principal: Principal,
+    invoiceId: string,
+    reason: string,
+    override: ConsumedOverride | undefined,
+  ): Promise<BillView> {
+    const billId = await this.prisma.transaction(async (tx) => {
+      const found = await tx.invoice.findFirst({
+        where: { id: invoiceId, restaurantId: principal.restaurantId },
+        select: { billId: true, tableSession: { select: { tableId: true, status: true } } },
+      });
+      if (found === null) throw invoiceNotFound();
+      if (found.billId === null) {
+        throw new AppError(409, 'INVOICE_NOT_EDITABLE', 'This invoice has no bill to edit.');
+      }
+      if (found.tableSession !== null) {
+        await tx.$queryRaw`SELECT 1 AS locked FROM tables WHERE id = ${found.tableSession.tableId}::uuid FOR UPDATE`;
+      }
+      await tx.$queryRaw`SELECT 1 AS locked FROM bills WHERE id = ${found.billId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT 1 AS locked FROM invoices WHERE id = ${invoiceId}::uuid FOR UPDATE`;
+      const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+      if (invoice.status === 'SETTLED') {
+        throw new AppError(
+          409,
+          'INVOICE_SETTLED',
+          'This bill is paid. Void it and issue a new one instead (manager PIN needed).',
+        );
+      }
+      if (invoice.status === 'VOIDED') {
+        throw new AppError(409, 'INVOICE_VOIDED', 'This invoice is voided. Edit its replacement.');
+      }
+      const bill = await tx.bill.findUniqueOrThrow({ where: { id: found.billId } });
+      if (bill.status === 'OPEN') {
+        throw new AppError(409, 'BILL_ALREADY_OPEN', 'This bill is already open for changes.');
+      }
+      const others = await tx.invoice.count({
+        where: { billId: bill.id, status: { not: 'VOIDED' }, NOT: { id: invoiceId } },
+      });
+      if (others > 0) {
+        throw new AppError(
+          409,
+          'INVOICE_NOT_EDITABLE',
+          'This bill was split. Void its parts and split it again instead.',
+        );
+      }
+      await tx.bill.update({
+        where: { id: bill.id },
+        data: {
+          status: 'OPEN',
+          editingInvoiceId: invoiceId,
+          editReason: reason,
+          editRequestedById: principal.staffId,
+          editApprovedById: override?.approverId ?? null,
+        },
+      });
+      await this.audit.record(tx, {
+        action: 'INVOICE_REOPENED',
+        entityType: 'invoice',
+        entityId: invoiceId,
+        actorId: principal.staffId,
+        approverId: override?.approverId ?? null,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: { version: invoice.version, grandTotal: invoice.grandTotal },
+        after: { billStatus: 'OPEN' },
+        reason,
+      });
+      const session = found.tableSession;
+      if (session?.status === 'OPEN') {
+        const table = await tx.diningTable.findUniqueOrThrow({ where: { id: session.tableId } });
+        if (table.state === 'BILL_PRINTED') {
+          const to = transition(tableMachine, table.state, 'ADD_ITEMS').to;
+          const now = new Date();
+          await tx.diningTable.update({ where: { id: table.id }, data: { state: to } });
+          await appendEvent(
+            tx,
+            {
+              eventId: newId(),
+              type: 'TableStateChanged',
+              version: 1,
+              occurredAt: now.toISOString(),
+              restaurantId: principal.restaurantId,
+              businessDate: await currentBusinessDate(tx, principal.restaurantId, now),
+              payload: { tableId: table.id, state: to },
+            },
+            { aggregate: { type: 'invoice', id: invoiceId }, audience: { tableIds: [table.id] } },
+          );
+        }
+      }
+      return bill.id;
+    });
+    return this.bills.view(principal.restaurantId, billId);
   }
 }

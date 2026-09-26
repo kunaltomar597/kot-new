@@ -13,6 +13,7 @@ import {
   OpenBillRequest,
   PrintInvoiceRequest,
   PrintInvoiceResponse,
+  ReopenInvoiceRequest,
   RevokeDiscountRequest,
   ServiceChargeRequest,
   VoidInvoiceRequest,
@@ -1938,6 +1939,29 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such invoice.', schema: ApiError },
       409: { description: 'Already voided, or its bill has a newer invoice.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'reopenInvoice',
+    method: 'POST',
+    path: '/api/v1/invoices/:id/reopen',
+    summary: 'Reopen a printed bill to edit its items or discounts',
+    description:
+      'BILL-010. Only an issued, unsettled invoice. The bill opens again; issuing it updates the ' +
+      'same invoice under the same number, audited with the reason, the approver and the values ' +
+      'before and after. Cashiers need a manager’s override token.',
+    tags: ['billing'],
+    requirements: ['BILL-010', 'AUTH-011', 'AUD-001'],
+    capability: 'BILL_EDIT_AFTER_PRINT',
+    request: { params: InvoiceParams, body: ReopenInvoiceRequest },
+    responses: {
+      200: { description: 'The bill, open for editing.', schema: BillView },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+      409: {
+        description: 'Settled (void and re-issue it instead), voided, or already reopened.',
+        schema: ApiError,
+      },
     },
   },
 ] as const satisfies readonly RouteDefinition[];
