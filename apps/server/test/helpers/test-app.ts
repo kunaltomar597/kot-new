@@ -22,6 +22,8 @@ export function testConfig(overrides: Partial<AppConfig> & { databaseUrl: string
       databaseUrl,
       // Each test app gets its own data folder, so its secrets (pepper, token key) are its own.
       dataDir: parsed.dataDir ?? mkdtempSync(join(tmpdir(), 'rp-server-data-')),
+      // No pager broker unless a test asks for one (P2-04).
+      mqtt: 'off',
     }),
     ...parsed,
   });

@@ -21,6 +21,7 @@ import { FloorModule } from './floor/floor.module.js';
 import { MenuModule } from './menu/menu.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { OrdersModule } from './orders/orders.module.js';
+import { PagersModule } from './pagers/pagers.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PhotosModule } from './photos/photos.module.js';
 import { PrintingModule } from './printing/printing.module.js';
@@ -52,6 +53,7 @@ export class AppModule {
         OrdersModule,
         PrintingModule,
         BillingModule,
+        PagersModule,
         PaymentsModule,
         PhotosModule,
         DayEndModule,

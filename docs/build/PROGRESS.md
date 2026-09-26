@@ -58,7 +58,7 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P2-01b React Native component library (P2-01a done).
-- P2-04 MQTT broker and pager server side (P2-03 done).
+- P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -129,7 +129,8 @@ Recommended next WPs (dependencies met):
 - [ ] P2-02 Waiter app: tables and order taking
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
-- [ ] P2-04 MQTT broker and pager server side
+- [x] P2-04a Pager broker, credentials, delivery and heartbeats
+- [ ] P2-04b Pager firmware OTA distribution
 - [ ] P2-05 Pager firmware [H]
 - [ ] P2-06 Waiter alerts, service-request inbox, nudge, Notify manager
 - [ ] P2-07 Phase 2 exit test on the lab rig [H]
@@ -434,6 +435,22 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-09-26 (P2-04a):
+
+105. A pager signs in to MQTT with its device id and its own secret. The secret is issued when a
+     manager registers the pager by serial, shown once, and stored as a peppered Argon2id hash like
+     the PINs; replacing it
+     disconnects the pager. There are no shared or default passwords (SEC-012, PGR-010).
+106. Pagers get alerts through their wearer: the broker sends each alert event to the connected
+     pagers of its recipients. A pager that connects gets every open alert of its wearer again,
+     rather than relying on the broker's in-memory queue, so a server restart loses nothing.
+107. A person wears at most one pager; giving someone a pager takes any other from them.
+     Managers may wear pagers and then receive escalations (PGR-014).
+108. A heartbeat emits `DeviceStatusChanged` only on a change of state (back online, or crossing
+     the low-battery line), not on every beat.
+109. A refused subscription is answered with 0x80 in the SUBACK and the connection stays open, so a
+     misconfigured pager keeps receiving its own alerts.
+
 Decided 2026-09-26 (P2-03b):
 
 101. A nudge is one alert per chosen person, so each acknowledgement is recorded per waiter. Only
@@ -589,6 +606,45 @@ Built: `packages/mobile-core` (secure credential persistence, the persistent out
 cache). Tests: 8, at 98 % line coverage.
 
 Decisions: 110 and 111.
+
+### 2026-09-26: P2-04a Pager broker, credentials, delivery and heartbeats
+
+P2-04 was split into P2-04a (this) and P2-04b (firmware OTA distribution).
+
+Built:
+
+- The embedded Aedes broker, with TLS when `RP_TLS` is on, per-pager credentials and the ACL.
+- Alert delivery and acknowledgement, heartbeats with offline detection, and presence from pagers.
+- Pager administration routes.
+- The domain pager rules, contracts and AsyncAPI channels.
+- Migration `20260928030000_pager_mqtt`.
+
+Also fixed on #47 (P2-03b): the report and exit tests asked the invoice register for the business
+date, which fails between midnight and the 04:00 cut-off because the register uses invoice dates.
+CI ran at 00:01 IST and failed; the tests now ask for the invoices' own dates.
+
+Tests:
+
+- domain: 4;
+- contracts: the AsyncAPI pager channels;
+- 9 integration tests with a real MQTT client:
+  - registration and uniqueness;
+  - a wrong password and cross-pager subscriptions refused;
+  - delivery within 2 s, with acknowledgement from the button;
+  - resend on reconnect;
+  - publishing where it may not is ignored;
+  - a 30-nudge burst within the budget;
+  - heartbeat, low battery and offline after 3 missed beats;
+  - re-assignment;
+  - credential rotation.
+
+Gotchas:
+
+- aedes 1.x is ESM with `Aedes.createBroker`.
+- mqtt.js 5 rejects `subscribeAsync` when the SUBACK carries 0x80.
+- `test/helpers/test-app.ts` turns the broker off unless a test sets `mqtt: 'on', mqttPort: 0`.
+
+Decisions: 105 to 109.
 
 ### 2026-09-26: P2-03b Nudges, breaks, device, printer and disk alerts
 

@@ -387,12 +387,23 @@ model Device {
   station                Station?     @relation(fields: [stationId], references: [id])
   /// Person wearing a pager.
   staffId                String?      @map("staff_id") @db.Uuid
+  /// Serial printed (and in the QR code) on a pager (PGR-012).
+  serial                 String?
+  /// Peppered Argon2id hash of the pager's MQTT secret (SEC-012); the secret is shown once when issued (P2-04).
+  mqttSecretHash         String?      @map("mqtt_secret_hash")
+  /// Last heartbeat's battery, signal and firmware (PGR-007).
+  batteryPercent         Int?         @map("battery_percent")
+  rssi                   Int?
+  firmwareVersion        String?      @map("firmware_version")
+  /// Connected and heard from within 3 heartbeats (pagers); kept current by the pager service.
+  online                 Boolean      @default(false)
   staff                  Staff?       @relation(fields: [staffId], references: [id])
   sessions               Session[]
   createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId, status])
+  @@index([restaurantId, serial])
   @@map("devices")
 }
 

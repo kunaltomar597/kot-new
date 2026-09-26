@@ -23,3 +23,4 @@ export * from './gstin.js';
 export * from './floor.js';
 export * from './menu-import.js';
 export * from './notifications.js';
+export * from './pager.js';

@@ -19,6 +19,7 @@
     { "name": "menu" },
     { "name": "notifications" },
     { "name": "orders" },
+    { "name": "pagers" },
     { "name": "payments" },
     { "name": "photos" },
     { "name": "printing" },
@@ -4334,6 +4335,216 @@
         "x-requirements": ["TBL-008", "ORD-010"]
       }
     },
+    "/api/v1/pagers": {
+      "get": {
+        "operationId": "listPagers",
+        "summary": "The restaurant's pagers with wearer, battery, signal and connection",
+        "tags": ["pagers"],
+        "responses": {
+          "200": {
+            "description": "Pagers.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PagerListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["PGR-007", "PGR-012"]
+      },
+      "post": {
+        "operationId": "createPager",
+        "summary": "Register a pager by its serial and get the credential to write into it",
+        "description": "PGR-012, SEC-012: a unique MQTT credential per pager, shown only in this answer (stored hashed). The pager may read only its own alerts topic and write only its own ack and heartbeat topics. Audited.",
+        "tags": ["pagers"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CreatePagerRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The pager and its credential.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PagerCredentialResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "A pager with this serial is already registered.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The wearer is not active staff here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["PGR-005", "PGR-012", "SEC-012", "AUD-001"]
+      }
+    },
+    "/api/v1/pagers/{deviceId}/credential": {
+      "post": {
+        "operationId": "rotatePagerCredential",
+        "summary": "Issue a new credential for a pager; the old one stops working at once",
+        "tags": ["pagers"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new credential.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PagerCredentialResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such pager.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["SEC-012", "AUD-001"]
+      }
+    },
+    "/api/v1/pagers/{deviceId}/wearer": {
+      "put": {
+        "operationId": "assignPager",
+        "summary": "Give a pager to a waiter or manager, or take it back",
+        "description": "PGR-012, PGR-014: effective at once; the pager's open alerts are sent again for the new wearer. A person wears one pager: giving them this one takes any other from them. Audited.",
+        "tags": ["pagers"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AssignPagerRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The pager.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PagerView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such pager.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The wearer is not active staff here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["PGR-012", "PGR-014", "AUD-001"]
+      }
+    },
     "/api/v1/photos": {
       "post": {
         "operationId": "uploadPhoto",
@@ -7497,6 +7708,14 @@
         "required": ["reason"],
         "additionalProperties": false
       },
+      "AssignPagerRequest": {
+        "type": "object",
+        "properties": {
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["staffId"],
+        "additionalProperties": false
+      },
       "AssignSessionWaiterRequest": {
         "type": "object",
         "properties": {
@@ -8215,6 +8434,16 @@
           }
         },
         "required": ["itemId", "components", "activeFrom", "activeUntil", "timeWindow"],
+        "additionalProperties": false
+      },
+      "CreatePagerRequest": {
+        "type": "object",
+        "properties": {
+          "serial": { "type": "string", "pattern": "^[A-Za-z0-9-]{4,32}$" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["serial", "name", "staffId"],
         "additionalProperties": false
       },
       "CreatePairingCodeRequest": {
@@ -11045,6 +11274,119 @@
         "required": ["newPassword"],
         "additionalProperties": false
       },
+      "PagerAckMessage": {
+        "type": "object",
+        "properties": { "alertId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["alertId"],
+        "additionalProperties": false
+      },
+      "PagerAlertMessage": {
+        "type": "object",
+        "properties": {
+          "alertId": { "$ref": "#/components/schemas/Id" },
+          "seq": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "state": { "type": "string", "enum": ["ALERT", "ACKNOWLEDGED", "CLEARED"] },
+          "type": { "$ref": "#/components/schemas/NotificationEventType" },
+          "lines": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "string", "maxLength": 12 },
+              { "type": "string", "maxLength": 12 }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "vibration": { "$ref": "#/components/schemas/VibrationPattern" },
+          "sentAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["alertId", "seq", "state", "type", "lines", "vibration", "sentAt"],
+        "additionalProperties": false
+      },
+      "PagerCredentialResponse": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "$ref": "#/components/schemas/Id" },
+          "mqttUsername": { "type": "string" },
+          "mqttPassword": { "type": "string" },
+          "alertsTopic": { "type": "string" },
+          "ackTopic": { "type": "string" },
+          "heartbeatTopic": { "type": "string" },
+          "mqttPort": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "deviceId",
+          "mqttUsername",
+          "mqttPassword",
+          "alertsTopic",
+          "ackTopic",
+          "heartbeatTopic",
+          "mqttPort"
+        ],
+        "additionalProperties": false
+      },
+      "PagerHeartbeat": {
+        "type": "object",
+        "properties": {
+          "battery": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "rssi": { "type": "integer", "minimum": -127, "maximum": 0 },
+          "firmware": { "type": "string", "minLength": 1, "maxLength": 32 }
+        },
+        "required": ["battery", "rssi", "firmware"],
+        "additionalProperties": false
+      },
+      "PagerListResponse": {
+        "type": "object",
+        "properties": {
+          "pagers": { "type": "array", "items": { "$ref": "#/components/schemas/PagerView" } }
+        },
+        "required": ["pagers"],
+        "additionalProperties": false
+      },
+      "PagerParams": {
+        "type": "object",
+        "properties": { "deviceId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["deviceId"],
+        "additionalProperties": false
+      },
+      "PagerView": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "serial": { "type": ["string", "null"] },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "online": { "type": "boolean" },
+          "batteryPercent": {
+            "anyOf": [
+              { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "rssi": {
+            "anyOf": [
+              { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "firmwareVersion": { "type": ["string", "null"] },
+          "lastSeenAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "deviceId",
+          "name",
+          "serial",
+          "staffId",
+          "online",
+          "batteryPercent",
+          "rssi",
+          "firmwareVersion",
+          "lastSeenAt"
+        ],
+        "additionalProperties": false
+      },
       "PairDeviceRequest": {
         "type": "object",
         "properties": {
@@ -13092,6 +13434,10 @@
         },
         "required": ["name", "version", "apiVersion", "node"],
         "additionalProperties": false
+      },
+      "VibrationPattern": {
+        "type": "string",
+        "enum": ["ONE_LONG", "TWO_SHORT", "THREE", "ONE_SHORT"]
       },
       "VoidInvoiceRequest": {
         "type": "object",

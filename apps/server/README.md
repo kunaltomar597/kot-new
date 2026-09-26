@@ -410,6 +410,18 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   domain events.
 - `PRESENCE` says who is reachable; today that is the gateway's live connections.
 
+## Pagers (P2-04a)
+
+- `src/pagers/pager-broker.ts` embeds the MQTT broker (Aedes) on `RP_MQTT_PORT` (8883), over TLS
+  when `RP_TLS` is on.
+- Each pager signs in with its device id and its own secret, and the ACL keeps it to its own
+  topics: `rp/<restaurant>/pagers/<device>/alerts|ack|heartbeat`.
+- Alert events reach the recipients' pagers at QoS 1, and a pager that connects is sent its
+  wearer's open alerts again. Heartbeats feed battery, signal and offline detection.
+- `src/pagers/pagers.service.ts` registers pagers, replaces credentials and assigns wearers.
+- Tests start the broker with `config: { mqtt: 'on', mqttPort: 0 }`. See
+  `test/integration/pagers.int.test.ts`.
+
 ## Phase 1 exit scenario (P1-14)
 
 - `test/scenario/service-day.ts` runs a seeded service day of about 100 orders through
