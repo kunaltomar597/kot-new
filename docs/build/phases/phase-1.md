@@ -519,6 +519,26 @@ As built: `apps/server/src/kitchen/`, station mode in the permission guard, migr
   resync.
 - Playwright: ticket lifecycle and reconnect resync.
 
+As built: `apps/console/src/kds/` (`KdsScreen`, `kds-view.ts`, `sounds.ts`).
+
+- The KDS mode shows the station's board (or all stations for a person without one): tickets
+  oldest first with KOT number, table or token, waiter, source, live age (server clock; tone plus
+  icon plus minutes and words), Moved/Changed/Cancelled badges, combo parts under the combo,
+  modifiers and notes, and each item's state chip.
+- Per item: Start, Ready, Picked up (the pass); per ticket: Start all, All ready (every item is
+  tried; the first refusal is shown), Bump (only when nothing is waiting or cooking) and Recall
+  from the recently bumped list.
+- Ready food waiting longer than `kds.readyNotCollectedMinutes` flashes the ticket (steady outline
+  with reduced motion) and offers Notify manager; the card then says the manager was notified.
+- A chime for new tickets and a distinct buzz for change and cancellation slips (Web Audio, volume
+  from settings), switched on by the first touch; the first read is silent.
+- While the server is unreachable a full-screen notice covers the board; on reconnect the board is
+  read again, so nothing is lost or shown twice.
+- All-day summary (KDS-010, S) of what is still to cook.
+- The POS now shows a combo line at its least advanced part (the kitchen moves the parts).
+- Playwright: cook, pick up, bump and recall a ticket; disconnect and resync; the POS sees the
+  kitchen's progress.
+
 ## P1-10 Billing engine and GST invoices
 
 Goal: correct, compliant bills and invoices.

@@ -3,11 +3,12 @@ import { Navigate, useNavigate } from 'react-router';
 import { useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { homeFor, isStationMode, type Mode, modesFor } from '../app/modes.js';
+import { KdsScreen } from '../kds/KdsScreen.js';
 import { PosHome } from '../pos/PosHome.js';
 
 /**
- * A mode's start screen: the POS floor (P1-08); the KDS (P1-09) and dashboard (P4-01) screens
- * arrive with their work packages, and until then those modes say so.
+ * A mode's start screen: the POS floor (P1-08) and the kitchen display (P1-09); the dashboard
+ * (P4-01) arrives with its work package, and until then that mode says so.
  */
 export function ModeHome({ mode }: { mode: Mode }) {
   const t = useT();
@@ -41,11 +42,11 @@ export function ModeHome({ mode }: { mode: Mode }) {
       <h1 id={`mode-${mode}`} className="console-title">
         {name}
       </h1>
-      {mode === 'pos' ? (
-        <PosHome />
-      ) : (
+      {mode === 'pos' ? <PosHome /> : null}
+      {mode === 'kds' ? <KdsScreen /> : null}
+      {mode === 'manage' ? (
         <EmptyState title={name} description={t('modes.comingSoon', { mode: name })} />
-      )}
+      ) : null}
     </section>
   );
 }

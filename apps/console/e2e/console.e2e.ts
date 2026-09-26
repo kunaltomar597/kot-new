@@ -171,4 +171,60 @@ test.describe.serial('the web console', () => {
     await expect(open.getByText(/Token \d+ · Anil/)).toBeVisible();
     await expect(open.getByText('1 × Butter Naan')).toBeVisible();
   });
+
+  test('[KDS-003] [KDS-005] [KDS-007] cooks, picks up, bumps and recalls a ticket on the kitchen display', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Chef Imran/ }).click();
+    await page.keyboard.type('6666');
+    await expect(page).toHaveURL(/\/kds$/);
+    const ticket = page.getByRole('article', { name: /^KOT \d+, Table 7$/ });
+    await expect(ticket).toBeVisible();
+    await expect(ticket.getByText('Veg Thali Combo')).toBeVisible();
+    await expect(ticket.getByText(/Chicken Tikka \(Full\)/)).toBeVisible();
+    await expect(page.getByRole('article', { name: /^KOT \d+, Token \d+$/ })).toBeVisible();
+
+    await ticket.getByRole('button', { name: t('kds.allPreparing') }).click();
+    await expect(ticket.getByRole('button', { name: t('kds.allReady') })).toBeVisible();
+    await expect(ticket.getByRole('button', { name: /^Bump KOT/ })).toBeDisabled();
+    await ticket.getByRole('button', { name: t('kds.allReady') }).click();
+    await expect(ticket.getByRole('button', { name: /^Bump KOT/ })).toBeEnabled();
+    const pickUp = ticket.getByRole('button', {
+      name: t('kds.stepFor', { step: t('kds.step.PICK_UP'), item: 'Chicken Tikka' }),
+    });
+    await pickUp.click();
+    await expect(pickUp).toHaveCount(0);
+
+    await ticket.getByRole('button', { name: /^Bump KOT/ }).click();
+    await expect(ticket).toHaveCount(0);
+    await page.getByRole('button', { name: t('kds.recall'), exact: true }).click();
+    const recall = page.getByRole('dialog', { name: t('kds.recallTitle') });
+    await recall
+      .getByRole('button', { name: /^Recall KOT/ })
+      .first()
+      .click();
+    await recall.getByRole('button', { name: t('ui.dialog.close') }).click();
+    await expect(page.getByRole('article', { name: /^KOT \d+, Table 7$/ })).toBeVisible();
+  });
+
+  test('[KDS-012] covers the board while disconnected and resyncs without duplicates', async () => {
+    const tickets = page.getByRole('article');
+    const before = await tickets.count();
+    expect(before).toBeGreaterThan(0);
+    await server.stop();
+    await expect(page.getByText(t('kds.disconnectedTitle'))).toBeVisible();
+    server = await startServer(server.port);
+    await expect(page.getByText(t('kds.disconnectedTitle'))).toHaveCount(0, { timeout: 30_000 });
+    await expect(tickets).toHaveCount(before);
+  });
+
+  test('[ORD-010] the POS sees the kitchen’s progress', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
+    await page.keyboard.type('3333');
+    await page.getByRole('button', { name: /^7, Occupied/ }).click();
+    await page.getByRole('button', { name: t('pos.table.takeOrder') }).click();
+    const sent = page.getByRole('region', { name: t('pos.sent.title') });
+    await expect(sent.getByText(t('pos.itemState.PICKED_UP')).first()).toBeVisible();
+    await expect(sent.getByText(t('pos.itemState.READY')).first()).toBeVisible();
+  });
 });

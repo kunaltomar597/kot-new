@@ -40,7 +40,8 @@ What exists:
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
-  move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b).
+  move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b); the
+  kitchen display with steps, bump, recall, notify manager, sounds and resync (P1-09b).
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -57,7 +58,7 @@ Recommended next WPs (dependencies met):
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-12 POS billing UI (P1-10 and P1-11 done).
-- P1-09b KDS screen (P1-09a done).
+- P1-14 Phase 1 exit test (after P1-12).
 - P1-12 POS billing UI (P1-10, P1-11 done).
 - P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -109,7 +110,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-08a POS floor: live table overview, open and move table
 - [x] P1-08b POS order entry, send KOT, takeaway, live item status
 - [x] P1-09a KDS server support (station mode, tickets, bump, recall, notify manager)
-- [ ] P1-09b KDS screen
+- [x] P1-09b KDS screen
 - [x] P1-10a Bill preview, discounts and invoice issue
 - [x] P1-10b Bill printing, reprint and void
 - [x] P1-10c Edit after print
@@ -428,6 +429,16 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P1-09b):
+
+77. Ticket ages use the server's clock (the answer's `serverTime` plus the time since it
+    arrived), so a screen with a wrong clock still shows the right colours.
+78. Sounds start with the first touch on the screen (browsers block audio until then); a button
+    says so until it happens. New tickets chime, change and cancellation slips buzz; nothing
+    sounds for tickets already seen or recalled.
+79. The POS shows a combo line at its least advanced part still in progress, because the kitchen
+    moves the parts and not the combo line itself.
+
 Decided 2026-09-26 (P1-09a):
 
 74. A kitchen screen in station mode acts with the kitchen role's grants and only on its own
@@ -474,6 +485,24 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-09b KDS screen (P1-09 done)
+
+Built:
+
+- `apps/console/src/kds/`: `KdsScreen` (board, ticket cards, recall sheet, all-day summary,
+  full-screen disconnected notice), `kds-view.ts` (age tone, next step, combo grouping, bump rule,
+  not-collected, summary, arrivals), `sounds.ts` (Web Audio chime and buzz).
+- `ModeHome` shows the KDS in KDS mode; KDS strings in `@rp/i18n`; `pos/order-state.ts` for combo
+  line states on the POS.
+- Tests: 7 KDS logic unit tests, 7 KDS screen tests (cards, empty board, steps with a refusal,
+  bump and recall, notify manager, sounds, disconnect and resync), a combo-state unit test, the
+  connection test now also checks the KDS cover; Playwright: kitchen lifecycle, disconnect and
+  resync, and the POS seeing the kitchen's progress (the check deferred from P1-08b).
+
+Next: P1-12 POS billing UI.
+
+Decisions: 77 to 79.
 
 ### 2026-09-26: P1-09a KDS server support
 

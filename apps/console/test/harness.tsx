@@ -33,6 +33,20 @@ const fakeKeyPair = () =>
     },
   });
 
+/** A kitchen screen with nothing to cook (KDS tests replace it). */
+export const EMPTY_KDS = {
+  station: null,
+  tickets: [],
+  recentlyBumped: [],
+  settings: {
+    ageAmberMinutes: 10,
+    ageRedMinutes: 20,
+    readyNotCollectedMinutes: 3,
+    soundVolumePercent: 70,
+  },
+  serverTime: '2026-09-26T10:00:00.000Z',
+};
+
 export function server(type: 'POS' | 'KDS' = 'POS'): FakeServer {
   return new FakeServer()
     .on('POST', '/api/v1/devices/pair', () => ({
@@ -63,6 +77,7 @@ export function server(type: 'POS' | 'KDS' = 'POS'): FakeServer {
       status: 200,
       body: { staff: Object.values(STAFF) },
     }))
+    .on('GET', '/api/v1/kds/tickets', () => ({ status: 200, body: EMPTY_KDS }))
     .on('POST', '/api/v1/auth/logout', () => ({ status: 204 }))
     .on('GET', '/api/v1/auth/session', () => ({ status: 200, body: {} }));
 }

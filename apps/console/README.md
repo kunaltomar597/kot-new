@@ -34,6 +34,11 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   prices), sends it with one idempotency key per cart (a retry cannot duplicate the order), marks
   refused lines, and lists what was sent with live item states. `src/app/use-live.ts` reads data
   again after the events that change it and after a reconnect.
+- Kitchen display (`/kds`, P1-09b): `src/kds/KdsScreen.tsx` shows the station's tickets with
+  live age from the server clock, badges, combo grouping and item states; item and ticket steps,
+  bump and recall, pick-up at the pass, "Notify manager" for ready food waiting, sounds
+  (`sounds.ts`, on after the first touch), an all-day summary and a full-screen notice while
+  disconnected. The rules are in `kds-view.ts`.
 - `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
   screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
 

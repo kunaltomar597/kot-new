@@ -28,6 +28,7 @@ import {
   updateLine,
 } from './cart.js';
 import { ItemDialog } from './ItemDialog.js';
+import { displayState } from './order-state.js';
 import {
   comboOf,
   displayPrice,
@@ -408,7 +409,10 @@ function SentOrders({
                     {item.quantity} × {item.name}
                     {item.variantName === null ? '' : ` (${item.variantName})`}
                   </span>
-                  <StatusChip state={item.state} label={t(`pos.itemState.${item.state}`)} />
+                  <StatusChip
+                    state={displayState(item, order.items)}
+                    label={t(`pos.itemState.${displayState(item, order.items)}`)}
+                  />
                 </li>
               ))}
           </ul>

@@ -317,3 +317,234 @@ body {
   flex-direction: column;
   gap: var(--rp-space-2);
 }
+
+/* Kitchen display (P1-09b): readable from 2 m, large touch targets (KDS-011). */
+.kds {
+  position: relative;
+  min-height: 100%;
+}
+
+.kds-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+}
+
+.kds-board__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-3);
+}
+
+.kds-board__station {
+  flex: 1;
+  margin: 0;
+  font-size: var(--rp-font-size-2xl);
+}
+
+.kds-board__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16rem;
+  gap: var(--rp-space-4);
+  align-items: start;
+}
+
+@media (width < 60rem) {
+  .kds-board__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kds-tickets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--rp-space-4);
+  align-items: start;
+}
+
+.kds-ticket {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--rp-color-border);
+  border-top: 10px solid var(--rp-color-success);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+  font-size: var(--rp-font-size-lg);
+}
+
+.kds-ticket[data-age='amber'] {
+  border-top-color: var(--rp-color-warning);
+}
+
+.kds-ticket[data-age='red'] {
+  border-top-color: var(--rp-color-danger);
+}
+
+.kds-ticket[data-kind='CANCELLED'] {
+  border-color: var(--rp-color-danger);
+}
+
+.kds-ticket[data-alert] {
+  animation: kds-flash 1s steps(2, jump-none) infinite;
+}
+
+@keyframes kds-flash {
+  from {
+    box-shadow: 0 0 0 6px var(--rp-color-danger);
+  }
+
+  to {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kds-ticket[data-alert] {
+    animation: none;
+    box-shadow: 0 0 0 6px var(--rp-color-danger);
+  }
+}
+
+.kds-ticket__header,
+.kds-ticket__lines,
+.kds-ticket__footer {
+  padding: var(--rp-space-3) var(--rp-space-4);
+}
+
+.kds-ticket__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+  border-bottom: 1px solid var(--rp-color-border);
+}
+
+.kds-ticket__title {
+  display: flex;
+  flex: 1;
+  gap: var(--rp-space-3);
+  margin: 0;
+  font-size: var(--rp-font-size-xl);
+}
+
+.kds-ticket__meta {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
+.kds-ticket__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+}
+
+.kds-group__combo {
+  margin: var(--rp-space-2) 0 0;
+  font-weight: var(--rp-font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.kds-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kds-lines[data-combo] {
+  padding-inline-start: var(--rp-space-4);
+  border-inline-start: 3px solid var(--rp-color-border-strong);
+}
+
+.kds-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+}
+
+.kds-line__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 10rem;
+}
+
+.kds-line__modifiers {
+  color: var(--rp-color-text-muted);
+}
+
+.kds-line__note {
+  color: var(--rp-color-warning-text);
+  font-style: italic;
+}
+
+.kds-ticket__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+  justify-content: flex-end;
+  border-top: 1px solid var(--rp-color-border);
+}
+
+.kds-ticket__alert {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: var(--rp-space-2);
+  margin: 0;
+  color: var(--rp-color-danger-text);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.kds-summary {
+  padding: var(--rp-space-3) var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+}
+
+.kds-summary__title {
+  margin: 0 0 var(--rp-space-2);
+}
+
+.kds-summary__list,
+.kds-recall {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kds-recall__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-3);
+}
+
+.kds-disconnected {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rp-space-3);
+  padding: var(--rp-space-6);
+  background: var(--rp-color-danger);
+  color: var(--rp-color-on-danger);
+  font-size: var(--rp-font-size-xl);
+  text-align: center;
+}
+
+.kds-disconnected__title {
+  margin: 0;
+  font-size: calc(var(--rp-font-size-2xl) * 1.5);
+}
