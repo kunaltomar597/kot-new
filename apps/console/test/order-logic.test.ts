@@ -18,7 +18,8 @@ import {
   selectable,
   visibleItems,
 } from '../src/pos/menu-view.js';
-import { IDS, MENU } from './menu-fixture.js';
+import { displayState } from '../src/pos/order-state.js';
+import { IDS, MENU, sentOrder } from './menu-fixture.js';
 
 let next = 0;
 const newId = () => `line-${String(++next)}`;
@@ -129,5 +130,24 @@ describe('[MENU-012] the POS menu', () => {
     ]);
     expect(displayPrice(tikka)).toBe(18_000);
     expect(displayPrice(dal)).toBe(24_000);
+  });
+});
+
+describe('[ORD-010] the state a line shows', () => {
+  const item = (id: string, state: string, parent: string | null = null) =>
+    ({ ...sentOrder(state as never).items[0], id, state, parentOrderItemId: parent }) as never;
+
+  it('shows a combo at its least advanced part still going, and plain lines as they are', () => {
+    const combo = item('combo', 'SENT');
+    const parts = [
+      item('a', 'READY', 'combo'),
+      item('b', 'PICKED_UP', 'combo'),
+      item('c', 'CANCELLED', 'combo'),
+    ];
+    expect(displayState(combo, [combo, ...parts])).toBe('READY');
+    const plain = item('plain', 'PREPARING');
+    expect(displayState(plain, [plain])).toBe('PREPARING');
+    const voided = item('voided', 'VOIDED');
+    expect(displayState(voided, [voided, item('d', 'READY', 'voided')])).toBe('VOIDED');
   });
 });
