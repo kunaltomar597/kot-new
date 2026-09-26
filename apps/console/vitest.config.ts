@@ -7,6 +7,9 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['test/**/*.test.{ts,tsx}'],
     setupFiles: ['test/setup.ts'],
+    // Screen tests render the whole console in jsdom and run axe; on a busy CI runner they need
+    // more than the 5 s default.
+    testTimeout: 20_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
