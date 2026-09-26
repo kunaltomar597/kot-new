@@ -52,7 +52,14 @@ export interface RouteResponse {
   schema?: z.ZodType;
 }
 
-export interface RouteDefinition {
+/** Who may call a local server endpoint (see `RouteDefinition.capability`). */
+export type RouteCapability = Capability | 'SESSION' | 'DEVICE' | 'PUBLIC';
+
+/**
+ * One REST endpoint. `TAccess` is the access vocabulary of the API it belongs to: the local
+ * server's (the default) or the Control Plane's (`@rp/contracts/control-plane`).
+ */
+export interface RouteDefinition<TAccess extends string = RouteCapability> {
   /** Stable, unique camelCase name; becomes the OpenAPI operationId and the api-client method. */
   operationId: string;
   method: HttpMethod;
@@ -69,7 +76,7 @@ export interface RouteDefinition {
    * endpoints that need a paired device but no signed-in person (login screen, token refresh); or
    * `PUBLIC` for the few endpoints that need neither (they must say why in `description`).
    */
-  capability: Capability | 'SESSION' | 'DEVICE' | 'PUBLIC';
+  capability: TAccess;
   request?: {
     params?: z.ZodObject;
     query?: z.ZodObject;

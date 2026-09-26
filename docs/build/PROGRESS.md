@@ -15,7 +15,8 @@ What exists:
   state machines, permissions, menu selection, KOT split. 89 tests, ~99 % line coverage.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
-  OpenAPI/AsyncAPI docs. 142 tests.
+  OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
+  (`@rp/contracts/control-plane`, P0-17a). 166 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -24,6 +25,12 @@ What exists:
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
   rooms, resync and revocation (P0-12); HTTPS/WSS with the installation's own CA, automatic
   certificate renewal and CA pinning at pairing (P0-15, ADR-0011). 419 tests.
+- `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
+  enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
+  release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
+  account pending).
+- `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
+  server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b).
@@ -40,7 +47,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-17 Minimal Vendor Control Plane (the parts that need no hosting account).
+- P0-17b Local server heartbeat client (enrolment, heartbeats, update discovery).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -66,7 +73,8 @@ Recommended next WPs (dependencies met):
 - [x] P0-14b Web console shell
 - [x] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
-- [ ] P0-17 Minimal Vendor Control Plane (needs hosting account)
+- [x] P0-17a Control Plane service (deployment waits for the hosting account)
+- [ ] P0-17b Local server heartbeat client
 - [ ] P0-H1 Pager battery prototype [H]
 - [ ] P0-H2 Wi-Fi coverage test kit [H]
 - [ ] P0-H3 Kiosk mode on the chosen tablet [H]
@@ -197,7 +205,8 @@ Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and 
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
 revocation), #12 (P0-14a client-side token handling), #13 (P0-14b console storage of keys and
-sessions, CSP), P0-15 (LAN CA, key storage, certificate renewal and pinning; this PR).
+sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning), P0-17a
+(installation identity, signed requests and enrolment of the Control Plane; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -205,6 +214,60 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P0-17a Control Plane service
+
+Split P0-17 into P0-17a (the service) and P0-17b (the local server's client and the end-to-end
+acceptance test) in the phase file. ADR-0012 (Accepted) records the design. Built:
+
+- `@rp/contracts/control-plane`: enrolment, heartbeat, release and update schemas; the signed
+  request headers and `signedRequestMessage`; a route registry. The route registry type is now
+  generic over its access vocabulary; the docs generator writes
+  `docs/api/control-plane.openapi.json` beside the local API's document; schema snapshots live in
+  `test/__snapshots__/schemas/control-plane/`.
+- `apps/control-plane`: NestJS 12, Prisma 7 (tenants, installations, heartbeats, request nonces,
+  releases, append-only audit log with CHECK constraints for HTTPS URLs and SHA-256).
+  - Enrolment with one-time codes (80 bits, 7 days, hashed, rate-limited).
+  - A deny-by-default guard for signed requests (±5 minute window, single-use nonces,
+    `CLOCK_SKEW` with the server time, revoked installations refused).
+  - Heartbeat ingest (idempotent by ID, unknown fields kept); release channels with semantic
+    version ordering.
+  - `GET /v1/updates`, health, and an admin CLI with every command audited.
+- `packages/test-postgres`: the server's throwaway-PostgreSQL harness, generalised by migrations
+  folder and database prefix. The server's `test/setup/postgres.ts` is now a thin wrapper
+  (the console e2e keeps importing it).
+- Runbook `docs/runbooks/control-plane.md`.
+- Tests: 12 unit tests (version ordering, codes, configuration, rate limit, error mapping) and 22
+  integration tests. They cover:
+  - enrolment, including reuse, wrong key, expiry, non-Ed25519 keys and the rate limit;
+  - signed requests: missing, wrong key, unknown installation, tampered body or path, replay,
+    clock skew, revoked, pending;
+  - heartbeats (stored, idempotent, unknown fields kept) and channel-specific update offers;
+  - the CLI, the append-only audit log, health, HSTS and schema-migration drift.
+
+  Coverage 92.7 % of lines. Contracts: 24 new tests.
+
+Decisions:
+
+- Installations authenticate by signing each request with an Ed25519 key, not with bearer API
+  keys: nothing in the cloud database can impersonate a PC (ADR-0012).
+- The heartbeat interval is a fleet setting in the Control Plane (`CP_HEARTBEAT_SECONDS`, default 300) returned with every heartbeat: the BRD's configurable value and UPD-010's remote
+  configuration in one.
+- The component releases are compared on is `RESTAURANT_PC`, the Windows installer that carries
+  server, console and shell together.
+- Heartbeat requests accept unknown fields (kept in storage) so an installation newer than the
+  Control Plane is never refused; every other request stays strict.
+
+Notes for the next session:
+
+- P0-17b: derive the installation key from a new `installation-signing-key` secret, and give the
+  server a signing client and an enrolment CLI command. The heartbeat service reports
+  `RESTAURANT_PC` with the product version. The acceptance test runs the real Control Plane from
+  `@rp/control-plane/testing` (it needs `createMigratedDatabase` from `@rp/test-postgres` with
+  `CONTROL_PLANE_MIGRATIONS_DIR`).
+- P7-03 (fleet monitoring) reads `installations.last_heartbeat` and `heartbeats`. P7-04 adds
+  pinning, staged rollout and halting on top of `releases`. P7-02 replaces the CLI with the web
+  app (roles, MFA) and adds re-binding an installation to a new PC.
 
 ### 2026-09-26: P0-15 LAN TLS decision and implementation
 

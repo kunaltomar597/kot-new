@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import * as controlPlane from '../src/control-plane/index.js';
 import * as contracts from '../src/index.js';
 import { buildAsyncApi } from '../scripts/lib/asyncapi.js';
 import { buildOpenApi } from '../scripts/lib/openapi.js';
@@ -13,6 +14,7 @@ const options = {
   namespace: contracts,
   routes: contracts.ROUTES,
   events: contracts.DomainEvent,
+  controlPlane: { namespace: controlPlane, routes: controlPlane.CONTROL_PLANE_ROUTES },
   version: '0.0.0-test',
   outDir,
 };
@@ -45,7 +47,28 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
     const first = await renderDocs(options);
     const second = await renderDocs(options);
     expect(second).toEqual(first);
-    expect(first.map((file) => file.name)).toEqual(['openapi.json', 'asyncapi.yaml']);
+    expect(first.map((file) => file.name)).toEqual([
+      'openapi.json',
+      'control-plane.openapi.json',
+      'asyncapi.yaml',
+    ]);
+  });
+
+  it('[VCP-005] [UPD-002] documents the Control Plane API separately, route by route', () => {
+    const document = buildOpenApi({
+      namespace: controlPlane,
+      routes: controlPlane.CONTROL_PLANE_ROUTES,
+      version: '0.0.0-test',
+    }) as unknown as Doc;
+    for (const registered of controlPlane.CONTROL_PLANE_ROUTES) {
+      expect(document.paths[registered.path]?.[registered.method.toLowerCase()]).toBeDefined();
+    }
+    for (const name of collectSchemas(controlPlane).keys()) {
+      expect(document.components.schemas).toHaveProperty([name]);
+    }
+    // The local API's document stays about the local server.
+    expect(openapi.components.schemas).not.toHaveProperty(['HeartbeatRequest']);
+    expect(Object.keys(openapi.paths).some((path) => path.startsWith('/v1/'))).toBe(false);
   });
 
   it('documents every exported schema as an OpenAPI component', () => {

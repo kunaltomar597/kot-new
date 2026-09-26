@@ -2,17 +2,35 @@ import * as prettier from 'prettier';
 import { stringify } from 'yaml';
 import type { RouteDefinition } from '../../src/routes.js';
 import { buildAsyncApi } from './asyncapi.js';
-import { buildOpenApi } from './openapi.js';
+import { buildOpenApi, type OpenApiInfo } from './openapi.js';
 import type { z } from 'zod';
 
 export interface RenderOptions {
   namespace: Readonly<Record<string, unknown>>;
   routes: readonly RouteDefinition[];
   events: z.ZodDiscriminatedUnion;
+  /** The Vendor Control Plane API (`@rp/contracts/control-plane`, ADR-0012). */
+  controlPlane: {
+    namespace: Readonly<Record<string, unknown>>;
+    routes: readonly RouteDefinition<string>[];
+  };
   version: string;
   /** Directory the files are written to; Prettier resolves its config from here. */
   outDir: string;
 }
+
+export const CONTROL_PLANE_INFO: OpenApiInfo = {
+  title: 'Restaurant Operations Platform: Vendor Control Plane API',
+  description:
+    'Generated from @rp/contracts/control-plane by `pnpm contracts:docs`; do not edit by hand. ' +
+    'Restaurant PCs call it: `x-capability` is `INSTALLATION` for requests signed with the ' +
+    "installation's Ed25519 key (headers x-rp-installation, x-rp-timestamp, x-rp-nonce and " +
+    'x-rp-signature over `signedRequestMessage`, ADR-0012) or `PUBLIC`. `x-requirements` lists ' +
+    'the BRD requirement IDs.',
+  servers: [
+    { url: 'https://control-plane.example.invalid', description: 'Set per environment (VCP-009)' },
+  ],
+};
 
 export interface RenderedFile {
   name: string;
@@ -23,10 +41,22 @@ export interface RenderedFile {
 export async function renderDocs(options: RenderOptions): Promise<RenderedFile[]> {
   const openapi = buildOpenApi(options);
   const asyncapi = buildAsyncApi(options);
+  const controlPlane = buildOpenApi({
+    ...options.controlPlane,
+    version: options.version,
+    info: CONTROL_PLANE_INFO,
+  });
   return [
     {
       name: 'openapi.json',
       content: await format(JSON.stringify(openapi), `${options.outDir}/openapi.json`),
+    },
+    {
+      name: 'control-plane.openapi.json',
+      content: await format(
+        JSON.stringify(controlPlane),
+        `${options.outDir}/control-plane.openapi.json`,
+      ),
     },
     {
       name: 'asyncapi.yaml',

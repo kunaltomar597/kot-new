@@ -352,6 +352,54 @@ People needed: Business Owner provides hosting account (OWNER_CHECKLIST items 2,
 Acceptance: a local server posts heartbeats and discovers a new release; tests run against a local
 Postgres.
 
+Split into two pull requests. Only the self-update test itself waits for P0-16; the heartbeat
+and the update discovery do not.
+
+### P0-17a Control Plane service
+
+The service, its contracts and its admin CLI, tested against a local PostgreSQL.
+
+As built (ADR-0012):
+
+- `apps/control-plane`: NestJS 12, Prisma 7 and PostgreSQL 16. The `CP_ENV` environments require
+  TLS to the database outside development.
+- Installation credentials are Ed25519 keys: a one-time enrolment code registers the public key.
+  Every request is then signed (timestamp window, single-use nonces), and there are no bearer
+  secrets.
+- Heartbeat ingest: versions, disk, audit chain head (the real one, not a placeholder) and device
+  counts. The answer gives the server time, the next interval and the update.
+- Releases per component and channel (`STABLE`, `PILOT`), and `GET /v1/updates`.
+- An audited admin CLI and an append-only audit log.
+- Contracts: `@rp/contracts/control-plane`, with a generated `docs/api/control-plane.openapi.json`.
+- The throwaway-PostgreSQL test harness moved to `packages/test-postgres`, shared with the
+  server.
+
+Deploying needs the hosting account (Owner checklist items 4 and 5). The runbook is
+`docs/runbooks/control-plane.md`.
+
+### P0-17b Local server heartbeat client
+
+Requirements: VCP-005, NFR-O03, NFR-A01, UPD-002, LIC-007.
+Depends on: P0-17a.
+
+Deliverables:
+
+- The installation key, derived from the secret store's `installation-signing-key` (DPAPI on
+  Windows), and a signing HTTP client for the Control Plane.
+- Enrolment with a code, via a server CLI command. The installer calls it during activation
+  (P0-16, later ONB-003 in P7-01).
+- A heartbeat service:
+  - every `nextHeartbeatSeconds` (default 5 minutes);
+  - never blocks local work (NFR-A01);
+  - corrects its clock offset from `CLOCK_SKEW`;
+  - reports versions, disk, the audit chain head and device counts;
+  - records the offered update.
+
+Acceptance: an integration test runs the real local server beside a real Control Plane
+(`@rp/control-plane/testing`). The server enrols, posts heartbeats, and discovers a release
+published after it started. With the Control Plane down, the server keeps working and reports
+again when it is back.
+
 ---
 
 ## Hardware spikes (Track 2)

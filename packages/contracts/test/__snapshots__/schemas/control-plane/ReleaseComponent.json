@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["RESTAURANT_PC"] },
+  "output": { "type": "string", "enum": ["RESTAURANT_PC"] }
+}

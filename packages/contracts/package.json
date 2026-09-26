@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./control-plane": {
+      "types": "./dist/control-plane/index.d.ts",
+      "import": "./dist/control-plane/index.js"
     }
   },
   "files": [
