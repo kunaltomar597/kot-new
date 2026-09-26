@@ -98,34 +98,33 @@ export class InvoicesService {
         throw new AppError(409, 'NOTHING_TO_BILL', 'There is nothing on this bill yet.');
       }
 
-      const series = await this.series(tx, principal.restaurantId, seriesId);
+      // A printed invoice reopened for editing is updated in place, keeping its number (BILL-010).
+      const editing =
+        bill.editingInvoiceId === null
+          ? null
+          : await tx.invoice.findUniqueOrThrow({ where: { id: bill.editingInvoiceId } });
       const [restaurant, snapshot] = await Promise.all([
         tx.restaurant.findUniqueOrThrow({ where: { id: principal.restaurantId } }),
         this.settings.snapshot(principal.restaurantId),
       ]);
       const now = new Date();
-      const invoiceDate = calendarDateOf(now, restaurant.timeZone);
-      const financialYear = financialYearOf(invoiceDate);
-      const config = {
-        prefix: series.prefix,
-        includeFinancialYear: series.includeFinancialYear,
-        separator: series.separator === '-' ? ('-' as const) : ('/' as const),
-        sequencePadding: series.sequencePadding,
-      };
-      const sequence = await allocateInvoiceSequence(tx, {
-        restaurantId: principal.restaurantId,
-        seriesId: series.id,
-        financialYear: config.includeFinancialYear ? financialYear.label : CONTINUOUS_SEQUENCE,
-      });
-      if (sequence > maxSequenceFor(config)) {
-        throw new AppError(
-          422,
-          'SERIES_FULL',
-          `Series ${series.name} has used every number it can print. Add a new series.`,
-        );
-      }
-      const invoiceNumber = formatInvoiceNumber(config, financialYear, sequence);
+      const target =
+        editing === null
+          ? {
+              kind: 'NEW' as const,
+              numbering: await this.number(
+                tx,
+                principal.restaurantId,
+                seriesId,
+                now,
+                restaurant.timeZone,
+              ),
+            }
+          : { kind: 'EDIT' as const, invoice: editing };
+      const invoiceNumber =
+        target.kind === 'NEW' ? target.numbering.invoiceNumber : target.invoice.invoiceNumber;
       const businessDate = await currentBusinessDate(tx, principal.restaurantId, now);
+      const version = editing === null ? 1 : editing.version + 1;
 
       const particulars: InvoiceParticulars = {
         displayName: restaurant.displayName,
@@ -153,6 +152,7 @@ export class InvoicesService {
         taxableValue: number;
         taxGroupId: string;
         sacCode: string | null;
+        version: number;
       }[] = result.lines.map((line) => {
         const item = itemsById.get(line.id);
         const taxGroupId = realGroup(line.taxGroupId);
@@ -167,6 +167,7 @@ export class InvoicesService {
           taxableValue: line.taxableValue,
           taxGroupId,
           sacCode: sacOf(taxGroupId),
+          version,
         };
       });
       const serviceChargeTax = result.taxLines.find((line) => line.source === 'SERVICE_CHARGE');
@@ -183,6 +184,7 @@ export class InvoicesService {
           taxableValue: serviceChargeTax.taxableValue,
           taxGroupId,
           sacCode: sacOf(taxGroupId),
+          version,
         });
       }
       const taxLines = result.taxLines.flatMap((line) =>
@@ -193,50 +195,77 @@ export class InvoicesService {
           rateBp: component.rateBp,
           taxableValue: line.taxableValue,
           amount: component.amount,
+          version,
         })),
       );
+      const amounts = {
+        priceMode: result.priceMode,
+        subtotal: result.subtotal,
+        discountTotal: result.discountTotal,
+        serviceCharge: result.serviceCharge,
+        taxTotal: result.taxTotal,
+        roundOff: result.roundOff,
+        grandTotal: result.grandTotal,
+        customerName: bill.customerName,
+        customerGstin: bill.customerGstin,
+        customerPhone: bill.customerPhone,
+        customerPhoneConsent: bill.customerPhoneConsent,
+      };
 
-      const invoice = await tx.invoice.create({
-        data: {
-          id: newId(),
-          restaurantId: principal.restaurantId,
-          businessDate: dbDate(businessDate),
-          invoiceDate: dbDate(invoiceDate),
-          financialYear: financialYear.label,
-          seriesId: series.id,
-          sequence,
-          invoiceNumber,
-          billId,
-          tableSessionId: bill.tableSessionId,
-          orderId: bill.orderId,
-          particulars,
-          priceMode: result.priceMode,
-          subtotal: result.subtotal,
-          discountTotal: result.discountTotal,
-          serviceCharge: result.serviceCharge,
-          taxTotal: result.taxTotal,
-          roundOff: result.roundOff,
-          grandTotal: result.grandTotal,
-          customerName: bill.customerName,
-          customerGstin: bill.customerGstin,
-          customerPhone: bill.customerPhone,
-          customerPhoneConsent: bill.customerPhoneConsent,
-          issuedById: principal.staffId,
-          issuedAt: now,
-          // Printing is its own step (`print`); the first successful print is the original.
-          printCount: 0,
-          replacesInvoiceId: replaces?.id ?? null,
-          lines: { create: lines },
-          taxLines: { create: taxLines },
-        },
-      });
+      const invoice =
+        target.kind === 'NEW'
+          ? await tx.invoice.create({
+              data: {
+                id: newId(),
+                restaurantId: principal.restaurantId,
+                businessDate: dbDate(businessDate),
+                invoiceDate: dbDate(target.numbering.invoiceDate),
+                financialYear: target.numbering.financialYear,
+                seriesId: target.numbering.seriesId,
+                sequence: target.numbering.sequence,
+                invoiceNumber,
+                billId,
+                tableSessionId: bill.tableSessionId,
+                orderId: bill.orderId,
+                particulars,
+                ...amounts,
+                issuedById: principal.staffId,
+                issuedAt: now,
+                // Printing is its own step (`print`); the first successful print is the original.
+                printCount: 0,
+                replacesInvoiceId: replaces?.id ?? null,
+                lines: { create: lines },
+                taxLines: { create: taxLines },
+              },
+            })
+          : // The edited invoice keeps its number, date and particulars as first issued; its new
+            // lines are the next version, and its next print is an original again.
+            await tx.invoice.update({
+              where: { id: target.invoice.id },
+              data: {
+                ...amounts,
+                version,
+                printCount: 0,
+                lines: { create: lines },
+                taxLines: { create: taxLines },
+              },
+            });
       for (const discount of context.discounts) {
         await tx.discount.update({
           where: { id: discount.id },
           data: { invoiceId: invoice.id, amount: this.bills.discountAmount(context, discount.id) },
         });
       }
-      await tx.bill.update({ where: { id: billId }, data: { status: 'INVOICED' } });
+      await tx.bill.update({
+        where: { id: billId },
+        data: {
+          status: 'INVOICED',
+          editingInvoiceId: null,
+          editReason: null,
+          editRequestedById: null,
+          editApprovedById: null,
+        },
+      });
 
       const envelope = {
         version: 1 as const,
@@ -280,6 +309,38 @@ export class InvoicesService {
         },
         options,
       );
+      const totals = {
+        subtotal: result.subtotal,
+        discountTotal: result.discountTotal,
+        serviceCharge: result.serviceCharge,
+        taxTotal: result.taxTotal,
+        roundOff: result.roundOff,
+        grandTotal: result.grandTotal,
+      };
+      if (editing !== null) {
+        // BILL-010: who asked, who approved, why, and the values before and after.
+        await this.audit.record(tx, {
+          action: 'INVOICE_EDITED',
+          entityType: 'invoice',
+          entityId: invoice.id,
+          actorId: principal.staffId,
+          approverId: bill.editApprovedById,
+          deviceId: principal.deviceId,
+          restaurantId: principal.restaurantId,
+          before: {
+            version: editing.version,
+            subtotal: editing.subtotal,
+            discountTotal: editing.discountTotal,
+            serviceCharge: editing.serviceCharge,
+            taxTotal: editing.taxTotal,
+            roundOff: editing.roundOff,
+            grandTotal: editing.grandTotal,
+          },
+          after: { version, ...totals, lines: lines.length },
+          reason: bill.editReason,
+        });
+        return invoice.id;
+      }
       await this.audit.record(tx, {
         action: 'INVOICE_ISSUED',
         entityType: 'invoice',
@@ -310,15 +371,24 @@ export class InvoicesService {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, restaurantId },
       include: {
-        lines: { orderBy: { createdAt: 'asc' } },
-        taxLines: { orderBy: { createdAt: 'asc' } },
         tableSession: { select: { table: { select: { label: true } } } },
       },
     });
     if (invoice === null) {
       throw new AppError(404, 'INVOICE_NOT_FOUND', 'There is no such invoice.');
     }
-    return this.toView(invoice);
+    // Only the current version's lines: earlier versions stay for the audit trail.
+    const [lines, taxLines] = await Promise.all([
+      this.prisma.invoiceLine.findMany({
+        where: { invoiceId, version: invoice.version },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+      this.prisma.taxLine.findMany({
+        where: { invoiceId, version: invoice.version },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+    return this.toView({ ...invoice, lines, taxLines });
   }
 
   private toView(invoice: InvoiceRow): InvoiceView {
@@ -364,9 +434,48 @@ export class InvoicesService {
       roundOff: invoice.roundOff,
       grandTotal: invoice.grandTotal,
       printCount: invoice.printCount,
+      version: invoice.version,
       voidedAt: invoice.voidedAt?.toISOString() ?? null,
       voidReason: invoice.voidReason,
       replacesInvoiceId: invoice.replacesInvoiceId,
+    };
+  }
+
+  /** The next number of the series (BILL-003), with the invoice date and financial year. */
+  private async number(
+    tx: TransactionClient,
+    restaurantId: string,
+    seriesId: string | null,
+    now: Date,
+    timeZone: string,
+  ) {
+    const series = await this.series(tx, restaurantId, seriesId);
+    const invoiceDate = calendarDateOf(now, timeZone);
+    const financialYear = financialYearOf(invoiceDate);
+    const config = {
+      prefix: series.prefix,
+      includeFinancialYear: series.includeFinancialYear,
+      separator: series.separator === '-' ? ('-' as const) : ('/' as const),
+      sequencePadding: series.sequencePadding,
+    };
+    const sequence = await allocateInvoiceSequence(tx, {
+      restaurantId,
+      seriesId: series.id,
+      financialYear: config.includeFinancialYear ? financialYear.label : CONTINUOUS_SEQUENCE,
+    });
+    if (sequence > maxSequenceFor(config)) {
+      throw new AppError(
+        422,
+        'SERIES_FULL',
+        `Series ${series.name} has used every number it can print. Add a new series.`,
+      );
+    }
+    return {
+      seriesId: series.id,
+      sequence,
+      invoiceDate,
+      financialYear: financialYear.label,
+      invoiceNumber: formatInvoiceNumber(config, financialYear, sequence),
     };
   }
 

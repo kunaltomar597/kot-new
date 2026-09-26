@@ -542,17 +542,39 @@ As built:
     - the next issue gets a new number, with `replacesInvoiceId` pointing at the voided invoice.
 - An invoice is issued with `printCount` 0; printing is its own step.
 
-### P1-10c Edit after print and split bill
+### P1-10c Edit after print
 
 - Edit a printed, unsettled invoice: items and discounts, with a manager PIN, a reason and the
   before and after values (BILL-010). The number is kept.
-  - Invoice lines and tax lines cannot be deleted (AUD-004), so the edit needs versioned lines
-    (a `version` on `invoice_lines` and `tax_lines`, matching `invoices.version`).
-  - This also covers items added after printing.
+- This also covers items ordered after the bill was printed.
+
+As built: migration `20260926220000_invoice_versions`, `InvoiceActionsService.reopen` and the edit
+path of `InvoicesService.issue`.
+
+- `POST /api/v1/invoices/:id/reopen` (`BILL_EDIT_AFTER_PRINT`, with an override for cashiers).
+  - Only an ISSUED invoice of an INVOICED, unsplit bill can be reopened. A SETTLED one is refused:
+    void and re-issue instead.
+  - The bill goes back to OPEN with `editing_invoice_id`, the reason, who asked and the approver.
+    It is audited (`INVOICE_REOPENED`), and the table goes back to OCCUPIED.
+- While open, the bill changes as before printing (discounts, service charge, customer, and items
+  through orders).
+- `POST /api/v1/bills/:id/invoice` on a reopened bill updates the same invoice.
+  - It keeps its number, date and particulars. It gets `version + 1`, the new totals, and new
+    lines and tax lines under that version, and `printCount` goes back to 0.
+  - It is audited as `INVOICE_EDITED`, with the approver, the reason and the before and after
+    values. No number is used.
+- `invoice_lines` and `tax_lines` carry `version`. The view and the printed bill read the current
+  version, and older lines stay for the audit trail (they can never be deleted).
+- Voiding an invoice that is being edited ends the edit.
+
+### P1-10d Split bill
+
 - Split a bill by items or into equal parts, each part with its own invoice number (BILL-007).
-  The parts' lines, taxes and round-off are allocated from the whole bill with `allocate`, so the
-  parts add up exactly to the original.
-- Acceptance: split totals equal the original, and edits are audited with the approver.
+  - The parts' lines, taxes, service charge and round-off are allocated from the whole bill with
+    `allocate`, so the parts add up exactly to the original.
+  - Equal parts show each line with its share of the amounts.
+- Voiding one part reopens the bill only once every part is voided.
+- Acceptance: split totals equal the original, and each part has a consecutive number.
 
 ## P1-11 Payments, shifts and day-end
 

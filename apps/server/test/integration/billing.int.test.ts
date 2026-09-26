@@ -749,3 +749,90 @@ describe('[BILL-010] [BILL-003] void and re-issue', () => {
     expect(register[0]?.status).toBe('VOIDED');
   });
 });
+
+describe('[BILL-010] editing a printed bill', () => {
+  let edited: InvoiceView;
+
+  it('reopens a printed bill with a manager PIN when items are added after printing', async () => {
+    const printed = await prisma.invoice.findFirstOrThrow({
+      where: { billId: dineIn.id, status: 'ISSUED' },
+    });
+    const orderId = await submit({
+      source: 'WAITER_APP',
+      orderType: 'DINE_IN',
+      tableSessionId: session.id,
+      lines: [line(id('Water'))],
+    });
+    expect(orderId).toBeTruthy();
+    const refused = await issue(dineIn.id);
+    expect([refused.status, codeOf(refused)]).toEqual([409, 'BILL_ALREADY_PRINTED']);
+
+    const reopen = (headers: Record<string, string>) =>
+      server()
+        .post(`/api/v1/invoices/${printed.id}/reopen`)
+        .set(headers)
+        .send({ reason: 'Guest ordered another water' });
+    const withoutPin = await reopen(as(cashier));
+    expect([withoutPin.status, codeOf(withoutPin)]).toEqual([403, 'OVERRIDE_REQUIRED']);
+    const token = await override('BILL_EDIT_AFTER_PRINT');
+    const opened = await reopen({ ...as(cashier), 'x-override-token': token });
+    expect(opened.status, JSON.stringify(opened.body)).toBe(200);
+    const view = BillView.parse(opened.body);
+    expect(view).toMatchObject({ status: 'OPEN', editingInvoiceId: printed.id });
+    expect(view.lines).toHaveLength(4);
+    const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'INVOICE_REOPENED' } });
+    expect(audit).toMatchObject({
+      entityId: printed.id,
+      approverId: kit.staff.MANAGER,
+      reason: 'Guest ordered another water',
+    });
+    const again = await reopen(as(manager));
+    expect([again.status, codeOf(again)]).toEqual([409, 'BILL_ALREADY_OPEN']);
+  });
+
+  it('prints the edited bill under the same number, audited with before and after', async () => {
+    const before = await prisma.invoice.findFirstOrThrow({
+      where: { billId: dineIn.id, status: 'ISSUED' },
+    });
+    const reissued = await issue(dineIn.id);
+    expect(reissued.status, JSON.stringify(reissued.body)).toBe(201);
+    edited = InvoiceView.parse(reissued.body);
+    expect(edited).toMatchObject({
+      id: before.id,
+      invoiceNumber: before.invoiceNumber,
+      version: 2,
+      printCount: 0,
+      grandTotal: 63_500,
+      roundOff: -20,
+      taxTotal: 3_520,
+    });
+    expect(edited.lines).toHaveLength(4);
+    // Both versions' lines stay in the database; the view shows the current one.
+    expect(await prisma.invoiceLine.count({ where: { invoiceId: before.id } })).toBe(7);
+
+    const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'INVOICE_EDITED' } });
+    expect(audit).toMatchObject({
+      entityId: before.id,
+      actorId: kit.staff.CASHIER,
+      approverId: kit.staff.MANAGER,
+      reason: 'Guest ordered another water',
+    });
+    expect(audit.before).toMatchObject({ version: 1, grandTotal: 61_200 });
+    expect(audit.after).toMatchObject({ version: 2, grandTotal: 63_500 });
+
+    // No number was used for the edit, and the bill and table are printed again.
+    expect(await prisma.invoice.count({ where: { seriesId: id('inv') } })).toBe(8);
+    expect((await bill({ tableSessionId: session.id })).editingInvoiceId).toBeNull();
+    const table = await prisma.diningTable.findUniqueOrThrow({ where: { id: id('T1') } });
+    expect(table.state).toBe('BILL_PRINTED');
+  });
+
+  it('refuses to reopen a settled bill: it must be voided and issued again', async () => {
+    await prisma.invoice.update({ where: { id: edited.id }, data: { status: 'SETTLED' } });
+    const refused = await server()
+      .post(`/api/v1/invoices/${edited.id}/reopen`)
+      .set(as(manager))
+      .send({ reason: 'Too late' });
+    expect([refused.status, codeOf(refused)]).toEqual([409, 'INVOICE_SETTLED']);
+  });
+});

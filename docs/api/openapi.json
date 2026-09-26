@@ -1840,6 +1840,74 @@
         "x-requirements": ["BILL-014", "BILL-009", "AUD-001"]
       }
     },
+    "/api/v1/invoices/{id}/reopen": {
+      "post": {
+        "operationId": "reopenInvoice",
+        "summary": "Reopen a printed bill to edit its items or discounts",
+        "description": "BILL-010. Only an issued, unsettled invoice. The bill opens again; issuing it updates the same invoice under the same number, audited with the reason, the approver and the values before and after. Cashiers need a manager’s override token.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReopenInvoiceRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bill, open for editing.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Settled (void and re-issue it instead), voided, or already reopened.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_EDIT_AFTER_PRINT",
+        "x-requirements": ["BILL-010", "AUTH-011", "AUD-001"]
+      }
+    },
     "/api/v1/invoices/{id}/void": {
       "post": {
         "operationId": "voidInvoice",
@@ -5809,7 +5877,10 @@
           "roundOff": { "$ref": "#/components/schemas/SignedPaise" },
           "grandTotal": { "$ref": "#/components/schemas/Paise" },
           "customer": { "$ref": "#/components/schemas/BillCustomerView" },
-          "invoiceIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
+          "invoiceIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } },
+          "editingInvoiceId": {
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          }
         },
         "required": [
           "id",
@@ -5829,7 +5900,8 @@
           "roundOff",
           "grandTotal",
           "customer",
-          "invoiceIds"
+          "invoiceIds",
+          "editingInvoiceId"
         ],
         "additionalProperties": false
       },
@@ -6625,6 +6697,7 @@
           "roundOff": { "$ref": "#/components/schemas/SignedPaise" },
           "grandTotal": { "$ref": "#/components/schemas/Paise" },
           "printCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "version": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
           "voidedAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           },
@@ -6656,6 +6729,7 @@
           "roundOff",
           "grandTotal",
           "printCount",
+          "version",
           "voidedAt",
           "voidReason",
           "replacesInvoiceId"
@@ -8213,6 +8287,12 @@
           "message": { "type": "string" }
         },
         "required": ["clientLineId", "code", "message"],
+        "additionalProperties": false
+      },
+      "ReopenInvoiceRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "RestaurantChanged": {

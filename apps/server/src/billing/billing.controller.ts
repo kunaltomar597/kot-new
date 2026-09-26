@@ -12,6 +12,7 @@ import {
   OVERRIDE_TOKEN_HEADER,
   PrintInvoiceRequest,
   type PrintInvoiceResponse,
+  ReopenInvoiceRequest,
   RevokeDiscountRequest,
   ServiceChargeRequest,
   VoidInvoiceRequest,
@@ -139,6 +140,17 @@ export class InvoicesController {
     body: ReturnType<typeof PrintInvoiceRequest.parse>,
   ): Promise<PrintInvoiceResponse> {
     return this.actions.print(principalOf(request), params.id, body.printerId);
+  }
+
+  @Post(':id/reopen')
+  @HttpCode(200)
+  @RequireCapability('BILL_EDIT_AFTER_PRINT')
+  reopen(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,
+    @Body(new ZodValidationPipe(ReopenInvoiceRequest)) body: ReopenInvoiceRequest,
+  ): Promise<BillView> {
+    return this.actions.reopen(principalOf(request), params.id, body.reason, request.override);
   }
 
   @Post(':id/void')

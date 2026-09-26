@@ -1228,6 +1228,12 @@ model Bill {
   /// Explicit consent to a digital bill or feedback on this number (BILL-011).
   customerPhoneConsent Boolean       @default(false) @map("customer_phone_consent")
   customerGstin        String?       @map("customer_gstin")
+  /// Set while a printed invoice is reopened for editing (BILL-010); the next issue updates it in
+  /// place, keeping its number.
+  editingInvoiceId     String?       @map("editing_invoice_id") @db.Uuid
+  editReason           String?       @map("edit_reason")
+  editRequestedById    String?       @map("edit_requested_by_id") @db.Uuid
+  editApprovedById     String?       @map("edit_approved_by_id") @db.Uuid
   discounts            Discount[]
   invoices             Invoice[]
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -1312,6 +1318,9 @@ model InvoiceLine {
   taxableValue Int        @map("taxable_value")
   taxGroupId   String?    @map("tax_group_id") @db.Uuid
   sacCode      String?    @map("sac_code")
+  /// The invoice version this line belongs to. An edited invoice (BILL-010) gets new lines under
+  /// its next version; earlier lines stay for the audit trail, since lines are never deleted.
+  version      Int        @default(1)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -1330,6 +1339,8 @@ model TaxLine {
   rateBp       Int      @map("rate_bp")
   taxableValue Int      @map("taxable_value")
   amount       Int
+  /// As on invoice lines: the invoice version this tax line belongs to.
+  version      Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

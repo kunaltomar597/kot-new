@@ -495,6 +495,7 @@ export class BillsService {
         gstin: bill.customerGstin,
       },
       invoiceIds: [...invoiceIds],
+      editingInvoiceId: bill.editingInvoiceId,
     };
   }
 

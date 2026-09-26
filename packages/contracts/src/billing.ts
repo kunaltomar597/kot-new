@@ -147,6 +147,8 @@ export const BillView = z.object({
   grandTotal: Paise,
   customer: BillCustomerView,
   invoiceIds: z.array(Id),
+  /** The printed invoice this bill was reopened to edit; printing it again keeps its number. */
+  editingInvoiceId: Id.nullable(),
 });
 export type BillView = z.infer<typeof BillView>;
 
@@ -206,6 +208,8 @@ export const InvoiceView = z.object({
   roundOff: SignedPaise,
   grandTotal: Paise,
   printCount: z.int().min(0),
+  /** 1 as issued; each edit after printing adds one (BILL-010). */
+  version: z.int().positive(),
   voidedAt: Timestamp.nullable(),
   voidReason: z.string().nullable(),
   /** The voided invoice this one replaces (BILL-010). */
@@ -239,3 +243,11 @@ export type PrintInvoiceResponse = z.infer<typeof PrintInvoiceResponse>;
  */
 export const VoidInvoiceRequest = z.strictObject({ reason: Reason });
 export type VoidInvoiceRequest = z.infer<typeof VoidInvoiceRequest>;
+
+/**
+ * Reopen a printed, unsettled invoice to change its items or discounts (BILL-010). Cashiers need a
+ * manager's override token; the reason and the values before and after are audited when the
+ * edited bill is printed again under the same number.
+ */
+export const ReopenInvoiceRequest = z.strictObject({ reason: Reason });
+export type ReopenInvoiceRequest = z.infer<typeof ReopenInvoiceRequest>;

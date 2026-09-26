@@ -60,6 +60,7 @@ const INVOICE: InvoiceView = {
   roundOff: 0,
   grandTotal: 37_800,
   printCount: 0,
+  version: 1,
   voidedAt: null,
   voidReason: null,
   replacesInvoiceId: null,

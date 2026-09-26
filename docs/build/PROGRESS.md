@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10a, P1-10b). 386 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10a to P1-10c). 387 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b). 560 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c). 563 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -55,7 +55,7 @@ Recommended next WPs (dependencies met):
 
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
-- P1-10c Edit after print and split bill (P1-10b done).
+- P1-10d Split bill (P1-10c done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -106,7 +106,8 @@ Recommended next WPs (dependencies met):
 - [ ] P1-09 KDS UI
 - [x] P1-10a Bill preview, discounts and invoice issue
 - [x] P1-10b Bill printing, reprint and void
-- [ ] P1-10c Edit after print and split bill
+- [x] P1-10c Edit after print
+- [ ] P1-10d Split bill
 - [ ] P1-11 Payments, shifts and day-end
 - [ ] P1-12 POS billing UI
 - [ ] P1-13 Core reports v1
@@ -345,6 +346,14 @@ Decided 2026-09-26 (P1-10b):
 50. A restaurant without a GSTIN prints "BILL" instead of "TAX INVOICE", since an unregistered
     business may not issue tax invoices. The logo is printed once photos exist (P1-04).
 
+Decided 2026-09-26 (P1-10c):
+
+51. Editing a printed bill keeps its number, date and seller particulars, and replaces its
+    amounts. The lines are versioned, so every version stays in the database. The edited bill's
+    next print is an original, not a DUPLICATE, because its content changed.
+52. Items ordered after the bill was printed need the bill reopened with a manager PIN (cashiers)
+    before they can be billed. The POS shows why printing is refused.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -355,7 +364,8 @@ installation key on the PC and its signing client), #18 (P1-01a who may change w
 including the Owner's second factor for tax and data settings), P1-01b (the Owner-only tax,
 invoice series and invoice particulars endpoints, #19), P1-10a (billing: discounts, overrides,
 invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-M05), P1-10b
-(invoice void with override, DUPLICATE marking).
+(invoice void with override, DUPLICATE marking), P1-10c (editing a printed invoice under its
+number, with override).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -363,6 +373,42 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-10c edit after print
+
+Split bill moved to P1-10d, to keep each billing PR small enough to review.
+
+Built:
+
+- Migration `20260926220000_invoice_versions`:
+  - `version` on invoice lines and tax lines;
+  - the edit fields on bills (invoice, reason, requested by, approved by).
+- `@rp/contracts`:
+  - the reopen request and a route;
+  - the invoice view gains `version`;
+  - the bill view gains `editingInvoiceId`.
+- `InvoiceActionsService.reopen`:
+  - checks the invoice is ISSUED and the bill is INVOICED and not split, refusing SETTLED;
+  - moves the bill to OPEN and the table to OCCUPIED, audited with the approver.
+- `InvoicesService.issue` has two paths, a new invoice or an edit in place.
+  - The edit keeps the number and adds a new version of the lines, audited as INVOICE_EDITED with
+    before and after.
+  - The invoice view shows only the current version.
+- Void ends an edit in progress.
+- Tests: 3 new integration tests:
+  - items added after printing refused until the bill is reopened with a manager PIN;
+  - the edited bill printed under the same number as version 2, with both versions' lines kept,
+    the audit carrying the approver, reason and before and after values, and no number used;
+  - a settled invoice refused.
+
+  Totals: server 563 tests, contracts 387.
+
+Decisions: 51 and 52.
+
+Notes for the next sessions:
+
+- P1-10d: split by allocation. Reports (P1-13) must read invoice lines at the invoice's current
+  `version`.
 
 ### 2026-09-26: P1-10b bill printing, reprint and void
 
