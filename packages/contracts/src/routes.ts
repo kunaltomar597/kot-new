@@ -62,7 +62,7 @@ import {
   ModifierGroupView,
 } from './menu-admin.js';
 import { MenuSnapshot } from './menu.js';
-import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
+import { OrderParams, OrderView, SubmitOrderRequest, SubmitOrderResponse } from './order.js';
 import {
   AssignSessionWaiterRequest,
   CloseWithoutBillRequest,
@@ -173,6 +173,27 @@ export const ROUTES = [
     responses: {
       200: { description: 'Order accepted or lines rejected.', schema: SubmitOrderResponse },
       ...standardErrors,
+      404: { description: 'No such open table session.', schema: ApiError },
+      409: { description: 'The table is closed, or the bill is being settled.', schema: ApiError },
+      422: {
+        description: 'The idempotency key was used for a different order, or a note is too long.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getOrder',
+    method: 'GET',
+    path: '/api/v1/orders/:orderId',
+    summary: 'An order with its items, prices, states and tickets',
+    tags: ['orders'],
+    requirements: ['ORD-009', 'ORD-010'],
+    capability: 'ORDER_CREATE',
+    request: { params: OrderParams },
+    responses: {
+      200: { description: 'The order.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
     },
   },
   {

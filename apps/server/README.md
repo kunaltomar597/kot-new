@@ -300,6 +300,14 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   - publishing `menu_versions`, with a checksum so an unchanged draft is not published again;
   - the device-facing menu with live availability.
 
+## Orders (P1-06)
+
+- `src/orders/orders.service.ts` (P1-06a): submission. The idempotency key is locked per
+  transaction and the result stored, so retries never duplicate anything (ORD-013).
+  - Lines are priced from the published menu, never the client (ORD-014), and all line problems
+    are reported together (ORD-017).
+  - Staff orders get per-station KOTs, and counted stock is taken off, all in one transaction.
+
 ## Commands
 
 ```

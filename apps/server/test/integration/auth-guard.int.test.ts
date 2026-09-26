@@ -296,7 +296,6 @@ describe('[AUTH-010] [INT-002] route registry', () => {
     // Every served route is in the registry with the same access (so it is documented and guarded).
     expect(served.filter((route) => !registered.includes(route))).toEqual([]);
     // Registered ahead of their work package; remove each line when the route is implemented.
-    const notYetServed = ['POST /api/v1/orders ORDER_CREATE' /* P1-06 order engine */];
-    expect(registered.filter((route) => !served.includes(route))).toEqual(notYetServed);
+    expect(registered.filter((route) => !served.includes(route))).toEqual([]);
   });
 });

@@ -428,8 +428,8 @@ export class MenuPublishService {
     };
   }
 
-  /** Locks an active item row and reads its availability. */
-  private async lockAvailability(
+  /** Locks an active item row and reads its availability (the order engine checks stock with it). */
+  async lockAvailability(
     tx: TransactionClient,
     restaurantId: string,
     itemId: string,
