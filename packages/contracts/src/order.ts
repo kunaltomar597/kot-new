@@ -156,6 +156,10 @@ export const OrderView = z.object({
 });
 export type OrderView = z.infer<typeof OrderView>;
 
+/** Orders of a table session, or today's open takeaway orders, oldest first (TBL-007, TBL-008). */
+export const OrderListResponse = z.object({ orders: z.array(OrderView) });
+export type OrderListResponse = z.infer<typeof OrderListResponse>;
+
 export const OrderParams = z.strictObject({ orderId: Id });
 export type OrderParams = z.infer<typeof OrderParams>;
 

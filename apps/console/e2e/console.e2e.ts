@@ -116,4 +116,59 @@ test.describe.serial('the web console', () => {
     ).toBeVisible();
     await expect(hall.getByRole('button', { name: '1, Free' })).toBeVisible();
   });
+
+  test('[ORD-001] [MENU-012] [ORD-010] orders at a table with a variant, modifier and combo', async () => {
+    await page
+      .getByRole('region', { name: 'Terrace' })
+      .getByRole('button', { name: /^7, Occupied/ })
+      .click();
+    await page.getByRole('button', { name: t('pos.table.takeOrder') }).click();
+    await expect(
+      page.getByRole('heading', { name: t('pos.table.title', { table: '7' }) }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: /^Chicken Tikka, / }).click();
+    const tikka = page.getByRole('dialog', { name: 'Chicken Tikka' });
+    await tikka.getByRole('radio', { name: /Full/ }).check();
+    await tikka.getByRole('radio', { name: 'Medium' }).check();
+    await tikka.getByRole('button', { name: t('pos.item.add') }).click();
+
+    await page.getByRole('button', { name: 'Combos', exact: true }).click();
+    await page.getByRole('button', { name: /^Veg Thali Combo, / }).click();
+    const thali = page.getByRole('dialog', { name: 'Veg Thali Combo' });
+    await thali.getByRole('radio', { name: 'Rasmalai' }).check();
+    await thali.getByRole('button', { name: t('pos.item.add') }).click();
+
+    const cart = page.getByRole('complementary', { name: t('pos.cart.title') });
+    await expect(cart.getByText('Full · Medium')).toBeVisible();
+    await expect(cart.getByText('Dessert: Rasmalai')).toBeVisible();
+    await cart.getByRole('button', { name: t('pos.cart.send') }).click();
+    await expect(page.getByText(/^Order \d+ sent to the kitchen$/)).toBeVisible();
+    await expect(cart.getByText(t('pos.cart.empty'))).toBeVisible();
+
+    const sent = page.getByRole('region', { name: t('pos.sent.title') });
+    await expect(sent.getByText(/Chicken Tikka \(Full\)/)).toBeVisible();
+    await expect(sent.getByText(t('pos.itemState.SENT')).first()).toBeVisible();
+
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+    await expect(
+      page.getByRole('button', { name: /^7, Occupied, 2 guests, .*, ₹[\d,]+\.\d{2}/ }),
+    ).toBeVisible();
+  });
+
+  test('[TBL-008] sends a takeaway order and shows its token', async () => {
+    await page.getByRole('button', { name: t('pos.takeaway') }).click();
+    await expect(page.getByRole('heading', { name: t('pos.takeaway') })).toBeVisible();
+    await page.getByRole('button', { name: 'Breads', exact: true }).click();
+    await page.getByRole('button', { name: /^Butter Naan, / }).click();
+    await page.getByLabel(t('pos.cart.customer')).fill('Anil');
+    await page
+      .getByRole('complementary', { name: t('pos.cart.title') })
+      .getByRole('button', { name: t('pos.cart.send') })
+      .click();
+    await expect(page.getByText(/^Token \d+: order \d+ sent to the kitchen$/)).toBeVisible();
+    const open = page.getByRole('region', { name: t('pos.sent.openTakeaway') });
+    await expect(open.getByText(/Token \d+ · Anil/)).toBeVisible();
+    await expect(open.getByText('1 × Butter Naan')).toBeVisible();
+  });
 });

@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import {
   ApiError,
   type LoginResponse,
+  OrderListResponse,
   OrderView,
   SubmitOrderRequest,
   SubmitOrderResponse,
@@ -435,5 +436,60 @@ describe('[ORD-001] [ORD-014] submitting an order', () => {
     });
     expect(submitted.payload).toMatchObject({ payload: { needsApproval: true } });
     expect(app.get(MenuPublishService)).toBeDefined();
+  });
+});
+
+describe('[TBL-007] [TBL-008] listing orders for the POS', () => {
+  it('lists a table session’s orders oldest first, with item states', async () => {
+    const session = await openTable('T2');
+    for (const name of ['Dal', 'Roti']) {
+      const response = await submit({
+        idempotencyKey: randomUUID(),
+        source: 'WAITER_APP',
+        orderType: 'DINE_IN',
+        tableSessionId: session.id,
+        lines: [line(id(name))],
+      });
+      expect(response.status, JSON.stringify(response.body)).toBe(200);
+    }
+    const response = await server()
+      .get(`/api/v1/table-sessions/${session.id}/orders`)
+      .set(as(waiter));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const { orders } = OrderListResponse.parse(response.body);
+    expect(orders.map((order) => order.items.map((item) => [item.name, item.state]))).toEqual([
+      [['Dal', 'SENT']],
+      [['Roti', 'SENT']],
+    ]);
+    expect(orders.every((order) => order.tableSessionId === session.id)).toBe(true);
+
+    const missing = await server()
+      .get(`/api/v1/table-sessions/${randomUUID()}/orders`)
+      .set(as(waiter));
+    expect([missing.status, codeOf(missing)]).toEqual([404, 'TABLE_SESSION_NOT_FOUND']);
+  });
+
+  it('lists today’s open takeaway orders with their tokens', async () => {
+    const response = await submit(
+      {
+        idempotencyKey: randomUUID(),
+        source: 'POS',
+        orderType: 'TAKEAWAY',
+        customerName: 'Anil',
+        lines: [line(id('Roti'), { quantity: 3 })],
+      },
+      manager,
+    );
+    const placed = await orderOf(response);
+    const listed = await server().get('/api/v1/orders/takeaway').set(as(waiter));
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+    const { orders } = OrderListResponse.parse(listed.body);
+    expect(orders.every((order) => order.orderType === 'TAKEAWAY' && order.status === 'OPEN')).toBe(
+      true,
+    );
+    const mine = orders.find((order) => order.id === placed.id);
+    expect(mine).toMatchObject({ customerName: 'Anil', takeawayToken: placed.takeawayToken });
+    expect(mine?.takeawayToken).not.toBeNull();
+    expect((await server().get('/api/v1/orders/takeaway')).status).toBe(401);
   });
 });

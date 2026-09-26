@@ -457,6 +457,25 @@ As built: `@rp/ui-web` `TableTile`, `apps/console/src/pos/`.
   live item status chips.
 - Playwright: order with variant, modifiers and combo; send; status updates live; takeaway order.
 
+As built: `@rp/ui-web` `MenuItemCard`, `ChoiceGroup`, `ItemOptions`, `ComboChoices`,
+`QuantityStepper`; `apps/console/src/pos/` `OrderEntry`, `ItemDialog`, `cart.ts`, `menu-view.ts`,
+`PosHome`; server `GET /api/v1/table-sessions/:sessionId/orders` and `GET /api/v1/orders/takeaway`.
+
+- "Take order" on an occupied table's details, and "Takeaway" on the floor.
+- Categories in display order, search by name, short code or synonym; sold-out and unavailable
+  dishes are shown but disabled.
+- The item dialog checks the selection with `validateSelection` and shows the estimated price
+  from `unitPriceOf`; combos ask for each choice slot.
+- The cart merges identical lines, keeps a note per line and sends no prices. One idempotency key
+  per cart: a network failure keeps the cart and the key, so sending again cannot duplicate; a
+  refusal marks the lines with the server's reason (ORD-017).
+- Sent orders show each item's state chip, read again on order and item events.
+- Takeaway takes an optional customer name and shows the token after sending.
+- The development seed now publishes its menu (version 1) and its combo sells all day, so the
+  Playwright flows run at any time of day.
+- Deferred to P1-09: the cross-device check that a kitchen status change shows on the POS (the
+  screen test covers it with a socket event).
+
 ## P1-09 KDS UI
 
 Goal: kitchen screens for each station.

@@ -1,7 +1,7 @@
 # @rp/ui-web
 
 React 19 component library for the console (POS, KDS, manager dashboard) and the QR menu, built on
-`@rp/design-tokens` (NFR-U01). Built in P0-13 (see ADR-0009); P1-08a adds the table tile; P1-08b adds the menu item card and the
+`@rp/design-tokens` (NFR-U01). Built in P0-13 (see ADR-0009); P1-08a added the table tile and P1-08b the menu item card and the
 variant/modifier/combo selection components (MENU-012).
 
 ## Components

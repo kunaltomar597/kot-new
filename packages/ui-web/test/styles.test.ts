@@ -45,6 +45,8 @@ describe('[NFR-U03] [KDS-011] touch targets', () => {
     ['toast.css', '.rp-toast__action', 'min-height: var(--rp-touch-target)'],
     ['table.css', '.rp-table th,\n.rp-table td', 'height: var(--rp-touch-target)'],
     ['table-tile.css', '.rp-table-tile', 'min-height: calc(var(--rp-touch-target) * 2)'],
+    ['menu.css', '.rp-menu-item', 'min-height: calc(var(--rp-touch-target) * 1.75)'],
+    ['menu.css', '.rp-choice-group__option', 'min-height: var(--rp-touch-target)'],
   ];
 
   it.each(interactive)('%s %s is at least the touch target', (file, selector, declaration) => {

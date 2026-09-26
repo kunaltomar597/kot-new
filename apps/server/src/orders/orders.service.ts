@@ -4,6 +4,7 @@ import type {
   DomainEvent,
   MenuSnapshot,
   OrderLineRequest,
+  OrderListResponse,
   OrderView,
   SubmitOrderRequest,
   SubmitOrderResponse,
@@ -28,6 +29,7 @@ import { newId } from '../common/ids.js';
 import { allocateDailyNumber } from '../database/numbering.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { appendEvent, type EventAudience } from '../events/outbox.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -95,6 +97,50 @@ function comboOnNow(combo: MenuSnapshot['combos'][number], now: Date, timeZone: 
  * deductions. Staff orders go straight to the kitchen as per-station KOTs; customer orders wait
  * for approval (P3-03).
  */
+const ORDER_VIEW_INCLUDE = {
+  items: { orderBy: { id: 'asc' }, include: { modifiers: { orderBy: { id: 'asc' } } } },
+  kots: { orderBy: { kotNumber: 'asc' } },
+} as const satisfies Prisma.OrderInclude;
+
+function orderView(
+  order: Prisma.OrderGetPayload<{ include: typeof ORDER_VIEW_INCLUDE }>,
+): OrderView {
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    orderType: order.orderType,
+    source: order.source,
+    status: order.status,
+    tableSessionId: order.tableSessionId,
+    tableId: order.tableId,
+    takeawayToken: order.takeawayToken,
+    customerName: order.customerName,
+    businessDate: isoDateOf(order.businessDate),
+    createdAt: order.createdAt.toISOString(),
+    note: order.notes,
+    items: order.items.map((item) => ({
+      id: item.id,
+      itemId: item.itemId,
+      parentOrderItemId: item.parentOrderItemId,
+      name: item.name,
+      variantName: item.variantName,
+      modifiers: item.modifiers.map(({ name, priceDelta }) => ({ name, priceDelta })),
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      stationId: item.stationId,
+      state: item.state,
+      instructions: item.instructions,
+    })),
+    kots: order.kots.map(({ id, kotNumber, stationId, kind }) => ({
+      id,
+      kotNumber,
+      stationId,
+      kind,
+    })),
+  };
+}
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -204,46 +250,43 @@ export class OrdersService {
   async get(restaurantId: string, orderId: string): Promise<OrderView> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, restaurantId },
-      include: {
-        items: { orderBy: { id: 'asc' }, include: { modifiers: { orderBy: { id: 'asc' } } } },
-        kots: { orderBy: { kotNumber: 'asc' } },
-      },
+      include: ORDER_VIEW_INCLUDE,
     });
     if (order === null) throw new AppError(404, 'ORDER_NOT_FOUND', 'There is no such order.');
-    return {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      orderType: order.orderType,
-      source: order.source,
-      status: order.status,
-      tableSessionId: order.tableSessionId,
-      tableId: order.tableId,
-      takeawayToken: order.takeawayToken,
-      customerName: order.customerName,
-      businessDate: isoDateOf(order.businessDate),
-      createdAt: order.createdAt.toISOString(),
-      note: order.notes,
-      items: order.items.map((item) => ({
-        id: item.id,
-        itemId: item.itemId,
-        parentOrderItemId: item.parentOrderItemId,
-        name: item.name,
-        variantName: item.variantName,
-        modifiers: item.modifiers.map(({ name, priceDelta }) => ({ name, priceDelta })),
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        lineTotal: item.lineTotal,
-        stationId: item.stationId,
-        state: item.state,
-        instructions: item.instructions,
-      })),
-      kots: order.kots.map(({ id, kotNumber, stationId, kind }) => ({
-        id,
-        kotNumber,
-        stationId,
-        kind,
-      })),
-    };
+    return orderView(order);
+  }
+
+  /** The orders of a table session, oldest first, for the POS and the waiter app (TBL-007). */
+  async listForSession(restaurantId: string, sessionId: string): Promise<OrderListResponse> {
+    const session = await this.prisma.tableSession.findFirst({
+      where: { id: sessionId, restaurantId },
+      select: { id: true },
+    });
+    if (session === null) {
+      throw new AppError(404, 'TABLE_SESSION_NOT_FOUND', 'There is no such table session.');
+    }
+    const orders = await this.prisma.order.findMany({
+      where: { restaurantId, tableSessionId: sessionId },
+      include: ORDER_VIEW_INCLUDE,
+      orderBy: [{ createdAt: 'asc' }, { orderNumber: 'asc' }],
+    });
+    return { orders: orders.map(orderView) };
+  }
+
+  /** Today's open takeaway orders, oldest first, with their tokens (TBL-008). */
+  async listOpenTakeaway(restaurantId: string): Promise<OrderListResponse> {
+    const businessDate = await currentBusinessDate(this.prisma, restaurantId);
+    const orders = await this.prisma.order.findMany({
+      where: {
+        restaurantId,
+        orderType: 'TAKEAWAY',
+        status: 'OPEN',
+        businessDate: dbDate(businessDate),
+      },
+      include: ORDER_VIEW_INCLUDE,
+      orderBy: [{ createdAt: 'asc' }, { orderNumber: 'asc' }],
+    });
+    return { orders: orders.map(orderView) };
   }
 
   /** Prices and checks one line against the published menu; a rejection says why (ORD-017). */

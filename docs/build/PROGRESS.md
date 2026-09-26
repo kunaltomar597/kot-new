@@ -40,7 +40,7 @@ What exists:
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
-  move table (P1-08a).
+  move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b).
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -57,7 +57,8 @@ Recommended next WPs (dependencies met):
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-12 POS billing UI (P1-10 and P1-11 done).
-- P1-08b POS order entry: menu, item picker, cart, send KOT, takeaway (P1-08a done).
+- P1-09 KDS UI (P1-06, P1-07 done).
+- P1-12 POS billing UI (P1-10, P1-11 done).
 - P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -106,7 +107,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-07a Stations, printers, ticket rendering and test print
 - [x] P1-07b Print queue, offline alert, redirect and reprint
 - [x] P1-08a POS floor: live table overview, open and move table
-- [ ] P1-08b POS order entry, send KOT, takeaway, live item status
+- [x] P1-08b POS order entry, send KOT, takeaway, live item status
 - [ ] P1-09 KDS UI
 - [x] P1-10a Bill preview, discounts and invoice issue
 - [x] P1-10b Bill printing, reprint and void
@@ -426,6 +427,17 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P1-08b):
+
+71. The POS keeps one idempotency key per cart: a failed or unanswered send keeps the cart and the
+    key, so pressing Send again returns the original order; any change to the cart starts a new
+    key. A refusal (ORD-017) creates nothing, marks the refused lines, and the next send is a new
+    attempt.
+72. The cart and item dialog show estimated prices from `@rp/domain` so the cashier sees the
+    effect of a choice; the request carries no prices and the bill is the server's (ORD-014).
+73. The development seed publishes its menu as version 1 and its combo sells all day, so demos and
+    end-to-end tests do not depend on the clock. Real restaurants still publish from Manage.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -446,6 +458,41 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-08b POS order entry (P1-08 done)
+
+Built:
+
+- Server:
+  - `GET /api/v1/table-sessions/:sessionId/orders` and `GET /api/v1/orders/takeaway`
+    (`OrderListResponse`);
+  - `src/menu/menu-content.ts` (the snapshot builder, shared by publishing and the seed);
+  - the dev seed publishes menu version 1 and its combo has no time window.
+- `@rp/ui-web`: `MenuItemCard` (veg/non-veg/egg mark with words), `ChoiceGroup`, `ItemOptions`
+  (variants and modifier groups, rule hints, `issue` words from the app), `ComboChoices`,
+  `QuantityStepper`, styles and touch-target tests.
+- Console: `PosHome` routes; `OrderEntry` (menu browser, cart, send, sent orders); `ItemDialog`;
+  `cart.ts`; `menu-view.ts`; `use-live.ts` (`useFloor` now uses it; the first connection no longer
+  triggers a second read, only a reconnect does); POS strings.
+- Tests:
+  - 2 server integration tests (session orders, takeaway list); seed test checks the published
+    menu;
+  - 6 ui-web ordering tests;
+  - 5 cart and menu unit tests, 6 order-entry screen tests (browse and search, variant, modifiers
+    and combo, network retry with the same key, refusal, live state from an event, takeaway
+    token, navigation), a reconnect test for the floor;
+  - Playwright: order at table 7 with a variant, a modifier and a combo, then a takeaway with a
+    token.
+
+Gotchas:
+
+- The e2e offline/restart test failed once on the first cold run after a build and passed five
+  runs after; watch it in CI.
+- Long screen tests need a larger Vitest timeout under the parallel coverage run.
+
+Deferred: the cross-device live-status check to P1-09 (KDS).
+
+Decisions: 71 to 73.
 
 ### 2026-09-26: P1-08a POS floor
 

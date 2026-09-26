@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import {
   type ComboRequest,
@@ -12,51 +11,14 @@ import { canonicalJson } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { authErrors } from '../auth/auth-errors.js';
 import type { Principal } from '../auth/principal.js';
-import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
+import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
-import type { Prisma } from '../generated/prisma/client.js';
 import { appendEvent } from '../events/outbox.js';
 import { lockSetup } from '../restaurant/setup-changes.js';
+import { buildMenuContent, COMBO_INCLUDE, comboView, menuChecksum } from './menu-content.js';
 import { SettingsService } from '../settings/settings.service.js';
-
-type Client = Pick<
-  TransactionClient,
-  'category' | 'item' | 'modifierGroup' | 'taxGroup' | 'station' | 'combo'
->;
-
-const COMBO_INCLUDE = {
-  components: {
-    orderBy: { displayOrder: 'asc' },
-    include: { choices: { orderBy: { id: 'asc' }, select: { itemId: true } } },
-  },
-} as const satisfies Prisma.ComboInclude;
-
-type ComboRow = Prisma.ComboGetPayload<{ include: typeof COMBO_INCLUDE }>;
-
-function comboView(combo: ComboRow): ComboView {
-  return {
-    itemId: combo.itemId,
-    components: combo.components.map((component) => ({
-      kind: component.kind,
-      itemId: component.itemId,
-      label: component.label,
-      itemIds: component.choices.map((choice) => choice.itemId),
-      quantity: component.quantity,
-    })),
-    activeFrom: combo.activeFrom === null ? null : isoDateOf(combo.activeFrom),
-    activeUntil: combo.activeUntil === null ? null : isoDateOf(combo.activeUntil),
-    timeWindow:
-      combo.windowStart === null || combo.windowEnd === null
-        ? null
-        : { start: combo.windowStart, end: combo.windowEnd },
-  };
-}
-
-function sha256(text: string): string {
-  return createHash('sha256').update(text).digest('hex');
-}
 
 /**
  * Combos (MENU-005), live availability and stock (MENU-006) and menu publishing (MENU-013,
@@ -245,8 +207,8 @@ export class MenuPublishService {
     return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
       const { restaurantId } = principal;
-      const content = await this.buildContent(tx, restaurantId);
-      const checksum = sha256(canonicalJson(content));
+      const content = await buildMenuContent(tx, restaurantId);
+      const checksum = menuChecksum(content);
       const latest = await tx.menuVersion.findFirst({
         where: { restaurantId },
         orderBy: { version: 'desc' },
@@ -321,128 +283,6 @@ export class MenuPublishService {
           stockCount: now.trackStock ? (now.stockLevel?.quantity ?? 0) : null,
         };
       }),
-    };
-  }
-
-  /** Everything a snapshot holds except its version and time: active entries only. */
-  private async buildContent(tx: Client, restaurantId: string) {
-    const active = { restaurantId, archivedAt: null };
-    const [categories, items, groups, taxGroups, stations, combos] = await Promise.all([
-      tx.category.findMany({ where: active, orderBy: [{ displayOrder: 'asc' }, { id: 'asc' }] }),
-      tx.item.findMany({
-        where: active,
-        orderBy: [{ displayOrder: 'asc' }, { id: 'asc' }],
-        include: {
-          variants: { where: { archivedAt: null }, orderBy: { displayOrder: 'asc' } },
-          modifierGroups: {
-            where: { group: { archivedAt: null } },
-            orderBy: { displayOrder: 'asc' },
-          },
-          tags: { include: { tag: true }, orderBy: { id: 'asc' } },
-          synonyms: { orderBy: { id: 'asc' } },
-          stockLevel: true,
-        },
-      }),
-      tx.modifierGroup.findMany({
-        where: active,
-        orderBy: { id: 'asc' },
-        include: { options: { where: { archivedAt: null }, orderBy: { displayOrder: 'asc' } } },
-      }),
-      tx.taxGroup.findMany({
-        where: active,
-        orderBy: { id: 'asc' },
-        include: { components: { orderBy: { displayOrder: 'asc' } } },
-      }),
-      tx.station.findMany({ where: active, orderBy: { id: 'asc' } }),
-      tx.combo.findMany({
-        where: { restaurantId, item: { archivedAt: null } },
-        orderBy: { id: 'asc' },
-        include: COMBO_INCLUDE,
-      }),
-    ]);
-    return {
-      categories: categories.map((category) => ({
-        id: category.id,
-        name: category.name,
-        parentId: category.parentId,
-        displayOrder: category.displayOrder,
-      })),
-      items: items.map((item) => ({
-        id: item.id,
-        categoryId: item.categoryId,
-        name: item.name,
-        ...(item.shortCode !== null && { shortCode: item.shortCode }),
-        ...(item.description !== null && { description: item.description }),
-        ...(item.photoId !== null && { photoId: item.photoId }),
-        basePrice: item.basePrice,
-        taxGroupId: item.taxGroupId,
-        foodType: item.foodType,
-        spiceLevel: item.spiceLevel,
-        tags: item.tags.map((link) => link.tag.name),
-        stationId: item.stationId,
-        ...(item.prepTimeMinutes !== null && { prepTimeMinutes: item.prepTimeMinutes }),
-        available: item.available,
-        stockCount: item.trackStock ? (item.stockLevel?.quantity ?? 0) : null,
-        displayOrder: item.displayOrder,
-        channels: item.channels,
-        variants: item.variants.map((variant) => ({
-          id: variant.id,
-          name: variant.name,
-          price: variant.price,
-        })),
-        modifierGroupIds: item.modifierGroups.map((link) => link.groupId),
-        synonyms: item.synonyms.map((synonym) => synonym.text),
-        repeatable: item.repeatable,
-        archived: false,
-        ...(item.externalId !== null && { externalId: item.externalId }),
-      })),
-      modifierGroups: groups
-        .filter((group) => group.options.length > 0)
-        .map((group) => ({
-          id: group.id,
-          name: group.name,
-          minSelections: group.minSelections,
-          maxSelections: group.maxSelections,
-          options: group.options.map((option) => ({
-            id: option.id,
-            name: option.name,
-            priceDelta: option.priceDelta,
-          })),
-        })),
-      combos: combos.map((combo) => {
-        const view = comboView(combo);
-        return {
-          id: combo.id,
-          itemId: combo.itemId,
-          components: view.components.map((component) =>
-            component.kind === 'FIXED'
-              ? {
-                  kind: 'FIXED' as const,
-                  itemId: component.itemId ?? '',
-                  quantity: component.quantity,
-                }
-              : {
-                  kind: 'CHOICE' as const,
-                  label: component.label ?? '',
-                  itemIds: component.itemIds,
-                  quantity: component.quantity,
-                },
-          ),
-          ...(view.activeFrom !== null && { activeFrom: view.activeFrom }),
-          ...(view.activeUntil !== null && { activeUntil: view.activeUntil }),
-          ...(view.timeWindow !== null && { timeWindow: view.timeWindow }),
-        };
-      }),
-      taxGroups: taxGroups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        components: group.components.map(({ code, rateBp }) => ({ code, rateBp })),
-      })),
-      stations: stations.map((station) => ({
-        id: station.id,
-        name: station.name,
-        mode: station.mode,
-      })),
     };
   }
 

@@ -44,7 +44,8 @@ of truth for the restaurant.
   and `allocateInvoiceSequence` (per series and financial year). Gap-free: a locked counter row
   inside the caller's transaction, never a PostgreSQL SEQUENCE (BILL-003, ADR-0005).
 - `src/database/dev-seed.ts`: development data (one restaurant, GST 5 % and 18 %, 2 stations,
-  10 tables, staff of every role, 30 items with variants, modifiers and a combo). Run with
+  10 tables, staff of every role, 30 items with variants, modifiers and an all-day combo, and the
+  menu published as version 1 through `src/menu/menu-content.ts`, as publishing does). Run with
   `pnpm --filter @rp/server build && DATABASE_URL=... pnpm --filter @rp/server db:seed`. It refuses
   to run on a database that already has a restaurant. Staff PINs come with P0-10.
 
@@ -307,6 +308,8 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   - Lines are priced from the published menu, never the client (ORD-014), and all line problems
     are reported together (ORD-017).
   - Staff orders get per-station KOTs, and counted stock is taken off, all in one transaction.
+- `GET /api/v1/table-sessions/:sessionId/orders` and `GET /api/v1/orders/takeaway` (P1-08b): a
+  session's orders and today's open takeaway orders with their item states, for the POS.
 - `src/orders/order-items.service.ts` (P1-06b): status steps, cancel, void (override token) and
   modify. Kitchen-relevant changes always produce a CANCELLED or MODIFIED ticket (ORD-012).
 

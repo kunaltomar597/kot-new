@@ -1,10 +1,12 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { newId } from '../common/ids.js';
+import { buildMenuContent, menuChecksum } from '../menu/menu-content.js';
 
 /**
  * Development and demo data (P0-08): one restaurant, GST 5 % and 18 % tax groups, 2 stations,
  * 10 tables in 2 sections, staff of every role and 30 menu items with variants, modifiers and a
- * combo. Staff get no PINs here; P0-10 adds credentials. Refuses to run on a database that
+ * combo, published as menu version 1 so every ordering surface has a menu at once. Staff get PINs
+ * only when `hashPin` is given. Refuses to run on a database that
  * already has a restaurant, so it can never touch real data.
  */
 export interface SeedOptions {
@@ -344,10 +346,12 @@ export async function seedDevelopmentData(
         ['WAITER', 'Sunita'],
         ['KITCHEN', 'Chef Imran'],
       ] as const;
+      let ownerId: string | undefined;
       for (const [role, displayName] of people) {
         const staff = await tx.staff.create({
           data: { ...base, roleId: roleIds.get(role) ?? '', displayName },
         });
+        if (role === 'OWNER') ownerId = staff.id;
         if (options.hashPin !== undefined) {
           await tx.credential.create({
             data: {
@@ -449,14 +453,13 @@ export async function seedDevelopmentData(
         data: { ...base, itemId: itemIds.get('Gulab Jamun') ?? '', quantity: 40 },
       });
 
-      // Combo: Veg Thali = Dal Makhani + 2 Tandoori Roti + Jeera Rice + a choice of dessert.
+      // Combo: Veg Thali = Dal Makhani + 2 Tandoori Roti + Jeera Rice + a choice of dessert, sold
+      // all day (a time window would make demos and tests depend on the clock).
       const item = (name: string) => itemIds.get(name) ?? '';
       await tx.combo.create({
         data: {
           ...base,
           itemId: item('Veg Thali Combo'),
-          windowStart: '11:00',
-          windowEnd: '16:00',
           components: {
             create: [
               { ...base, kind: 'FIXED', itemId: item('Dal Makhani'), quantity: 1, displayOrder: 1 },
@@ -483,6 +486,21 @@ export async function seedDevelopmentData(
               },
             ],
           },
+        },
+      });
+
+      // Publish the demo menu as version 1 (MENU-013), as the Owner would.
+      const content = await buildMenuContent(tx, restaurantId);
+      const publishedAt = new Date();
+      await tx.menuVersion.create({
+        data: {
+          id: newId(),
+          restaurantId,
+          version: 1,
+          publishedAt,
+          publishedById: ownerId ?? null,
+          snapshot: { version: 1, publishedAt: publishedAt.toISOString(), ...content },
+          checksum: menuChecksum(content),
         },
       });
 

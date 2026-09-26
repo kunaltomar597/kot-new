@@ -166,6 +166,26 @@ describe('[TBL-007] the POS floor', () => {
   });
 });
 
+describe('[NFR-P11] the POS floor after a dropped connection', () => {
+  it('reads the floor again when the connection comes back, not on the first connect', async () => {
+    const fake = posServer(overview(entry(T1, 'T1', HALL)), overview(entry(T1, 'T1', HALL, {})));
+    const { sockets } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos' });
+    await tile(/^T1, Free$/);
+    act(() => {
+      sockets.sync(0);
+    });
+    expect(fake.callsTo('GET', '/api/v1/tables/overview')).toHaveLength(1);
+    act(() => {
+      sockets.last.fire('disconnect', 'transport close');
+    });
+    act(() => {
+      sockets.sync(0);
+    });
+    expect(await tile(/^T1, Occupied/)).toBeInTheDocument();
+    expect(fake.callsTo('GET', '/api/v1/tables/overview')).toHaveLength(2);
+  });
+});
+
 describe('[TBL-003] opening a table', () => {
   it('seats guests with the assigned waiter unless another is chosen', async () => {
     const fake = posServer(
