@@ -368,6 +368,11 @@ describe('outbox clean-up', () => {
     await bus.drain();
     const head = bus.head;
     await until(async () => Number((await cursorOf(probe.name)).lastSequence) === head);
+    // Only the probe's cursor matters here; the application's own consumers are past everything.
+    await prisma.eventConsumerCursor.updateMany({
+      where: { consumer: { not: probe.name } },
+      data: { lastSequence: BigInt(head) },
+    });
     await prisma.$executeRaw`UPDATE outbox SET published_at = now() - interval '2 days'`;
     await prisma.$executeRaw`UPDATE inbox SET received_at = now() - interval '2 days'`;
 

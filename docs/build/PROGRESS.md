@@ -58,7 +58,7 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P2-01 React Native foundation (P0-11 to P0-14 done).
-- P2-03 Notification and escalation engine (P0-12, P1-02 done).
+- P2-03b Nudges, breaks, device and system alerts (P2-03a done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -125,7 +125,8 @@ Recommended next WPs (dependencies met):
 
 - [ ] P2-01 React Native foundation
 - [ ] P2-02 Waiter app: tables and order taking
-- [ ] P2-03 Notification and escalation engine
+- [x] P2-03a Notification engine core
+- [ ] P2-03b Nudges, breaks, device, printer and system alerts
 - [ ] P2-04 MQTT broker and pager server side
 - [ ] P2-05 Pager firmware [H]
 - [ ] P2-06 Waiter alerts, service-request inbox, nudge, Notify manager
@@ -428,6 +429,24 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P2-03a):
+
+95. "Managers on duty" are the Owner and managers signed in on a device now. If none is signed in,
+    every active manager is alerted so that someone is. Cashiers on duty are those with an open
+    cash shift; if none has one, every cashier.
+96. A waiter counts as reachable while their waiter app (any signed-in device) is connected. Pager
+    presence joins in P2-04. An unreachable, missing or on-break responsible waiter sends the
+    alert to the managers at once (NTF-007, NTF-009).
+97. One open alert per cause (a dedupe key such as `bill:<session>` or `ready:<session>`). A second
+    trigger while it is open does not stack a new alert or reset its timers.
+98. Ready food raises one alert per table session, not per item. It is cleared when nothing of
+    that session waits at the pass. Takeaway food raises no waiter alert; the token display calls
+    it.
+99. After downtime, missed repeats are folded into one repeat, not sent as a burst. An escalation
+    that fell due while the server was down happens at start-up.
+100.  Manager changes to the Appendix C rules are the setting `notifications.rules` (per event:
+      recipients, channels, pager text, escalate, repeat). N and R stay the existing settings.
+
 Decided 2026-09-26 (P1-14):
 
 94. The exit scenario raises `auth.attemptsPerMinutePerDevice` to its maximum (100) while it runs
@@ -543,6 +562,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P2-03a Notification engine core
+
+P2-03 was split into P2-03a (this) and P2-03b (nudges, breaks, device, printer and system alerts).
+
+Built:
+
+- `@rp/domain` `notifications.ts`: the rules, recipients and deadlines.
+- Migration `20260928010000_notifications`.
+- Contracts: alert events, `AlertView`, and the `listAlerts` and `acknowledgeAlert` routes.
+- `apps/server/src/notifications/`: service, triggers (a durable consumer), presence from the
+  gateway, controller and module. The KDS "Notify manager" uses the engine.
+- Tests:
+  - domain: 21 (the Appendix C matrix table-driven, recipients, deadlines, pager text);
+  - server: 4 trigger unit tests;
+  - 5 integration tests with a fake clock and presence: delivery and acknowledgement everywhere,
+    who may acknowledge, repeat plus escalation once plus clear, immediate escalation for an
+    unreachable waiter, and a restart during a pending escalation.
+
+Gotchas:
+
+- The engine is the first real durable consumer. The event-bus clean-up test now moves the
+  application's own cursors to the head, so only the probe holds events back.
+- Alert rows use `created_at` from the engine's clock, so tests can move time.
+
+Decisions: 95 to 100.
 
 ### 2026-09-26: P1-14 Phase 1 exit test (simulated service day)
 

@@ -61,6 +61,55 @@ pager via MQTT (P2-04).
 Acceptance: integration tests with a fake clock for repeat, escalation, ack-stops-repeat, offline
 bypass, restart during a pending escalation, and the whole Appendix C matrix (table-driven).
 
+P2-03 is split in two.
+
+### P2-03a Engine core (done)
+
+As built:
+
+- `@rp/domain` `notifications.ts`:
+  - `DEFAULT_NOTIFICATION_RULES` (Appendix C);
+  - `effectiveRule`, which applies the `notifications.rules` setting;
+  - `resolveRecipients`, including NTF-007 (waiter unreachable) and NTF-009 (on break) routing;
+  - `pagerTextFor`;
+  - `initialDeadlines` and `dueActions` for escalation after N and repeats every R.
+- The `alerts` table gains recipients, channels, pager text, deadlines (`escalate_at`,
+  `next_repeat_at`), escalation, repeat count, `dedupe_key` and `cleared_at`. Migration:
+  `20260928010000_notifications`.
+- Contracts:
+  - events `AlertRaised` (delivery and each repeat, with the repeat number for de-duplication),
+    `AlertAcknowledged` and `AlertCleared`;
+  - `AlertView`;
+  - routes `GET /api/v1/alerts` (mine; managers see all) and
+    `POST /api/v1/alerts/:alertId/acknowledge`.
+- `apps/server/src/notifications/`:
+  - `NotificationsService` raises alerts inside the caller's transaction, acknowledges and clears
+    them, and runs `processDue` from a 1 s ticker. Each alert is handled under
+    `FOR UPDATE SKIP LOCKED`, and missed repeats fold into one.
+  - `NotificationTriggers` is a durable event-bus consumer:
+    - an order pending approval raises an alert that approval or rejection clears;
+    - ready food at a table raises one alert per table session, cleared when nothing waits at
+      the pass;
+    - a bill request raises an alert that closing the table clears;
+    - a bumped ticket clears its "not collected" alert.
+  - Presence comes from the Socket.io gateway (the person's staff room has a connection). Pagers
+    join in P2-04.
+  - "Managers on duty" are the Owner and managers signed in now, otherwise every active manager.
+    Cashiers on duty are those with an open cash shift, otherwise every cashier.
+- The KDS "Notify manager" now goes through the engine (`collect:<kotId>`).
+
+### P2-03b Nudges, breaks, device, printer and system alerts
+
+- Manager nudge (NTF-008): pick waiters, then a preset or up to 40 characters. `MANAGER_NUDGE`
+  with `SELECTED`.
+- "On break" (NTF-009): the waiter app sets and clears it, and `recipientContext` fills
+  `onBreak`.
+- Device offline or low battery once per state change (pager, tablet, KDS; from
+  `DeviceStatusChanged`, P2-04).
+- Printer offline until resolved (`PrinterStatusChanged`).
+- Disk, backup and licence daily alerts (from the heartbeat and the licence service).
+- The waiter-app, POS and dashboard views of alerts (P2-06, P4).
+
 ## P2-04 MQTT broker and pager server side
 
 Goal: secure, reliable pager messaging from the local server.

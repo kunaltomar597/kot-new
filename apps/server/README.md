@@ -399,6 +399,17 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   REPORT_EXPORTED.
 - `src/reports/order-drill-down.service.ts` (P1-13b): one order and who did each step (RPT-015).
 
+## Notifications (P2-03a)
+
+- `src/notifications/notifications.service.ts` raises alerts in the caller's transaction, with
+  recipients from `recipients.ts` and the rules in `@rp/domain` `notifications.ts`.
+- It keeps the deadlines in the `alerts` row and runs `processDue` every second. `NOTIFICATION_CLOCK`
+  and `NOTIFICATION_OPTIONS` can be replaced in tests.
+- Acknowledging and clearing emit `AlertAcknowledged` and `AlertCleared` to every recipient.
+- `notification-triggers.ts` is the durable event-bus consumer that raises and clears alerts from
+  domain events.
+- `PRESENCE` says who is reachable; today that is the gateway's live connections.
+
 ## Phase 1 exit scenario (P1-14)
 
 - `test/scenario/service-day.ts` runs a seeded service day of about 100 orders through

@@ -134,6 +134,32 @@ export const AlertEscalated = event(
   'AlertEscalated',
   z.object({ alertId: Id, eventType: z.string(), escalatedTo: z.array(Id) }),
 );
+/**
+ * An alert reaches its recipients (P2-03, NTF-001, NTF-006): the first time (`repeat` 0) and on
+ * every repeat. Devices show it once per `alertId` and vibrate again only for a higher `repeat`.
+ */
+export const AlertRaised = event(
+  'AlertRaised',
+  z.object({
+    alertId: Id,
+    eventType: z.string(),
+    recipients: z.array(Id),
+    pagerText: z.string().nullable(),
+    tableId: Id.nullable(),
+    repeat: z.int().nonnegative(),
+    escalated: z.boolean(),
+  }),
+);
+/** Acknowledged on any device: every device of every recipient stops alerting (NTF-004). */
+export const AlertAcknowledged = event(
+  'AlertAcknowledged',
+  z.object({ alertId: Id, acknowledgedBy: Id.nullable(), recipients: z.array(Id) }),
+);
+/** The cause went away (the bill was paid, the food collected): no one needs to act. */
+export const AlertCleared = event(
+  'AlertCleared',
+  z.object({ alertId: Id, recipients: z.array(Id) }),
+);
 export const DeviceStatusChanged = event(
   'DeviceStatusChanged',
   z.object({
@@ -217,6 +243,9 @@ export const DomainEvent = z.discriminatedUnion('type', [
   BillPrinted,
   BillSettled,
   AlertEscalated,
+  AlertRaised,
+  AlertAcknowledged,
+  AlertCleared,
   DeviceStatusChanged,
   DeviceRevoked,
   PrinterStatusChanged,
