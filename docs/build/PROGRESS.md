@@ -260,6 +260,8 @@ series). Built:
   - `SettingsChanged` goes to every screen.
   - `AuthSettingsService` reads through the registry, so the auth defaults now have one source.
     The step-up rule is a shared pure function.
+- Migration `20260926120000_price_mode_setting` drops the unused `restaurants.price_mode` column
+  (P0-08): `billing.priceMode` is the one source. Invoices keep their own `price_mode` snapshot.
 - Tests: 73 catalogue tests (every default against its schema, range probes, the BRD defaults,
   vendor scope, cross rules) and 8 integration tests. The integration tests cover:
   - listing with editability per role;
