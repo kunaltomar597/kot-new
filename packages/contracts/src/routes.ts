@@ -11,8 +11,11 @@ import {
   InvoiceView,
   IssueInvoiceRequest,
   OpenBillRequest,
+  PrintInvoiceRequest,
+  PrintInvoiceResponse,
   RevokeDiscountRequest,
   ServiceChargeRequest,
+  VoidInvoiceRequest,
 } from './billing.js';
 import {
   CurrentSessionResponse,
@@ -1895,6 +1898,46 @@ export const ROUTES = [
       200: { description: 'The invoice.', schema: InvoiceView },
       ...standardErrors,
       404: { description: 'No such invoice.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'printInvoice',
+    method: 'POST',
+    path: '/api/v1/invoices/:id/print',
+    summary: 'Print an invoice on the bill printer; later prints are marked DUPLICATE',
+    description:
+      'BILL-014, BILL-009. The first successful print is the original; every later one is ' +
+      'marked DUPLICATE and audited. Answers whether it printed.',
+    tags: ['billing'],
+    requirements: ['BILL-014', 'BILL-009', 'AUD-001'],
+    capability: 'BILL_REPRINT',
+    request: { params: InvoiceParams, body: PrintInvoiceRequest },
+    responses: {
+      200: { description: 'The result.', schema: PrintInvoiceResponse },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+      409: { description: 'The invoice is voided.', schema: ApiError },
+      422: { description: 'No bill printer is set, or the printer is unknown.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'voidInvoice',
+    method: 'POST',
+    path: '/api/v1/invoices/:id/void',
+    summary: 'Void an invoice so the bill can be corrected and issued again',
+    description:
+      'BILL-010, BILL-003. The invoice keeps its number with status VOIDED; the bill opens again ' +
+      'and its next invoice gets a new number and points back at this one. Cashiers need a ' +
+      'manager’s override token. Audited with the approver.',
+    tags: ['billing'],
+    requirements: ['BILL-010', 'BILL-003', 'AUTH-011', 'AUD-001'],
+    capability: 'INVOICE_VOID',
+    request: { params: InvoiceParams, body: VoidInvoiceRequest },
+    responses: {
+      200: { description: 'The voided invoice.', schema: InvoiceView },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+      409: { description: 'Already voided, or its bill has a newer invoice.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];

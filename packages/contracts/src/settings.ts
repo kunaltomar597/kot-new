@@ -308,6 +308,16 @@ export const SETTINGS = [
     requirements: ['ONB-004', 'BILL-002'],
   }),
   setting({
+    key: 'bills.printerId',
+    schema: z.uuid().nullable(),
+    defaultValue: null,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'The printer bills print on, usually the one at the cash counter (none: choose each time).',
+    requirements: ['BILL-014'],
+  }),
+  setting({
     key: 'payments.otherModes',
     schema: z.array(z.string().trim().min(1).max(30)).min(1).max(5),
     defaultValue: ['Other'],

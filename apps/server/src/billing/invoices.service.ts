@@ -71,7 +71,13 @@ export class InvoicesService {
       const context = await this.bills.lockedOpenBill(tx, principal.restaurantId, billId);
       const { bill, calculated } = context;
       const { result } = calculated;
-      if (bill.tableSessionId !== null) {
+      // A voided invoice of this bill not yet replaced: the new one replaces it (BILL-010).
+      const replaces = await tx.invoice.findFirst({
+        where: { billId, status: 'VOIDED', replacedBy: { none: {} } },
+        orderBy: { issuedAt: 'desc' },
+        select: { id: true },
+      });
+      if (bill.tableSessionId !== null && replaces === null) {
         const session = await tx.tableSession.findUniqueOrThrow({
           where: { id: bill.tableSessionId },
           select: { status: true },
@@ -217,7 +223,9 @@ export class InvoicesService {
           customerPhoneConsent: bill.customerPhoneConsent,
           issuedById: principal.staffId,
           issuedAt: now,
-          printCount: 1,
+          // Printing is its own step (`print`); the first successful print is the original.
+          printCount: 0,
+          replacesInvoiceId: replaces?.id ?? null,
           lines: { create: lines },
           taxLines: { create: taxLines },
         },
@@ -283,6 +291,7 @@ export class InvoicesService {
         after: {
           invoiceNumber,
           billId,
+          replacesInvoiceId: replaces?.id ?? null,
           subtotal: result.subtotal,
           discountTotal: result.discountTotal,
           serviceCharge: result.serviceCharge,
@@ -355,6 +364,9 @@ export class InvoicesService {
       roundOff: invoice.roundOff,
       grandTotal: invoice.grandTotal,
       printCount: invoice.printCount,
+      voidedAt: invoice.voidedAt?.toISOString() ?? null,
+      voidReason: invoice.voidReason,
+      replacesInvoiceId: invoice.replacesInvoiceId,
     };
   }
 

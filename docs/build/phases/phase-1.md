@@ -512,15 +512,47 @@ As built: `apps/server/src/billing/` and migration `20260926200000_bills`.
   - The table goes to BILL_PRINTED (`TableStateChanged`), with `BillPrinted` and an audit entry,
     all in one transaction.
 
-### P1-10b Split, reprint, edit, void and the printed bill
+### P1-10b Bill printing, reprint and void
 
+- The ESC/POS bill template (header, particulars, footer; the logo waits for P1-04 photos)
+  (BILL-014), printed on the bill printer.
+- Reprints marked DUPLICATE and audited (BILL-009).
+- Void and re-issue: the voided invoice keeps its number, and the new invoice gets a new number
+  (BILL-010, BILL-003).
+
+As built:
+
+- `renderBill` in `apps/server/src/printing/escpos.ts` prints:
+  - the seller's particulars and header lines;
+  - "TAX INVOICE" (or "BILL" without a GSTIN), with VOID or DUPLICATE banners;
+  - the number, table or takeaway, date and place of supply, and the customer GSTIN;
+  - lines with discounts, and the subtotal, discounts and service charge;
+  - each tax as code, rate and taxable value, then the round-off and the total;
+  - the SAC codes and the footer.
+- The `bills.printerId` setting names the bill printer. A print request can name another printer.
+- `apps/server/src/billing/invoice-actions.service.ts`:
+  - `POST /api/v1/invoices/:id/print` (`BILL_REPRINT`) locks the invoice row while it prints, so
+    two tills cannot both print an original.
+    - The first successful print is the original. Later prints are DUPLICATE, audited
+      (`INVOICE_REPRINTED`) and announced with `BillPrinted { duplicate: true }`.
+    - Printer health follows P1-07 (offline alert).
+  - `POST /api/v1/invoices/:id/void` (`INVOICE_VOID`, with an override for cashiers):
+    - sets VOIDED with the reason, and audits it with the approver;
+    - reopens the bill and moves the table from BILL_PRINTED back to OCCUPIED;
+    - the next issue gets a new number, with `replacesInvoiceId` pointing at the voided invoice.
+- An invoice is issued with `printCount` 0; printing is its own step.
+
+### P1-10c Edit after print and split bill
+
+- Edit a printed, unsettled invoice: items and discounts, with a manager PIN, a reason and the
+  before and after values (BILL-010). The number is kept.
+  - Invoice lines and tax lines cannot be deleted (AUD-004), so the edit needs versioned lines
+    (a `version` on `invoice_lines` and `tax_lines`, matching `invoices.version`).
+  - This also covers items added after printing.
 - Split a bill by items or into equal parts, each part with its own invoice number (BILL-007).
-- Reprint marked DUPLICATE, audited (BILL-009), on the POS printer through the P1-07 transport.
-- Edit a printed, unsettled invoice (manager PIN, reason, before/after), and void and re-issue
-  (BILL-010).
-- The ESC/POS bill template (logo, header, footer) (BILL-014).
-- Acceptance: split totals equal the original; cancelled invoices stay in the series; edit and
-  void audited with the approver; DUPLICATE marking.
+  The parts' lines, taxes and round-off are allocated from the whole bill with `allocate`, so the
+  parts add up exactly to the original.
+- Acceptance: split totals equal the original, and edits are audited with the approver.
 
 ## P1-11 Payments, shifts and day-end
 

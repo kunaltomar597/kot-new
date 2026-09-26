@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
+import { type AddressInfo, createServer, type Server } from 'node:net';
 import type { INestApplication } from '@nestjs/common';
 import {
   ApiError,
@@ -6,6 +8,7 @@ import {
   InvoiceView,
   type LoginResponse,
   OverrideResponse,
+  PrintInvoiceResponse,
   SubmitOrderResponse,
   TableSessionView,
 } from '@rp/contracts';
@@ -453,7 +456,7 @@ describe('[BILL-002] [BILL-003] printing: the GST invoice', () => {
       taxTotal: 3_160,
       roundOff: 40,
       grandTotal: 61_200,
-      printCount: 1,
+      printCount: 0,
       particulars: {
         displayName: 'Spice Route',
         legalName: 'Spice Route Foods LLP',
@@ -567,5 +570,182 @@ describe('[BILL-002] [BILL-003] printing: the GST invoice', () => {
     ).rejects.toThrow('printer on fire');
     const next = InvoiceView.parse((await issue((await takeawayBill()).id)).body);
     expect(next.invoiceNumber).toBe(`INV/${FY.shortLabel}/000007`);
+  });
+});
+
+describe('[BILL-014] [BILL-009] printing the bill', () => {
+  const jobs: string[] = [];
+  let paper: Server;
+  let port = 0;
+  let invoiceId: string;
+
+  const listen = async () => {
+    paper = createServer((socket) => {
+      const chunks: Buffer[] = [];
+      socket.on('data', (chunk: Buffer) => chunks.push(chunk));
+      socket.on('end', () => {
+        jobs.push(Buffer.concat(chunks).toString('latin1'));
+        socket.end();
+      });
+    });
+    paper.listen(port, '127.0.0.1');
+    await once(paper, 'listening');
+    port = (paper.address() as AddressInfo).port;
+  };
+  const print = (login = cashier) =>
+    server().post(`/api/v1/invoices/${invoiceId}/print`).set(as(login)).send({});
+
+  beforeAll(async () => {
+    await listen();
+    invoiceId = (await prisma.invoice.findFirstOrThrow({ where: { billId: dineIn.id } })).id;
+  });
+
+  afterAll(() => {
+    paper.close();
+  });
+
+  it('prints the original on the bill printer, then marks every reprint DUPLICATE', async () => {
+    const unset = await print();
+    expect([unset.status, codeOf(unset)]).toEqual([422, 'NO_BILL_PRINTER']);
+
+    const printer = await prisma.printer.create({
+      data: {
+        restaurantId: kit.restaurantId,
+        name: 'Counter',
+        connection: 'NETWORK',
+        host: '127.0.0.1',
+        port,
+      },
+    });
+    ids.billPrinter = printer.id;
+    await prisma.setting.create({
+      data: { restaurantId: kit.restaurantId, key: 'bills.printerId', value: printer.id },
+    });
+    app.get(SettingsService).invalidate();
+    expect((await print(waiter)).status).toBe(403);
+
+    const first = await print();
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
+    expect(PrintInvoiceResponse.parse(first.body)).toEqual({
+      printed: true,
+      error: null,
+      duplicate: false,
+      printCount: 1,
+    });
+    const original = jobs.at(-1) ?? '';
+    expect(original).toContain('Spice Route');
+    expect(original).toContain('TAX INVOICE');
+    expect(original).toContain(`No: INV/${FY.shortLabel}/000001`);
+    expect(original).toContain('Table T1');
+    expect(original).toContain('Customer GSTIN: ' + CUSTOMER_GSTIN);
+    expect(original).toContain('CGST @ 2.5% on 560.00');
+    expect(original).toContain('612.00');
+    expect(original).toContain('SAC: 996331, 996332');
+    expect(original).not.toContain('DUPLICATE');
+    expect(await prisma.auditLog.count({ where: { action: 'INVOICE_REPRINTED' } })).toBe(0);
+
+    const again = PrintInvoiceResponse.parse((await print()).body);
+    expect(again).toMatchObject({ printed: true, duplicate: true, printCount: 2 });
+    expect(jobs.at(-1)).toContain('DUPLICATE');
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'INVOICE_REPRINTED' },
+    });
+    expect(audit).toMatchObject({ entityId: invoiceId, actorId: kit.staff.CASHIER });
+    const events = await prisma.outboxEvent.findMany({ where: { eventType: 'BillPrinted' } });
+    expect(
+      events.some((row) => (row.payload as { payload: { duplicate: boolean } }).payload.duplicate),
+    ).toBe(true);
+  });
+
+  it('answers in plain words when the bill printer is off, and does not count the print', async () => {
+    paper.close();
+    await once(paper, 'close');
+    const failed = PrintInvoiceResponse.parse((await print()).body);
+    expect(failed).toMatchObject({ printed: false, duplicate: true, printCount: 2 });
+    expect(failed.error).toContain('refused the connection');
+    const printer = await prisma.printer.findUniqueOrThrow({ where: { id: id('billPrinter') } });
+    expect(printer.offlineSince).not.toBeNull();
+    await listen();
+  });
+});
+
+describe('[BILL-010] [BILL-003] void and re-issue', () => {
+  let voided: InvoiceView;
+
+  it('voids with a manager PIN; the number stays in the series and the table waits again', async () => {
+    const original = await prisma.invoice.findFirstOrThrow({ where: { billId: dineIn.id } });
+    const voidIt = (headers: Record<string, string>) =>
+      server()
+        .post(`/api/v1/invoices/${original.id}/void`)
+        .set(headers)
+        .send({ reason: 'Wrong table billed' });
+
+    const withoutPin = await voidIt(as(cashier));
+    expect([withoutPin.status, codeOf(withoutPin)]).toEqual([403, 'OVERRIDE_REQUIRED']);
+    const token = await override('INVOICE_VOID');
+    const done = await voidIt({ ...as(cashier), 'x-override-token': token });
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+    voided = InvoiceView.parse(done.body);
+    expect(voided).toMatchObject({
+      status: 'VOIDED',
+      voidReason: 'Wrong table billed',
+      invoiceNumber: `INV/${FY.shortLabel}/000001`,
+      grandTotal: 61_200,
+    });
+    expect(voided.voidedAt).not.toBeNull();
+    const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'INVOICE_VOIDED' } });
+    expect(audit).toMatchObject({
+      entityId: original.id,
+      actorId: kit.staff.CASHIER,
+      approverId: kit.staff.MANAGER,
+      reason: 'Wrong table billed',
+    });
+    const table = await prisma.diningTable.findUniqueOrThrow({ where: { id: id('T1') } });
+    expect(table.state).toBe('OCCUPIED');
+    expect((await bill({ tableSessionId: session.id })).status).toBe('OPEN');
+
+    const twice = await server()
+      .post(`/api/v1/invoices/${original.id}/void`)
+      .set(as(manager))
+      .send({ reason: 'Again' });
+    expect([twice.status, codeOf(twice)]).toEqual([409, 'INVOICE_ALREADY_VOIDED']);
+    const reprint = await server()
+      .post(`/api/v1/invoices/${original.id}/print`)
+      .set(as(cashier))
+      .send({});
+    expect([reprint.status, codeOf(reprint)]).toEqual([409, 'INVOICE_VOIDED']);
+
+    // Its amounts are frozen in the database, whatever the application does.
+    await expect(
+      prisma.invoice.update({ where: { id: original.id }, data: { grandTotal: 1 } }),
+    ).rejects.toThrow();
+  });
+
+  it('issues the corrected bill with a new number that points back at the voided one', async () => {
+    const reissued = await issue(dineIn.id);
+    expect(reissued.status, JSON.stringify(reissued.body)).toBe(201);
+    const invoice = InvoiceView.parse(reissued.body);
+    expect(invoice).toMatchObject({
+      invoiceNumber: `INV/${FY.shortLabel}/000008`,
+      status: 'ISSUED',
+      replacesInvoiceId: voided.id,
+      grandTotal: 61_200,
+      printCount: 0,
+    });
+    expect((await bill({ tableSessionId: session.id })).invoiceIds).toEqual([
+      voided.id,
+      invoice.id,
+    ]);
+    const table = await prisma.diningTable.findUniqueOrThrow({ where: { id: id('T1') } });
+    expect(table.state).toBe('BILL_PRINTED');
+
+    // The register keeps every number, the voided one included (RPT-006).
+    const register = await prisma.invoice.findMany({
+      where: { seriesId: id('inv') },
+      orderBy: { sequence: 'asc' },
+      select: { sequence: true, status: true },
+    });
+    expect(register.map((row) => row.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(register[0]?.status).toBe('VOIDED');
   });
 });

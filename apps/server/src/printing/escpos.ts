@@ -1,4 +1,5 @@
-import { toLocalDateTime } from '@rp/domain';
+import type { InvoiceView } from '@rp/contracts';
+import { formatRupees, toLocalDateTime } from '@rp/domain';
 
 /**
  * ESC/POS rendering for kitchen tickets and test pages (P1-07a, KDS-008). Pure: it turns a ticket
@@ -301,4 +302,126 @@ export function renderNotice(notice: PrintNoticePage, paperWidthMm: PaperWidthMm
     .line('-'.repeat(width))
     .line(formatLocal(notice.createdAt, notice.timeZone))
     .finish();
+}
+
+/** "2.5%" from basis points. */
+function percent(rateBp: number): string {
+  const whole = Math.trunc(rateBp / 100);
+  const fraction = String(rateBp % 100)
+    .padStart(2, '0')
+    .replace(/0+$/, '');
+  return fraction === '' ? `${String(whole)}%` : `${String(whole)}.${fraction}%`;
+}
+
+const money = (paise: number): string => formatRupees(paise, { symbol: false });
+
+/**
+ * The printed bill: a GST tax invoice (BILL-002, BILL-014). The seller's particulars and header,
+ * the invoice number, date and place of supply, the customer's GSTIN for B2B, the lines with any
+ * discount, the tax per component and rate, the round-off and the total, the SAC codes and the
+ * footer. A reprint says DUPLICATE in large letters (BILL-009). The logo is added when menu photos
+ * exist (P1-04).
+ */
+export function renderBill(
+  invoice: InvoiceView,
+  options: {
+    readonly paperWidthMm: PaperWidthMm;
+    readonly duplicate: boolean;
+    readonly timeZone: string;
+  },
+): Uint8Array {
+  const width = charactersPerLine(options.paperWidthMm);
+  const half = Math.floor(width / 2);
+  const { particulars } = invoice;
+  const receipt = new Receipt()
+    .command(ALIGN_CENTRE)
+    .command(SIZE_DOUBLE)
+    .command(BOLD_ON)
+    .lines(wrap(particulars.displayName, half))
+    .command(SIZE_NORMAL)
+    .command(BOLD_OFF);
+  if (particulars.legalName !== null && particulars.legalName !== particulars.displayName) {
+    receipt.lines(wrap(particulars.legalName, width));
+  }
+  if (particulars.address !== null) {
+    const { line1, line2, city, pincode } = particulars.address;
+    receipt.lines(wrap(line1, width));
+    if (line2 !== undefined) receipt.lines(wrap(line2, width));
+    receipt.lines(wrap(`${city} - ${pincode}`, width));
+  }
+  if (particulars.phone !== null) receipt.line(`Phone: ${particulars.phone}`);
+  if (particulars.gstin !== null) receipt.line(`GSTIN: ${particulars.gstin}`);
+  if (particulars.fssaiNumber !== null) receipt.line(`FSSAI: ${particulars.fssaiNumber}`);
+  for (const text of particulars.headerLines) receipt.lines(wrap(text, width));
+
+  receipt
+    .command(BOLD_ON)
+    .line(particulars.gstin === null ? 'BILL' : 'TAX INVOICE')
+    .command(BOLD_OFF);
+  if (invoice.status === 'VOIDED') {
+    receipt.command(SIZE_DOUBLE).command(BOLD_ON).lines(wrap('VOID', half));
+    receipt.command(SIZE_NORMAL).command(BOLD_OFF);
+  }
+  if (options.duplicate) {
+    receipt.command(SIZE_DOUBLE).command(BOLD_ON).lines(wrap('DUPLICATE', half));
+    receipt.command(SIZE_NORMAL).command(BOLD_OFF);
+  }
+
+  receipt.command(ALIGN_LEFT);
+  receipt.line(
+    spread(
+      `No: ${invoice.invoiceNumber}`,
+      invoice.tableLabel === null ? 'Takeaway' : `Table ${invoice.tableLabel}`,
+      width,
+    ),
+  );
+  receipt.line(`Date: ${formatLocal(new Date(invoice.issuedAt), options.timeZone)}`);
+  if (particulars.placeOfSupply !== null) {
+    receipt.line(`Place of supply: ${particulars.placeOfSupply}`);
+  }
+  if (invoice.customer.name !== null)
+    receipt.lines(wrap(`Customer: ${invoice.customer.name}`, width));
+  if (invoice.customer.gstin !== null) receipt.line(`Customer GSTIN: ${invoice.customer.gstin}`);
+  receipt.line('-'.repeat(width));
+
+  for (const line of invoice.lines) {
+    receipt.lines(wrap(line.description, width));
+    receipt.line(
+      spread(`  ${String(line.quantity)} x ${money(line.unitPrice)}`, money(line.lineTotal), width),
+    );
+    if (line.discount > 0) receipt.line(spread('  Discount', `-${money(line.discount)}`, width));
+  }
+  receipt.line('-'.repeat(width));
+  receipt.line(spread('Subtotal', money(invoice.subtotal), width));
+  if (invoice.discountTotal > 0) {
+    receipt.line(spread('Discounts', `-${money(invoice.discountTotal)}`, width));
+  }
+  if (invoice.serviceCharge > 0) {
+    receipt.line(spread('Service charge (voluntary)', money(invoice.serviceCharge), width));
+  }
+  for (const tax of invoice.taxLines) {
+    receipt.line(
+      spread(
+        `${tax.code} @ ${percent(tax.rateBp)} on ${money(tax.taxableValue)}`,
+        money(tax.amount),
+        width,
+      ),
+    );
+  }
+  if (invoice.roundOff !== 0) {
+    receipt.line(
+      spread('Round off', `${invoice.roundOff > 0 ? '+' : ''}${money(invoice.roundOff)}`, width),
+    );
+  }
+  receipt.command(SIZE_TALL).command(BOLD_ON);
+  receipt.line(spread('TOTAL Rs', money(invoice.grandTotal), width));
+  receipt.command(SIZE_NORMAL).command(BOLD_OFF);
+  receipt.line('-'.repeat(width));
+  const sacCodes = [
+    ...new Set(invoice.lines.flatMap((line) => (line.sacCode === null ? [] : [line.sacCode]))),
+  ];
+  if (sacCodes.length > 0) receipt.lines(wrap(`SAC: ${sacCodes.join(', ')}`, width));
+  receipt.command(ALIGN_CENTRE);
+  for (const text of particulars.footerLines) receipt.lines(wrap(text, width));
+  return receipt.finish();
 }
