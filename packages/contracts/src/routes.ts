@@ -45,6 +45,7 @@ import {
   KdsTicketsResponse,
   NotifyManagerResponse,
 } from './kds.js';
+import { PhotoRenditionParams, PhotoView, UploadPhotoRequest } from './photos.js';
 import { CloseDayRequest, DayEndParams, DayEndPreview, DayEndView } from './day-end.js';
 import {
   BindTableRequest,
@@ -1595,6 +1596,46 @@ export const ROUTES = [
     responses: {
       200: { description: 'The current version.', schema: MenuPublishResponse },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'uploadPhoto',
+    method: 'POST',
+    path: '/api/v1/photos',
+    summary: 'Upload a photo for a menu item, the logo or a staff member',
+    description:
+      'MENU-008, SEC-004. At most 5 MB. The content decides the format (JPEG, PNG, WebP or ' +
+      'HEIF/AVIF), not the claimed type; anything else is refused. The image is turned upright, ' +
+      're-encoded to WebP renditions 160, 480 and 960 px wide and stored without EXIF or other ' +
+      'metadata. Choose the photo afterwards on the item, logo or staff record.',
+    tags: ['photos'],
+    requirements: ['MENU-008', 'SEC-004'],
+    capability: 'MENU_MANAGE',
+    request: { body: UploadPhotoRequest },
+    responses: {
+      201: { description: 'The stored photo and its renditions.', schema: PhotoView },
+      ...standardErrors,
+      413: { description: 'Larger than 5 MB, or too many pixels.', schema: ApiError },
+      415: { description: 'Not an image in an accepted format.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getPhotoRendition',
+    method: 'GET',
+    path: '/api/v1/photos/:id/:width',
+    summary: 'One WebP rendition of a photo',
+    description:
+      'MENU-008. Public so that an `<img>` on any screen can load it without a token: menu ' +
+      'photos are shown to guests on the public QR menu anyway, ids are random UUIDs, and the ' +
+      'files hold no metadata. Renditions never change, so they are cached for a year.',
+    tags: ['photos'],
+    requirements: ['MENU-008'],
+    capability: 'PUBLIC',
+    request: { params: PhotoRenditionParams },
+    responses: {
+      200: { description: 'The image (image/webp).' },
+      400: standardErrors[400],
+      404: { description: 'No such photo.', schema: ApiError },
     },
   },
   {

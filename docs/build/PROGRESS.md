@@ -56,7 +56,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-12 POS billing UI (P1-10 and P1-11 done).
 - P1-12b split bill, void and re-issue, day-end screen (P1-12a done).
@@ -102,7 +101,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-02b Table sessions, move table, takeaway tokens, overview
 - [x] P1-03a Draft menu: categories, items, variants, modifier groups
 - [x] P1-03b Combos, availability and stock, menu publishing
-- [ ] P1-04 Menu photos
+- [x] P1-04 Menu photos
 - [ ] P1-05 Excel/CSV menu import
 - [x] P1-06a Order submission and KOTs
 - [x] P1-06b Item status, modify, cancel and void
@@ -498,6 +497,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-04 Menu photos
+
+Built:
+
+- Contracts `photos.ts` (`UploadPhotoRequest`, `PhotoView`, `PhotoRenditionParams`, `photoUrl`)
+  and the routes `uploadPhoto` and `getPhotoRendition`.
+- `apps/server/src/photos/`: processing with `sharp`, the file store, upload, serving, and the
+  daily clean-up. The upload path alone gets a 7 MB JSON limit.
+- Tests:
+  - 5 unit tests: EXIF removed and orientation applied; PNG, WebP and HEIF accepted and never
+    enlarged; SVG, GIF, text and truncated files refused; the size and pixel limits; the store's
+    path checks.
+  - 4 integration tests: upload and serve with headers, refusals, 404 and 400, and the clean-up.
+
+Gotchas: HEVC-compressed HEIC cannot be decoded by prebuilt libvips; the console should convert in
+the browser (P4). The logo is still not printed on bills; ESC/POS raster printing of the logo can
+now use the 160 px rendition.
+
+Decisions: 86 to 89.
 
 ### 2026-09-26: P1-12a POS bill, payment and shift screens
 

@@ -245,6 +245,20 @@ Deliverables: upload endpoint (≤ 5 MB, content-type sniffing), re-encode to We
 caching headers; orphan rendition clean-up job hook for DATA-007.
 Acceptance: tests with JPEG/PNG/HEIC-like fixtures, oversized file rejected, EXIF removed.
 
+As built: `apps/server/src/photos/`, contracts `photos.ts`.
+
+- `POST /api/v1/photos` (`MENU_MANAGE`) takes the image as base64 JSON, so the typed client and
+  validation match every other endpoint.
+- The format is sniffed from the content: JPEG, PNG, WebP and HEIF/AVIF are accepted; SVG, GIF,
+  TIFF and anything else are refused with 415. Files over 5 MB or over 40 megapixels get 413.
+- The image is re-encoded to WebP at 160, 480 and 960 px without metadata.
+  - HEIC photos compressed with HEVC cannot be decoded by the prebuilt libvips (patents), so they
+    are refused with a message asking for JPEG. The console upload (P4 manager UI) should convert
+    them in the browser first.
+- `GET /api/v1/photos/:id/:width` is public and served with `immutable` caching.
+- `PhotosService.purgeUnused` is the DATA-007 hook, run daily.
+- The Control Plane mirror for the QR menu is P5-03.
+
 ## P1-05 Excel/CSV menu import
 
 Goal: onboard a restaurant menu from the vendor template in under an hour.

@@ -20,6 +20,24 @@
   "exceptions": {
     "elkjs": {
       "reason": "EPL-2.0 (weak, file-level copyleft; not GPL/AGPL). Reaches the production tree only through the Prisma CLI (optional peer of @prisma/client), inside Prisma Studio's graph layout. Used unmodified and never launched by the product; EPL obligations apply only to modified EPL files. Added with P0-07; revisit if the Prisma CLI stops bundling Studio or the installer (P0-16) excludes it."
+    },
+    "@img/sharp-libvips-linux-x64": {
+      "reason": "LGPL-3.0-or-later libvips, the image library behind sharp (P1-04 photo re-encoding, MENU-008, SEC-004). Shipped unmodified as a separate prebuilt shared library that sharp loads at run time, so LGPL obligations are met by keeping it replaceable and offering its source (the installer's third-party notices, P0-16). Only the package for the build platform is installed."
+    },
+    "@img/sharp-libvips-linux-arm64": {
+      "reason": "LGPL-3.0-or-later libvips, the image library behind sharp (P1-04 photo re-encoding, MENU-008, SEC-004). Shipped unmodified as a separate prebuilt shared library that sharp loads at run time, so LGPL obligations are met by keeping it replaceable and offering its source (the installer's third-party notices, P0-16). Only the package for the build platform is installed."
+    },
+    "@img/sharp-libvips-darwin-arm64": {
+      "reason": "LGPL-3.0-or-later libvips, the image library behind sharp (P1-04 photo re-encoding, MENU-008, SEC-004). Shipped unmodified as a separate prebuilt shared library that sharp loads at run time, so LGPL obligations are met by keeping it replaceable and offering its source (the installer's third-party notices, P0-16). Only the package for the build platform is installed."
+    },
+    "@img/sharp-libvips-darwin-x64": {
+      "reason": "LGPL-3.0-or-later libvips, the image library behind sharp (P1-04 photo re-encoding, MENU-008, SEC-004). Shipped unmodified as a separate prebuilt shared library that sharp loads at run time, so LGPL obligations are met by keeping it replaceable and offering its source (the installer's third-party notices, P0-16). Only the package for the build platform is installed."
+    },
+    "@img/sharp-win32-x64": {
+      "reason": "LGPL-3.0-or-later libvips, the image library behind sharp (P1-04 photo re-encoding, MENU-008, SEC-004). Shipped unmodified as a separate prebuilt shared library that sharp loads at run time, so LGPL obligations are met by keeping it replaceable and offering its source (the installer's third-party notices, P0-16). Only the package for the build platform is installed."
+    },
+    "@img/sharp-win32-arm64": {
+      "reason": "LGPL-3.0-or-later libvips, the image library behind sharp (P1-04 photo re-encoding, MENU-008, SEC-004). Shipped unmodified as a separate prebuilt shared library that sharp loads at run time, so LGPL obligations are met by keeping it replaceable and offering its source (the installer's third-party notices, P0-16). Only the package for the build platform is installed."
     }
   }
 }

@@ -1,0 +1,23 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "width": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "height": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "bytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "url": { "type": "string" }
+    },
+    "required": ["width", "height", "bytes", "url"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "width": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "height": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "bytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "url": { "type": "string" }
+    },
+    "required": ["width", "height", "bytes", "url"],
+    "additionalProperties": false
+  }
+}

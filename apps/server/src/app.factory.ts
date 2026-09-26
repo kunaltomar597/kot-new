@@ -17,6 +17,8 @@ export const API_PREFIX = 'api/v1';
 /** Options for `https.createServer`, as Nest takes them. */
 type HttpsOptions = NonNullable<NestApplicationOptions['httpsOptions']>;
 const JSON_BODY_LIMIT = '1mb';
+/** A 5 MB photo as base64 is about 6.7 MB of JSON (P1-04); only the upload path gets this. */
+const PHOTO_BODY_LIMIT = '7mb';
 
 /**
  * Options for creating the Nest application. Nest's own body parser is disabled because
@@ -35,6 +37,7 @@ export function configureApp(app: INestApplication): void {
   express.use(caDownloadMiddleware(app.get(TlsService)));
   const { consoleDir } = app.get<AppConfig>(APP_CONFIG);
   if (consoleDir !== undefined) express.use(consoleMiddleware(consoleDir));
+  express.use(`/${API_PREFIX}/photos`, json({ limit: PHOTO_BODY_LIMIT }));
   express.use(json({ limit: JSON_BODY_LIMIT }));
   express.use(bodyParserErrorHandler);
   app.setGlobalPrefix(API_PREFIX);
