@@ -465,7 +465,8 @@ invoice series and invoice particulars endpoints, #19), P1-10a (billing: discoun
 invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-M05), P1-10b
 (invoice void with override, DUPLICATE marking), P1-10c (editing a printed invoice under its
 number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts), P1-13b (who may export which report, CSV formula
-neutralising).
+neutralising), #38 (P1-09a station mode: device-only kitchen access
+in the permission guard).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
