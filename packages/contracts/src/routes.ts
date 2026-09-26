@@ -48,14 +48,20 @@ import {
 import {
   CategoryRequest,
   CategoryView,
+  ComboRequest,
+  ComboView,
+  ItemAvailabilityRequest,
+  ItemAvailabilityView,
   ItemRequest,
   ItemView,
   MenuArchiveRequest,
   MenuDraftResponse,
   MenuEntityParams,
+  MenuPublishResponse,
   ModifierGroupRequest,
   ModifierGroupView,
 } from './menu-admin.js';
+import { MenuSnapshot } from './menu.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
 import {
   AssignSessionWaiterRequest,
@@ -1341,6 +1347,76 @@ export const ROUTES = [
         description: 'It clashes with an active entry, or what it belongs to is archived.',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'setCombo',
+    method: 'PUT',
+    path: '/api/v1/menu/items/:id/combo',
+    summary: 'Make an item a combo, or change its components',
+    description:
+      'A fixed-price bundle of items and choice slots, with an optional date range and time ' +
+      'window (MENU-005). Components must be active items that are not combos. Audited.',
+    tags: ['menu'],
+    requirements: ['MENU-005', 'MGR-005', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { params: MenuEntityParams, body: ComboRequest },
+    responses: {
+      200: { description: 'The combo.', schema: ComboView },
+      ...standardErrors,
+      404: { description: 'No such active item.', schema: ApiError },
+      422: { description: 'A component is unknown, archived or a combo itself.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'setItemAvailability',
+    method: 'PUT',
+    path: '/api/v1/menu/items/:id/availability',
+    summary: 'Mark an item out of stock or available, or set its remaining quantity',
+    description:
+      'Applies at once and reaches every device with ItemAvailabilityChanged (MENU-006). Kitchen ' +
+      'staff may do it unless the stock.kitchenMayManage setting is off (OI-11). Audited.',
+    tags: ['menu'],
+    requirements: ['MENU-006', 'OI-11', 'AUD-001'],
+    capability: 'STOCK_MANAGE',
+    request: { params: MenuEntityParams, body: ItemAvailabilityRequest },
+    responses: {
+      200: { description: 'Availability as it is now.', schema: ItemAvailabilityView },
+      ...standardErrors,
+      404: { description: 'No such active item.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'publishMenu',
+    method: 'POST',
+    path: '/api/v1/menu/publish',
+    summary: 'Publish the draft as a new menu version',
+    description:
+      'Every ordering surface refreshes on MenuPublished (MENU-013). Publishing an unchanged ' +
+      'draft returns the current version. Audited.',
+    tags: ['menu'],
+    requirements: ['MENU-013', 'MENU-012', 'MGR-005', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    responses: {
+      200: { description: 'The current version.', schema: MenuPublishResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getMenu',
+    method: 'GET',
+    path: '/api/v1/menu',
+    summary: 'The published menu with live availability, for every ordering surface',
+    description:
+      'For any paired device, including table tablets (MENU-012, MENU-013). Availability and ' +
+      'stock are current, not as published (MENU-006).',
+    tags: ['menu'],
+    requirements: ['MENU-012', 'MENU-013', 'MENU-006'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The menu.', schema: MenuSnapshot },
+      ...deviceErrors,
+      404: { description: 'No menu has been published yet.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];

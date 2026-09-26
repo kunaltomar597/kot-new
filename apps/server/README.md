@@ -294,6 +294,11 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   - Variants and modifier options are updated by id; dropped ones are archived because order
     items refer to them.
   - Every change writes an audit entry, and price changes use `ITEM_PRICE_CHANGED`.
+- `src/menu/menu-publish.service.ts` (P1-03b):
+  - combos;
+  - live availability and stock, with `decrementStock` for the order engine;
+  - publishing `menu_versions`, with a checksum so an unchanged draft is not published again;
+  - the device-facing menu with live availability.
 
 ## Commands
 

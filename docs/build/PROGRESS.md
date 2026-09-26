@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the draft menu (P1-03a). 330 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03). 337 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu (P1-03a). 485 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03). 493 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -53,8 +53,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-03b Combos, availability and stock, menu publishing (P1-03a done).
-- P1-06 Order engine after P1-03 (P1-02 done).
+- P1-04 Menu photos (P1-03 done).
+- P1-06 Order engine (P1-02 and P1-03 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -94,7 +94,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-02a Floor (sections, tables) and waiter assignment
 - [x] P1-02b Table sessions, move table, takeaway tokens, overview
 - [x] P1-03a Draft menu: categories, items, variants, modifier groups
-- [ ] P1-03b Combos, availability and stock, menu publishing
+- [x] P1-03b Combos, availability and stock, menu publishing
 - [ ] P1-04 Menu photos
 - [ ] P1-05 Excel/CSV menu import
 - [ ] P1-06 Order engine
@@ -270,6 +270,13 @@ Decided 2026-09-26 (P1-03a):
 27. A price change gets its own audit action, `ITEM_PRICE_CHANGED`, so price history can be
     reported on directly (MENU-009).
 
+Decided 2026-09-26 (P1-03b):
+
+28. Availability and stock are live, not drafts. `GET /api/v1/menu` overlays them on the published
+    version, so an item marked out of stock is refused at once without publishing (MENU-006).
+29. A combo cannot contain another combo, and an item used in a combo cannot become one. That
+    keeps kitchen tickets to one level of components (MENU-005).
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -286,6 +293,34 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-03b combos, availability and publishing (P1-03 done)
+
+Built:
+
+- `@rp/contracts`:
+  - combo, availability and publish schemas, and 4 routes;
+  - the snapshot allows six tax components, matching the tax groups;
+  - `setting()` keeps each key as a literal. Before this, `SettingKey` was plain `string` and
+    `SettingValue<K>` resolved to `never`, so typed setting reads were unchecked (P1-01a bug).
+- `apps/server/src/menu/menu-publish.*`:
+  - combos;
+  - live availability and stock (the kitchen per OI-11), with `decrementStock` for P1-06;
+  - publish with checksum and version, `MenuPublished`;
+  - the device menu with live availability.
+- Tests: 1 contract test and 8 integration tests (combo, combo refusals, no menu before
+  publishing, publish and read, the unchanged draft, archived items left out, the kitchen's
+  out-of-stock and live overlay, OI-11 off, the stock countdown to 0).
+
+  Totals: server 493 tests.
+
+Decisions: 28 and 29.
+
+Notes for P1-06:
+
+- Price from the latest published version (`MenuPublishService.current`) and refuse unavailable
+  items (ORD-017).
+- Call `decrementStock` in the order transaction when an order is approved or sent.
 
 ### 2026-09-26: P1-03a draft menu
 

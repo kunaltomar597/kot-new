@@ -1,0 +1,24 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "available": { "type": "boolean" },
+      "stockCount": {
+        "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100000 }, { "type": "null" }]
+      }
+    },
+    "required": ["available", "stockCount"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "available": { "type": "boolean" },
+      "stockCount": {
+        "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100000 }, { "type": "null" }]
+      }
+    },
+    "required": ["available", "stockCount"],
+    "additionalProperties": false
+  }
+}

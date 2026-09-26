@@ -21,9 +21,12 @@ export const SETTING_SCOPES = ['RESTAURANT', 'VENDOR'] as const;
 export const SettingScope = z.enum(SETTING_SCOPES);
 export type SettingScope = z.infer<typeof SettingScope>;
 
-export interface SettingDefinition<Schema extends z.ZodType = z.ZodType> {
+export interface SettingDefinition<
+  Schema extends z.ZodType = z.ZodType,
+  Key extends string = string,
+> {
   /** Stable dotted key, `area.name`, as stored in the settings table. */
-  readonly key: string;
+  readonly key: Key;
   readonly schema: Schema;
   /** The BRD default (or ours when the BRD gives none; the description says so). */
   readonly defaultValue: z.output<Schema>;
@@ -50,9 +53,10 @@ export interface SettingDefinition<Schema extends z.ZodType = z.ZodType> {
     | 'orders';
 }
 
-function setting<Schema extends z.ZodType>(
-  definition: SettingDefinition<Schema>,
-): SettingDefinition<Schema> {
+// `const Key` keeps each key a literal, so `SettingKey` and `SettingValue<K>` are precise.
+function setting<Schema extends z.ZodType, const Key extends string>(
+  definition: SettingDefinition<Schema, Key>,
+): SettingDefinition<Schema, Key> {
   return definition;
 }
 

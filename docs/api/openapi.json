@@ -1251,6 +1251,42 @@
         "x-requirements": ["BILL-003", "AUTH-006", "AUD-001"]
       }
     },
+    "/api/v1/menu": {
+      "get": {
+        "operationId": "getMenu",
+        "summary": "The published menu with live availability, for every ordering surface",
+        "description": "For any paired device, including table tablets (MENU-012, MENU-013). Availability and stock are current, not as published (MENU-006).",
+        "tags": ["menu"],
+        "responses": {
+          "200": {
+            "description": "The menu.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MenuSnapshot" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No menu has been published yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["MENU-012", "MENU-013", "MENU-006"]
+      }
+    },
     "/api/v1/menu/categories": {
       "post": {
         "operationId": "createCategory",
@@ -1755,6 +1791,136 @@
         ]
       }
     },
+    "/api/v1/menu/items/{id}/availability": {
+      "put": {
+        "operationId": "setItemAvailability",
+        "summary": "Mark an item out of stock or available, or set its remaining quantity",
+        "description": "Applies at once and reaches every device with ItemAvailabilityChanged (MENU-006). Kitchen staff may do it unless the stock.kitchenMayManage setting is off (OI-11). Audited.",
+        "tags": ["menu"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ItemAvailabilityRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Availability as it is now.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ItemAvailabilityView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such active item.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STOCK_MANAGE",
+        "x-requirements": ["MENU-006", "OI-11", "AUD-001"]
+      }
+    },
+    "/api/v1/menu/items/{id}/combo": {
+      "put": {
+        "operationId": "setCombo",
+        "summary": "Make an item a combo, or change its components",
+        "description": "A fixed-price bundle of items and choice slots, with an optional date range and time window (MENU-005). Components must be active items that are not combos. Audited.",
+        "tags": ["menu"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ComboRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The combo.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ComboView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such active item.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "A component is unknown, archived or a combo itself.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["MENU-005", "MGR-005", "AUD-001"]
+      }
+    },
     "/api/v1/menu/items/{id}/restore": {
       "post": {
         "operationId": "restoreItem",
@@ -2075,6 +2241,44 @@
         },
         "x-capability": "MENU_MANAGE",
         "x-requirements": ["MENU-004", "MGR-005", "AUD-001"]
+      }
+    },
+    "/api/v1/menu/publish": {
+      "post": {
+        "operationId": "publishMenu",
+        "summary": "Publish the draft as a new menu version",
+        "description": "Every ordering surface refreshes on MenuPublished (MENU-013). Publishing an unchanged draft returns the current version. Audited.",
+        "tags": ["menu"],
+        "responses": {
+          "200": {
+            "description": "The current version.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MenuPublishResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["MENU-013", "MENU-012", "MGR-005", "AUD-001"]
       }
     },
     "/api/v1/orders": {
@@ -3947,6 +4151,142 @@
         "required": ["id", "itemId", "components"],
         "additionalProperties": false
       },
+      "ComboComponentRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "FIXED" },
+              "itemId": { "$ref": "#/components/schemas/Id" },
+              "quantity": { "type": "integer", "minimum": 1, "maximum": 20 }
+            },
+            "required": ["kind", "itemId", "quantity"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "CHOICE" },
+              "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+              "itemIds": {
+                "minItems": 2,
+                "maxItems": 30,
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/Id" }
+              },
+              "quantity": { "type": "integer", "minimum": 1, "maximum": 20 }
+            },
+            "required": ["kind", "label", "itemIds", "quantity"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ComboRequest": {
+        "type": "object",
+        "properties": {
+          "components": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ComboComponentRequest" }
+          },
+          "activeFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "activeUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "timeWindow": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+                  "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                },
+                "required": ["start", "end"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["components", "activeFrom", "activeUntil", "timeWindow"],
+        "additionalProperties": false
+      },
+      "ComboView": {
+        "type": "object",
+        "properties": {
+          "itemId": { "$ref": "#/components/schemas/Id" },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "enum": ["FIXED", "CHOICE"] },
+                "itemId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+                "label": { "type": ["string", "null"] },
+                "itemIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } },
+                "quantity": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["kind", "itemId", "label", "itemIds", "quantity"],
+              "additionalProperties": false
+            }
+          },
+          "activeFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "activeUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "timeWindow": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": { "start": { "type": "string" }, "end": { "type": "string" } },
+                "required": ["start", "end"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["itemId", "components", "activeFrom", "activeUntil", "timeWindow"],
+        "additionalProperties": false
+      },
       "CreatePairingCodeRequest": {
         "type": "object",
         "properties": {
@@ -4340,6 +4680,32 @@
           "businessDate",
           "payload"
         ],
+        "additionalProperties": false
+      },
+      "ItemAvailabilityRequest": {
+        "type": "object",
+        "properties": {
+          "available": { "type": "boolean" },
+          "stockCount": {
+            "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100000 }, { "type": "null" }]
+          }
+        },
+        "required": ["available", "stockCount"],
+        "additionalProperties": false
+      },
+      "ItemAvailabilityView": {
+        "type": "object",
+        "properties": {
+          "itemId": { "$ref": "#/components/schemas/Id" },
+          "available": { "type": "boolean" },
+          "stockCount": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["itemId", "available", "stockCount"],
         "additionalProperties": false
       },
       "ItemRequest": {
@@ -4772,6 +5138,17 @@
           "repeatable",
           "archived"
         ],
+        "additionalProperties": false
+      },
+      "MenuPublishResponse": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "publishedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "checksum": { "type": "string" },
+          "published": { "type": "boolean" }
+        },
+        "required": ["version", "publishedAt", "checksum", "published"],
         "additionalProperties": false
       },
       "MenuPublished": {
@@ -6230,7 +6607,7 @@
           "id": { "$ref": "#/components/schemas/Id" },
           "name": { "type": "string", "minLength": 1, "maxLength": 60 },
           "components": {
-            "maxItems": 5,
+            "maxItems": 6,
             "type": "array",
             "items": {
               "type": "object",

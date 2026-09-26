@@ -216,6 +216,25 @@ As built: `packages/contracts/src/menu-admin.ts` and `apps/server/src/menu`, all
 The rest of P1-03: combos, availability and stock (`STOCK_MANAGE`, `ItemAvailabilityChanged`),
 publishing a `MenuSnapshot` version with `MenuPublished`, and search index data.
 
+As built: `apps/server/src/menu/menu-publish.*`.
+
+- `PUT /api/v1/menu/items/:id/combo` (`MENU_MANAGE`): fixed items and choice slots, with an
+  optional date range and time window. Parts must be active items that are not combos, and a
+  combo part cannot become a combo.
+- `PUT /api/v1/menu/items/:id/availability` (`STOCK_MANAGE`; the kitchen only while
+  `stock.kitchenMayManage` is on):
+  - out of stock or available, and an optional count;
+  - a count of 0 means unavailable, and null stops counting;
+  - live at once, with `ItemAvailabilityChanged`.
+- `MenuPublishService.decrementStock` is for the order engine: it takes stock off in the order's
+  transaction and switches the item off at 0.
+- `POST /api/v1/menu/publish` builds a `MenuSnapshot` from active entries and stores it as the
+  next version with a checksum. It emits `MenuPublished`; an unchanged draft is not published
+  again.
+- `GET /api/v1/menu` gives any paired device the latest version with live availability overlaid.
+- Search data: the item names, synonyms and tags in the snapshot. Fuzzy search runs on the
+  clients (P1-08).
+
 ## P1-04 Menu photos (local)
 
 Goal: photos stored locally, resized, served to devices.
