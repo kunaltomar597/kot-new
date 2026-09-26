@@ -1,9 +1,13 @@
-import { Controller, Get, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
 import {
   type GstSummaryResponse,
   type InvoiceRegisterResponse,
   type ItemSalesResponse,
+  OrderDrillDownParams,
+  type OrderDrillDownResponse,
   type PaymentModesResponse,
+  ReportExportRequest,
+  type ReportExportResponse,
   ReportRangeQuery,
   type SalesSummaryResponse,
   type ShiftReportResponse,
@@ -12,6 +16,8 @@ import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { OrderDrillDownService } from './order-drill-down.service.js';
+import { ReportExportService } from './report-export.service.js';
 import { ReportsService } from './reports.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
@@ -30,7 +36,11 @@ function restaurantOf(request: AuthenticatedRequest): string {
 
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly exports: ReportExportService,
+    private readonly drillDowns: OrderDrillDownService,
+  ) {}
 
   @Get('sales')
   @RequireCapability('REPORTS_VIEW_EXPORT')
@@ -86,5 +96,29 @@ export class ReportsController {
     @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
   ): Promise<InvoiceRegisterResponse> {
     return this.reports.register(restaurantOf(request), range);
+  }
+
+  /** RPT-017: a stamped, audited CSV. Cashiers may export their own shift report only. */
+  @Post('exports')
+  @HttpCode(200)
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  export(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(ReportExportRequest)) body: ReportExportRequest,
+  ): Promise<ReportExportResponse> {
+    const principal = principalOf(request);
+    const own = request.ownershipRequired === true;
+    if (own && body.report !== 'SHIFTS') throw authErrors.forbidden();
+    return this.exports.export(principal, body, own ? principal.staffId : null);
+  }
+
+  /** RPT-015: one order and who did each step. */
+  @Get('orders/:orderId')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  drillDown(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderDrillDownParams)) params: OrderDrillDownParams,
+  ): Promise<OrderDrillDownResponse> {
+    return this.drillDowns.drillDown(restaurantOf(request), params.orderId);
   }
 }

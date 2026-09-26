@@ -12,13 +12,13 @@ What exists:
 
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
-  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment, bill splitting, payments and shift cash, the Z-report, report aggregation.
-  134 tests.
+  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment, bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export.
+  140 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a); day-end (P1-11b); reports (P1-13a). 424 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down (P1-13). 430 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills (P1-10d); shifts, cash and payments with table settlement (P1-11a); day-end with the Z-report and carry-forward (P1-11b); the core reports (P1-13a). 583 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills (P1-10d); shifts, cash and payments with table settlement (P1-11a); day-end with the Z-report and carry-forward (P1-11b); the core reports, stamped and audited CSV export and the order drill-down (P1-13). 588 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -56,7 +56,8 @@ Recommended next WPs (dependencies met):
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-12 POS billing UI (P1-10 and P1-11 done).
-- P1-13b CSV export and order drill-down (P1-13a done).
+- P1-08 POS UI: tables and order entry (P1-02, P1-06 done).
+- P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -113,7 +114,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-11b Day-end and Z-report
 - [ ] P1-12 POS billing UI
 - [x] P1-13a Report data
-- [ ] P1-13b CSV export and order drill-down
+- [x] P1-13b CSV export and order drill-down
 - [ ] P1-14 Phase 1 exit test
 
 ### Phase 2: Waiter app, notifications, pagers
@@ -401,6 +402,20 @@ Decided 2026-09-26 (P1-13a):
 64. Cashiers see only the shift report of their own shifts (§4.2 "own shift"). Other reports are
     for the Owner and managers.
 
+Decided 2026-09-26 (P1-13b):
+
+65. An export returns the CSV inside JSON (`filename`, `contentType`, `content`), so the typed client
+    handles it like any other call; the console saves it as a file. It is a POST because every
+    export writes an audit entry (REPORT_EXPORTED with the report, range and row count).
+66. CSV amounts are plain rupees with two decimals and no grouping ("1234.50"), so spreadsheets
+    sum them; storage and the JSON reports stay in paise. Text that a spreadsheet would run as a
+    formula (starting with =, +, -, @, tab or CR) is prefixed with an apostrophe.
+67. Cashiers may export only their own shift report, like viewing it (decision 64). The order
+    drill-down is for the Owner and managers.
+68. The first print of a bill is now audited too (INVOICE_PRINTED; reprints stay
+    INVOICE_REPRINTED), so the drill-down can say who printed it. A table's bill covers all its
+    orders, so its invoices appear on the drill-down of each of those orders.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -412,7 +427,8 @@ including the Owner's second factor for tax and data settings), P1-01b (the Owne
 invoice series and invoice particulars endpoints, #19), P1-10a (billing: discounts, overrides,
 invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-M05), P1-10b
 (invoice void with override, DUPLICATE marking), P1-10c (editing a printed invoice under its
-number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts).
+number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts), P1-13b (who may export which report, CSV formula
+neutralising).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -420,6 +436,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-13b CSV export and order drill-down (P1-13 done)
+
+Built:
+
+- `@rp/domain` `csv.ts`: `csvCell` (RFC 4180 quoting and formula neutralising), `toCsv`,
+  `csvRupees` and `stampedCsv` (the RPT-017 stamp: title, restaurant, filters, generated by and
+  at, then the sections).
+- `@rp/contracts`: `ReportKind`, `ReportExportRequest` and `ReportExportResponse`,
+  `OrderDrillDownParams` and `OrderDrillDownResponse`; routes `POST /api/v1/reports/exports` and
+  `GET /api/v1/reports/orders/:orderId`.
+- `ReportExportService`: the six reports as CSV, built from the same `ReportsService` figures,
+  audited as REPORT_EXPORTED.
+- `OrderDrillDownService`: the order with its creator and device, approvals, items with status
+  times, KOTs, the order history, audited actions on the order, items, bill and invoices, and who
+  issued, printed, settled or voided each invoice.
+- The first bill print is audited (INVOICE_PRINTED).
+- Tests: 6 domain, 1 contract (plus schema snapshots), 5 integration (the stamp and figures of the
+  sales, GST and register exports; the cashier's own shift export and refusals; the takeaway
+  drill-down through void and re-issue; who printed a table bill; 403 and 404).
+
+  Totals: domain 140 tests, contracts 430, server 588.
+
+Deferred: PDF and Excel exports (P4-06 per phase-4), the drill-down UI (P4 dashboard).
+
+Decisions: 65 to 68.
 
 ### 2026-09-26: P1-13a report data
 

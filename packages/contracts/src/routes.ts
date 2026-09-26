@@ -87,6 +87,10 @@ import {
   InvoiceRegisterResponse,
   ItemSalesResponse,
   PaymentModesResponse,
+  OrderDrillDownParams,
+  OrderDrillDownResponse,
+  ReportExportRequest,
+  ReportExportResponse,
   ReportRangeQuery,
   SalesSummaryResponse,
   ShiftReportResponse,
@@ -2248,6 +2252,39 @@ export const ROUTES = [
     responses: {
       200: { description: 'The report.', schema: InvoiceRegisterResponse },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'exportReport',
+    method: 'POST',
+    path: '/api/v1/reports/exports',
+    summary: 'Export a report as CSV, stamped and audited',
+    description:
+      'The file starts with the restaurant, the report, its filters, who generated it and when ' +
+      '(RPT-017); every export is audited as REPORT_EXPORTED. Cashiers may export their own shift ' +
+      'report only. Amounts are plain rupees with two decimals.',
+    tags: ['reports'],
+    requirements: ['RPT-017', 'AUD-001'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { body: ReportExportRequest },
+    responses: {
+      200: { description: 'The exported file.', schema: ReportExportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getOrderDrillDown',
+    method: 'GET',
+    path: '/api/v1/reports/orders/:orderId',
+    summary: 'Everything about one order and who did each step',
+    tags: ['reports'],
+    requirements: ['RPT-015'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { params: OrderDrillDownParams },
+    responses: {
+      200: { description: 'The order and its history.', schema: OrderDrillDownResponse },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];
