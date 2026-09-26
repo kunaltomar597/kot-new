@@ -54,3 +54,29 @@ describe('[MENU-004] [MENU-001] groups and categories', () => {
     ).toBe(true);
   });
 });
+
+describe('[MENU-005] [MENU-006] combos and availability', () => {
+  it('needs two or more items in a choice slot and a range that starts before it ends', async () => {
+    const { ComboRequest, ItemAvailabilityRequest } = await import('../src/index.js');
+    const combo = {
+      components: [{ kind: 'CHOICE', label: 'Drink', itemIds: [id(1), id(2)], quantity: 1 }],
+      activeFrom: null,
+      activeUntil: null,
+      timeWindow: null,
+    };
+    expect(ComboRequest.safeParse(combo).success).toBe(true);
+    expect(
+      ComboRequest.safeParse({
+        ...combo,
+        components: [{ kind: 'CHOICE', label: 'Drink', itemIds: [id(1)], quantity: 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      ComboRequest.safeParse({ ...combo, activeFrom: '2026-10-02', activeUntil: '2026-10-01' })
+        .success,
+    ).toBe(false);
+    expect(ItemAvailabilityRequest.safeParse({ available: true, stockCount: -1 }).success).toBe(
+      false,
+    );
+  });
+});

@@ -13,7 +13,7 @@ import {
 export const TaxGroup = z.object({
   id: Id,
   name: z.string().min(1).max(60),
-  components: z.array(z.object({ code: z.string().min(1).max(20), rateBp: BasisPoints })).max(5),
+  components: z.array(z.object({ code: z.string().min(1).max(20), rateBp: BasisPoints })).max(6),
 });
 export type TaxGroup = z.infer<typeof TaxGroup>;
 

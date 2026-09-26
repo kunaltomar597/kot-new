@@ -211,3 +211,93 @@ export type MenuArchiveRequest = z.infer<typeof MenuArchiveRequest>;
 
 export const MenuEntityParams = z.strictObject({ id: Id });
 export type MenuEntityParams = z.infer<typeof MenuEntityParams>;
+
+// ---------------------------------------------------------------- combos (P1-03b)
+
+/** One part of a combo: a fixed item, or a choice among items ("any 1 beverage"). */
+export const ComboComponentRequest = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('FIXED'),
+    itemId: Id,
+    quantity: z.int().min(1).max(20),
+  }),
+  z.strictObject({
+    kind: z.literal('CHOICE'),
+    label: Name(60),
+    itemIds: z.array(Id).min(2).max(30),
+    quantity: z.int().min(1).max(20),
+  }),
+]);
+export type ComboComponentRequest = z.infer<typeof ComboComponentRequest>;
+
+/** MENU-005: the item becomes a fixed-price bundle; its own price is the combo price. */
+export const ComboRequest = z
+  .strictObject({
+    components: z.array(ComboComponentRequest).min(1).max(10),
+    /** Optional date range for festivals or seasonal promotions. */
+    activeFrom: z.iso.date().nullable(),
+    activeUntil: z.iso.date().nullable(),
+    /** Optional daily window, local time; end before start runs past midnight. */
+    timeWindow: z
+      .strictObject({
+        start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+        end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+      })
+      .nullable(),
+    reason: Reason.optional(),
+  })
+  .refine(
+    (combo) =>
+      combo.activeFrom === null ||
+      combo.activeUntil === null ||
+      combo.activeFrom <= combo.activeUntil,
+    { message: 'The combo must start before it ends', path: ['activeUntil'] },
+  );
+export type ComboRequest = z.infer<typeof ComboRequest>;
+
+export const ComboView = z.object({
+  itemId: Id,
+  components: z.array(
+    z.object({
+      kind: z.enum(['FIXED', 'CHOICE']),
+      itemId: Id.nullable(),
+      label: z.string().nullable(),
+      itemIds: z.array(Id),
+      quantity: z.int().positive(),
+    }),
+  ),
+  activeFrom: z.iso.date().nullable(),
+  activeUntil: z.iso.date().nullable(),
+  timeWindow: z.object({ start: z.string(), end: z.string() }).nullable(),
+});
+export type ComboView = z.infer<typeof ComboView>;
+
+// ---------------------------------------------------------------- availability (P1-03b)
+
+/**
+ * MENU-006: mark an item available or out of stock, and optionally count its stock. A count of
+ * 0 makes it unavailable; null stops counting. Applies at once, without publishing.
+ */
+export const ItemAvailabilityRequest = z.strictObject({
+  available: z.boolean(),
+  stockCount: z.int().min(0).max(100_000).nullable(),
+});
+export type ItemAvailabilityRequest = z.infer<typeof ItemAvailabilityRequest>;
+
+export const ItemAvailabilityView = z.object({
+  itemId: Id,
+  available: z.boolean(),
+  stockCount: z.int().nonnegative().nullable(),
+});
+export type ItemAvailabilityView = z.infer<typeof ItemAvailabilityView>;
+
+// ---------------------------------------------------------------- publishing (P1-03b)
+
+export const MenuPublishResponse = z.object({
+  version: z.int().positive(),
+  publishedAt: Timestamp,
+  checksum: z.string(),
+  /** False when the draft matched the current version, so nothing new was published. */
+  published: z.boolean(),
+});
+export type MenuPublishResponse = z.infer<typeof MenuPublishResponse>;
