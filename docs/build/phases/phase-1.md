@@ -925,3 +925,25 @@ discounts, split bills, reprints and a move table, closes the day, then checks i
 summary, Z-report and that the audit chain verifies. A script to run the same scenario against a
 real install on the lab rig.
 Acceptance: the test passes in CI; results summarised in PROGRESS.md.
+
+As built:
+
+- `apps/server/test/scenario/service-day.ts` (`runServiceDay`) drives the day through
+  `@rp/api-client`, as the POS does. It uses two paired terminals: the manager (kitchen steps,
+  approvals, day-end, reports) and the cashier (orders, bills, payments, shift). Every random choice
+  comes from a seed, so a run repeats exactly.
+- `service-day-suite.ts` runs it and checks:
+  - invoice numbers have no gaps in any series, and cancelled invoices keep their numbers and
+    reasons;
+  - nothing is left unpaid;
+  - the Z-report agrees with the settled invoices and payments (in total, and in cash per shift);
+  - the GST summary agrees with the register and adds up by component;
+  - the shift variance is zero;
+  - the audit chain verifies.
+- CI: `test/integration/service-day.int.test.ts` runs it against a throwaway server with the demo
+  seed and a loopback printer that accepts every job (about 25 s).
+- Lab rig: `pnpm --filter @rp/server scenario:service-day` with `RP_SCENARIO_URL` and friends. It
+  runs the same suite against a real install and needs no database on the machine running it.
+- The UI side of the same flows (floor, order entry, KDS, bill with an approved discount, split
+  bill paid within a minute) is in the console Playwright suite. The exit scenario covers volume
+  and the books.

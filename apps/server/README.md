@@ -399,6 +399,16 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   REPORT_EXPORTED.
 - `src/reports/order-drill-down.service.ts` (P1-13b): one order and who did each step (RPT-015).
 
+## Phase 1 exit scenario (P1-14)
+
+- `test/scenario/service-day.ts` runs a seeded service day of about 100 orders through
+  `@rp/api-client`.
+- `service-day-suite.ts` checks the books afterwards: invoice numbering, the Z-report, the GST
+  summary, the shift and the audit chain.
+- In CI it runs as `test/integration/service-day.int.test.ts`. Against a real install:
+  `RP_SCENARIO_URL=... pnpm --filter @rp/server scenario:service-day`. See
+  `test/scenario/real-install.scenario.test.ts` for the variables.
+
 ## Commands
 
 ```
