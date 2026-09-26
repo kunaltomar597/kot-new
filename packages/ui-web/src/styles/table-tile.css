@@ -1,0 +1,80 @@
+.rp-table-tile {
+  --rp-tone-solid: var(--rp-color-neutral);
+  --rp-tone-subtle: var(--rp-color-neutral-subtle);
+  --rp-tone-text: var(--rp-color-neutral-text);
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--rp-space-1);
+  min-width: calc(var(--rp-touch-target) * 3);
+  min-height: calc(var(--rp-touch-target) * 2);
+  padding: var(--rp-space-3) var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-inline-start: 6px solid var(--rp-tone-solid);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+  color: var(--rp-color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rp-table-tile[data-tone='info'] {
+  --rp-tone-solid: var(--rp-color-info);
+  --rp-tone-subtle: var(--rp-color-info-subtle);
+  --rp-tone-text: var(--rp-color-info-text);
+}
+
+.rp-table-tile[data-tone='success'] {
+  --rp-tone-solid: var(--rp-color-success);
+  --rp-tone-subtle: var(--rp-color-success-subtle);
+  --rp-tone-text: var(--rp-color-success-text);
+}
+
+.rp-table-tile[data-tone='warning'] {
+  --rp-tone-solid: var(--rp-color-warning);
+  --rp-tone-subtle: var(--rp-color-warning-subtle);
+  --rp-tone-text: var(--rp-color-warning-text);
+}
+
+.rp-table-tile:hover:not(:disabled) {
+  background: var(--rp-tone-subtle);
+}
+
+.rp-table-tile[aria-pressed='true'] {
+  border-color: var(--rp-tone-solid);
+  box-shadow: 0 0 0 2px var(--rp-tone-solid);
+}
+
+.rp-table-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.rp-table-tile__label {
+  font-size: var(--rp-font-size-xl);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.rp-table-tile__state,
+.rp-table-tile__alert {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rp-space-1);
+  color: var(--rp-tone-text);
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.rp-table-tile__alert {
+  color: var(--rp-color-warning-text);
+}
+
+.rp-table-tile__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-1) var(--rp-space-3);
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}

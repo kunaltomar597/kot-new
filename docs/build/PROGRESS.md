@@ -39,7 +39,8 @@ What exists:
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
-  local server, with a Playwright end-to-end test in CI (P0-14b).
+  local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
+  move table (P1-08a).
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -56,7 +57,7 @@ Recommended next WPs (dependencies met):
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-12 POS billing UI (P1-10 and P1-11 done).
-- P1-08 POS UI: tables and order entry (P1-02, P1-06 done).
+- P1-08b POS order entry: menu, item picker, cart, send KOT, takeaway (P1-08a done).
 - P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -104,7 +105,8 @@ Recommended next WPs (dependencies met):
 - [x] P1-06b Item status, modify, cancel and void
 - [x] P1-07a Stations, printers, ticket rendering and test print
 - [x] P1-07b Print queue, offline alert, redirect and reprint
-- [ ] P1-08 POS UI: tables and order entry
+- [x] P1-08a POS floor: live table overview, open and move table
+- [ ] P1-08b POS order entry, send KOT, takeaway, live item status
 - [ ] P1-09 KDS UI
 - [x] P1-10a Bill preview, discounts and invoice issue
 - [x] P1-10b Bill printing, reprint and void
@@ -416,6 +418,14 @@ Decided 2026-09-26 (P1-13b):
     INVOICE_REPRINTED), so the drill-down can say who printed it. A table's bill covers all its
     orders, so its invoices appear on the drill-down of each of those orders.
 
+Decided 2026-09-26 (P1-08a):
+
+69. The POS floor reads the table overview again after any table, order, bill or service-request
+    event (debounced) and when the connection comes back, instead of patching tiles from event
+    payloads: one read is cheap on the LAN and the screen always matches the server.
+70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
+    the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -436,6 +446,31 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-08a POS floor
+
+P1-08 was split into P1-08a (this) and P1-08b (order entry, send KOT, takeaway, live status).
+
+Built:
+
+- `@rp/ui-web` `TableTile` with `TABLE_STATE_STYLES` (tone and icon per table state; a button whose
+  accessible name reads label, state, guests, time, waiter, amount and alert) and three icons.
+- `apps/console`:
+  - `ConsoleController.api` for screens;
+  - `src/pos/`: `floor-view.ts` (sections in display order, seated time, tile facts, which
+    events refresh), `use-floor.ts` (live reads), `TableOverview`, `OpenTableDialog` (guests pad,
+    optional waiter), `MoveTableDialog` (free tables only);
+  - POS strings in `@rp/i18n`.
+- Tests:
+  - 3 ui-web and 4 floor-view unit tests;
+  - 7 screen tests against the fake server (sections and tile facts, live refresh on an event,
+    opening with a chosen waiter, a refused open, moving, mode guard, retry);
+  - a Playwright test on the real server: open table 1 for 2 guests, move it to 7.
+- The console test setup moved to `test/harness.tsx`.
+
+Next: P1-08b builds order entry on the table details sheet.
+
+Decisions: 69 and 70.
 
 ### 2026-09-26: P1-13b CSV export and order drill-down (P1-13 done)
 

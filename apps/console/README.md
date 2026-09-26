@@ -25,6 +25,9 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
 - Storage (`src/app/storage.ts`): the key pair (as a key object), device token and device summary
   in IndexedDB; the session in `sessionStorage` (this tab only, so a shared terminal never reopens
   signed in); the resume point in `localStorage`.
+- POS floor (`/pos`, P1-08a, TBL-007): `src/pos/` shows every table by section with its state,
+  guests, time seated, waiter and amount so far, and reads the overview again after table, order
+  and bill events. A free table opens (guests, optional waiter); an occupied one moves.
 - `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
   screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
 
