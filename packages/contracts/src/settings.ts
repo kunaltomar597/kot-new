@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NotificationEventType } from './alerts.js';
 import { Capability } from './auth.js';
 import { Timestamp } from './common.js';
 
@@ -61,6 +62,47 @@ function setting<Schema extends z.ZodType, const Key extends string>(
 }
 
 const int = (min: number, max: number) => z.int().min(min).max(max);
+
+/** NTF-002: a manager's changes to the Appendix C rules; anything left out keeps the default. */
+const NotificationRuleOverrides = z.partialRecord(
+  NotificationEventType,
+  z.strictObject({
+    recipients: z
+      .array(
+        z.enum([
+          'RESPONSIBLE_WAITER',
+          'SECTION_WAITERS',
+          'ALL_WAITERS',
+          'MANAGERS_ON_DUTY',
+          'CASHIER',
+          'STATION',
+          'OWNER',
+          'WEARER',
+          'SELECTED',
+        ]),
+      )
+      .min(1)
+      .optional(),
+    channels: z
+      .array(
+        z.enum([
+          'PAGER',
+          'WAITER_APP',
+          'POS',
+          'DASHBOARD',
+          'KDS',
+          'TABLET',
+          'PRINTED_SLIP',
+          'CONTROL_PLANE',
+        ]),
+      )
+      .min(1)
+      .optional(),
+    pagerText: z.string().trim().min(1).max(20).nullable().optional(),
+    escalate: z.boolean().optional(),
+    repeat: z.enum(['UNTIL_ACKED', 'NONE', 'ONCE_PER_STATE', 'UNTIL_RESOLVED', 'DAILY']).optional(),
+  }),
+);
 /** `HH:MM`, 24-hour clock. */
 export const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 /** A daily window; `end` before `start` means it runs past midnight. */
@@ -357,6 +399,16 @@ export const SETTINGS = [
     description: 'R: an unacknowledged alert or service request alerts again this often.',
     requirements: ['NTF-002', 'TAB-004', 'OI-02'],
     unit: 'seconds',
+  }),
+  setting({
+    key: 'notifications.rules',
+    schema: NotificationRuleOverrides,
+    defaultValue: {},
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Changes to the factory notification rules (Appendix C), per event: recipients, channels, pager text, escalation and repeat.',
+    requirements: ['NTF-002', 'NTF-003'],
   }),
   setting({
     key: 'kds.ageAmberMinutes',

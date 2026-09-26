@@ -369,6 +369,12 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     return { streamId, head, replayed, fullRefresh: false };
   }
 
+  /** Whether the person has a live connection now, e.g. the waiter app (NTF-007). */
+  isStaffConnected(restaurantId: string, staffId: string): boolean {
+    const room = this.namespace?.adapter.rooms.get(rooms.staff(restaurantId, staffId));
+    return room !== undefined && room.size > 0;
+  }
+
   /** Live listener: each published event goes to its rooms (ORD-010). */
   private broadcast(events: readonly PublishedEvent[]): void {
     const namespace = this.namespace;

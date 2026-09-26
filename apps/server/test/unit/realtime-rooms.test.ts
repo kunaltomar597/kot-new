@@ -330,6 +330,20 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { invoiceId: id(), grandTotal: 100 });
     case 'AlertEscalated':
       return domainEvent(type, rid, { alertId: id(), eventType: 'X', escalatedTo: [] });
+    case 'AlertRaised':
+      return domainEvent(type, rid, {
+        alertId: id(),
+        eventType: 'ITEM_READY',
+        recipients: [id()],
+        pagerText: 'T7 READY',
+        tableId: null,
+        repeat: 0,
+        escalated: false,
+      });
+    case 'AlertAcknowledged':
+      return domainEvent(type, rid, { alertId: id(), acknowledgedBy: null, recipients: [] });
+    case 'AlertCleared':
+      return domainEvent(type, rid, { alertId: id(), recipients: [] });
     case 'DeviceStatusChanged':
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', online: true });
     case 'DeviceRevoked':

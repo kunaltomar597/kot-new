@@ -1,0 +1,38 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "ORDER_PENDING_APPROVAL",
+      "ITEM_READY",
+      "WATER_REQUEST",
+      "WAITER_REQUEST",
+      "BILL_REQUEST",
+      "READY_NOT_COLLECTED",
+      "MANAGER_NUDGE",
+      "ORDER_CHANGED",
+      "WAITER_UNREACHABLE",
+      "DEVICE_LOW_BATTERY_OR_OFFLINE",
+      "PRINTER_OFFLINE",
+      "DISK_OR_BACKUP",
+      "LICENSE_STATE"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "ORDER_PENDING_APPROVAL",
+      "ITEM_READY",
+      "WATER_REQUEST",
+      "WAITER_REQUEST",
+      "BILL_REQUEST",
+      "READY_NOT_COLLECTED",
+      "MANAGER_NUDGE",
+      "ORDER_CHANGED",
+      "WAITER_UNREACHABLE",
+      "DEVICE_LOW_BATTERY_OR_OFFLINE",
+      "PRINTER_OFFLINE",
+      "DISK_OR_BACKUP",
+      "LICENSE_STATE"
+    ]
+  }
+}

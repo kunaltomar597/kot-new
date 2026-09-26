@@ -1156,11 +1156,30 @@ model Alert {
   payload          Json        @default("{}")
   acknowledgedAt   DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
   acknowledgedById String?     @map("acknowledged_by_id") @db.Uuid
+  /// The table session or order the alert is about (P2-03).
+  tableSessionId   String?     @map("table_session_id") @db.Uuid
+  orderId          String?     @map("order_id") @db.Uuid
+  /// One open alert per cause, e.g. "bill:<sessionId>": a repeated trigger does not stack alerts.
+  dedupeKey        String?     @map("dedupe_key")
+  /// Who is alerted now (the escalation adds the managers on duty).
+  recipientIds     String[]    @default([]) @map("recipient_ids") @db.Uuid
+  channels         String[]    @default([])
+  pagerText        String?     @map("pager_text")
+  /// Persisted deadlines, so repeats and escalation survive a restart (P2-03).
+  escalateAt       DateTime?   @map("escalate_at") @db.Timestamptz(3)
+  nextRepeatAt     DateTime?   @map("next_repeat_at") @db.Timestamptz(3)
+  escalatedAt      DateTime?   @map("escalated_at") @db.Timestamptz(3)
+  escalatedTo      String[]    @default([]) @map("escalated_to") @db.Uuid
+  repeatCount      Int         @default(0) @map("repeat_count")
+  clearedAt        DateTime?   @map("cleared_at") @db.Timestamptz(3)
   createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId, status])
   @@index([kotId])
+  @@index([status, escalateAt])
+  @@index([status, nextRepeatAt])
+  @@index([restaurantId, dedupeKey])
   @@map("alerts")
 }
 

@@ -106,6 +106,21 @@ channels:
     messages:
       AlertEscalated:
         $ref: '#/components/messages/AlertEscalated'
+  AlertRaised:
+    address: AlertRaised
+    messages:
+      AlertRaised:
+        $ref: '#/components/messages/AlertRaised'
+  AlertAcknowledged:
+    address: AlertAcknowledged
+    messages:
+      AlertAcknowledged:
+        $ref: '#/components/messages/AlertAcknowledged'
+  AlertCleared:
+    address: AlertCleared
+    messages:
+      AlertCleared:
+        $ref: '#/components/messages/AlertCleared'
   DeviceStatusChanged:
     address: DeviceStatusChanged
     messages:
@@ -252,6 +267,24 @@ operations:
       $ref: '#/channels/AlertEscalated'
     messages:
       - $ref: '#/channels/AlertEscalated/messages/AlertEscalated'
+  receiveAlertRaised:
+    action: receive
+    channel:
+      $ref: '#/channels/AlertRaised'
+    messages:
+      - $ref: '#/channels/AlertRaised/messages/AlertRaised'
+  receiveAlertAcknowledged:
+    action: receive
+    channel:
+      $ref: '#/channels/AlertAcknowledged'
+    messages:
+      - $ref: '#/channels/AlertAcknowledged/messages/AlertAcknowledged'
+  receiveAlertCleared:
+    action: receive
+    channel:
+      $ref: '#/channels/AlertCleared'
+    messages:
+      - $ref: '#/channels/AlertCleared/messages/AlertCleared'
   receiveDeviceStatusChanged:
     action: receive
     channel:
@@ -404,6 +437,24 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/AlertEscalated'
+    AlertRaised:
+      name: AlertRaised
+      title: AlertRaised v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AlertRaised'
+    AlertAcknowledged:
+      name: AlertAcknowledged
+      title: AlertAcknowledged v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AlertAcknowledged'
+    AlertCleared:
+      name: AlertCleared
+      title: AlertCleared v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/AlertCleared'
     DeviceStatusChanged:
       name: DeviceStatusChanged
       title: DeviceStatusChanged v1
@@ -435,6 +486,99 @@ components:
       payload:
         $ref: '#/components/schemas/RestaurantChanged'
   schemas:
+    AlertAcknowledged:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: AlertAcknowledged
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            alertId:
+              $ref: '#/components/schemas/Id'
+            acknowledgedBy:
+              anyOf:
+                - $ref: '#/components/schemas/Id'
+                - type: 'null'
+            recipients:
+              type: array
+              items:
+                $ref: '#/components/schemas/Id'
+          required:
+            - alertId
+            - acknowledgedBy
+            - recipients
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    AlertCleared:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: AlertCleared
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            alertId:
+              $ref: '#/components/schemas/Id'
+            recipients:
+              type: array
+              items:
+                $ref: '#/components/schemas/Id'
+          required:
+            - alertId
+            - recipients
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
     AlertEscalated:
       type: object
       properties:
@@ -472,6 +616,71 @@ components:
             - alertId
             - eventType
             - escalatedTo
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    AlertRaised:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: AlertRaised
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            alertId:
+              $ref: '#/components/schemas/Id'
+            eventType:
+              type: string
+            recipients:
+              type: array
+              items:
+                $ref: '#/components/schemas/Id'
+            pagerText:
+              type:
+                - string
+                - 'null'
+            tableId:
+              anyOf:
+                - $ref: '#/components/schemas/Id'
+                - type: 'null'
+            repeat:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            escalated:
+              type: boolean
+          required:
+            - alertId
+            - eventType
+            - recipients
+            - pagerText
+            - tableId
+            - repeat
+            - escalated
           additionalProperties: false
       required:
         - eventId

@@ -260,7 +260,7 @@ describe('[KDS-005] [KDS-006] [KDS-007] kitchen steps, bump, recall and notify m
     expect(alert.payload).toMatchObject({ tableLabel: 'T1', items: ['Dal'] });
     expect(
       await prisma.outboxEvent.count({
-        where: { eventType: 'AlertEscalated', aggregateId: raised.alertId },
+        where: { eventType: 'AlertRaised', aggregateId: raised.alertId },
       }),
     ).toBe(1);
     expect((await kitchenTicket()).managerNotified).toBe(true);

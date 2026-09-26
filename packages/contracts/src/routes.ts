@@ -1,5 +1,6 @@
 import type { Capability } from '@rp/domain';
 import { z } from 'zod';
+import { AlertListResponse, AlertParams, AlertView } from './alerts.js';
 import { AuditVerifyResponse } from './audit.js';
 import {
   BillCustomerRequest,
@@ -1692,6 +1693,40 @@ export const ROUTES = [
       200: { description: 'The image (image/webp).' },
       400: standardErrors[400],
       404: { description: 'No such photo.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listAlerts',
+    method: 'GET',
+    path: '/api/v1/alerts',
+    summary: 'Open alerts for the signed-in person',
+    description:
+      'NTF-006: a device fetches this on start and after reconnecting, so no alert is missed. ' +
+      'Managers and the Owner see every open alert of the restaurant.',
+    tags: ['notifications'],
+    requirements: ['NTF-001', 'NTF-006'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'Open alerts, oldest first.', schema: AlertListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'acknowledgeAlert',
+    method: 'POST',
+    path: '/api/v1/alerts/:alertId/acknowledge',
+    summary: 'Acknowledge an alert, which stops its repeats and escalation everywhere',
+    description:
+      'NTF-004: a recipient, a manager or the Owner. Acknowledging again returns the alert as it ' +
+      'is. The time is kept for reports.',
+    tags: ['notifications'],
+    requirements: ['NTF-004', 'NTF-005'],
+    capability: 'SESSION',
+    request: { params: AlertParams },
+    responses: {
+      200: { description: 'The alert.', schema: AlertView },
+      ...standardErrors,
+      404: { description: 'No such alert, or not one for you.', schema: ApiError },
     },
   },
   {

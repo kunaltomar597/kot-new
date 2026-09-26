@@ -90,6 +90,10 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   BillPrinted: 'BILL_REQUEST',
   BillSettled: 'BILL_REQUEST',
   AlertEscalated: 'MANAGERS',
+  // Managers see every alert on the dashboard; recipients hear theirs through their own rooms.
+  AlertRaised: 'MANAGERS',
+  AlertAcknowledged: 'MANAGERS',
+  AlertCleared: 'MANAGERS',
   DeviceStatusChanged: 'DEVICE_PAIR',
   DeviceRevoked: 'DEVICE_PAIR',
   // The POS and managers are alerted when a printer stops or starts again (KDS-008, NTF-003).
@@ -132,6 +136,11 @@ function named(event: DomainEvent): Required<EventAudience> {
       break;
     case 'AlertEscalated':
       found.staffIds.push(...event.payload.escalatedTo);
+      break;
+    case 'AlertRaised':
+    case 'AlertAcknowledged':
+    case 'AlertCleared':
+      found.staffIds.push(...event.payload.recipients);
       break;
     default:
       break;

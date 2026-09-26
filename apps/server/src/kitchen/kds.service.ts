@@ -14,6 +14,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 /** Items a station still has to cook: a ticket holding one of these cannot be bumped. */
@@ -72,6 +73,7 @@ export class KdsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async tickets(actor: Actor, query: KdsTicketsQuery): Promise<KdsTicketsResponse> {
@@ -188,38 +190,25 @@ export class KdsService {
           'Nothing on this ticket is ready and waiting to be collected.',
         );
       }
-      const open = await tx.alert.findFirst({
-        where: { kotId: kot.id, type: READY_NOT_COLLECTED, status: 'OPEN' },
-        select: { id: true },
-      });
-      if (open !== null) return { alertId: open.id, alreadyOpen: true };
-      const businessDate = await currentBusinessDate(tx, actor.restaurantId);
-      const alert = await tx.alert.create({
-        data: {
-          id: newId(),
-          restaurantId: actor.restaurantId,
-          businessDate: dbDate(businessDate),
-          type: READY_NOT_COLLECTED,
-          kotId: kot.id,
-          tableId: kot.order.tableId,
-          raisedById: actor.staffId,
-          raisedByDeviceId: actor.deviceId,
-          payload: {
-            kotNumber: kot.kotNumber,
-            stationName: kot.station.name,
-            tableLabel: kot.order.table?.label ?? null,
-            takeawayToken: kot.order.takeawayToken,
-            items: waiting.map((line) => line.orderItem.name),
-          },
+      // The notification engine delivers it to the managers on duty until acknowledged (P2-03).
+      return this.notifications.raise(tx, {
+        restaurantId: actor.restaurantId,
+        type: READY_NOT_COLLECTED,
+        kotId: kot.id,
+        tableId: kot.order.tableId,
+        tableSessionId: kot.order.tableSessionId,
+        orderId: kot.orderId,
+        dedupeKey: `collect:${kot.id}`,
+        raisedById: actor.staffId ?? null,
+        raisedByDeviceId: actor.deviceId,
+        payload: {
+          kotNumber: kot.kotNumber,
+          stationName: kot.station.name,
+          tableLabel: kot.order.table?.label ?? null,
+          takeawayToken: kot.order.takeawayToken,
+          items: waiting.map((line) => line.orderItem.name),
         },
       });
-      // Delivery rules, acknowledgement and escalation to the managers on duty come with P2-03;
-      // until then every manager's screen hears it.
-      await this.emit(tx, actor.restaurantId, alert.id, {
-        type: 'AlertEscalated',
-        payload: { alertId: alert.id, eventType: READY_NOT_COLLECTED, escalatedTo: [] },
-      });
-      return { alertId: alert.id, alreadyOpen: false };
     });
   }
 

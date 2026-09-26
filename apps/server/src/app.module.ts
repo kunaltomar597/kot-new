@@ -19,6 +19,7 @@ import { KitchenModule } from './kitchen/kitchen.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { FloorModule } from './floor/floor.module.js';
 import { MenuModule } from './menu/menu.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PhotosModule } from './photos/photos.module.js';
@@ -47,6 +48,7 @@ export class AppModule {
         RestaurantModule,
         FloorModule,
         MenuModule,
+        NotificationsModule,
         OrdersModule,
         PrintingModule,
         BillingModule,
