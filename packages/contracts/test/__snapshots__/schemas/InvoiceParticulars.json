@@ -1,0 +1,83 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "displayName": { "type": "string" },
+      "legalName": { "type": ["string", "null"] },
+      "address": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "line1": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "line2": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "city": { "type": "string", "minLength": 1, "maxLength": 60 },
+              "pincode": { "type": "string", "pattern": "^[1-9]\\d{5}$" }
+            },
+            "required": ["line1", "city", "pincode"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "gstin": { "type": ["string", "null"] },
+      "fssaiNumber": { "type": ["string", "null"] },
+      "placeOfSupply": { "type": ["string", "null"] },
+      "phone": { "type": ["string", "null"] },
+      "headerLines": { "type": "array", "items": { "type": "string" } },
+      "footerLines": { "type": "array", "items": { "type": "string" } }
+    },
+    "required": [
+      "displayName",
+      "legalName",
+      "address",
+      "gstin",
+      "fssaiNumber",
+      "placeOfSupply",
+      "phone",
+      "headerLines",
+      "footerLines"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "displayName": { "type": "string" },
+      "legalName": { "type": ["string", "null"] },
+      "address": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "line1": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "line2": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "city": { "type": "string", "minLength": 1, "maxLength": 60 },
+              "pincode": { "type": "string", "pattern": "^[1-9]\\d{5}$" }
+            },
+            "required": ["line1", "city", "pincode"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "gstin": { "type": ["string", "null"] },
+      "fssaiNumber": { "type": ["string", "null"] },
+      "placeOfSupply": { "type": ["string", "null"] },
+      "phone": { "type": ["string", "null"] },
+      "headerLines": { "type": "array", "items": { "type": "string" } },
+      "footerLines": { "type": "array", "items": { "type": "string" } }
+    },
+    "required": [
+      "displayName",
+      "legalName",
+      "address",
+      "gstin",
+      "fssaiNumber",
+      "placeOfSupply",
+      "phone",
+      "headerLines",
+      "footerLines"
+    ],
+    "additionalProperties": false
+  }
+}

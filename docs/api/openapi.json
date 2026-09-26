@@ -11,6 +11,7 @@
   "tags": [
     { "name": "audit" },
     { "name": "auth" },
+    { "name": "billing" },
     { "name": "devices" },
     { "name": "floor" },
     { "name": "menu" },
@@ -541,6 +542,464 @@
         },
         "x-capability": "STAFF_MANAGE",
         "x-requirements": ["AUTH-003", "AUTH-013"]
+      }
+    },
+    "/api/v1/bills": {
+      "post": {
+        "operationId": "openBill",
+        "summary": "Open the bill of a table session or a takeaway order (or return the open one)",
+        "description": "BILL-001. The bill is priced on the server from what was ordered, with the restaurant’s price mode, tax groups, rounding and service charge settings.",
+        "tags": ["billing"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/OpenBillRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bill as it stands.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open table session or takeaway order.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-001", "BILL-004"]
+      }
+    },
+    "/api/v1/bills/{id}": {
+      "get": {
+        "operationId": "getBill",
+        "summary": "The bill as it stands",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-001"]
+      }
+    },
+    "/api/v1/bills/{id}/customer": {
+      "put": {
+        "operationId": "setBillCustomer",
+        "summary": "Record the customer’s name, phone (with consent) and GSTIN for the invoice",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/BillCustomerRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The bill is printed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-011", "BILL-002"]
+      }
+    },
+    "/api/v1/bills/{id}/discounts": {
+      "post": {
+        "operationId": "addBillDiscount",
+        "summary": "Give an item or bill discount, or make an item complimentary",
+        "description": "BILL-005. A reason is required. Above the cashier’s limit, or complimentary, a manager’s override token for DISCOUNT_ABOVE_LIMIT goes in `x-override-token`. Audited.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DiscountRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bill with the discount.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such bill or item on it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The bill is printed, or already has a discount of that kind.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The discount is larger than what it applies to.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DISCOUNT_WITHIN_LIMIT",
+        "x-requirements": ["BILL-005", "AUTH-011", "AUD-001"]
+      }
+    },
+    "/api/v1/bills/{id}/discounts/{discountId}/revoke": {
+      "post": {
+        "operationId": "revokeBillDiscount",
+        "summary": "Take a discount back before the bill is printed",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "discountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RevokeDiscountRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bill without it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such discount on this bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The bill is printed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DISCOUNT_WITHIN_LIMIT",
+        "x-requirements": ["BILL-005", "AUD-001"]
+      }
+    },
+    "/api/v1/bills/{id}/invoice": {
+      "post": {
+        "operationId": "issueInvoice",
+        "summary": "Print the bill: issue its GST invoice with the next number",
+        "description": "BILL-002, BILL-003. The number comes from the series with no gaps; the lines, taxes and particulars are kept as issued. The table moves to Bill printed. Audited.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/IssueInvoiceRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Already printed, nothing to bill, or items still waiting for approval.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The series is unknown, archived or full.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-002", "BILL-003", "BILL-001", "AUD-001"]
+      }
+    },
+    "/api/v1/bills/{id}/service-charge": {
+      "post": {
+        "operationId": "setBillServiceCharge",
+        "summary": "Remove the voluntary service charge at the diner’s request, or restore it",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ServiceChargeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The bill is printed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SERVICE_CHARGE_REMOVE",
+        "x-requirements": ["BILL-006", "AUD-001"]
       }
     },
     "/api/v1/devices": {
@@ -1250,6 +1709,59 @@
         },
         "x-capability": "TAX_AND_INVOICE_SETTINGS",
         "x-requirements": ["BILL-003", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/invoices/{id}": {
+      "get": {
+        "operationId": "getInvoice",
+        "summary": "An invoice as issued, for the on-screen preview",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-002", "BILL-014"]
       }
     },
     "/api/v1/kots/{id}/reprint": {
@@ -4895,6 +5407,101 @@
         "additionalProperties": false
       },
       "BasisPoints": { "type": "integer", "minimum": 0, "maximum": 10000 },
+      "BillCustomerRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 60 }, { "type": "null" }]
+          },
+          "phone": {
+            "anyOf": [{ "$ref": "#/components/schemas/PhoneNumber" }, { "type": "null" }]
+          },
+          "phoneConsent": { "type": "boolean" },
+          "gstin": { "anyOf": [{ "$ref": "#/components/schemas/Gstin" }, { "type": "null" }] }
+        },
+        "required": ["name", "phone", "phoneConsent", "gstin"],
+        "additionalProperties": false
+      },
+      "BillCustomerView": {
+        "type": "object",
+        "properties": {
+          "name": { "type": ["string", "null"] },
+          "phone": { "type": ["string", "null"] },
+          "phoneConsent": { "type": "boolean" },
+          "gstin": { "type": ["string", "null"] }
+        },
+        "required": ["name", "phone", "phoneConsent", "gstin"],
+        "additionalProperties": false
+      },
+      "BillDiscountParams": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "discountId": { "$ref": "#/components/schemas/Id" }
+        },
+        "required": ["id", "discountId"],
+        "additionalProperties": false
+      },
+      "BillDiscountView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "orderItemId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "kind": { "type": "string", "enum": ["PERCENT", "FLAT"] },
+          "rateBp": {
+            "anyOf": [{ "$ref": "#/components/schemas/BasisPoints" }, { "type": "null" }]
+          },
+          "amount": { "$ref": "#/components/schemas/Paise" },
+          "reason": { "type": "string" },
+          "appliedById": { "$ref": "#/components/schemas/Id" },
+          "approvedById": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": [
+          "id",
+          "orderItemId",
+          "kind",
+          "rateBp",
+          "amount",
+          "reason",
+          "appliedById",
+          "approvedById"
+        ],
+        "additionalProperties": false
+      },
+      "BillLineView": {
+        "type": "object",
+        "properties": {
+          "orderItemId": { "$ref": "#/components/schemas/Id" },
+          "description": { "type": "string" },
+          "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "unitPrice": { "$ref": "#/components/schemas/Paise" },
+          "grossAmount": { "$ref": "#/components/schemas/Paise" },
+          "itemDiscount": { "$ref": "#/components/schemas/Paise" },
+          "billDiscountShare": { "$ref": "#/components/schemas/Paise" },
+          "netAmount": { "$ref": "#/components/schemas/Paise" },
+          "taxGroupId": { "$ref": "#/components/schemas/Id" },
+          "complimentary": { "type": "boolean" }
+        },
+        "required": [
+          "orderItemId",
+          "description",
+          "quantity",
+          "unitPrice",
+          "grossAmount",
+          "itemDiscount",
+          "billDiscountShare",
+          "netAmount",
+          "taxGroupId",
+          "complimentary"
+        ],
+        "additionalProperties": false
+      },
+      "BillParams": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" } },
+        "required": ["id"],
+        "additionalProperties": false
+      },
       "BillPrinted": {
         "type": "object",
         "properties": {
@@ -5002,6 +5609,85 @@
           "restaurantId",
           "businessDate",
           "payload"
+        ],
+        "additionalProperties": false
+      },
+      "BillStatus": { "type": "string", "enum": ["OPEN", "INVOICED"] },
+      "BillTaxLineView": {
+        "type": "object",
+        "properties": {
+          "taxGroupId": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "source": { "type": "string", "enum": ["ITEMS", "SERVICE_CHARGE"] },
+          "taxableValue": { "$ref": "#/components/schemas/Paise" },
+          "components": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TaxComponentView" }
+          },
+          "taxTotal": { "$ref": "#/components/schemas/Paise" }
+        },
+        "required": ["taxGroupId", "name", "source", "taxableValue", "components", "taxTotal"],
+        "additionalProperties": false
+      },
+      "BillView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "status": { "$ref": "#/components/schemas/BillStatus" },
+          "tableSessionId": {
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "orderId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "tableLabel": { "type": ["string", "null"] },
+          "priceMode": { "$ref": "#/components/schemas/PriceMode" },
+          "lines": { "type": "array", "items": { "$ref": "#/components/schemas/BillLineView" } },
+          "discounts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BillDiscountView" }
+          },
+          "serviceCharge": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "removed": { "type": "boolean" },
+              "rateBp": { "$ref": "#/components/schemas/BasisPoints" },
+              "amount": { "$ref": "#/components/schemas/Paise" }
+            },
+            "required": ["enabled", "removed", "rateBp", "amount"],
+            "additionalProperties": false
+          },
+          "subtotal": { "$ref": "#/components/schemas/Paise" },
+          "discountTotal": { "$ref": "#/components/schemas/Paise" },
+          "taxableValueTotal": { "$ref": "#/components/schemas/Paise" },
+          "taxLines": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BillTaxLineView" }
+          },
+          "taxTotal": { "$ref": "#/components/schemas/Paise" },
+          "roundOff": { "$ref": "#/components/schemas/SignedPaise" },
+          "grandTotal": { "$ref": "#/components/schemas/Paise" },
+          "customer": { "$ref": "#/components/schemas/BillCustomerView" },
+          "invoiceIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
+        },
+        "required": [
+          "id",
+          "status",
+          "tableSessionId",
+          "orderId",
+          "tableLabel",
+          "priceMode",
+          "lines",
+          "discounts",
+          "serviceCharge",
+          "subtotal",
+          "discountTotal",
+          "taxableValueTotal",
+          "taxLines",
+          "taxTotal",
+          "roundOff",
+          "grandTotal",
+          "customer",
+          "invoiceIds"
         ],
         "additionalProperties": false
       },
@@ -5504,6 +6190,54 @@
         "type": "string",
         "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
       },
+      "DiscountRequest": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "kind": { "type": "string", "enum": ["PERCENT", "FLAT"] },
+          "rateBp": {
+            "default": null,
+            "anyOf": [
+              { "minimum": 1, "$ref": "#/components/schemas/BasisPoints" },
+              { "type": "null" }
+            ]
+          },
+          "amount": {
+            "default": null,
+            "anyOf": [{ "minimum": 1, "$ref": "#/components/schemas/Paise" }, { "type": "null" }]
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["orderItemId", "kind", "rateBp", "amount", "reason"],
+        "additionalProperties": false
+      },
+      "DiscountRequestInput": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "kind": { "type": "string", "enum": ["PERCENT", "FLAT"] },
+          "rateBp": {
+            "default": null,
+            "anyOf": [
+              { "minimum": 1, "$ref": "#/components/schemas/BasisPoints" },
+              { "type": "null" }
+            ]
+          },
+          "amount": {
+            "default": null,
+            "anyOf": [{ "minimum": 1, "$ref": "#/components/schemas/Paise" }, { "type": "null" }]
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["kind", "reason"],
+        "additionalProperties": false
+      },
       "DomainEvent": {
         "oneOf": [
           { "$ref": "#/components/schemas/MenuPublished" },
@@ -5587,6 +6321,60 @@
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
       },
+      "InvoiceLineView": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "unitPrice": { "$ref": "#/components/schemas/Paise" },
+          "lineTotal": { "$ref": "#/components/schemas/Paise" },
+          "discount": { "$ref": "#/components/schemas/Paise" },
+          "taxableValue": { "$ref": "#/components/schemas/Paise" },
+          "sacCode": { "type": ["string", "null"] }
+        },
+        "required": [
+          "description",
+          "quantity",
+          "unitPrice",
+          "lineTotal",
+          "discount",
+          "taxableValue",
+          "sacCode"
+        ],
+        "additionalProperties": false
+      },
+      "InvoiceParams": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" } },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "InvoiceParticulars": {
+        "type": "object",
+        "properties": {
+          "displayName": { "type": "string" },
+          "legalName": { "type": ["string", "null"] },
+          "address": { "anyOf": [{ "$ref": "#/components/schemas/Address" }, { "type": "null" }] },
+          "gstin": { "type": ["string", "null"] },
+          "fssaiNumber": { "type": ["string", "null"] },
+          "placeOfSupply": { "type": ["string", "null"] },
+          "phone": { "type": ["string", "null"] },
+          "headerLines": { "type": "array", "items": { "type": "string" } },
+          "footerLines": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "displayName",
+          "legalName",
+          "address",
+          "gstin",
+          "fssaiNumber",
+          "placeOfSupply",
+          "phone",
+          "headerLines",
+          "footerLines"
+        ],
+        "additionalProperties": false
+      },
       "InvoiceSeparator": { "type": "string", "enum": ["/", "-"] },
       "InvoiceSeriesListResponse": {
         "type": "object",
@@ -5655,10 +6443,98 @@
         ],
         "additionalProperties": false
       },
+      "InvoiceTaxLineView": {
+        "type": "object",
+        "properties": {
+          "taxGroupId": { "$ref": "#/components/schemas/Id" },
+          "code": { "type": "string" },
+          "rateBp": { "$ref": "#/components/schemas/BasisPoints" },
+          "taxableValue": { "$ref": "#/components/schemas/Paise" },
+          "amount": { "$ref": "#/components/schemas/Paise" }
+        },
+        "required": ["taxGroupId", "code", "rateBp", "taxableValue", "amount"],
+        "additionalProperties": false
+      },
+      "InvoiceView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "billId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "invoiceNumber": { "type": "string", "maxLength": 16 },
+          "status": { "type": "string", "enum": ["ISSUED", "SETTLED", "VOIDED"] },
+          "invoiceDate": { "$ref": "#/components/schemas/IsoDate" },
+          "financialYear": { "type": "string" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "issuedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "issuedById": { "$ref": "#/components/schemas/Id" },
+          "tableLabel": { "type": ["string", "null"] },
+          "particulars": { "$ref": "#/components/schemas/InvoiceParticulars" },
+          "customer": { "$ref": "#/components/schemas/BillCustomerView" },
+          "priceMode": { "$ref": "#/components/schemas/PriceMode" },
+          "lines": { "type": "array", "items": { "$ref": "#/components/schemas/InvoiceLineView" } },
+          "taxLines": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/InvoiceTaxLineView" }
+          },
+          "subtotal": { "$ref": "#/components/schemas/Paise" },
+          "discountTotal": { "$ref": "#/components/schemas/Paise" },
+          "serviceCharge": { "$ref": "#/components/schemas/Paise" },
+          "taxTotal": { "$ref": "#/components/schemas/Paise" },
+          "roundOff": { "$ref": "#/components/schemas/SignedPaise" },
+          "grandTotal": { "$ref": "#/components/schemas/Paise" },
+          "printCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "id",
+          "billId",
+          "invoiceNumber",
+          "status",
+          "invoiceDate",
+          "financialYear",
+          "businessDate",
+          "issuedAt",
+          "issuedById",
+          "tableLabel",
+          "particulars",
+          "customer",
+          "priceMode",
+          "lines",
+          "taxLines",
+          "subtotal",
+          "discountTotal",
+          "serviceCharge",
+          "taxTotal",
+          "roundOff",
+          "grandTotal",
+          "printCount"
+        ],
+        "additionalProperties": false
+      },
       "IsoDate": {
         "type": "string",
         "format": "date",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "IssueInvoiceRequest": {
+        "type": "object",
+        "properties": {
+          "seriesId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          }
+        },
+        "required": ["seriesId"],
+        "additionalProperties": false
+      },
+      "IssueInvoiceRequestInput": {
+        "type": "object",
+        "properties": {
+          "seriesId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          }
+        },
+        "additionalProperties": false
       },
       "ItemAvailabilityChanged": {
         "type": "object",
@@ -6397,6 +7273,14 @@
         "type": "object",
         "properties": { "toTableId": { "$ref": "#/components/schemas/Id" } },
         "required": ["toTableId"],
+        "additionalProperties": false
+      },
+      "OpenBillRequest": {
+        "type": "object",
+        "properties": {
+          "tableSessionId": { "$ref": "#/components/schemas/Id" },
+          "orderId": { "$ref": "#/components/schemas/Id" }
+        },
         "additionalProperties": false
       },
       "OpenTableRequest": {
@@ -7256,6 +8140,12 @@
         "required": ["reason"],
         "additionalProperties": false
       },
+      "RevokeDiscountRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "Role": { "type": "string", "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
       "SacCode": { "type": "string", "pattern": "^\\d{4,8}$" },
       "SalesChannel": { "type": "string", "enum": ["POS", "WAITER_APP", "TABLE_TABLET", "QR"] },
@@ -7309,6 +8199,15 @@
           "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
         },
         "required": ["id", "name", "displayOrder", "archivedAt", "tables", "updatedAt"],
+        "additionalProperties": false
+      },
+      "ServiceChargeRequest": {
+        "type": "object",
+        "properties": {
+          "removed": { "type": "boolean" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["removed", "reason"],
         "additionalProperties": false
       },
       "ServiceRequestAcknowledged": {
@@ -8006,6 +8905,16 @@
           "rateBp": { "$ref": "#/components/schemas/BasisPoints" }
         },
         "required": ["code", "rateBp"],
+        "additionalProperties": false
+      },
+      "TaxComponentView": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "rateBp": { "$ref": "#/components/schemas/BasisPoints" },
+          "amount": { "$ref": "#/components/schemas/Paise" }
+        },
+        "required": ["code", "rateBp", "amount"],
         "additionalProperties": false
       },
       "TaxGroup": {

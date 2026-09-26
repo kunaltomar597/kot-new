@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07). 362 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10a). 382 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07). 536 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a). 552 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -55,7 +55,7 @@ Recommended next WPs (dependencies met):
 
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
-- P1-10 Billing engine and GST invoices (P1-06 done).
+- P1-10b Split, reprint, edit, void and the printed bill (P1-10a done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -104,7 +104,8 @@ Recommended next WPs (dependencies met):
 - [x] P1-07b Print queue, offline alert, redirect and reprint
 - [ ] P1-08 POS UI: tables and order entry
 - [ ] P1-09 KDS UI
-- [ ] P1-10 Billing engine and GST invoices
+- [x] P1-10a Bill preview, discounts and invoice issue
+- [ ] P1-10b Split, reprint, edit, void and the printed bill
 - [ ] P1-11 Payments, shifts and day-end
 - [ ] P1-12 POS billing UI
 - [ ] P1-13 Core reports v1
@@ -319,6 +320,20 @@ Decided 2026-09-26 (P1-07b):
 41. Printing is at least once. A job the printer took just before a crash may print twice, which
     is better than a lost ticket. The retry wait (2 s doubling to 60 s) is fixed, not a setting.
 
+Decided 2026-09-26 (P1-10a):
+
+42. The voluntary service charge is taxed with the tax group that carries the most value on the
+    bill. It is usually the food group. Add a setting if a CA asks for a fixed group.
+43. The service charge applies to dine-in bills only; takeaway guests were not served at a table.
+44. A bill has one discount per item and one bill discount at a time. Each is checked against the
+    cashier's limit on its own base, so an item discount and a bill discount can each be within
+    10 %. The daily suspicious-activity report (P4) flags large combined discounts.
+45. Tax on a bill uses the rates stored on each item when it was ordered, so a tax-group change
+    during a meal does not change what the guest was told.
+46. A series without the financial year keeps one continuous counter; its invoices still record
+    their real financial year for the GST reports.
+47. Issuing the invoice is its first print (`printCount` 1); later prints are DUPLICATEs (P1-10b).
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -327,7 +342,8 @@ sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning)
 installation identity, signed requests and enrolment of the Control Plane), #17 (P0-17b the
 installation key on the PC and its signing client), #18 (P1-01a who may change which setting,
 including the Owner's second factor for tax and data settings), P1-01b (the Owner-only tax,
-invoice series and invoice particulars endpoints, #19).
+invoice series and invoice particulars endpoints, #19), P1-10a (billing: discounts, overrides,
+invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-M05).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -335,6 +351,48 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-10a bill preview, discounts and invoice issue
+
+P1-10 was split into P1-10a (this) and P1-10b (split, reprint, edit, void, the printed bill).
+
+Built:
+
+- Migration `20260926200000_bills`:
+  - a `bills` table, protected from DELETE like invoices;
+  - discounts gain `bill_id`, `revoked_at` and `revoked_by_id`;
+  - invoices gain `bill_id`, `particulars` and `customer_phone_consent`.
+- `@rp/contracts` `billing.ts`: the bill and invoice views, and the discount, service-charge,
+  customer and issue requests. There are 8 routes.
+- `apps/server/src/billing/`: the bill calculation, the bills service (open, view, discounts,
+  revoke, service charge, customer) and the invoices service (issue, view).
+- Tests:
+  - 11 integration tests:
+    - totals with two tax groups and round-off;
+    - discounts: within the limit, above it needing a PIN, complimentary with the approver
+      audited, a spent token refused, flat over the base, and revoke;
+    - the service charge added, taxed and removed with an audit entry;
+    - customer consent and GSTIN;
+    - the invoice number, particulars, lines, SAC and tax lines;
+    - the table moving to BILL_PRINTED, with the event and audit entry;
+    - printing twice refused, and a profile change not altering the invoice;
+    - an empty bill refused, a takeaway bill in a continuous series, and a dine-in order refused
+      as takeaway;
+    - 5 invoices issued at once, consecutive, and a rolled-back allocation leaving no gap.
+  - 4 unit tests of the calculation.
+
+  Totals: server 552 tests (one more schema check for `bills`), contracts 382.
+
+Decisions: 42 to 47.
+
+Notes for the next sessions:
+
+- P1-10b builds on `BillsService.context` and the bill lock.
+  - Split can create several invoices for one bill; the `bills` row already allows many.
+  - Editing an ISSUED invoice is allowed by the database trigger. SETTLED and VOIDED are frozen.
+- P1-11 settles invoices (payments), then closes the table session (SETTLE_AND_CLOSE).
+- Items added after printing move the table back to OCCUPIED. They need an edit of the printed
+  bill (P1-10b): today the bill stays INVOICED and a second print is refused.
 
 ### 2026-09-26: P1-07b print queue, offline alert, redirect and reprint (P1-07 done)
 

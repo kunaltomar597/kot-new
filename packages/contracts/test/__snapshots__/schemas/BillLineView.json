@@ -1,0 +1,73 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "orderItemId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "description": { "type": "string" },
+      "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "unitPrice": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "grossAmount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "itemDiscount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "billDiscountShare": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "netAmount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "taxGroupId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "complimentary": { "type": "boolean" }
+    },
+    "required": [
+      "orderItemId",
+      "description",
+      "quantity",
+      "unitPrice",
+      "grossAmount",
+      "itemDiscount",
+      "billDiscountShare",
+      "netAmount",
+      "taxGroupId",
+      "complimentary"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "orderItemId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "description": { "type": "string" },
+      "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "unitPrice": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "grossAmount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "itemDiscount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "billDiscountShare": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "netAmount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "taxGroupId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "complimentary": { "type": "boolean" }
+    },
+    "required": [
+      "orderItemId",
+      "description",
+      "quantity",
+      "unitPrice",
+      "grossAmount",
+      "itemDiscount",
+      "billDiscountShare",
+      "netAmount",
+      "taxGroupId",
+      "complimentary"
+    ],
+    "additionalProperties": false
+  }
+}

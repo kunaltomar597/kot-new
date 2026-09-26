@@ -1,0 +1,23 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "name": { "type": ["string", "null"] },
+      "phone": { "type": ["string", "null"] },
+      "phoneConsent": { "type": "boolean" },
+      "gstin": { "type": ["string", "null"] }
+    },
+    "required": ["name", "phone", "phoneConsent", "gstin"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "name": { "type": ["string", "null"] },
+      "phone": { "type": ["string", "null"] },
+      "phoneConsent": { "type": "boolean" },
+      "gstin": { "type": ["string", "null"] }
+    },
+    "required": ["name", "phone", "phoneConsent", "gstin"],
+    "additionalProperties": false
+  }
+}

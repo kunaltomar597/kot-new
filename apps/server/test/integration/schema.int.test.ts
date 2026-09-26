@@ -27,6 +27,7 @@ const PROTECTED = [
   'invoice_lines',
   'tax_lines',
   'discounts',
+  'bills',
   'payments',
   'cash_movements',
   'shifts',

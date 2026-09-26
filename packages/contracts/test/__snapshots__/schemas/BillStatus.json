@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["OPEN", "INVOICED"] },
+  "output": { "type": "string", "enum": ["OPEN", "INVOICED"] }
+}

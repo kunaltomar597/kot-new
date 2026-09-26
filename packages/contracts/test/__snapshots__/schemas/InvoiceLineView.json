@@ -1,0 +1,45 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "description": { "type": "string" },
+      "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "unitPrice": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "lineTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "discount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "sacCode": { "type": ["string", "null"] }
+    },
+    "required": [
+      "description",
+      "quantity",
+      "unitPrice",
+      "lineTotal",
+      "discount",
+      "taxableValue",
+      "sacCode"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "description": { "type": "string" },
+      "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "unitPrice": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "lineTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "discount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "sacCode": { "type": ["string", "null"] }
+    },
+    "required": [
+      "description",
+      "quantity",
+      "unitPrice",
+      "lineTotal",
+      "discount",
+      "taxableValue",
+      "sacCode"
+    ],
+    "additionalProperties": false
+  }
+}
