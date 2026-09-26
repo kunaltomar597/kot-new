@@ -5,7 +5,14 @@ import type { TransactionClient } from '../database/prisma.service.js';
 import { appendEvent } from '../events/outbox.js';
 
 export type SetupPart =
-  'PROFILE' | 'LEGAL' | 'TAX_GROUPS' | 'INVOICE_SERIES' | 'FLOOR' | 'WAITER_ASSIGNMENTS';
+  | 'PROFILE'
+  | 'LEGAL'
+  | 'TAX_GROUPS'
+  | 'INVOICE_SERIES'
+  | 'FLOOR'
+  | 'WAITER_ASSIGNMENTS'
+  | 'STATIONS'
+  | 'PRINTERS';
 
 /**
  * Serialises changes to the restaurant's setup for the rest of the transaction, so checks such as

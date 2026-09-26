@@ -1263,7 +1263,9 @@
                   "TAX_GROUPS",
                   "INVOICE_SERIES",
                   "FLOOR",
-                  "WAITER_ASSIGNMENTS"
+                  "WAITER_ASSIGNMENTS",
+                  "STATIONS",
+                  "PRINTERS"
                 ]
               }
             },
@@ -2590,7 +2592,9 @@
                   "TAX_GROUPS",
                   "INVOICE_SERIES",
                   "FLOOR",
-                  "WAITER_ASSIGNMENTS"
+                  "WAITER_ASSIGNMENTS",
+                  "STATIONS",
+                  "PRINTERS"
                 ]
               }
             },

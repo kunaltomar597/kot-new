@@ -310,6 +310,19 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - `src/orders/order-items.service.ts` (P1-06b): status steps, cancel, void (override token) and
   modify. Kitchen-relevant changes always produce a CANCELLED or MODIFIED ticket (ORD-012).
 
+## Printing (P1-07)
+
+- `src/printing/escpos.ts` (P1-07a): pure ESC/POS rendering of kitchen tickets and the test page,
+  tested byte for byte in `test/unit/escpos.test.ts`.
+- `src/printing/printer-transport.ts`: `PrinterTransport` sends the bytes to a network printer's
+  raw TCP port, or to a USB printer shared in Windows as `\\localhost\<share>`. Override the
+  provider in tests, or point a printer at a local TCP server as `printing.int.test.ts` does.
+- `src/printing/stations.service.ts` and `printers.service.ts`: setup, audited and announced.
+  `kot-tickets.service.ts` renders a stored KOT for its station's printer.
+
+To try a real printer on a PC: add it under Printers with its IP address and port 9100, then use
+"Test print" (`POST /api/v1/printers/:id/test`). The answer says why it did not print.
+
 ## Commands
 
 ```

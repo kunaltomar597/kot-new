@@ -168,6 +168,8 @@ export const RestaurantChanged = event(
       'INVOICE_SERIES',
       'FLOOR',
       'WAITER_ASSIGNMENTS',
+      'STATIONS',
+      'PRINTERS',
     ]),
   }),
 );

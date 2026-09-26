@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+    "required": ["reason"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+    "required": ["reason"],
+    "additionalProperties": false
+  }
+}

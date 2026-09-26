@@ -15,6 +15,7 @@
     { "name": "floor" },
     { "name": "menu" },
     { "name": "orders" },
+    { "name": "printing" },
     { "name": "restaurant" },
     { "name": "settings" },
     { "name": "system" },
@@ -2672,6 +2673,276 @@
         "x-requirements": ["ORD-009", "ORD-010"]
       }
     },
+    "/api/v1/printers": {
+      "get": {
+        "operationId": "listPrinters",
+        "summary": "Printers with their connection and last contact, archived ones included",
+        "tags": ["printing"],
+        "responses": {
+          "200": {
+            "description": "Printers.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PrinterListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-008", "ONB-004"]
+      },
+      "post": {
+        "operationId": "createPrinter",
+        "summary": "Add a printer",
+        "description": "Managers and the Owner (BRD §4.2 \"configure printers, stations\"). Audited.",
+        "tags": ["printing"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PrinterRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new printer.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PrinterView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Another active printer has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-008", "ONB-004", "AUD-001"]
+      }
+    },
+    "/api/v1/printers/{id}": {
+      "put": {
+        "operationId": "updatePrinter",
+        "summary": "Change a printer",
+        "tags": ["printing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PrinterRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The printer as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PrinterView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such printer.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Archived, or another active printer has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-008", "ONB-004", "AUD-001"]
+      }
+    },
+    "/api/v1/printers/{id}/archive": {
+      "post": {
+        "operationId": "archivePrinter",
+        "summary": "Archive a printer nothing uses any more",
+        "description": "Active stations must use another printer first.",
+        "tags": ["printing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PrintingArchiveRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PrinterView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such printer.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Still in use.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-008", "ONB-004", "AUD-001"]
+      }
+    },
+    "/api/v1/printers/{id}/test": {
+      "post": {
+        "operationId": "testPrinter",
+        "summary": "Print a test page",
+        "description": "ONB-004 step 6. Answers whether the printer took the page, and why not.",
+        "tags": ["printing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The result.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TestPrintResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such active printer.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-008", "ONB-004"]
+      }
+    },
     "/api/v1/restaurant": {
       "get": {
         "operationId": "getRestaurant",
@@ -3138,6 +3409,234 @@
         },
         "x-capability": "OPERATIONS_CONFIGURE",
         "x-requirements": ["MGR-007", "AUD-001", "AUTH-006", "BILL-006"]
+      }
+    },
+    "/api/v1/stations": {
+      "get": {
+        "operationId": "listStations",
+        "summary": "Kitchen stations with their mode and printer, archived ones included",
+        "tags": ["printing"],
+        "responses": {
+          "200": {
+            "description": "Stations.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StationListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["KDS-002", "KDS-008"]
+      },
+      "post": {
+        "operationId": "createStation",
+        "summary": "Add a station",
+        "description": "Managers and the Owner (BRD §4.2 \"configure printers, stations\"). Audited.",
+        "tags": ["printing"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/StationRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new station.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StationView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Another active station has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The printer is unknown or archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-002", "KDS-008", "ONB-004", "AUD-001"]
+      }
+    },
+    "/api/v1/stations/{id}": {
+      "put": {
+        "operationId": "updateStation",
+        "summary": "Change a station",
+        "tags": ["printing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/StationRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The station as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StationView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such station.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Archived, or another active station has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The printer is unknown or archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-002", "KDS-008", "ONB-004", "AUD-001"]
+      }
+    },
+    "/api/v1/stations/{id}/archive": {
+      "post": {
+        "operationId": "archiveStation",
+        "summary": "Archive a station nothing uses any more",
+        "description": "Active menu items must move to another station first.",
+        "tags": ["printing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PrintingArchiveRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StationView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such station.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Still in use.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-002", "KDS-008", "ONB-004", "AUD-001"]
       }
     },
     "/api/v1/table-sessions/{sessionId}/close-without-bill": {
@@ -6172,6 +6671,83 @@
         "additionalProperties": false
       },
       "PriceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] },
+      "PrinterConnection": { "type": "string", "enum": ["NETWORK", "USB"] },
+      "PrinterListResponse": {
+        "type": "object",
+        "properties": {
+          "printers": { "type": "array", "items": { "$ref": "#/components/schemas/PrinterView" } }
+        },
+        "required": ["printers"],
+        "additionalProperties": false
+      },
+      "PrinterRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "connection": { "$ref": "#/components/schemas/PrinterConnection" },
+          "host": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "port": {
+            "anyOf": [{ "type": "integer", "minimum": 1, "maximum": 65535 }, { "type": "null" }]
+          },
+          "paperWidthMm": {
+            "anyOf": [
+              { "type": "number", "const": 58 },
+              { "type": "number", "const": 80 }
+            ]
+          }
+        },
+        "required": ["name", "connection", "host", "port", "paperWidthMm"],
+        "additionalProperties": false
+      },
+      "PrinterView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "connection": { "$ref": "#/components/schemas/PrinterConnection" },
+          "host": { "type": ["string", "null"] },
+          "port": {
+            "anyOf": [
+              { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "paperWidthMm": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lastSeenAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "archivedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "connection",
+          "host",
+          "port",
+          "paperWidthMm",
+          "lastSeenAt",
+          "archivedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PrintingArchiveRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "PrintingParams": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" } },
+        "required": ["id"],
+        "additionalProperties": false
+      },
       "RealtimeEndReason": {
         "type": "string",
         "enum": ["DEVICE_REVOKED", "DEVICE_CHANGED", "SESSION_ENDED"]
@@ -6301,7 +6877,9 @@
                   "TAX_GROUPS",
                   "INVOICE_SERIES",
                   "FLOOR",
-                  "WAITER_ASSIGNMENTS"
+                  "WAITER_ASSIGNMENTS",
+                  "STATIONS",
+                  "PRINTERS"
                 ]
               }
             },
@@ -6667,6 +7245,39 @@
           "mode": { "type": "string", "enum": ["SCREEN", "PRINT", "BOTH"] }
         },
         "required": ["id", "name", "mode"],
+        "additionalProperties": false
+      },
+      "StationListResponse": {
+        "type": "object",
+        "properties": {
+          "stations": { "type": "array", "items": { "$ref": "#/components/schemas/StationView" } }
+        },
+        "required": ["stations"],
+        "additionalProperties": false
+      },
+      "StationMode": { "type": "string", "enum": ["SCREEN", "PRINT", "BOTH"] },
+      "StationRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "mode": { "$ref": "#/components/schemas/StationMode" },
+          "printerId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["name", "mode", "printerId"],
+        "additionalProperties": false
+      },
+      "StationView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "mode": { "$ref": "#/components/schemas/StationMode" },
+          "printerId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "archivedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": ["id", "name", "mode", "printerId", "archivedAt"],
         "additionalProperties": false
       },
       "StepUpRequest": {
@@ -7188,6 +7799,12 @@
           "archivedAt",
           "updatedAt"
         ],
+        "additionalProperties": false
+      },
+      "TestPrintResponse": {
+        "type": "object",
+        "properties": { "printed": { "type": "boolean" }, "error": { "type": ["string", "null"] } },
+        "required": ["printed", "error"],
         "additionalProperties": false
       },
       "TimeOfDay": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },

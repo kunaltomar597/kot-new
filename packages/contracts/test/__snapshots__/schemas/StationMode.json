@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["SCREEN", "PRINT", "BOTH"] },
+  "output": { "type": "string", "enum": ["SCREEN", "PRINT", "BOTH"] }
+}
