@@ -1,0 +1,178 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "invoiceId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "invoiceNumber": { "type": "string" },
+      "status": { "type": "string", "enum": ["ISSUED", "SETTLED", "VOIDED"] },
+      "grandTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "paid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "remaining": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "payments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "mode": { "type": "string", "enum": ["CASH", "CARD", "UPI", "OTHER"] },
+            "modeLabel": { "type": ["string", "null"] },
+            "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "tendered": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "change": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "reference": { "type": ["string", "null"] },
+            "receivedById": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "shiftId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                { "type": "null" }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "id",
+            "mode",
+            "modeLabel",
+            "amount",
+            "tendered",
+            "change",
+            "reference",
+            "receivedById",
+            "shiftId",
+            "createdAt"
+          ]
+        }
+      },
+      "tableClosed": { "type": "boolean" }
+    },
+    "required": [
+      "invoiceId",
+      "invoiceNumber",
+      "status",
+      "grandTotal",
+      "paid",
+      "remaining",
+      "payments",
+      "tableClosed"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "invoiceId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "invoiceNumber": { "type": "string" },
+      "status": { "type": "string", "enum": ["ISSUED", "SETTLED", "VOIDED"] },
+      "grandTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "paid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "remaining": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "payments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "mode": { "type": "string", "enum": ["CASH", "CARD", "UPI", "OTHER"] },
+            "modeLabel": { "type": ["string", "null"] },
+            "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "tendered": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "change": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "reference": { "type": ["string", "null"] },
+            "receivedById": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "shiftId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                { "type": "null" }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "id",
+            "mode",
+            "modeLabel",
+            "amount",
+            "tendered",
+            "change",
+            "reference",
+            "receivedById",
+            "shiftId",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "tableClosed": { "type": "boolean" }
+    },
+    "required": [
+      "invoiceId",
+      "invoiceNumber",
+      "status",
+      "grandTotal",
+      "paid",
+      "remaining",
+      "payments",
+      "tableClosed"
+    ],
+    "additionalProperties": false
+  }
+}

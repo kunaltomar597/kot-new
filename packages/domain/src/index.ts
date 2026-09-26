@@ -4,6 +4,7 @@ export * from './tax.js';
 export * from './discount.js';
 export * from './bill.js';
 export * from './bill-split.js';
+export * from './payments.js';
 export * from './business-date.js';
 export * from './invoice-number.js';
 export * from './permissions.js';

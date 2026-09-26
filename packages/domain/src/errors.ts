@@ -15,7 +15,9 @@ export type DomainErrorCode =
   | 'INVOICE_NUMBER_TOO_LONG'
   | 'INVALID_INVOICE_SERIES'
   | 'INVALID_DATE'
-  | 'INVALID_TIME';
+  | 'INVALID_TIME'
+  | 'INVALID_PAYMENT'
+  | 'OVERPAYMENT';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

@@ -337,6 +337,13 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `src/billing/invoices.service.ts`: issues the GST invoice with a gap-free number and snapshots
   what was printed.
 
+## Payments (P1-11)
+
+- `src/payments/shifts.service.ts` (P1-11a): shifts with a float, cash in and out, and closing
+  with counted cash and variance.
+- `src/payments/payments.service.ts`: idempotent payment recording, settlement, and freeing the
+  table when its last bill is paid.
+
 ## Commands
 
 ```

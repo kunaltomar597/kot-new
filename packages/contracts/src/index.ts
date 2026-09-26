@@ -11,6 +11,7 @@ export * from './realtime.js';
 export * from './restaurant.js';
 export * from './billing.js';
 export * from './events.js';
+export * from './payments.js';
 export * from './routes.js';
 export * from './settings.js';
 export * from './table-sessions.js';

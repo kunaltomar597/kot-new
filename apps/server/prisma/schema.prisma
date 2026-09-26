@@ -1414,6 +1414,8 @@ model Payment {
   shiftId      String?       @map("shift_id") @db.Uuid
   shift        Shift?        @relation(fields: [shiftId], references: [id])
   mode         PaymentMode
+  /// The restaurant's name for an OTHER mode, e.g. "Swiggy Dineout" (`payments.otherModes`).
+  modeLabel    String?       @map("mode_label")
   status       PaymentStatus @default(CAPTURED)
   amount       Int
   /// Cash handed over and change returned, for cash payments.

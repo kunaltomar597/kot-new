@@ -1,0 +1,12 @@
+{
+  "input": {
+    "type": "object",
+    "propertyNames": { "type": "string", "pattern": "^\\d{1,4}(\\.\\d{1,2})?$" },
+    "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 100000 }
+  },
+  "output": {
+    "type": "object",
+    "propertyNames": { "type": "string", "pattern": "^\\d{1,4}(\\.\\d{1,2})?$" },
+    "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 100000 }
+  }
+}
