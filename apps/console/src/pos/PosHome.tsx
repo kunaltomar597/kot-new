@@ -1,5 +1,6 @@
 import { Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router';
 import { BillScreen } from '../billing/BillScreen.js';
+import { DayEndScreen } from '../billing/DayEndScreen.js';
 import { PaymentScreen } from '../billing/PaymentScreen.js';
 import { ShiftScreen } from '../billing/ShiftScreen.js';
 import { OrderEntry } from './OrderEntry.js';
@@ -16,6 +17,7 @@ export function PosHome() {
       <Route path="table/:sessionId" element={<TableOrder />} />
       <Route path="takeaway" element={<TakeawayOrder />} />
       <Route path="shift" element={<Shift />} />
+      <Route path="day-end" element={<DayEnd />} />
       <Route path="bill/:billId" element={<Bill />} />
       <Route path="pay/:invoiceId" element={<Pay />} />
     </Routes>
@@ -93,6 +95,17 @@ function Pay() {
       onDone={back}
       onOpenShift={() => {
         void navigate('/pos/shift');
+      }}
+    />
+  );
+}
+
+function DayEnd() {
+  const navigate = useNavigate();
+  return (
+    <DayEndScreen
+      onBack={() => {
+        void navigate('/pos');
       }}
     />
   );
