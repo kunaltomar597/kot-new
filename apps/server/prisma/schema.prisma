@@ -209,7 +209,15 @@ model Restaurant {
   fssaiNumber       String?  @map("fssai_number")
   /// GST state code (two digits) of the place of supply.
   stateCode         String?  @map("state_code")
+  /// The `Address` contract (P1-01b); the state is `stateCode`.
   address           Json?
+  phone             String?
+  email             String?
+  /// Opening hours, the `BusinessHours` contract: `[{ day, start, end }]` (ONB-004).
+  businessHours     Json     @default("[]") @map("business_hours")
+  logoPhotoId       String?  @map("logo_photo_id") @db.Uuid
+  /// Restrict: a photo in use as the logo is never removed by photo clean-up (P1-04).
+  logoPhoto         Photo?   @relation(fields: [logoPhotoId], references: [id], onDelete: Restrict)
   timeZone          String   @default("Asia/Kolkata") @map("time_zone")
   /// Business-day cut-off, local time HH:MM (default 04:00).
   businessDayCutoff String   @default("04:00") @map("business_day_cutoff")
@@ -643,17 +651,19 @@ model TaxComponent {
 }
 
 model Photo {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  restaurantId String   @map("restaurant_id") @db.Uuid
+  id           String       @id @default(uuid(7)) @db.Uuid
+  restaurantId String       @map("restaurant_id") @db.Uuid
   /// Path relative to the photo store (P1-04); images are re-encoded on upload.
-  storageKey   String   @unique @map("storage_key")
-  mimeType     String   @map("mime_type")
+  storageKey   String       @unique @map("storage_key")
+  mimeType     String       @map("mime_type")
   width        Int
   height       Int
   bytes        Int
   sha256       String
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  /// Restaurants showing this photo as their logo.
+  logoOf       Restaurant[]
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId])
   @@map("photos")

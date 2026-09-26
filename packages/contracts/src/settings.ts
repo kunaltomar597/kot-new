@@ -268,7 +268,8 @@ export const SETTINGS = [
     schema: z.boolean(),
     defaultValue: false,
     scope: 'RESTAURANT',
-    capability: 'OPERATIONS_CONFIGURE',
+    // An invoice setting (ONB-004 step 3), so the Owner's (AUTH-006).
+    capability: 'TAX_AND_INVOICE_SETTINGS',
     description: 'Add a voluntary service charge to bills (off by default; removable on request).',
     requirements: ['BILL-006', 'OI-12'],
   }),
@@ -277,11 +278,30 @@ export const SETTINGS = [
     schema: int(0, 2_000),
     defaultValue: 500,
     scope: 'RESTAURANT',
-    capability: 'OPERATIONS_CONFIGURE',
+    capability: 'TAX_AND_INVOICE_SETTINGS',
     description:
       'Service charge rate on the taxable value of items when enabled (our default: 5 %).',
     requirements: ['BILL-006'],
     unit: 'basis points',
+  }),
+  setting({
+    key: 'bills.headerLines',
+    schema: z.array(z.string().trim().min(1).max(48)).max(4),
+    defaultValue: [],
+    scope: 'RESTAURANT',
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    description:
+      'Lines printed on every bill under the restaurant particulars (48 characters each).',
+    requirements: ['ONB-004', 'BILL-002'],
+  }),
+  setting({
+    key: 'bills.footerLines',
+    schema: z.array(z.string().trim().min(1).max(48)).max(4),
+    defaultValue: [],
+    scope: 'RESTAURANT',
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    description: 'Lines printed at the foot of every bill, e.g. a thank-you note.',
+    requirements: ['ONB-004', 'BILL-002'],
   }),
   setting({
     key: 'payments.otherModes',

@@ -130,6 +130,23 @@ export function businessDateOf(
 }
 
 /**
+ * Whether changing the business-day cut-off from `from` to `to` at `instant` would change the
+ * business date records are filed under (BRD §9.4). At 03:00, moving 04:00 to 02:00 would start
+ * the next business day at once; at 15:00 no morning cut-off changes anything.
+ */
+export function cutoffChangeMovesBusinessDate(
+  instant: Date,
+  from: string,
+  to: string,
+  timeZone: string = DEFAULT_TIME_ZONE,
+): boolean {
+  return (
+    businessDateOf(instant, { cutoff: from, timeZone }) !==
+    businessDateOf(instant, { cutoff: to, timeZone })
+  );
+}
+
+/**
  * Converts a local wall-clock time in `timeZone` to a UTC instant. Handles zones with
  * offset changes by re-checking the offset once; India has no DST, so this is exact there.
  */

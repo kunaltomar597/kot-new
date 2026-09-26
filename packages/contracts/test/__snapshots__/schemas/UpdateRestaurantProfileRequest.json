@@ -1,0 +1,118 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "contact": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "anyOf": [
+              { "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" },
+              { "type": "null" }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["phone", "email"],
+        "additionalProperties": false
+      },
+      "businessHours": {
+        "maxItems": 28,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "day": { "type": "string", "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] },
+            "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+            "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+          },
+          "required": ["day", "start", "end"],
+          "additionalProperties": false
+        }
+      },
+      "logoPhotoId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "businessDayCutoff": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["displayName", "contact", "businessHours", "logoPhotoId", "businessDayCutoff"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "contact": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "anyOf": [
+              { "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" },
+              { "type": "null" }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["phone", "email"],
+        "additionalProperties": false
+      },
+      "businessHours": {
+        "maxItems": 28,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "day": { "type": "string", "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] },
+            "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+            "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+          },
+          "required": ["day", "start", "end"],
+          "additionalProperties": false
+        }
+      },
+      "logoPhotoId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "businessDayCutoff": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["displayName", "contact", "businessHours", "logoPhotoId", "businessDayCutoff"],
+    "additionalProperties": false
+  }
+}

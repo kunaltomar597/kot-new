@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "pattern": "^[A-Z0-9]{0,10}$" },
+  "output": { "type": "string", "pattern": "^[A-Z0-9]{0,10}$" }
+}

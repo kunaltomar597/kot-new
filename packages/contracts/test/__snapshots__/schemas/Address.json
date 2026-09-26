@@ -1,0 +1,24 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "line1": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "line2": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "city": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "pincode": { "type": "string", "pattern": "^[1-9]\\d{5}$" }
+    },
+    "required": ["line1", "city", "pincode"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "line1": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "line2": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "city": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "pincode": { "type": "string", "pattern": "^[1-9]\\d{5}$" }
+    },
+    "required": ["line1", "city", "pincode"],
+    "additionalProperties": false
+  }
+}

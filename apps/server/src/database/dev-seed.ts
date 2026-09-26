@@ -252,7 +252,7 @@ export async function seedDevelopmentData(
           legalName: 'Demo Foods Private Limited',
           displayName: 'Demo Dhaba',
           stateCode: '27',
-          address: { line1: '1 Demo Road', city: 'Pune', state: 'Maharashtra', pincode: '411001' },
+          address: { line1: '1 Demo Road', city: 'Pune', pincode: '411001' },
         },
       });
       const restaurantId = restaurant.id;

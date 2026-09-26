@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" },
+  "output": { "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" }
+}

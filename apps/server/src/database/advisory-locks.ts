@@ -9,4 +9,6 @@ export const ADVISORY_LOCKS = {
   pairingBootstrap: 7_261_000_002n,
   /** Serialises the event dispatchers that number committed outbox events (P0-12). */
   outboxSequence: 7_261_000_003n,
+  /** Serialises changes to the restaurant's setup: unique names and one default series (P1-01b). */
+  restaurantSetup: 7_261_000_004n,
 } as const;

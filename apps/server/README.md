@@ -255,6 +255,27 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - Modules read their settings through the snapshot, never from the table. `AuthSettingsService`
   is now a typed view of the `auth.*` keys.
 
+## Restaurant setup (P1-01b)
+
+`src/restaurant` serves the setup wizard's first three steps (ONB-004):
+
+- `RestaurantService`: the profile, which managers change, and the invoice particulars (BILL-002),
+  which only the Owner changes. GSTINs are checked by the contract (`@rp/domain` `gstin.ts`) and
+  must match the state code. A cut-off change that would move the current business date is
+  refused (`@rp/domain` `cutoffChangeMovesBusinessDate`).
+- `TaxGroupsService`: groups with their components, whose rates are data. An update replaces the
+  components (invoices keep their own tax lines). A group is archived only when no active item
+  uses it.
+- `InvoiceSeriesService`: prefix and format of invoice numbers.
+  - A prefix is never reused.
+  - The format is fixed once an invoice exists.
+  - Exactly one default series.
+  - `example` shows the first number of the current financial year.
+- Every change takes the `restaurantSetup` advisory lock, writes an audit entry with before and
+  after, and appends `RestaurantChanged { part }` in the same transaction.
+- Routes: the Owner-only ones declare `TAX_AND_INVOICE_SETTINGS`, so the permission guard asks
+  for the second factor. Reads are for any signed-in person, and the profile for any paired device.
+
 ## Commands
 
 ```

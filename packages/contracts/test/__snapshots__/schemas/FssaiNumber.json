@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "pattern": "^\\d{14}$" },
+  "output": { "type": "string", "pattern": "^\\d{14}$" }
+}

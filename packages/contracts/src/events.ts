@@ -148,6 +148,15 @@ export const SettingsChanged = event(
   z.object({ keys: z.array(z.string().max(80)).min(1) }),
 );
 
+/**
+ * Part of the restaurant's setup changed (P1-01b): its profile, its invoice particulars, its tax
+ * groups or its invoice series. Screens and bill templates read that part again.
+ */
+export const RestaurantChanged = event(
+  'RestaurantChanged',
+  z.object({ part: z.enum(['PROFILE', 'LEGAL', 'TAX_GROUPS', 'INVOICE_SERIES']) }),
+);
+
 export const DomainEvent = z.discriminatedUnion('type', [
   MenuPublished,
   ItemAvailabilityChanged,
@@ -170,6 +179,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   DeviceStatusChanged,
   DeviceRevoked,
   SettingsChanged,
+  RestaurantChanged,
 ]);
 export type DomainEvent = z.infer<typeof DomainEvent>;
 export type DomainEventType = DomainEvent['type'];

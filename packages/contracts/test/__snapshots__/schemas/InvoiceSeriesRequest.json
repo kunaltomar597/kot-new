@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "prefix": { "type": "string", "pattern": "^[A-Z0-9]{0,10}$" },
+      "includeFinancialYear": { "type": "boolean" },
+      "separator": { "type": "string", "enum": ["/", "-"] },
+      "sequencePadding": { "type": "integer", "minimum": 1, "maximum": 12 },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["name", "prefix", "includeFinancialYear", "separator", "sequencePadding"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "prefix": { "type": "string", "pattern": "^[A-Z0-9]{0,10}$" },
+      "includeFinancialYear": { "type": "boolean" },
+      "separator": { "type": "string", "enum": ["/", "-"] },
+      "sequencePadding": { "type": "integer", "minimum": 1, "maximum": 12 },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["name", "prefix", "includeFinancialYear", "separator", "sequencePadding"],
+    "additionalProperties": false
+  }
+}

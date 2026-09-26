@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["/", "-"] },
+  "output": { "type": "string", "enum": ["/", "-"] }
+}

@@ -4,6 +4,7 @@ import {
   businessDateOf,
   businessDayStart,
   calendarDateOf,
+  cutoffChangeMovesBusinessDate,
   DEFAULT_INVOICE_SERIES,
   financialYearFromStart,
   financialYearOf,
@@ -70,6 +71,23 @@ describe('[ONB-004] business date with cut-off (BRD §9.4)', () => {
     expect(() => parseCutoff('24:00')).toThrow();
     expect(() => parseCutoff('4:00')).toThrow();
     expect(() => businessDateOf(new Date('invalid'))).toThrow();
+  });
+
+  it('[NFR-L03] knows when a new cut-off would move the business date', () => {
+    const threeAm = new Date('2026-09-25T21:30:00Z'); // 03:00 IST on 26 September
+    // Before the 04:00 cut-off it is still the 25th; a 02:00 cut-off would make it the 26th.
+    expect(cutoffChangeMovesBusinessDate(threeAm, '04:00', '02:00')).toBe(true);
+    expect(cutoffChangeMovesBusinessDate(threeAm, '04:00', '05:00')).toBe(false);
+    expect(cutoffChangeMovesBusinessDate(threeAm, '04:00', '03:01')).toBe(false);
+    expect(cutoffChangeMovesBusinessDate(threeAm, '04:00', '03:00')).toBe(true);
+    const tenAm = new Date('2026-09-26T04:30:00Z'); // 10:00 IST
+    expect(cutoffChangeMovesBusinessDate(tenAm, '04:00', '11:00')).toBe(true);
+    expect(cutoffChangeMovesBusinessDate(tenAm, '04:00', '06:00')).toBe(false);
+    // In the afternoon every morning cut-off keeps the date.
+    const threePm = new Date('2026-09-26T09:30:00Z');
+    for (const cutoff of ['00:00', '02:00', '06:00', '11:59']) {
+      expect(cutoffChangeMovesBusinessDate(threePm, '04:00', cutoff), cutoff).toBe(false);
+    }
   });
 });
 
