@@ -111,8 +111,24 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
         'controlPlane.heartbeatSeconds',
       ]),
     );
-    // Tax and invoice settings are the Owner's (MGR-007, AUTH-006).
-    expect(settingDefinition('billing.priceMode')?.capability).toBe('TAX_AND_INVOICE_SETTINGS');
+  });
+
+  it('[AUTH-006] [ONB-004] leaves tax and invoice settings to the Owner', () => {
+    // ONB-004 steps 2 and 3: price mode, rounding, header and footer, service charge.
+    for (const key of [
+      'billing.priceMode',
+      'billing.roundingUnitPaise',
+      'billing.serviceChargeEnabled',
+      'billing.serviceChargeRateBp',
+      'bills.headerLines',
+      'bills.footerLines',
+    ]) {
+      expect(settingDefinition(key)?.capability, key).toBe('TAX_AND_INVOICE_SETTINGS');
+    }
+    const footer = settingDefinition('bills.footerLines');
+    expect(footer?.schema.safeParse(['Thank you, visit again']).success).toBe(true);
+    expect(footer?.schema.safeParse(['x'.repeat(49)]).success).toBe(false);
+    expect(footer?.schema.safeParse(['1', '2', '3', '4', '5']).success).toBe(false);
   });
 
   it('checks the rules between settings', () => {

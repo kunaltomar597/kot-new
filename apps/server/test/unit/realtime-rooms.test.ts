@@ -182,6 +182,11 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     expect(targets).toEqual([rooms.all(rid)]);
   });
 
+  it('[ONB-004] tells every screen which part of the restaurant setup changed', () => {
+    const targets = roomsForEvent(domainEvent('RestaurantChanged', rid, { part: 'LEGAL' }));
+    expect(targets).toEqual([rooms.all(rid)]);
+  });
+
   it('keeps device events for the roles that manage devices', () => {
     const targets = roomsForEvent(
       domainEvent('DeviceStatusChanged', rid, {
@@ -299,5 +304,7 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', reason: 'Lost' });
     case 'SettingsChanged':
       return domainEvent(type, rid, { keys: ['kds.ageAmberMinutes'] });
+    case 'RestaurantChanged':
+      return domainEvent(type, rid, { part: 'PROFILE' });
   }
 }

@@ -111,6 +111,11 @@ channels:
     messages:
       SettingsChanged:
         $ref: '#/components/messages/SettingsChanged'
+  RestaurantChanged:
+    address: RestaurantChanged
+    messages:
+      RestaurantChanged:
+        $ref: '#/components/messages/RestaurantChanged'
 operations:
   receiveMenuPublished:
     action: receive
@@ -238,6 +243,12 @@ operations:
       $ref: '#/channels/SettingsChanged'
     messages:
       - $ref: '#/channels/SettingsChanged/messages/SettingsChanged'
+  receiveRestaurantChanged:
+    action: receive
+    channel:
+      $ref: '#/channels/RestaurantChanged'
+    messages:
+      - $ref: '#/channels/RestaurantChanged/messages/RestaurantChanged'
 components:
   messages:
     MenuPublished:
@@ -366,6 +377,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/SettingsChanged'
+    RestaurantChanged:
+      name: RestaurantChanged
+      title: RestaurantChanged v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/RestaurantChanged'
   schemas:
     AlertEscalated:
       type: object
@@ -1027,6 +1044,50 @@ components:
       type: integer
       minimum: 0
       maximum: 9007199254740991
+    RestaurantChanged:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: RestaurantChanged
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            part:
+              type: string
+              enum:
+                - PROFILE
+                - LEGAL
+                - TAX_GROUPS
+                - INVOICE_SERIES
+          required:
+            - part
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
     ServiceRequestAcknowledged:
       type: object
       properties:

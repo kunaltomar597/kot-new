@@ -13,6 +13,7 @@
     { "name": "auth" },
     { "name": "devices" },
     { "name": "orders" },
+    { "name": "restaurant" },
     { "name": "settings" },
     { "name": "system" }
   ],
@@ -934,6 +935,284 @@
         "x-requirements": ["NFR-A04", "NFR-O01"]
       }
     },
+    "/api/v1/invoice-series": {
+      "get": {
+        "operationId": "listInvoiceSeries",
+        "summary": "Invoice series with an example number, archived ones included",
+        "tags": ["restaurant"],
+        "responses": {
+          "200": {
+            "description": "Invoice series.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InvoiceSeriesListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["BILL-003", "ONB-004"]
+      },
+      "post": {
+        "operationId": "createInvoiceSeries",
+        "summary": "Add an invoice series",
+        "description": "Numbers are at most 16 characters (BILL-003). The first series becomes the default. The Owner with a fresh second factor (AUTH-006). Audited.",
+        "tags": ["restaurant"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InvoiceSeriesRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new series.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceSeriesView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Another series has that prefix.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["BILL-003", "ONB-004", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/invoice-series/{seriesId}": {
+      "put": {
+        "operationId": "updateInvoiceSeries",
+        "summary": "Rename a series, or change its format while it has no invoices",
+        "description": "Once an invoice is issued the prefix and format are fixed, so numbers stay consecutive (BILL-003). The Owner with a fresh second factor (AUTH-006). Audited.",
+        "tags": ["restaurant"],
+        "parameters": [
+          {
+            "name": "seriesId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InvoiceSeriesRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The series as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceSeriesView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such series.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Archived, the format is fixed, or the prefix is taken.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["BILL-003", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/invoice-series/{seriesId}/archive": {
+      "post": {
+        "operationId": "archiveInvoiceSeries",
+        "summary": "Stop using a series; its invoices keep their numbers",
+        "description": "The default series cannot be archived: make another the default first.",
+        "tags": ["restaurant"],
+        "parameters": [
+          {
+            "name": "seriesId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ArchiveRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceSeriesView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such series.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "It is the default series.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["BILL-003", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/invoice-series/{seriesId}/default": {
+      "post": {
+        "operationId": "setDefaultInvoiceSeries",
+        "summary": "Make a series the one new bills use",
+        "tags": ["restaurant"],
+        "parameters": [
+          {
+            "name": "seriesId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new default series.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceSeriesView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such series.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The series is archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["BILL-003", "AUTH-006", "AUD-001"]
+      }
+    },
     "/api/v1/orders": {
       "post": {
         "operationId": "submitOrder",
@@ -978,6 +1257,136 @@
         },
         "x-capability": "ORDER_CREATE",
         "x-requirements": ["ORD-001", "ORD-013", "ORD-014", "ORD-017"]
+      }
+    },
+    "/api/v1/restaurant": {
+      "get": {
+        "operationId": "getRestaurant",
+        "summary": "The restaurant: names, invoice particulars, contact, hours and business-day cut-off",
+        "description": "For any paired device: the login screen shows the name and logo, and bills print the legal particulars (BILL-002).",
+        "tags": ["restaurant"],
+        "responses": {
+          "200": {
+            "description": "The restaurant.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/RestaurantProfile" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["ONB-004", "BILL-002", "NFR-L03"]
+      }
+    },
+    "/api/v1/restaurant/legal": {
+      "put": {
+        "operationId": "updateRestaurantLegal",
+        "summary": "Change the invoice particulars: legal name, address, state, GSTIN and FSSAI number",
+        "description": "Tax and invoice settings: the Owner with a fresh second factor (AUTH-006). The GSTIN must pass its checksum and belong to the restaurant state (BILL-002). Audited.",
+        "tags": ["restaurant"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateRestaurantLegalRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The restaurant as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/RestaurantProfile" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["ONB-004", "BILL-002", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/restaurant/profile": {
+      "put": {
+        "operationId": "updateRestaurantProfile",
+        "summary": "Change the display name, contact, opening hours, logo or business-day cut-off",
+        "description": "Audited with before and after, and announced with `RestaurantChanged`. A new cut-off is refused while it would move the current business date (BRD §9.4): change it during the day, not in the hours around the cut-off.",
+        "tags": ["restaurant"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateRestaurantProfileRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The restaurant as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/RestaurantProfile" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The cut-off change would move the business date.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "No such logo photo.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-004", "AUD-001"]
       }
     },
     "/api/v1/settings": {
@@ -1080,6 +1489,222 @@
         "x-requirements": ["MGR-007", "AUD-001", "AUTH-006", "BILL-006"]
       }
     },
+    "/api/v1/tax-groups": {
+      "get": {
+        "operationId": "listTaxGroups",
+        "summary": "Tax groups with their rates, archived ones included",
+        "description": "Menu editing assigns items to tax groups; any signed-in person may read them.",
+        "tags": ["restaurant"],
+        "responses": {
+          "200": {
+            "description": "Tax groups.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaxGroupListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["BILL-004", "ONB-004"]
+      },
+      "post": {
+        "operationId": "createTaxGroup",
+        "summary": "Add a tax group, e.g. \"GST 5 %\" = CGST 2.5 % + SGST 2.5 %",
+        "description": "Rates are entered by the restaurant, never built in (BILL-004). The Owner with a fresh second factor (AUTH-006). Audited.",
+        "tags": ["restaurant"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TaxGroupRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new tax group.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TaxGroupView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Another tax group has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["BILL-004", "ONB-004", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/tax-groups/{taxGroupId}": {
+      "put": {
+        "operationId": "updateTaxGroup",
+        "summary": "Change a tax group: name, SAC code or rates",
+        "description": "New rates apply to bills issued from now on; issued invoices keep their own tax lines. The Owner with a fresh second factor (AUTH-006). Audited with before and after.",
+        "tags": ["restaurant"],
+        "parameters": [
+          {
+            "name": "taxGroupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TaxGroupRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The tax group as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TaxGroupView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tax group.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Archived, or another tax group has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["BILL-004", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/tax-groups/{taxGroupId}/archive": {
+      "post": {
+        "operationId": "archiveTaxGroup",
+        "summary": "Archive a tax group no menu item uses",
+        "description": "Master data is archived, never deleted (BRD §9.4). Owner with second factor.",
+        "tags": ["restaurant"],
+        "parameters": [
+          {
+            "name": "taxGroupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ArchiveRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TaxGroupView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tax group.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Menu items still use it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TAX_AND_INVOICE_SETTINGS",
+        "x-requirements": ["BILL-004", "AUTH-006", "AUD-001"]
+      }
+    },
     "/api/v1/tls/ca": {
       "get": {
         "operationId": "getTlsCa",
@@ -1125,6 +1750,17 @@
   },
   "components": {
     "schemas": {
+      "Address": {
+        "type": "object",
+        "properties": {
+          "line1": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "line2": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "city": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "pincode": { "type": "string", "pattern": "^[1-9]\\d{5}$" }
+        },
+        "required": ["line1", "city", "pincode"],
+        "additionalProperties": false
+      },
       "AlertEscalated": {
         "type": "object",
         "properties": {
@@ -1174,6 +1810,12 @@
           "correlationId": { "type": "string" }
         },
         "required": ["code", "message"],
+        "additionalProperties": false
+      },
+      "ArchiveRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "AuditChainBreak": {
@@ -1328,6 +1970,12 @@
         "properties": { "tableId": { "$ref": "#/components/schemas/Id" } },
         "required": ["tableId"],
         "additionalProperties": false
+      },
+      "BusinessDayCutoff": { "$ref": "#/components/schemas/TimeOfDay" },
+      "BusinessHours": {
+        "maxItems": 28,
+        "type": "array",
+        "items": { "$ref": "#/components/schemas/OpeningHours" }
       },
       "Capability": {
         "type": "string",
@@ -1668,11 +2316,15 @@
           { "$ref": "#/components/schemas/AlertEscalated" },
           { "$ref": "#/components/schemas/DeviceStatusChanged" },
           { "$ref": "#/components/schemas/DeviceRevoked" },
-          { "$ref": "#/components/schemas/SettingsChanged" }
+          { "$ref": "#/components/schemas/SettingsChanged" },
+          { "$ref": "#/components/schemas/RestaurantChanged" }
         ]
       },
       "ExternalId": { "type": "string", "minLength": 1, "maxLength": 128 },
       "FoodType": { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] },
+      "FssaiNumber": { "type": "string", "pattern": "^\\d{14}$" },
+      "GstStateCode": { "type": "string", "pattern": "^\\d{2}$" },
+      "Gstin": { "type": "string", "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$" },
       "HealthResponse": {
         "type": "object",
         "properties": {
@@ -1708,6 +2360,74 @@
         "type": "string",
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "InvoiceSeparator": { "type": "string", "enum": ["/", "-"] },
+      "InvoiceSeriesListResponse": {
+        "type": "object",
+        "properties": {
+          "invoiceSeries": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/InvoiceSeriesView" }
+          }
+        },
+        "required": ["invoiceSeries"],
+        "additionalProperties": false
+      },
+      "InvoiceSeriesParams": {
+        "type": "object",
+        "properties": { "seriesId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["seriesId"],
+        "additionalProperties": false
+      },
+      "InvoiceSeriesPrefix": { "type": "string", "pattern": "^[A-Z0-9]{0,10}$" },
+      "InvoiceSeriesRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "prefix": { "$ref": "#/components/schemas/InvoiceSeriesPrefix" },
+          "includeFinancialYear": { "type": "boolean" },
+          "separator": { "$ref": "#/components/schemas/InvoiceSeparator" },
+          "sequencePadding": { "type": "integer", "minimum": 1, "maximum": 12 },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["name", "prefix", "includeFinancialYear", "separator", "sequencePadding"],
+        "additionalProperties": false
+      },
+      "InvoiceSeriesView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "prefix": { "type": "string" },
+          "includeFinancialYear": { "type": "boolean" },
+          "separator": { "$ref": "#/components/schemas/InvoiceSeparator" },
+          "sequencePadding": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "isDefault": { "type": "boolean" },
+          "example": { "type": "string" },
+          "invoiceCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "archivedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "includeFinancialYear",
+          "separator",
+          "sequencePadding",
+          "isDefault",
+          "example",
+          "invoiceCount",
+          "archivedAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
       },
       "IsoDate": {
         "type": "string",
@@ -2114,6 +2834,16 @@
         "required": ["id", "name", "priceDelta"],
         "additionalProperties": false
       },
+      "OpeningHours": {
+        "type": "object",
+        "properties": {
+          "day": { "$ref": "#/components/schemas/Weekday" },
+          "start": { "$ref": "#/components/schemas/TimeOfDay" },
+          "end": { "$ref": "#/components/schemas/TimeOfDay" }
+        },
+        "required": ["day", "start", "end"],
+        "additionalProperties": false
+      },
       "OrderApproved": {
         "type": "object",
         "properties": {
@@ -2412,6 +3142,7 @@
       },
       "Paise": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
       "PaymentMode": { "type": "string", "enum": ["CASH", "CARD", "UPI", "OTHER"] },
+      "PhoneNumber": { "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" },
       "Pin": { "type": "string", "pattern": "^\\d{4,8}$" },
       "PinLoginRequest": {
         "type": "object",
@@ -2527,6 +3258,100 @@
         "required": ["clientLineId", "code", "message"],
         "additionalProperties": false
       },
+      "RestaurantChanged": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "RestaurantChanged" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "part": {
+                "type": "string",
+                "enum": ["PROFILE", "LEGAL", "TAX_GROUPS", "INVOICE_SERIES"]
+              }
+            },
+            "required": ["part"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "RestaurantContact": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "anyOf": [{ "$ref": "#/components/schemas/PhoneNumber" }, { "type": "null" }]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["phone", "email"],
+        "additionalProperties": false
+      },
+      "RestaurantProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "displayName": { "type": "string" },
+          "legalName": { "type": ["string", "null"] },
+          "address": { "anyOf": [{ "$ref": "#/components/schemas/Address" }, { "type": "null" }] },
+          "stateCode": { "type": ["string", "null"] },
+          "stateName": { "type": ["string", "null"] },
+          "gstin": { "type": ["string", "null"] },
+          "fssaiNumber": { "type": ["string", "null"] },
+          "contact": { "$ref": "#/components/schemas/RestaurantContact" },
+          "businessHours": { "$ref": "#/components/schemas/BusinessHours" },
+          "logoPhotoId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "timeZone": { "type": "string" },
+          "businessDayCutoff": { "$ref": "#/components/schemas/TimeOfDay" },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "legalName",
+          "address",
+          "stateCode",
+          "stateName",
+          "gstin",
+          "fssaiNumber",
+          "contact",
+          "businessHours",
+          "logoPhotoId",
+          "timeZone",
+          "businessDayCutoff",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
       "RevokeDeviceRequest": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
@@ -2534,6 +3359,7 @@
         "additionalProperties": false
       },
       "Role": { "type": "string", "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+      "SacCode": { "type": "string", "pattern": "^\\d{4,8}$" },
       "SalesChannel": { "type": "string", "enum": ["POS", "WAITER_APP", "TABLE_TABLET", "QR"] },
       "SecondFactor": {
         "oneOf": [
@@ -3023,6 +3849,16 @@
         ],
         "additionalProperties": false
       },
+      "TaxComponentCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{0,9}$" },
+      "TaxComponentInput": {
+        "type": "object",
+        "properties": {
+          "code": { "$ref": "#/components/schemas/TaxComponentCode" },
+          "rateBp": { "$ref": "#/components/schemas/BasisPoints" }
+        },
+        "required": ["code", "rateBp"],
+        "additionalProperties": false
+      },
       "TaxGroup": {
         "type": "object",
         "properties": {
@@ -3043,6 +3879,72 @@
           }
         },
         "required": ["id", "name", "components"],
+        "additionalProperties": false
+      },
+      "TaxGroupListResponse": {
+        "type": "object",
+        "properties": {
+          "taxGroups": { "type": "array", "items": { "$ref": "#/components/schemas/TaxGroupView" } }
+        },
+        "required": ["taxGroups"],
+        "additionalProperties": false
+      },
+      "TaxGroupParams": {
+        "type": "object",
+        "properties": { "taxGroupId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["taxGroupId"],
+        "additionalProperties": false
+      },
+      "TaxGroupRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "sacCode": { "anyOf": [{ "$ref": "#/components/schemas/SacCode" }, { "type": "null" }] },
+          "components": {
+            "maxItems": 6,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TaxComponentInput" }
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["name", "sacCode", "components"],
+        "additionalProperties": false
+      },
+      "TaxGroupView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "sacCode": { "type": ["string", "null"] },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string" },
+                "rateBp": { "$ref": "#/components/schemas/BasisPoints" }
+              },
+              "required": ["code", "rateBp"],
+              "additionalProperties": false
+            }
+          },
+          "totalRateBp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "itemCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "archivedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": [
+          "id",
+          "name",
+          "sacCode",
+          "components",
+          "totalRateBp",
+          "itemCount",
+          "archivedAt",
+          "updatedAt"
+        ],
         "additionalProperties": false
       },
       "TimeOfDay": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
@@ -3112,6 +4014,34 @@
         "required": ["staffId"],
         "additionalProperties": false
       },
+      "UpdateRestaurantLegalRequest": {
+        "type": "object",
+        "properties": {
+          "legalName": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "address": { "$ref": "#/components/schemas/Address" },
+          "stateCode": { "$ref": "#/components/schemas/GstStateCode" },
+          "gstin": { "anyOf": [{ "$ref": "#/components/schemas/Gstin" }, { "type": "null" }] },
+          "fssaiNumber": {
+            "anyOf": [{ "$ref": "#/components/schemas/FssaiNumber" }, { "type": "null" }]
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["legalName", "address", "stateCode", "gstin", "fssaiNumber"],
+        "additionalProperties": false
+      },
+      "UpdateRestaurantProfileRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "contact": { "$ref": "#/components/schemas/RestaurantContact" },
+          "businessHours": { "$ref": "#/components/schemas/BusinessHours" },
+          "logoPhotoId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "businessDayCutoff": { "$ref": "#/components/schemas/BusinessDayCutoff" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["displayName", "contact", "businessHours", "logoPhotoId", "businessDayCutoff"],
+        "additionalProperties": false
+      },
       "UpdateSettingRequest": {
         "type": "object",
         "properties": {
@@ -3142,7 +4072,8 @@
         },
         "required": ["name", "version", "apiVersion", "node"],
         "additionalProperties": false
-      }
+      },
+      "Weekday": { "type": "string", "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] }
     }
   }
 }

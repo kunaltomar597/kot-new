@@ -74,6 +74,26 @@ Kept out of the catalogue on purpose (documented in `settings.ts`):
 The rest of P1-01: the restaurant profile API with GSTIN checksum validation, tax groups CRUD and
 invoice series CRUD, Owner-only with step-up.
 
+As built: `@rp/domain` `gstin.ts` validates GSTINs (format, state code, mod-36 check character).
+`packages/contracts/src/restaurant.ts` has the schemas and `apps/server/src/restaurant` the
+module:
+
+- `GET /api/v1/restaurant` for any paired device. `PUT /api/v1/restaurant/profile` is for
+  managers: display name, contact, opening hours, logo and the business-day cut-off. A new cut-off
+  is refused while it would move the current business date.
+- `PUT /api/v1/restaurant/legal` covers the legal name, address, state, GSTIN and FSSAI number.
+  The GSTIN must be from the restaurant's state.
+- Tax groups: list, create, update and archive. The rates are data. An archived group keeps its
+  history, and a group is archived only when no active item uses it.
+- Invoice series: list, create, update, archive and make default.
+  - Numbers are at most 16 characters. A prefix is never reused.
+  - The format is fixed once an invoice exists.
+  - There is exactly one default series, which cannot be archived.
+- Every change is audited with before and after and announced with `RestaurantChanged`. Tax,
+  invoice and legal changes need the Owner with a fresh second factor.
+- New settings: `bills.headerLines` and `bills.footerLines` (ONB-004 step 3). The service charge
+  settings are now the Owner's.
+
 ## P1-02 Floor, tables, table sessions, waiter assignment, move table, takeaway tokens
 
 Goal: the table side of service.

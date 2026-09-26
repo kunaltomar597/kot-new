@@ -35,6 +35,20 @@ import {
 } from './devices.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
 import {
+  ArchiveRequest,
+  InvoiceSeriesListResponse,
+  InvoiceSeriesParams,
+  InvoiceSeriesRequest,
+  InvoiceSeriesView,
+  RestaurantProfile,
+  TaxGroupListResponse,
+  TaxGroupParams,
+  TaxGroupRequest,
+  TaxGroupView,
+  UpdateRestaurantLegalRequest,
+  UpdateRestaurantProfileRequest,
+} from './restaurant.js';
+import {
   SettingKeyParams,
   SettingsResponse,
   SettingView,
@@ -535,5 +549,212 @@ export const ROUTES = [
     capability: 'DEVICE_PAIR',
     request: { params: z.object({ deviceId: Id }), body: BindTableRequest },
     responses: { 200: { description: 'Rebound.', schema: DeviceSummary }, ...standardErrors },
+  },
+  {
+    operationId: 'getRestaurant',
+    method: 'GET',
+    path: '/api/v1/restaurant',
+    summary: 'The restaurant: names, invoice particulars, contact, hours and business-day cut-off',
+    description:
+      'For any paired device: the login screen shows the name and logo, and bills print the ' +
+      'legal particulars (BILL-002).',
+    tags: ['restaurant'],
+    requirements: ['ONB-004', 'BILL-002', 'NFR-L03'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The restaurant.', schema: RestaurantProfile },
+      ...deviceErrors,
+    },
+  },
+  {
+    operationId: 'updateRestaurantProfile',
+    method: 'PUT',
+    path: '/api/v1/restaurant/profile',
+    summary: 'Change the display name, contact, opening hours, logo or business-day cut-off',
+    description:
+      'Audited with before and after, and announced with `RestaurantChanged`. A new cut-off ' +
+      'is refused while it would move the current business date (BRD §9.4): change it during ' +
+      'the day, not in the hours around the cut-off.',
+    tags: ['restaurant'],
+    requirements: ['ONB-004', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { body: UpdateRestaurantProfileRequest },
+    responses: {
+      200: { description: 'The restaurant as it is now.', schema: RestaurantProfile },
+      ...standardErrors,
+      409: { description: 'The cut-off change would move the business date.', schema: ApiError },
+      422: { description: 'No such logo photo.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateRestaurantLegal',
+    method: 'PUT',
+    path: '/api/v1/restaurant/legal',
+    summary: 'Change the invoice particulars: legal name, address, state, GSTIN and FSSAI number',
+    description:
+      'Tax and invoice settings: the Owner with a fresh second factor (AUTH-006). The GSTIN must ' +
+      'pass its checksum and belong to the restaurant state (BILL-002). Audited.',
+    tags: ['restaurant'],
+    requirements: ['ONB-004', 'BILL-002', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { body: UpdateRestaurantLegalRequest },
+    responses: {
+      200: { description: 'The restaurant as it is now.', schema: RestaurantProfile },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'listTaxGroups',
+    method: 'GET',
+    path: '/api/v1/tax-groups',
+    summary: 'Tax groups with their rates, archived ones included',
+    description: 'Menu editing assigns items to tax groups; any signed-in person may read them.',
+    tags: ['restaurant'],
+    requirements: ['BILL-004', 'ONB-004'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'Tax groups.', schema: TaxGroupListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'createTaxGroup',
+    method: 'POST',
+    path: '/api/v1/tax-groups',
+    summary: 'Add a tax group, e.g. "GST 5 %" = CGST 2.5 % + SGST 2.5 %',
+    description:
+      'Rates are entered by the restaurant, never built in (BILL-004). The Owner with a fresh ' +
+      'second factor (AUTH-006). Audited.',
+    tags: ['restaurant'],
+    requirements: ['BILL-004', 'ONB-004', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { body: TaxGroupRequest },
+    responses: {
+      201: { description: 'The new tax group.', schema: TaxGroupView },
+      ...standardErrors,
+      409: { description: 'Another tax group has that name.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateTaxGroup',
+    method: 'PUT',
+    path: '/api/v1/tax-groups/:taxGroupId',
+    summary: 'Change a tax group: name, SAC code or rates',
+    description:
+      'New rates apply to bills issued from now on; issued invoices keep their own tax lines. ' +
+      'The Owner with a fresh second factor (AUTH-006). Audited with before and after.',
+    tags: ['restaurant'],
+    requirements: ['BILL-004', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { params: TaxGroupParams, body: TaxGroupRequest },
+    responses: {
+      200: { description: 'The tax group as it is now.', schema: TaxGroupView },
+      ...standardErrors,
+      404: { description: 'No such tax group.', schema: ApiError },
+      409: { description: 'Archived, or another tax group has that name.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'archiveTaxGroup',
+    method: 'POST',
+    path: '/api/v1/tax-groups/:taxGroupId/archive',
+    summary: 'Archive a tax group no menu item uses',
+    description: 'Master data is archived, never deleted (BRD §9.4). Owner with second factor.',
+    tags: ['restaurant'],
+    requirements: ['BILL-004', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { params: TaxGroupParams, body: ArchiveRequest },
+    responses: {
+      200: { description: 'Archived.', schema: TaxGroupView },
+      ...standardErrors,
+      404: { description: 'No such tax group.', schema: ApiError },
+      409: { description: 'Menu items still use it.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listInvoiceSeries',
+    method: 'GET',
+    path: '/api/v1/invoice-series',
+    summary: 'Invoice series with an example number, archived ones included',
+    tags: ['restaurant'],
+    requirements: ['BILL-003', 'ONB-004'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'Invoice series.', schema: InvoiceSeriesListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'createInvoiceSeries',
+    method: 'POST',
+    path: '/api/v1/invoice-series',
+    summary: 'Add an invoice series',
+    description:
+      'Numbers are at most 16 characters (BILL-003). The first series becomes the default. The ' +
+      'Owner with a fresh second factor (AUTH-006). Audited.',
+    tags: ['restaurant'],
+    requirements: ['BILL-003', 'ONB-004', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { body: InvoiceSeriesRequest },
+    responses: {
+      201: { description: 'The new series.', schema: InvoiceSeriesView },
+      ...standardErrors,
+      409: { description: 'Another series has that prefix.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateInvoiceSeries',
+    method: 'PUT',
+    path: '/api/v1/invoice-series/:seriesId',
+    summary: 'Rename a series, or change its format while it has no invoices',
+    description:
+      'Once an invoice is issued the prefix and format are fixed, so numbers stay consecutive ' +
+      '(BILL-003). The Owner with a fresh second factor (AUTH-006). Audited.',
+    tags: ['restaurant'],
+    requirements: ['BILL-003', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { params: InvoiceSeriesParams, body: InvoiceSeriesRequest },
+    responses: {
+      200: { description: 'The series as it is now.', schema: InvoiceSeriesView },
+      ...standardErrors,
+      404: { description: 'No such series.', schema: ApiError },
+      409: {
+        description: 'Archived, the format is fixed, or the prefix is taken.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'archiveInvoiceSeries',
+    method: 'POST',
+    path: '/api/v1/invoice-series/:seriesId/archive',
+    summary: 'Stop using a series; its invoices keep their numbers',
+    description: 'The default series cannot be archived: make another the default first.',
+    tags: ['restaurant'],
+    requirements: ['BILL-003', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { params: InvoiceSeriesParams, body: ArchiveRequest },
+    responses: {
+      200: { description: 'Archived.', schema: InvoiceSeriesView },
+      ...standardErrors,
+      404: { description: 'No such series.', schema: ApiError },
+      409: { description: 'It is the default series.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'setDefaultInvoiceSeries',
+    method: 'POST',
+    path: '/api/v1/invoice-series/:seriesId/default',
+    summary: 'Make a series the one new bills use',
+    tags: ['restaurant'],
+    requirements: ['BILL-003', 'AUTH-006', 'AUD-001'],
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    request: { params: InvoiceSeriesParams },
+    responses: {
+      200: { description: 'The new default series.', schema: InvoiceSeriesView },
+      ...standardErrors,
+      404: { description: 'No such series.', schema: ApiError },
+      409: { description: 'The series is archived.', schema: ApiError },
+    },
   },
 ] as const satisfies readonly RouteDefinition[];

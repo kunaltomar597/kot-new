@@ -1,0 +1,48 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "sacCode": { "anyOf": [{ "type": "string", "pattern": "^\\d{4,8}$" }, { "type": "null" }] },
+      "components": {
+        "maxItems": 6,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{0,9}$" },
+            "rateBp": { "type": "integer", "minimum": 0, "maximum": 10000 }
+          },
+          "required": ["code", "rateBp"],
+          "additionalProperties": false
+        }
+      },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["name", "sacCode", "components"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "sacCode": { "anyOf": [{ "type": "string", "pattern": "^\\d{4,8}$" }, { "type": "null" }] },
+      "components": {
+        "maxItems": 6,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{0,9}$" },
+            "rateBp": { "type": "integer", "minimum": 0, "maximum": 10000 }
+          },
+          "required": ["code", "rateBp"],
+          "additionalProperties": false
+        }
+      },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["name", "sacCode", "components"],
+    "additionalProperties": false
+  }
+}

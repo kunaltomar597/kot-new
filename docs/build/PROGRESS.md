@@ -12,12 +12,12 @@ What exists:
 
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
-  state machines, permissions, menu selection, KOT split. 89 tests, ~99 % line coverage.
+  state machines, permissions, menu selection, KOT split, GSTIN validation. 113 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
-  (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a).
-  247 tests.
+  (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
+  the restaurant profile, tax groups and invoice series (P1-01b). 288 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -27,7 +27,8 @@ What exists:
   rooms, resync and revocation (P0-12); HTTPS/WSS with the installation's own CA, automatic
   certificate renewal and CA pinning at pairing (P0-15, ADR-0011); enrolment with the Vendor
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
-  with audited changes and `SettingsChanged` events (P1-01a). 442 tests.
+  with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
+  and invoice series with Owner-only changes (P1-01b). 459 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -50,8 +51,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-01b Restaurant profile, GSTIN, tax groups and invoice series.
-- P1-02 Floor, tables, table sessions (after P1-01b; P0-12 done).
+- P1-02 Floor, tables, table sessions (P1-01 and P0-12 done).
+- P1-03 Menu management API (P1-01 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -87,7 +88,7 @@ Recommended next WPs (dependencies met):
 ### Phase 1: Core POS and kitchen
 
 - [x] P1-01a Settings registry
-- [ ] P1-01b Restaurant profile, tax groups and invoice series
+- [x] P1-01b Restaurant profile, tax groups and invoice series
 - [ ] P1-02 Floor, tables, sessions, move table, takeaway tokens
 - [ ] P1-03 Menu management API
 - [ ] P1-04 Menu photos
@@ -221,14 +222,33 @@ restaurant (or the vendor) can change:
 16. An overdue invoice moves a licence to grace after 15 days (`licence.overdueToGraceDays`,
     vendor-controlled). This must match the subscription agreement (LIC-009).
 
+Decided 2026-09-26 (P1-01b):
+
+17. The "financial-year reset" of an invoice series (ONB-004 step 3) is `includeFinancialYear`.
+    With it, numbers carry the year ("INV/26-27/000001") and restart at 1 every April. Without it
+    they run on across years, so every number stays unique for the restaurant (the database
+    requires that). The billing engine (P1-10) allocates such a series from one sequence row.
+18. Service charge (on/off and rate) and the bill header and footer are invoice settings (ONB-004
+    step 3), so they are the Owner's with a second factor (AUTH-006). P1-01a had given the
+    service charge to managers.
+19. A new business-day cut-off applies at once, but is refused while it would move the current
+    business date (for example 04:00 to 02:00 at 03:00). The cut-off must be before 12:00.
+20. Setup data rules:
+    - GSTIN: optional (a restaurant may not be registered). When given, it must be from the
+      restaurant's state.
+    - Tax groups: names are unique among active groups, with at most 6 components adding up to at
+      most 100 %. A group without components is allowed for exempt supplies.
+    - Invoice prefixes: upper-case letters and digits, never reused, archived series included.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
 revocation), #12 (P0-14a client-side token handling), #13 (P0-14b console storage of keys and
 sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning), #16 (P0-17a
 installation identity, signed requests and enrolment of the Control Plane), #17 (P0-17b the
-installation key on the PC and its signing client), P1-01a (who may change which setting,
-including the Owner's second factor for tax and data settings; this PR).
+installation key on the PC and its signing client), #18 (P1-01a who may change which setting,
+including the Owner's second factor for tax and data settings), P1-01b (the Owner-only tax,
+invoice series and invoice particulars endpoints; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -236,6 +256,62 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-01b restaurant profile, tax groups and invoice series (P1-01 done)
+
+Built:
+
+- `@rp/domain`:
+  - `gstin.ts`: format, GST state codes and the mod-36 check character, plus normalising what
+    people type.
+  - `cutoffChangeMovesBusinessDate` in `business-date.ts`.
+- `@rp/contracts` `restaurant.ts`:
+  - the profile, legal-particulars, tax-group and invoice-series schemas;
+  - a GSTIN schema that checks the check character, and a GSTIN that must match the state code;
+  - a `RestaurantChanged` event with the changed part;
+  - 12 routes.
+
+  New settings `bills.headerLines` and `bills.footerLines`. The service charge settings are the
+  Owner's now (Decision 18).
+
+- `apps/server/src/restaurant`:
+  - `GET /api/v1/restaurant` for any paired device (login screen and bills).
+  - `PUT /api/v1/restaurant/profile` for managers: name, contact, hours, logo and cut-off. The
+    cut-off guard is Decision 19.
+  - `PUT /api/v1/restaurant/legal` for the Owner with a second factor.
+  - Tax groups and invoice series: list, create, update and archive; make-default for series.
+  - Each change runs under an advisory lock, with an audit entry (before, after, reason) and
+    `RestaurantChanged`, in one transaction. Repeating the same values is a no-op.
+- Migration `20260926140000_restaurant_profile`: phone, email, opening hours and the logo, with a
+  restricting foreign key to `photos`. The development seed's address follows the `Address`
+  contract.
+- Tests:
+  - domain: GSTIN vectors and typos; the cut-off rule at 03:00, 10:00 and 15:00 IST;
+  - contracts: 10 restaurant schema tests, plus the Owner-only invoice settings;
+  - server: 16 integration tests, covering device-only read, audited no-op repeats, the logo
+    photo, the Owner's second factor, a mistyped or foreign-state GSTIN, the tax-group name clash,
+    rate changes, archive refusal while items use a group, series default, prefix reuse, the
+    format fixed after an invoice, and the cut-off guard with a moved clock;
+  - the rooms test covers the new event.
+
+  Totals: domain 113 tests, contracts 288 tests, server 459 tests.
+
+Decisions: 17 to 20.
+
+Notes for the next sessions:
+
+- P1-03 (menu): when an item gets a tax group, read the group row `FOR SHARE` and check it is not
+  archived. The archive holds the row `FOR UPDATE`, so the two cannot race.
+- P1-10 (billing):
+  - Read the invoice series row `FOR SHARE` before formatting a number. The series update holds
+    it `FOR UPDATE` while it checks that no invoice exists.
+  - A series without the financial year runs on from one sequence row (Decision 17).
+  - Bills use the default series and print `bills.headerLines` and `bills.footerLines`, the legal
+    particulars, and the state name as place of supply.
+- P1-04 (photos): the orphan clean-up must skip a photo used as the logo; the foreign key refuses
+  the delete anyway.
+- P7-07 (wizard UI): steps 1 to 3 call these endpoints. Normalise a typed GSTIN with
+  `normaliseGstin` before sending it, and show the state name from `GST_STATE_CODES`.
 
 ### 2026-09-26: P1-01a settings registry
 
