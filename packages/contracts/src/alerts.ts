@@ -51,3 +51,24 @@ export type AlertListResponse = z.infer<typeof AlertListResponse>;
 
 export const AlertParams = z.strictObject({ alertId: Id });
 export type AlertParams = z.infer<typeof AlertParams>;
+
+/** NTF-008: a manager nudges one or more waiters with a preset or a short text for the pager. */
+export const NudgeRequest = z.strictObject({
+  staffIds: z.array(Id).min(1).max(20),
+  message: z.string().trim().min(1).max(40),
+});
+export type NudgeRequest = z.infer<typeof NudgeRequest>;
+
+export const NudgeResponse = z.object({ alertIds: z.array(Id) });
+export type NudgeResponse = z.infer<typeof NudgeResponse>;
+
+/** NTF-009: "On break" for the signed-in person; their alerts go to the managers meanwhile. */
+export const BreakRequest = z.strictObject({ onBreak: z.boolean() });
+export type BreakRequest = z.infer<typeof BreakRequest>;
+
+export const BreakView = z.object({
+  staffId: Id,
+  onBreak: z.boolean(),
+  since: Timestamp.nullable(),
+});
+export type BreakView = z.infer<typeof BreakView>;

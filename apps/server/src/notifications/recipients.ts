@@ -38,7 +38,7 @@ export async function recipientContext(
       : tx.diningTable.findUnique({ where: { id: subject.tableId }, select: { sectionId: true } }),
     tx.staff.findMany({
       where: { restaurantId, active: true, archivedAt: null },
-      select: { id: true, role: { select: { baseRole: true } } },
+      select: { id: true, onBreakSince: true, role: { select: { baseRole: true } } },
     }),
     tx.session.findMany({
       where: { restaurantId, revokedAt: null, expiresAt: { gt: now } },
@@ -77,8 +77,9 @@ export async function recipientContext(
     ownerIds: byRole(['OWNER']),
     selectedIds: subject.selectedIds ?? [],
     wearerId: subject.wearerId ?? null,
-    // "On break" arrives with P2-03b.
-    onBreak: new Set(),
+    onBreak: new Set(
+      staff.filter((person) => person.onBreakSince !== null).map((person) => person.id),
+    ),
     reachable,
   };
 }

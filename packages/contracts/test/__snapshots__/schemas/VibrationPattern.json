@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["ONE_LONG", "TWO_SHORT", "THREE", "ONE_SHORT"] },
+  "output": { "type": "string", "enum": ["ONE_LONG", "TWO_SHORT", "THREE", "ONE_SHORT"] }
+}

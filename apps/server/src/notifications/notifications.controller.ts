@@ -1,7 +1,15 @@
-import { Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
-import { type AlertListResponse, AlertParams, type AlertView } from '@rp/contracts';
+import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
+import {
+  type AlertListResponse,
+  AlertParams,
+  type AlertView,
+  BreakRequest,
+  type BreakView,
+  NudgeRequest,
+  type NudgeResponse,
+} from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
-import { RequireSession } from '../auth/decorators.js';
+import { RequireCapability, RequireSession } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { NotificationsService } from './notifications.service.js';
@@ -29,5 +37,30 @@ export class NotificationsController {
     @Param(new ZodValidationPipe(AlertParams)) { alertId }: AlertParams,
   ): Promise<AlertView> {
     return this.notifications.acknowledge(principalOf(request), alertId);
+  }
+
+  @Post('nudge')
+  @RequireCapability('STAFF_MANAGE')
+  nudge(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(NudgeRequest)) body: NudgeRequest,
+  ): Promise<NudgeResponse> {
+    return this.notifications.nudge(principalOf(request), body);
+  }
+}
+
+/** "On break" for the signed-in person (NTF-009). */
+@Controller('staff/me')
+@RequireSession()
+export class BreakController {
+  constructor(private readonly notifications: NotificationsService) {}
+
+  @Post('break')
+  @HttpCode(200)
+  setBreak(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(BreakRequest)) body: BreakRequest,
+  ): Promise<BreakView> {
+    return this.notifications.setBreak(principalOf(request), body.onBreak);
   }
 }

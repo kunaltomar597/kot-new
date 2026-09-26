@@ -8,8 +8,11 @@ import {
 import type {
   AlertListResponse,
   AlertView,
+  BreakView,
   DomainEvent,
   NotificationEventType,
+  NudgeRequest,
+  NudgeResponse,
 } from '@rp/contracts';
 import {
   dueActions,
@@ -248,7 +251,9 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     return open.length;
   }
 
-  async list(principal: Principal): Promise<AlertListResponse> {
+  async list(
+    principal: Pick<Principal, 'restaurantId' | 'staffId' | 'role'>,
+  ): Promise<AlertListResponse> {
     const alerts = await this.prisma.alert.findMany({
       where: {
         restaurantId: principal.restaurantId,
@@ -260,8 +265,63 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     return { alerts: alerts.map(toAlertView) };
   }
 
+  /**
+   * NTF-008: one alert per person, so each acknowledges their own. Anyone chosen must be active
+   * staff of the restaurant.
+   */
+  async nudge(principal: Principal, request: NudgeRequest): Promise<NudgeResponse> {
+    const staffIds = [...new Set(request.staffIds)];
+    return this.prisma.transaction(async (tx) => {
+      const found = await tx.staff.count({
+        where: {
+          id: { in: staffIds },
+          restaurantId: principal.restaurantId,
+          active: true,
+          archivedAt: null,
+        },
+      });
+      if (found !== staffIds.length) {
+        throw new AppError(422, 'STAFF_NOT_FOUND', 'Choose people who work here and are active.');
+      }
+      const alertIds: string[] = [];
+      for (const staffId of staffIds) {
+        const { alertId } = await this.raise(tx, {
+          restaurantId: principal.restaurantId,
+          type: 'MANAGER_NUDGE',
+          selectedIds: [staffId],
+          message: request.message,
+          raisedById: principal.staffId,
+          raisedByDeviceId: principal.deviceId,
+          payload: { from: principal.staffId },
+        });
+        alertIds.push(alertId);
+      }
+      return { alertIds };
+    });
+  }
+
+  /** NTF-009: while on break, the person's alerts go to the managers on duty. */
+  async setBreak(principal: Principal, onBreak: boolean): Promise<BreakView> {
+    const current = await this.prisma.staff.findFirstOrThrow({
+      where: { id: principal.staffId, restaurantId: principal.restaurantId },
+      select: { onBreakSince: true },
+    });
+    let since = current.onBreakSince;
+    if (onBreak !== (since !== null)) {
+      since = onBreak ? this.clock.now() : null;
+      await this.prisma.staff.update({
+        where: { id: principal.staffId },
+        data: { onBreakSince: since },
+      });
+    }
+    return { staffId: principal.staffId, onBreak: since !== null, since: iso(since) };
+  }
+
   /** NTF-004: acknowledged by a recipient, a manager or the Owner, on any device. */
-  async acknowledge(principal: Principal, alertId: string): Promise<AlertView> {
+  async acknowledge(
+    principal: Pick<Principal, 'restaurantId' | 'staffId' | 'role'>,
+    alertId: string,
+  ): Promise<AlertView> {
     return this.prisma.transaction(async (tx) => {
       const [alert] = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM alerts WHERE id = ${alertId}::uuid AND restaurant_id = ${principal.restaurantId}::uuid
@@ -393,6 +453,11 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       },
     });
     return true;
+  }
+
+  /** The restaurant's settings (cached), for triggers that need a threshold. */
+  settingsOf(restaurantId: string) {
+    return this.settings.snapshot(restaurantId);
   }
 
   private async ruleFor(

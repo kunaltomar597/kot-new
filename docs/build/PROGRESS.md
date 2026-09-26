@@ -14,7 +14,7 @@ What exists:
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
   state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment,
   bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export, menu
-  import planning (P1-05) and notification rules (P2-03a). 169 tests.
+  import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a). 173 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -23,10 +23,12 @@ What exists:
   (P1-02); the menu (P1-03); photos (P1-04); menu import (P1-05); orders and item changes (P1-06);
   stations, printers and the print queue (P1-07); the KDS (P1-09a); bills and invoices (P1-10);
   shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down
-  (P1-13); alerts (P2-03a). 458 tests.
+  (P1-13); alerts (P2-03a); nudges and breaks (P2-03b); pagers and their MQTT channels (P2-04a).
+  478 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
-  harness; core data model (61 tables after the later migrations), least-privilege roles, audit/invoice protection triggers,
+  harness; core data model (61 tables after the later migrations), least-privilege roles,
+  audit/invoice protection triggers,
   gap-free numbering and a development seed (P0-08); audit hash chain (P0-09); authentication,
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
@@ -45,11 +47,15 @@ What exists:
   (P1-10d); shifts, cash and payments with table settlement (P1-11a); day-end with the Z-report
   and carry-forward (P1-11b); the core reports, stamped and audited CSV export and the order
   drill-down (P1-13); the Phase 1 exit scenario (P1-14); the notification engine core with
-  acknowledgement, repeats and escalation (P2-03a). 629 tests (4 skipped without a real install).
+  acknowledgement, repeats and escalation (P2-03a); nudges, breaks, device, printer and disk
+  alerts (P2-03b); the pager MQTT broker with per-pager credentials, ACL, alert delivery, acks and
+  heartbeats (P2-04a). 644 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
   account pending).
+- `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
+  for the React Native apps (P2-01a). 8 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -72,8 +78,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-01 React Native foundation (P0-11 to P0-14 done).
-- P2-03b Nudges, breaks, device and system alerts (P2-03a done).
+- P2-01b React Native component library (P2-01a done).
+- P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -138,11 +144,14 @@ Recommended next WPs (dependencies met):
 
 ### Phase 2: Waiter app, notifications, pagers
 
-- [ ] P2-01 React Native foundation
+- [x] P2-01a Mobile core (credentials, outbox, menu cache)
+- [ ] P2-01b React Native component library
+- [ ] P2-01c Expo apps, builds and smoke flows
 - [ ] P2-02 Waiter app: tables and order taking
 - [x] P2-03a Notification engine core
-- [ ] P2-03b Nudges, breaks, device, printer and system alerts
-- [ ] P2-04 MQTT broker and pager server side
+- [x] P2-03b Nudges, breaks, device, printer and system alerts
+- [x] P2-04a Pager broker, credentials, delivery and heartbeats
+- [ ] P2-04b Pager firmware OTA distribution
 - [ ] P2-05 Pager firmware [H]
 - [ ] P2-06 Waiter alerts, service-request inbox, nudge, Notify manager
 - [ ] P2-07 Phase 2 exit test on the lab rig [H]
@@ -444,6 +453,38 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
+decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-26 (P2-04a):
+
+105. A pager signs in to MQTT with its device id and its own secret. The secret is issued when a
+     manager registers the pager by serial, shown once, and stored as a peppered Argon2id hash like
+     the PINs; replacing it
+     disconnects the pager. There are no shared or default passwords (SEC-012, PGR-010).
+106. Pagers get alerts through their wearer: the broker sends each alert event to the connected
+     pagers of its recipients. A pager that connects gets every open alert of its wearer again,
+     rather than relying on the broker's in-memory queue, so a server restart loses nothing.
+107. A person wears at most one pager; giving someone a pager takes any other from them.
+     Managers may wear pagers and then receive escalations (PGR-014).
+108. A heartbeat emits `DeviceStatusChanged` only on a change of state (back online, or crossing
+     the low-battery line), not on every beat.
+109. A refused subscription is answered with 0x80 in the SUBACK and the connection stays open, so a
+     misconfigured pager keeps receiving its own alerts.
+
+Decided 2026-09-26 (P2-03b):
+
+101. A nudge is one alert per chosen person, so each acknowledgement is recorded per waiter. Only
+     Owner and managers (`STAFF_MANAGE`) can nudge; the text is a preset or up to 40 characters.
+102. "On break" is a flag on the person (with the time it started). Anyone signed in may set their
+     own; while set, their alerts go to the managers at once. Break reporting comes with staff
+     reports (P4).
+103. Device alerts cover pagers, table tablets and kitchen screens: one alert for "offline" and one
+     for "low battery" (at or below `notifications.lowBatteryPercent`, default 20 %), each raised
+     once per state and cleared when the device is back online with enough battery.
+104. The disk check runs hourly on the server PC and alerts every restaurant on it when the data
+     drive is at or above `notifications.diskAlertPercent` (default 80 %), until space is freed.
+
 Decided 2026-09-26 (P2-03a):
 
 95. "Managers on duty" are the Owner and managers signed in on a device now. If none is signed in,
@@ -582,6 +623,8 @@ Security-sensitive PRs for the P8-03 human review:
 - #41 P1-12b: void and edit-after-print approvals on the POS.
 - #42 P1-04: upload checks, image decoding of untrusted files, the public rendition route.
 - #43 P1-05: spreadsheet parsing of untrusted files and the ZIP size guard.
+- #48 P2-04a: pager credentials (peppered Argon2id), MQTT ACL and TLS.
+- #49 P2-01a: secure credential persistence on the mobile apps.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -593,12 +636,67 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
 ### 2026-09-26: docs review of PROGRESS.md and the server README
 
 Checked both against the code on `main` (after PR #45). PROGRESS "Current state": test counts
-re-run (domain 169, contracts 458, server 629), the table count is 61, and the items built since
-P1-13 (photos, menu import, KDS server, exit scenario, notifications) are listed. The
+re-run (domain 173, contracts 478, server 644), the table count is 61, and the items built since
+P1-13 (photos, menu import, KDS server, exit scenario, notifications, pagers, mobile core) are
+listed. The
 security-review list now gives every PR number, with P0-06 (#2) and P0-07 (#3) added. Server
 README: removed "comes later" notes for things that exist (settings registry, PINs, capability
 declarations, alert routing), listed every package script, and pointed the test-harness notes at
 `@rp/test-postgres` and `test/helpers`. No code changed.
+
+### 2026-09-26: P2-01a Mobile core
+
+P2-01 was split into P2-01a (this), P2-01b (`ui-native`) and P2-01c (the Expo apps and builds).
+
+Built: `packages/mobile-core` (secure credential persistence, the persistent outbox and the menu
+cache). Tests: 8, at 98 % line coverage.
+
+Decisions: 110 and 111.
+
+### 2026-09-26: P2-04a Pager broker, credentials, delivery and heartbeats
+
+P2-04 was split into P2-04a (this) and P2-04b (firmware OTA distribution).
+
+Built:
+
+- The embedded Aedes broker, with TLS when `RP_TLS` is on, per-pager credentials and the ACL.
+- Alert delivery and acknowledgement, heartbeats with offline detection, and presence from pagers.
+- Pager administration routes.
+- The domain pager rules, contracts and AsyncAPI channels.
+- Migration `20260928030000_pager_mqtt`.
+
+Also fixed on #47 (P2-03b): the report and exit tests asked the invoice register for the business
+date, which fails between midnight and the 04:00 cut-off because the register uses invoice dates.
+CI ran at 00:01 IST and failed; the tests now ask for the invoices' own dates.
+
+Tests:
+
+- domain: 4;
+- contracts: the AsyncAPI pager channels;
+- 9 integration tests with a real MQTT client:
+  - registration and uniqueness;
+  - a wrong password and cross-pager subscriptions refused;
+  - delivery within 2 s, with acknowledgement from the button;
+  - resend on reconnect;
+  - publishing where it may not is ignored;
+  - a 30-nudge burst within the budget;
+  - heartbeat, low battery and offline after 3 missed beats;
+  - re-assignment;
+  - credential rotation.
+
+Gotchas:
+
+- aedes 1.x is ESM with `Aedes.createBroker`.
+- mqtt.js 5 rejects `subscribeAsync` when the SUBACK carries 0x80.
+- `test/helpers/test-app.ts` turns the broker off unless a test sets `mqtt: 'on', mqttPort: 0`.
+
+Decisions: 105 to 109.
+
+### 2026-09-26: P2-03b Nudges, breaks, device, printer and disk alerts
+
+Built: nudge and break routes with contracts, `staff.on_break_since`, device/printer triggers, `SystemAlerts` disk check, three new settings. The owner's standing instruction to never stop is now in CLAUDE.md. Tests: 6 integration tests (nudge, who may nudge and limits, on break routes to managers, device once-per-state and clear, printer offline and clear, disk full and clear).
+
+Decisions: 101 to 104.
 
 ### 2026-09-26: P2-03a Notification engine core
 

@@ -457,11 +457,25 @@ export async function runServiceDay(options: ServiceDayOptions): Promise<Service
     body: { businessDate: preview.businessDate, carryForwardTables: false },
   });
   const range = { from: preview.businessDate, to: preview.businessDate };
-  const [gst, register, audit] = await Promise.all([
+  // The register is kept by invoice (calendar) date for GST: between midnight and the 04:00
+  // cut-off that is the day after the business date. Ask for the invoices' own dates and keep
+  // this business day's.
+  const invoiceDates = [...invoices.values()].map((invoice) => invoice.invoiceDate).sort();
+  const registerRange = {
+    from: invoiceDates[0] ?? preview.businessDate,
+    to: invoiceDates.at(-1) ?? preview.businessDate,
+  };
+  const [gst, fullRegister, audit] = await Promise.all([
     manager.api.getGstSummary({ query: range }),
-    manager.api.getInvoiceRegister({ query: range }),
+    manager.api.getInvoiceRegister({ query: registerRange }),
     manager.api.verifyAuditChain(),
   ]);
+  const register = {
+    ...fullRegister,
+    invoices: fullRegister.invoices.filter(
+      (invoice) => invoice.businessDate === preview.businessDate,
+    ),
+  };
   log(`Day ${preview.businessDate} closed with ${String(register.invoices.length)} invoices`);
   await manager.api.updateSetting({
     params: { key: ATTEMPTS },

@@ -36,6 +36,9 @@ export class TlsService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly store: TlsStore;
   private material: TlsMaterial | undefined;
   private timer: NodeJS.Timeout | undefined;
+  private readonly renewedListeners = new Set<
+    (options: ReturnType<typeof serverTlsOptions>) => void
+  >();
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -68,6 +71,22 @@ export class TlsService implements OnApplicationBootstrap, OnModuleDestroy {
     clearInterval(this.timer);
   }
 
+  /**
+   * TLS options for another listener on this PC (the pagers' MQTTS broker, P2-04), loading the
+   * material if needed; undefined without TLS.
+   */
+  async listenerOptions(): Promise<ReturnType<typeof serverTlsOptions> | undefined> {
+    if (!this.enabled) return undefined;
+    if (this.material === undefined) await this.renew();
+    return this.material === undefined ? undefined : serverTlsOptions(this.material);
+  }
+
+  /** Called with the new options whenever the certificate is renewed. */
+  onRenewed(listener: (options: ReturnType<typeof serverTlsOptions>) => void): () => void {
+    this.renewedListeners.add(listener);
+    return () => this.renewedListeners.delete(listener);
+  }
+
   /** The CA's fingerprint for apps to pin; null without TLS. */
   caFingerprint(): string | null {
     return this.material?.caFingerprint ?? null;
@@ -96,6 +115,9 @@ export class TlsService implements OnApplicationBootstrap, OnModuleDestroy {
     this.material = material;
     const adapter = this.adapterHost.httpAdapter as typeof this.adapterHost.httpAdapter | undefined;
     const server: unknown = adapter?.getHttpServer();
+    if (renewed) {
+      for (const listener of this.renewedListeners) listener(serverTlsOptions(material));
+    }
     if (renewed && server instanceof HttpsServer) {
       server.setSecureContext(serverTlsOptions(material));
       this.logger.log(

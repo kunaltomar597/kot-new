@@ -30,6 +30,8 @@ export class NotificationTriggers implements OnModuleInit {
         'BillRequested',
         'TableClosed',
         'KotBumped',
+        'DeviceStatusChanged',
+        'PrinterStatusChanged',
       ],
       handle: (event, context) => this.handle(event, context.tx),
     });
@@ -95,9 +97,70 @@ export class NotificationTriggers implements OnModuleInit {
         await this.notifications.clear(tx, { restaurantId, ids: alerts.map((alert) => alert.id) });
         return;
       }
+      case 'DeviceStatusChanged':
+        await this.deviceChanged(tx, restaurantId, event.payload);
+        return;
+      case 'PrinterStatusChanged': {
+        const key = `printer:${event.payload.printerId}`;
+        if (event.payload.online) {
+          await this.notifications.clear(tx, { restaurantId, dedupeKey: key });
+          return;
+        }
+        await this.notifications.raise(tx, {
+          restaurantId,
+          type: 'PRINTER_OFFLINE',
+          dedupeKey: key,
+          payload: {
+            printerId: event.payload.printerId,
+            printerName: event.payload.printerName,
+            error: event.payload.error,
+            queued: event.payload.queued,
+          },
+        });
+        return;
+      }
       default:
         return;
     }
+  }
+
+  /**
+   * A pager, tablet or kitchen screen went offline or ran low (Appendix C: once per state change).
+   * Back online with enough battery clears both.
+   */
+  private async deviceChanged(
+    tx: TransactionClient,
+    restaurantId: string,
+    change: { deviceId: string; deviceType: string; online: boolean; batteryPercent?: number },
+  ): Promise<void> {
+    if (!['PAGER', 'TABLE_TABLET', 'KDS'].includes(change.deviceType)) return;
+    const settings = await this.notifications.settingsOf(restaurantId);
+    const low =
+      change.batteryPercent !== undefined &&
+      change.batteryPercent <= settings.get('notifications.lowBatteryPercent');
+    const offlineKey = `device:${change.deviceId}:offline`;
+    const lowKey = `device:${change.deviceId}:low`;
+    if (change.online) await this.notifications.clear(tx, { restaurantId, dedupeKey: offlineKey });
+    if (!low) await this.notifications.clear(tx, { restaurantId, dedupeKey: lowKey });
+    if (change.online && !low) return;
+    const device = await tx.device.findUnique({
+      where: { id: change.deviceId },
+      select: { name: true, staffId: true, tableId: true },
+    });
+    await this.notifications.raise(tx, {
+      restaurantId,
+      type: 'DEVICE_LOW_BATTERY_OR_OFFLINE',
+      dedupeKey: change.online ? lowKey : offlineKey,
+      tableId: device?.tableId ?? null,
+      wearerId: change.deviceType === 'PAGER' ? (device?.staffId ?? null) : null,
+      payload: {
+        deviceId: change.deviceId,
+        deviceType: change.deviceType,
+        deviceName: device?.name ?? null,
+        online: change.online,
+        batteryPercent: change.batteryPercent ?? null,
+      },
+    });
   }
 
   private async itemChanged(

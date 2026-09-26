@@ -29,6 +29,39 @@ use EAS secrets; never commit keystores.
 Acceptance: both apps build as development APKs in CI (EAS or local Gradle), pair with a local
 server, log in, and show live data.
 
+P2-01 is split in three.
+
+### P2-01a Mobile core (done)
+
+`packages/mobile-core`, free of React Native and tested with Vitest:
+
+- `KeyValueStore` and `MemoryStore`.
+- `createMobileClient`: the `ApiClient` with credentials restored from, and written back to, the
+  secure store on every change, in order.
+- `PersistentOutbox`: unsent submissions keyed by idempotency key.
+  - Sent oldest first; a flush stops at the first network failure.
+  - Refused submissions are kept until dismissed or corrected.
+  - A send cut short by the app closing becomes pending again.
+  - One flush runs at a time.
+- `MenuCache`: works offline, refreshes on a newer version or on reconnect, and applies
+  availability changes.
+
+### P2-01b React Native component library
+
+`packages/ui-native`: PinPad, Button, Sheet, Toast, StatusChip, menu item card, variant/modifier
+popup and combo picker using `@rp/domain` menu-selection, with the same tokens as `ui-web`.
+Tested with React Native Testing Library.
+
+### P2-01c Expo apps, builds and smoke flows
+
+`apps/waiter-app` and `apps/table-tablet` as Expo development builds:
+
+- the Keystore key through `expo-secure-store` and a native signer;
+- AsyncStorage for the outbox and menu;
+- EAS Build and Update profiles (the keystore comes from EAS secrets, never committed);
+- Maestro flows;
+- a CI job that builds debug APKs with Gradle.
+
 ## P2-02 Waiter app: tables and order taking
 
 Goal: waiters take orders and manage their tables.
@@ -98,7 +131,11 @@ As built:
     Cashiers on duty are those with an open cash shift, otherwise every cashier.
 - The KDS "Notify manager" now goes through the engine (`collect:<kotId>`).
 
-### P2-03b Nudges, breaks, device, printer and system alerts
+### P2-03b Nudges, breaks, device, printer and system alerts (done)
+
+As built: `POST /api/v1/alerts/nudge` (`STAFF_MANAGE`; one alert per person, presets in `notifications.nudgePresets`), `POST /api/v1/staff/me/break` (`staff.on_break_since`, migration `20260928020000_staff_break`; `recipientContext` fills `onBreak`), triggers for `DeviceStatusChanged` (pager, tablet, KDS: offline and low battery at `notifications.lowBatteryPercent`, one alert per state) and `PrinterStatusChanged` (until back online), and `SystemAlerts.checkDisk` hourly (`notifications.diskAlertPercent`). Backup and licence alerts use the same engine when P7 adds them; the UI parts are P2-06 and P4.
+
+Original scope:
 
 - Manager nudge (NTF-008): pick waiters, then a preset or up to 40 characters. `MANAGER_NUDGE`
   with `SELECTED`.
@@ -125,6 +162,44 @@ waiters (≤ 30 s re-assignment); low battery alerts; firmware OTA distribution 
 images from the Control Plane.
 Acceptance: integration tests with an MQTT test client: ACL denies cross-pager reads, QoS 1
 redelivery after reconnect, offline detection, latency measured under load.
+
+P2-04 is split in two.
+
+### P2-04a Broker, credentials, delivery, heartbeats (done)
+
+As built:
+
+- `apps/server/src/pagers/`:
+  - `PagerBroker` runs Aedes 1.x embedded, on `RP_MQTT_PORT` (8883). It uses MQTTS with the
+    installation certificate when `RP_TLS` is on (renewals are applied live); `RP_MQTT=off` turns
+    it off.
+  - Sign-in: client id = user name = the pager's device id, plus a per-pager secret stored as
+    a peppered Argon2id hash, like staff PINs.
+  - ACL: a pager may subscribe only to its own `alerts` topic (anything else is refused with 0x80
+    in the SUBACK) and publish only its own `ack` and `heartbeat`.
+  - Delivery listens to published `AlertRaised`, `AlertAcknowledged` and `AlertCleared` events and
+    sends `PagerAlertMessage` at QoS 1 to the recipients' connected pagers. A pager that
+    (re)connects is sent its wearer's open alerts again, so unacknowledged alerts survive
+    disconnects and server restarts.
+  - An `ack` acknowledges the alert as the wearer.
+  - Heartbeats store battery, RSSI and firmware, and emit `DeviceStatusChanged` only when the
+    state changes (online, low battery), which feeds the P2-03b device alerts.
+  - `checkOffline` (every 10 s) marks a pager offline after 3 missed heartbeats
+    (`pagers.heartbeatSeconds`).
+- Presence is now a `PresenceRegistry` fed by the gateway and the broker, so a connected pager
+  counts as reachable (NTF-007).
+- Routes, all `DEVICE_PAIR`: `GET/POST /api/v1/pagers`, `POST /api/v1/pagers/:id/credential` and
+  `PUT /api/v1/pagers/:id/wearer`. A person wears one pager, and every change is audited.
+- `@rp/domain` `pager.ts`: 2×12 line wrapping, vibration per type (setting `pagers.vibration`),
+  topics, ACL checks and offline detection.
+- Contracts `pagers.ts`. The pager topics are documented in `docs/api/asyncapi.yaml`.
+
+### P2-04b Firmware OTA distribution
+
+- Serve signed pager firmware from the Control Plane manifest to pagers over the LAN
+  (PGR-011).
+- Pair a pager by scanning its QR code in the manager UI (P4). The API from P2-04a takes the
+  serial.
 
 ## P2-05 Pager firmware
 
