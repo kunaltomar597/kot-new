@@ -73,11 +73,15 @@ import {
   SubmitOrderResponse,
 } from './order.js';
 import {
+  KotParams,
+  KotReprintRequest,
   PrinterListResponse,
+  PrinterRedirectRequest,
   PrinterRequest,
   PrinterView,
   PrintingArchiveRequest,
   PrintingParams,
+  PrintQueueResponse,
   StationListResponse,
   StationRequest,
   StationView,
@@ -1681,6 +1685,61 @@ export const ROUTES = [
       200: { description: 'The result.', schema: TestPrintResponse },
       ...standardErrors,
       404: { description: 'No such active printer.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'redirectPrinter',
+    method: 'POST',
+    path: '/api/v1/printers/:id/redirect',
+    summary: "Send a printer's tickets to another printer, or stop doing so",
+    description:
+      'KDS-008: while a printer is broken, a manager chooses another one; waiting tickets print ' +
+      'there. `toPrinterId: null` sends them back. Audited.',
+    tags: ['printing'],
+    requirements: ['KDS-008', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: PrintingParams, body: PrinterRedirectRequest },
+    responses: {
+      200: { description: 'The printer as it is now.', schema: PrinterView },
+      ...standardErrors,
+      404: { description: 'No such active printer.', schema: ApiError },
+      422: {
+        description: 'The target is this printer, archived, or itself redirected.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getPrintQueue',
+    method: 'GET',
+    path: '/api/v1/print-queue',
+    summary: 'Printers with their state and waiting tickets',
+    description: 'For the POS and manager "printer offline" alert (KDS-008, NTF-003).',
+    tags: ['printing'],
+    requirements: ['KDS-008', 'NTF-003'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    responses: {
+      200: { description: 'The queue.', schema: PrintQueueResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'reprintKot',
+    method: 'POST',
+    path: '/api/v1/kots/:id/reprint',
+    summary: 'Print a kitchen ticket again',
+    description:
+      "KDS-008. Prints now on the station's printer (following a redirect) or on the printer " +
+      'chosen, marked REPRINT. Answers whether it printed. Audited.',
+    tags: ['printing'],
+    requirements: ['KDS-008', 'AUD-001'],
+    capability: 'ORDER_CREATE',
+    request: { params: KotParams, body: KotReprintRequest },
+    responses: {
+      200: { description: 'The result.', schema: TestPrintResponse },
+      ...standardErrors,
+      404: { description: 'No such ticket.', schema: ApiError },
+      422: { description: 'No printer to print on.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];

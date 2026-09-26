@@ -395,6 +395,31 @@ The MOVED ticket waits for P1-07b: moving a table (P1-02b) raises no KOT today, 
 - A MOVED slip goes to each station holding items when a table moves.
 - Acceptance: queue tests with a fake printer that fails and recovers; the offline event emitted.
 
+As built: `apps/server/src/printing/print-queue.service.ts` and `printer-status.service.ts`, and
+migration `20260926180000_print_queue`.
+
+- The queue prints waiting tickets and notes (PENDING or FAILED) oldest first, per printer, and
+  printers run in parallel.
+  - It is woken by `KotCreated` and `TableMoved` on the event bus, and runs every 2 s besides
+    (NFR-P02). Tests drive it with `drain()`.
+  - A failure marks the job FAILED and stops that printer for this pass, so the order is kept. The
+    printer is retried after 2 s, doubling to 60 s.
+- Printer health lives on `printers.offline_since` and `last_error`.
+  - The first failure emits `PrinterStatusChanged { online: false, error, queued }`, and the first
+    success after it emits `online: true`. Only changes are announced.
+  - The event goes to the roles with `BILL_PRINT_AND_PAYMENT` (the POS and managers).
+  - A successful test page also brings a printer back.
+- `GET /api/v1/print-queue` returns each printer's state and waiting count, for the POS banner.
+- `POST /api/v1/printers/:id/redirect` (`OPERATIONS_CONFIGURE`, audited) sends a printer's jobs to
+  another printer until cleared.
+  - Redirects are one step only, and a printer that others are redirected to cannot be archived.
+  - Rendering follows the paper width of the printer that receives the job.
+- `POST /api/v1/kots/:id/reprint` (`ORDER_CREATE`, audited with a reason) prints now, marked
+  REPRINT, on the station's printer or the one chosen. A waiting ticket that is reprinted counts as
+  printed.
+- A table move creates a `print_notices` row, "MOVED / From T1 to T3 / Orders …", for each
+  printing station with the session's tickets. Tickets are not printed again (TBL-005).
+
 ## P1-08 POS UI: table overview and order entry
 
 Goal: the cashier/manager can run dine-in and takeaway service from the POS.

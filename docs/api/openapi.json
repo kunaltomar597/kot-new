@@ -1252,6 +1252,74 @@
         "x-requirements": ["BILL-003", "AUTH-006", "AUD-001"]
       }
     },
+    "/api/v1/kots/{id}/reprint": {
+      "post": {
+        "operationId": "reprintKot",
+        "summary": "Print a kitchen ticket again",
+        "description": "KDS-008. Prints now on the station's printer (following a redirect) or on the printer chosen, marked REPRINT. Answers whether it printed. Audited.",
+        "tags": ["printing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/KotReprintRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The result.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TestPrintResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such ticket.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "No printer to print on.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["KDS-008", "AUD-001"]
+      }
+    },
     "/api/v1/menu": {
       "get": {
         "operationId": "getMenu",
@@ -2673,6 +2741,44 @@
         "x-requirements": ["ORD-009", "ORD-010"]
       }
     },
+    "/api/v1/print-queue": {
+      "get": {
+        "operationId": "getPrintQueue",
+        "summary": "Printers with their state and waiting tickets",
+        "description": "For the POS and manager \"printer offline\" alert (KDS-008, NTF-003).",
+        "tags": ["printing"],
+        "responses": {
+          "200": {
+            "description": "The queue.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PrintQueueResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["KDS-008", "NTF-003"]
+      }
+    },
     "/api/v1/printers": {
       "get": {
         "operationId": "listPrinters",
@@ -2887,6 +2993,74 @@
         },
         "x-capability": "OPERATIONS_CONFIGURE",
         "x-requirements": ["KDS-008", "ONB-004", "AUD-001"]
+      }
+    },
+    "/api/v1/printers/{id}/redirect": {
+      "post": {
+        "operationId": "redirectPrinter",
+        "summary": "Send a printer's tickets to another printer, or stop doing so",
+        "description": "KDS-008: while a printer is broken, a manager chooses another one; waiting tickets print there. `toPrinterId: null` sends them back. Audited.",
+        "tags": ["printing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PrinterRedirectRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The printer as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PrinterView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such active printer.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The target is this printer, archived, or itself redirected.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["KDS-008", "AUD-001"]
       }
     },
     "/api/v1/printers/{id}/test": {
@@ -5353,6 +5527,7 @@
           { "$ref": "#/components/schemas/AlertEscalated" },
           { "$ref": "#/components/schemas/DeviceStatusChanged" },
           { "$ref": "#/components/schemas/DeviceRevoked" },
+          { "$ref": "#/components/schemas/PrinterStatusChanged" },
           { "$ref": "#/components/schemas/SettingsChanged" },
           { "$ref": "#/components/schemas/RestaurantChanged" }
         ]
@@ -5836,6 +6011,36 @@
           "businessDate",
           "payload"
         ],
+        "additionalProperties": false
+      },
+      "KotParams": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" } },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "KotReprintRequest": {
+        "type": "object",
+        "properties": {
+          "printerId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["printerId", "reason"],
+        "additionalProperties": false
+      },
+      "KotReprintRequestInput": {
+        "type": "object",
+        "properties": {
+          "printerId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "LicenseState": {
@@ -6671,6 +6876,41 @@
         "additionalProperties": false
       },
       "PriceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] },
+      "PrintQueuePrinter": {
+        "type": "object",
+        "properties": {
+          "printerId": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "online": { "type": "boolean" },
+          "offlineSince": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastError": { "type": ["string", "null"] },
+          "redirectToId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "queued": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "printerId",
+          "name",
+          "online",
+          "offlineSince",
+          "lastError",
+          "redirectToId",
+          "queued"
+        ],
+        "additionalProperties": false
+      },
+      "PrintQueueResponse": {
+        "type": "object",
+        "properties": {
+          "printers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PrintQueuePrinter" }
+          }
+        },
+        "required": ["printers"],
+        "additionalProperties": false
+      },
       "PrinterConnection": { "type": "string", "enum": ["NETWORK", "USB"] },
       "PrinterListResponse": {
         "type": "object",
@@ -6678,6 +6918,15 @@
           "printers": { "type": "array", "items": { "$ref": "#/components/schemas/PrinterView" } }
         },
         "required": ["printers"],
+        "additionalProperties": false
+      },
+      "PrinterRedirectRequest": {
+        "type": "object",
+        "properties": {
+          "toPrinterId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["toPrinterId", "reason"],
         "additionalProperties": false
       },
       "PrinterRequest": {
@@ -6697,6 +6946,44 @@
           }
         },
         "required": ["name", "connection", "host", "port", "paperWidthMm"],
+        "additionalProperties": false
+      },
+      "PrinterStatusChanged": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "PrinterStatusChanged" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "printerId": { "$ref": "#/components/schemas/Id" },
+              "printerName": { "type": "string", "maxLength": 40 },
+              "online": { "type": "boolean" },
+              "error": { "anyOf": [{ "type": "string", "maxLength": 300 }, { "type": "null" }] },
+              "queued": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["printerId", "printerName", "online", "error", "queued"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
+        ],
         "additionalProperties": false
       },
       "PrinterView": {
@@ -6720,6 +7007,11 @@
           "lastSeenAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           },
+          "offlineSince": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastError": { "type": ["string", "null"] },
+          "redirectToId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "archivedAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           }
@@ -6732,6 +7024,9 @@
           "port",
           "paperWidthMm",
           "lastSeenAt",
+          "offlineSince",
+          "lastError",
+          "redirectToId",
           "archivedAt"
         ],
         "additionalProperties": false

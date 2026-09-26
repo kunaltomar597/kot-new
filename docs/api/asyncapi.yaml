@@ -111,6 +111,11 @@ channels:
     messages:
       DeviceRevoked:
         $ref: '#/components/messages/DeviceRevoked'
+  PrinterStatusChanged:
+    address: PrinterStatusChanged
+    messages:
+      PrinterStatusChanged:
+        $ref: '#/components/messages/PrinterStatusChanged'
   SettingsChanged:
     address: SettingsChanged
     messages:
@@ -248,6 +253,12 @@ operations:
       $ref: '#/channels/DeviceRevoked'
     messages:
       - $ref: '#/channels/DeviceRevoked/messages/DeviceRevoked'
+  receivePrinterStatusChanged:
+    action: receive
+    channel:
+      $ref: '#/channels/PrinterStatusChanged'
+    messages:
+      - $ref: '#/channels/PrinterStatusChanged/messages/PrinterStatusChanged'
   receiveSettingsChanged:
     action: receive
     channel:
@@ -388,6 +399,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/DeviceRevoked'
+    PrinterStatusChanged:
+      name: PrinterStatusChanged
+      title: PrinterStatusChanged v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PrinterStatusChanged'
     SettingsChanged:
       name: SettingsChanged
       title: SettingsChanged v1
@@ -1061,6 +1078,63 @@ components:
       type: integer
       minimum: 0
       maximum: 9007199254740991
+    PrinterStatusChanged:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: PrinterStatusChanged
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            printerId:
+              $ref: '#/components/schemas/Id'
+            printerName:
+              type: string
+              maxLength: 40
+            online:
+              type: boolean
+            error:
+              anyOf:
+                - type: string
+                  maxLength: 300
+                - type: 'null'
+            queued:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+            - printerId
+            - printerName
+            - online
+            - error
+            - queued
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
     RestaurantChanged:
       type: object
       properties:

@@ -265,11 +265,12 @@ export class TableSessionsService {
         select: { stationId: true },
         distinct: ['stationId'],
       });
+      await this.noteMoveForPrinters(tx, principal.restaurantId, session, target.label, kots);
       await this.record(tx, principal, 'TABLE_MOVED', sessionId, {
         before: { tableId: session.tableId, tableLabel: session.table.label },
         after: { tableId: toTableId, tableLabel: target.label },
       });
-      // Tickets update in place: their stations hear the move; nothing is printed again (TBL-005).
+      // Tickets update in place: their stations hear the move; printing stations get a note (TBL-005).
       await this.emit(
         tx,
         principal.restaurantId,
@@ -420,6 +421,46 @@ export class TableSessionsService {
       closedAt: session.closedAt?.toISOString() ?? null,
       closeReason: session.closeReason,
     };
+  }
+
+  /**
+   * Stations that print get a note "Moved from T4 to T7" (TBL-005): their tickets already on paper
+   * stay valid, so nothing is printed again as a ticket. Screens update the tickets in place.
+   */
+  private async noteMoveForPrinters(
+    tx: TransactionClient,
+    restaurantId: string,
+    session: { id: string; businessDate: Date; table: { label: string } },
+    toLabel: string,
+    kots: readonly { stationId: string }[],
+  ): Promise<void> {
+    if (kots.length === 0) return;
+    const [stations, orders] = await Promise.all([
+      tx.station.findMany({
+        where: { id: { in: kots.map((kot) => kot.stationId) }, mode: { not: 'SCREEN' } },
+        select: { id: true },
+      }),
+      tx.order.findMany({
+        where: { tableSessionId: session.id },
+        select: { orderNumber: true },
+        orderBy: { orderNumber: 'asc' },
+      }),
+    ]);
+    const lines = [
+      `From ${session.table.label} to ${toLabel}`,
+      `Orders ${orders.map((order) => String(order.orderNumber)).join(', ')}`,
+    ];
+    for (const station of stations) {
+      await tx.printNotice.create({
+        data: {
+          restaurantId,
+          businessDate: session.businessDate,
+          stationId: station.id,
+          title: 'MOVED',
+          lines,
+        },
+      });
+    }
   }
 
   private async emit(

@@ -4,6 +4,7 @@ import {
   formatLocal,
   type KotTicket,
   renderKotTicket,
+  renderNotice,
   renderTestPage,
   toPrintable,
   wrap,
@@ -199,5 +200,24 @@ describe('ESC/POS rendering', () => {
     expect(text).toContain('Printer: Kitchen printer');
     expect(text).toContain('Paper: 58 mm, 32 characters');
     expect(text).toContain('12345678901234567890123456789012\n');
+  });
+
+  it('[TBL-005] renders a note that is not a ticket, e.g. a table move', () => {
+    const text = readable(
+      renderNotice(
+        {
+          title: 'MOVED',
+          lines: ['From T1 to T3', 'Orders 4, 5'],
+          stationName: 'Kitchen',
+          createdAt: new Date('2026-09-26T07:35:00Z'),
+          timeZone: 'Asia/Kolkata',
+        },
+        58,
+      ),
+    );
+    expect(text).toContain('<DOUBLE><BOLD>MOVED\n');
+    expect(text).toContain('<TALL><BOLD>From T1 to T3\nOrders 4, 5\n');
+    expect(text).toContain('26-09-2026 13:05');
+    expect(text).not.toContain('KOT');
   });
 });

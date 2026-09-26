@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import type { Printer } from '../generated/prisma/client.js';
-import { type KotTicket, type PaperWidthMm, renderKotTicket } from './escpos.js';
-import { paperWidthOf } from './printers.service.js';
+import { type KotTicket, type PaperWidthMm, paperWidthOf, renderKotTicket } from './escpos.js';
 
 export interface RenderedKot {
   readonly ticket: KotTicket;

@@ -1,10 +1,14 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/common';
 import {
+  KotParams,
+  KotReprintRequest,
   type PrinterListResponse,
+  PrinterRedirectRequest,
   PrinterRequest,
   type PrinterView,
   PrintingArchiveRequest,
   PrintingParams,
+  type PrintQueueResponse,
   type StationListResponse,
   StationRequest,
   type StationView,
@@ -14,6 +18,7 @@ import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability, RequireSession } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { PrintQueueService } from './print-queue.service.js';
 import { PrintersService } from './printers.service.js';
 import { StationsService } from './stations.service.js';
 
@@ -105,6 +110,17 @@ export class PrintersController {
     return this.printers.archive(principalOf(request), params.id, body.reason);
   }
 
+  @Post(':id/redirect')
+  @HttpCode(200)
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  redirect(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(PrintingParams)) params: PrintingParams,
+    @Body(new ZodValidationPipe(PrinterRedirectRequest)) body: PrinterRedirectRequest,
+  ): Promise<PrinterView> {
+    return this.printers.redirect(principalOf(request), params.id, body.toPrinterId, body.reason);
+  }
+
   @Post(':id/test')
   @HttpCode(200)
   @RequireCapability('OPERATIONS_CONFIGURE')
@@ -113,5 +129,35 @@ export class PrintersController {
     @Param(new ZodValidationPipe(PrintingParams)) params: PrintingParams,
   ): Promise<TestPrintResponse> {
     return this.printers.testPrint(principalOf(request), params.id);
+  }
+}
+
+/** The print queue as the POS sees it (P1-07b, KDS-008, NTF-003). */
+@Controller('print-queue')
+export class PrintQueueController {
+  constructor(private readonly queue: PrintQueueService) {}
+
+  @Get()
+  @RequireCapability('BILL_PRINT_AND_PAYMENT')
+  get(@Req() request: AuthenticatedRequest): Promise<PrintQueueResponse> {
+    return this.queue.queue(principalOf(request).restaurantId);
+  }
+}
+
+/** Kitchen tickets on paper (P1-07b, KDS-008). */
+@Controller('kots')
+export class KotsController {
+  constructor(private readonly queue: PrintQueueService) {}
+
+  @Post(':id/reprint')
+  @HttpCode(200)
+  @RequireCapability('ORDER_CREATE')
+  reprint(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(KotParams)) params: KotParams,
+    @Body(new ZodValidationPipe(KotReprintRequest)) body: KotReprintRequest,
+  ): Promise<TestPrintResponse> {
+    const parsed = KotReprintRequest.parse(body);
+    return this.queue.reprint(principalOf(request), params.id, parsed);
   }
 }

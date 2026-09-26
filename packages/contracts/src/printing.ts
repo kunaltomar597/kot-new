@@ -82,6 +82,12 @@ export const PrinterView = z.object({
   paperWidthMm: z.int(),
   /** Last time the printer took a job or a test page. */
   lastSeenAt: Timestamp.nullable(),
+  /** Since when jobs fail; null while it prints (KDS-008). */
+  offlineSince: Timestamp.nullable(),
+  /** Why the last job failed, in plain words. */
+  lastError: z.string().nullable(),
+  /** The printer this one's jobs go to instead, set by a manager while it is broken. */
+  redirectToId: Id.nullable(),
   archivedAt: Timestamp.nullable(),
 });
 export type PrinterView = z.infer<typeof PrinterView>;
@@ -101,3 +107,36 @@ export const TestPrintResponse = z.object({
   error: z.string().nullable(),
 });
 export type TestPrintResponse = z.infer<typeof TestPrintResponse>;
+
+/** Send one printer's jobs to another until cleared (KDS-008); `toPrinterId: null` clears it. */
+export const PrinterRedirectRequest = z.strictObject({
+  toPrinterId: Id.nullable(),
+  reason: Reason,
+});
+export type PrinterRedirectRequest = z.infer<typeof PrinterRedirectRequest>;
+
+/** Print a kitchen ticket again (KDS-008), on its station's printer or on the one chosen. */
+export const KotReprintRequest = z.strictObject({
+  printerId: Id.nullable().default(null),
+  reason: Reason,
+});
+export type KotReprintRequest = z.input<typeof KotReprintRequest>;
+
+export const KotParams = z.strictObject({ id: Id });
+export type KotParams = z.infer<typeof KotParams>;
+
+/** A printer as the print queue sees it, for the POS "printer offline" banner. */
+export const PrintQueuePrinter = z.object({
+  printerId: Id,
+  name: z.string(),
+  online: z.boolean(),
+  offlineSince: Timestamp.nullable(),
+  lastError: z.string().nullable(),
+  redirectToId: Id.nullable(),
+  /** Tickets and notes waiting for this printer. */
+  queued: z.int().min(0),
+});
+export type PrintQueuePrinter = z.infer<typeof PrintQueuePrinter>;
+
+export const PrintQueueResponse = z.object({ printers: z.array(PrintQueuePrinter) });
+export type PrintQueueResponse = z.infer<typeof PrintQueueResponse>;
