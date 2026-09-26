@@ -41,7 +41,8 @@ What exists:
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
   move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b); the
-  kitchen display with steps, bump, recall, notify manager, sounds and resync (P1-09b).
+  kitchen display with steps, bump, recall, notify manager, sounds and resync (P1-09b); bills,
+  discounts with manager approval, payments and shifts on the POS (P1-12a).
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -58,7 +59,7 @@ Recommended next WPs (dependencies met):
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-12 POS billing UI (P1-10 and P1-11 done).
-- P1-14 Phase 1 exit test (after P1-12).
+- P1-12b split bill, void and re-issue, day-end screen (P1-12a done).
 - P1-12 POS billing UI (P1-10, P1-11 done).
 - P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -117,7 +118,8 @@ Recommended next WPs (dependencies met):
 - [x] P1-10d Split bill
 - [x] P1-11a Shifts, cash and payments
 - [x] P1-11b Day-end and Z-report
-- [ ] P1-12 POS billing UI
+- [x] P1-12a POS bill, payment and shift screens
+- [ ] P1-12b Split bill, void and re-issue, day-end screen
 - [x] P1-13a Report data
 - [x] P1-13b CSV export and order drill-down
 - [ ] P1-14 Phase 1 exit test
@@ -429,6 +431,16 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P1-12a):
+
+80. Manager approval happens where the cashier is: when the server answers OVERRIDE_REQUIRED, the
+    POS asks a manager (Owner or Manager tiles) for their PIN and sends the action again with the
+    single-use approval for that capability and that bill. Cancelling leaves nothing changed.
+81. "Print bill" issues the invoice and prints it in one step. If printing fails the invoice stays
+    issued with its number, and the cashier can print it again from the bill.
+82. Payments are recorded as a set with one idempotency key: a failed send keeps the set and its
+    key; changing the set gives a new key.
+
 Decided 2026-09-26 (P1-09b):
 
 77. Ticket ages use the server's clock (the answer's `serverTime` plus the time since it
@@ -485,6 +497,25 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-12a POS bill, payment and shift screens
+
+P1-12 was split into P1-12a (this) and P1-12b (split bill, void and re-issue, day-end screen).
+
+Built:
+
+- `apps/console/src/billing/`: `BillScreen`, `DiscountDialog`, `CustomerDialog`, `ReasonDialog`,
+  `PaymentScreen`, `ShiftScreen`, `override.tsx` (`useOverride`), `use-open-bill.ts`,
+  `money-input.ts`; routes `/pos/bill/:billId`, `/pos/pay/:invoiceId`, `/pos/shift`; Bill buttons
+  on the table details, order entry and takeaway orders; Shift on the floor; strings.
+- Found and fixed while testing: recording payments after adding the entered one could send a
+  different key on retry; the key now travels with its set.
+- Console screen tests get a 20 s timeout (CI was slower than the 5 s default; fixed on #39).
+- Tests: 2 money unit tests, 8 screen tests (preview and approved discount with the override
+  header, print and pay, service charge, split payment with retry on the same key, shift needed,
+  amount above the balance, open shift, cash out and close), Playwright bill-and-pay flow.
+
+Decisions: 80 to 82.
 
 ### 2026-09-26: P1-09b KDS screen (P1-09 done)
 

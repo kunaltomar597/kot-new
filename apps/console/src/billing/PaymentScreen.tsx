@@ -114,7 +114,8 @@ function PaymentForm({
   const entered = paiseFromInput(amount);
   const cashGiven = mode === 'CASH' ? (paiseFromInput(tendered) ?? null) : null;
 
-  const add = (): PlannedPayment[] | undefined => {
+  /** Lines up what is entered; the set changed, so it gets a new key. */
+  const add = (): { payments: PlannedPayment[]; key: string } | undefined => {
     if (entered === undefined || entered > left) {
       setInvalid(t('payment.invalidAmount'));
       return undefined;
@@ -135,15 +136,16 @@ function PaymentForm({
         otherModeName: mode === 'OTHER' ? t('payment.modes.OTHER') : null,
       },
     ];
+    const nextKey = newKey();
     setPlanned(next);
-    setKey(newKey());
+    setKey(nextKey);
     setAmount(inputFromPaise(stillToPay(view.remaining, next)));
     setTendered('');
     setReference('');
-    return next;
+    return { payments: next, key: nextKey };
   };
 
-  const record = async (payments: readonly PlannedPayment[]) => {
+  const record = async (payments: readonly PlannedPayment[], idempotencyKey: string) => {
     setBusy(true);
     setError(undefined);
     setNeedShift(false);
@@ -151,7 +153,7 @@ function PaymentForm({
       const result = await controller.api.recordPayments({
         params: { id: view.invoiceId },
         body: {
-          idempotencyKey: key,
+          idempotencyKey,
           payments: payments.map((payment) => ({
             mode: payment.mode,
             amount: payment.amount,
@@ -181,10 +183,14 @@ function PaymentForm({
     }
   };
 
-  // With nothing lined up yet, "Record payment" records what is entered in the form.
+  // "Record payment" records the lined-up payments, adding what is entered in the form first.
+  // A retry of the same set sends the same key (the state holds the key of the current set).
   const submit = () => {
-    const payments = planned.length > 0 && entered === undefined ? planned : add();
-    if (payments !== undefined && payments.length > 0) void record(payments);
+    const attempt =
+      planned.length > 0 && entered === undefined ? { payments: planned, key } : add();
+    if (attempt !== undefined && attempt.payments.length > 0) {
+      void record(attempt.payments, attempt.key);
+    }
   };
 
   return (

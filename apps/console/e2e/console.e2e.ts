@@ -227,4 +227,51 @@ test.describe.serial('the web console', () => {
     await expect(sent.getByText(t('pos.itemState.PICKED_UP')).first()).toBeVisible();
     await expect(sent.getByText(t('pos.itemState.READY')).first()).toBeVisible();
   });
+
+  test('[BILL-005] [BILL-008] [AUTH-011] bills a table with a manager-approved discount and a split payment in under a minute', async () => {
+    const started = Date.now();
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+    await page.getByRole('button', { name: t('pos.shift') }).click();
+    await page.getByLabel(t('shift.openingFloat')).fill('1000');
+    await page.getByRole('button', { name: t('shift.open') }).click();
+    await expect(page.getByText(t('shift.expected'))).toBeVisible();
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+
+    await page.getByRole('button', { name: /^7, Occupied/ }).click();
+    await page.getByRole('button', { name: t('pos.billTable') }).click();
+    await expect(
+      page.getByRole('heading', {
+        name: t('billing.billFor', { target: t('pos.table.title', { table: '7' }) }),
+      }),
+    ).toBeVisible();
+
+    // 20 % is above the cashier's 10 % limit: a manager approves with their PIN.
+    await page.getByRole('button', { name: t('billing.addDiscount') }).click();
+    const discount = page.getByRole('dialog', { name: t('billing.discount.title') });
+    await discount.getByLabel(t('billing.discount.percentValue')).fill('20');
+    await discount.getByLabel(t('billing.discount.reason')).fill('Birthday');
+    await discount.getByRole('button', { name: t('billing.discount.apply') }).click();
+    const approval = page.getByRole('dialog', { name: t('override.title') });
+    await approval.getByRole('button', { name: 'Vikram (Manager)' }).click();
+    await page.keyboard.type('2222');
+    await expect(page.getByText(/Birthday/)).toBeVisible();
+
+    await page.getByRole('button', { name: t('billing.printBill') }).click();
+    await page.getByRole('button', { name: t('billing.pay') }).click();
+    await expect(page.getByRole('heading', { name: /^Payment for invoice / })).toBeVisible();
+
+    await page.getByLabel(t('payment.mode')).selectOption({ label: t('payment.modes.UPI') });
+    await page.getByLabel(t('payment.amount')).fill('100');
+    await page.getByRole('button', { name: t('payment.add') }).click();
+    await page.getByLabel(t('payment.mode')).selectOption({ label: t('payment.modes.CASH') });
+    await page.getByLabel(t('payment.tendered')).fill('5000');
+    await page.getByRole('button', { name: t('payment.record') }).click();
+    await expect(page.getByText(/^Invoice .* is paid$/)).toBeVisible();
+    await expect(page.getByText(t('billing.settled'))).toBeVisible();
+    expect(Date.now() - started).toBeLessThan(60_000);
+
+    // Paid in full: the table is free again.
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+    await expect(page.getByRole('button', { name: '7, Free' })).toBeVisible();
+  });
 });

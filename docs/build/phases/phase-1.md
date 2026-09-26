@@ -770,6 +770,37 @@ void/re-issue, shift open/close screens, day-end screen with Z-report preview.
 Acceptance: Playwright flows for a split bill and payment in under a minute of scripted steps;
 override prompt appears above the cashier limit.
 
+P1-12 is split in two.
+
+### P1-12a Bill, payment and shift screens
+
+As built: `apps/console/src/billing/`.
+
+- "Bill" on a table's details and in its order entry, and "Bill order N" on open takeaway
+  orders, open (or find) the bill and go to it.
+- The bill screen shows the server's preview (lines, subtotal, discounts, service charge, each
+  tax component, round-off, total); adds a discount on the bill or a line (percentage or amount,
+  with a reason); removes or restores the service charge with a reason; edits the customer
+  (phone kept only with consent, GSTIN); and prints, which issues the invoice with its number
+  and then prints it (a print failure is reported; the invoice stays issued).
+- Manager approval in place (AUTH-011): an action refused with OVERRIDE_REQUIRED opens a dialog
+  where a manager picks their name and enters their PIN; the action is sent again with the
+  single-use approval for that capability and bill.
+- Payment: one or several payments across cash, UPI, card and other, the change for cash, and
+  one idempotency key per set of payments (a retry never records twice); cash without an open
+  shift points to the shift screen.
+- Shift: open with the float, cash in or out with a reason, close with the counted cash and see
+  the difference.
+- Playwright: open a shift, bill a table with a manager-approved 20 % discount, pay by UPI and
+  cash, all within a minute; the table is free again.
+
+### P1-12b Split bill, void and re-issue, day-end
+
+- Split by items or equally; reprint marked DUPLICATE; void with a manager's approval and
+  re-issue; reopen a printed bill to edit it; day-end screen with the Z-report preview, blockers
+  and carry-forward.
+- Playwright: a split bill paid within a minute.
+
 ## P1-13 Core reports v1
 
 Goal: the reports the restaurant and its CA need from day one.
