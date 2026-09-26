@@ -301,6 +301,23 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   - publishing `menu_versions`, with a checksum so an unchanged draft is not published again;
   - the device-facing menu with live availability.
 
+## Photos (P1-04)
+
+- `POST /api/v1/photos` (`MENU_MANAGE`) takes the image as base64 JSON, at most 5 MB. Only this
+  path gets the larger 7 MB JSON limit.
+- `src/photos/photo-processing.ts` uses `sharp`:
+  - the format is read from the content, and only JPEG, PNG, WebP and HEIF/AVIF are accepted;
+  - at most 40 megapixels;
+  - the image is turned upright, then written as WebP 160, 480 and 960 px wide (never enlarged)
+    with no EXIF, ICC or XMP metadata.
+- Files live under `<RP_DATA_DIR>/photos/<restaurantId>/<photoId>/<width>.webp` (`photo-store.ts`
+  builds paths only from UUIDs).
+- `GET /api/v1/photos/:id/:width` is public (for `<img>`) and cached for a year.
+- `PhotosService.purgeUnused` runs daily (DATA-007). It removes photos older than
+  `retention.operationalDays` that no item, staff member, logo or the latest published menu uses,
+  and photo folders left without a record for a day.
+- libvips (LGPL) is on the licence exceptions list; see `infra/ci/license-policy.json`.
+
 ## Orders (P1-06)
 
 - `src/orders/orders.service.ts` (P1-06a): submission. The idempotency key is locked per
