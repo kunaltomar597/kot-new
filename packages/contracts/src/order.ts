@@ -113,3 +113,48 @@ export const Kot = z.object({
   ),
 });
 export type Kot = z.infer<typeof Kot>;
+
+/** An order as staff screens show it (P1-06a). Prices are paise, as charged at order time. */
+export const OrderView = z.object({
+  id: Id,
+  orderNumber: z.int().positive(),
+  orderType: OrderType,
+  source: OrderSource,
+  status: z.enum(['OPEN', 'CLOSED', 'CANCELLED']),
+  tableSessionId: Id.nullable(),
+  tableId: Id.nullable(),
+  takeawayToken: z.int().positive().nullable(),
+  customerName: z.string().nullable(),
+  businessDate: z.iso.date(),
+  createdAt: Timestamp,
+  note: z.string().nullable(),
+  items: z.array(
+    z.object({
+      id: Id,
+      itemId: Id,
+      /** Set on the parts of a combo; the combo line carries the price. */
+      parentOrderItemId: Id.nullable(),
+      name: z.string(),
+      variantName: z.string().nullable(),
+      modifiers: z.array(z.object({ name: z.string(), priceDelta: z.int() })),
+      quantity: z.int().positive(),
+      unitPrice: z.int().nonnegative(),
+      lineTotal: z.int().nonnegative(),
+      stationId: Id,
+      state: OrderItemState,
+      instructions: z.string().nullable(),
+    }),
+  ),
+  kots: z.array(
+    z.object({
+      id: Id,
+      kotNumber: z.int().positive(),
+      stationId: Id,
+      kind: z.enum(['NEW', 'MODIFIED', 'CANCELLED']),
+    }),
+  ),
+});
+export type OrderView = z.infer<typeof OrderView>;
+
+export const OrderParams = z.strictObject({ orderId: Id });
+export type OrderParams = z.infer<typeof OrderParams>;

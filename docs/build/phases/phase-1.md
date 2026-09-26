@@ -283,6 +283,43 @@ Acceptance: integration tests for idempotent replay (same key twice → one orde
 stock deduction), partial rejection, KOT split, modify/cancel/void rules per state and role, price
 change not affecting open orders, events emitted after commit only.
 
+Split into P1-06a (submission and KOTs) and P1-06b (item status, modify, cancel and void).
+
+### P1-06a Order submission and KOTs
+
+As built: `apps/server/src/orders`.
+
+- `POST /api/v1/orders` (`ORDER_CREATE`; staff sources POS and WAITER_APP) and
+  `GET /api/v1/orders/:orderId`.
+- Idempotency: the key is locked for the transaction (`pg_advisory_xact_lock`), and the accepted
+  response is stored in `idempotency_records` for 7 days with the request hash. A repeat returns
+  it with `replayed: true`; the same key with another body gets 422. Rejections are not stored,
+  so the corrected order can be sent again.
+- Every line is priced from the published menu (`unitPriceOf`, modifiers, variants) and checked
+  for availability, channel, selection, instruction length and the combo's date and time window.
+  - Counted stock is checked under row locks.
+  - Any bad line rejects the order with every reason (ORD-017), and nothing is created.
+- Order number and takeaway token are per business day.
+  - Dine-in locks the table row. A table waiting for its bill goes back to OCCUPIED
+    (`ADD_ITEMS`); a closed session gets 409.
+  - Combos become a priced parent line and zero-priced parts routed to their own stations.
+- Staff orders get `SENT` items:
+  - per-station KOTs (`splitIntoKots`), with PENDING print status on printing stations;
+  - `KotCreated`;
+  - stock taken off with `decrementStock`.
+
+  Customer orders get `PENDING_APPROVAL` and wait for P3-03.
+
+- An audit entry, an `order_events` row and `OrderSubmitted` in the same transaction.
+
+### P1-06b Item status, modify, cancel and void
+
+The rest of P1-06:
+
+- item status through `orderItemMachine` with permission checks and audit;
+- cancel with a reason, and void with a manager override;
+- MODIFIED and CANCELLED delta KOTs (ORD-012).
+
 ## P1-07 Stations, printers and KOT printing
 
 Goal: kitchen tickets reach the right station on screen, paper or both.
