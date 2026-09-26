@@ -10,14 +10,15 @@ import {
   SYSTEM_CLOCK,
 } from './clock.js';
 import { NotificationTriggers } from './notification-triggers.js';
-import { NotificationsController } from './notifications.controller.js';
+import { BreakController, NotificationsController } from './notifications.controller.js';
 import { NotificationsService } from './notifications.service.js';
 import { PRESENCE, type Presence } from './presence.js';
+import { SystemAlerts } from './system-alerts.js';
 
 /** The notification and escalation engine (P2-03, NTF-001 to NTF-007). */
 @Module({
   imports: [EventsModule, RealtimeModule, SettingsModule],
-  controllers: [NotificationsController],
+  controllers: [NotificationsController, BreakController],
   providers: [
     { provide: NOTIFICATION_CLOCK, useValue: SYSTEM_CLOCK },
     { provide: NOTIFICATION_OPTIONS, useValue: DEFAULT_NOTIFICATION_OPTIONS },
@@ -30,6 +31,7 @@ import { PRESENCE, type Presence } from './presence.js';
     },
     NotificationsService,
     NotificationTriggers,
+    SystemAlerts,
   ],
   exports: [NotificationsService],
 })

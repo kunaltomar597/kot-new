@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "onBreak": { "type": "boolean" } },
+    "required": ["onBreak"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "onBreak": { "type": "boolean" } },
+    "required": ["onBreak"],
+    "additionalProperties": false
+  }
+}
