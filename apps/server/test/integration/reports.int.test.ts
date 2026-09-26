@@ -40,6 +40,11 @@ let waiter: LoginResponse;
 const ids: Record<string, string> = {};
 const id = (name: string) => ids[name] ?? '';
 let today: string;
+/**
+ * The invoices' own (calendar) date. The register is kept by invoice date for GST, which is the
+ * next calendar day when the test runs between midnight and the 04:00 business-day cut-off.
+ */
+let invoiceDay: string;
 const invoices: Record<string, InvoiceView> = {};
 
 const as = (login: LoginResponse) => authHeaders(kit.deviceId, login.accessToken);
@@ -204,6 +209,7 @@ beforeAll(async () => {
   today = DayEndPreview.parse(
     (await server().get('/api/v1/day-end').set(as(manager))).body,
   ).businessDate;
+  invoiceDay = invoices.a.invoiceDate;
 });
 
 afterAll(async () => {
@@ -324,7 +330,9 @@ describe('[RPT-006] GST reports for the CA', () => {
   });
 
   it('lists every invoice number in sequence, the cancelled one included', async () => {
-    const register = InvoiceRegisterResponse.parse((await report('invoice-register')).body);
+    const register = InvoiceRegisterResponse.parse(
+      (await report('invoice-register', manager, invoiceDay, invoiceDay)).body,
+    );
     expect(register.invoices.map((invoice) => [invoice.invoiceNumber, invoice.status])).toEqual([
       [invoices.a?.invoiceNumber, 'SETTLED'],
       [expect.stringMatching(/000002$/), 'SETTLED'],
@@ -389,9 +397,9 @@ describe('[RPT-017] CSV export', () => {
     expect(gst).toContain('Total,,900.00,23.80,23.80,47.60');
 
     const register = ReportExportResponse.parse(
-      (await exportCsv({ report: 'INVOICE_REGISTER', from: today, to: today })).body,
+      (await exportCsv({ report: 'INVOICE_REGISTER', from: invoiceDay, to: invoiceDay })).body,
     ).content;
-    expect(register).toContain(`${invoices.voided?.invoiceNumber ?? ''},${today},${today}`);
+    expect(register).toContain(`${invoices.voided?.invoiceNumber ?? ''},${invoiceDay},${today}`);
     expect(register).toContain(',VOIDED,');
     expect(register).toContain(',Wrong item,');
 
