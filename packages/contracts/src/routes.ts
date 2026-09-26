@@ -1,6 +1,14 @@
 import type { Capability } from '@rp/domain';
 import { z } from 'zod';
-import { AlertListResponse, AlertParams, AlertView } from './alerts.js';
+import {
+  AlertListResponse,
+  AlertParams,
+  AlertView,
+  BreakRequest,
+  BreakView,
+  NudgeRequest,
+  NudgeResponse,
+} from './alerts.js';
 import { AuditVerifyResponse } from './audit.js';
 import {
   BillCustomerRequest,
@@ -1727,6 +1735,42 @@ export const ROUTES = [
       200: { description: 'The alert.', schema: AlertView },
       ...standardErrors,
       404: { description: 'No such alert, or not one for you.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'nudgeStaff',
+    method: 'POST',
+    path: '/api/v1/alerts/nudge',
+    summary: 'Nudge waiters with a preset or a short message on their pager and app',
+    description:
+      'NTF-008: one alert per person, "MGR: <message>" on the pager, repeated every R until ' +
+      'acknowledged; the acknowledgement time is kept. Presets are the setting ' +
+      '`notifications.nudgePresets`; any text up to 40 characters is allowed.',
+    tags: ['notifications'],
+    requirements: ['NTF-008', 'NTF-004'],
+    capability: 'STAFF_MANAGE',
+    request: { body: NudgeRequest },
+    responses: {
+      201: { description: 'The alerts, one per person.', schema: NudgeResponse },
+      ...standardErrors,
+      422: { description: 'Someone chosen is not active staff here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'setMyBreak',
+    method: 'POST',
+    path: '/api/v1/staff/me/break',
+    summary: 'Start or end "On break" for the signed-in person',
+    description:
+      "NTF-009: while on break the person's alerts go to the managers on duty. Setting the same " +
+      'value again changes nothing.',
+    tags: ['notifications'],
+    requirements: ['NTF-009'],
+    capability: 'SESSION',
+    request: { body: BreakRequest },
+    responses: {
+      200: { description: 'The break state.', schema: BreakView },
+      ...standardErrors,
     },
   },
   {

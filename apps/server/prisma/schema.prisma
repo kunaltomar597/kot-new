@@ -320,6 +320,8 @@ model Staff {
   email            String?
   active           Boolean           @default(true)
   externalId       String?           @map("external_id")
+  /// Set while the person is on break: their alerts go to the managers (NTF-009, P2-03b).
+  onBreakSince     DateTime?         @map("on_break_since") @db.Timestamptz(3)
   archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
   credentials      Credential[]
   sessions         Session[]

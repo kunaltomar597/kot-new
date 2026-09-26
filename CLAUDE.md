@@ -7,6 +7,22 @@ control plane. It is being built by Claude, one work package at a time.
 
 Read this file fully at the start of every session. It tells you where everything is and how to work.
 
+## Standing instruction from the owner (applies to every session)
+
+The Business Owner has said, repeatedly and explicitly: build everything, make every decision
+yourself, and never stop to ask. So:
+
+- Do not stop between work packages, at checkpoints or for decisions. Pick the next WP from
+  `docs/build/PROGRESS.md` and keep going until nothing buildable is left.
+- Decide technical and product questions yourself, choosing the reading that best matches the BRD.
+  Record each decision in PROGRESS.md ("Decided ...") instead of asking. Only a question that
+  truly changes a business rule goes to "Questions for the Business Owner"; even then, pick a
+  sensible default, build it behind a setting and carry on.
+- Open, watch and merge your own PRs once CI, CodeQL and e2e are green. Then start the next WP at
+  once.
+- Pause only for what physically needs a person (hardware, a Windows PC, signing keys). For those
+  WPs, prepare everything Claude can do, then move on to the next buildable WP.
+
 ## Sources of truth, in order
 
 1. `docs/brd/Restaurant_Platform_BRD_v1.0.pdf`: the signed-off business requirements. Authoritative.

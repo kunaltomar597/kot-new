@@ -58,7 +58,7 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P2-01 React Native foundation (P0-11 to P0-14 done).
-- P2-03b Nudges, breaks, device and system alerts (P2-03a done).
+- P2-04 MQTT broker and pager server side (P2-03 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -126,7 +126,7 @@ Recommended next WPs (dependencies met):
 - [ ] P2-01 React Native foundation
 - [ ] P2-02 Waiter app: tables and order taking
 - [x] P2-03a Notification engine core
-- [ ] P2-03b Nudges, breaks, device, printer and system alerts
+- [x] P2-03b Nudges, breaks, device, printer and system alerts
 - [ ] P2-04 MQTT broker and pager server side
 - [ ] P2-05 Pager firmware [H]
 - [ ] P2-06 Waiter alerts, service-request inbox, nudge, Notify manager
@@ -429,6 +429,22 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
+decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-26 (P2-03b):
+
+101. A nudge is one alert per chosen person, so each acknowledgement is recorded per waiter. Only
+     Owner and managers (`STAFF_MANAGE`) can nudge; the text is a preset or up to 40 characters.
+102. "On break" is a flag on the person (with the time it started). Anyone signed in may set their
+     own; while set, their alerts go to the managers at once. Break reporting comes with staff
+     reports (P4).
+103. Device alerts cover pagers, table tablets and kitchen screens: one alert for "offline" and one
+     for "low battery" (at or below `notifications.lowBatteryPercent`, default 20 %), each raised
+     once per state and cleared when the device is back online with enough battery.
+104. The disk check runs hourly on the server PC and alerts every restaurant on it when the data
+     drive is at or above `notifications.diskAlertPercent` (default 80 %), until space is freed.
+
 Decided 2026-09-26 (P2-03a):
 
 95. "Managers on duty" are the Owner and managers signed in on a device now. If none is signed in,
@@ -562,6 +578,12 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P2-03b Nudges, breaks, device, printer and disk alerts
+
+Built: nudge and break routes with contracts, `staff.on_break_since`, device/printer triggers, `SystemAlerts` disk check, three new settings. The owner's standing instruction to never stop is now in CLAUDE.md. Tests: 6 integration tests (nudge, who may nudge and limits, on break routes to managers, device once-per-state and clear, printer offline and clear, disk full and clear).
+
+Decisions: 101 to 104.
 
 ### 2026-09-26: P2-03a Notification engine core
 

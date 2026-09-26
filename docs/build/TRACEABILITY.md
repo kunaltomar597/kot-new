@@ -87,13 +87,13 @@ Must: 139 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 - QR-006 (M): packages/contracts/test/contracts.test.ts
 - NTF-001 (M): apps/server/test/integration/notifications.int.test.ts
 - NTF-002 (M): apps/server/test/integration/notifications.int.test.ts, packages/domain/test/notifications.test.ts
-- NTF-003 (M): apps/server/test/integration/notifications.int.test.ts, apps/server/test/integration/print-queue.int.test.ts, apps/server/test/unit/notification-triggers.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/domain/test/notifications.test.ts
+- NTF-003 (M): apps/server/test/integration/notifications-extra.int.test.ts, apps/server/test/integration/notifications.int.test.ts, apps/server/test/integration/print-queue.int.test.ts, apps/server/test/unit/notification-triggers.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/domain/test/notifications.test.ts
 - NTF-004 (M): apps/server/test/integration/notifications.int.test.ts, packages/domain/test/notifications.test.ts
 - NTF-005 (M): apps/server/test/integration/notifications.int.test.ts, packages/domain/test/notifications.test.ts
 - NTF-006 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/event-bus.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/api-client/test/realtime.test.ts, packages/contracts/test/realtime.test.ts
 - NTF-007 (M): apps/server/test/integration/notifications.int.test.ts, packages/domain/test/notifications.test.ts
-- NTF-008 (M): packages/domain/test/notifications.test.ts
-- NTF-009 (S): packages/domain/test/notifications.test.ts
+- NTF-008 (M): apps/server/test/integration/notifications-extra.int.test.ts, packages/domain/test/notifications.test.ts
+- NTF-009 (S): apps/server/test/integration/notifications-extra.int.test.ts, packages/domain/test/notifications.test.ts
 - MGR-001 (M): apps/console/e2e/console.e2e.ts, apps/console/test/console.test.tsx, apps/console/test/modes.test.ts, apps/server/test/integration/console-static.int.test.ts
 - MGR-007 (M): apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/settings.test.ts
 - RPT-001 (M): apps/server/test/integration/reports.int.test.ts, packages/contracts/test/billing-payments.test.ts

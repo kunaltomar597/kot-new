@@ -13,6 +13,11 @@ export const NOTIFICATION_OPTIONS = Symbol('NOTIFICATION_OPTIONS');
 export interface NotificationOptions {
   /** 0 turns the ticker off (tests call `processDue` themselves). */
   readonly tickMs: number;
+  /** How often the disk is checked (0 or unset turns it off). */
+  readonly systemCheckMs?: number;
 }
 
-export const DEFAULT_NOTIFICATION_OPTIONS: NotificationOptions = { tickMs: 1_000 };
+export const DEFAULT_NOTIFICATION_OPTIONS: NotificationOptions = {
+  tickMs: 1_000,
+  systemCheckMs: 60 * 60 * 1000,
+};
