@@ -25,7 +25,8 @@ import {
 } from '@rp/contracts';
 import type { Request } from 'express';
 import { authErrors } from '../auth/auth-errors.js';
-import { Public, RequireCapability } from '../auth/decorators.js';
+import { Public, RequireCapability, RequireDevice } from '../auth/decorators.js';
+import type { AuthenticatedDevice } from '../auth/device.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { DevicesService } from './devices.service.js';
@@ -40,6 +41,11 @@ function clientKey(request: Request): string {
 function principalOf(request: AuthenticatedRequest): Principal {
   if (request.principal === undefined) throw authErrors.unauthenticated();
   return request.principal;
+}
+
+function deviceOf(request: AuthenticatedRequest): AuthenticatedDevice {
+  if (request.device === undefined) throw authErrors.deviceNotRecognised();
+  return request.device;
 }
 
 /** Device pairing, device authentication and device management (AUTH-007 to AUTH-009). */
@@ -94,6 +100,12 @@ export class DevicesController {
     @Body(new ZodValidationPipe(DeviceTokenRequest)) body: DeviceTokenRequest,
   ): Promise<DeviceTokenResponse> {
     return this.devices.issueToken(body, clientKey(request));
+  }
+
+  @Get('current')
+  @RequireDevice()
+  current(@Req() request: AuthenticatedRequest): Promise<DeviceSummary> {
+    return this.devices.current(deviceOf(request));
   }
 
   @Get()

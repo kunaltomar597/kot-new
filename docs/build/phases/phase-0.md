@@ -285,6 +285,13 @@ LAN devices needs P0-15.
 Acceptance: Playwright test pairs a browser device, logs in with a PIN and lands in the right mode
 for each role; offline banner shows when the server stops.
 
+As built: the local server serves the built console at `/` (`RP_CONSOLE_DIR`) with a strict CSP,
+so console, API and socket share one origin. Two small endpoints support the shell:
+`GET /api/v1/auth/session` (restore a session, keep-alive) and `GET /api/v1/devices/current`
+(own type and binding). Home mode by role: Owner and Manager → Manage, Cashier and Waiter → POS,
+Kitchen → KDS; a KDS device opens its station without login. The session lives in
+`sessionStorage` only. CI runs the Playwright test in its own job (`End-to-end (Playwright)`).
+
 ## P0-15 LAN TLS decision and implementation (OI-07)
 
 Goal: HTTPS/WSS/MQTTS on the restaurant LAN.

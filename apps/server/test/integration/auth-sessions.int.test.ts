@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { ApiError, LoginResponse } from '@rp/contracts';
+import { ApiError, CurrentSessionResponse, LoginResponse } from '@rp/contracts';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { authSettingKey, AuthSettingsService } from '../../src/auth/auth-settings.js';
@@ -222,5 +222,51 @@ describe('[AUTH-005] [AUTH-013] logout and deactivation', () => {
       where: { id: kit.staff.CASHIER },
       data: { roleId: cashierRole.id },
     });
+  });
+});
+
+describe('[AUTH-005] the current session', () => {
+  it('describes the signed-in person and session without tokens, and counts as activity', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const manager = await addDevice(app, kit, 'MANAGER_BROWSER');
+    const session = await signIn(app, kit, 'MANAGER', manager);
+    minutes(20);
+    const response = await server()
+      .get('/api/v1/auth/session')
+      .set(authHeaders(manager, session.accessToken));
+    // The access token has expired by now; renew it the way the app would.
+    const renewed = LoginResponse.parse((await refresh(manager, session.refreshToken)).body);
+    const current = await server()
+      .get('/api/v1/auth/session')
+      .set(authHeaders(manager, renewed.accessToken))
+      .expect(200);
+    expect(codeOf(response)).toBe('TOKEN_EXPIRED');
+    expect(CurrentSessionResponse.parse(current.body)).toEqual({
+      session: {
+        id: session.session.id,
+        expiresAt: session.session.expiresAt,
+        inactivityTimeoutSeconds: 30 * 60,
+      },
+      staff: session.staff,
+      secondFactorValidUntil: null,
+    });
+    expect(JSON.stringify(current.body)).not.toMatch(/Token/);
+    // Still alive 25 minutes later thanks to that call (manager browsers idle out after 30).
+    minutes(25);
+    await server()
+      .get('/api/v1/auth/session')
+      .set(authHeaders(manager, renewed.accessToken))
+      .expect(401);
+    const again = LoginResponse.parse((await refresh(manager, renewed.refreshToken)).body);
+    await server()
+      .get('/api/v1/auth/session')
+      .set(authHeaders(manager, again.accessToken))
+      .expect(200);
+  });
+
+  it('needs a signed-in person', async () => {
+    expect(codeOf(await server().get('/api/v1/auth/session').set(authHeaders(kit.deviceId)))).toBe(
+      'UNAUTHENTICATED',
+    );
   });
 });

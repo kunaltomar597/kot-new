@@ -1,12 +1,45 @@
 # apps/console: web console (C3)
 
-React + TypeScript (Vite), served by the local server. One codebase with role-based modes:
+React 19 + TypeScript (Vite, React Router), served by the local server. One codebase with
+role-based modes:
 
 - POS (`/pos`): tables, order entry, billing, shifts, day-end (Phase 1);
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
 - Manager dashboard (`/manage`): live views, management, configuration, reports (Phase 4).
 
-Opened in Electron on the restaurant PC and in browsers on paired devices. Uses `@rp/ui-web`,
-`@rp/api-client`, `@rp/i18n`, `@rp/domain`.
+Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
+`@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
+screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
 
-Built by: P0-14 (shell), P1-08, P1-09, P1-12, P4-01 to P4-07. Not started yet.
+## What the shell does (P0-14b)
+
+- Pairing (`/pair`, AUTH-007): the browser makes a non-extractable ECDSA P-256 key with WebCrypto
+  and pairs with a manager's code. WebCrypto exists only on https:// pages or on localhost, so
+  until P0-15 a browser can only be paired on the server PC itself.
+- Login (`/login`, AUTH-001, AUTH-004): staff tiles, then the `@rp/ui-web` PIN pad (touch or
+  keyboard). A KDS device skips login and shows its station (station mode, AUTH-005).
+- Modes: people land in their home mode (Owner and Manager: Manage; Cashier and Waiter: POS;
+  Kitchen: KDS) and may open the modes their role allows (`src/app/modes.ts`, BRD §4.2 matrix).
+- Connection banner (NFR-P11) from the live connection's status; inactivity warning and sign-out
+  (AUTH-005) with a keep-alive while the person is using the screen.
+- Storage (`src/app/storage.ts`): the key pair (as a key object), device token and device summary
+  in IndexedDB; the session in `sessionStorage` (this tab only, so a shared terminal never reopens
+  signed in); the resume point in `localStorage`.
+- `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
+  screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
+
+## Commands
+
+```
+pnpm --filter @rp/console dev          Vite dev server; /api and /socket.io go to RP_SERVER_URL
+                                       (default http://127.0.0.1:8080: run the server alongside)
+pnpm --filter @rp/console build        build to dist/ (the server serves it with RP_CONSOLE_DIR)
+pnpm --filter @rp/console test         unit and screen tests (Vitest, Testing Library, axe)
+pnpm --filter @rp/console e2e          Playwright against the built server and console (after
+                                       `pnpm build`; uses TEST_DATABASE_URL or a throwaway cluster)
+```
+
+The e2e tests (`e2e/`) start PostgreSQL, seed it, run `apps/server/dist/main.js` with the built
+console, pair a real Chromium, sign each role in and stop and restart the server to check the
+offline banner. In cloud sessions they use the preinstalled Chromium (`/opt/pw-browsers`); CI
+installs Playwright's own.

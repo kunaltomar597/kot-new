@@ -31,6 +31,8 @@ export const AppConfigSchema = z.object({
   logPretty: booleanFlag,
   /** Git commit or build identifier, reported by GET /api/v1/version. */
   buildId: z.string().max(64).optional(),
+  /** Folder of the built web console (`apps/console/dist`), served at `/` when set (P0-14b). */
+  consoleDir: z.string().min(1).optional(),
 });
 
 export type AppConfig = Readonly<z.infer<typeof AppConfigSchema>>;
@@ -64,6 +66,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     logLevel: env.LOG_LEVEL,
     logPretty: env.LOG_PRETTY,
     buildId: env.RP_BUILD_ID,
+    consoleDir: env.RP_CONSOLE_DIR,
   });
   if (!result.success) {
     const problems = result.error.issues

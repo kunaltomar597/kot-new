@@ -68,6 +68,8 @@ export const en = {
       '{seconds, plural, one {Signing out in # second} other {Signing out in # seconds}}. Tap anywhere to stay signed in.',
   },
   modes: {
+    navigation: 'Modes',
+    signedInAs: '{name} ({role})',
     pos: 'POS',
     kds: 'Kitchen display',
     manage: 'Manage',

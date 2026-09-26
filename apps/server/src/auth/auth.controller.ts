@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import {
+  type CurrentSessionResponse,
   type LoginResponse,
   OverrideRequest,
   type OverrideResponse,
@@ -45,6 +46,12 @@ export class AuthController {
   @RequireDevice()
   staffTiles(@Req() request: AuthenticatedRequest): Promise<StaffTilesResponse> {
     return this.auth.staffTiles(deviceOf(request));
+  }
+
+  @Get('session')
+  @RequireSession()
+  currentSession(@Req() request: AuthenticatedRequest): Promise<CurrentSessionResponse> {
+    return this.sessions.describe(principalOf(request), deviceOf(request));
   }
 
   @Post('pin-login')

@@ -4,7 +4,16 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build", "generate"],
-      "inputs": ["src/**", "scripts/**", "prisma/**", "package.json", "tsconfig*.json"],
+      "inputs": [
+        "src/**",
+        "scripts/**",
+        "prisma/**",
+        "package.json",
+        "tsconfig*.json",
+        "index.html",
+        "public/**",
+        "vite.config.*"
+      ],
       "outputs": ["dist/**"]
     },
     "typecheck": {
@@ -16,7 +25,9 @@
         "stories/**",
         ".storybook/**",
         "package.json",
-        "tsconfig*.json"
+        "tsconfig*.json",
+        "e2e/**",
+        "*.config.ts"
       ]
     },
     "test": {

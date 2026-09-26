@@ -2,6 +2,7 @@ import type { Capability } from '@rp/domain';
 import { z } from 'zod';
 import { AuditVerifyResponse } from './audit.js';
 import {
+  CurrentSessionResponse,
   LoginResponse,
   OverrideRequest,
   OverrideResponse,
@@ -234,6 +235,22 @@ export const ROUTES = [
     responses: { 204: { description: 'Signed out.' }, ...standardErrors },
   },
   {
+    operationId: 'getCurrentSession',
+    method: 'GET',
+    path: '/api/v1/auth/session',
+    summary: 'The signed-in person and their session on this device',
+    description:
+      'Apps check a restored session with it after a restart. Like every authenticated call it ' +
+      'counts as activity, so an app can keep a session alive while the person is using it.',
+    tags: ['auth'],
+    requirements: ['AUTH-005'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'The current session.', schema: CurrentSessionResponse },
+      ...standardErrors,
+    },
+  },
+  {
     operationId: 'stepUp',
     method: 'POST',
     path: '/api/v1/auth/step-up',
@@ -405,6 +422,19 @@ export const ROUTES = [
       401: { description: 'Unknown or revoked device, or a bad signature.', schema: ApiError },
       429: { description: 'Too many attempts.', schema: ApiError },
     },
+  },
+  {
+    operationId: 'getCurrentDevice',
+    method: 'GET',
+    path: '/api/v1/devices/current',
+    summary: 'This device: its type, name and binding',
+    description:
+      'Apps read their own type and binding (table, station, person) after a restart or when a ' +
+      'manager has changed them.',
+    tags: ['devices'],
+    requirements: ['AUTH-007', 'AUTH-009'],
+    capability: 'DEVICE',
+    responses: { 200: { description: 'This device.', schema: DeviceSummary }, ...deviceErrors },
   },
   {
     operationId: 'listDevices',

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { LoginResponse } from '@rp/contracts';
+import type { CurrentSessionResponse, LoginResponse } from '@rp/contracts';
 import type { Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
@@ -108,10 +108,6 @@ export class SessionService {
       ttlSeconds,
       now,
     );
-    const stepUpUntil =
-      session.secondFactorAt === null
-        ? null
-        : new Date(session.secondFactorAt.getTime() + settings.stepUpMinutes * 60_000);
     return {
       accessToken: access.token,
       accessTokenExpiresAt: access.expiresAt.toISOString(),
@@ -122,9 +118,45 @@ export class SessionService {
         inactivityTimeoutSeconds: this.inactivityMs(settings, input.device) / 1000,
       },
       staff: { id: input.staff.id, displayName: input.staff.displayName, role: input.staff.role },
-      secondFactorValidUntil:
-        stepUpUntil !== null && stepUpUntil > now ? stepUpUntil.toISOString() : null,
+      secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
     };
+  }
+
+  /** The signed-in person's session as their app sees it, without tokens (AUTH-005). */
+  async describe(
+    principal: Principal,
+    device: AuthenticatedDevice,
+    now: Date = new Date(),
+  ): Promise<CurrentSessionResponse> {
+    const session = await this.prisma.session.findUniqueOrThrow({
+      where: { id: principal.sessionId },
+      include: SESSION_STAFF,
+    });
+    const settings = await this.settings.get(session.restaurantId);
+    return {
+      session: {
+        id: session.id,
+        expiresAt: session.expiresAt.toISOString(),
+        inactivityTimeoutSeconds: this.inactivityMs(settings, device) / 1000,
+      },
+      staff: {
+        id: session.staffId,
+        displayName: session.staff.displayName,
+        role: session.staff.role.baseRole,
+      },
+      secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
+    };
+  }
+
+  /** Until when an Owner's password + TOTP step-up counts (AUTH-006), if it still does. */
+  private stepUpValidUntil(
+    secondFactorAt: Date | null,
+    settings: AuthSettings,
+    now: Date,
+  ): string | null {
+    if (secondFactorAt === null) return null;
+    const until = new Date(secondFactorAt.getTime() + settings.stepUpMinutes * 60_000);
+    return until > now ? until.toISOString() : null;
   }
 
   /**

@@ -73,6 +73,17 @@ export const LoginResponse = z.object({
 });
 export type LoginResponse = z.infer<typeof LoginResponse>;
 
+/**
+ * The signed-in person and their session on this device, without tokens. Apps check it after a
+ * restart, and calling it counts as activity (AUTH-005).
+ */
+export const CurrentSessionResponse = LoginResponse.pick({
+  session: true,
+  staff: true,
+  secondFactorValidUntil: true,
+});
+export type CurrentSessionResponse = z.infer<typeof CurrentSessionResponse>;
+
 export const StepUpRequest = z.strictObject({
   password: OwnerPassword,
   secondFactor: SecondFactor,

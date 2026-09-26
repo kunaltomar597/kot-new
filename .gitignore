@@ -23,6 +23,9 @@ android/app/build/
 out/
 # Storybook workbench build (packages/ui-web)
 storybook-static/
+# Playwright output (apps/console e2e)
+test-results/
+playwright-report/
 # ESP-IDF
 firmware/**/build/
 firmware/**/sdkconfig.old

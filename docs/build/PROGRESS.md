@@ -23,6 +23,9 @@ What exists:
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
   rooms, resync and revocation (P0-12). 387 tests.
+- `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
+  role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
+  local server, with a Playwright end-to-end test in CI (P0-14b).
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -36,8 +39,9 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-14b Web console shell (P0-14a is done).
-- P0-15 LAN TLS decision and implementation.
+- P0-15 LAN TLS decision and implementation (browsers other than the server PC need https:// to
+  pair).
+- P0-17 Minimal Vendor Control Plane (the parts that need no hosting account).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -58,7 +62,7 @@ Recommended next WPs (dependencies met):
 - [x] P0-12 Real-time and domain-event infrastructure
 - [x] P0-13 Design tokens and web UI library
 - [x] P0-14a API client and i18n
-- [ ] P0-14b Web console shell
+- [x] P0-14b Web console shell
 - [ ] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
 - [ ] P0-17 Minimal Vendor Control Plane (needs hosting account)
@@ -191,7 +195,8 @@ Decided 2026-09-25:
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
-revocation), P0-14a (client-side token storage and renewal; this PR).
+revocation), #12 (P0-14a client-side token handling), P0-14b (console storage of keys and
+sessions, CSP; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -199,6 +204,47 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P0-14b web console shell
+
+Built `apps/console` (Vite 8, React 19, React Router 8) and its server support (see the console
+README and the server README "Web console and client support"):
+
+- Server: `RP_CONSOLE_DIR` serves the built console at `/` with a strict Content-Security-Policy,
+  SPA fallback that never touches `/api` or `/socket.io`, 404 for missing files, immutable caching
+  of hashed assets; `GET /api/v1/auth/session` and `GET /api/v1/devices/current`, with contracts,
+  routes and tests.
+- Console: `ConsoleController` (state and actions outside React), `BrowserStorage` (key pair and
+  device in IndexedDB, session in `sessionStorage`, resume point in `localStorage`), pairing
+  screen, staff tiles and PIN login, role modes with a header and mode links, not-allowed screen,
+  KDS station mode (dark KDS theme), connection banner, inactivity warning and sign-out with
+  keep-alive, `UiStrings` for `@rp/ui-web` built from the i18n catalogue.
+- Tests: 37 unit and screen tests (Vitest, Testing Library, axe on the pairing, login and mode
+  screens), 97 % lines; 2 Playwright tests on real Chromium against the built server (pairing with
+  the bootstrap code, PIN login for all five roles landing in the right mode, offline banner while
+  the server is down and recovery with the session intact after a restart). New CI job
+  `End-to-end (Playwright)`.
+
+Decisions:
+
+- The server serves the console (one origin, no CORS, one certificate for P0-15) rather than a
+  separate web server.
+- Sessions are kept per tab (`sessionStorage`): a reload keeps the person signed in, a closed tab
+  does not. Device identity persists in IndexedDB.
+- Owner and Manager land in Manage; the KDS mode is open to Owner, Manager and Kitchen
+  (`ITEM_MARK_PREPARING_READY`), POS to roles with `ORDER_CREATE`, Manage to roles with
+  `OPERATIONS_CONFIGURE`.
+- Playwright uses the preinstalled Chromium in cloud sessions (`/opt/pw-browsers/chromium`) and its
+  own browser in CI.
+
+Notes for the next session:
+
+- P0-15: browsers other than the server PC need an https:// address to pair (WebCrypto); the
+  console, API and socket already share one origin.
+- Mode screens (P1-08 POS, P1-09 KDS, P4-01 dashboard) replace `ModeHome`; subscribe to live events
+  with `controller.onEvent` and reload on `onSync` full refresh.
+- `packages/ui-web/fixtures/en-strings.ts` stays for ui-web's own tests; apps build `UiStrings` from
+  the catalogue (`apps/console/src/app/i18n.tsx`).
 
 ### 2026-09-25: P0-14a API client and i18n
 
