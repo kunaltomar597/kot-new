@@ -8,9 +8,9 @@ Must: 140 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 ## Covered requirements
 
 - AUTH-001 (M): apps/console/test/console-controller.test.ts, apps/console/test/console.test.tsx, apps/server/test/integration/auth-login.int.test.ts, packages/ui-web/test/PinPad.test.tsx
-- AUTH-002 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/unit/auth-primitives.test.ts, packages/ui-web/test/PinPad.test.tsx
+- AUTH-002 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/unit/auth-primitives.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-web/test/PinPad.test.tsx
 - AUTH-003 (M): apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/settings.int.test.ts
-- AUTH-004 (M): apps/console/e2e/console.e2e.ts, apps/console/test/console.test.tsx, packages/ui-web/test/PinPad.test.tsx
+- AUTH-004 (M): apps/console/e2e/console.e2e.ts, apps/console/test/console.test.tsx, packages/ui-native/test/controls.test.tsx, packages/ui-web/test/PinPad.test.tsx
 - AUTH-005 (M): apps/console/test/console-controller.test.ts, apps/console/test/console.test.tsx, apps/console/test/inactivity.test.ts, apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/auth-sessions.int.test.ts, apps/server/test/integration/kds.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/auth-primitives.test.ts, packages/api-client/test/client.test.ts
 - AUTH-006 (M): apps/server/test/integration/auth-owner.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/auth-primitives.test.ts, packages/contracts/test/settings.test.ts, packages/domain/test/permissions.test.ts
 - AUTH-007 (M): apps/console/e2e/console.e2e.ts, apps/console/test/console-controller.test.ts, apps/console/test/console.test.tsx, apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/api-client/test/client.test.ts, packages/contracts/test/devices.test.ts, packages/mobile-core/test/mobile-core.test.ts
@@ -26,15 +26,15 @@ Must: 140 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 - ONB-009 (M): apps/server/test/integration/menu-import.int.test.ts
 - MENU-001 (M): apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/menu-admin.test.ts
 - MENU-002 (M): apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts
-- MENU-003 (M): apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/menu-admin.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ui-web/test/ordering.test.tsx
-- MENU-004 (M): apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ui-web/test/ordering.test.tsx
-- MENU-005 (M): apps/server/test/integration/menu-publish.int.test.ts, apps/server/test/integration/orders.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts, packages/ui-web/test/ordering.test.tsx
+- MENU-003 (M): apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/menu-admin.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/ordering.test.tsx
+- MENU-004 (M): apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/ordering.test.tsx
+- MENU-005 (M): apps/server/test/integration/menu-publish.int.test.ts, apps/server/test/integration/orders.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/ordering.test.tsx
 - MENU-006 (M): apps/server/test/integration/menu-publish.int.test.ts, packages/contracts/test/menu-admin.test.ts, packages/mobile-core/test/mobile-core.test.ts
 - MENU-008 (M): apps/server/test/integration/photos.int.test.ts, apps/server/test/unit/photo-processing.test.ts
 - MENU-009 (M): apps/server/test/integration/menu-admin.int.test.ts, apps/server/test/integration/orders.int.test.ts
 - MENU-010 (M): apps/server/test/integration/menu-admin.int.test.ts
 - MENU-011 (M): apps/server/test/integration/menu-admin.int.test.ts, apps/server/test/integration/menu-import.int.test.ts, packages/contracts/test/menu-admin.test.ts, packages/domain/test/menu-import.test.ts
-- MENU-012 (M): apps/console/e2e/console.e2e.ts, apps/console/test/order-entry.test.tsx, apps/console/test/order-logic.test.ts, apps/server/test/integration/menu-publish.int.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ui-web/test/ordering.test.tsx
+- MENU-012 (M): apps/console/e2e/console.e2e.ts, apps/console/test/order-entry.test.tsx, apps/console/test/order-logic.test.ts, apps/server/test/integration/menu-publish.int.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/ordering.test.tsx
 - MENU-013 (M): apps/server/test/integration/menu-publish.int.test.ts, packages/contracts/test/contracts.test.ts, packages/mobile-core/test/mobile-core.test.ts
 - TBL-001 (M): apps/server/test/integration/floor.int.test.ts, packages/contracts/test/floor.test.ts
 - TBL-002 (M): apps/server/test/integration/floor.int.test.ts, packages/contracts/test/floor.test.ts, packages/domain/test/floor.test.ts
@@ -126,11 +126,11 @@ Must: 140 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 - NFR-A01 (M): apps/server/test/integration/control-plane.int.test.ts
 - NFR-A03 (M): apps/server/test/integration/database.int.test.ts
 - NFR-A04 (M): apps/server/test/integration/health.int.test.ts
-- NFR-U01 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/Button.test.tsx, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Tabs.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/styles.test.ts
+- NFR-U01 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-native/test/overlays.test.tsx, packages/ui-web/test/Button.test.tsx, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Tabs.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/styles.test.ts
 - NFR-U02 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/display.test.tsx
-- NFR-U03 (M): packages/design-tokens/test/themes.test.ts, packages/ui-web/test/NumberPad.test.tsx, packages/ui-web/test/ordering.test.tsx, packages/ui-web/test/styles.test.ts
+- NFR-U03 (M): packages/design-tokens/test/themes.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/NumberPad.test.tsx, packages/ui-web/test/ordering.test.tsx, packages/ui-web/test/styles.test.ts
 - NFR-U04 (M): apps/console/test/messages.test.ts, apps/server/test/unit/error-mapping.test.ts, packages/api-client/test/client.test.ts, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Toast.test.tsx, packages/ui-web/test/display.test.tsx
-- NFR-U05 (M): packages/design-tokens/test/color.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/TableTile.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/fields.test.tsx
+- NFR-U05 (M): packages/design-tokens/test/color.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-web/test/TableTile.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/fields.test.tsx
 - NFR-L02 (M): packages/i18n/test/message-format.test.ts, packages/i18n/test/translator.test.ts, packages/i18n/test/ui-text-rule.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-L03 (M): apps/server/test/integration/restaurant.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/money.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-M01 (M): packages/ui-web/test/display.test.tsx
