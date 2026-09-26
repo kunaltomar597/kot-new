@@ -7,6 +7,7 @@ import { useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
+import { useOpenBill } from '../billing/use-open-bill.js';
 import { floorSections, tileAlert, tileDetails } from './floor-view.js';
 import { MoveTableDialog } from './MoveTableDialog.js';
 import { OpenTableDialog } from './OpenTableDialog.js';
@@ -61,14 +62,24 @@ export function TableOverview() {
         <p className="pos-floor__summary">
           {t('pos.summary', { free: free.length, total: tables.length })}
         </p>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            void navigate('takeaway');
-          }}
-        >
-          {t('pos.takeaway')}
-        </Button>
+        <div className="bill__actions">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void navigate('shift');
+            }}
+          >
+            {t('pos.shift')}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void navigate('takeaway');
+            }}
+          >
+            {t('pos.takeaway')}
+          </Button>
+        </div>
       </div>
       {sections.map((section) => (
         <section
@@ -139,6 +150,7 @@ function TableDetails({
 }) {
   const t = useT();
   const session = table.session;
+  const { openBill, opening } = useOpenBill();
   return (
     <Dialog
       open
@@ -154,6 +166,15 @@ function TableDetails({
                 {t('pos.table.move')}
               </Button>
             ) : null}
+            <Button
+              variant="secondary"
+              loading={opening}
+              onClick={() => {
+                openBill({ tableSessionId: session.id });
+              }}
+            >
+              {t('pos.billTable')}
+            </Button>
             <Button
               onClick={() => {
                 onTakeOrder(session.id);

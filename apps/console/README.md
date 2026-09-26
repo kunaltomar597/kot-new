@@ -39,6 +39,10 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   bump and recall, pick-up at the pass, "Notify manager" for ready food waiting, sounds
   (`sounds.ts`, on after the first touch), an all-day summary and a full-screen notice while
   disconnected. The rules are in `kds-view.ts`.
+- Billing (`/pos/bill/:billId`, `/pos/pay/:invoiceId`, `/pos/shift`, P1-12a): `src/billing/`
+  shows the bill preview, discounts (with a manager's PIN in place when above the cashier's
+  limit, `override.tsx`), service charge, customer, print (issue and print), payments across
+  modes with change and one idempotency key per set, and the cashier's shift.
 - `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
   screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
 
