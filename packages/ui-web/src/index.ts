@@ -14,6 +14,7 @@ export * from './components/Spinner.js';
 export * from './components/StateViews.js';
 export * from './components/StatusChip.js';
 export * from './components/Table.js';
+export * from './components/TableTile.js';
 export * from './components/Tabs.js';
 export * from './components/TextField.js';
 export * from './components/ThemeRoot.js';

@@ -11,6 +11,7 @@ import {
   LoadingState,
   Money,
   StatusChip,
+  TableTile,
   Table,
   Tabs,
 } from '../src/index.js';
@@ -40,6 +41,40 @@ export const StatusChips: Story = {
       {ORDER_ITEM_STATES.map((state) => (
         <StatusChip key={`lg-${state}`} state={state} label={STATE_LABELS[state]} size="lg" />
       ))}
+    </div>
+  ),
+};
+
+export const TableTiles: Story = {
+  render: () => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+      <TableTile label="1" state="FREE" stateLabel="Free" onSelect={() => undefined} />
+      <TableTile
+        label="2"
+        state="OCCUPIED"
+        stateLabel="Occupied"
+        details={['4 guests', '25 min', 'Ravi']}
+        amountSoFar={123_450}
+        onSelect={() => undefined}
+      />
+      <TableTile
+        label="3"
+        state="BILL_REQUESTED"
+        stateLabel="Bill asked"
+        details={['2 guests', '1 h 05 min', 'Priya']}
+        amountSoFar={86_000}
+        alert="1 to approve"
+        onSelect={() => undefined}
+      />
+      <TableTile
+        label="4"
+        state="BILL_PRINTED"
+        stateLabel="Bill printed"
+        details={['6 guests', '1 h 40 min', 'Ravi']}
+        amountSoFar={412_000}
+        selected
+        onSelect={() => undefined}
+      />
     </div>
   ),
 };

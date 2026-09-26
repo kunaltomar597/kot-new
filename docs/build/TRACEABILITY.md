@@ -35,10 +35,10 @@ Must: 121 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - MENU-013 (M): apps/server/test/integration/menu-publish.int.test.ts, packages/contracts/test/contracts.test.ts
 - TBL-001 (M): apps/server/test/integration/floor.int.test.ts, packages/contracts/test/floor.test.ts
 - TBL-002 (M): apps/server/test/integration/floor.int.test.ts, packages/contracts/test/floor.test.ts, packages/domain/test/floor.test.ts
-- TBL-003 (M): apps/server/test/integration/table-sessions.int.test.ts, packages/contracts/test/table-sessions.test.ts
+- TBL-003 (M): apps/console/e2e/console.e2e.ts, apps/console/test/pos.test.tsx, apps/server/test/integration/table-sessions.int.test.ts, packages/contracts/test/table-sessions.test.ts
 - TBL-004 (M): apps/server/test/integration/orders.int.test.ts, apps/server/test/integration/payments.int.test.ts, apps/server/test/integration/table-sessions.int.test.ts, packages/contracts/test/table-sessions.test.ts, packages/domain/test/state-machines.test.ts
-- TBL-005 (M): apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/table-sessions.int.test.ts, apps/server/test/unit/escpos.test.ts
-- TBL-007 (M): apps/server/test/integration/table-sessions.int.test.ts
+- TBL-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/pos.test.tsx, apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/table-sessions.int.test.ts, apps/server/test/unit/escpos.test.ts
+- TBL-007 (M): apps/console/e2e/console.e2e.ts, apps/console/test/floor-view.test.ts, apps/console/test/pos.test.tsx, apps/server/test/integration/table-sessions.int.test.ts, packages/ui-web/test/TableTile.test.tsx
 - ORD-001 (M): apps/server/test/integration/orders.int.test.ts
 - ORD-002 (M): packages/domain/test/state-machines.test.ts
 - ORD-003 (M): apps/server/test/integration/orders.int.test.ts, packages/domain/test/state-machines.test.ts
@@ -109,7 +109,7 @@ Must: 121 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - NFR-U02 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-U03 (M): packages/design-tokens/test/themes.test.ts, packages/ui-web/test/NumberPad.test.tsx, packages/ui-web/test/styles.test.ts
 - NFR-U04 (M): apps/console/test/messages.test.ts, apps/server/test/unit/error-mapping.test.ts, packages/api-client/test/client.test.ts, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Toast.test.tsx, packages/ui-web/test/display.test.tsx
-- NFR-U05 (M): packages/design-tokens/test/color.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/display.test.tsx, packages/ui-web/test/fields.test.tsx
+- NFR-U05 (M): packages/design-tokens/test/color.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/TableTile.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/fields.test.tsx
 - NFR-L02 (M): packages/i18n/test/message-format.test.ts, packages/i18n/test/translator.test.ts, packages/i18n/test/ui-text-rule.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-L03 (M): apps/server/test/integration/restaurant.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/money.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-M01 (M): packages/ui-web/test/display.test.tsx

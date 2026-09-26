@@ -18,3 +18,4 @@
 @import url('./card.css') layer(rp.components);
 @import url('./table.css') layer(rp.components);
 @import url('./money.css') layer(rp.components);
+@import url('./table-tile.css') layer(rp.components);

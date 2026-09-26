@@ -435,6 +435,28 @@ table; takeaway with token; live item status chips.
 Acceptance: Playwright flows: open table → order with variant + modifiers + combo → send → status
 updates live; move table; takeaway order.
 
+P1-08 is split in two.
+
+### P1-08a POS floor
+
+As built: `@rp/ui-web` `TableTile`, `apps/console/src/pos/`.
+
+- The POS home is the live floor: sections in display order, a tile per table with its state,
+  guests, time seated, waiter, amount so far and approvals or requests waiting.
+- It reads the floor and the overview again after table, order, bill and service-request events
+  and when the connection returns.
+- A free table opens with guests (pad or keyboard) and an optional waiter; an occupied one shows
+  its details and moves to a free table.
+- Playwright: open a table, move it.
+
+### P1-08b POS order entry
+
+- Order entry from the table details and for takeaway: categories, search, item card,
+  variant/modifier popup and combo picker as shared `@rp/ui-web` components using `@rp/domain`
+  menu-selection; cart with instructions; Send KOT with clear success or failure; takeaway token;
+  live item status chips.
+- Playwright: order with variant, modifiers and combo; send; status updates live; takeaway order.
+
 ## P1-09 KDS UI
 
 Goal: kitchen screens for each station.

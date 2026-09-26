@@ -167,3 +167,33 @@ body {
   flex-direction: column;
   gap: var(--rp-space-6);
 }
+
+/* POS floor (P1-08a). */
+.pos-floor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-5);
+}
+
+.pos-floor__summary {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
+.pos-floor__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+}
+
+.pos-floor__heading {
+  margin: 0;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.pos-floor__tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--rp-space-3);
+}

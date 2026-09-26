@@ -3,10 +3,11 @@ import { Navigate, useNavigate } from 'react-router';
 import { useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { homeFor, isStationMode, type Mode, modesFor } from '../app/modes.js';
+import { TableOverview } from '../pos/TableOverview.js';
 
 /**
- * A mode's start screen. The screens themselves arrive with their work packages (POS P1-08, KDS
- * P1-09, dashboard P4-01); until then each mode says so.
+ * A mode's start screen: the POS floor (P1-08); the KDS (P1-09) and dashboard (P4-01) screens
+ * arrive with their work packages, and until then those modes say so.
  */
 export function ModeHome({ mode }: { mode: Mode }) {
   const t = useT();
@@ -40,7 +41,11 @@ export function ModeHome({ mode }: { mode: Mode }) {
       <h1 id={`mode-${mode}`} className="console-title">
         {name}
       </h1>
-      <EmptyState title={name} description={t('modes.comingSoon', { mode: name })} />
+      {mode === 'pos' ? (
+        <TableOverview />
+      ) : (
+        <EmptyState title={name} description={t('modes.comingSoon', { mode: name })} />
+      )}
     </section>
   );
 }

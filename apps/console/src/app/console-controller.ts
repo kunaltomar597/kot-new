@@ -8,6 +8,7 @@ import {
   type RealtimeConnectionOptions,
   type ResumePoint,
   type StoredCredentials,
+  type TypedApi,
   webCryptoDeviceKey,
 } from '@rp/api-client';
 import type { DeviceSummary, DomainEvent, LoginResponse, StaffTile } from '@rp/contracts';
@@ -75,6 +76,11 @@ export class ConsoleController {
   };
 
   readonly getSnapshot = (): ConsoleSnapshot => this.snapshot;
+
+  /** The typed REST API with this device's and person's credentials, for the screens. */
+  get api(): TypedApi {
+    return this.client.api;
+  }
 
   /** Loads the stored device and session and checks them with the server. */
   async start(): Promise<void> {

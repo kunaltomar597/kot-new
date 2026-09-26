@@ -88,4 +88,32 @@ test.describe.serial('the web console', () => {
     await page.reload();
     await expect(page.getByRole('heading', { level: 1, name: t('modes.pos') })).toBeVisible();
   });
+
+  test('[TBL-007] [TBL-003] [TBL-005] opens a table and moves it on the POS floor', async () => {
+    await expect(page).toHaveURL(/\/pos$/);
+    const hall = page.getByRole('region', { name: 'Main Hall' });
+    await expect(hall.getByRole('button', { name: '1, Free' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Terrace' })).toBeVisible();
+
+    await hall.getByRole('button', { name: '1, Free' }).click();
+    const open = page.getByRole('dialog', { name: t('pos.open.title', { table: '1' }) });
+    await open.getByLabel(t('pos.open.guests'), { exact: true }).fill('2');
+    await open.getByRole('button', { name: t('pos.open.submit') }).click();
+    await expect(page.getByText(t('pos.open.opened', { table: '1' }))).toBeVisible();
+    const occupied = hall.getByRole('button', { name: /^1, Occupied, 2 guests, 0 min, / });
+    await expect(occupied).toBeVisible();
+
+    await occupied.click();
+    const details = page.getByRole('dialog', { name: t('pos.table.title', { table: '1' }) });
+    await details.getByRole('button', { name: t('pos.table.move') }).click();
+    const move = page.getByRole('dialog', { name: t('pos.move.title', { table: '1' }) });
+    await move.getByRole('button', { name: '7, Free' }).click();
+    await expect(page.getByText(t('pos.move.moved', { from: '1', to: '7' }))).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: 'Terrace' })
+        .getByRole('button', { name: /^7, Occupied, 2 guests/ }),
+    ).toBeVisible();
+    await expect(hall.getByRole('button', { name: '1, Free' })).toBeVisible();
+  });
 });

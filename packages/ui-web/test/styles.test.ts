@@ -44,6 +44,7 @@ describe('[NFR-U03] [KDS-011] touch targets', () => {
     ['tabs.css', '.rp-tabs__tab', 'min-height: var(--rp-touch-target)'],
     ['toast.css', '.rp-toast__action', 'min-height: var(--rp-touch-target)'],
     ['table.css', '.rp-table th,\n.rp-table td', 'height: var(--rp-touch-target)'],
+    ['table-tile.css', '.rp-table-tile', 'min-height: calc(var(--rp-touch-target) * 2)'],
   ];
 
   it.each(interactive)('%s %s is at least the touch target', (file, selector, declaration) => {
@@ -53,5 +54,6 @@ describe('[NFR-U03] [KDS-011] touch targets', () => {
   it('removes the tap delay on touch screens', () => {
     expect(rule(read('button.css'), '.rp-button')).toContain('touch-action: manipulation');
     expect(rule(read('keypad.css'), '.rp-keypad__key')).toContain('touch-action: manipulation');
+    expect(rule(read('table-tile.css'), '.rp-table-tile')).toContain('touch-action: manipulation');
   });
 });
