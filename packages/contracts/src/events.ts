@@ -138,6 +138,22 @@ export const DeviceStatusChanged = event(
   }),
 );
 
+/**
+ * A printer stopped taking jobs, or took one again (KDS-008, NTF-003 "device offline: printer").
+ * The POS and managers are alerted; `queued` is how many tickets wait for it.
+ */
+export const PrinterStatusChanged = event(
+  'PrinterStatusChanged',
+  z.object({
+    printerId: Id,
+    printerName: z.string().max(40),
+    online: z.boolean(),
+    /** Why the last job failed, in plain words, while offline. */
+    error: z.string().max(300).nullable(),
+    queued: z.int().min(0),
+  }),
+);
+
 /** A device was unpaired: its tokens stop working and its live connections close (AUTH-008). */
 export const DeviceRevoked = event(
   'DeviceRevoked',
@@ -196,6 +212,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   AlertEscalated,
   DeviceStatusChanged,
   DeviceRevoked,
+  PrinterStatusChanged,
   SettingsChanged,
   RestaurantChanged,
 ]);

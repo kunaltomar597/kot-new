@@ -198,6 +198,21 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     expect(targets.sort()).toEqual([rooms.role(rid, 'MANAGER'), rooms.role(rid, 'OWNER')].sort());
   });
 
+  it('[KDS-008] [NTF-003] alerts the POS and managers when a printer goes offline', () => {
+    const targets = roomsForEvent(
+      domainEvent('PrinterStatusChanged', rid, {
+        printerId: randomUUID(),
+        printerName: 'Kitchen',
+        online: false,
+        error: 'No answer',
+        queued: 3,
+      }),
+    );
+    expect(targets.sort()).toEqual(
+      [rooms.role(rid, 'OWNER'), rooms.role(rid, 'MANAGER'), rooms.role(rid, 'CASHIER')].sort(),
+    );
+  });
+
   it('sends an escalation to managers and the people it names', () => {
     const targets = roomsForEvent(
       domainEvent('AlertEscalated', rid, {
@@ -302,6 +317,14 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', online: true });
     case 'DeviceRevoked':
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', reason: 'Lost' });
+    case 'PrinterStatusChanged':
+      return domainEvent(type, rid, {
+        printerId: id(),
+        printerName: 'Kitchen',
+        online: false,
+        error: 'No answer',
+        queued: 2,
+      });
     case 'SettingsChanged':
       return domainEvent(type, rid, { keys: ['kds.ageAmberMinutes'] });
     case 'TableWaiterChanged':

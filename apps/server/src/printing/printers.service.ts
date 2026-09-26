@@ -6,7 +6,9 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import type { Printer } from '../generated/prisma/client.js';
 import { announceSetupChange, lockSetup } from '../restaurant/setup-changes.js';
-import { type PaperWidthMm, renderTestPage } from './escpos.js';
+import { paperWidthOf, renderTestPage } from './escpos.js';
+import { PrintQueueService } from './print-queue.service.js';
+import { PrinterStatusService } from './printer-status.service.js';
 import { PrintFailure, PrinterTransport } from './printer-transport.js';
 
 export function toPrinterView(printer: Printer): PrinterView {
@@ -18,13 +20,11 @@ export function toPrinterView(printer: Printer): PrinterView {
     port: printer.port,
     paperWidthMm: printer.paperWidthMm,
     lastSeenAt: printer.lastSeenAt?.toISOString() ?? null,
+    offlineSince: printer.offlineSince?.toISOString() ?? null,
+    lastError: printer.lastError,
+    redirectToId: printer.redirectToId,
     archivedAt: printer.archivedAt?.toISOString() ?? null,
   };
-}
-
-/** Rows written before P1-07a could hold any width; anything but 58 prints as 80 mm. */
-export function paperWidthOf(printer: Pick<Printer, 'paperWidthMm'>): PaperWidthMm {
-  return printer.paperWidthMm === 58 ? 58 : 80;
 }
 
 function snapshot(
@@ -56,6 +56,8 @@ export class PrintersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly transport: PrinterTransport,
+    private readonly status: PrinterStatusService,
+    private readonly queue: PrintQueueService,
   ) {}
 
   async list(restaurantId: string): Promise<PrinterView[]> {
@@ -113,18 +115,26 @@ export class PrintersService {
         select: { name: true },
         orderBy: { name: 'asc' },
       });
-      if (stations.length > 0) {
-        const names = stations.map((station) => station.name);
+      const redirected = await tx.printer.findMany({
+        where: { redirectToId: printerId, archivedAt: null },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
+      if (stations.length > 0 || redirected.length > 0) {
+        const names = [
+          ...stations.map((station) => station.name),
+          ...redirected.map((printer) => `${printer.name} (redirected here)`),
+        ];
         throw new AppError(
           409,
           'PRINTER_IN_USE',
-          `These stations still print on this printer: ${names.join(', ')}. Give them another printer first.`,
+          `These still print on this printer: ${names.join(', ')}. Give them another printer first.`,
           { stations: names },
         );
       }
       const printer = await tx.printer.update({
         where: { id: printerId },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: new Date(), redirectToId: null },
       });
       await this.record(tx, principal, 'PRINTER_ARCHIVED', printerId, {
         before: { archivedAt: null },
@@ -160,14 +170,75 @@ export class PrintersService {
         page,
       );
     } catch (error) {
-      if (error instanceof PrintFailure) return { printed: false, error: error.message };
-      throw error;
+      if (!(error instanceof PrintFailure)) throw error;
+      await this.status.markOffline(printer.id, error.message);
+      return { printed: false, error: error.message };
     }
-    await this.prisma.printer.update({
-      where: { id: printer.id },
-      data: { lastSeenAt: new Date() },
-    });
+    // A printer that works again prints what waited for it now, not after its back-off.
+    await this.status.markOnline(printer.id);
+    this.queue.retrySoon(printer.id);
     return { printed: true, error: null };
+  }
+
+  /**
+   * Sends a broken printer's tickets to another printer until cleared (KDS-008). One step only:
+   * the target must print itself, and a printer others are sent to cannot be sent on.
+   */
+  async redirect(
+    principal: Principal,
+    printerId: string,
+    toPrinterId: string | null,
+    reason: string,
+  ): Promise<PrinterView> {
+    const view = await this.change(principal, async (tx) => {
+      const existing = await this.find(tx, principal.restaurantId, printerId);
+      if (existing.archivedAt !== null) {
+        throw new AppError(404, 'PRINTER_NOT_FOUND', 'There is no such active printer.');
+      }
+      if (existing.redirectToId === toPrinterId) return { changed: false, printer: existing };
+      if (toPrinterId !== null) {
+        const target = await tx.printer.findFirst({
+          where: { id: toPrinterId, restaurantId: principal.restaurantId, archivedAt: null },
+        });
+        if (target === null || target.id === printerId) {
+          throw new AppError(
+            422,
+            'REDIRECT_TARGET_INVALID',
+            'Choose another active printer to print these tickets on.',
+          );
+        }
+        if (target.redirectToId !== null) {
+          throw new AppError(
+            422,
+            'REDIRECT_TARGET_INVALID',
+            `${target.name} sends its own tickets elsewhere. Choose a printer that prints.`,
+          );
+        }
+        const sentHere = await tx.printer.count({
+          where: { redirectToId: printerId, archivedAt: null },
+        });
+        if (sentHere > 0) {
+          throw new AppError(
+            422,
+            'REDIRECT_TARGET_INVALID',
+            'Other printers send their tickets to this one. Send them elsewhere first.',
+          );
+        }
+      }
+      const printer = await tx.printer.update({
+        where: { id: printerId },
+        data: { redirectToId: toPrinterId },
+      });
+      await this.record(tx, principal, 'PRINTER_REDIRECTED', printerId, {
+        before: { redirectToId: existing.redirectToId },
+        after: { redirectToId: toPrinterId },
+        reason,
+      });
+      return { changed: true, printer };
+    });
+    if (toPrinterId !== null) this.queue.retrySoon(toPrinterId);
+    this.queue.retrySoon(printerId);
+    return view;
   }
 
   private fields(request: PrinterRequest): {

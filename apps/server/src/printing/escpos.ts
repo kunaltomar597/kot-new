@@ -26,6 +26,11 @@ const FEED_AND_CUT = [GS, 0x56, 0x42, 0x03];
 
 export type PaperWidthMm = 58 | 80;
 
+/** Rows written before P1-07a could hold any width; anything but 58 prints as 80 mm. */
+export function paperWidthOf(printer: { readonly paperWidthMm: number }): PaperWidthMm {
+  return printer.paperWidthMm === 58 ? 58 : 80;
+}
+
 /** Characters per line in the printer's standard font (font A, 12 x 24 dots). */
 export function charactersPerLine(paperWidthMm: PaperWidthMm): number {
   return paperWidthMm === 58 ? 32 : 48;
@@ -260,5 +265,40 @@ export function renderTestPage(page: TestPage): Uint8Array {
     .line(ruler)
     .line('-'.repeat(width))
     .lines(wrap('If this page printed in full, the printer is ready.', width))
+    .finish();
+}
+
+export interface PrintNoticePage {
+  /** Large heading, e.g. "MOVED". */
+  readonly title: string;
+  readonly lines: readonly string[];
+  readonly stationName: string;
+  readonly createdAt: Date;
+  readonly timeZone: string;
+}
+
+/**
+ * A note for a station that is not a ticket to cook from, e.g. "Moved from T4 to T7" when a table
+ * moves (TBL-005: the tickets already printed stay valid, so they are not printed again).
+ */
+export function renderNotice(notice: PrintNoticePage, paperWidthMm: PaperWidthMm): Uint8Array {
+  const width = charactersPerLine(paperWidthMm);
+  return new Receipt()
+    .command(ALIGN_CENTRE)
+    .command(SIZE_DOUBLE)
+    .command(BOLD_ON)
+    .lines(wrap(notice.title, Math.floor(width / 2)))
+    .command(SIZE_NORMAL)
+    .command(BOLD_OFF)
+    .lines(wrap(notice.stationName, width))
+    .command(ALIGN_LEFT)
+    .line('-'.repeat(width))
+    .command(SIZE_TALL)
+    .command(BOLD_ON)
+    .lines(notice.lines.flatMap((text) => wrap(text, width)))
+    .command(SIZE_NORMAL)
+    .command(BOLD_OFF)
+    .line('-'.repeat(width))
+    .line(formatLocal(notice.createdAt, notice.timeZone))
     .finish();
 }

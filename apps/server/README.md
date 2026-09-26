@@ -320,6 +320,11 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - `src/printing/stations.service.ts` and `printers.service.ts`: setup, audited and announced.
   `kot-tickets.service.ts` renders a stored KOT for its station's printer.
 
+- `src/printing/print-queue.service.ts` (P1-07b) prints waiting tickets and notes in order per
+  printer, retries a failed printer with back-off, and handles redirect and reprint.
+  `printer-status.service.ts` marks printers offline or online and emits `PrinterStatusChanged`.
+  In tests the queue does not run by itself: call `PrintQueueService.drain()`.
+
 To try a real printer on a PC: add it under Printers with its IP address and port 9100, then use
 "Test print" (`POST /api/v1/printers/:id/test`). The answer says why it did not print.
 

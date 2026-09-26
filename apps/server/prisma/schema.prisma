@@ -586,36 +586,44 @@ model Category {
 }
 
 model Printer {
-  id           String            @id @default(uuid(7)) @db.Uuid
-  restaurantId String            @map("restaurant_id") @db.Uuid
-  name         String
-  connection   PrinterConnection
-  host         String?
-  port         Int?
-  paperWidthMm Int               @default(80) @map("paper_width_mm")
-  lastSeenAt   DateTime?         @map("last_seen_at") @db.Timestamptz(3)
-  archivedAt   DateTime?         @map("archived_at") @db.Timestamptz(3)
-  stations     Station[]
-  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id             String            @id @default(uuid(7)) @db.Uuid
+  restaurantId   String            @map("restaurant_id") @db.Uuid
+  name           String
+  connection     PrinterConnection
+  host           String?
+  port           Int?
+  paperWidthMm   Int               @default(80) @map("paper_width_mm")
+  lastSeenAt     DateTime?         @map("last_seen_at") @db.Timestamptz(3)
+  /// Set when a job failed; cleared when the printer takes one again (KDS-008, NTF-003).
+  offlineSince   DateTime?         @map("offline_since") @db.Timestamptz(3)
+  lastError      String?           @map("last_error")
+  /// While set, this printer's jobs go to that printer instead (KDS-008 redirect).
+  redirectToId   String?           @map("redirect_to_id") @db.Uuid
+  redirectTo     Printer?          @relation("PrinterRedirect", fields: [redirectToId], references: [id])
+  redirectedFrom Printer[]         @relation("PrinterRedirect")
+  archivedAt     DateTime?         @map("archived_at") @db.Timestamptz(3)
+  stations       Station[]
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId])
   @@map("printers")
 }
 
 model Station {
-  id           String      @id @default(uuid(7)) @db.Uuid
-  restaurantId String      @map("restaurant_id") @db.Uuid
+  id           String        @id @default(uuid(7)) @db.Uuid
+  restaurantId String        @map("restaurant_id") @db.Uuid
   name         String
-  mode         StationMode @default(BOTH)
-  printerId    String?     @map("printer_id") @db.Uuid
-  printer      Printer?    @relation(fields: [printerId], references: [id])
-  archivedAt   DateTime?   @map("archived_at") @db.Timestamptz(3)
+  mode         StationMode   @default(BOTH)
+  printerId    String?       @map("printer_id") @db.Uuid
+  printer      Printer?      @relation(fields: [printerId], references: [id])
+  archivedAt   DateTime?     @map("archived_at") @db.Timestamptz(3)
   items        Item[]
   kots         Kot[]
+  printNotices PrintNotice[]
   devices      Device[]
-  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId])
   @@map("stations")
@@ -1103,7 +1111,32 @@ model Kot {
   @@index([restaurantId])
   @@index([orderId])
   @@index([stationId, businessDate])
+  /// The print queue (P1-07b) scans PENDING and FAILED tickets.
+  @@index([restaurantId, printStatus])
   @@map("kots")
+}
+
+/// A note printed at a station that is not a kitchen ticket, e.g. "Moved from T4 to T7" when a
+/// table moves (TBL-005: tickets update in place, so nothing is printed again as a new ticket).
+model PrintNotice {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  restaurantId  String         @map("restaurant_id") @db.Uuid
+  businessDate  DateTime       @map("business_date") @db.Date
+  stationId     String         @map("station_id") @db.Uuid
+  station       Station        @relation(fields: [stationId], references: [id])
+  /// Large heading, e.g. "MOVED".
+  title         String
+  /// Lines under the heading ({text}[] as strings).
+  lines         Json
+  printStatus   KotPrintStatus @default(PENDING) @map("print_status")
+  printedAt     DateTime?      @map("printed_at") @db.Timestamptz(3)
+  printAttempts Int            @default(0) @map("print_attempts")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, printStatus])
+  @@index([stationId, businessDate])
+  @@map("print_notices")
 }
 
 model KotLine {

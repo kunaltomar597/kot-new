@@ -90,6 +90,8 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   AlertEscalated: 'MANAGERS',
   DeviceStatusChanged: 'DEVICE_PAIR',
   DeviceRevoked: 'DEVICE_PAIR',
+  // The POS and managers are alerted when a printer stops or starts again (KDS-008, NTF-003).
+  PrinterStatusChanged: 'BILL_PRINT_AND_PAYMENT',
   // Only the changed keys: every screen may hear it and reads what it may see again.
   SettingsChanged: 'EVERYONE',
   // Which part of the setup changed: every screen may show the name, logo or particulars.

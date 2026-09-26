@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations and printers (P1-07a). 356 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07). 362 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets and the test page (P1-07a). 524 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07). 536 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -54,7 +54,7 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P1-04 Menu photos (P1-03 done).
-- P1-07b Print queue, offline alert, redirect and reprint (P1-07a done).
+- P1-09 KDS UI (P1-06 and P1-07 done).
 - P1-10 Billing engine and GST invoices (P1-06 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -101,7 +101,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-06a Order submission and KOTs
 - [x] P1-06b Item status, modify, cancel and void
 - [x] P1-07a Stations, printers, ticket rendering and test print
-- [ ] P1-07b Print queue, offline alert, redirect and reprint
+- [x] P1-07b Print queue, offline alert, redirect and reprint
 - [ ] P1-08 POS UI: tables and order entry
 - [ ] P1-09 KDS UI
 - [ ] P1-10 Billing engine and GST invoices
@@ -306,6 +306,19 @@ Decided 2026-09-26 (P1-07a):
 37. Stations are readable by every signed-in person, since kitchen screens and waiters show them.
     Printers are visible to `OPERATIONS_CONFIGURE` only.
 
+Decided 2026-09-26 (P1-07b):
+
+38. Any role that may send KOTs (`ORDER_CREATE`: Owner, Manager, Cashier, Waiter) may reprint one,
+    with a reason, audited. The kitchen may not, because the §4.2 matrix has no KOT-reprint row.
+    Add one if the Owner wants kitchens to reprint.
+39. "POS and manager are alerted" (KDS-008) means the roles with `BILL_PRINT_AND_PAYMENT` (Owner,
+    Manager, Cashier). They get one `PrinterStatusChanged` when a printer fails and one when it
+    works again.
+40. A table move prints a small "MOVED" note at printing stations, not the tickets again and not a
+    numbered KOT (TBL-005 "no duplicate tickets").
+41. Printing is at least once. A job the printer took just before a crash may print twice, which
+    is better than a lost ticket. The retry wait (2 s doubling to 60 s) is fixed, not a setting.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -322,6 +335,49 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-07b print queue, offline alert, redirect and reprint (P1-07 done)
+
+Built:
+
+- Migration `20260926180000_print_queue`:
+  - the printer's `offline_since`, `last_error` and `redirect_to_id`;
+  - the `print_notices` table;
+  - an index on the KOT print status.
+- `@rp/contracts`:
+  - the `PrinterStatusChanged` event;
+  - the printer view with health and redirect;
+  - the redirect and reprint requests, and the print-queue view;
+  - 3 routes (redirect, print queue, reprint).
+- `apps/server/src/printing/`:
+  - `PrintQueueService`: the worker, reprint and the queue view;
+  - `PrinterStatusService`: routing through redirects, health and the alert event;
+  - `renderNotice`.
+  - The table move writes MOVED notes (`table-sessions.service.ts`).
+  - Realtime routing sends printer alerts to the POS and managers.
+- Tests:
+  - 7 integration tests against two fake TCP printers switched off and on:
+    - printing and screen-only stations;
+    - offline with FAILED tickets and one alert, with the queue view;
+    - recovery printing in order with the online alert;
+    - redirect with its rules and audit;
+    - reprint with its permissions, audit and the "no printer" case;
+    - the MOVED note;
+    - a test page bringing a printer back.
+  - 5 unit tests: routing through redirects, the notice rendering, and the alert's rooms.
+
+  Totals: server 536 tests, contracts 362.
+
+Decisions: 38 to 41.
+
+Notes for the next sessions:
+
+- P1-09 (KDS) shows `print_notices` only on paper. Screens hear `TableMoved` and relabel the
+  tickets in place.
+- P1-08 (POS) should show a banner from `PrinterStatusChanged` and `GET /api/v1/print-queue`, with
+  a redirect action for managers.
+- The queue runs in one server process. A second process would need a database lock around
+  `drain()`.
 
 ### 2026-09-26: P1-07a stations, printers, ticket rendering and test print
 
