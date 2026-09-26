@@ -72,3 +72,53 @@ jobs:
         run: |
           pnpm trace
           git diff --exit-code -- docs/build/TRACEABILITY.md || (echo "Run 'pnpm trace' and commit docs/build/TRACEABILITY.md" && exit 1)
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # PostgreSQL for the console end-to-end tests (apps/console/e2e/global-setup.ts).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build server and console
+        run: pnpm build
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @rp/console exec playwright install --with-deps chromium
+
+      - name: Console end-to-end tests
+        run: pnpm --filter @rp/console e2e
+
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/console/playwright-report
+            apps/console/test-results
+          retention-days: 7

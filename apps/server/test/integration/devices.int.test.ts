@@ -423,3 +423,26 @@ describe('[AUTH-009] [SEC-003] table tablets', () => {
     expect(codeOf(notTablet)).toBe('NOT_A_TABLE_TABLET');
   });
 });
+
+describe('[AUTH-007] [AUTH-009] the current device', () => {
+  it('tells a device its own type and binding, as a manager last set them', async () => {
+    const tablet = await addDevice(app, kit, 'TABLE_TABLET', { tableId: tables[0]! });
+    const before = DeviceSummary.parse(
+      (await server().get('/api/v1/devices/current').set(authHeaders(tablet)).expect(200)).body,
+    );
+    expect(before).toMatchObject({ id: tablet, type: 'TABLE_TABLET', tableId: tables[0] });
+    await server()
+      .put(`/api/v1/devices/${tablet}/table`)
+      .set(asManager())
+      .send({ tableId: tables[1] })
+      .expect(200);
+    const after = DeviceSummary.parse(
+      (await server().get('/api/v1/devices/current').set(authHeaders(tablet)).expect(200)).body,
+    );
+    expect(after.tableId).toBe(tables[1]);
+  });
+
+  it('needs a paired device', async () => {
+    expect(codeOf(await server().get('/api/v1/devices/current'))).toBe('DEVICE_NOT_RECOGNISED');
+  });
+});

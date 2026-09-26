@@ -4,7 +4,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { json } from 'express';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
-import { type AppConfig, loadConfig } from './config/app-config.js';
+import { APP_CONFIG, type AppConfig, loadConfig } from './config/app-config.js';
+import { consoleMiddleware } from './http/console-static.js';
 import { bodyParserErrorHandler, correlationMiddleware } from './http/request-pipeline.js';
 
 export const API_PREFIX = 'api/v1';
@@ -21,8 +22,11 @@ export function configureApp(app: INestApplication): void {
   const express = app as NestExpressApplication;
   express.useLogger(app.get(Logger));
   express.disable('x-powered-by');
-  // Order matters: correlation ID first, then the JSON parser, then its error handler.
+  // Order matters: correlation ID first, then the console's files, then the JSON parser, then its
+  // error handler.
   express.use(correlationMiddleware);
+  const { consoleDir } = app.get<AppConfig>(APP_CONFIG);
+  if (consoleDir !== undefined) express.use(consoleMiddleware(consoleDir));
   express.use(json({ limit: JSON_BODY_LIMIT }));
   express.use(bodyParserErrorHandler);
   app.setGlobalPrefix(API_PREFIX);

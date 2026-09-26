@@ -390,6 +390,44 @@
         "x-requirements": ["AUTH-005"]
       }
     },
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "getCurrentSession",
+        "summary": "The signed-in person and their session on this device",
+        "description": "Apps check a restored session with it after a restart. Like every authenticated call it counts as activity, so an app can keep a session alive while the person is using it.",
+        "tags": ["auth"],
+        "responses": {
+          "200": {
+            "description": "The current session.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CurrentSessionResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["AUTH-005"]
+      }
+    },
     "/api/v1/auth/staff-tiles": {
       "get": {
         "operationId": "listStaffTiles",
@@ -681,6 +719,36 @@
         },
         "x-capability": "PUBLIC",
         "x-requirements": ["AUTH-007"]
+      }
+    },
+    "/api/v1/devices/current": {
+      "get": {
+        "operationId": "getCurrentDevice",
+        "summary": "This device: its type, name and binding",
+        "description": "Apps read their own type and binding (table, station, person) after a restart or when a manager has changed them.",
+        "tags": ["devices"],
+        "responses": {
+          "200": {
+            "description": "This device.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DeviceSummary" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["AUTH-007", "AUTH-009"]
       }
     },
     "/api/v1/devices/pair": {
@@ -1264,6 +1332,40 @@
           "staffId": { "$ref": "#/components/schemas/Id" }
         },
         "required": ["type", "name"],
+        "additionalProperties": false
+      },
+      "CurrentSessionResponse": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": { "$ref": "#/components/schemas/Id" },
+              "expiresAt": { "$ref": "#/components/schemas/Timestamp" },
+              "inactivityTimeoutSeconds": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["id", "expiresAt", "inactivityTimeoutSeconds"],
+            "additionalProperties": false
+          },
+          "staff": {
+            "type": "object",
+            "properties": {
+              "id": { "$ref": "#/components/schemas/Id" },
+              "displayName": { "type": "string" },
+              "role": { "$ref": "#/components/schemas/Role" }
+            },
+            "required": ["id", "displayName", "role"],
+            "additionalProperties": false
+          },
+          "secondFactorValidUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": ["session", "staff", "secondFactorValidUntil"],
         "additionalProperties": false
       },
       "DeviceChallengeRequest": {

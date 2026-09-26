@@ -21,6 +21,7 @@ import {
   parseDevicePublicKey,
   verifyDeviceSignature,
 } from '../auth/device-keys.js';
+import type { AuthenticatedDevice } from '../auth/device.js';
 import { DeviceTokenService } from '../auth/device-token.service.js';
 import type { Principal } from '../auth/principal.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
@@ -270,6 +271,12 @@ export class DevicesService {
     );
     await this.prisma.device.update({ where: { id: device.id }, data: { lastSeenAt: now } });
     return { deviceToken: token, expiresAt: expiresAt.toISOString() };
+  }
+
+  /** The calling device as it is now (a manager may have renamed or re-bound it). */
+  async current(device: AuthenticatedDevice): Promise<DeviceSummary> {
+    const row = await this.prisma.device.findUniqueOrThrow({ where: { id: device.deviceId } });
+    return summary(row);
   }
 
   async list(principal: Principal): Promise<DeviceListResponse> {

@@ -177,6 +177,19 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - Tests: `test/helpers/events.ts` builds and produces events; `test/helpers/realtime-client.ts` is a
   Socket.io client that records messages and waits for them (`createTestApp({ listen: true })`).
 
+## Web console and client support (P0-14b)
+
+- `RP_CONSOLE_DIR` (`consoleDir`): the built console (`apps/console/dist`) is served at `/` from
+  the server's own origin, so the console, the API and the socket share one origin (no CORS) and
+  one certificate (P0-15). `src/http/console-static.ts` answers every other page request with
+  `index.html` (the console's routes), never answers `/api` or `/socket.io`, returns 404 for a
+  missing file, caches hashed `/assets` for a year and sends a strict Content-Security-Policy
+  (same-origin scripts, styles and connections only; no framing) with `nosniff` and
+  `no-referrer`. A missing build stops the server at start-up.
+- `GET /api/v1/auth/session` (signed in): the person and session without tokens; apps check a
+  restored session with it, and it counts as activity (keep-alive for AUTH-005).
+- `GET /api/v1/devices/current` (paired device): the device's own type, name and binding.
+
 ## Commands
 
 ```

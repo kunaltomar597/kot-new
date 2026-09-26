@@ -1,0 +1,169 @@
+/* Layout of the console shell (P0-14b). Colours, spacing and type come from the design tokens. */
+
+html,
+body,
+#root,
+.console-root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--rp-color-background);
+  color: var(--rp-color-text);
+  font-family: var(--rp-font-sans);
+}
+
+.console-center {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: var(--rp-space-6);
+  box-sizing: border-box;
+}
+
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+  width: min(100%, 36rem);
+}
+
+.console-title {
+  margin: 0;
+  font-size: var(--rp-font-size-2xl);
+  font-weight: var(--rp-font-weight-semibold);
+  line-height: var(--rp-line-height-tight);
+}
+
+.console-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+}
+
+.console-notice {
+  margin: 0;
+  padding: var(--rp-space-3) var(--rp-space-4);
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-info-subtle);
+  color: var(--rp-color-info-text);
+}
+
+.console-notice--danger {
+  background: var(--rp-color-danger-subtle);
+  color: var(--rp-color-danger-text);
+}
+
+.console-login {
+  align-items: stretch;
+}
+
+.console-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.console-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+  width: 100%;
+  min-height: var(--rp-touch-comfortable);
+  padding: var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+  color: var(--rp-color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.console-tile:hover {
+  border-color: var(--rp-color-border-strong);
+}
+
+.console-tile:focus-visible {
+  outline: 3px solid var(--rp-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.console-tile__name {
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.console-tile__role {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.console-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--rp-color-background);
+  color: var(--rp-color-text);
+}
+
+.console-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-4);
+  padding: var(--rp-space-3) var(--rp-space-6);
+  border-bottom: 1px solid var(--rp-color-border);
+  background: var(--rp-color-surface);
+}
+
+.console-header__app {
+  font-weight: var(--rp-font-weight-bold);
+}
+
+.console-header__modes {
+  display: flex;
+  gap: var(--rp-space-2);
+}
+
+.console-header__mode {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--rp-touch-min);
+  padding: 0 var(--rp-space-3);
+  border-radius: var(--rp-radius-md);
+  color: var(--rp-color-text);
+  text-decoration: none;
+}
+
+.console-header__mode[aria-current='page'] {
+  background: var(--rp-color-primary);
+  color: var(--rp-color-on-primary);
+}
+
+.console-header__device {
+  margin-inline-start: auto;
+  color: var(--rp-color-text-muted);
+}
+
+.console-inactivity {
+  padding: var(--rp-space-3) var(--rp-space-6);
+  background: var(--rp-color-warning-subtle);
+  color: var(--rp-color-warning-text);
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.console-main {
+  flex: 1;
+  padding: var(--rp-space-6);
+}
+
+.console-mode {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-6);
+}
