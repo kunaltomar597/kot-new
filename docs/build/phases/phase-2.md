@@ -141,7 +141,7 @@ As built:
     installation certificate when `RP_TLS` is on (renewals are applied live); `RP_MQTT=off` turns
     it off.
   - Sign-in: client id = user name = the pager's device id, plus a per-pager secret stored as
-    SHA-256.
+    a peppered Argon2id hash, like staff PINs.
   - ACL: a pager may subscribe only to its own `alerts` topic (anything else is refused with 0x80
     in the SUBACK) and publish only its own `ack` and `heartbeat`.
   - Delivery listens to published `AlertRaised`, `AlertAcknowledged` and `AlertCleared` events and

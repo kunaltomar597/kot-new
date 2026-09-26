@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import { createServer as createTlsServer, type Server as TlsServer } from 'node:tls';
 import {
@@ -25,6 +24,7 @@ import {
   vibrationFor,
 } from '@rp/domain';
 import { Aedes, type AuthenticateError, type Client } from 'aedes';
+import { CredentialHasher } from '../auth/credential-hasher.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { currentBusinessDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
@@ -44,10 +44,6 @@ export interface PagerOptions {
 }
 
 export const DEFAULT_PAGER_OPTIONS: PagerOptions = { offlineCheckMs: 10_000 };
-
-export function hashPagerSecret(secret: string): string {
-  return createHash('sha256').update(secret).digest('hex');
-}
 
 interface ConnectedPager {
   readonly restaurantId: string;
@@ -90,6 +86,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly notifications: NotificationsService,
     private readonly tls: TlsService,
     private readonly presence: PresenceRegistry,
+    private readonly hasher: CredentialHasher,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -275,10 +272,12 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
       select: { restaurantId: true, type: true, status: true, staffId: true, mqttSecretHash: true },
     });
     if (device?.type !== 'PAGER' || device.status !== 'ACTIVE') return false;
-    if (device.mqttSecretHash === null) return false;
-    const given = Buffer.from(hashPagerSecret(password.toString('utf8')), 'hex');
-    const stored = Buffer.from(device.mqttSecretHash, 'hex');
-    if (given.length !== stored.length || !timingSafeEqual(given, stored)) return false;
+    // Peppered Argon2id, as for staff PINs (SEC-012): a stolen database does not give pager secrets.
+    if (device.mqttSecretHash === null) {
+      await this.hasher.verifyNothing(password.toString('utf8'));
+      return false;
+    }
+    if (!(await this.hasher.verify(device.mqttSecretHash, password.toString('utf8')))) return false;
     this.connected.set(client.id, {
       restaurantId: device.restaurantId,
       deviceId: client.id,

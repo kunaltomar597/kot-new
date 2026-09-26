@@ -437,7 +437,8 @@ decides, records decisions here and moves straight to the next WP. Recorded in C
 Decided 2026-09-26 (P2-04a):
 
 105. A pager signs in to MQTT with its device id and its own secret. The secret is issued when a
-     manager registers the pager by serial, shown once, and stored as SHA-256; replacing it
+     manager registers the pager by serial, shown once, and stored as a peppered Argon2id hash like
+     the PINs; replacing it
      disconnects the pager. There are no shared or default passwords (SEC-012, PGR-010).
 106. Pagers get alerts through their wearer: the broker sends each alert event to the connected
      pagers of its recipients. A pager that connects gets every open alert of its wearer again,

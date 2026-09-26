@@ -14,7 +14,8 @@ import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { Device } from '../generated/prisma/client.js';
 import { AppError } from '../errors/app-error.js';
-import { hashPagerSecret, PagerBroker } from './pager-broker.js';
+import { CredentialHasher } from '../auth/credential-hasher.js';
+import { PagerBroker } from './pager-broker.js';
 
 function view(device: Device): PagerView {
   return {
@@ -32,7 +33,7 @@ function view(device: Device): PagerView {
 
 /**
  * Pager administration for managers (P2-04, PGR-012, PGR-014, SEC-012): register a pager from its
- * serial with a unique credential (shown once, stored hashed), replace the credential, and give
+ * serial with a unique credential (shown once, stored as a peppered Argon2id hash), replace the credential, and give
  * the pager to a person or take it back, effective at once.
  */
 @Injectable()
@@ -41,6 +42,7 @@ export class PagersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly broker: PagerBroker,
+    private readonly hasher: CredentialHasher,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -57,6 +59,7 @@ export class PagersService {
     request: CreatePagerRequest,
   ): Promise<PagerCredentialResponse> {
     const secret = randomBytes(24).toString('base64url');
+    const secretHash = await this.hasher.hash(secret);
     const device = await this.prisma.transaction(async (tx) => {
       const clash = await tx.device.findFirst({
         where: {
@@ -82,7 +85,7 @@ export class PagersService {
           pairedAt: new Date(),
           pairedById: principal.staffId,
           staffId: request.staffId,
-          mqttSecretHash: hashPagerSecret(secret),
+          mqttSecretHash: secretHash,
         },
       });
       await this.record(tx, principal, 'PAGER_REGISTERED', created.id, null, {
@@ -97,11 +100,12 @@ export class PagersService {
 
   async rotate(principal: Principal, deviceId: string): Promise<PagerCredentialResponse> {
     const secret = randomBytes(24).toString('base64url');
+    const secretHash = await this.hasher.hash(secret);
     const device = await this.prisma.transaction(async (tx) => {
       await this.find(tx, principal.restaurantId, deviceId);
       const updated = await tx.device.update({
         where: { id: deviceId },
-        data: { mqttSecretHash: hashPagerSecret(secret) },
+        data: { mqttSecretHash: secretHash },
       });
       await this.record(tx, principal, 'PAGER_CREDENTIAL_REPLACED', deviceId, null, null);
       return updated;

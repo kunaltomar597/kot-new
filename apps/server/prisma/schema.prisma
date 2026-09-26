@@ -389,7 +389,7 @@ model Device {
   staffId                String?      @map("staff_id") @db.Uuid
   /// Serial printed (and in the QR code) on a pager (PGR-012).
   serial                 String?
-  /// SHA-256 of the pager's MQTT secret (SEC-012); the secret is shown once when issued (P2-04).
+  /// Peppered Argon2id hash of the pager's MQTT secret (SEC-012); the secret is shown once when issued (P2-04).
   mqttSecretHash         String?      @map("mqtt_secret_hash")
   /// Last heartbeat's battery, signal and firmware (PGR-007).
   batteryPercent         Int?         @map("battery_percent")
