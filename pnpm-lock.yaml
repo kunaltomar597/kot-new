@@ -276,6 +276,9 @@ importers:
       '@rp/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@rp/control-plane':
+        specifier: workspace:*
+        version: link:../control-plane
       '@rp/test-postgres':
         specifier: workspace:*
         version: link:../../packages/test-postgres

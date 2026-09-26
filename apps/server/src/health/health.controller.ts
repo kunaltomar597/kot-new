@@ -1,28 +1,12 @@
-import { readFileSync } from 'node:fs';
 import { Controller, Get, Inject, Res } from '@nestjs/common';
 import type { HealthResponse, VersionResponse } from '@rp/contracts';
 import type { Response } from 'express';
 import { Public } from '../auth/decorators.js';
+import { SERVER_PACKAGE } from '../common/package-version.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 
-function readPackageVersion(): { name: string; version: string } {
-  const fallback = { name: '@rp/server', version: '0.0.0' };
-  try {
-    // Resolves to apps/server/package.json from both src/health and dist/health. A missing or
-    // unreadable file (for example a different installer layout) must never stop the server.
-    const raw = readFileSync(new URL('../../package.json', import.meta.url), 'utf8');
-    const parsed = JSON.parse(raw) as { name?: unknown; version?: unknown };
-    return {
-      name: typeof parsed.name === 'string' ? parsed.name : fallback.name,
-      version: typeof parsed.version === 'string' ? parsed.version : fallback.version,
-    };
-  } catch {
-    return fallback;
-  }
-}
-
-const PACKAGE = readPackageVersion();
+const PACKAGE = SERVER_PACKAGE;
 
 /**
  * Liveness, readiness and version endpoints. Public: the watchdog and devices call them before
