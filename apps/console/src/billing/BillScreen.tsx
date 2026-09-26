@@ -9,12 +9,16 @@ import { CustomerDialog } from './CustomerDialog.js';
 import { DiscountDialog } from './DiscountDialog.js';
 import { OverrideCancelled, useOverride } from './override.js';
 import { ReasonDialog } from './ReasonDialog.js';
+import { SplitDialog } from './SplitDialog.js';
 
 type Panel =
   | { readonly kind: 'discount' }
   | { readonly kind: 'revoke'; readonly discountId: string; readonly reason: string }
   | { readonly kind: 'serviceCharge' }
-  | { readonly kind: 'customer' };
+  | { readonly kind: 'customer' }
+  | { readonly kind: 'split' }
+  | { readonly kind: 'void'; readonly invoice: InvoiceView }
+  | { readonly kind: 'edit'; readonly invoice: InvoiceView };
 
 const affectsBill = (type: string) => /^(Order|ItemStatusChanged$|Bill|TableMoved$)/.test(type);
 
@@ -88,7 +92,12 @@ export function BillScreen({
       const result = await controller.api.printInvoice({ params: { id: invoice.id }, body: {} });
       toast.show(
         result.printed
-          ? { title: t('billing.printed', { number: invoice.invoiceNumber }), tone: 'success' }
+          ? {
+              title: result.duplicate
+                ? t('billing.reprinted')
+                : t('billing.printed', { number: invoice.invoiceNumber }),
+              tone: 'success',
+            }
           : {
               title: t('billing.notPrinted', {
                 number: invoice.invoiceNumber,
@@ -127,6 +136,14 @@ export function BillScreen({
           {error}
         </p>
       )}
+      {bill.editingInvoiceId === null ? null : (
+        <p className="console-notice" role="status">
+          {t('billing.editing', {
+            number:
+              invoices.find((invoice) => invoice.id === bill.editingInvoiceId)?.invoiceNumber ?? '',
+          })}
+        </p>
+      )}
       <div className="bill">
         <BillPreview bill={bill} />
         <div className="bill__panel">
@@ -163,16 +180,44 @@ export function BillScreen({
                         {t('billing.pay')}
                       </Button>
                     ) : null}
-                    {invoice.status === 'VOIDED' ? null : (
-                      <Button
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => {
-                          void act(() => printInvoice(invoice));
-                        }}
-                      >
-                        {t('billing.reprint')}
-                      </Button>
+                    {invoice.status === 'VOIDED' ? (
+                      <Badge tone="danger">
+                        {t('billing.voided', { reason: invoice.voidReason ?? '' })}
+                      </Badge>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => {
+                            void act(() => printInvoice(invoice));
+                          }}
+                        >
+                          {t('billing.reprint')}
+                        </Button>
+                        {invoice.status === 'ISSUED' && bill.editingInvoiceId === null ? (
+                          <Button
+                            variant="ghost"
+                            aria-label={t('billing.editFor', { number: invoice.invoiceNumber })}
+                            disabled={busy}
+                            onClick={() => {
+                              setPanel({ kind: 'edit', invoice });
+                            }}
+                          >
+                            {t('billing.edit')}
+                          </Button>
+                        ) : null}
+                        <Button
+                          variant="ghost"
+                          aria-label={t('billing.voidFor', { number: invoice.invoiceNumber })}
+                          disabled={busy}
+                          onClick={() => {
+                            setPanel({ kind: 'void', invoice });
+                          }}
+                        >
+                          {t('billing.void')}
+                        </Button>
+                      </>
                     )}
                   </li>
                 ))}
@@ -262,6 +307,80 @@ export function BillScreen({
           onSave={(customer) => {
             void act(() =>
               controller.api.setBillCustomer({ params: { id: bill.id }, body: customer }),
+            );
+          }}
+        />
+      ) : null}
+      {panel?.kind === 'split' ? (
+        <SplitDialog
+          bill={bill}
+          busy={busy}
+          error={error}
+          onClose={() => {
+            setPanel(undefined);
+          }}
+          onSplit={(request) => {
+            void act(
+              async () => {
+                const result = await controller.api.splitBill({
+                  params: { id: bill.id },
+                  body: request,
+                });
+                for (const invoice of result.invoices) await printInvoice(invoice);
+              },
+              t('billing.split.done', {
+                count: request.mode === 'EQUAL' ? request.parts : request.parts.length,
+              }),
+            );
+          }}
+        />
+      ) : null}
+      {panel?.kind === 'void' ? (
+        <ReasonDialog
+          title={t('billing.voidFor', { number: panel.invoice.invoiceNumber })}
+          label={t('billing.voidReason')}
+          busy={busy}
+          error={error}
+          onClose={() => {
+            setPanel(undefined);
+          }}
+          onConfirm={(reason) => {
+            void act(
+              () =>
+                withOverride(
+                  (overrideToken) =>
+                    controller.api.voidInvoice({
+                      params: { id: panel.invoice.id },
+                      body: { reason },
+                      ...(overrideToken !== undefined && { overrideToken }),
+                    }),
+                  { entityType: 'invoice', entityId: panel.invoice.id },
+                ),
+              t('billing.voidedToast', { number: panel.invoice.invoiceNumber }),
+            );
+          }}
+        />
+      ) : null}
+      {panel?.kind === 'edit' ? (
+        <ReasonDialog
+          title={t('billing.editFor', { number: panel.invoice.invoiceNumber })}
+          label={t('billing.editReason')}
+          busy={busy}
+          error={error}
+          onClose={() => {
+            setPanel(undefined);
+          }}
+          onConfirm={(reason) => {
+            void act(() =>
+              withOverride(
+                (overrideToken) =>
+                  controller.api.reopenInvoice({
+                    params: { id: panel.invoice.id },
+                    body: { reason },
+                    ...(overrideToken !== undefined && { overrideToken }),
+                  }),
+                { entityType: 'invoice', entityId: panel.invoice.id },
+              ),
             );
           }}
         />
@@ -403,6 +522,15 @@ function OpenBillActions({
             }}
           >
             {t('billing.addDiscount')}
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={busy || bill.lines.length === 0}
+            onClick={() => {
+              onPanel({ kind: 'split' });
+            }}
+          >
+            {t('billing.split.open')}
           </Button>
           {bill.serviceCharge.enabled ? (
             <Button

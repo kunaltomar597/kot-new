@@ -801,6 +801,20 @@ As built: `apps/console/src/billing/`.
   and carry-forward.
 - Playwright: a split bill paid within a minute.
 
+As built: `apps/console/src/billing/` `SplitDialog.tsx`, `split.ts`, `DayEndScreen.tsx` and the
+additions to `BillScreen.tsx`; route `/pos/day-end`.
+
+- Split: equally into 2 to 20 parts, or each line to a part (every line must have one, at least
+  two parts used). Each resulting invoice is printed straight away and paid on its own.
+- Void and edit use the reason dialog and the manager approval prompt (`INVOICE_VOID`,
+  `BILL_EDIT_AFTER_PRINT`). While a printed bill is reopened a banner says printing again keeps
+  its number. Edit is offered only for an issued, unsettled invoice.
+- A reprint says it was printed as DUPLICATE.
+- Day-end: the Z-report so far, what blocks closing, the carry-forward choice when tables are
+  open, and the close. The floor shows the Day-end button only to roles allowed `DAY_END_CLOSE`.
+- Refunds for a voided invoice that was already paid are not handled here (BILL-010 has no refund
+  flow; recorded as a question in PROGRESS.md).
+
 ## P1-13 Core reports v1
 
 Goal: the reports the restaurant and its CA need from day one.

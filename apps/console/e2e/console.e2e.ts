@@ -274,4 +274,46 @@ test.describe.serial('the web console', () => {
     await page.getByRole('button', { name: t('pos.backToTables') }).click();
     await expect(page.getByRole('button', { name: '7, Free' })).toBeVisible();
   });
+
+  test('[BILL-007] splits a table’s bill in two and settles each part within a minute', async () => {
+    const hall = page.getByRole('region', { name: 'Main Hall' });
+    await hall.getByRole('button', { name: '2, Free' }).click();
+    const open = page.getByRole('dialog', { name: t('pos.open.title', { table: '2' }) });
+    await open.getByLabel(t('pos.open.guests'), { exact: true }).fill('2');
+    await open.getByRole('button', { name: t('pos.open.submit') }).click();
+    await hall.getByRole('button', { name: /^2, Occupied/ }).click();
+    await page.getByRole('button', { name: t('pos.table.takeOrder') }).click();
+    await page.getByRole('button', { name: 'Breads', exact: true }).click();
+    await page.getByRole('button', { name: /^Butter Naan, / }).click();
+    await page.getByRole('button', { name: /^Butter Naan, / }).click();
+    const cart = page.getByRole('complementary', { name: t('pos.cart.title') });
+    await cart.getByRole('button', { name: t('pos.cart.send') }).click();
+    await expect(page.getByText(/^Order \d+ sent to the kitchen$/)).toBeVisible();
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+
+    const started = Date.now();
+    await hall.getByRole('button', { name: /^2, Occupied/ }).click();
+    await page.getByRole('button', { name: t('pos.billTable') }).click();
+    await page.getByRole('button', { name: t('billing.split.open') }).click();
+    const split = page.getByRole('dialog', { name: t('billing.split.title') });
+    await split.getByRole('button', { name: t('billing.split.submit') }).click();
+    await expect(page.getByText(t('billing.split.done', { count: 2 }))).toBeVisible();
+
+    for (let part = 0; part < 2; part += 1) {
+      await page
+        .getByRole('button', { name: t('billing.pay') })
+        .first()
+        .click();
+      await expect(page.getByRole('heading', { name: /^Payment for invoice / })).toBeVisible();
+      await page.getByLabel(t('payment.mode')).selectOption({ label: t('payment.modes.CASH') });
+      await page.getByLabel(t('payment.tendered')).fill('500');
+      await page.getByRole('button', { name: t('payment.record') }).click();
+      await expect(page.getByText(/^Invoice .* is paid$/).first()).toBeVisible();
+    }
+    await expect(page.getByText(t('billing.settled'), { exact: true })).toHaveCount(2);
+    expect(Date.now() - started).toBeLessThan(60_000);
+
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+    await expect(hall.getByRole('button', { name: '2, Free' })).toBeVisible();
+  });
 });

@@ -6,6 +6,8 @@ import {
   type PlannedPayment,
   stillToPay,
 } from '../src/billing/money-input.js';
+import { itemsSplit } from '../src/billing/split.js';
+import { B, billView } from './billing-fixture.js';
 
 const payment = (amount: number): PlannedPayment => ({
   key: String(amount),
@@ -33,5 +35,26 @@ describe('[BILL-008] money typed at the counter', () => {
     expect(changeFor(94_000, 100_000)).toBe(6_000);
     expect(changeFor(94_000, null)).toBe(0);
     expect(changeFor(94_000, 90_000)).toBe(0);
+  });
+});
+
+describe('[BILL-007] splitting by items', () => {
+  it('gives each whole line to its part, in part order, skipping unused numbers', () => {
+    expect(itemsSplit(billView(), { [B.item1]: 3, [B.item2]: 1 })).toEqual({
+      ok: true,
+      request: {
+        mode: 'ITEMS',
+        parts: [[{ orderItemId: B.item2, quantity: 1 }], [{ orderItemId: B.item1, quantity: 2 }]],
+        seriesId: null,
+      },
+    });
+  });
+
+  it('asks for every item to have a part, and for at least two parts', () => {
+    expect(itemsSplit(billView(), { [B.item1]: 1 })).toEqual({ ok: false, problem: 'UNASSIGNED' });
+    expect(itemsSplit(billView(), { [B.item1]: 2, [B.item2]: 2 })).toEqual({
+      ok: false,
+      problem: 'NEED_TWO',
+    });
   });
 });
