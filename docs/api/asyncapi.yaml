@@ -61,6 +61,11 @@ channels:
     messages:
       KotCreated:
         $ref: '#/components/messages/KotCreated'
+  KotBumped:
+    address: KotBumped
+    messages:
+      KotBumped:
+        $ref: '#/components/messages/KotBumped'
   ItemStatusChanged:
     address: ItemStatusChanged
     messages:
@@ -193,6 +198,12 @@ operations:
       $ref: '#/channels/KotCreated'
     messages:
       - $ref: '#/channels/KotCreated/messages/KotCreated'
+  receiveKotBumped:
+    action: receive
+    channel:
+      $ref: '#/channels/KotBumped'
+    messages:
+      - $ref: '#/channels/KotBumped/messages/KotBumped'
   receiveItemStatusChanged:
     action: receive
     channel:
@@ -339,6 +350,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/KotCreated'
+    KotBumped:
+      name: KotBumped
+      title: KotBumped v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/KotBumped'
     ItemStatusChanged:
       name: ItemStatusChanged
       title: ItemStatusChanged v1
@@ -806,6 +823,51 @@ components:
             - orderItemId
             - from
             - to
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    KotBumped:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: KotBumped
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            kotId:
+              $ref: '#/components/schemas/Id'
+            stationId:
+              $ref: '#/components/schemas/Id'
+            bumped:
+              type: boolean
+          required:
+            - kotId
+            - stationId
+            - bumped
           additionalProperties: false
       required:
         - eventId

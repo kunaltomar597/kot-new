@@ -81,6 +81,12 @@ export const KotCreated = event(
     kind: z.enum(['NEW', 'MODIFIED', 'CANCELLED']),
   }),
 );
+/** A ticket left the kitchen screen (bumped) or came back (recalled) (KDS-005). */
+export const KotBumped = event(
+  'KotBumped',
+  z.object({ kotId: Id, stationId: Id, bumped: z.boolean() }),
+);
+
 export const ItemStatusChanged = event(
   'ItemStatusChanged',
   z.object({
@@ -202,6 +208,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   OrderApproved,
   OrderRejected,
   KotCreated,
+  KotBumped,
   ItemStatusChanged,
   ServiceRequestRaised,
   ServiceRequestAcknowledged,

@@ -491,6 +491,34 @@ duplication.
 Acceptance: Playwright tests for ticket lifecycle and reconnect resync; visual check of dark theme
 contrast.
 
+P1-09 is split in two.
+
+### P1-09a KDS server support
+
+As built: `apps/server/src/kitchen/`, station mode in the permission guard, migration
+`20260927040000_kds`.
+
+- A paired KDS with nobody signed in acts for the kitchen when individual kitchen logins are off
+  (AUTH-005); bound to a station, it sees and changes only that station's tickets and items; its
+  steps are attributed to the device (`order_events.device_id`, `actor_id` null).
+- `GET /api/v1/kds/tickets`: open tickets oldest first (a NEW ticket while any item is still
+  waiting, cooking or ready at the pass; change and cancellation slips until bumped, on their
+  business day), recently bumped ones (last hour, at most 20), the KDS settings and the server
+  time. Signed-in managers and kitchen staff may pass `stationId` or see every station.
+- Bump (refused while an item is waiting or cooking; slips any time), recall, and "Notify manager"
+  (one open READY_NOT_COLLECTED alert per ticket; `AlertEscalated` to the managers).
+- The item status route admits station mode; picking up at the pass (KDS-007) uses it.
+- Deferred to P2-03: alert delivery rules, acknowledgement, escalation and the automatic
+  ready-not-collected escalation (S, `kds.autoEscalateNotCollected`).
+
+### P1-09b KDS screen
+
+- `apps/console` KDS mode: ticket cards with live age and thresholds, badges, combo grouping, per
+  item and per ticket actions, bump and recall, pick-up at the pass, ready-not-collected flash with
+  "Notify manager", chime and distinct sounds, dark theme, full-screen disconnected banner with
+  resync.
+- Playwright: ticket lifecycle and reconnect resync.
+
 ## P1-10 Billing engine and GST invoices
 
 Goal: correct, compliant bills and invoices.

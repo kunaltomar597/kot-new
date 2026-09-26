@@ -15,6 +15,7 @@
     { "name": "day-end" },
     { "name": "devices" },
     { "name": "floor" },
+    { "name": "kitchen" },
     { "name": "menu" },
     { "name": "orders" },
     { "name": "payments" },
@@ -2316,6 +2317,237 @@
         "x-requirements": ["BILL-010", "BILL-003", "AUTH-011", "AUD-001"]
       }
     },
+    "/api/v1/kds/tickets": {
+      "get": {
+        "operationId": "getKdsTickets",
+        "summary": "A station's open kitchen tickets, recently bumped ones and the screen settings",
+        "description": "A kitchen screen in station mode (nobody signed in, AUTH-005) sees its own station and cannot choose another; a signed-in person may pass `stationId`, or see every station.",
+        "tags": ["kitchen"],
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tickets.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/KdsTicketsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such station.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ITEM_MARK_PREPARING_READY",
+        "x-requirements": ["KDS-001", "KDS-002", "KDS-003", "KDS-004", "KDS-012"]
+      }
+    },
+    "/api/v1/kds/tickets/{kotId}/bump": {
+      "post": {
+        "operationId": "bumpKot",
+        "summary": "Take a finished ticket off the kitchen screen",
+        "description": "Refused while an item on it is still waiting or being prepared. Change and cancellation slips can be bumped once seen.",
+        "tags": ["kitchen"],
+        "parameters": [
+          {
+            "name": "kotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ticket, bumped.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/KdsTicket" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such ticket at this station.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Items on it are not ready yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ITEM_MARK_PREPARING_READY",
+        "x-requirements": ["KDS-005"]
+      }
+    },
+    "/api/v1/kds/tickets/{kotId}/notify-manager": {
+      "post": {
+        "operationId": "notifyManagerForKot",
+        "summary": "Ready food is not being collected: alert the manager",
+        "description": "Raises a READY_NOT_COLLECTED alert for the managers (KDS-006). Pressing it again while the alert is open returns the same alert. Delivery rules and escalation arrive with P2-03.",
+        "tags": ["kitchen"],
+        "parameters": [
+          {
+            "name": "kotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The alert.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotifyManagerResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such ticket at this station.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Nothing on the ticket is ready and waiting.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ITEM_MARK_PREPARING_READY",
+        "x-requirements": ["KDS-006", "NTF-003"]
+      }
+    },
+    "/api/v1/kds/tickets/{kotId}/recall": {
+      "post": {
+        "operationId": "recallKot",
+        "summary": "Bring a bumped ticket back to the kitchen screen",
+        "tags": ["kitchen"],
+        "parameters": [
+          {
+            "name": "kotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ticket, back on the screen.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/KdsTicket" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such ticket at this station.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ITEM_MARK_PREPARING_READY",
+        "x-requirements": ["KDS-005"]
+      }
+    },
     "/api/v1/kots/{id}/reprint": {
       "post": {
         "operationId": "reprintKot",
@@ -3558,7 +3790,7 @@
       "post": {
         "operationId": "setOrderItemStatus",
         "summary": "Move an item along: preparing, ready, picked up, served",
-        "description": "Each step needs its own grant (BRD §4.2): the kitchen marks preparing and ready, the floor picks up and serves. A combo line moves its parts with it. Returns the order.",
+        "description": "Each step needs its own grant (BRD §4.2): the kitchen marks preparing and ready, the floor picks up and serves. A combo line moves its parts with it. Returns the order. A kitchen screen in station mode (nobody signed in, AUTH-005) acts with the kitchen grants on its own station's items only.",
         "tags": ["orders"],
         "parameters": [
           {
@@ -3619,7 +3851,7 @@
           }
         },
         "x-capability": "SESSION",
-        "x-requirements": ["ORD-010", "ORD-002"]
+        "x-requirements": ["ORD-010", "ORD-002", "KDS-005", "KDS-007"]
       }
     },
     "/api/v1/order-items/{orderItemId}/void": {
@@ -7723,6 +7955,7 @@
           { "$ref": "#/components/schemas/OrderApproved" },
           { "$ref": "#/components/schemas/OrderRejected" },
           { "$ref": "#/components/schemas/KotCreated" },
+          { "$ref": "#/components/schemas/KotBumped" },
           { "$ref": "#/components/schemas/ItemStatusChanged" },
           { "$ref": "#/components/schemas/ServiceRequestRaised" },
           { "$ref": "#/components/schemas/ServiceRequestAcknowledged" },
@@ -8445,6 +8678,150 @@
         ],
         "additionalProperties": false
       },
+      "KdsSettings": {
+        "type": "object",
+        "properties": {
+          "ageAmberMinutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "ageRedMinutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "readyNotCollectedMinutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "soundVolumePercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+        },
+        "required": [
+          "ageAmberMinutes",
+          "ageRedMinutes",
+          "readyNotCollectedMinutes",
+          "soundVolumePercent"
+        ],
+        "additionalProperties": false
+      },
+      "KdsTicket": {
+        "type": "object",
+        "properties": {
+          "kotId": { "$ref": "#/components/schemas/Id" },
+          "kotNumber": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] },
+          "stationId": { "$ref": "#/components/schemas/Id" },
+          "stationName": { "type": "string" },
+          "orderId": { "$ref": "#/components/schemas/Id" },
+          "orderNumber": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "tableLabel": { "type": ["string", "null"] },
+          "takeawayToken": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "movedFrom": { "type": ["string", "null"] },
+          "waiterName": { "type": ["string", "null"] },
+          "source": { "$ref": "#/components/schemas/OrderSource" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "bumpedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "managerNotified": { "type": "boolean" },
+          "lines": { "type": "array", "items": { "$ref": "#/components/schemas/KdsTicketLine" } }
+        },
+        "required": [
+          "kotId",
+          "kotNumber",
+          "kind",
+          "stationId",
+          "stationName",
+          "orderId",
+          "orderNumber",
+          "tableLabel",
+          "takeawayToken",
+          "movedFrom",
+          "waiterName",
+          "source",
+          "createdAt",
+          "bumpedAt",
+          "managerNotified",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "KdsTicketLine": {
+        "type": "object",
+        "properties": {
+          "orderItemId": { "$ref": "#/components/schemas/Id" },
+          "quantity": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "name": { "type": "string" },
+          "variantName": { "type": ["string", "null"] },
+          "modifiers": { "type": "array", "items": { "type": "string" } },
+          "instructions": { "type": ["string", "null"] },
+          "comboName": { "type": ["string", "null"] },
+          "state": { "$ref": "#/components/schemas/OrderItemState" },
+          "readyAt": { "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }] }
+        },
+        "required": [
+          "orderItemId",
+          "quantity",
+          "name",
+          "variantName",
+          "modifiers",
+          "instructions",
+          "comboName",
+          "state",
+          "readyAt"
+        ],
+        "additionalProperties": false
+      },
+      "KdsTicketParams": {
+        "type": "object",
+        "properties": { "kotId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["kotId"],
+        "additionalProperties": false
+      },
+      "KdsTicketsQuery": {
+        "type": "object",
+        "properties": { "stationId": { "$ref": "#/components/schemas/Id" } },
+        "additionalProperties": false
+      },
+      "KdsTicketsResponse": {
+        "type": "object",
+        "properties": {
+          "station": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "tickets": { "type": "array", "items": { "$ref": "#/components/schemas/KdsTicket" } },
+          "recentlyBumped": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/KdsTicket" }
+          },
+          "settings": { "$ref": "#/components/schemas/KdsSettings" },
+          "serverTime": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["station", "tickets", "recentlyBumped", "settings", "serverTime"],
+        "additionalProperties": false
+      },
       "Kot": {
         "type": "object",
         "properties": {
@@ -8503,6 +8880,42 @@
           "source",
           "createdAt",
           "lines"
+        ],
+        "additionalProperties": false
+      },
+      "KotBumped": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "KotBumped" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "kotId": { "$ref": "#/components/schemas/Id" },
+              "stationId": { "$ref": "#/components/schemas/Id" },
+              "bumped": { "type": "boolean" }
+            },
+            "required": ["kotId", "stationId", "bumped"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
         ],
         "additionalProperties": false
       },
@@ -8932,6 +9345,15 @@
         "type": "object",
         "properties": { "toTableId": { "$ref": "#/components/schemas/Id" } },
         "required": ["toTableId"],
+        "additionalProperties": false
+      },
+      "NotifyManagerResponse": {
+        "type": "object",
+        "properties": {
+          "alertId": { "$ref": "#/components/schemas/Id" },
+          "alreadyOpen": { "type": "boolean" }
+        },
+        "required": ["alertId", "alreadyOpen"],
         "additionalProperties": false
       },
       "OpenBillRequest": {

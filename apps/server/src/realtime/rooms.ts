@@ -80,6 +80,8 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   OrderApproved: 'ORDER_CREATE',
   OrderRejected: 'ORDER_CREATE',
   KotCreated: 'ORDER_CREATE',
+  // Kitchen screens hear it through their station room, like tickets; managers see every bump.
+  KotBumped: 'MANAGERS',
   ItemStatusChanged: 'ORDER_CREATE',
   ServiceRequestRaised: 'ORDER_CREATE',
   ServiceRequestAcknowledged: 'ORDER_CREATE',
@@ -125,6 +127,7 @@ function named(event: DomainEvent): Required<EventAudience> {
       found.tableIds.push(event.payload.fromTableId, event.payload.toTableId);
       break;
     case 'KotCreated':
+    case 'KotBumped':
       found.stationIds.push(event.payload.stationId);
       break;
     case 'AlertEscalated':
