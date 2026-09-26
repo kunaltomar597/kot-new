@@ -150,11 +150,14 @@ describe('[NFR-P11] connection banner', () => {
       expect(screen.queryByText(t('connection.connecting'))).toBeNull();
     });
     sockets.last.fire('disconnect', 'transport close');
-    expect(await screen.findByRole('alert')).toHaveTextContent(t('connection.offline'));
+    expect(await screen.findByText(t('connection.offline'))).toBeInTheDocument();
+    // A kitchen screen also covers the board: tickets must not look current (KDS-012).
+    expect(screen.getByText(t('kds.disconnectedTitle'))).toBeInTheDocument();
     sockets.sync(2);
     await waitFor(() => {
       expect(screen.queryByText(t('connection.offline'))).toBeNull();
     });
+    expect(screen.queryByText(t('kds.disconnectedTitle'))).toBeNull();
   });
 });
 
