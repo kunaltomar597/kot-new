@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02). 314 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the draft menu (P1-03a). 330 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b). 477 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu (P1-03a). 485 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -53,7 +53,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-03 Menu management API (P1-01 done).
+- P1-03b Combos, availability and stock, menu publishing (P1-03a done).
 - P1-06 Order engine after P1-03 (P1-02 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -93,7 +93,8 @@ Recommended next WPs (dependencies met):
 - [x] P1-01b Restaurant profile, tax groups and invoice series
 - [x] P1-02a Floor (sections, tables) and waiter assignment
 - [x] P1-02b Table sessions, move table, takeaway tokens, overview
-- [ ] P1-03 Menu management API
+- [x] P1-03a Draft menu: categories, items, variants, modifier groups
+- [ ] P1-03b Combos, availability and stock, menu publishing
 - [ ] P1-04 Menu photos
 - [ ] P1-05 Excel/CSV menu import
 - [ ] P1-06 Order engine
@@ -262,6 +263,13 @@ Decided 2026-09-26 (P1-02b):
 25. A moved table keeps its state (for example BILL_REQUESTED). Tickets are not reprinted: the
     kitchen screens and printers hear `TableMoved` and show the new table (TBL-005).
 
+Decided 2026-09-26 (P1-03a):
+
+26. Menu edits are a draft. Ordering surfaces and the order engine use the last published menu
+    (P1-03b), so managers can prepare several changes and publish them together (MENU-013).
+27. A price change gets its own audit action, `ITEM_PRICE_CHANGED`, so price history can be
+    reported on directly (MENU-009).
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -278,6 +286,31 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-03a draft menu
+
+Split P1-03 into P1-03a (the draft menu) and P1-03b (combos, availability and stock,
+publishing). Built:
+
+- `@rp/contracts` `menu-admin.ts`: category, modifier-group and item requests and views, the
+  draft response, and 13 routes. Input schemas are named `...Request`, because the doc generator
+  reserves `<Name>Input` for exported schemas such as `ModifierOption`.
+- `apps/server/src/menu`: `MenuAdminService` and its controller (`MENU_MANAGE`).
+  - One level of sub-categories; unique names and short codes among active entries.
+  - Variants and options are updated by id and archived when dropped.
+  - Tags, synonyms and modifier-group links are written with the item.
+  - Archive and restore rules as in the phase spec; audit entries, with price changes separate.
+- Tests: 4 contract tests and 8 integration tests (categories, groups keeping option ids, items
+  with every attribute, refusals, price audit, variant archive, archive order, the draft).
+
+Decisions: 26 and 27.
+
+Notes for P1-03b:
+
+- Publish builds `MenuSnapshot` from active entries only and stores it in `menu_versions` with a
+  checksum. It emits `MenuPublished`.
+- The order engine (P1-06) prices from the published version.
+- Availability and stock changes are immediate and not drafts (MENU-006).
 
 ### 2026-09-26: P1-02b table sessions, move table and overview (P1-02 done)
 

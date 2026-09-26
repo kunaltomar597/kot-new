@@ -191,6 +191,31 @@ Deliverables:
 Acceptance: integration tests for CRUD validation, archive-not-delete, stock countdown to zero,
 snapshot matches contract schema, audit entries for price changes.
 
+Split into P1-03a (the draft menu: categories, items, variants, modifier groups) and P1-03b
+(combos, availability and stock, publishing the versioned snapshot, search data).
+
+### P1-03a Draft menu
+
+As built: `packages/contracts/src/menu-admin.ts` and `apps/server/src/menu`, all for
+`MENU_MANAGE`.
+
+- `GET /api/v1/menu/draft` returns categories, modifier groups and items, archived ones included.
+- Categories (one level of sub-categories), modifier groups and items: create, change, archive
+  and restore.
+  - Names are unique among active siblings; short codes are unique among active items.
+  - Variants and options keep their ids when changed; dropped ones are archived, never deleted
+    (orders refer to them).
+  - Tags are shared by name; synonyms feed search (MENU-011).
+- A category is archived only when empty, and a modifier group only when no active item offers
+  it. Items are only ever archived (MENU-010).
+- Every change is audited. A change to the base price or a variant price is recorded as
+  `ITEM_PRICE_CHANGED` (MENU-009). Nothing reaches ordering surfaces until a publish (P1-03b).
+
+### P1-03b Combos, availability and publishing
+
+The rest of P1-03: combos, availability and stock (`STOCK_MANAGE`, `ItemAvailabilityChanged`),
+publishing a `MenuSnapshot` version with `MenuPublished`, and search index data.
+
 ## P1-04 Menu photos (local)
 
 Goal: photos stored locally, resized, served to devices.

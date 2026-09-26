@@ -288,6 +288,13 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   and hand over tables, and the TBL-007 overview. Every change locks the table rows it touches,
   follows `tableMachine`, and writes the audit entry and the table events in one transaction.
 
+## Menu (P1-03)
+
+- `src/menu/menu-admin.service.ts` (P1-03a): the draft menu, under the setup lock.
+  - Variants and modifier options are updated by id; dropped ones are archived because order
+    items refer to them.
+  - Every change writes an audit entry, and price changes use `ITEM_PRICE_CHANGED`.
+
 ## Commands
 
 ```
