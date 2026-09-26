@@ -489,7 +489,8 @@ invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-
 (invoice void with override, DUPLICATE marking), P1-10c (editing a printed invoice under its
 number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts), P1-13b (who may export which report, CSV formula
 neutralising), #38 (P1-09a station mode: device-only kitchen access
-in the permission guard).
+in the permission guard), #40 (P1-12a manager approval prompt and payment
+idempotency on the POS).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
