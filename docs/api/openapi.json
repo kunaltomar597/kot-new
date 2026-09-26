@@ -2940,6 +2940,128 @@
         "x-requirements": ["MGR-005", "MENU-001", "MENU-002"]
       }
     },
+    "/api/v1/menu/import": {
+      "post": {
+        "operationId": "importMenu",
+        "summary": "Import a menu file and publish it",
+        "description": "ONB-005, ONB-009. Checks the file as the check does; with no problems, adds everything in one transaction, audited, and publishes a new menu version. With problems nothing is written and the report lists them.",
+        "tags": ["menu"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/MenuImportRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The report; `committed` says whether it was imported.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MenuImportReport" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["ONB-005", "ONB-009", "MENU-011", "MENU-013", "AUD-001"]
+      }
+    },
+    "/api/v1/menu/import/check": {
+      "post": {
+        "operationId": "checkMenuImport",
+        "summary": "Check a menu file and list every problem, writing nothing",
+        "description": "ONB-005, MENU-011. Each problem names its sheet, row and column. Items, categories, modifier groups and combos are added; existing items are never changed, and tax groups and kitchen stations are referred to by name.",
+        "tags": ["menu"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/MenuImportRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MenuImportReport" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["ONB-005", "ONB-009", "MENU-011"]
+      }
+    },
+    "/api/v1/menu/import/template": {
+      "get": {
+        "operationId": "menuImportTemplate",
+        "summary": "The vendor menu template (.xlsx)",
+        "description": "ONB-005. Sheets Items, Variants, Modifiers and Combos, with a notes row under each header saying what goes in each column. The notes row is skipped on import.",
+        "tags": ["menu"],
+        "responses": {
+          "200": {
+            "description": "The workbook, base64.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MenuTemplateResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["ONB-005"]
+      }
+    },
     "/api/v1/menu/items": {
       "post": {
         "operationId": "createItem",
@@ -9165,6 +9287,103 @@
         "required": ["id"],
         "additionalProperties": false
       },
+      "MenuImportFile": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "format": { "type": "string", "const": "XLSX" },
+              "contentBase64": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 6990508,
+                "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+              }
+            },
+            "required": ["format", "contentBase64"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "format": { "type": "string", "const": "CSV" },
+              "sheets": {
+                "type": "object",
+                "properties": {
+                  "Items": { "type": "string", "maxLength": 2097152 },
+                  "Variants": { "type": "string", "maxLength": 2097152 },
+                  "Modifiers": { "type": "string", "maxLength": 2097152 },
+                  "Combos": { "type": "string", "maxLength": 2097152 }
+                },
+                "required": ["Items"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["format", "sheets"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "MenuImportIssue": {
+        "type": "object",
+        "properties": {
+          "sheet": { "$ref": "#/components/schemas/MenuImportSheetName" },
+          "row": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "column": { "type": ["string", "null"] },
+          "message": { "type": "string" }
+        },
+        "required": ["sheet", "row", "column", "message"],
+        "additionalProperties": false
+      },
+      "MenuImportReport": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "committed": { "type": "boolean" },
+          "issues": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MenuImportIssue" }
+          },
+          "summary": {
+            "anyOf": [{ "$ref": "#/components/schemas/MenuImportSummary" }, { "type": "null" }]
+          },
+          "menuVersion": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["ok", "committed", "issues", "summary", "menuVersion"],
+        "additionalProperties": false
+      },
+      "MenuImportRequest": {
+        "type": "object",
+        "properties": { "file": { "$ref": "#/components/schemas/MenuImportFile" } },
+        "required": ["file"],
+        "additionalProperties": false
+      },
+      "MenuImportSheetName": {
+        "type": "string",
+        "enum": ["Items", "Variants", "Modifiers", "Combos"]
+      },
+      "MenuImportSummary": {
+        "type": "object",
+        "properties": {
+          "categories": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "modifierGroups": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "items": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "variants": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "combos": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["categories", "modifierGroups", "items", "variants", "combos"],
+        "additionalProperties": false
+      },
       "MenuItem": {
         "type": "object",
         "properties": {
@@ -9313,6 +9532,19 @@
           "taxGroups",
           "stations"
         ],
+        "additionalProperties": false
+      },
+      "MenuTemplateResponse": {
+        "type": "object",
+        "properties": {
+          "filename": { "type": "string" },
+          "contentType": {
+            "type": "string",
+            "const": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          },
+          "contentBase64": { "type": "string" }
+        },
+        "required": ["filename", "contentType", "contentBase64"],
         "additionalProperties": false
       },
       "ModifierGroup": {

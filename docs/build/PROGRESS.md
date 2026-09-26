@@ -57,7 +57,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-05 Menu import (P1-03 done).
 - P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -100,7 +99,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-03a Draft menu: categories, items, variants, modifier groups
 - [x] P1-03b Combos, availability and stock, menu publishing
 - [x] P1-04 Menu photos
-- [ ] P1-05 Excel/CSV menu import
+- [x] P1-05 Excel/CSV menu import
 - [x] P1-06a Order submission and KOTs
 - [x] P1-06b Item status, modify, cancel and void
 - [x] P1-07a Stations, printers, ticket rendering and test print
@@ -428,6 +427,19 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P1-05):
+
+90. The menu import only adds. It never changes or archives existing items. An item name already
+    on the menu is an error, so a second import of the same file cannot silently overwrite the
+    menu. Changes are made in the menu editor.
+91. Tax groups and kitchen stations are matched by name and must exist before the import (the
+    setup wizard creates them). Categories and modifier groups are reused when they exist and
+    created otherwise.
+92. An item with variants may leave its price blank; it then takes its lowest variant's price.
+    Blank channels mean every channel; blank spice level is 0; "Repeatable" defaults to No.
+93. XLSX is read with read-excel-file (ADR-0013), because ExcelJS's dependencies fail the licence
+    policy.
+
 Decided 2026-09-26 (P1-04):
 
 86. Photos are uploaded as base64 in JSON (up to 5 MB decoded) rather than multipart, so the
@@ -515,7 +527,8 @@ number, with override), P1-10d (split bills: allocation and numbering), P1-11a (
 neutralising), #38 (P1-09a station mode: device-only kitchen access
 in the permission guard), #40 (P1-12a manager approval prompt and payment
 idempotency on the POS), P1-12b (void and edit-after-print approvals on the POS), P1-04 (upload checks, image decoding
-of untrusted files, the public rendition route).
+of untrusted files, the public rendition route), P1-05 (spreadsheet parsing of untrusted files and
+the ZIP size guard).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -523,6 +536,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-05 Excel/CSV menu import
+
+Built:
+
+- `@rp/domain` `planMenuImport` and `parseCsv`.
+- Contracts `menu-import.ts`, and the routes `menuImportTemplate`, `checkMenuImport` and
+  `importMenu`.
+- Server `src/menu/import/`: workbook reading with a ZIP size guard, the template and its CLI,
+  and the import service.
+- `MenuAdminService` and `MenuPublishService` gained `createCategoryIn`, `createModifierGroupIn`,
+  `createItemIn`, `setComboIn` and `publishIn`, which take a transaction. The public methods wrap
+  them.
+- `docs/onboarding/menu-template.xlsx` and ADR-0013 (read-excel-file and write-excel-file instead
+  of ExcelJS).
+- One JSON limit, `UPLOAD_PATHS`, now covers both photo and import uploads.
+- Tests:
+  - domain: 6 planner tests and 2 CSV tests;
+  - server: 3 unit tests (ZIP guard, cell text, sheet names);
+  - 5 integration tests: the template, an error report with nothing written, 151 items checked
+    then imported and published, CSV with reuse, and a file that is not a workbook.
+
+Gotchas: `read-excel-file` returns time-only cells as dates on 30 Dec 1899; `cellText` turns them
+into HH:MM.
+
+Decisions: 90 to 93.
 
 ### 2026-09-26: P1-04 Menu photos
 

@@ -301,6 +301,16 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   - publishing `menu_versions`, with a checksum so an unchanged draft is not published again;
   - the device-facing menu with live availability.
 
+## Menu import (P1-05)
+
+- `src/menu/import/`:
+  - `menu-import.service.ts`: check (dry run) and import (one transaction with the setup lock,
+    then publish);
+  - `workbook.ts`: read-excel-file, with cells turned into the text a person typed;
+  - `zip-limits.ts`: refuses a workbook whose entries unpack beyond 20 MB each or 60 MB in total;
+  - `menu-template.ts`: the vendor template.
+- The rules live in `@rp/domain` `planMenuImport`. See ADR-0013 and `docs/onboarding/README.md`.
+
 ## Photos (P1-04)
 
 - `POST /api/v1/photos` (`MENU_MANAGE`) takes the image as base64 JSON, at most 5 MB. Only this
