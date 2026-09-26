@@ -576,6 +576,26 @@ path of `InvoicesService.issue`.
 - Voiding one part reopens the bill only once every part is voided.
 - Acceptance: split totals equal the original, and each part has a consecutive number.
 
+As built:
+
+- `@rp/domain` `splitBill(bill, shares)` (`bill-split.ts`) spreads each line's gross, discount and
+  taxable value over the parts with `allocate`.
+  - Each tax component follows a part's taxable value in its group, and the service charge follows
+    a part's taxable value of items.
+  - The round-off follows each part's total. Every amount of the parts adds up exactly to the
+    bill.
+- `apps/server/src/billing/bill-split.service.ts`: `POST /api/v1/bills/:id/split`
+  (`BILL_PRINT_AND_PAYMENT`).
+  - `ITEMS` parts give out every item's quantity exactly (422 otherwise). `EQUAL` takes 2 to 20
+    parts, and each line keeps its quantity with "(share n of N)" and this part's amounts.
+  - Each part is issued with the next number in one transaction: particulars, lines, tax lines,
+    `BillPrinted` per part, the table set to BILL_PRINTED, and one `BILL_SPLIT` audit entry.
+  - A bill being edited cannot be split.
+- Voiding a part reopens the bill (and moves the table back to OCCUPIED) only when every part is
+  voided.
+  - A split bill cannot be reopened for editing; void its parts and split it again.
+  - A new invoice replaces the most recently voided one.
+
 ## P1-11 Payments, shifts and day-end
 
 Goal: record payments manually and close the day.

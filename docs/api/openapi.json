@@ -1002,6 +1002,80 @@
         "x-requirements": ["BILL-006", "AUD-001"]
       }
     },
+    "/api/v1/bills/{id}/split": {
+      "post": {
+        "operationId": "splitBill",
+        "summary": "Split a bill by items or into equal parts, each with its own invoice number",
+        "description": "BILL-007. Every amount of the parts (lines, discounts, each tax, service charge and round-off) adds up exactly to the whole bill. Audited.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SplitBillRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The invoices, one per part.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SplitBillResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Already printed, being edited, nothing to bill, or items awaiting approval.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The parts do not give out every item exactly, or the series is unusable.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-007", "BILL-003", "AUD-001"]
+      }
+    },
     "/api/v1/devices": {
       "get": {
         "operationId": "listDevices",
@@ -8675,6 +8749,98 @@
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
+      },
+      "SplitBillRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "mode": { "type": "string", "const": "ITEMS" },
+              "parts": {
+                "minItems": 2,
+                "maxItems": 20,
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/SplitPartRequest" }
+              },
+              "seriesId": {
+                "default": null,
+                "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+              }
+            },
+            "required": ["mode", "parts", "seriesId"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": { "type": "string", "const": "EQUAL" },
+              "parts": { "type": "integer", "minimum": 2, "maximum": 20 },
+              "seriesId": {
+                "default": null,
+                "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+              }
+            },
+            "required": ["mode", "parts", "seriesId"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "SplitBillRequestInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "mode": { "type": "string", "const": "ITEMS" },
+              "parts": {
+                "minItems": 2,
+                "maxItems": 20,
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/SplitPartRequest" }
+              },
+              "seriesId": {
+                "default": null,
+                "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+              }
+            },
+            "required": ["mode", "parts"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": { "type": "string", "const": "EQUAL" },
+              "parts": { "type": "integer", "minimum": 2, "maximum": 20 },
+              "seriesId": {
+                "default": null,
+                "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+              }
+            },
+            "required": ["mode", "parts"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "SplitBillResponse": {
+        "type": "object",
+        "properties": {
+          "invoices": { "type": "array", "items": { "$ref": "#/components/schemas/InvoiceView" } }
+        },
+        "required": ["invoices"],
+        "additionalProperties": false
+      },
+      "SplitPartRequest": {
+        "minItems": 1,
+        "maxItems": 100,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "orderItemId": { "$ref": "#/components/schemas/Id" },
+            "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["orderItemId", "quantity"],
+          "additionalProperties": false
+        }
       },
       "StaffTile": {
         "type": "object",

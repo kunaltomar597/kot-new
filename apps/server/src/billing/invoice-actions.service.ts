@@ -174,7 +174,14 @@ export class InvoiceActionsService {
         where: { id: invoiceId },
         data: { status: 'VOIDED', voidedAt: now, voidReason: reason },
       });
-      if (invoice.billId !== null) {
+      // A split bill opens again only when its last part is voided (BILL-007, BILL-010).
+      const partsLeft =
+        invoice.billId === null
+          ? 0
+          : await tx.invoice.count({
+              where: { billId: invoice.billId, status: { not: 'VOIDED' }, NOT: { id: invoiceId } },
+            });
+      if (invoice.billId !== null && partsLeft === 0) {
         await tx.bill.update({
           where: { id: invoice.billId },
           data: {
@@ -206,7 +213,7 @@ export class InvoiceActionsService {
 
       // The table no longer has a valid bill: back to Occupied until the new one prints.
       const session = found.tableSession;
-      if (session?.status === 'OPEN') {
+      if (session?.status === 'OPEN' && partsLeft === 0) {
         const table = await tx.diningTable.findUniqueOrThrow({ where: { id: session.tableId } });
         if (table.state === 'BILL_PRINTED') {
           const to = transition(tableMachine, table.state, 'ADD_ITEMS').to;

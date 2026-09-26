@@ -251,3 +251,31 @@ export type VoidInvoiceRequest = z.infer<typeof VoidInvoiceRequest>;
  */
 export const ReopenInvoiceRequest = z.strictObject({ reason: Reason });
 export type ReopenInvoiceRequest = z.infer<typeof ReopenInvoiceRequest>;
+
+/** One part of a split by items: which items, and how many of each (BILL-007). */
+export const SplitPartRequest = z
+  .array(z.strictObject({ orderItemId: Id, quantity: z.int().positive() }))
+  .min(1)
+  .max(100);
+
+/**
+ * Split an open bill into parts, each issued as its own invoice with the next number (BILL-007):
+ * by items (every item's quantity given out exactly) or into 2 to 20 equal parts. The parts add up
+ * exactly to the whole bill.
+ */
+export const SplitBillRequest = z.discriminatedUnion('mode', [
+  z.strictObject({
+    mode: z.literal('ITEMS'),
+    parts: z.array(SplitPartRequest).min(2).max(20),
+    seriesId: Id.nullable().default(null),
+  }),
+  z.strictObject({
+    mode: z.literal('EQUAL'),
+    parts: z.int().min(2).max(20),
+    seriesId: Id.nullable().default(null),
+  }),
+]);
+export type SplitBillRequest = z.input<typeof SplitBillRequest>;
+
+export const SplitBillResponse = z.object({ invoices: z.array(InvoiceView) });
+export type SplitBillResponse = z.infer<typeof SplitBillResponse>;

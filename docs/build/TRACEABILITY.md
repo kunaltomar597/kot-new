@@ -62,9 +62,9 @@ Must: 112 / 287 covered. Should: 0 / 24. Could: 0 / 7.
 - BILL-004 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/tax-and-bill.test.ts
 - BILL-005 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/domain/test/tax-and-bill.test.ts
 - BILL-006 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/domain/test/tax-and-bill.test.ts
-- BILL-007 (M): packages/domain/test/money.test.ts
+- BILL-007 (M): apps/server/test/integration/bill-split.int.test.ts, packages/domain/test/bill-split.test.ts, packages/domain/test/money.test.ts
 - BILL-009 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-template.test.ts
-- BILL-010 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/schema.int.test.ts
+- BILL-010 (M): apps/server/test/integration/bill-split.int.test.ts, apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/schema.int.test.ts
 - BILL-011 (M): apps/server/test/integration/billing.int.test.ts
 - BILL-014 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-template.test.ts
 - WTR-002 (M): packages/domain/test/floor.test.ts

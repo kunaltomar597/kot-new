@@ -16,6 +16,8 @@ import {
   ReopenInvoiceRequest,
   RevokeDiscountRequest,
   ServiceChargeRequest,
+  SplitBillRequest,
+  SplitBillResponse,
   VoidInvoiceRequest,
 } from './billing.js';
 import {
@@ -1960,6 +1962,32 @@ export const ROUTES = [
       404: { description: 'No such invoice.', schema: ApiError },
       409: {
         description: 'Settled (void and re-issue it instead), voided, or already reopened.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'splitBill',
+    method: 'POST',
+    path: '/api/v1/bills/:id/split',
+    summary: 'Split a bill by items or into equal parts, each with its own invoice number',
+    description:
+      'BILL-007. Every amount of the parts (lines, discounts, each tax, service charge and ' +
+      'round-off) adds up exactly to the whole bill. Audited.',
+    tags: ['billing'],
+    requirements: ['BILL-007', 'BILL-003', 'AUD-001'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { params: BillParams, body: SplitBillRequest },
+    responses: {
+      201: { description: 'The invoices, one per part.', schema: SplitBillResponse },
+      ...standardErrors,
+      404: { description: 'No such bill.', schema: ApiError },
+      409: {
+        description: 'Already printed, being edited, nothing to bill, or items awaiting approval.',
+        schema: ApiError,
+      },
+      422: {
+        description: 'The parts do not give out every item exactly, or the series is unusable.',
         schema: ApiError,
       },
     },
