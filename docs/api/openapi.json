@@ -2281,6 +2281,280 @@
         "x-requirements": ["MENU-013", "MENU-012", "MGR-005", "AUD-001"]
       }
     },
+    "/api/v1/order-items/{orderItemId}": {
+      "patch": {
+        "operationId": "modifyOrderItem",
+        "summary": "Change the quantity or instructions of an item the kitchen has not started",
+        "description": "The station gets a MODIFIED ticket with the new quantity and instructions; nothing changes silently (ORD-012). Stock follows the quantity. Combos are cancelled and ordered again instead. Audited.",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "orderItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ModifyOrderItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The order as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such order item.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The kitchen has started it, it is a combo, or stock ran out.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The instructions are too long.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["ORD-012", "ORD-015", "AUD-001"]
+      }
+    },
+    "/api/v1/order-items/{orderItemId}/cancel": {
+      "post": {
+        "operationId": "cancelOrderItem",
+        "summary": "Cancel an item the kitchen has not started, with a reason",
+        "description": "Waiters may cancel only on their own tables. The station gets a CANCELLED ticket slip and counted stock is returned (ORD-011, ORD-012). Audited.",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "orderItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/OrderItemEndRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The order as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such order item.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The kitchen has started it: void it instead.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ITEM_CANCEL_BEFORE_PREP",
+        "x-requirements": ["ORD-011", "ORD-012", "AUD-001"]
+      }
+    },
+    "/api/v1/order-items/{orderItemId}/status": {
+      "post": {
+        "operationId": "setOrderItemStatus",
+        "summary": "Move an item along: preparing, ready, picked up, served",
+        "description": "Each step needs its own grant (BRD §4.2): the kitchen marks preparing and ready, the floor picks up and serves. A combo line moves its parts with it. Returns the order.",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "orderItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OrderItemStatusRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The order as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such order item.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The item is not in a state for this step.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["ORD-010", "ORD-002"]
+      }
+    },
+    "/api/v1/order-items/{orderItemId}/void": {
+      "post": {
+        "operationId": "voidOrderItem",
+        "summary": "Void an item after preparation started, with a reason",
+        "description": "Cashiers and waiters need a manager's PIN (override token, AUTH-011). A station still working on it gets a CANCELLED slip (ORD-011, ORD-012). Audited with the approver.",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "orderItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/OrderItemEndRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The order as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such order item.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The item has not been started: cancel it instead.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ITEM_VOID_AFTER_PREP",
+        "x-requirements": ["ORD-011", "ORD-012", "AUTH-011", "AUD-001"]
+      }
+    },
     "/api/v1/orders": {
       "post": {
         "operationId": "submitOrder",
@@ -5407,6 +5681,14 @@
         "required": ["id", "name", "priceDelta", "available", "displayOrder", "archivedAt"],
         "additionalProperties": false
       },
+      "ModifyOrderItemRequest": {
+        "type": "object",
+        "properties": {
+          "quantity": { "type": "integer", "minimum": 1, "maximum": 99 },
+          "instructions": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+        },
+        "additionalProperties": false
+      },
       "MoveTableRequest": {
         "type": "object",
         "properties": { "toTableId": { "$ref": "#/components/schemas/Id" } },
@@ -5467,6 +5749,18 @@
         ],
         "additionalProperties": false
       },
+      "OrderItemEndRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "OrderItemParams": {
+        "type": "object",
+        "properties": { "orderItemId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["orderItemId"],
+        "additionalProperties": false
+      },
       "OrderItemState": {
         "type": "string",
         "enum": [
@@ -5480,6 +5774,17 @@
           "CANCELLED",
           "VOIDED"
         ]
+      },
+      "OrderItemStatusRequest": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": ["START_PREPARING", "MARK_READY", "PICK_UP", "SERVE"]
+          }
+        },
+        "required": ["event"],
+        "additionalProperties": false
       },
       "OrderLineRequest": {
         "type": "object",

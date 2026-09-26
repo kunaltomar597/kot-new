@@ -62,7 +62,16 @@ import {
   ModifierGroupView,
 } from './menu-admin.js';
 import { MenuSnapshot } from './menu.js';
-import { OrderParams, OrderView, SubmitOrderRequest, SubmitOrderResponse } from './order.js';
+import {
+  ModifyOrderItemRequest,
+  OrderItemEndRequest,
+  OrderItemParams,
+  OrderItemStatusRequest,
+  OrderParams,
+  OrderView,
+  SubmitOrderRequest,
+  SubmitOrderResponse,
+} from './order.js';
 import {
   AssignSessionWaiterRequest,
   CloseWithoutBillRequest,
@@ -1438,6 +1447,87 @@ export const ROUTES = [
       200: { description: 'The menu.', schema: MenuSnapshot },
       ...deviceErrors,
       404: { description: 'No menu has been published yet.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'setOrderItemStatus',
+    method: 'POST',
+    path: '/api/v1/order-items/:orderItemId/status',
+    summary: 'Move an item along: preparing, ready, picked up, served',
+    description:
+      'Each step needs its own grant (BRD §4.2): the kitchen marks preparing and ready, the floor ' +
+      'picks up and serves. A combo line moves its parts with it. Returns the order.',
+    tags: ['orders'],
+    requirements: ['ORD-010', 'ORD-002'],
+    capability: 'SESSION',
+    request: { params: OrderItemParams, body: OrderItemStatusRequest },
+    responses: {
+      200: { description: 'The order as it is now.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order item.', schema: ApiError },
+      409: { description: 'The item is not in a state for this step.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'cancelOrderItem',
+    method: 'POST',
+    path: '/api/v1/order-items/:orderItemId/cancel',
+    summary: 'Cancel an item the kitchen has not started, with a reason',
+    description:
+      'Waiters may cancel only on their own tables. The station gets a CANCELLED ticket slip and ' +
+      'counted stock is returned (ORD-011, ORD-012). Audited.',
+    tags: ['orders'],
+    requirements: ['ORD-011', 'ORD-012', 'AUD-001'],
+    capability: 'ITEM_CANCEL_BEFORE_PREP',
+    request: { params: OrderItemParams, body: OrderItemEndRequest },
+    responses: {
+      200: { description: 'The order as it is now.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order item.', schema: ApiError },
+      409: { description: 'The kitchen has started it: void it instead.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'voidOrderItem',
+    method: 'POST',
+    path: '/api/v1/order-items/:orderItemId/void',
+    summary: 'Void an item after preparation started, with a reason',
+    description:
+      "Cashiers and waiters need a manager's PIN (override token, AUTH-011). A station still " +
+      'working on it gets a CANCELLED slip (ORD-011, ORD-012). Audited with the approver.',
+    tags: ['orders'],
+    requirements: ['ORD-011', 'ORD-012', 'AUTH-011', 'AUD-001'],
+    capability: 'ITEM_VOID_AFTER_PREP',
+    request: { params: OrderItemParams, body: OrderItemEndRequest },
+    responses: {
+      200: { description: 'The order as it is now.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order item.', schema: ApiError },
+      409: { description: 'The item has not been started: cancel it instead.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'modifyOrderItem',
+    method: 'PATCH',
+    path: '/api/v1/order-items/:orderItemId',
+    summary: 'Change the quantity or instructions of an item the kitchen has not started',
+    description:
+      'The station gets a MODIFIED ticket with the new quantity and instructions; nothing changes ' +
+      'silently (ORD-012). Stock follows the quantity. Combos are cancelled and ordered again ' +
+      'instead. Audited.',
+    tags: ['orders'],
+    requirements: ['ORD-012', 'ORD-015', 'AUD-001'],
+    capability: 'ORDER_CREATE',
+    request: { params: OrderItemParams, body: ModifyOrderItemRequest },
+    responses: {
+      200: { description: 'The order as it is now.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order item.', schema: ApiError },
+      409: {
+        description: 'The kitchen has started it, it is a combo, or stock ran out.',
+        schema: ApiError,
+      },
+      422: { description: 'The instructions are too long.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];

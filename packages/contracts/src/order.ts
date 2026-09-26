@@ -158,3 +158,31 @@ export type OrderView = z.infer<typeof OrderView>;
 
 export const OrderParams = z.strictObject({ orderId: Id });
 export type OrderParams = z.infer<typeof OrderParams>;
+
+// ---------------------------------------------------------------- item changes (P1-06b)
+
+export const OrderItemParams = z.strictObject({ orderItemId: Id });
+export type OrderItemParams = z.infer<typeof OrderItemParams>;
+
+/** ORD-010: the kitchen and floor move items along (`@rp/domain` `orderItemMachine`). */
+export const OrderItemStatusRequest = z.strictObject({
+  event: z.enum(['START_PREPARING', 'MARK_READY', 'PICK_UP', 'SERVE']),
+});
+export type OrderItemStatusRequest = z.infer<typeof OrderItemStatusRequest>;
+
+/** ORD-011: cancel before preparation, or void after it (with a manager's approval). */
+export const OrderItemEndRequest = z.strictObject({
+  reason: z.string().trim().min(3).max(200),
+});
+export type OrderItemEndRequest = z.infer<typeof OrderItemEndRequest>;
+
+/** ORD-012: change quantity or instructions while the kitchen has not started. */
+export const ModifyOrderItemRequest = z
+  .strictObject({
+    quantity: z.int().min(1).max(99).optional(),
+    instructions: z.string().trim().max(INSTRUCTION_HARD_MAX_LENGTH).nullable().optional(),
+  })
+  .refine((change) => change.quantity !== undefined || change.instructions !== undefined, {
+    message: 'Change the quantity or the instructions',
+  });
+export type ModifyOrderItemRequest = z.infer<typeof ModifyOrderItemRequest>;

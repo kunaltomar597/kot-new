@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); the order view (P1-06a). 339 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06). 345 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); order submission and KOTs (P1-06a). 501 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06). 508 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -54,7 +54,8 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P1-04 Menu photos (P1-03 done).
-- P1-06b Item status, modify, cancel and void (P1-06a done).
+- P1-07 Stations, printers and KOT printing (P1-06 done).
+- P1-10 Billing engine and GST invoices (P1-06 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -98,7 +99,7 @@ Recommended next WPs (dependencies met):
 - [ ] P1-04 Menu photos
 - [ ] P1-05 Excel/CSV menu import
 - [x] P1-06a Order submission and KOTs
-- [ ] P1-06b Item status, modify, cancel and void
+- [x] P1-06b Item status, modify, cancel and void
 - [ ] P1-07 Stations, printers and KOT printing
 - [ ] P1-08 POS UI: tables and order entry
 - [ ] P1-09 KDS UI
@@ -286,6 +287,13 @@ Decided 2026-09-26 (P1-06a):
     kitchen tracks each part and the bill shows the combo once.
 32. Idempotency results are kept 7 days; only accepted orders are stored.
 
+Decided 2026-09-26 (P1-06b):
+
+33. A MODIFIED ticket shows the item's new quantity and instructions, not a signed difference, so
+    the cook reads the final state.
+34. Cancelling before cooking returns counted stock; a void does not (the food was made). A combo
+    is cancelled or voided as a whole, and its parts follow.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -302,6 +310,37 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-06b item status, cancel, void and modify (P1-06 done)
+
+Built:
+
+- `@rp/contracts`: the item status, end (reason) and modify requests, and 4 routes.
+- `apps/server/src/orders/order-items.service.ts` and `OrderItemsController`:
+  - status steps with per-step grants, combos carrying their parts;
+  - cancel (OWN for waiters) with stock back;
+  - void with the override token and the approver in the audit;
+  - modify with a MODIFIED ticket and stock following;
+  - CANCELLED slips for items a station still holds.
+- `MenuPublishService.restoreStock`.
+- Tests: 1 contract test and 7 integration tests:
+  - the grants of each step, the implied pick-up time and a backwards step refused;
+  - a combo moving its parts;
+  - cancel with slip, stock and audit;
+  - cancel refused once started, and waiters limited to their own tables;
+  - void needing the override, with the approver audited;
+  - modify with a MODIFIED ticket and stock, refused once cooking;
+  - a combo part refused alone and the combo cancelled whole.
+
+  Totals: server 508 tests.
+
+Decisions: 33 and 34.
+
+Notes for the next sessions:
+
+- P1-07 prints PENDING KOTs, including MODIFIED and CANCELLED slips. P1-09 shows them on the KDS.
+- Kitchen screens in station mode (no person signed in) need a device path for the status steps
+  (P1-09).
 
 ### 2026-09-26: P1-06a order submission and KOTs
 

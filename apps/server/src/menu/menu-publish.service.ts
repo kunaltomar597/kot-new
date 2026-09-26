@@ -221,6 +221,24 @@ export class MenuPublishService {
     return after;
   }
 
+  /**
+   * Gives stock back for a cancelled or reduced order line (P1-06b). The count goes up; whether
+   * the item is offered again stays a person's decision (MENU-006).
+   */
+  async restoreStock(
+    tx: TransactionClient,
+    restaurantId: string,
+    itemId: string,
+    quantity: number,
+  ): Promise<ItemAvailabilityView | null> {
+    const before = await this.lockAvailability(tx, restaurantId, itemId);
+    if (before.stockCount === null) return null;
+    const after: ItemAvailabilityView = { ...before, stockCount: before.stockCount + quantity };
+    await tx.stockLevel.update({ where: { itemId }, data: { quantity: after.stockCount ?? 0 } });
+    await this.announceAvailability(tx, restaurantId, after);
+    return after;
+  }
+
   // ---------------------------------------------------------------- publishing
 
   publish(principal: Principal): Promise<MenuPublishResponse> {
