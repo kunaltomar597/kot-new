@@ -60,6 +60,10 @@ export const AppConfigSchema = z.object({
    * (P0-16); the server's own version when unset.
    */
   productVersion: z.string().min(1).max(64).optional(),
+  /** The pagers' MQTT broker (P2-04, PGR-005): on by default; over TLS when `tls` is on. */
+  mqtt: z.enum(['on', 'off']).default('on'),
+  /** MQTT port; 8883 is MQTTS. 0 picks a free port (tests). */
+  mqttPort: z.coerce.number().int().min(0).max(65_535).default(8883),
   /** Serve HTTPS/WSS with the installation's private CA (ADR-0011, SEC-001). */
   tls: booleanFlag,
   /** Extra host names for the server certificate, e.g. `pos.local` (comma-separated). */
@@ -109,6 +113,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     consoleDir: env.RP_CONSOLE_DIR,
     controlPlaneUrl: env.RP_CONTROL_PLANE_URL,
     productVersion: env.RP_PRODUCT_VERSION,
+    mqtt: env.RP_MQTT,
+    mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,
     tlsHostnames: env.RP_TLS_HOSTNAMES,
   });

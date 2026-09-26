@@ -14,6 +14,33 @@ export interface AsyncApiOptions {
   version: string;
 }
 
+/** MQTT topics of the pagers (P2-04, PGR-005): documented next to the domain events. */
+const PAGER_CHANNELS = [
+  {
+    id: 'pagerAlerts',
+    address: 'rp/{restaurantId}/pagers/{deviceId}/alerts',
+    action: 'send',
+    schema: 'PagerAlertMessage',
+    description:
+      'Server → pager, QoS 1. Only the pager itself may subscribe. Show each alertId once; buzz ' +
+      'again only for a higher seq; ACKNOWLEDGED or CLEARED removes it.',
+  },
+  {
+    id: 'pagerAck',
+    address: 'rp/{restaurantId}/pagers/{deviceId}/ack',
+    action: 'receive',
+    schema: 'PagerAckMessage',
+    description: 'Pager → server: the wearer pressed the button on this alert.',
+  },
+  {
+    id: 'pagerHeartbeat',
+    address: 'rp/{restaurantId}/pagers/{deviceId}/heartbeat',
+    action: 'receive',
+    schema: 'PagerHeartbeat',
+    description: 'Pager → server every 30 s ⚙: battery, signal and firmware.',
+  },
+] as const;
+
 interface EventInfo {
   type: string;
   version: number;
@@ -37,7 +64,11 @@ export function buildAsyncApi({ namespace, events, version }: AsyncApiOptions): 
     }
     payloadNames.set(event.type, name);
   }
-  const schemas = pruneToReachable(toJsonSchemas(named, 'output'), payloadNames.values());
+  const pagerChannels = PAGER_CHANNELS.filter((channel) => named.has(channel.schema));
+  const schemas = pruneToReachable(toJsonSchemas(named, 'output'), [
+    ...payloadNames.values(),
+    ...pagerChannels.map((channel) => channel.schema),
+  ]);
 
   const channels: Record<string, unknown> = {};
   const operations: Record<string, unknown> = {};
@@ -58,6 +89,25 @@ export function buildAsyncApi({ namespace, events, version }: AsyncApiOptions): 
       title: `${event.type} v${event.version}`,
       contentType: 'application/json',
       payload: { $ref: `#/components/schemas/${payloadNames.get(event.type) ?? event.type}` },
+    };
+  }
+
+  for (const channel of pagerChannels) {
+    channels[channel.id] = {
+      address: channel.address,
+      description: channel.description,
+      parameters: { restaurantId: {}, deviceId: {} },
+      messages: { [channel.schema]: { $ref: `#/components/messages/${channel.schema}` } },
+    };
+    operations[`${channel.action}${channel.id}`] = {
+      action: channel.action,
+      channel: { $ref: `#/channels/${channel.id}` },
+      messages: [{ $ref: `#/channels/${channel.id}/messages/${channel.schema}` }],
+    };
+    messages[channel.schema] = {
+      name: channel.schema,
+      contentType: 'application/json',
+      payload: { $ref: `#/components/schemas/${channel.schema}` },
     };
   }
 

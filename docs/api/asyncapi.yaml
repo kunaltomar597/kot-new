@@ -146,6 +146,33 @@ channels:
     messages:
       RestaurantChanged:
         $ref: '#/components/messages/RestaurantChanged'
+  pagerAlerts:
+    address: rp/{restaurantId}/pagers/{deviceId}/alerts
+    description: Server → pager, QoS 1. Only the pager itself may subscribe. Show each alertId once; buzz again only for a higher seq; ACKNOWLEDGED or CLEARED removes it.
+    parameters:
+      restaurantId: {}
+      deviceId: {}
+    messages:
+      PagerAlertMessage:
+        $ref: '#/components/messages/PagerAlertMessage'
+  pagerAck:
+    address: rp/{restaurantId}/pagers/{deviceId}/ack
+    description: 'Pager → server: the wearer pressed the button on this alert.'
+    parameters:
+      restaurantId: {}
+      deviceId: {}
+    messages:
+      PagerAckMessage:
+        $ref: '#/components/messages/PagerAckMessage'
+  pagerHeartbeat:
+    address: rp/{restaurantId}/pagers/{deviceId}/heartbeat
+    description: 'Pager → server every 30 s ⚙: battery, signal and firmware.'
+    parameters:
+      restaurantId: {}
+      deviceId: {}
+    messages:
+      PagerHeartbeat:
+        $ref: '#/components/messages/PagerHeartbeat'
 operations:
   receiveMenuPublished:
     action: receive
@@ -315,6 +342,24 @@ operations:
       $ref: '#/channels/RestaurantChanged'
     messages:
       - $ref: '#/channels/RestaurantChanged/messages/RestaurantChanged'
+  sendpagerAlerts:
+    action: send
+    channel:
+      $ref: '#/channels/pagerAlerts'
+    messages:
+      - $ref: '#/channels/pagerAlerts/messages/PagerAlertMessage'
+  receivepagerAck:
+    action: receive
+    channel:
+      $ref: '#/channels/pagerAck'
+    messages:
+      - $ref: '#/channels/pagerAck/messages/PagerAckMessage'
+  receivepagerHeartbeat:
+    action: receive
+    channel:
+      $ref: '#/channels/pagerHeartbeat'
+    messages:
+      - $ref: '#/channels/pagerHeartbeat/messages/PagerHeartbeat'
 components:
   messages:
     MenuPublished:
@@ -485,6 +530,21 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/RestaurantChanged'
+    PagerAlertMessage:
+      name: PagerAlertMessage
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PagerAlertMessage'
+    PagerAckMessage:
+      name: PagerAckMessage
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PagerAckMessage'
+    PagerHeartbeat:
+      name: PagerHeartbeat
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PagerHeartbeat'
   schemas:
     AlertAcknowledged:
       type: object
@@ -1185,6 +1245,22 @@ components:
         - businessDate
         - payload
       additionalProperties: false
+    NotificationEventType:
+      type: string
+      enum:
+        - ORDER_PENDING_APPROVAL
+        - ITEM_READY
+        - WATER_REQUEST
+        - WAITER_REQUEST
+        - BILL_REQUEST
+        - READY_NOT_COLLECTED
+        - MANAGER_NUDGE
+        - ORDER_CHANGED
+        - WAITER_UNREACHABLE
+        - DEVICE_LOW_BATTERY_OR_OFFLINE
+        - PRINTER_OFFLINE
+        - DISK_OR_BACKUP
+        - LICENSE_STATE
     OrderApproved:
       type: object
       properties:
@@ -1344,6 +1420,74 @@ components:
         - restaurantId
         - businessDate
         - payload
+      additionalProperties: false
+    PagerAckMessage:
+      type: object
+      properties:
+        alertId:
+          $ref: '#/components/schemas/Id'
+      required:
+        - alertId
+      additionalProperties: false
+    PagerAlertMessage:
+      type: object
+      properties:
+        alertId:
+          $ref: '#/components/schemas/Id'
+        seq:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        state:
+          type: string
+          enum:
+            - ALERT
+            - ACKNOWLEDGED
+            - CLEARED
+        type:
+          $ref: '#/components/schemas/NotificationEventType'
+        lines:
+          type: array
+          prefixItems:
+            - type: string
+              maxLength: 12
+            - type: string
+              maxLength: 12
+          items: false
+          minItems: 2
+          maxItems: 2
+        vibration:
+          $ref: '#/components/schemas/VibrationPattern'
+        sentAt:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - alertId
+        - seq
+        - state
+        - type
+        - lines
+        - vibration
+        - sentAt
+      additionalProperties: false
+    PagerHeartbeat:
+      type: object
+      properties:
+        battery:
+          type: integer
+          minimum: 0
+          maximum: 100
+        rssi:
+          type: integer
+          minimum: -127
+          maximum: 0
+        firmware:
+          type: string
+          minLength: 1
+          maxLength: 32
+      required:
+        - battery
+        - rssi
+        - firmware
       additionalProperties: false
     Paise:
       type: integer
@@ -1870,3 +2014,10 @@ components:
       type: string
       format: date-time
       pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+    VibrationPattern:
+      type: string
+      enum:
+        - ONE_LONG
+        - TWO_SHORT
+        - THREE
+        - ONE_SHORT
