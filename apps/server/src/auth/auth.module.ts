@@ -1,6 +1,7 @@
 import { Logger, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
+import { SettingsModule } from '../settings/settings.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { AuthSettingsService } from './auth-settings.js';
@@ -21,6 +22,7 @@ import { TokenService } from './tokens.js';
  * the Windows DPAPI store in the installer (P0-16).
  */
 @Module({
+  imports: [SettingsModule],
   controllers: [AuthController],
   providers: [
     {

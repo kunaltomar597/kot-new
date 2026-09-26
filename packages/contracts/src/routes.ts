@@ -34,6 +34,12 @@ import {
   RevokeDeviceRequest,
 } from './devices.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
+import {
+  SettingKeyParams,
+  SettingsResponse,
+  SettingView,
+  UpdateSettingRequest,
+} from './settings.js';
 import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
 
 /**
@@ -164,6 +170,43 @@ export const ROUTES = [
     responses: {
       200: { description: 'The CA certificate.', schema: TlsCaResponse },
       404: { description: 'This server does not use TLS.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listSettings',
+    method: 'GET',
+    path: '/api/v1/settings',
+    summary: 'Every setting with its value, default and whether the caller may change it',
+    description:
+      'The whole catalogue (P1-01a): values the restaurant changed and the BRD defaults for the ' +
+      'rest. Vendor-controlled settings are listed read-only (UPD-010).',
+    tags: ['settings'],
+    requirements: ['MGR-007', 'UPD-010', 'NFR-L03'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The settings.', schema: SettingsResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'updateSetting',
+    method: 'PUT',
+    path: '/api/v1/settings/:key',
+    summary: 'Change one setting',
+    description:
+      'The value must match the setting (and the rules between settings). Each setting names the ' +
+      'capability needed: tax and invoice, data and licence settings need the Owner with a fresh ' +
+      'second factor (AUTH-006); vendor-controlled settings cannot be changed here. Audited with ' +
+      'before and after, and announced with `SettingsChanged`.',
+    tags: ['settings'],
+    requirements: ['MGR-007', 'AUD-001', 'AUTH-006', 'BILL-006'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: SettingKeyParams, body: UpdateSettingRequest },
+    responses: {
+      200: { description: 'The setting as it is now.', schema: SettingView },
+      ...standardErrors,
+      404: { description: 'No such setting.', schema: ApiError },
+      422: { description: 'The value is not allowed.', schema: ApiError },
     },
   },
   {

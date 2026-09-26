@@ -237,6 +237,24 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - Tests: `test/integration/control-plane.int.test.ts` runs a real Control Plane
   (`@rp/control-plane/testing`) beside the server.
 
+## Settings registry (P1-01a)
+
+- The catalogue is `@rp/contracts` `SETTINGS`: every ⚙ value of the BRD, with its schema,
+  default, scope (`RESTAURANT` or `VENDOR`) and the capability needed to change it.
+- `src/settings/settings.service.ts`:
+  - `snapshot(restaurantId).get('kds.ageAmberMinutes')` gives the typed effective value: the
+    stored value when valid, otherwise the default. Snapshots are cached 30 s; `invalidate()`
+    clears the cache.
+  - `update()` checks the setting's capability. The Owner's second factor is needed for
+    `TAX_AND_INVOICE_SETTINGS` and `DATA_ADMIN`; `VENDOR` settings are refused.
+  - `update()` also validates the value and the rules between settings, then writes the row, a
+    `SETTING_CHANGED` audit entry (before and after) and a `SettingsChanged` event with the keys,
+    in one transaction.
+- API: `GET /api/v1/settings` lists values, defaults and editability; `PUT /api/v1/settings/:key`
+  takes `{ value, reason? }`.
+- Modules read their settings through the snapshot, never from the table. `AuthSettingsService`
+  is now a typed view of the `auth.*` keys.
+
 ## Commands
 
 ```

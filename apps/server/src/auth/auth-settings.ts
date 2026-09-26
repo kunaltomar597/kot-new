@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { z } from 'zod';
-import { PrismaService } from '../database/prisma.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 /**
- * The ⚙ settings of authentication (BRD §4, AUTH-001, AUTH-003, AUTH-005, AUTH-011), read from the
- * settings table with these defaults. P1-01 folds them into the full settings registry.
+ * The ⚙ settings of authentication (BRD §4, AUTH-001, AUTH-003, AUTH-005, AUTH-011). Their
+ * validation and defaults live in the settings catalogue (`@rp/contracts` settings, P1-01a).
  */
 export interface AuthSettings {
   /** AUTH-001: 4 by default, 6 when the owner requires it. */
@@ -35,87 +34,39 @@ export interface AuthSettings {
   readonly deviceTokenMinutes: number;
 }
 
-export const AUTH_SETTING_DEFAULTS: AuthSettings = {
-  pinLength: 4,
-  lockoutMaxFailures: 5,
-  lockoutWindowMinutes: 10,
-  lockoutMinutes: 15,
-  attemptsPerMinutePerDevice: 10,
-  accessTokenMinutes: 15,
-  inactivityMinutes: 10,
-  managerBrowserInactivityMinutes: 30,
-  sessionMaxHours: 16,
-  stepUpMinutes: 5,
-  overrideSeconds: 120,
-  kitchenIndividualLogins: false,
-  pairingCodeMinutes: 10,
-  deviceTokenMinutes: 60,
-};
-
-const minutes = (max: number) => z.int().min(1).max(max);
-
-const SCHEMAS: { readonly [K in keyof AuthSettings]: z.ZodType<AuthSettings[K]> } = {
-  pinLength: z.union([z.literal(4), z.literal(6)]),
-  lockoutMaxFailures: z.int().min(3).max(20),
-  lockoutWindowMinutes: minutes(120),
-  lockoutMinutes: minutes(24 * 60),
-  attemptsPerMinutePerDevice: z.int().min(3).max(100),
-  accessTokenMinutes: minutes(15),
-  inactivityMinutes: minutes(240),
-  managerBrowserInactivityMinutes: minutes(24 * 60),
-  sessionMaxHours: z.int().min(1).max(24),
-  stepUpMinutes: minutes(60),
-  overrideSeconds: z.int().min(30).max(900),
-  kitchenIndividualLogins: z.boolean(),
-  pairingCodeMinutes: minutes(60),
-  deviceTokenMinutes: z
-    .int()
-    .min(5)
-    .max(24 * 60),
-};
-
 /** Settings-table key of each setting, e.g. `auth.lockoutMaxFailures`. */
 export function authSettingKey(name: keyof AuthSettings): string {
   return `auth.${name}`;
 }
 
-/** Settings are read at most this often per restaurant (they change rarely; requests are many). */
-const CACHE_MS = 30_000;
-
+/** The authentication settings of a restaurant, read through the settings registry (P1-01a). */
 @Injectable()
 export class AuthSettingsService {
-  private readonly cache = new Map<string, { at: number; value: Promise<AuthSettings> }>();
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly settings: SettingsService) {}
 
   /** Current values; a missing or invalid stored value falls back to its default. */
-  get(restaurantId: string): Promise<AuthSettings> {
-    const now = Date.now();
-    const cached = this.cache.get(restaurantId);
-    if (cached !== undefined && now - cached.at < CACHE_MS) return cached.value;
-    const value = this.load(restaurantId);
-    value.catch(() => this.cache.delete(restaurantId));
-    this.cache.set(restaurantId, { at: now, value });
-    return value;
+  async get(restaurantId: string): Promise<AuthSettings> {
+    const values = await this.settings.snapshot(restaurantId);
+    return {
+      pinLength: values.get('auth.pinLength'),
+      lockoutMaxFailures: values.get('auth.lockoutMaxFailures'),
+      lockoutWindowMinutes: values.get('auth.lockoutWindowMinutes'),
+      lockoutMinutes: values.get('auth.lockoutMinutes'),
+      attemptsPerMinutePerDevice: values.get('auth.attemptsPerMinutePerDevice'),
+      accessTokenMinutes: values.get('auth.accessTokenMinutes'),
+      inactivityMinutes: values.get('auth.inactivityMinutes'),
+      managerBrowserInactivityMinutes: values.get('auth.managerBrowserInactivityMinutes'),
+      sessionMaxHours: values.get('auth.sessionMaxHours'),
+      stepUpMinutes: values.get('auth.stepUpMinutes'),
+      overrideSeconds: values.get('auth.overrideSeconds'),
+      kitchenIndividualLogins: values.get('auth.kitchenIndividualLogins'),
+      pairingCodeMinutes: values.get('auth.pairingCodeMinutes'),
+      deviceTokenMinutes: values.get('auth.deviceTokenMinutes'),
+    };
   }
 
-  /** Forget cached values, e.g. after a setting was changed. */
+  /** Forget cached values, e.g. after a test changed a setting directly. */
   invalidate(): void {
-    this.cache.clear();
-  }
-
-  private async load(restaurantId: string): Promise<AuthSettings> {
-    const names = Object.keys(AUTH_SETTING_DEFAULTS) as (keyof AuthSettings)[];
-    const rows = await this.prisma.setting.findMany({
-      where: { restaurantId, key: { in: names.map(authSettingKey) } },
-      select: { key: true, value: true },
-    });
-    const stored = new Map(rows.map((row) => [row.key, row.value]));
-    const result: Record<string, unknown> = { ...AUTH_SETTING_DEFAULTS };
-    for (const name of names) {
-      const parsed = SCHEMAS[name].safeParse(stored.get(authSettingKey(name)));
-      if (parsed.success) result[name] = parsed.data;
-    }
-    return result as unknown as AuthSettings;
+    this.settings.invalidate();
   }
 }

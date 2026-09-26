@@ -36,6 +36,44 @@ Deliverables:
 Acceptance: every catalogue entry has a default and validation test; GSTIN validator tests; tax and
 invoice endpoints require the Owner step-up.
 
+Split into P1-01a (the settings catalogue, service and API) and P1-01b (restaurant profile, GSTIN,
+tax groups and invoice series).
+
+### P1-01a Settings registry
+
+As built: `packages/contracts/src/settings.ts` holds 66 settings. Each has:
+
+- a key, a Zod schema and the BRD default (ours where the BRD gives none);
+- a scope: `RESTAURANT`, or `VENDOR`, which is read-only locally;
+- the capability needed to change it, a description, requirements and a unit.
+
+It also defines the rules between settings: red age after amber, critical storage above warning.
+
+The server's `SettingsService` does the rest:
+
+- Effective values are the stored value when valid, else the default. They are cached for 30 s
+  per restaurant.
+- `GET /api/v1/settings` and `PUT /api/v1/settings/:key` (route: `OPERATIONS_CONFIGURE`) check
+  the setting's own capability. The Owner's second factor is needed for tax, invoice and data
+  settings.
+- A change is validated and written in one transaction with its audit entry (before and after)
+  and a `SettingsChanged` event carrying only the keys, which reaches every screen.
+
+The authentication settings now read through the registry.
+
+Kept out of the catalogue on purpose (documented in `settings.ts`):
+
+- the business-day cut-off (restaurant profile, P1-01b);
+- per-item availability and "repeatable" flags (P1-03);
+- the station print mode (P1-06);
+- notification rules (P2-03);
+- fleet alert thresholds (the Control Plane).
+
+### P1-01b Restaurant profile, tax groups and invoice series
+
+The rest of P1-01: the restaurant profile API with GSTIN checksum validation, tax groups CRUD and
+invoice series CRUD, Owner-only with step-up.
+
 ## P1-02 Floor, tables, table sessions, waiter assignment, move table, takeaway tokens
 
 Goal: the table side of service.

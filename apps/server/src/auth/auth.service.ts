@@ -21,6 +21,7 @@ import type { AppError } from '../errors/app-error.js';
 import type { CredentialKind } from '../generated/prisma/enums.js';
 import { authErrors } from './auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
+import { hasFreshStepUp } from './step-up.js';
 import { CredentialHasher } from './credential-hasher.js';
 import type { AuthenticatedDevice } from './device.js';
 import type { ConsumedOverride, Principal } from './principal.js';
@@ -531,11 +532,7 @@ export class AuthService {
 
   /** The Owner confirmed password + second factor recently enough (AUTH-006). */
   hasFreshStepUp(principal: Principal, settings: AuthSettings, now: Date = new Date()): boolean {
-    return (
-      principal.role === 'OWNER' &&
-      principal.secondFactorAt !== null &&
-      now.getTime() - principal.secondFactorAt.getTime() <= settings.stepUpMinutes * 60_000
-    );
+    return hasFreshStepUp(principal, settings.stepUpMinutes, now);
   }
 
   private requireFreshStepUp(principal: Principal, settings: AuthSettings): void {
