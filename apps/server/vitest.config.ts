@@ -22,6 +22,15 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
+      {
+        extends: true,
+        // The Phase 1 exit scenario against a real install (P1-14); skipped without RP_SCENARIO_URL.
+        test: {
+          name: 'scenario',
+          include: ['test/scenario/**/*.scenario.test.ts'],
+          testTimeout: 600_000,
+        },
+      },
     ],
     coverage: {
       provider: 'v8',

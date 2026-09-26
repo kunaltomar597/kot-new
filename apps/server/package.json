@@ -19,7 +19,8 @@
     "clean": "rm -rf dist coverage src/generated",
     "db:seed": "node --env-file-if-exists=.env dist/database/seed-cli.js",
     "control-plane:enrol": "node --env-file-if-exists=.env dist/cloud/enrol-cli.js",
-    "menu:template": "node dist/menu/import/menu-template-cli.js"
+    "menu:template": "node dist/menu/import/menu-template-cli.js",
+    "scenario:service-day": "vitest run --project scenario"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",
