@@ -1,0 +1,33 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "sheet": { "type": "string", "enum": ["Items", "Variants", "Modifiers", "Combos"] },
+      "row": {
+        "anyOf": [
+          { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      },
+      "column": { "type": ["string", "null"] },
+      "message": { "type": "string" }
+    },
+    "required": ["sheet", "row", "column", "message"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "sheet": { "type": "string", "enum": ["Items", "Variants", "Modifiers", "Combos"] },
+      "row": {
+        "anyOf": [
+          { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      },
+      "column": { "type": ["string", "null"] },
+      "message": { "type": "string" }
+    },
+    "required": ["sheet", "row", "column", "message"],
+    "additionalProperties": false
+  }
+}

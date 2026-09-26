@@ -1,0 +1,27 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "filename": { "type": "string" },
+      "contentType": {
+        "type": "string",
+        "const": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      },
+      "contentBase64": { "type": "string" }
+    },
+    "required": ["filename", "contentType", "contentBase64"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "filename": { "type": "string" },
+      "contentType": {
+        "type": "string",
+        "const": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      },
+      "contentBase64": { "type": "string" }
+    },
+    "required": ["filename", "contentType", "contentBase64"],
+    "additionalProperties": false
+  }
+}

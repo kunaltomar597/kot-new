@@ -18,7 +18,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "clean": "rm -rf dist coverage src/generated",
     "db:seed": "node --env-file-if-exists=.env dist/database/seed-cli.js",
-    "control-plane:enrol": "node --env-file-if-exists=.env dist/cloud/enrol-cli.js"
+    "control-plane:enrol": "node --env-file-if-exists=.env dist/cloud/enrol-cli.js",
+    "menu:template": "node dist/menu/import/menu-template-cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",
@@ -36,10 +37,12 @@
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "read-excel-file": "^9.3.10",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.4",
     "uuid": "^14.0.2",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

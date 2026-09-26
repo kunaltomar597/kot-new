@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { csvCell, csvRupees, stampedCsv, toCsv } from '../src/index.js';
+import { csvCell, csvRupees, parseCsv, stampedCsv, toCsv } from '../src/index.js';
 
 describe('[RPT-017] CSV export', () => {
   it('quotes cells with commas, quotes and line breaks (RFC 4180)', () => {
@@ -83,5 +83,27 @@ describe('[RPT-017] CSV export', () => {
       generatedAt: 'now',
     };
     expect(() => stampedCsv(stamp, [{ columns: ['a', 'b'], rows: [['x']] }])).toThrow(TypeError);
+  });
+});
+
+describe('[ONB-005] reading CSV', () => {
+  it('reads quoted cells, doubled quotes, line breaks in quotes, CRLF and a BOM', () => {
+    const text = '﻿Item,Price\r\n"Paneer, Tikka",250\r\n"Say ""hi""","line\none"\n\nLast,1';
+    expect(parseCsv(text)).toEqual([
+      ['Item', 'Price'],
+      ['Paneer, Tikka', '250'],
+      ['Say "hi"', 'line\none'],
+      [''],
+      ['Last', '1'],
+    ]);
+  });
+
+  it('refuses an unclosed quote and round-trips what toCsv writes', () => {
+    expect(() => parseCsv('"open,1')).toThrow('not closed');
+    const rows = [
+      ['a', 'b, c'],
+      ['"q"', ''],
+    ];
+    expect(parseCsv(toCsv(rows))).toEqual(rows);
   });
 });

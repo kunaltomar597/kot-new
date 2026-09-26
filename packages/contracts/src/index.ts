@@ -6,6 +6,7 @@ export * from './floor.js';
 export * from './kds.js';
 export * from './menu.js';
 export * from './menu-admin.js';
+export * from './menu-import.js';
 export * from './order.js';
 export * from './printing.js';
 export * from './realtime.js';
