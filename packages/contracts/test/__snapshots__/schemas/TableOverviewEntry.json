@@ -1,0 +1,136 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "tableId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "label": { "type": "string" },
+      "sectionId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "capacity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "state": { "type": "string", "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"] },
+      "session": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "openedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "covers": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              "waiterId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "waiterName": { "type": "string" },
+              "amountSoFar": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "pendingApprovals": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": [
+              "id",
+              "openedAt",
+              "covers",
+              "waiterId",
+              "waiterName",
+              "amountSoFar",
+              "pendingApprovals"
+            ]
+          },
+          { "type": "null" }
+        ]
+      },
+      "activeServiceRequests": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": [
+      "tableId",
+      "label",
+      "sectionId",
+      "capacity",
+      "state",
+      "session",
+      "activeServiceRequests"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "tableId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "label": { "type": "string" },
+      "sectionId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "capacity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+      "state": { "type": "string", "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"] },
+      "session": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "openedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "covers": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              "waiterId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "waiterName": { "type": "string" },
+              "amountSoFar": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "pendingApprovals": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": [
+              "id",
+              "openedAt",
+              "covers",
+              "waiterId",
+              "waiterName",
+              "amountSoFar",
+              "pendingApprovals"
+            ],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "activeServiceRequests": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": [
+      "tableId",
+      "label",
+      "sectionId",
+      "capacity",
+      "state",
+      "session",
+      "activeServiceRequests"
+    ],
+    "additionalProperties": false
+  }
+}

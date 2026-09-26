@@ -143,6 +143,32 @@ As built: `packages/contracts/src/floor.ts` and `apps/server/src/floor`.
 The rest of P1-02: open (covers, waiter), state changes, close without bill, request bill, move
 table with KOT update events, takeaway tokens and the TBL-007 overview.
 
+As built: `packages/contracts/src/table-sessions.ts` and `apps/server/src/floor/table-sessions.*`.
+
+- `POST /api/v1/tables/:tableId/open` (`ORDER_CREATE`) takes covers and a waiter. The waiter
+  defaults to the table's first responsible waiter today, else the person opening it.
+  - The table row is locked, so of two devices opening one table, one wins and the other gets
+    409 `TABLE_NOT_FREE`.
+  - It emits `TableOpened` and `TableStateChanged`, and is audited.
+- `request-bill` (`BILL_REQUEST`) emits `BillRequested` and moves the table to BILL_REQUESTED.
+- `close-without-bill` (`ORDER_CREATE`, reason) works only from OCCUPIED, and only when no item
+  is billable or awaiting approval.
+- `move` (`TABLE_MOVE_MERGE`; waiters only their own tables, the OWN grant):
+  - Both table rows are locked in id order. The session and its orders move to a free table,
+    and the new table takes the old state.
+  - `TableMoved` reaches both tables and the stations holding the session's tickets. No ticket is
+    printed or created again (S7).
+- `PUT .../waiter` (`STAFF_MANAGE`) hands the table to another waiter, with the new event
+  `TableWaiterChanged`.
+- `GET /api/v1/tables/overview` (TBL-007) gives each active table:
+  - its state and session;
+  - the waiter;
+  - the billable amount so far;
+  - pending approvals;
+  - service requests (0 until P2 and P3 add them).
+- Takeaway tokens use the existing gap-free `allocateDailyNumber(..., 'TAKEAWAY_TOKEN')` (P0-08).
+  The order engine (P1-06) allocates one when it creates a takeaway order (TBL-008).
+
 ## P1-03 Menu management API
 
 Goal: the full menu model and its versioned snapshot.

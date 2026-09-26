@@ -47,6 +47,15 @@ import {
 } from './floor.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
 import {
+  AssignSessionWaiterRequest,
+  CloseWithoutBillRequest,
+  MoveTableRequest,
+  OpenTableRequest,
+  TableOverviewResponse,
+  TableSessionParams,
+  TableSessionView,
+} from './table-sessions.js';
+import {
   ArchiveRequest,
   InvoiceSeriesListResponse,
   InvoiceSeriesParams,
@@ -945,6 +954,110 @@ export const ROUTES = [
         description: 'An unknown or inactive person, section or table.',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'getTableOverview',
+    method: 'GET',
+    path: '/api/v1/tables/overview',
+    summary: 'Every active table with its state, session, waiter and amount so far',
+    description:
+      'The live table overview (TBL-007). Screens refresh it on table, order and bill events.',
+    tags: ['tables'],
+    requirements: ['TBL-007', 'WTR-002'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'The tables.', schema: TableOverviewResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'openTable',
+    method: 'POST',
+    path: '/api/v1/tables/:tableId/open',
+    summary: 'Seat guests: open a table session with covers and a responsible waiter',
+    description:
+      'The waiter defaults to the one assigned to the table or its section (TBL-002), else the ' +
+      'person opening it. Two devices opening the same table at once: one wins, the other gets 409.',
+    tags: ['tables'],
+    requirements: ['TBL-003', 'TBL-004', 'AUD-001'],
+    capability: 'ORDER_CREATE',
+    request: { params: z.object({ tableId: Id }), body: OpenTableRequest },
+    responses: {
+      201: { description: 'The new session.', schema: TableSessionView },
+      ...standardErrors,
+      404: { description: 'No such active table.', schema: ApiError },
+      409: { description: 'The table is not free.', schema: ApiError },
+      422: { description: 'The waiter cannot take tables.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'requestBill',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/request-bill',
+    summary: 'Ask for the bill; the cashier is notified',
+    tags: ['tables'],
+    requirements: ['TBL-004', 'WTR-008'],
+    capability: 'BILL_REQUEST',
+    request: { params: TableSessionParams },
+    responses: {
+      200: { description: 'The session as it is now.', schema: TableSessionView },
+      ...standardErrors,
+      404: { description: 'No such open session.', schema: ApiError },
+      409: { description: 'The table is not in a state to ask for the bill.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'closeTableWithoutBill',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/close-without-bill',
+    summary: 'Free a table opened by mistake',
+    description: 'Only while nothing billable or awaiting approval has been ordered. Audited.',
+    tags: ['tables'],
+    requirements: ['TBL-004', 'AUD-001'],
+    capability: 'ORDER_CREATE',
+    request: { params: TableSessionParams, body: CloseWithoutBillRequest },
+    responses: {
+      200: { description: 'Closed.', schema: TableSessionView },
+      ...standardErrors,
+      404: { description: 'No such open session.', schema: ApiError },
+      409: { description: 'Items have been ordered, or the bill is under way.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'moveTable',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/move',
+    summary: 'Move guests, their orders and tickets to a free table',
+    description:
+      'Kitchen tickets are updated in place (TableMoved to their stations), never duplicated; ' +
+      "the old table's tablet resets and the new one's unlocks (TBL-005). Waiters may move " +
+      'only their own tables. Audited.',
+    tags: ['tables'],
+    requirements: ['TBL-005', 'WTR-008', 'AUD-001'],
+    capability: 'TABLE_MOVE_MERGE',
+    request: { params: TableSessionParams, body: MoveTableRequest },
+    responses: {
+      200: { description: 'The session at its new table.', schema: TableSessionView },
+      ...standardErrors,
+      404: { description: 'No such open session or active table.', schema: ApiError },
+      409: { description: 'The new table is not free.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'assignSessionWaiter',
+    method: 'PUT',
+    path: '/api/v1/table-sessions/:sessionId/waiter',
+    summary: 'Hand an open table to another waiter',
+    tags: ['tables'],
+    requirements: ['TBL-002', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: TableSessionParams, body: AssignSessionWaiterRequest },
+    responses: {
+      200: { description: 'The session as it is now.', schema: TableSessionView },
+      ...standardErrors,
+      404: { description: 'No such open session.', schema: ApiError },
+      422: { description: 'The waiter cannot take tables.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];

@@ -284,6 +284,9 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - `src/floor/waiter-assignments.service.ts`: the business day's assignments (TBL-002), stored as
   `shift_assignments` rows (a whole section, or one table with `table_id`). `assignmentsFor()`
   returns them for `@rp/domain` `responsibleWaiters`.
+- `src/floor/table-sessions.service.ts` (P1-02b): open, request bill, close without bill, move
+  and hand over tables, and the TBL-007 overview. Every change locks the table rows it touches,
+  follows `tableMachine`, and writes the audit entry and the table events in one transaction.
 
 ## Commands
 

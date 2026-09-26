@@ -16,7 +16,8 @@
     { "name": "orders" },
     { "name": "restaurant" },
     { "name": "settings" },
-    { "name": "system" }
+    { "name": "system" },
+    { "name": "tables" }
   ],
   "paths": {
     "/api/v1/audit/verify": {
@@ -1763,6 +1764,266 @@
         "x-requirements": ["MGR-007", "AUD-001", "AUTH-006", "BILL-006"]
       }
     },
+    "/api/v1/table-sessions/{sessionId}/close-without-bill": {
+      "post": {
+        "operationId": "closeTableWithoutBill",
+        "summary": "Free a table opened by mistake",
+        "description": "Only while nothing billable or awaiting approval has been ordered. Audited.",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CloseWithoutBillRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Closed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableSessionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Items have been ordered, or the bill is under way.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["TBL-004", "AUD-001"]
+      }
+    },
+    "/api/v1/table-sessions/{sessionId}/move": {
+      "post": {
+        "operationId": "moveTable",
+        "summary": "Move guests, their orders and tickets to a free table",
+        "description": "Kitchen tickets are updated in place (TableMoved to their stations), never duplicated; the old table's tablet resets and the new one's unlocks (TBL-005). Waiters may move only their own tables. Audited.",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/MoveTableRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session at its new table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableSessionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open session or active table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The new table is not free.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TABLE_MOVE_MERGE",
+        "x-requirements": ["TBL-005", "WTR-008", "AUD-001"]
+      }
+    },
+    "/api/v1/table-sessions/{sessionId}/request-bill": {
+      "post": {
+        "operationId": "requestBill",
+        "summary": "Ask for the bill; the cashier is notified",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableSessionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table is not in a state to ask for the bill.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_REQUEST",
+        "x-requirements": ["TBL-004", "WTR-008"]
+      }
+    },
+    "/api/v1/table-sessions/{sessionId}/waiter": {
+      "put": {
+        "operationId": "assignSessionWaiter",
+        "summary": "Hand an open table to another waiter",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AssignSessionWaiterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableSessionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The waiter cannot take tables.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["TBL-002", "AUD-001"]
+      }
+    },
     "/api/v1/tables": {
       "post": {
         "operationId": "createTable",
@@ -1953,6 +2214,78 @@
         "x-requirements": ["TBL-001", "AUD-001"]
       }
     },
+    "/api/v1/tables/{tableId}/open": {
+      "post": {
+        "operationId": "openTable",
+        "summary": "Seat guests: open a table session with covers and a responsible waiter",
+        "description": "The waiter defaults to the one assigned to the table or its section (TBL-002), else the person opening it. Two devices opening the same table at once: one wins, the other gets 409.",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "tableId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/OpenTableRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableSessionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such active table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table is not free.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The waiter cannot take tables.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["TBL-003", "TBL-004", "AUD-001"]
+      }
+    },
     "/api/v1/tables/{tableId}/restore": {
       "post": {
         "operationId": "restoreTable",
@@ -2010,6 +2343,44 @@
         },
         "x-capability": "STAFF_MANAGE",
         "x-requirements": ["TBL-001", "AUD-001"]
+      }
+    },
+    "/api/v1/tables/overview": {
+      "get": {
+        "operationId": "getTableOverview",
+        "summary": "Every active table with its state, session, waiter and amount so far",
+        "description": "The live table overview (TBL-007). Screens refresh it on table, order and bill events.",
+        "tags": ["tables"],
+        "responses": {
+          "200": {
+            "description": "The tables.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TableOverviewResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["TBL-007", "WTR-002"]
       }
     },
     "/api/v1/tax-groups": {
@@ -2429,6 +2800,15 @@
         "required": ["reason"],
         "additionalProperties": false
       },
+      "AssignSessionWaiterRequest": {
+        "type": "object",
+        "properties": {
+          "waiterId": { "$ref": "#/components/schemas/Id" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["waiterId"],
+        "additionalProperties": false
+      },
       "AuditChainBreak": {
         "type": "string",
         "enum": ["HASH_MISMATCH", "PREV_HASH_MISMATCH", "SEQUENCE_GAP"]
@@ -2636,6 +3016,12 @@
           }
         },
         "required": ["id", "name", "parentId", "displayOrder"],
+        "additionalProperties": false
+      },
+      "CloseWithoutBillRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "Combo": {
@@ -2913,6 +3299,7 @@
           { "$ref": "#/components/schemas/TableMoved" },
           { "$ref": "#/components/schemas/TableClosed" },
           { "$ref": "#/components/schemas/TableStateChanged" },
+          { "$ref": "#/components/schemas/TableWaiterChanged" },
           { "$ref": "#/components/schemas/OrderSubmitted" },
           { "$ref": "#/components/schemas/OrderApproved" },
           { "$ref": "#/components/schemas/OrderRejected" },
@@ -3457,6 +3844,21 @@
           "priceDelta": { "$ref": "#/components/schemas/SignedPaise" }
         },
         "required": ["id", "name", "priceDelta"],
+        "additionalProperties": false
+      },
+      "MoveTableRequest": {
+        "type": "object",
+        "properties": { "toTableId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["toTableId"],
+        "additionalProperties": false
+      },
+      "OpenTableRequest": {
+        "type": "object",
+        "properties": {
+          "covers": { "type": "integer", "minimum": 1, "maximum": 99 },
+          "waiterId": { "$ref": "#/components/schemas/Id" }
+        },
+        "required": ["covers"],
         "additionalProperties": false
       },
       "OpeningHours": {
@@ -4472,6 +4874,73 @@
         ],
         "additionalProperties": false
       },
+      "TableOverviewEntry": {
+        "type": "object",
+        "properties": {
+          "tableId": { "$ref": "#/components/schemas/Id" },
+          "label": { "type": "string" },
+          "sectionId": { "$ref": "#/components/schemas/Id" },
+          "capacity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "state": { "$ref": "#/components/schemas/TableState" },
+          "session": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "openedAt": { "$ref": "#/components/schemas/Timestamp" },
+                  "covers": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "waiterId": { "$ref": "#/components/schemas/Id" },
+                  "waiterName": { "type": "string" },
+                  "amountSoFar": { "$ref": "#/components/schemas/Paise" },
+                  "pendingApprovals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "id",
+                  "openedAt",
+                  "covers",
+                  "waiterId",
+                  "waiterName",
+                  "amountSoFar",
+                  "pendingApprovals"
+                ],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "activeServiceRequests": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "tableId",
+          "label",
+          "sectionId",
+          "capacity",
+          "state",
+          "session",
+          "activeServiceRequests"
+        ],
+        "additionalProperties": false
+      },
+      "TableOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TableOverviewEntry" }
+          }
+        },
+        "required": ["tables"],
+        "additionalProperties": false
+      },
       "TableParams": {
         "type": "object",
         "properties": { "tableId": { "$ref": "#/components/schemas/Id" } },
@@ -4487,6 +4956,46 @@
           "displayOrder": { "type": "integer", "minimum": 0, "maximum": 9999 }
         },
         "required": ["label", "capacity", "sectionId", "displayOrder"],
+        "additionalProperties": false
+      },
+      "TableSessionParams": {
+        "type": "object",
+        "properties": { "sessionId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["sessionId"],
+        "additionalProperties": false
+      },
+      "TableSessionView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "tableId": { "$ref": "#/components/schemas/Id" },
+          "tableLabel": { "type": "string" },
+          "state": { "$ref": "#/components/schemas/TableState" },
+          "status": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+          "covers": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "waiterId": { "$ref": "#/components/schemas/Id" },
+          "waiterName": { "type": "string" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "openedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "closedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "closeReason": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "tableId",
+          "tableLabel",
+          "state",
+          "status",
+          "covers",
+          "waiterId",
+          "waiterName",
+          "businessDate",
+          "openedAt",
+          "closedAt",
+          "closeReason"
+        ],
         "additionalProperties": false
       },
       "TableState": {
@@ -4553,6 +5062,42 @@
           "tabletDeviceIds",
           "archivedAt",
           "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "TableWaiterChanged": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "TableWaiterChanged" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "tableId": { "$ref": "#/components/schemas/Id" },
+              "tableSessionId": { "$ref": "#/components/schemas/Id" },
+              "waiterId": { "$ref": "#/components/schemas/Id" }
+            },
+            "required": ["tableId", "tableSessionId", "waiterId"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
         ],
         "additionalProperties": false
       },

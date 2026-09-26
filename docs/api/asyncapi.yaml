@@ -36,6 +36,11 @@ channels:
     messages:
       TableStateChanged:
         $ref: '#/components/messages/TableStateChanged'
+  TableWaiterChanged:
+    address: TableWaiterChanged
+    messages:
+      TableWaiterChanged:
+        $ref: '#/components/messages/TableWaiterChanged'
   OrderSubmitted:
     address: OrderSubmitted
     messages:
@@ -153,6 +158,12 @@ operations:
       $ref: '#/channels/TableStateChanged'
     messages:
       - $ref: '#/channels/TableStateChanged/messages/TableStateChanged'
+  receiveTableWaiterChanged:
+    action: receive
+    channel:
+      $ref: '#/channels/TableWaiterChanged'
+    messages:
+      - $ref: '#/channels/TableWaiterChanged/messages/TableWaiterChanged'
   receiveOrderSubmitted:
     action: receive
     channel:
@@ -287,6 +298,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/TableStateChanged'
+    TableWaiterChanged:
+      name: TableWaiterChanged
+      title: TableWaiterChanged v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/TableWaiterChanged'
     OrderSubmitted:
       name: OrderSubmitted
       title: OrderSubmitted v1
@@ -1447,6 +1464,51 @@ components:
           required:
             - tableId
             - state
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    TableWaiterChanged:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: TableWaiterChanged
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            tableId:
+              $ref: '#/components/schemas/Id'
+            tableSessionId:
+              $ref: '#/components/schemas/Id'
+            waiterId:
+              $ref: '#/components/schemas/Id'
+          required:
+            - tableId
+            - tableSessionId
+            - waiterId
           additionalProperties: false
       required:
         - eventId
