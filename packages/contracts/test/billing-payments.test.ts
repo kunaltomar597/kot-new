@@ -9,6 +9,7 @@ import {
   OpenBillRequest,
   PaymentRequest,
   RecordPaymentsRequest,
+  ReportRangeQuery,
   SplitBillRequest,
 } from '../src/index.js';
 
@@ -130,5 +131,18 @@ describe('[BILL-013] closing a business date', () => {
     });
     expect(CloseDayRequest.safeParse({ businessDate: '26-09-2026' }).success).toBe(false);
     expect(DayEndParams.safeParse({ businessDate: '2026-02-30' }).success).toBe(false);
+  });
+});
+
+describe('[RPT-001] report ranges', () => {
+  it('runs from a date to a later one, at most a year', () => {
+    expect(ReportRangeQuery.safeParse({ from: '2026-09-01', to: '2026-09-30' }).success).toBe(true);
+    expect(ReportRangeQuery.safeParse({ from: '2026-09-30', to: '2026-09-01' }).success).toBe(
+      false,
+    );
+    expect(ReportRangeQuery.safeParse({ from: '2025-09-01', to: '2026-09-30' }).success).toBe(
+      false,
+    );
+    expect(ReportRangeQuery.safeParse({ from: '2026-09-01' }).success).toBe(false);
   });
 });

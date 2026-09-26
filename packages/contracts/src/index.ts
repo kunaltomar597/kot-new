@@ -13,6 +13,7 @@ export * from './billing.js';
 export * from './day-end.js';
 export * from './events.js';
 export * from './payments.js';
+export * from './reports.js';
 export * from './routes.js';
 export * from './settings.js';
 export * from './table-sessions.js';

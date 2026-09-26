@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { ObservabilityModule } from './observability/error-reporter.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 import { FloorModule } from './floor/floor.module.js';
 import { MenuModule } from './menu/menu.module.js';
 import { OrdersModule } from './orders/orders.module.js';
@@ -49,6 +50,7 @@ export class AppModule {
         BillingModule,
         PaymentsModule,
         DayEndModule,
+        ReportsModule,
         DevicesModule,
         EventsModule,
         RealtimeModule,

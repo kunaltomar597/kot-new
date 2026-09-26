@@ -1,0 +1,216 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "grossSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "serviceCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "tax": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "roundOff": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "netSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "invoices",
+          "grossSales",
+          "discounts",
+          "serviceCharge",
+          "tax",
+          "roundOff",
+          "netSales"
+        ]
+      },
+      "byDay": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "grossSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "serviceCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "tax": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "roundOff": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "netSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "businessDate": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          "required": [
+            "invoices",
+            "grossSales",
+            "discounts",
+            "serviceCharge",
+            "tax",
+            "roundOff",
+            "netSales",
+            "businessDate"
+          ]
+        }
+      },
+      "byHour": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "grossSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "serviceCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "tax": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "roundOff": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "netSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "hour": { "type": "integer", "minimum": 0, "maximum": 23 }
+          },
+          "required": [
+            "invoices",
+            "grossSales",
+            "discounts",
+            "serviceCharge",
+            "tax",
+            "roundOff",
+            "netSales",
+            "hour"
+          ]
+        }
+      }
+    },
+    "required": ["from", "to", "totals", "byDay", "byHour"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "grossSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "serviceCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "tax": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "roundOff": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "netSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "invoices",
+          "grossSales",
+          "discounts",
+          "serviceCharge",
+          "tax",
+          "roundOff",
+          "netSales"
+        ],
+        "additionalProperties": false
+      },
+      "byDay": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "grossSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "serviceCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "tax": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "roundOff": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "netSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "businessDate": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          "required": [
+            "invoices",
+            "grossSales",
+            "discounts",
+            "serviceCharge",
+            "tax",
+            "roundOff",
+            "netSales",
+            "businessDate"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "byHour": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "grossSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "serviceCharge": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "tax": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "roundOff": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "netSales": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "hour": { "type": "integer", "minimum": 0, "maximum": 23 }
+          },
+          "required": [
+            "invoices",
+            "grossSales",
+            "discounts",
+            "serviceCharge",
+            "tax",
+            "roundOff",
+            "netSales",
+            "hour"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["from", "to", "totals", "byDay", "byHour"],
+    "additionalProperties": false
+  }
+}

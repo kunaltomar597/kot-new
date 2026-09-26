@@ -1,0 +1,107 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sacCode": { "type": ["string", "null"] },
+            "rateBp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "components": {
+              "type": "object",
+              "propertyNames": { "type": "string" },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "taxTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["sacCode", "rateBp", "taxableValue", "components", "taxTotal"]
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "components": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "taxTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["taxableValue", "components", "taxTotal"]
+      }
+    },
+    "required": ["from", "to", "rows", "totals"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sacCode": { "type": ["string", "null"] },
+            "rateBp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "components": {
+              "type": "object",
+              "propertyNames": { "type": "string" },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "taxTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["sacCode", "rateBp", "taxableValue", "components", "taxTotal"],
+          "additionalProperties": false
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "taxableValue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "components": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "taxTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["taxableValue", "components", "taxTotal"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["from", "to", "rows", "totals"],
+    "additionalProperties": false
+  }
+}
