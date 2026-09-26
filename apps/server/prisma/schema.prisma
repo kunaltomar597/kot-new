@@ -1300,6 +1300,8 @@ model Invoice {
   @@index([restaurantId, businessDate])
   @@index([tableSessionId])
   @@index([billId])
+  /// The invoice register and GST reports read by invoice date (RPT-006, RPT-018).
+  @@index([restaurantId, invoiceDate])
   @@map("invoices")
 }
 

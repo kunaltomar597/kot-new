@@ -346,6 +346,11 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `src/payments/payments.service.ts`: idempotent payment recording, settlement, and freeing the
   table when its last bill is paid.
 
+## Reports (P1-13)
+
+- `src/reports/reports.service.ts` (P1-13a): sales, items and categories, payment modes, shifts, the
+  GST summary and the invoice register, from invoices as issued (current version, voided excluded).
+
 ## Commands
 
 ```
