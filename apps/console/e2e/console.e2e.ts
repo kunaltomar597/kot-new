@@ -267,7 +267,7 @@ test.describe.serial('the web console', () => {
     await page.getByLabel(t('payment.tendered')).fill('5000');
     await page.getByRole('button', { name: t('payment.record') }).click();
     await expect(page.getByText(/^Invoice .* is paid$/)).toBeVisible();
-    await expect(page.getByText(t('billing.settled'))).toBeVisible();
+    await expect(page.getByText(t('billing.settled'), { exact: true })).toBeVisible();
     expect(Date.now() - started).toBeLessThan(60_000);
 
     // Paid in full: the table is free again.
