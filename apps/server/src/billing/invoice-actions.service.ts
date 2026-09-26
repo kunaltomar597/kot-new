@@ -96,18 +96,19 @@ export class InvoiceActionsService {
           data: { printCount: { increment: 1 } },
           select: { printCount: true },
         });
+        // Every print is audited, so reports can say who printed the bill (RPT-015).
+        await this.audit.record(tx, {
+          action: duplicate ? 'INVOICE_REPRINTED' : 'INVOICE_PRINTED',
+          entityType: 'invoice',
+          entityId: invoiceId,
+          actorId: principal.staffId,
+          deviceId: principal.deviceId,
+          restaurantId: principal.restaurantId,
+          before: { printCount: current.printCount },
+          after: { printCount: updated.printCount, printerId: printer.id },
+          reason: null,
+        });
         if (duplicate) {
-          await this.audit.record(tx, {
-            action: 'INVOICE_REPRINTED',
-            entityType: 'invoice',
-            entityId: invoiceId,
-            actorId: principal.staffId,
-            deviceId: principal.deviceId,
-            restaurantId: principal.restaurantId,
-            before: { printCount: current.printCount },
-            after: { printCount: updated.printCount, printerId: printer.id },
-            reason: null,
-          });
           await appendEvent(
             tx,
             {

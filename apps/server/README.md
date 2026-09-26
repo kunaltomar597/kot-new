@@ -350,6 +350,9 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 
 - `src/reports/reports.service.ts` (P1-13a): sales, items and categories, payment modes, shifts, the
   GST summary and the invoice register, from invoices as issued (current version, voided excluded).
+- `src/reports/report-export.service.ts` (P1-13b): the same reports as stamped CSV, audited as
+  REPORT_EXPORTED.
+- `src/reports/order-drill-down.service.ts` (P1-13b): one order and who did each step (RPT-015).
 
 ## Commands
 

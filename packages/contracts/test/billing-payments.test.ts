@@ -9,6 +9,7 @@ import {
   OpenBillRequest,
   PaymentRequest,
   RecordPaymentsRequest,
+  ReportExportRequest,
   ReportRangeQuery,
   SplitBillRequest,
 } from '../src/index.js';
@@ -144,5 +145,24 @@ describe('[RPT-001] report ranges', () => {
       false,
     );
     expect(ReportRangeQuery.safeParse({ from: '2026-09-01' }).success).toBe(false);
+  });
+});
+
+describe('[RPT-017] report exports', () => {
+  it('names a known report and a valid range, CSV by default', () => {
+    const parsed = ReportExportRequest.parse({
+      report: 'GST',
+      from: '2026-09-01',
+      to: '2026-09-30',
+    });
+    expect(parsed.format).toBe('CSV');
+    const bad = [
+      { report: 'GST', from: '2026-09-30', to: '2026-09-01' },
+      { report: 'GST', from: '2025-09-01', to: '2026-09-30' },
+      { report: 'EVERYTHING', from: '2026-09-01', to: '2026-09-30' },
+      { report: 'GST', from: '2026-09-01', to: '2026-09-30', format: 'PDF' },
+      { report: 'GST', from: '2026-09-01', to: '2026-09-30', extra: 1 },
+    ];
+    for (const body of bad) expect(ReportExportRequest.safeParse(body).success).toBe(false);
   });
 });

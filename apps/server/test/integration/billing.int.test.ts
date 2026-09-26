@@ -643,6 +643,9 @@ describe('[BILL-014] [BILL-009] printing the bill', () => {
     expect(original).toContain('SAC: 996331, 996332');
     expect(original).not.toContain('DUPLICATE');
     expect(await prisma.auditLog.count({ where: { action: 'INVOICE_REPRINTED' } })).toBe(0);
+    expect(
+      await prisma.auditLog.findFirstOrThrow({ where: { action: 'INVOICE_PRINTED' } }),
+    ).toMatchObject({ entityId: invoiceId, actorId: kit.staff.CASHIER });
 
     const again = PrintInvoiceResponse.parse((await print()).body);
     expect(again).toMatchObject({ printed: true, duplicate: true, printCount: 2 });
