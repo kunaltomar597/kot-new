@@ -4,6 +4,7 @@ export * from './common.js';
 export * from './devices.js';
 export * from './floor.js';
 export * from './menu.js';
+export * from './menu-admin.js';
 export * from './order.js';
 export * from './realtime.js';
 export * from './restaurant.js';
