@@ -209,6 +209,34 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - Tests: `test/integration/tls.int.test.ts` runs the real server over HTTPS and WSS; `api(app)`
   (`test/helpers/test-app.ts`) is a supertest client that trusts only the app's CA.
 
+## Vendor Control Plane (P0-17b)
+
+- `RP_CONTROL_PLANE_URL` (`controlPlaneUrl`) is the Control Plane's origin: `https://` in
+  production, with no path (requests are signed over their path). When it is unset the server
+  makes no cloud calls.
+- Installation key (`src/cloud/installation-key.ts`): an Ed25519 key derived from the secret
+  store's `installation-signing-key` (DPAPI on Windows). Only its public key ever leaves the PC
+  (ADR-0012).
+- Enrolment: `pnpm control-plane:enrol <code>` (`src/cloud/enrol-cli.ts`, run by the installer
+  during activation).
+  - It registers the key with the vendor's one-time code; spaces, dashes and lower case are
+    accepted.
+  - It saves the installation's identity in `system_meta` (`control_plane.enrolment`).
+  - It writes an `INSTALLATION_ENROLLED` audit entry once the restaurant exists.
+- Heartbeats (`src/cloud/heartbeat.service.ts`):
+  - Content: `RESTAURANT_PC` (`RP_PRODUCT_VERSION`, else the server's version), server, Node and
+    PostgreSQL versions; the data drive's size and free space; the audit chain head; active
+    devices by type.
+  - Schedule: the first 15 s after start, then every `nextHeartbeatSeconds` from the answer
+    (5 minutes by default, and after a failure).
+  - Answers: an offered update is kept in `system_meta` (`control_plane.offered_update`) and
+    logged once. A `CLOCK_SKEW` answer corrects the clock offset and the request is sent again.
+  - Failures (`NOT_ENROLLED`, `UNREACHABLE`, `INSTALLATION_REVOKED`, ...) are logged once per
+    change and never affect local work (NFR-A01).
+  - `HeartbeatService.status()` and `beat()` are for the support screen (P7-08).
+- Tests: `test/integration/control-plane.int.test.ts` runs a real Control Plane
+  (`@rp/control-plane/testing`) beside the server.
+
 ## Commands
 
 ```
@@ -218,6 +246,7 @@ pnpm --filter @rp/server test          unit + integration tests
 pnpm --filter @rp/server test:unit     unit tests only (no database)
 pnpm --filter @rp/server test:int      integration tests (PostgreSQL)
 pnpm --filter @rp/server start         run dist/main.js (needs DATABASE_URL)
+pnpm --filter @rp/server control-plane:enrol <code>   enrol this PC with the Control Plane
 ```
 
 Schema changes: edit `prisma/schema.prisma`, then create a migration against a development database

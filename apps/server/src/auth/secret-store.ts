@@ -13,6 +13,8 @@ export const SECRET_NAMES = [
   'totp-encryption-key',
   /** Encrypts the LAN TLS private keys at rest (P0-15, ADR-0011). */
   'tls-key-encryption-key',
+  /** Seed of the installation's Ed25519 key for the Vendor Control Plane (P0-17b, ADR-0012). */
+  'installation-signing-key',
 ] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 

@@ -37,10 +37,12 @@ For staging and production:
 
 1. `cli tenant:create --name "<restaurant>"` (once per restaurant business).
 2. `cli installation:create --tenant <id> --name "<which PC>"`. The command prints the enrolment
-   code once; it is valid 7 days. Give it to the installer through the onboarding channel. The
-   installer enters it during activation (P0-17b, then ONB-003 in P7-01).
-3. If the code expired before use: `cli installation:code --installation <id>`.
-4. `cli installations:list` shows the installation `ACTIVE` once the PC has enrolled, and its
+   code once; it is valid 7 days. Give it to the installer through the onboarding channel.
+3. On the restaurant PC, with `RP_CONTROL_PLANE_URL` set, the installer enrols the PC during
+   activation: `pnpm --filter @rp/server control-plane:enrol <code>` (P0-17b; the activation
+   screen of ONB-003 comes in P7-01). The PC reports every 5 minutes from then on.
+4. If the code expired before use: `cli installation:code --installation <id>`.
+5. `cli installations:list` shows the installation `ACTIVE` once the PC has enrolled, and its
    last heartbeat time.
 
 Run `cli` as `pnpm --filter @rp/control-plane cli ...` from an operator host or the pipeline,

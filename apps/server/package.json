@@ -17,7 +17,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "clean": "rm -rf dist coverage src/generated",
-    "db:seed": "node --env-file-if-exists=.env dist/database/seed-cli.js"
+    "db:seed": "node --env-file-if-exists=.env dist/database/seed-cli.js",
+    "control-plane:enrol": "node --env-file-if-exists=.env dist/cloud/enrol-cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.0",
@@ -44,6 +45,7 @@
   "devDependencies": {
     "@nestjs/testing": "^12.1.0",
     "@rp/api-client": "workspace:*",
+    "@rp/control-plane": "workspace:*",
     "@rp/test-postgres": "workspace:*",
     "@swc/core": "^1.16.2",
     "@types/express": "^5.0.6",

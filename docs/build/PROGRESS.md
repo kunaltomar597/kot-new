@@ -24,7 +24,8 @@ What exists:
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
   rooms, resync and revocation (P0-12); HTTPS/WSS with the installation's own CA, automatic
-  certificate renewal and CA pinning at pairing (P0-15, ADR-0011). 419 tests.
+  certificate renewal and CA pinning at pairing (P0-15, ADR-0011); enrolment with the Vendor
+  Control Plane and signed heartbeats that discover releases (P0-17b). 433 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -47,7 +48,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-17b Local server heartbeat client (enrolment, heartbeats, update discovery).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -74,7 +74,7 @@ Recommended next WPs (dependencies met):
 - [x] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
 - [x] P0-17a Control Plane service (deployment waits for the hosting account)
-- [ ] P0-17b Local server heartbeat client
+- [x] P0-17b Local server heartbeat client
 - [ ] P0-H1 Pager battery prototype [H]
 - [ ] P0-H2 Wi-Fi coverage test kit [H]
 - [ ] P0-H3 Kiosk mode on the chosen tablet [H]
@@ -206,7 +206,8 @@ Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and 
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
 revocation), #12 (P0-14a client-side token handling), #13 (P0-14b console storage of keys and
 sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning), P0-17a
-(installation identity, signed requests and enrolment of the Control Plane; this PR).
+(installation identity, signed requests and enrolment of the Control Plane), P0-17b (the
+installation key on the PC and its signing client; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -214,6 +215,59 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P0-17b local server heartbeat client (P0-17 done)
+
+Built `apps/server/src/cloud` (see the server README "Vendor Control Plane"):
+
+- Installation key: an Ed25519 key from a new secret, `installation-signing-key` (the 32-byte
+  seed in PKCS#8). The same seed always gives the same key.
+- `ControlPlaneClient` signs requests as ADR-0012 describes:
+  - redirects are refused and each call has a 15 s timeout;
+  - after `CLOCK_SKEW` it corrects its clock offset and tries once more;
+  - failures carry a code: an `ApiError` code, `UNREACHABLE`, `HTTP_<status>` or
+    `INVALID_RESPONSE`.
+- Enrolment (`enrolInstallation`, CLI `pnpm control-plane:enrol <code>`):
+  - accepts codes as people type them;
+  - refuses a second enrolment;
+  - saves the identity in `system_meta`;
+  - audits `INSTALLATION_ENROLLED` once the restaurant exists.
+- `HeartbeatService`:
+  - Sends 15 s after start, then at the Control Plane's interval (5 minutes by default and after
+    failures).
+  - Reports `RESTAURANT_PC` (`RP_PRODUCT_VERSION` or the server version), server, Node and
+    PostgreSQL versions; the data drive's size and free space; the audit chain head; active
+    devices by type.
+  - Keeps and logs the offered update once, and measures the clock offset from the answer.
+  - Logs each failure kind once; `status()` and `beat()` are ready for the support screen.
+- Config: `RP_CONTROL_PLANE_URL` must be an origin and `https://` in production;
+  `RP_PRODUCT_VERSION`.
+- Tests:
+  - 8 unit tests: key derivation, the signed enrolment proof, request signatures verified the
+    way the Control Plane verifies them, the clock correction, the failure codes, code
+    normalisation, the configuration rules.
+  - 6 acceptance tests with the real Control Plane:
+    - the scheduled heartbeat waits for enrolment;
+    - enrolment with a typed code, audited, only once;
+    - accepted heartbeats with versions;
+    - discovery of a release published later, remembered across restarts;
+    - the Control Plane down while local work goes on, then reporting again;
+    - revocation refused.
+
+Decisions:
+
+- The installation key is the secret store's 32-byte seed used as an Ed25519 private key. There
+  is no extra key file, and DPAPI protects it on Windows.
+- Before the restaurant is set up, the enrolment is audited only on the Control Plane (the local
+  audit log needs a restaurant).
+
+Notes for the next session:
+
+- P0-16: the installer sets `RP_CONTROL_PLANE_URL` and `RP_PRODUCT_VERSION` and runs
+  `node dist/cloud/enrol-cli.js <code>` during activation. The Electron updater reads the offered
+  update from `system_meta` `control_plane.offered_update`, or asks `GET /v1/updates`.
+- P7-08: a support screen endpoint can expose `HeartbeatService.status()`.
+- P7-03: backup status, error counts and licence state join the heartbeat as optional fields.
 
 ### 2026-09-26: P0-17a Control Plane service
 

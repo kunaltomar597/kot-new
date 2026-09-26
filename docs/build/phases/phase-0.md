@@ -400,6 +400,18 @@ Acceptance: an integration test runs the real local server beside a real Control
 published after it started. With the Control Plane down, the server keeps working and reports
 again when it is back.
 
+As built:
+
+- `apps/server/src/cloud`: the installation key (Ed25519 from the 32-byte seed), a
+  `ControlPlaneClient` (refuses redirects, retries once after `CLOCK_SKEW`), and enrolment with a
+  CLI (`pnpm control-plane:enrol <code>`).
+- `HeartbeatService`: runs 15 s after start, then at the interval the Control Plane sets. The
+  offered update is kept in `system_meta`.
+- `RP_CONTROL_PLANE_URL` must be the service origin, `https://` in production.
+- `RP_PRODUCT_VERSION` (set by the installer) is the `RESTAURANT_PC` version.
+
+The self-update test itself comes with P0-16.
+
 ---
 
 ## Hardware spikes (Track 2)
