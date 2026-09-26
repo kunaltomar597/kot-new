@@ -1095,6 +1095,8 @@ components:
                 - INVOICE_SERIES
                 - FLOOR
                 - WAITER_ASSIGNMENTS
+                - STATIONS
+                - PRINTERS
           required:
             - part
           additionalProperties: false

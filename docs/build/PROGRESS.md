@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06). 345 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations and printers (P1-07a). 356 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06). 508 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets and the test page (P1-07a). 524 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -54,7 +54,7 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P1-04 Menu photos (P1-03 done).
-- P1-07 Stations, printers and KOT printing (P1-06 done).
+- P1-07b Print queue, offline alert, redirect and reprint (P1-07a done).
 - P1-10 Billing engine and GST invoices (P1-06 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -100,7 +100,8 @@ Recommended next WPs (dependencies met):
 - [ ] P1-05 Excel/CSV menu import
 - [x] P1-06a Order submission and KOTs
 - [x] P1-06b Item status, modify, cancel and void
-- [ ] P1-07 Stations, printers and KOT printing
+- [x] P1-07a Stations, printers, ticket rendering and test print
+- [ ] P1-07b Print queue, offline alert, redirect and reprint
 - [ ] P1-08 POS UI: tables and order entry
 - [ ] P1-09 KDS UI
 - [ ] P1-10 Billing engine and GST invoices
@@ -294,6 +295,17 @@ Decided 2026-09-26 (P1-06b):
 34. Cancelling before cooking returns counted stock; a void does not (the food was made). A combo
     is cancelled or voided as a whole, and its parts follow.
 
+Decided 2026-09-26 (P1-07a):
+
+35. Tickets print in printable ASCII only. Accents are dropped and other characters become "?",
+    because code pages differ between printers. Printing in Hindi or other scripts needs a raster
+    (image) mode and is out of scope for v1.
+36. A USB printer is reached through its Windows share name (`\\localhost\<share>`), with no
+    native printer driver in the server. Installers share the printer during setup (runbook for
+    P0-16 and P0-H4).
+37. Stations are readable by every signed-in person, since kitchen screens and waiters show them.
+    Printers are visible to `OPERATIONS_CONFIGURE` only.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -310,6 +322,41 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-07a stations, printers, ticket rendering and test print
+
+P1-07 was split into P1-07a (this) and P1-07b (queue, offline alert, redirect, reprint).
+
+Built:
+
+- `@rp/contracts`: `printing.ts` with station and printer requests and views, the archive request
+  and the test-print response. Printer hosts are limited to an IP address or host name (network),
+  or a share name or `/dev/usb/lpN` (USB). There are 9 routes, and `RestaurantChanged` gains the
+  STATIONS and PRINTERS parts.
+- `apps/server/src/printing/`:
+  - the pure ESC/POS renderer for KOTs and the test page;
+  - the network and USB transport;
+  - the stations and printers services and controllers;
+  - `KotTicketsService`, which builds and renders a stored KOT.
+- Tests:
+  - 8 unit tests: byte output for 80 and 58 mm, wrapping, ASCII, never wider than the paper, and
+    the test page;
+  - 8 integration tests: CRUD and permissions, host validation, no-op updates not audited, a test
+    page received by a fake TCP printer, a refused connection and a missing USB printer reported
+    in words, the archive rules, and a real order's KOT rendered.
+  - Contract snapshots were updated.
+
+Decisions: 35 to 37.
+
+Notes for the next sessions:
+
+- P1-07b:
+  - the queue should render with `KotTicketsService.render` and send with `PrinterTransport`,
+    overriding the provider in tests (or using a local TCP server as in `printing.int.test.ts`);
+  - `PrinterStatusChanged` needs a contract event and an audience (POS and managers);
+  - the MOVED kind needs a migration adding `MOVED` to `KotKind`.
+- The printer connection timeout is a fixed 5 s. Make it a setting if P0-H4 shows printers that
+  need longer.
 
 ### 2026-09-26: P1-06b item status, cancel, void and modify (P1-06 done)
 

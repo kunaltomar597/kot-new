@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["NETWORK", "USB"] },
+  "output": { "type": "string", "enum": ["NETWORK", "USB"] }
+}

@@ -348,6 +348,53 @@ with retry, offline detection and alert, redirect to another printer, reprint; t
 Acceptance: rendering snapshot tests (byte output), queue tests with a fake printer that fails and
 recovers, printer-offline alert event emitted.
 
+P1-07 is split in two.
+
+### P1-07a Stations, printers, ticket rendering and test print
+
+- Station and printer setup (`OPERATIONS_CONFIGURE`, audited, `RestaurantChanged` with STATIONS or
+  PRINTERS). Archive only when nothing uses them.
+- ESC/POS rendering of NEW, MODIFIED and CANCELLED tickets and a test page, as bytes.
+- The network (raw TCP) and USB transport, and `POST /api/v1/printers/:id/test`.
+
+As built: `apps/server/src/printing/`.
+
+- `escpos.ts` (pure): 48 characters a line on 80 mm, 32 on 58 mm, printable ASCII only.
+  - The table or token is printed double size, with a CHANGED, CANCELLED or REPRINT banner.
+  - Then the KOT and order numbers, the waiter, the source and the local time.
+  - Each item shows its variant, then modifiers (`+`), instructions (`!`) and the combo it belongs
+    to. The ticket ends with a feed and a cut.
+- `printer-transport.ts`:
+  - network printers take the bytes on their TCP port with a 5 s timeout;
+  - USB printers are shared in Windows and written to as `\\localhost\<share>` (on Linux,
+    `/dev/usb/lpN`);
+  - host values are restricted by the contract and checked again before any write;
+  - failures come back as plain-language `PrintFailure`s.
+- `stations.service.ts` and `printers.service.ts`:
+  - active names are unique;
+  - a screen-only station keeps no printer;
+  - a station cannot be archived while active items or kitchen screens use it;
+  - a printer cannot be archived while an active station prints on it.
+- `kot-tickets.service.ts` builds a ticket from the stored order (names as ordered, table or token,
+  the waiter) and renders it for the station printer or a chosen paper width. It is used by the
+  P1-07b queue.
+- A test print answers `{ printed, error }` and sets `lastSeenAt` on success.
+
+The MOVED ticket waits for P1-07b: moving a table (P1-02b) raises no KOT today, only the
+`TableMoved` event with the stations involved.
+
+### P1-07b Print queue, offline alert, redirect and reprint
+
+- A worker prints PENDING KOTs through `KotTicketsService`, retrying with backoff, and marks them
+  PRINTED or FAILED (`printAttempts`, `printedAt`).
+- A printer is offline after a failed job. The worker emits a new `PrinterStatusChanged` event
+  (NTF-003) to the POS and managers, and another when the printer is back. `lastSeenAt` is updated.
+- In print-only mode, queued KOTs print on recovery (KDS-012).
+- A manager can redirect one printer's queue to another printer, and staff can reprint a KOT
+  (with a REPRINT banner), both audited.
+- A MOVED slip goes to each station holding items when a table moves.
+- Acceptance: queue tests with a fake printer that fails and recovers; the offline event emitted.
+
 ## P1-08 POS UI: table overview and order entry
 
 Goal: the cashier/manager can run dine-in and takeaway service from the POS.

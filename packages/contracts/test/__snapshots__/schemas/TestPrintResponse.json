@@ -1,0 +1,13 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "printed": { "type": "boolean" }, "error": { "type": ["string", "null"] } },
+    "required": ["printed", "error"]
+  },
+  "output": {
+    "type": "object",
+    "properties": { "printed": { "type": "boolean" }, "error": { "type": ["string", "null"] } },
+    "required": ["printed", "error"],
+    "additionalProperties": false
+  }
+}
