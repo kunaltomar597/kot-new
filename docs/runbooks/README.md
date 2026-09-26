@@ -5,3 +5,5 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 
 - `lan-tls.md`: trusting the restaurant's certificate authority in browsers, fingerprint checks and
   certificate problems (P0-15).
+- `control-plane.md`: operating the Vendor Control Plane: environments, deploying, connecting a
+  restaurant PC, publishing releases, disconnecting an installation (P0-17a).

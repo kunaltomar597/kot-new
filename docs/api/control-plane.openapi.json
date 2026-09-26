@@ -1,0 +1,426 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Restaurant Operations Platform: Vendor Control Plane API",
+    "version": "0.1.0",
+    "description": "Generated from @rp/contracts/control-plane by `pnpm contracts:docs`; do not edit by hand. Restaurant PCs call it: `x-capability` is `INSTALLATION` for requests signed with the installation's Ed25519 key (headers x-rp-installation, x-rp-timestamp, x-rp-nonce and x-rp-signature over `signedRequestMessage`, ADR-0012) or `PUBLIC`. `x-requirements` lists the BRD requirement IDs."
+  },
+  "servers": [
+    {
+      "url": "https://control-plane.example.invalid",
+      "description": "Set per environment (VCP-009)"
+    }
+  ],
+  "tags": [{ "name": "installations" }, { "name": "releases" }, { "name": "system" }],
+  "paths": {
+    "/v1/enrolments": {
+      "post": {
+        "operationId": "enrolInstallation",
+        "summary": "Register a restaurant PC with a one-time enrolment code",
+        "description": "Public because the installation has no credential yet: the one-time code and the proof that it holds the private key are its credential. Codes are used once and expire; attempts are rate-limited per client address.",
+        "tags": ["installations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/EnrolRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Enrolled.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EnrolResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown, used or expired code, or a bad proof.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many attempts from this address.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["SEC-002", "ONB-003"]
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "getControlPlaneHealth",
+        "summary": "Liveness and database status",
+        "description": "Public because the load balancer and uptime monitoring call it; it reveals nothing but whether the service and its database answer.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "Service and database are up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } }
+            }
+          },
+          "503": {
+            "description": "The database is down.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["VCP-009"]
+      }
+    },
+    "/v1/heartbeats": {
+      "post": {
+        "operationId": "postHeartbeat",
+        "summary": "Report that an installation is alive, with its versions and health",
+        "description": "Every 5 minutes by default; the answer sets the next interval, gives the server time and offers the release to update to. Sending the same heartbeat again is harmless.",
+        "tags": ["installations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/HeartbeatRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/HeartbeatResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["VCP-005", "NFR-O03", "UPD-002", "UPD-010", "LIC-007"]
+      }
+    },
+    "/v1/updates": {
+      "get": {
+        "operationId": "getUpdates",
+        "summary": "The release an installation should move to from a given version",
+        "tags": ["releases"],
+        "parameters": [
+          {
+            "name": "component",
+            "in": "query",
+            "required": false,
+            "schema": { "default": "RESTAURANT_PC", "type": "string", "enum": ["RESTAURANT_PC"] }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The update, or null when up to date.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/UpdatesResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["UPD-002", "UPD-007"]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 },
+          "details": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "correlationId": { "type": "string" }
+        },
+        "required": ["code", "message"],
+        "additionalProperties": false
+      },
+      "ComponentVersion": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,40}$" },
+          "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+        },
+        "required": ["name", "version"],
+        "additionalProperties": false
+      },
+      "EnrolRequest": {
+        "type": "object",
+        "properties": {
+          "code": { "$ref": "#/components/schemas/EnrolmentCode" },
+          "publicKey": { "type": "string", "maxLength": 200, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+          "proof": { "type": "string", "maxLength": 200, "pattern": "^[A-Za-z0-9+/]+={0,2}$" }
+        },
+        "required": ["code", "publicKey", "proof"],
+        "additionalProperties": false
+      },
+      "EnrolResponse": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": { "type": "string" },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "enrolledAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["installationId", "tenantId", "name", "channel", "enrolledAt"],
+        "additionalProperties": false
+      },
+      "EnrolmentCode": {
+        "type": "string",
+        "pattern": "^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$"
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["ok", "degraded"] },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["up", "down"] },
+                  "latencyMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["status", "latencyMs"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["database"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["status", "time", "uptimeSeconds", "checks"],
+        "additionalProperties": false
+      },
+      "HeartbeatRequest": {
+        "type": "object",
+        "properties": {
+          "heartbeatId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "components": {
+            "minItems": 1,
+            "maxItems": 30,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ComponentVersion" }
+          },
+          "disk": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "totalBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "freeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["totalBytes", "freeBytes"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "auditChainHead": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sequence": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "hash": { "$ref": "#/components/schemas/Sha256Hex" }
+                },
+                "required": ["sequence", "hash"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "devices": {
+            "type": "object",
+            "propertyNames": { "type": "string", "pattern": "^[A-Z_]{1,40}$" },
+            "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          }
+        },
+        "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
+        "additionalProperties": {}
+      },
+      "HeartbeatResponse": {
+        "type": "object",
+        "properties": {
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "nextHeartbeatSeconds": { "type": "integer", "minimum": 60, "maximum": 3600 },
+          "update": {
+            "anyOf": [{ "$ref": "#/components/schemas/ReleaseInfo" }, { "type": "null" }]
+          }
+        },
+        "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"],
+        "additionalProperties": false
+      },
+      "ReleaseChannel": { "type": "string", "enum": ["STABLE", "PILOT"] },
+      "ReleaseComponent": { "type": "string", "enum": ["RESTAURANT_PC"] },
+      "ReleaseInfo": {
+        "type": "object",
+        "properties": {
+          "component": { "$ref": "#/components/schemas/ReleaseComponent" },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "version": { "$ref": "#/components/schemas/SemVer" },
+          "url": { "type": "string", "format": "uri" },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "notes": { "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }] },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "component",
+          "channel",
+          "version",
+          "url",
+          "sha256",
+          "sizeBytes",
+          "notes",
+          "publishedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SemVer": {
+        "type": "string",
+        "maxLength": 64,
+        "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+      },
+      "Sha256Hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+      "UpdatesQuery": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "default": "RESTAURANT_PC",
+            "$ref": "#/components/schemas/ReleaseComponent"
+          },
+          "version": { "$ref": "#/components/schemas/SemVer" }
+        },
+        "required": ["component", "version"],
+        "additionalProperties": false
+      },
+      "UpdatesQueryInput": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "default": "RESTAURANT_PC",
+            "$ref": "#/components/schemas/ReleaseComponent"
+          },
+          "version": { "$ref": "#/components/schemas/SemVer" }
+        },
+        "required": ["version"],
+        "additionalProperties": false
+      },
+      "UpdatesResponse": {
+        "type": "object",
+        "properties": {
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "update": {
+            "anyOf": [{ "$ref": "#/components/schemas/ReleaseInfo" }, { "type": "null" }]
+          }
+        },
+        "required": ["channel", "update"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

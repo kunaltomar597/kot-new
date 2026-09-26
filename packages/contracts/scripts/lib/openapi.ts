@@ -11,19 +11,52 @@ import {
 export interface OpenApiOptions {
   /** The package namespace (`import * as contracts`); every exported Zod schema becomes a component. */
   namespace: Readonly<Record<string, unknown>>;
-  routes: readonly RouteDefinition[];
+  routes: readonly RouteDefinition<string>[];
   version: string;
+  /** Title, description and servers; the local server's API by default. */
+  info?: OpenApiInfo;
 }
+
+export interface OpenApiInfo {
+  readonly title: string;
+  readonly description: string;
+  readonly servers: readonly { readonly url: string; readonly description: string }[];
+}
+
+const LOCAL_SERVER_INFO: OpenApiInfo = {
+  title: 'Restaurant Operations Platform: local server API',
+  description:
+    'Generated from @rp/contracts by `pnpm contracts:docs`; do not edit by hand. Money is ' +
+    'integer paise, rates are basis points, dates are YYYY-MM-DD and instants are ISO-8601 ' +
+    'UTC. `x-capability` names the permission the server enforces (AUTH-010): a capability, ' +
+    '`SESSION` (any signed-in person), `DEVICE` (a paired device, nobody signed in) or ' +
+    '`PUBLIC`; ' +
+    '`x-requirements` lists the BRD requirement IDs. Components cover every exported contract ' +
+    'schema, including those not yet used by a route. A `<Name>Input` component describes ' +
+    'what a client may send when it differs from the parsed form (for example omitted ' +
+    'defaults).',
+  servers: [
+    { url: '/', description: "The restaurant's local server (address set at installation)" },
+  ],
+};
 
 const PATH_PARAMETER = /:([A-Za-z][A-Za-z0-9_]*)/g;
 
-/** Builds the OpenAPI 3.1 document for the local server's REST API (INT-002). */
-export function buildOpenApi({ namespace, routes, version }: OpenApiOptions): JsonSchema {
+/**
+ * Builds an OpenAPI 3.1 document from a route registry (INT-002): the local server's API unless
+ * `info` names another (the Control Plane's).
+ */
+export function buildOpenApi({
+  namespace,
+  routes,
+  version,
+  info = LOCAL_SERVER_INFO,
+}: OpenApiOptions): JsonSchema {
   const named = collectSchemas(namespace);
   const nameOf = new Map([...named].map(([name, schema]) => [schema, name]));
   const components = buildComponents(named);
 
-  const reference = (route: RouteDefinition, schema: z.ZodType, io: 'input' | 'output') => {
+  const reference = (route: RouteDefinition<string>, schema: z.ZodType, io: 'input' | 'output') => {
     const name = nameOf.get(schema);
     if (name === undefined) {
       throw new Error(
@@ -94,23 +127,8 @@ export function buildOpenApi({ namespace, routes, version }: OpenApiOptions): Js
   const tags = [...new Set(routes.flatMap((route) => route.tags))].sort().map((name) => ({ name }));
   return {
     openapi: '3.1.1',
-    info: {
-      title: 'Restaurant Operations Platform: local server API',
-      version,
-      description:
-        'Generated from @rp/contracts by `pnpm contracts:docs`; do not edit by hand. Money is ' +
-        'integer paise, rates are basis points, dates are YYYY-MM-DD and instants are ISO-8601 ' +
-        'UTC. `x-capability` names the permission the server enforces (AUTH-010): a capability, ' +
-        '`SESSION` (any signed-in person), `DEVICE` (a paired device, nobody signed in) or ' +
-        '`PUBLIC`; ' +
-        '`x-requirements` lists the BRD requirement IDs. Components cover every exported contract ' +
-        'schema, including those not yet used by a route. A `<Name>Input` component describes ' +
-        'what a client may send when it differs from the parsed form (for example omitted ' +
-        'defaults).',
-    },
-    servers: [
-      { url: '/', description: "The restaurant's local server (address set at installation)" },
-    ],
+    info: { title: info.title, version, description: info.description },
+    servers: info.servers.map((server) => ({ ...server })),
     tags,
     paths,
     components: { schemas: components.schemas },

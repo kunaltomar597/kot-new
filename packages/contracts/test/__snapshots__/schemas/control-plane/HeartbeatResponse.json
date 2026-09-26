@@ -1,0 +1,118 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "receivedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "serverTime": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "nextHeartbeatSeconds": { "type": "integer", "minimum": 60, "maximum": 3600 },
+      "update": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "component": { "type": "string", "enum": ["RESTAURANT_PC"] },
+              "channel": { "type": "string", "enum": ["STABLE", "PILOT"] },
+              "version": {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+              },
+              "url": { "type": "string", "format": "uri" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "sizeBytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "notes": { "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }] },
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "component",
+              "channel",
+              "version",
+              "url",
+              "sha256",
+              "sizeBytes",
+              "notes",
+              "publishedAt"
+            ]
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "receivedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "serverTime": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "nextHeartbeatSeconds": { "type": "integer", "minimum": 60, "maximum": 3600 },
+      "update": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "component": { "type": "string", "enum": ["RESTAURANT_PC"] },
+              "channel": { "type": "string", "enum": ["STABLE", "PILOT"] },
+              "version": {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+              },
+              "url": { "type": "string", "format": "uri" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "sizeBytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "notes": { "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }] },
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "component",
+              "channel",
+              "version",
+              "url",
+              "sha256",
+              "sizeBytes",
+              "notes",
+              "publishedAt"
+            ],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"],
+    "additionalProperties": false
+  }
+}

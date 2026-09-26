@@ -1,7 +1,8 @@
 /**
  * Generates the published contract documents (INT-002, NFR-M06):
- *   docs/api/openapi.json   REST API, from the route registry and every exported schema
- *   docs/api/asyncapi.yaml  domain events, from the event catalogue
+ *   docs/api/openapi.json                local REST API, from the route registry and every schema
+ *   docs/api/control-plane.openapi.json  Vendor Control Plane API (ADR-0012)
+ *   docs/api/asyncapi.yaml               domain events, from the event catalogue
  *
  * Usage: pnpm contracts:docs            write the files
  *        pnpm contracts:docs --check    exit 1 if the committed files are stale (CI)
@@ -9,6 +10,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as controlPlane from '../src/control-plane/index.js';
 import * as contracts from '../src/index.js';
 import { renderDocs } from './lib/render.js';
 
@@ -22,6 +24,7 @@ const files = await renderDocs({
   namespace: contracts,
   routes: contracts.ROUTES,
   events: contracts.DomainEvent,
+  controlPlane: { namespace: controlPlane, routes: controlPlane.CONTROL_PLANE_ROUTES },
   version: pkg.version,
   outDir,
 });
