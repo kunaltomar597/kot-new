@@ -48,7 +48,12 @@ export type CreatePairingCodeRequest = z.infer<typeof CreatePairingCodeRequest>;
 export const PairingCodeResponse = z.object({
   code: PairingCode,
   expiresAt: Timestamp,
-  /** JSON for the QR code the device scans: `{"v":1,"code":"..."}`. */
+  /**
+   * SHA-256 fingerprint of the installation's LAN CA when the server uses TLS (ADR-0011): the app
+   * pins it before connecting. Null on a development server without TLS.
+   */
+  caSha256: z.string().nullable(),
+  /** JSON for the QR code the device scans: `{"v":1,"code":"...","ca":"<caSha256>"}`. */
   qrPayload: z.string(),
 });
 export type PairingCodeResponse = z.infer<typeof PairingCodeResponse>;

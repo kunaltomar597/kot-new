@@ -8,7 +8,7 @@ import {
   RealtimeHead,
   RealtimeSync,
 } from '@rp/contracts';
-import { io, type Socket } from 'socket.io-client';
+import { io, type ManagerOptions, type Socket, type SocketOptions } from 'socket.io-client';
 import { until } from './wait.js';
 
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -19,7 +19,15 @@ export interface ConnectFailure {
   readonly code: string | undefined;
 }
 
-function openSocket(url: string, auth: Record<string, unknown>, namespace: string): Socket {
+/** TLS options of a socket over `wss:` (P0-15): the CA it trusts. */
+export type TlsSocketOptions = Pick<Partial<ManagerOptions & SocketOptions>, 'ca'>;
+
+function openSocket(
+  url: string,
+  auth: Record<string, unknown>,
+  namespace: string,
+  tls: TlsSocketOptions,
+): Socket {
   return io(`${url}${namespace}`, {
     path: REALTIME_PATH,
     transports: ['websocket'],
@@ -27,6 +35,7 @@ function openSocket(url: string, auth: Record<string, unknown>, namespace: strin
     forceNew: true,
     reconnection: false,
     timeout: DEFAULT_TIMEOUT_MS,
+    ...tls,
   });
 }
 
@@ -71,8 +80,12 @@ export class RealtimeTestClient {
   }
 
   /** Connects and waits for the first `sync`; rejects with the server's refusal. */
-  static async connect(url: string, auth: Record<string, unknown>): Promise<RealtimeTestClient> {
-    const client = new RealtimeTestClient(openSocket(url, auth, REALTIME_NAMESPACE));
+  static async connect(
+    url: string,
+    auth: Record<string, unknown>,
+    tls: TlsSocketOptions = {},
+  ): Promise<RealtimeTestClient> {
+    const client = new RealtimeTestClient(openSocket(url, auth, REALTIME_NAMESPACE, tls));
     await new Promise<void>((resolve, reject) => {
       client.socket.once('connect_error', (error: Error & { data?: unknown }) => {
         const failure = failureOf(error);
@@ -91,8 +104,9 @@ export class RealtimeTestClient {
     url: string,
     auth: Record<string, unknown>,
     namespace: string = REALTIME_NAMESPACE,
+    tls: TlsSocketOptions = {},
   ): Promise<ConnectFailure> {
-    const socket = openSocket(url, auth, namespace);
+    const socket = openSocket(url, auth, namespace, tls);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         socket.close();

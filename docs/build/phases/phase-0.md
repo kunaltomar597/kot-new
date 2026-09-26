@@ -305,6 +305,14 @@ delivered to devices during pairing (pin), trust installation guide for manager 
 Acceptance: server serves HTTPS/WSS with the generated certificate; a client with the pinned CA
 connects, a client with a different CA is rejected (integration test).
 
+As built (ADR-0011, Accepted): option (a). `RP_TLS=on` serves HTTPS/WSS on `PORT` (TLS 1.2
+minimum). The CA is created at the server's first start rather than by the installer, so a repair
+or reinstall that keeps the data folder keeps it; the server certificate covers every LAN address,
+`localhost`, the computer name and `RP_TLS_HOSTNAMES`, is checked every minute and hot-swapped when
+renewed. Keys are sealed with a key from the secret store. Pinning: `GET /api/v1/tls/ca`, the CA
+fingerprint in pairing codes and their QR payload; browsers download `/ca.crt` and follow
+`docs/runbooks/lan-tls.md`. MQTTS for pagers reuses the certificate (P2-04).
+
 ## P0-16 Windows packaging: services, watchdog, Electron shell, installer, updater
 
 Goal: one signed installer that sets everything up (ONB-001) and can update itself.

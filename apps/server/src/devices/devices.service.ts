@@ -31,6 +31,7 @@ import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
+import { TlsService } from '../tls/tls.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -129,6 +130,7 @@ export class DevicesService {
     private readonly settings: AuthSettingsService,
     private readonly audit: AuditService,
     private readonly limiter: RateLimiter,
+    private readonly tls: TlsService,
   ) {}
 
   async createPairingCode(
@@ -434,10 +436,13 @@ export class DevicesService {
       },
       ...(createdById === null && { reason: 'Bootstrap code for the POS on the server PC' }),
     });
+    // The app pins the CA from the QR code before it connects (ADR-0011).
+    const caSha256 = this.tls.caFingerprint();
     return {
       code,
       expiresAt: expiresAt.toISOString(),
-      qrPayload: JSON.stringify({ v: 1, code }),
+      caSha256,
+      qrPayload: JSON.stringify({ v: 1, code, ...(caSha256 !== null && { ca: caSha256 }) }),
     };
   }
 

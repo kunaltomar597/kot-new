@@ -12,6 +12,7 @@ import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { ObservabilityModule } from './observability/error-reporter.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { TlsModule } from './tls/tls.module.js';
 
 /**
  * Root module. Feature modules (settings, floor, menu, orders, kitchen, billing, ...) are added here
@@ -32,6 +33,7 @@ export class AppModule {
         DevicesModule,
         EventsModule,
         RealtimeModule,
+        TlsModule,
         HealthModule,
       ],
       providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

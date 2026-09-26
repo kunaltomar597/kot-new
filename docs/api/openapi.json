@@ -979,6 +979,30 @@
         "x-requirements": ["ORD-001", "ORD-013", "ORD-014", "ORD-017"]
       }
     },
+    "/api/v1/tls/ca": {
+      "get": {
+        "operationId": "getTlsCa",
+        "summary": "The LAN certificate authority to pin or install",
+        "description": "Public because a device needs it before it can pair: apps pin the CA and browsers install it (ADR-0011). It is a public certificate; people compare its fingerprint with the one the POS shows. 404 when the server runs without TLS (development).",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The CA certificate.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TlsCaResponse" } }
+            }
+          },
+          "404": {
+            "description": "This server does not use TLS.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["SEC-001", "SEC-010"]
+      }
+    },
     "/api/v1/version": {
       "get": {
         "operationId": "getVersion",
@@ -2278,9 +2302,10 @@
         "properties": {
           "code": { "$ref": "#/components/schemas/PairingCode" },
           "expiresAt": { "$ref": "#/components/schemas/Timestamp" },
+          "caSha256": { "type": ["string", "null"] },
           "qrPayload": { "type": "string" }
         },
-        "required": ["code", "expiresAt", "qrPayload"],
+        "required": ["code", "expiresAt", "caSha256", "qrPayload"],
         "additionalProperties": false
       },
       "Paise": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -2836,6 +2861,20 @@
         "type": "string",
         "format": "date-time",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "TlsCaResponse": {
+        "type": "object",
+        "properties": {
+          "certificate": {
+            "type": "string",
+            "format": "starts_with",
+            "pattern": "^-----BEGIN CERTIFICATE-----.*"
+          },
+          "sha256": { "type": "string", "pattern": "^([0-9A-F]{2}:){31}[0-9A-F]{2}$" },
+          "expiresAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["certificate", "sha256", "expiresAt"],
+        "additionalProperties": false
       },
       "TotpConfirmRequest": {
         "type": "object",

@@ -24,3 +24,17 @@ export const VersionResponse = z.object({
   buildId: z.string().optional(),
 });
 export type VersionResponse = z.infer<typeof VersionResponse>;
+
+/**
+ * The installation's LAN certificate authority (ADR-0011, SEC-001): apps pin it, browsers install
+ * it once. Compare `sha256` with the fingerprint shown on the POS before trusting it.
+ */
+export const TlsCaResponse = z.object({
+  /** PEM, to save as a `.crt` file. */
+  certificate: z.string().startsWith('-----BEGIN CERTIFICATE-----'),
+  /** SHA-256 fingerprint, `AB:CD:…` (32 bytes). */
+  sha256: z.string().regex(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/),
+  /** When the CA expires (10 years after the installation created it). */
+  expiresAt: Timestamp,
+});
+export type TlsCaResponse = z.infer<typeof TlsCaResponse>;

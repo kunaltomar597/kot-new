@@ -11,6 +11,8 @@ export const SECRET_NAMES = [
   'token-signing-key',
   'device-token-key',
   'totp-encryption-key',
+  /** Encrypts the LAN TLS private keys at rest (P0-15, ADR-0011). */
+  'tls-key-encryption-key',
 ] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 
@@ -78,4 +80,12 @@ export class FileSecretStore implements SecretStore {
       await handle.close();
     }
   }
+}
+
+/**
+ * The installation's secret store: files under `<dataDir>/secrets` for now; the installer swaps in
+ * the Windows DPAPI store (P0-16, SEC-006).
+ */
+export function createSecretStore(config: { readonly dataDir: string }): SecretStore {
+  return new FileSecretStore(join(config.dataDir, 'secrets'));
 }
