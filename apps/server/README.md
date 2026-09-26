@@ -276,6 +276,15 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
 - Routes: the Owner-only ones declare `TAX_AND_INVOICE_SETTINGS`, so the permission guard asks
   for the second factor. Reads are for any signed-in person, and the profile for any paired device.
 
+## Floor and waiter assignment (P1-02a)
+
+- `src/floor/floor.service.ts`: sections and tables (TBL-001) under the setup lock, each change
+  audited and announced with `RestaurantChanged { part: 'FLOOR' }`. Archiving a table takes its
+  row lock, so it cannot race a table being opened.
+- `src/floor/waiter-assignments.service.ts`: the business day's assignments (TBL-002), stored as
+  `shift_assignments` rows (a whole section, or one table with `table_id`). `assignmentsFor()`
+  returns them for `@rp/domain` `responsibleWaiters`.
+
 ## Commands
 
 ```

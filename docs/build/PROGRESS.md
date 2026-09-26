@@ -12,12 +12,13 @@ What exists:
 
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
-  state machines, permissions, menu selection, KOT split, GSTIN validation. 113 tests.
+  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment.
+  118 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b). 288 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor (P1-02a). 303 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -28,7 +29,8 @@ What exists:
   certificate renewal and CA pinning at pairing (P0-15, ADR-0011); enrolment with the Vendor
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
-  and invoice series with Owner-only changes (P1-01b). 459 tests.
+  and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
+  assignment (P1-02a). 468 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -51,7 +53,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-02 Floor, tables, table sessions (P1-01 and P0-12 done).
+- P1-02b Table sessions, move table, takeaway tokens, overview (P1-02a done).
 - P1-03 Menu management API (P1-01 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -89,7 +91,8 @@ Recommended next WPs (dependencies met):
 
 - [x] P1-01a Settings registry
 - [x] P1-01b Restaurant profile, tax groups and invoice series
-- [ ] P1-02 Floor, tables, sessions, move table, takeaway tokens
+- [x] P1-02a Floor (sections, tables) and waiter assignment
+- [ ] P1-02b Table sessions, move table, takeaway tokens, overview
 - [ ] P1-03 Menu management API
 - [ ] P1-04 Menu photos
 - [ ] P1-05 Excel/CSV menu import
@@ -240,6 +243,17 @@ Decided 2026-09-26 (P1-01b):
       most 100 %. A group without components is allowed for exempt supplies.
     - Invoice prefixes: upper-case letters and digits, never reused, archived series included.
 
+Decided 2026-09-26 (P1-02a):
+
+21. Sections, tables and waiter assignment need `STAFF_MANAGE` (BRD §4.2 "manage staff,
+    sections"): the Owner and managers.
+22. Waiter assignments belong to one business day and do not carry over. The previous set is
+    offered to apply again in one step. Anyone who takes orders (owner, manager, cashier, waiter)
+    can be assigned. A waiter given a table takes it over from the section's waiters; waiters
+    sharing a section share its tables, the first assigned being the default for a new session.
+23. Table labels stay unique including archived tables; an archived table is restored, not
+    recreated.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -248,7 +262,7 @@ sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning)
 installation identity, signed requests and enrolment of the Control Plane), #17 (P0-17b the
 installation key on the PC and its signing client), #18 (P1-01a who may change which setting,
 including the Owner's second factor for tax and data settings), P1-01b (the Owner-only tax,
-invoice series and invoice particulars endpoints; this PR).
+invoice series and invoice particulars endpoints, #19).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -256,6 +270,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-02a floor and waiter assignment
+
+Split P1-02 into P1-02a (floor, waiter assignment) and P1-02b (table sessions). Built:
+
+- `@rp/domain` `floor.ts`: `responsibleWaiters` and `tablesOf` (TBL-002, WTR-002).
+- `@rp/contracts` `floor.ts`: section, table, floor and waiter-assignment schemas and 11 routes.
+  `RestaurantChanged` gains the parts `FLOOR` and `WAITER_ASSIGNMENTS`.
+- `apps/server/src/floor`: `FloorService` (sections and tables: create, change, archive,
+  restore) and `WaiterAssignmentsService` (the day's set, the previous set, `assignmentsFor`).
+  Changes run under the setup lock with an audit entry and the event.
+- Migration `20260926160000_table_assignments`: `shift_assignments.table_id`.
+- Tests: 5 domain, 2 contract and 9 integration tests (layout and audit, name and label clashes,
+  table changes and the no-op repeat, archive refused while seated or with a tablet, restore,
+  section archive, 404s, assignments with audit and the domain view, refusals, a new day starting
+  empty with the previous set offered).
+
+Decisions: 21 to 23.
+
+Notes for P1-02b:
+
+- Open a table: lock the table row `FOR UPDATE` (archive takes the same lock), check it is
+  active and `FREE`, and default the session's waiter to the first of
+  `responsibleWaiters(table, assignmentsFor(today))`, else the person opening it if they take
+  orders.
+- `TableView.state` is the table's state column; keep it in step with the session.
 
 ### 2026-09-26: P1-01b restaurant profile, tax groups and invoice series (P1-01 done)
 

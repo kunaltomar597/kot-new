@@ -495,24 +495,25 @@ model Section {
 }
 
 model DiningTable {
-  id           String         @id @default(uuid(7)) @db.Uuid
-  restaurantId String         @map("restaurant_id") @db.Uuid
-  sectionId    String         @map("section_id") @db.Uuid
-  section      Section        @relation(fields: [sectionId], references: [id])
+  id           String            @id @default(uuid(7)) @db.Uuid
+  restaurantId String            @map("restaurant_id") @db.Uuid
+  sectionId    String            @map("section_id") @db.Uuid
+  section      Section           @relation(fields: [sectionId], references: [id])
   /// Number or name shown to staff and on KOTs, e.g. "12" or "Terrace 3".
   label        String
-  capacity     Int            @default(4)
-  state        TableState     @default(FREE)
+  capacity     Int               @default(4)
+  state        TableState        @default(FREE)
   /// Position on the visual floor plan (S requirement), free-form.
   layout       Json?
-  displayOrder Int            @default(0) @map("display_order")
-  externalId   String?        @map("external_id")
-  archivedAt   DateTime?      @map("archived_at") @db.Timestamptz(3)
+  displayOrder Int               @default(0) @map("display_order")
+  externalId   String?           @map("external_id")
+  archivedAt   DateTime?         @map("archived_at") @db.Timestamptz(3)
   sessions     TableSession[]
   devices      Device[]
   orders       Order[]
-  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  assignments  ShiftAssignment[]
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([restaurantId, label])
   @@index([restaurantId])
@@ -543,18 +544,22 @@ model TableSession {
   @@map("table_sessions")
 }
 
+/// A waiter's assignment for a business day (TBL-002): a whole section, or one table of it.
 model ShiftAssignment {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  restaurantId String    @map("restaurant_id") @db.Uuid
-  staffId      String    @map("staff_id") @db.Uuid
-  staff        Staff     @relation(fields: [staffId], references: [id])
-  sectionId    String    @map("section_id") @db.Uuid
-  section      Section   @relation(fields: [sectionId], references: [id])
-  businessDate DateTime  @map("business_date") @db.Date
-  startsAt     DateTime? @map("starts_at") @db.Timestamptz(3)
-  endsAt       DateTime? @map("ends_at") @db.Timestamptz(3)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String       @id @default(uuid(7)) @db.Uuid
+  restaurantId String       @map("restaurant_id") @db.Uuid
+  staffId      String       @map("staff_id") @db.Uuid
+  staff        Staff        @relation(fields: [staffId], references: [id])
+  sectionId    String       @map("section_id") @db.Uuid
+  section      Section      @relation(fields: [sectionId], references: [id])
+  /// Set when the waiter is given this one table rather than the whole section (P1-02a).
+  tableId      String?      @map("table_id") @db.Uuid
+  table        DiningTable? @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  businessDate DateTime     @map("business_date") @db.Date
+  startsAt     DateTime?    @map("starts_at") @db.Timestamptz(3)
+  endsAt       DateTime?    @map("ends_at") @db.Timestamptz(3)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId, businessDate])
   @@map("shift_assignments")

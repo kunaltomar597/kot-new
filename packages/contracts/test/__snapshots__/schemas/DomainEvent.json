@@ -1199,7 +1199,14 @@
             "properties": {
               "part": {
                 "type": "string",
-                "enum": ["PROFILE", "LEGAL", "TAX_GROUPS", "INVOICE_SERIES"]
+                "enum": [
+                  "PROFILE",
+                  "LEGAL",
+                  "TAX_GROUPS",
+                  "INVOICE_SERIES",
+                  "FLOOR",
+                  "WAITER_ASSIGNMENTS"
+                ]
               }
             },
             "required": ["part"]
@@ -2459,7 +2466,14 @@
             "properties": {
               "part": {
                 "type": "string",
-                "enum": ["PROFILE", "LEGAL", "TAX_GROUPS", "INVOICE_SERIES"]
+                "enum": [
+                  "PROFILE",
+                  "LEGAL",
+                  "TAX_GROUPS",
+                  "INVOICE_SERIES",
+                  "FLOOR",
+                  "WAITER_ASSIGNMENTS"
+                ]
               }
             },
             "required": ["part"],
