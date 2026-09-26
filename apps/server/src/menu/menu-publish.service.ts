@@ -39,84 +39,94 @@ export class MenuPublishService {
   setCombo(principal: Principal, itemId: string, request: ComboRequest): Promise<ComboView> {
     return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      const { restaurantId } = principal;
-      const item = await tx.item.findFirst({
-        where: { id: itemId, restaurantId, archivedAt: null },
-      });
-      if (item === null) throw new AppError(404, 'ITEM_NOT_FOUND', 'There is no such active item.');
-
-      const componentIds = request.components.flatMap((component) =>
-        component.kind === 'FIXED' ? [component.itemId] : component.itemIds,
-      );
-      const usable = await tx.item.findMany({
-        where: {
-          id: { in: componentIds },
-          restaurantId,
-          archivedAt: null,
-          combo: { is: null },
-          NOT: { id: itemId },
-        },
-        select: { id: true },
-      });
-      const found = new Set(usable.map((entry) => entry.id));
-      const refused = [...new Set(componentIds)].filter((id) => !found.has(id));
-      if (refused.length > 0) {
-        throw new AppError(
-          422,
-          'COMBO_COMPONENT_INVALID',
-          'Combo parts must be active items that are not combos themselves.',
-          { itemIds: refused },
-        );
-      }
-      if ((await tx.comboComponent.count({ where: { itemId } })) > 0) {
-        throw new AppError(
-          422,
-          'COMBO_COMPONENT_INVALID',
-          'This item is part of another combo, so it cannot be a combo itself.',
-        );
-      }
-
-      const existing = await tx.combo.findUnique({ where: { itemId }, include: COMBO_INCLUDE });
-      const before = existing === null ? null : comboView(existing);
-      const data = {
-        activeFrom: request.activeFrom === null ? null : dbDate(request.activeFrom),
-        activeUntil: request.activeUntil === null ? null : dbDate(request.activeUntil),
-        windowStart: request.timeWindow?.start ?? null,
-        windowEnd: request.timeWindow?.end ?? null,
-      };
-      const combo =
-        existing === null
-          ? await tx.combo.create({ data: { ...data, restaurantId, itemId } })
-          : await tx.combo.update({ where: { id: existing.id }, data });
-      await tx.comboChoiceOption.deleteMany({ where: { component: { comboId: combo.id } } });
-      await tx.comboComponent.deleteMany({ where: { comboId: combo.id } });
-      for (const [index, component] of request.components.entries()) {
-        await tx.comboComponent.create({
-          data: {
-            restaurantId,
-            comboId: combo.id,
-            kind: component.kind,
-            quantity: component.quantity,
-            displayOrder: index + 1,
-            ...(component.kind === 'FIXED'
-              ? { itemId: component.itemId }
-              : {
-                  label: component.label,
-                  choices: {
-                    create: component.itemIds.map((choice) => ({ restaurantId, itemId: choice })),
-                  },
-                }),
-          },
-        });
-      }
-      const after = comboView(
-        await tx.combo.findUniqueOrThrow({ where: { id: combo.id }, include: COMBO_INCLUDE }),
-      );
-      if (canonicalJson(before) !== canonicalJson(after)) {
-        await this.record(tx, principal, 'COMBO_CHANGED', itemId, before, after, request.reason);
-      }
-      return after;
+      return this.setComboIn(tx, principal, itemId, request);
     });
+  }
+
+  /** Inside a transaction that holds the setup lock (the menu import writes several at once). */
+  async setComboIn(
+    tx: TransactionClient,
+    principal: Principal,
+    itemId: string,
+    request: ComboRequest,
+  ): Promise<ComboView> {
+    const { restaurantId } = principal;
+    const item = await tx.item.findFirst({
+      where: { id: itemId, restaurantId, archivedAt: null },
+    });
+    if (item === null) throw new AppError(404, 'ITEM_NOT_FOUND', 'There is no such active item.');
+
+    const componentIds = request.components.flatMap((component) =>
+      component.kind === 'FIXED' ? [component.itemId] : component.itemIds,
+    );
+    const usable = await tx.item.findMany({
+      where: {
+        id: { in: componentIds },
+        restaurantId,
+        archivedAt: null,
+        combo: { is: null },
+        NOT: { id: itemId },
+      },
+      select: { id: true },
+    });
+    const found = new Set(usable.map((entry) => entry.id));
+    const refused = [...new Set(componentIds)].filter((id) => !found.has(id));
+    if (refused.length > 0) {
+      throw new AppError(
+        422,
+        'COMBO_COMPONENT_INVALID',
+        'Combo parts must be active items that are not combos themselves.',
+        { itemIds: refused },
+      );
+    }
+    if ((await tx.comboComponent.count({ where: { itemId } })) > 0) {
+      throw new AppError(
+        422,
+        'COMBO_COMPONENT_INVALID',
+        'This item is part of another combo, so it cannot be a combo itself.',
+      );
+    }
+
+    const existing = await tx.combo.findUnique({ where: { itemId }, include: COMBO_INCLUDE });
+    const before = existing === null ? null : comboView(existing);
+    const data = {
+      activeFrom: request.activeFrom === null ? null : dbDate(request.activeFrom),
+      activeUntil: request.activeUntil === null ? null : dbDate(request.activeUntil),
+      windowStart: request.timeWindow?.start ?? null,
+      windowEnd: request.timeWindow?.end ?? null,
+    };
+    const combo =
+      existing === null
+        ? await tx.combo.create({ data: { ...data, restaurantId, itemId } })
+        : await tx.combo.update({ where: { id: existing.id }, data });
+    await tx.comboChoiceOption.deleteMany({ where: { component: { comboId: combo.id } } });
+    await tx.comboComponent.deleteMany({ where: { comboId: combo.id } });
+    for (const [index, component] of request.components.entries()) {
+      await tx.comboComponent.create({
+        data: {
+          restaurantId,
+          comboId: combo.id,
+          kind: component.kind,
+          quantity: component.quantity,
+          displayOrder: index + 1,
+          ...(component.kind === 'FIXED'
+            ? { itemId: component.itemId }
+            : {
+                label: component.label,
+                choices: {
+                  create: component.itemIds.map((choice) => ({ restaurantId, itemId: choice })),
+                },
+              }),
+        },
+      });
+    }
+    const after = comboView(
+      await tx.combo.findUniqueOrThrow({ where: { id: combo.id }, include: COMBO_INCLUDE }),
+    );
+    if (canonicalJson(before) !== canonicalJson(after)) {
+      await this.record(tx, principal, 'COMBO_CHANGED', itemId, before, after, request.reason);
+    }
+    return after;
   }
 
   // ---------------------------------------------------------------- availability and stock
@@ -206,55 +216,60 @@ export class MenuPublishService {
   publish(principal: Principal): Promise<MenuPublishResponse> {
     return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      const { restaurantId } = principal;
-      const content = await buildMenuContent(tx, restaurantId);
-      const checksum = menuChecksum(content);
-      const latest = await tx.menuVersion.findFirst({
-        where: { restaurantId },
-        orderBy: { version: 'desc' },
-      });
-      if (latest?.checksum === checksum) {
-        return {
-          version: latest.version,
-          publishedAt: latest.publishedAt.toISOString(),
-          checksum,
-          published: false,
-        };
-      }
-      const version = (latest?.version ?? 0) + 1;
-      const publishedAt = new Date();
-      const snapshot = MenuSnapshot.parse({
-        version,
-        publishedAt: publishedAt.toISOString(),
-        ...content,
-      });
-      const row = await tx.menuVersion.create({
-        data: {
-          id: newId(),
-          restaurantId,
-          version,
-          publishedAt,
-          publishedById: principal.staffId,
-          snapshot,
-          checksum,
-        },
-      });
-      await this.audit.record(tx, {
-        action: 'MENU_PUBLISHED',
-        entityType: 'menu_version',
-        entityId: row.id,
-        actorId: principal.staffId,
-        deviceId: principal.deviceId,
-        restaurantId,
-        before: latest === null ? null : { version: latest.version },
-        after: { version, checksum, items: snapshot.items.length },
-      });
-      await this.emit(tx, restaurantId, 'menu_version', row.id, {
-        type: 'MenuPublished',
-        payload: { menuVersion: version },
-      });
-      return { version, publishedAt: publishedAt.toISOString(), checksum, published: true };
+      return this.publishIn(tx, principal);
     });
+  }
+
+  /** Inside a transaction that holds the setup lock. */
+  async publishIn(tx: TransactionClient, principal: Principal): Promise<MenuPublishResponse> {
+    const { restaurantId } = principal;
+    const content = await buildMenuContent(tx, restaurantId);
+    const checksum = menuChecksum(content);
+    const latest = await tx.menuVersion.findFirst({
+      where: { restaurantId },
+      orderBy: { version: 'desc' },
+    });
+    if (latest?.checksum === checksum) {
+      return {
+        version: latest.version,
+        publishedAt: latest.publishedAt.toISOString(),
+        checksum,
+        published: false,
+      };
+    }
+    const version = (latest?.version ?? 0) + 1;
+    const publishedAt = new Date();
+    const snapshot = MenuSnapshot.parse({
+      version,
+      publishedAt: publishedAt.toISOString(),
+      ...content,
+    });
+    const row = await tx.menuVersion.create({
+      data: {
+        id: newId(),
+        restaurantId,
+        version,
+        publishedAt,
+        publishedById: principal.staffId,
+        snapshot,
+        checksum,
+      },
+    });
+    await this.audit.record(tx, {
+      action: 'MENU_PUBLISHED',
+      entityType: 'menu_version',
+      entityId: row.id,
+      actorId: principal.staffId,
+      deviceId: principal.deviceId,
+      restaurantId,
+      before: latest === null ? null : { version: latest.version },
+      after: { version, checksum, items: snapshot.items.length },
+    });
+    await this.emit(tx, restaurantId, 'menu_version', row.id, {
+      type: 'MenuPublished',
+      payload: { menuVersion: version },
+    });
+    return { version, publishedAt: publishedAt.toISOString(), checksum, published: true };
   }
 
   /** The published menu with current availability and stock overlaid (MENU-006, MENU-013). */

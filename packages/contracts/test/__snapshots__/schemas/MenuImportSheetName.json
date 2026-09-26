@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["Items", "Variants", "Modifiers", "Combos"] },
+  "output": { "type": "string", "enum": ["Items", "Variants", "Modifiers", "Combos"] }
+}

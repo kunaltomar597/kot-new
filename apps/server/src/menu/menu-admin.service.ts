@@ -167,18 +167,25 @@ export class MenuAdminService {
   // ---------------------------------------------------------------- categories
 
   createCategory(principal: Principal, request: CategoryRequest): Promise<CategoryView> {
-    return this.change(async (tx) => {
-      await this.assertParent(tx, principal.restaurantId, request.parentId, null);
-      await this.assertCategoryNameFree(tx, principal.restaurantId, request, null);
-      const category = await tx.category.create({
-        data: { restaurantId: principal.restaurantId, ...request },
-      });
-      await this.record(tx, principal, 'MENU_CATEGORY_CREATED', 'menu_category', category.id, {
-        before: null,
-        after: request,
-      });
-      return toCategoryView(category);
+    return this.change((tx) => this.createCategoryIn(tx, principal, request));
+  }
+
+  /** Inside a transaction that holds the setup lock (the menu import writes several at once). */
+  async createCategoryIn(
+    tx: TransactionClient,
+    principal: Principal,
+    request: CategoryRequest,
+  ): Promise<CategoryView> {
+    await this.assertParent(tx, principal.restaurantId, request.parentId, null);
+    await this.assertCategoryNameFree(tx, principal.restaurantId, request, null);
+    const category = await tx.category.create({
+      data: { restaurantId: principal.restaurantId, ...request },
     });
+    await this.record(tx, principal, 'MENU_CATEGORY_CREATED', 'menu_category', category.id, {
+      before: null,
+      after: request,
+    });
+    return toCategoryView(category);
   }
 
   updateCategory(
@@ -262,36 +269,43 @@ export class MenuAdminService {
     principal: Principal,
     request: ModifierGroupRequest,
   ): Promise<ModifierGroupView> {
-    return this.change(async (tx) => {
-      await this.assertGroupNameFree(tx, principal.restaurantId, request.name, null);
-      if (request.options.some((option) => option.id !== undefined)) {
-        throw invalid('MODIFIER_OPTION_NOT_FOUND', 'A new group cannot keep options of another.');
-      }
-      const group = await tx.modifierGroup.create({
-        data: {
-          restaurantId: principal.restaurantId,
-          name: request.name,
-          minSelections: request.minSelections,
-          maxSelections: request.maxSelections,
-          options: {
-            create: request.options.map((option, index) => ({
-              restaurantId: principal.restaurantId,
-              name: option.name,
-              priceDelta: option.priceDelta,
-              available: option.available,
-              displayOrder: index + 1,
-            })),
-          },
+    return this.change((tx) => this.createModifierGroupIn(tx, principal, request));
+  }
+
+  /** Inside a transaction that holds the setup lock. */
+  async createModifierGroupIn(
+    tx: TransactionClient,
+    principal: Principal,
+    request: ModifierGroupRequest,
+  ): Promise<ModifierGroupView> {
+    await this.assertGroupNameFree(tx, principal.restaurantId, request.name, null);
+    if (request.options.some((option) => option.id !== undefined)) {
+      throw invalid('MODIFIER_OPTION_NOT_FOUND', 'A new group cannot keep options of another.');
+    }
+    const group = await tx.modifierGroup.create({
+      data: {
+        restaurantId: principal.restaurantId,
+        name: request.name,
+        minSelections: request.minSelections,
+        maxSelections: request.maxSelections,
+        options: {
+          create: request.options.map((option, index) => ({
+            restaurantId: principal.restaurantId,
+            name: option.name,
+            priceDelta: option.priceDelta,
+            available: option.available,
+            displayOrder: index + 1,
+          })),
         },
-        include: GROUP_INCLUDE,
-      });
-      const view = toGroupView(group);
-      await this.record(tx, principal, 'MODIFIER_GROUP_CREATED', 'modifier_group', group.id, {
-        before: null,
-        after: this.groupSnapshot(view),
-      });
-      return view;
+      },
+      include: GROUP_INCLUDE,
     });
+    const view = toGroupView(group);
+    await this.record(tx, principal, 'MODIFIER_GROUP_CREATED', 'modifier_group', group.id, {
+      before: null,
+      after: this.groupSnapshot(view),
+    });
+    return view;
   }
 
   updateModifierGroup(
@@ -406,24 +420,31 @@ export class MenuAdminService {
   // ---------------------------------------------------------------- items
 
   createItem(principal: Principal, request: ItemRequest): Promise<ItemView> {
-    return this.change(async (tx) => {
-      await this.assertItemReferences(tx, principal.restaurantId, request);
-      await this.assertShortCodeFree(tx, principal.restaurantId, request.shortCode, null);
-      if (request.variants.some((variant) => variant.id !== undefined)) {
-        throw invalid('VARIANT_NOT_FOUND', 'A new item cannot keep variants of another.');
-      }
-      const item = await tx.item.create({
-        data: { restaurantId: principal.restaurantId, ...this.itemColumns(request) },
-      });
-      await this.writeItemParts(tx, principal.restaurantId, item.id, request, []);
-      const view = toItemView(await this.findItem(tx, principal.restaurantId, item.id));
-      await this.record(tx, principal, 'MENU_ITEM_CREATED', 'menu_item', item.id, {
-        before: null,
-        after: itemSnapshot(view),
-        reason: request.reason ?? null,
-      });
-      return view;
+    return this.change((tx) => this.createItemIn(tx, principal, request));
+  }
+
+  /** Inside a transaction that holds the setup lock. */
+  async createItemIn(
+    tx: TransactionClient,
+    principal: Principal,
+    request: ItemRequest,
+  ): Promise<ItemView> {
+    await this.assertItemReferences(tx, principal.restaurantId, request);
+    await this.assertShortCodeFree(tx, principal.restaurantId, request.shortCode, null);
+    if (request.variants.some((variant) => variant.id !== undefined)) {
+      throw invalid('VARIANT_NOT_FOUND', 'A new item cannot keep variants of another.');
+    }
+    const item = await tx.item.create({
+      data: { restaurantId: principal.restaurantId, ...this.itemColumns(request) },
     });
+    await this.writeItemParts(tx, principal.restaurantId, item.id, request, []);
+    const view = toItemView(await this.findItem(tx, principal.restaurantId, item.id));
+    await this.record(tx, principal, 'MENU_ITEM_CREATED', 'menu_item', item.id, {
+      before: null,
+      after: itemSnapshot(view),
+      reason: request.reason ?? null,
+    });
+    return view;
   }
 
   updateItem(principal: Principal, id: string, request: ItemRequest): Promise<ItemView> {

@@ -45,6 +45,7 @@ import {
   KdsTicketsResponse,
   NotifyManagerResponse,
 } from './kds.js';
+import { MenuImportReport, MenuImportRequest, MenuTemplateResponse } from './menu-import.js';
 import { PhotoRenditionParams, PhotoView, UploadPhotoRequest } from './photos.js';
 import { CloseDayRequest, DayEndParams, DayEndPreview, DayEndView } from './day-end.js';
 import {
@@ -1595,6 +1596,61 @@ export const ROUTES = [
     capability: 'MENU_MANAGE',
     responses: {
       200: { description: 'The current version.', schema: MenuPublishResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'menuImportTemplate',
+    method: 'GET',
+    path: '/api/v1/menu/import/template',
+    summary: 'The vendor menu template (.xlsx)',
+    description:
+      'ONB-005. Sheets Items, Variants, Modifiers and Combos, with a notes row under each header ' +
+      'saying what goes in each column. The notes row is skipped on import.',
+    tags: ['menu'],
+    requirements: ['ONB-005'],
+    capability: 'MENU_MANAGE',
+    responses: {
+      200: { description: 'The workbook, base64.', schema: MenuTemplateResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'checkMenuImport',
+    method: 'POST',
+    path: '/api/v1/menu/import/check',
+    summary: 'Check a menu file and list every problem, writing nothing',
+    description:
+      'ONB-005, MENU-011. Each problem names its sheet, row and column. Items, categories, ' +
+      'modifier groups and combos are added; existing items are never changed, and tax groups ' +
+      'and kitchen stations are referred to by name.',
+    tags: ['menu'],
+    requirements: ['ONB-005', 'ONB-009', 'MENU-011'],
+    capability: 'MENU_MANAGE',
+    request: { body: MenuImportRequest },
+    responses: {
+      200: { description: 'The report.', schema: MenuImportReport },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'importMenu',
+    method: 'POST',
+    path: '/api/v1/menu/import',
+    summary: 'Import a menu file and publish it',
+    description:
+      'ONB-005, ONB-009. Checks the file as the check does; with no problems, adds everything in ' +
+      'one transaction, audited, and publishes a new menu version. With problems nothing is ' +
+      'written and the report lists them.',
+    tags: ['menu'],
+    requirements: ['ONB-005', 'ONB-009', 'MENU-011', 'MENU-013', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { body: MenuImportRequest },
+    responses: {
+      200: {
+        description: 'The report; `committed` says whether it was imported.',
+        schema: MenuImportReport,
+      },
       ...standardErrors,
     },
   },

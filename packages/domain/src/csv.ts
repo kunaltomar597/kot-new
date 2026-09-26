@@ -83,3 +83,55 @@ export function stampedCsv(stamp: CsvStamp, sections: readonly CsvSection[]): st
   }
   return toCsv(rows);
 }
+
+/**
+ * Parses CSV text (RFC 4180: quoted cells, doubled quotes, CRLF or LF line ends, a UTF-8 BOM) into
+ * rows of cells. Blank lines are kept as rows with one empty cell so row numbers match what a
+ * spreadsheet shows. Throws on an unclosed quote.
+ */
+export function parseCsv(text: string): string[][] {
+  const input = text.startsWith('﻿') ? text.slice(1) : text;
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  let index = 0;
+  while (index < input.length) {
+    const char = input.charAt(index);
+    if (quoted) {
+      if (char === '"') {
+        if (input[index + 1] === '"') {
+          cell += '"';
+          index += 2;
+          continue;
+        }
+        quoted = false;
+      } else {
+        cell += char;
+      }
+      index += 1;
+      continue;
+    }
+    if (char === '"' && cell === '') {
+      quoted = true;
+    } else if (char === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (char === '\r' || char === '\n') {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+      if (char === '\r' && input[index + 1] === '\n') index += 1;
+    } else {
+      cell += char;
+    }
+    index += 1;
+  }
+  if (quoted) throw new TypeError('A quoted cell is not closed');
+  if (cell !== '' || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}

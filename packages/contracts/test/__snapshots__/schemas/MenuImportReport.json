@@ -1,0 +1,101 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "ok": { "type": "boolean" },
+      "committed": { "type": "boolean" },
+      "issues": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sheet": { "type": "string", "enum": ["Items", "Variants", "Modifiers", "Combos"] },
+            "row": {
+              "anyOf": [
+                { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "column": { "type": ["string", "null"] },
+            "message": { "type": "string" }
+          },
+          "required": ["sheet", "row", "column", "message"]
+        }
+      },
+      "summary": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "categories": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "modifierGroups": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "items": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "variants": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "combos": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["categories", "modifierGroups", "items", "variants", "combos"]
+          },
+          { "type": "null" }
+        ]
+      },
+      "menuVersion": {
+        "anyOf": [
+          { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["ok", "committed", "issues", "summary", "menuVersion"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "ok": { "type": "boolean" },
+      "committed": { "type": "boolean" },
+      "issues": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sheet": { "type": "string", "enum": ["Items", "Variants", "Modifiers", "Combos"] },
+            "row": {
+              "anyOf": [
+                { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "column": { "type": ["string", "null"] },
+            "message": { "type": "string" }
+          },
+          "required": ["sheet", "row", "column", "message"],
+          "additionalProperties": false
+        }
+      },
+      "summary": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "categories": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "modifierGroups": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "items": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "variants": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "combos": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["categories", "modifierGroups", "items", "variants", "combos"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "menuVersion": {
+        "anyOf": [
+          { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["ok", "committed", "issues", "summary", "menuVersion"],
+    "additionalProperties": false
+  }
+}
