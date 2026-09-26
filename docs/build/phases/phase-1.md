@@ -320,6 +320,21 @@ The rest of P1-06:
 - cancel with a reason, and void with a manager override;
 - MODIFIED and CANCELLED delta KOTs (ORD-012).
 
+As built: `apps/server/src/orders/order-items.service.ts`.
+
+- `POST /api/v1/order-items/:id/status` (START_PREPARING, MARK_READY, PICK_UP, SERVE). Each step
+  checks its own §4.2 grant, and a combo line carries its parts.
+- `POST .../cancel` (`ITEM_CANCEL_BEFORE_PREP`; waiters own tables only) works from SENT. It
+  returns counted stock and gives the station a CANCELLED slip.
+- `POST .../void` (`ITEM_VOID_AFTER_PREP`; cashiers and waiters with a manager override token)
+  works after preparation started. It is audited with the approver, and a station still holding
+  the item gets a CANCELLED slip.
+- `PATCH /api/v1/order-items/:id` changes quantity or instructions before cooking.
+  - A sent item gets a MODIFIED ticket with the new quantity, and stock follows the difference.
+  - Combos are cancelled and ordered again instead.
+- Each change runs under a row lock and writes an `order_events` row, `ItemStatusChanged` (to the
+  station and the table) and an audit entry for cancel, void and modify.
+
 ## P1-07 Stations, printers and KOT printing
 
 Goal: kitchen tickets reach the right station on screen, paper or both.

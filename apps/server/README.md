@@ -307,6 +307,8 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   - Lines are priced from the published menu, never the client (ORD-014), and all line problems
     are reported together (ORD-017).
   - Staff orders get per-station KOTs, and counted stock is taken off, all in one transaction.
+- `src/orders/order-items.service.ts` (P1-06b): status steps, cancel, void (override token) and
+  modify. Kitchen-relevant changes always produce a CANCELLED or MODIFIED ticket (ORD-012).
 
 ## Commands
 

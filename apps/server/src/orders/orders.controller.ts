@@ -1,15 +1,20 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Req } from '@nestjs/common';
 import {
+  ModifyOrderItemRequest,
+  OrderItemEndRequest,
+  OrderItemParams,
+  OrderItemStatusRequest,
   OrderParams,
   type OrderView,
   SubmitOrderRequest,
   type SubmitOrderResponse,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
-import { RequireCapability } from '../auth/decorators.js';
+import { RequireCapability, RequireSession } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { AppError } from '../errors/app-error.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { OrderItemsService } from './order-items.service.js';
 import { OrdersService } from './orders.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
@@ -55,5 +60,62 @@ export class OrdersController {
     @Param(new ZodValidationPipe(OrderParams)) params: OrderParams,
   ): Promise<OrderView> {
     return this.orders.get(principalOf(request).restaurantId, params.orderId);
+  }
+}
+
+/** Item changes after an order is placed (P1-06b, ORD-010 to ORD-012). */
+@Controller('order-items')
+export class OrderItemsController {
+  constructor(private readonly items: OrderItemsService) {}
+
+  // Each step checks its own §4.2 grant in the service (kitchen marks, floor serves).
+  @Post(':orderItemId/status')
+  @HttpCode(200)
+  @RequireSession()
+  status(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderItemParams)) params: OrderItemParams,
+    @Body(new ZodValidationPipe(OrderItemStatusRequest)) body: OrderItemStatusRequest,
+  ): Promise<OrderView> {
+    return this.items.setStatus(principalOf(request), params.orderItemId, body.event);
+  }
+
+  // Waiters: their own tables only (OWN), which the guard marks for the service.
+  @Post(':orderItemId/cancel')
+  @HttpCode(200)
+  @RequireCapability('ITEM_CANCEL_BEFORE_PREP')
+  cancel(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderItemParams)) params: OrderItemParams,
+    @Body(new ZodValidationPipe(OrderItemEndRequest)) body: OrderItemEndRequest,
+  ): Promise<OrderView> {
+    return this.items.cancel(
+      principalOf(request),
+      params.orderItemId,
+      body.reason,
+      request.ownershipRequired === true,
+    );
+  }
+
+  // Cashiers and waiters: the guard has consumed a manager's override token (AUTH-011).
+  @Post(':orderItemId/void')
+  @HttpCode(200)
+  @RequireCapability('ITEM_VOID_AFTER_PREP')
+  void(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderItemParams)) params: OrderItemParams,
+    @Body(new ZodValidationPipe(OrderItemEndRequest)) body: OrderItemEndRequest,
+  ): Promise<OrderView> {
+    return this.items.void(principalOf(request), params.orderItemId, body.reason, request.override);
+  }
+
+  @Patch(':orderItemId')
+  @RequireCapability('ORDER_CREATE')
+  modify(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderItemParams)) params: OrderItemParams,
+    @Body(new ZodValidationPipe(ModifyOrderItemRequest)) body: ModifyOrderItemRequest,
+  ): Promise<OrderView> {
+    return this.items.modify(principalOf(request), params.orderItemId, body);
   }
 }

@@ -1,0 +1,18 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "event": { "type": "string", "enum": ["START_PREPARING", "MARK_READY", "PICK_UP", "SERVE"] }
+    },
+    "required": ["event"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "event": { "type": "string", "enum": ["START_PREPARING", "MARK_READY", "PICK_UP", "SERVE"] }
+    },
+    "required": ["event"],
+    "additionalProperties": false
+  }
+}
