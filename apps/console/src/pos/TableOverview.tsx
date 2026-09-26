@@ -46,6 +46,7 @@ export function TableOverview() {
   const free = tables.filter((table) => table.state === 'FREE');
   const selected = tables.find((table) => table.tableId === panel?.tableId);
   const canMove = person !== undefined && grantFor(person.role, 'TABLE_MOVE_MERGE') !== 'DENY';
+  const canCloseDay = person !== undefined && grantFor(person.role, 'DAY_END_CLOSE') !== 'DENY';
   const close = () => {
     setPanel(undefined);
   };
@@ -71,6 +72,16 @@ export function TableOverview() {
           >
             {t('pos.shift')}
           </Button>
+          {canCloseDay ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                void navigate('day-end');
+              }}
+            >
+              {t('dayEnd.open')}
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             onClick={() => {

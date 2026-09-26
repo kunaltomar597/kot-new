@@ -17,7 +17,7 @@ Must: 130 / 287 covered. Should: 1 / 24. Could: 0 / 7.
 - AUTH-008 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/contracts/test/devices.test.ts
 - AUTH-009 (M): apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/devices.test.ts
 - AUTH-010 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/integration/auth-guard.int.test.ts, packages/domain/test/permissions.test.ts
-- AUTH-011 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/auth-guard.int.test.ts, packages/domain/test/permissions.test.ts
+- AUTH-011 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-corrections.test.tsx, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/auth-guard.int.test.ts, packages/domain/test/permissions.test.ts
 - AUTH-013 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/auth-sessions.int.test.ts
 - ONB-001 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/devices.int.test.ts
 - ONB-003 (M): apps/control-plane/test/integration/enrolment.int.test.ts, apps/control-plane/test/unit/enrolment-code.test.ts, apps/server/test/unit/control-plane-client.test.ts, packages/contracts/test/control-plane.test.ts
@@ -71,12 +71,12 @@ Must: 130 / 287 covered. Should: 1 / 24. Could: 0 / 7.
 - BILL-004 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/tax-and-bill.test.ts
 - BILL-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/tax-and-bill.test.ts
 - BILL-006 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/domain/test/tax-and-bill.test.ts
-- BILL-007 (M): apps/server/test/integration/bill-split.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/bill-split.test.ts, packages/domain/test/money.test.ts
+- BILL-007 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-corrections.test.tsx, apps/console/test/billing-logic.test.ts, apps/server/test/integration/bill-split.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/bill-split.test.ts, packages/domain/test/money.test.ts
 - BILL-008 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-logic.test.ts, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/payments.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/payments.test.ts
 - BILL-009 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-template.test.ts
-- BILL-010 (M): apps/server/test/integration/bill-split.int.test.ts, apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/schema.int.test.ts
+- BILL-010 (M): apps/console/test/billing-corrections.test.tsx, apps/server/test/integration/bill-split.int.test.ts, apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/schema.int.test.ts
 - BILL-011 (M): apps/server/test/integration/billing.int.test.ts, packages/contracts/test/billing-payments.test.ts
-- BILL-013 (M): apps/console/test/billing-screens.test.tsx, apps/server/test/integration/day-end.int.test.ts, apps/server/test/integration/payments.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/payments.test.ts, packages/domain/test/z-report.test.ts
+- BILL-013 (M): apps/console/test/billing-corrections.test.tsx, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/day-end.int.test.ts, apps/server/test/integration/payments.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/payments.test.ts, packages/domain/test/z-report.test.ts
 - BILL-014 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-template.test.ts
 - WTR-002 (M): packages/domain/test/floor.test.ts
 - WTR-008 (M): apps/server/test/integration/table-sessions.int.test.ts
@@ -88,7 +88,7 @@ Must: 130 / 287 covered. Should: 1 / 24. Could: 0 / 7.
 - MGR-007 (M): apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/settings.test.ts
 - RPT-001 (M): apps/server/test/integration/reports.int.test.ts, packages/contracts/test/billing-payments.test.ts
 - RPT-002 (M): apps/server/test/integration/reports.int.test.ts, packages/domain/test/reports.test.ts
-- RPT-005 (M): apps/server/test/integration/day-end.int.test.ts, apps/server/test/integration/reports.int.test.ts, packages/domain/test/z-report.test.ts
+- RPT-005 (M): apps/console/test/billing-corrections.test.tsx, apps/server/test/integration/day-end.int.test.ts, apps/server/test/integration/reports.int.test.ts, packages/domain/test/z-report.test.ts
 - RPT-006 (M): apps/server/test/integration/reports.int.test.ts, packages/domain/test/reports.test.ts
 - RPT-015 (M): apps/server/test/integration/reports.int.test.ts
 - RPT-017 (M): apps/server/test/integration/reports.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/csv.test.ts
