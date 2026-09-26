@@ -57,7 +57,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-14 Phase 1 exit test (after the P1 UIs).
+- P2-01 React Native foundation (P0-11 to P0-14 done).
+- P2-03 Notification and escalation engine (P0-12, P1-02 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -118,7 +119,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-12b Split bill, void and re-issue, day-end screen
 - [x] P1-13a Report data
 - [x] P1-13b CSV export and order drill-down
-- [ ] P1-14 Phase 1 exit test
+- [x] P1-14 Phase 1 exit test
 
 ### Phase 2: Waiter app, notifications, pagers
 
@@ -427,6 +428,12 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P1-14):
+
+94. The exit scenario raises `auth.attemptsPerMinutePerDevice` to its maximum (100) while it runs
+    and puts it back afterwards; both changes are audited. A day squeezed into seconds asks for
+    manager PINs far faster than a real counter does. The limit itself is unchanged.
+
 Decided 2026-09-26 (P1-05):
 
 90. The menu import only adds. It never changes or archives existing items. An item name already
@@ -536,6 +543,35 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-14 Phase 1 exit test (simulated service day)
+
+Built:
+
+- `apps/server/test/scenario/`: `service-day.ts` (the scenario), `service-day-suite.ts` (run and
+  checks), and `real-install.scenario.test.ts` for the lab rig.
+- `test/integration/service-day.int.test.ts` runs the suite in CI.
+- A vitest project `scenario` and the script `scenario:service-day`.
+
+Results (seed 20260926, run in CI in about 25 s):
+
+- 100 orders: 85 at 43 tables and 15 takeaway, with 202 lines. Of those, 24 had variants, 24 had
+  modifiers and 6 were combos.
+- Item changes: 7 items cancelled before preparation, and 6 voided after it with a manager's
+  approval.
+- Discounts: 15 within the cashier's limit, and 8 above it with approval.
+- Bills: 8 bills split in two, 16 reprints marked DUPLICATE, 6 invoices cancelled and issued
+  again, and 6 table moves.
+- 84 payments, some split across UPI and cash; retried orders and payment sets were replayed, not
+  duplicated.
+- 72 invoices, with numbers in sequence and the cancelled ones included. None were left unpaid.
+- The Z-report equals the settled invoices and the payments, with zero cash variance. GST equals
+  the register, and the audit chain verifies.
+
+Phase 1 is complete apart from P0-16 (Windows packaging, which needs a PC) and the hardware
+spikes.
+
+Decisions: 94.
 
 ### 2026-09-26: P1-05 Excel/CSV menu import
 
