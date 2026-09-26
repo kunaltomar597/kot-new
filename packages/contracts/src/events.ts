@@ -149,12 +149,22 @@ export const SettingsChanged = event(
 );
 
 /**
- * Part of the restaurant's setup changed (P1-01b): its profile, its invoice particulars, its tax
- * groups or its invoice series. Screens and bill templates read that part again.
+ * Part of the restaurant's setup changed (P1-01b, P1-02a): its profile, its invoice particulars,
+ * its tax groups, its invoice series, the floor (sections and tables) or the day's waiter
+ * assignments. Screens and bill templates read that part again.
  */
 export const RestaurantChanged = event(
   'RestaurantChanged',
-  z.object({ part: z.enum(['PROFILE', 'LEGAL', 'TAX_GROUPS', 'INVOICE_SERIES']) }),
+  z.object({
+    part: z.enum([
+      'PROFILE',
+      'LEGAL',
+      'TAX_GROUPS',
+      'INVOICE_SERIES',
+      'FLOOR',
+      'WAITER_ASSIGNMENTS',
+    ]),
+  }),
 );
 
 export const DomainEvent = z.discriminatedUnion('type', [

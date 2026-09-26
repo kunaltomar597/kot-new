@@ -1076,6 +1076,8 @@ components:
                 - LEGAL
                 - TAX_GROUPS
                 - INVOICE_SERIES
+                - FLOOR
+                - WAITER_ASSIGNMENTS
           required:
             - part
           additionalProperties: false

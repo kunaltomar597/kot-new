@@ -116,6 +116,33 @@ Deliverables:
 Acceptance: integration tests for the whole table state machine including invalid transitions,
 move table with open KOTs (scenario S7 at API level), concurrent open of the same table (one wins).
 
+Split into P1-02a (floor setup and waiter assignment) and P1-02b (table sessions, move table,
+takeaway tokens and the table overview).
+
+### P1-02a Floor and waiter assignment
+
+As built: `packages/contracts/src/floor.ts` and `apps/server/src/floor`.
+
+- `GET /api/v1/floor` gives any signed-in person the sections and their tables, with state and
+  paired tablets.
+- Sections and tables are created, changed, archived and restored by managers and the Owner
+  (`STAFF_MANAGE`, BRD §4.2 "manage staff, sections").
+  - Section names are unique among active sections. Table labels are unique, archived tables
+    included: an archived table is restored rather than recreated.
+  - A table is archived only when it is free and no tablet is paired to it; a section only when
+    it has no active tables.
+- `GET` and `PUT /api/v1/waiter-assignments` hold the business day's assignments: sections, or
+  single tables, per waiter. Each day starts empty and the previous set is offered to apply again.
+  `@rp/domain` `responsibleWaiters` gives the table's waiters: those given the table itself, else
+  the section's.
+- Every change is audited and announced with `RestaurantChanged` (`FLOOR`,
+  `WAITER_ASSIGNMENTS`).
+
+### P1-02b Table sessions, move table, takeaway tokens and overview
+
+The rest of P1-02: open (covers, waiter), state changes, close without bill, request bill, move
+table with KOT update events, takeaway tokens and the TBL-007 overview.
+
 ## P1-03 Menu management API
 
 Goal: the full menu model and its versioned snapshot.

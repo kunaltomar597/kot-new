@@ -13,6 +13,7 @@ import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { ObservabilityModule } from './observability/error-reporter.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { FloorModule } from './floor/floor.module.js';
 import { RestaurantModule } from './restaurant/restaurant.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { TlsModule } from './tls/tls.module.js';
@@ -35,6 +36,7 @@ export class AppModule {
         AuditModule,
         SettingsModule,
         RestaurantModule,
+        FloorModule,
         DevicesModule,
         EventsModule,
         RealtimeModule,

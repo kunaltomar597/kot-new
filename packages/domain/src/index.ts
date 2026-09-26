@@ -15,3 +15,4 @@ export * from './menu-selection.js';
 export * from './kot.js';
 export * from './canonical-json.js';
 export * from './gstin.js';
+export * from './floor.js';
