@@ -12,6 +12,7 @@
     { "name": "audit" },
     { "name": "auth" },
     { "name": "billing" },
+    { "name": "day-end" },
     { "name": "devices" },
     { "name": "floor" },
     { "name": "menu" },
@@ -1075,6 +1076,142 @@
         },
         "x-capability": "BILL_PRINT_AND_PAYMENT",
         "x-requirements": ["BILL-007", "BILL-003", "AUD-001"]
+      }
+    },
+    "/api/v1/day-end": {
+      "get": {
+        "operationId": "previewDayEnd",
+        "summary": "The current business date’s Z-report and what blocks closing it",
+        "tags": ["day-end"],
+        "responses": {
+          "200": {
+            "description": "The preview.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DayEndPreview" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DAY_END_CLOSE",
+        "x-requirements": ["BILL-013", "RPT-005"]
+      },
+      "post": {
+        "operationId": "closeDay",
+        "summary": "Close the business date and keep its Z-report",
+        "description": "BILL-013. Refused while shifts are open or takeaway bills are unpaid; open tables block unless carried forward to the next business date. Afterwards everything recorded belongs to the next business date. Audited.",
+        "tags": ["day-end"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CloseDayRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The closed day and its Z-report.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DayEndView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Blocked (details list the blockers), already closed, or not the current date.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DAY_END_CLOSE",
+        "x-requirements": ["BILL-013", "RPT-005", "AUD-001"]
+      }
+    },
+    "/api/v1/day-ends/{businessDate}": {
+      "get": {
+        "operationId": "getDayEnd",
+        "summary": "The Z-report kept when a business date was closed",
+        "tags": ["day-end"],
+        "parameters": [
+          {
+            "name": "businessDate",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The closed day.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DayEndView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "That date is not closed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DAY_END_CLOSE",
+        "x-requirements": ["RPT-005"]
       }
     },
     "/api/v1/devices": {
@@ -6441,6 +6578,24 @@
         "required": ["id", "name", "parentId", "displayOrder", "archivedAt"],
         "additionalProperties": false
       },
+      "CloseDayRequest": {
+        "type": "object",
+        "properties": {
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "carryForwardTables": { "default": false, "type": "boolean" }
+        },
+        "required": ["businessDate", "carryForwardTables"],
+        "additionalProperties": false
+      },
+      "CloseDayRequestInput": {
+        "type": "object",
+        "properties": {
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "carryForwardTables": { "default": false, "type": "boolean" }
+        },
+        "required": ["businessDate"],
+        "additionalProperties": false
+      },
       "CloseShiftRequest": {
         "type": "object",
         "properties": {
@@ -6732,6 +6887,79 @@
           "shift": { "anyOf": [{ "$ref": "#/components/schemas/ShiftView" }, { "type": "null" }] }
         },
         "required": ["shift"],
+        "additionalProperties": false
+      },
+      "DayEndBlockers": {
+        "type": "object",
+        "properties": {
+          "openShifts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "shiftId": { "$ref": "#/components/schemas/Id" },
+                "staffId": { "$ref": "#/components/schemas/Id" }
+              },
+              "required": ["shiftId", "staffId"],
+              "additionalProperties": false
+            }
+          },
+          "openTables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tableSessionId": { "$ref": "#/components/schemas/Id" },
+                "tableLabel": { "type": "string" }
+              },
+              "required": ["tableSessionId", "tableLabel"],
+              "additionalProperties": false
+            }
+          },
+          "unsettledInvoices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "invoiceId": { "$ref": "#/components/schemas/Id" },
+                "invoiceNumber": { "type": "string" },
+                "grandTotal": { "$ref": "#/components/schemas/Paise" }
+              },
+              "required": ["invoiceId", "invoiceNumber", "grandTotal"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["openShifts", "openTables", "unsettledInvoices"],
+        "additionalProperties": false
+      },
+      "DayEndParams": {
+        "type": "object",
+        "properties": { "businessDate": { "$ref": "#/components/schemas/IsoDate" } },
+        "required": ["businessDate"],
+        "additionalProperties": false
+      },
+      "DayEndPreview": {
+        "type": "object",
+        "properties": {
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "status": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+          "blockers": { "$ref": "#/components/schemas/DayEndBlockers" },
+          "report": { "$ref": "#/components/schemas/ZReportView" }
+        },
+        "required": ["businessDate", "status", "blockers", "report"],
+        "additionalProperties": false
+      },
+      "DayEndView": {
+        "type": "object",
+        "properties": {
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "closedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "closedById": { "$ref": "#/components/schemas/Id" },
+          "carriedForward": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } },
+          "report": { "$ref": "#/components/schemas/ZReportView" }
+        },
+        "required": ["businessDate", "closedAt", "closedById", "carriedForward", "report"],
         "additionalProperties": false
       },
       "Denominations": {
@@ -10272,7 +10500,137 @@
         "required": ["current", "previous"],
         "additionalProperties": false
       },
-      "Weekday": { "type": "string", "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] }
+      "Weekday": { "type": "string", "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] },
+      "ZReportView": {
+        "type": "object",
+        "properties": {
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "invoices": {
+            "type": "object",
+            "properties": {
+              "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "settled": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "unsettled": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "voided": { "type": "array", "items": { "type": "string" } },
+              "numbers": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["count", "settled", "unsettled", "voided", "numbers"],
+            "additionalProperties": false
+          },
+          "grossSales": { "$ref": "#/components/schemas/Paise" },
+          "discounts": { "$ref": "#/components/schemas/Paise" },
+          "serviceCharge": { "$ref": "#/components/schemas/Paise" },
+          "taxTotal": { "$ref": "#/components/schemas/Paise" },
+          "roundOff": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "netSales": { "$ref": "#/components/schemas/Paise" },
+          "settledSales": { "$ref": "#/components/schemas/Paise" },
+          "taxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string" },
+                "rateBp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "taxableValue": { "$ref": "#/components/schemas/Paise" },
+                "amount": { "$ref": "#/components/schemas/Paise" }
+              },
+              "required": ["code", "rateBp", "taxableValue", "amount"],
+              "additionalProperties": false
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mode": { "$ref": "#/components/schemas/PaymentMode" },
+                "label": { "type": ["string", "null"] },
+                "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "amount": { "$ref": "#/components/schemas/Paise" }
+              },
+              "required": ["mode", "label", "count", "amount"],
+              "additionalProperties": false
+            }
+          },
+          "paymentsTotal": { "$ref": "#/components/schemas/Paise" },
+          "cash": {
+            "type": "object",
+            "properties": {
+              "cashIn": { "$ref": "#/components/schemas/Paise" },
+              "cashOut": { "$ref": "#/components/schemas/Paise" }
+            },
+            "required": ["cashIn", "cashOut"],
+            "additionalProperties": false
+          },
+          "shifts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "shiftId": { "$ref": "#/components/schemas/Id" },
+                "staffId": { "$ref": "#/components/schemas/Id" },
+                "openingFloat": { "$ref": "#/components/schemas/Paise" },
+                "expectedCash": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "countedCash": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Paise" }, { "type": "null" }]
+                },
+                "variance": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": [
+                "shiftId",
+                "staffId",
+                "openingFloat",
+                "expectedCash",
+                "countedCash",
+                "variance"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "totalVariance": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "businessDate",
+          "orders",
+          "invoices",
+          "grossSales",
+          "discounts",
+          "serviceCharge",
+          "taxTotal",
+          "roundOff",
+          "netSales",
+          "settledSales",
+          "taxes",
+          "payments",
+          "paymentsTotal",
+          "cash",
+          "shifts",
+          "totalVariance"
+        ],
+        "additionalProperties": false
+      }
     }
   }
 }

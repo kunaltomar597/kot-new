@@ -1,0 +1,118 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "openShifts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "shiftId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "staffId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": ["shiftId", "staffId"]
+        }
+      },
+      "openTables": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tableSessionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "tableLabel": { "type": "string" }
+          },
+          "required": ["tableSessionId", "tableLabel"]
+        }
+      },
+      "unsettledInvoices": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "invoiceId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "invoiceNumber": { "type": "string" },
+            "grandTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["invoiceId", "invoiceNumber", "grandTotal"]
+        }
+      }
+    },
+    "required": ["openShifts", "openTables", "unsettledInvoices"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "openShifts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "shiftId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "staffId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": ["shiftId", "staffId"],
+          "additionalProperties": false
+        }
+      },
+      "openTables": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tableSessionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "tableLabel": { "type": "string" }
+          },
+          "required": ["tableSessionId", "tableLabel"],
+          "additionalProperties": false
+        }
+      },
+      "unsettledInvoices": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "invoiceId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "invoiceNumber": { "type": "string" },
+            "grandTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["invoiceId", "invoiceNumber", "grandTotal"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["openShifts", "openTables", "unsettledInvoices"],
+    "additionalProperties": false
+  }
+}

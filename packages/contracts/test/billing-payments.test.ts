@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   BillCustomerRequest,
+  CloseDayRequest,
   CloseShiftRequest,
+  DayEndParams,
   DiscountRequest,
   OpenBillRequest,
   PaymentRequest,
@@ -117,5 +119,16 @@ describe('[BILL-013] closing a shift', () => {
       false,
     );
     expect(CloseShiftRequest.safeParse({ denominations: { abc: 1 } }).success).toBe(false);
+  });
+});
+
+describe('[BILL-013] closing a business date', () => {
+  it('takes the date, and carries tables forward only when asked', () => {
+    expect(CloseDayRequest.parse({ businessDate: '2026-09-26' })).toEqual({
+      businessDate: '2026-09-26',
+      carryForwardTables: false,
+    });
+    expect(CloseDayRequest.safeParse({ businessDate: '26-09-2026' }).success).toBe(false);
+    expect(DayEndParams.safeParse({ businessDate: '2026-02-30' }).success).toBe(false);
   });
 });
