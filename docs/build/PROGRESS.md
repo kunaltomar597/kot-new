@@ -12,13 +12,13 @@ What exists:
 
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
-  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment, bill splitting.
-  122 tests.
+  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment, bill splitting, payments and shift cash.
+  128 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10). 390 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a). 409 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills (P1-10d). 566 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills (P1-10d); shifts, cash and payments with table settlement (P1-11a). 572 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -55,7 +55,7 @@ Recommended next WPs (dependencies met):
 
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
-- P1-11 Payments, shifts and day-end (P1-10 done).
+- P1-11b Day-end and Z-report (P1-11a done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -108,7 +108,8 @@ Recommended next WPs (dependencies met):
 - [x] P1-10b Bill printing, reprint and void
 - [x] P1-10c Edit after print
 - [x] P1-10d Split bill
-- [ ] P1-11 Payments, shifts and day-end
+- [x] P1-11a Shifts, cash and payments
+- [ ] P1-11b Day-end and Z-report
 - [ ] P1-12 POS billing UI
 - [ ] P1-13 Core reports v1
 - [ ] P1-14 Phase 1 exit test
@@ -363,6 +364,19 @@ Decided 2026-09-26 (P1-10d):
 54. Equal parts list every line at its full quantity with "(share n of N)" and that part's amounts,
     so each invoice shows what was eaten. Splits go up to 20 parts.
 
+Decided 2026-09-26 (P1-11a):
+
+55. Cash can only be taken in an open shift, so every rupee of cash is counted at shift close.
+    Card, UPI and other payments join the shift when one is open, and are accepted without one
+    (a manager covering).
+56. Payment recording is idempotent, like order submission: a retried request never records a
+    payment twice. A bill may be paid in steps, but never beyond its total. Change is recorded on
+    the cash payment; it is never an overpayment.
+57. A table is freed when every bill of its session is paid and nothing was ordered since
+    printing. Items ordered after printing keep the table open for the edited bill.
+58. A cashier moves cash and closes only their own shift (§4.2 OWN). Managers and the Owner can
+    handle any shift.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -374,7 +388,7 @@ including the Owner's second factor for tax and data settings), P1-01b (the Owne
 invoice series and invoice particulars endpoints, #19), P1-10a (billing: discounts, overrides,
 invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-M05), P1-10b
 (invoice void with override, DUPLICATE marking), P1-10c (editing a printed invoice under its
-number, with override), P1-10d (split bills: allocation and numbering).
+number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -382,6 +396,46 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-11a shifts, cash and payments
+
+P1-11 was split into P1-11a (this) and P1-11b (day-end and Z-report).
+
+Built:
+
+- `@rp/domain` `payments.ts`: `applyPayments`, `expectedCash`, `cashVariance` and
+  `countDenominations`. There are new domain error codes INVALID_PAYMENT and OVERPAYMENT, both
+  mapped to 422.
+- Migration `20260927000000_payment_mode_label`.
+- `@rp/contracts` `payments.ts`: shift, cash movement, close, payments and views, with 6 routes.
+- `apps/server/src/payments/`: `ShiftsService`, `PaymentsService` and their controllers.
+- Tests:
+  - 6 domain tests;
+  - 6 integration tests:
+    - one shift per person;
+    - refusals: overpayment, short cash, tendered on a card, OTHER unnamed or unknown;
+    - a split card and cash payment settling with change, freeing the table and closing the
+      session with its events and audit;
+    - an idempotent retry and a reused key refused;
+    - payment in steps, with cash refused without a shift;
+    - cash in and out with OWN enforced;
+    - close by denominations with the variance.
+
+  Totals: domain 128 tests, contracts 409, server 572.
+
+Decisions: 55 to 58.
+
+Notes for the next sessions:
+
+- P1-11b: open shifts and open tables block day-end; a manager with a PIN carries open tables
+  forward. The Z-report reads settled and voided invoices of the business date (invoice lines at
+  their current `version`), payments by mode, and shifts.
+- CI also runs `pnpm test:coverage`, which `pnpm check` does not. The first push failed on the
+  contracts function-coverage threshold, because the new request schemas' refinements were
+  untested (fixed with `billing-payments.test.ts`). Run `pnpm test:coverage` before pushing a WP
+  that adds contracts.
+- Voiding a settled invoice still leaves its payments CAPTURED. Refunds or reversals are
+  undesigned (BILL-010 re-issue after a settled void). Decide in P1-11b or P1-12.
 
 ### 2026-09-26: P1-10d split bill (P1-10 done)
 

@@ -609,6 +609,45 @@ data, closes the business date; open tables block unless carried forward with ma
 Acceptance: integration tests for split payments, over/under payment rejection, variance
 calculation, day-end blocking and carry-forward.
 
+P1-11 is split in two.
+
+### P1-11a Shifts, cash and payments
+
+As built: `@rp/domain` `payments.ts`, migration `20260927000000_payment_mode_label` and
+`apps/server/src/payments/`.
+
+- `@rp/domain`:
+  - `applyPayments(total, alreadyPaid, payments)` allows splits across modes and payment in
+    steps, and refuses anything beyond the total (OVERPAYMENT). Change is tendered − amount, only
+    for cash. The bill is settled at equality, so a bill of zero settles with no payments.
+  - `expectedCash`, `cashVariance` and `countDenominations`, which parses rupee notes with
+    `parseRupees`.
+- Shifts:
+  - `POST /api/v1/shifts` and `GET /api/v1/shifts/current` (`BILL_PRINT_AND_PAYMENT`). One open
+    shift per person, locked on the staff row.
+  - `POST /api/v1/shifts/:id/cash-movements` and `/close` (`CASH_MOVEMENT_AND_SHIFT_CLOSE`, OWN for
+    cashiers).
+  - Close takes the counted cash or a denomination count. The expected cash (float + cash payments
+    - cash in − cash out) and the variance are stored.
+  - Opening, cash movements and closing are all audited.
+- Payments: `POST /api/v1/invoices/:id/payments` and `GET .../payments` (`BILL_PRINT_AND_PAYMENT`).
+  - Idempotent (scope `payments.record`, 7 days), under a row lock on the invoice.
+  - OTHER needs one of `payments.otherModes`, stored as `mode_label`.
+  - Cash needs the person's open shift, and payments join it when there is one.
+  - On settlement the invoice becomes SETTLED, with `BillSettled` and an audit entry.
+  - When every invoice of the table's bill is settled and the table is BILL_PRINTED, the session
+    closes and the table is FREE (`TableClosed`, `TableStateChanged`, audit).
+  - Items ordered after printing keep the table open.
+
+### P1-11b Day-end and Z-report
+
+- The Z-report data for the business date: sales, discounts, tax per component, payments per
+  mode, shifts with their variance, and the invoice range with cancelled numbers.
+- Closing the business date (`business_days`, `day_ends`) with `DAY_END_CLOSE`.
+  - Open shifts and open tables block it.
+  - A manager can carry open tables forward to the next business date with a PIN.
+- Acceptance: day-end blocking and carry-forward, and Z-report totals equal the settled invoices.
+
 ## P1-12 POS billing UI
 
 Goal: the cashier settles bills quickly.

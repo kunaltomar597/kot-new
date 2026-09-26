@@ -82,6 +82,16 @@ import {
 } from './menu-admin.js';
 import { MenuSnapshot } from './menu.js';
 import {
+  CashMovementRequest,
+  CloseShiftRequest,
+  CurrentShiftResponse,
+  InvoicePaymentsView,
+  OpenShiftRequest,
+  RecordPaymentsRequest,
+  ShiftParams,
+  ShiftView,
+} from './payments.js';
+import {
   ModifyOrderItemRequest,
   OrderItemEndRequest,
   OrderItemParams,
@@ -1990,6 +2000,109 @@ export const ROUTES = [
         description: 'The parts do not give out every item exactly, or the series is unusable.',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'openShift',
+    method: 'POST',
+    path: '/api/v1/shifts',
+    summary: 'Open a cash shift with an opening float',
+    description: 'BILL-013. One open shift per person. Audited.',
+    tags: ['payments'],
+    requirements: ['BILL-013', 'AUD-001'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { body: OpenShiftRequest },
+    responses: {
+      201: { description: 'The shift.', schema: ShiftView },
+      ...standardErrors,
+      409: { description: 'This person already has an open shift.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getCurrentShift',
+    method: 'GET',
+    path: '/api/v1/shifts/current',
+    summary: 'The signed-in person’s open shift, with the cash expected in the drawer',
+    tags: ['payments'],
+    requirements: ['BILL-013'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    responses: {
+      200: { description: 'The shift, or null.', schema: CurrentShiftResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'recordCashMovement',
+    method: 'POST',
+    path: '/api/v1/shifts/:id/cash-movements',
+    summary: 'Record cash taken into or out of the drawer, with a reason',
+    description: 'BILL-013. Cashiers for their own shift; managers for any. Audited.',
+    tags: ['payments'],
+    requirements: ['BILL-013', 'AUD-001'],
+    capability: 'CASH_MOVEMENT_AND_SHIFT_CLOSE',
+    request: { params: ShiftParams, body: CashMovementRequest },
+    responses: {
+      200: { description: 'The shift.', schema: ShiftView },
+      ...standardErrors,
+      404: { description: 'No such shift.', schema: ApiError },
+      409: { description: 'The shift is closed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'closeShift',
+    method: 'POST',
+    path: '/api/v1/shifts/:id/close',
+    summary: 'Close a shift: counted cash against expected, and the variance',
+    description:
+      'BILL-013, AUD-006. The expected cash is the float plus cash payments plus cash in minus ' +
+      'cash out. Cashiers for their own shift; managers for any. Audited.',
+    tags: ['payments'],
+    requirements: ['BILL-013', 'AUD-006', 'AUD-001'],
+    capability: 'CASH_MOVEMENT_AND_SHIFT_CLOSE',
+    request: { params: ShiftParams, body: CloseShiftRequest },
+    responses: {
+      200: { description: 'The closed shift.', schema: ShiftView },
+      ...standardErrors,
+      404: { description: 'No such shift.', schema: ApiError },
+      409: { description: 'Already closed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'recordPayments',
+    method: 'POST',
+    path: '/api/v1/invoices/:id/payments',
+    summary: 'Record payments against an invoice; settled when they equal the total',
+    description:
+      'BILL-008. Split across modes and paid in steps, never more than the total. Cash needs ' +
+      'an open shift. When a table’s last bill is paid, the table is freed. Idempotent. Audited.',
+    tags: ['payments'],
+    requirements: ['BILL-008', 'BILL-013', 'TBL-004', 'AUD-001'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { params: InvoiceParams, body: RecordPaymentsRequest },
+    responses: {
+      200: { description: 'The invoice’s payments.', schema: InvoicePaymentsView },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+      409: {
+        description: 'Voided or already settled, or cash without an open shift.',
+        schema: ApiError,
+      },
+      422: { description: 'More than the bill, or cash tendered short.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getInvoicePayments',
+    method: 'GET',
+    path: '/api/v1/invoices/:id/payments',
+    summary: 'The payments of an invoice and what remains to pay',
+    tags: ['payments'],
+    requirements: ['BILL-008'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { params: InvoiceParams },
+    responses: {
+      200: { description: 'The payments.', schema: InvoicePaymentsView },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];
