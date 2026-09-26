@@ -1,0 +1,18 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "key": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*\\.[a-z][A-Za-z0-9]*$" }
+    },
+    "required": ["key"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "key": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*\\.[a-z][A-Za-z0-9]*$" }
+    },
+    "required": ["key"],
+    "additionalProperties": false
+  }
+}

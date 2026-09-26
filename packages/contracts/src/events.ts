@@ -139,6 +139,15 @@ export const DeviceRevoked = event(
   z.object({ deviceId: Id, deviceType: DeviceType, reason: z.string().max(200) }),
 );
 
+/**
+ * Settings changed (P1-01a, MGR-007, UPD-010). Only the keys: every screen may hear it, and each
+ * reads the values it is allowed to see again.
+ */
+export const SettingsChanged = event(
+  'SettingsChanged',
+  z.object({ keys: z.array(z.string().max(80)).min(1) }),
+);
+
 export const DomainEvent = z.discriminatedUnion('type', [
   MenuPublished,
   ItemAvailabilityChanged,
@@ -160,6 +169,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   AlertEscalated,
   DeviceStatusChanged,
   DeviceRevoked,
+  SettingsChanged,
 ]);
 export type DomainEvent = z.infer<typeof DomainEvent>;
 export type DomainEventType = DomainEvent['type'];

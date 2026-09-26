@@ -13,6 +13,7 @@
     { "name": "auth" },
     { "name": "devices" },
     { "name": "orders" },
+    { "name": "settings" },
     { "name": "system" }
   ],
   "paths": {
@@ -979,6 +980,106 @@
         "x-requirements": ["ORD-001", "ORD-013", "ORD-014", "ORD-017"]
       }
     },
+    "/api/v1/settings": {
+      "get": {
+        "operationId": "listSettings",
+        "summary": "Every setting with its value, default and whether the caller may change it",
+        "description": "The whole catalogue (P1-01a): values the restaurant changed and the BRD defaults for the rest. Vendor-controlled settings are listed read-only (UPD-010).",
+        "tags": ["settings"],
+        "responses": {
+          "200": {
+            "description": "The settings.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SettingsResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["MGR-007", "UPD-010", "NFR-L03"]
+      }
+    },
+    "/api/v1/settings/{key}": {
+      "put": {
+        "operationId": "updateSetting",
+        "summary": "Change one setting",
+        "description": "The value must match the setting (and the rules between settings). Each setting names the capability needed: tax and invoice, data and licence settings need the Owner with a fresh second factor (AUTH-006); vendor-controlled settings cannot be changed here. Audited with before and after, and announced with `SettingsChanged`.",
+        "tags": ["settings"],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*\\.[a-z][A-Za-z0-9]*$" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateSettingRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The setting as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SettingView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such setting.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The value is not allowed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["MGR-007", "AUD-001", "AUTH-006", "BILL-006"]
+      }
+    },
     "/api/v1/tls/ca": {
       "get": {
         "operationId": "getTlsCa",
@@ -1566,7 +1667,8 @@
           { "$ref": "#/components/schemas/BillSettled" },
           { "$ref": "#/components/schemas/AlertEscalated" },
           { "$ref": "#/components/schemas/DeviceStatusChanged" },
-          { "$ref": "#/components/schemas/DeviceRevoked" }
+          { "$ref": "#/components/schemas/DeviceRevoked" },
+          { "$ref": "#/components/schemas/SettingsChanged" }
         ]
       },
       "ExternalId": { "type": "string", "minLength": 1, "maxLength": 128 },
@@ -2566,6 +2668,92 @@
         "enum": ["ACTIVE", "ESCALATED", "ACKNOWLEDGED", "CANCELLED", "RESOLVED"]
       },
       "ServiceRequestType": { "type": "string", "enum": ["WATER", "WAITER", "BILL"] },
+      "SettingKeyParams": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*\\.[a-z][A-Za-z0-9]*$" }
+        },
+        "required": ["key"],
+        "additionalProperties": false
+      },
+      "SettingScope": { "type": "string", "enum": ["RESTAURANT", "VENDOR"] },
+      "SettingView": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "value": {},
+          "defaultValue": {},
+          "isDefault": { "type": "boolean" },
+          "scope": { "$ref": "#/components/schemas/SettingScope" },
+          "capability": { "$ref": "#/components/schemas/Capability" },
+          "editable": { "type": "boolean" },
+          "description": { "type": "string" },
+          "requirements": { "type": "array", "items": { "type": "string" } },
+          "unit": { "type": "string" },
+          "updatedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "defaultValue",
+          "isDefault",
+          "scope",
+          "capability",
+          "editable",
+          "description",
+          "requirements",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsChanged": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "SettingsChanged" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "keys": {
+                "minItems": 1,
+                "type": "array",
+                "items": { "type": "string", "maxLength": 80 }
+              }
+            },
+            "required": ["keys"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsResponse": {
+        "type": "object",
+        "properties": {
+          "settings": { "type": "array", "items": { "$ref": "#/components/schemas/SettingView" } }
+        },
+        "required": ["settings"],
+        "additionalProperties": false
+      },
       "SignedPaise": {
         "type": "integer",
         "minimum": -9007199254740991,
@@ -2857,6 +3045,16 @@
         "required": ["id", "name", "components"],
         "additionalProperties": false
       },
+      "TimeOfDay": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+      "TimeWindow": {
+        "type": "object",
+        "properties": {
+          "start": { "$ref": "#/components/schemas/TimeOfDay" },
+          "end": { "$ref": "#/components/schemas/TimeOfDay" }
+        },
+        "required": ["start", "end"],
+        "additionalProperties": false
+      },
       "Timestamp": {
         "type": "string",
         "format": "date-time",
@@ -2912,6 +3110,15 @@
         "type": "object",
         "properties": { "staffId": { "$ref": "#/components/schemas/Id" } },
         "required": ["staffId"],
+        "additionalProperties": false
+      },
+      "UpdateSettingRequest": {
+        "type": "object",
+        "properties": {
+          "value": {},
+          "reason": { "type": "string", "minLength": 1, "maxLength": 200 }
+        },
+        "required": ["value"],
         "additionalProperties": false
       },
       "Variant": {

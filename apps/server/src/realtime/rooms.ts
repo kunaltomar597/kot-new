@@ -89,6 +89,8 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   AlertEscalated: 'MANAGERS',
   DeviceStatusChanged: 'DEVICE_PAIR',
   DeviceRevoked: 'DEVICE_PAIR',
+  // Only the changed keys: every screen may hear it and reads what it may see again.
+  SettingsChanged: 'EVERYONE',
 };
 
 function rolesWith(capability: Capability, matrix: PermissionMatrix): Role[] {

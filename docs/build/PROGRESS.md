@@ -16,7 +16,8 @@ What exists:
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
-  (`@rp/contracts/control-plane`, P0-17a). 166 tests.
+  (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a).
+  247 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -25,7 +26,8 @@ What exists:
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
   rooms, resync and revocation (P0-12); HTTPS/WSS with the installation's own CA, automatic
   certificate renewal and CA pinning at pairing (P0-15, ADR-0011); enrolment with the Vendor
-  Control Plane and signed heartbeats that discover releases (P0-17b). 433 tests.
+  Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
+  with audited changes and `SettingsChanged` events (P1-01a). 442 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -48,6 +50,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
+- P1-01b Restaurant profile, GSTIN, tax groups and invoice series.
+- P1-02 Floor, tables, table sessions (after P1-01b; P0-12 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -82,7 +86,8 @@ Recommended next WPs (dependencies met):
 
 ### Phase 1: Core POS and kitchen
 
-- [ ] P1-01 Settings registry and restaurant setup APIs
+- [x] P1-01a Settings registry
+- [ ] P1-01b Restaurant profile, tax groups and invoice series
 - [ ] P1-02 Floor, tables, sessions, move table, takeaway tokens
 - [ ] P1-03 Menu management API
 - [ ] P1-04 Menu photos
@@ -201,13 +206,29 @@ Decided 2026-09-25:
    in their WPs (P0-H1 to P0-H4, P3-01, P0-15; OI-07 is settled by ADR-0011: a private CA).
 10. TypeScript stays on 6.0 until typescript-eslint supports 7 (ADR-0002).
 
+Decided 2026-09-26 (P1-01a). These are defaults where the BRD gives no value; each is a setting the
+restaurant (or the vendor) can change:
+
+11. Prices are tax-exclusive by default (`billing.priceMode`). Grand totals round to the nearest ₹1
+    (`billing.roundingUnitPaise`). Both are the Owner's settings.
+12. Service charge, when a restaurant turns it on, defaults to 5 % (`billing.serviceChargeRateBp`).
+13. Learned recommendation rules need 0.5 % support, 20 % confidence and 1.2 lift. The dayparts
+    are breakfast 07-11, lunch 11-16, evening 16-19 and dinner 19-04. The course order is
+    Starters, Mains, Breads, Desserts, Beverages.
+14. The daily suspicious-activity report flags discounts above 20 % and cash variances above ₹200.
+15. Clocks show 12-hour time. Kitchen sounds play at 70 %. Manager browsers sign out after 30
+    minutes of inactivity. Sessions last at most 16 hours.
+16. An overdue invoice moves a licence to grace after 15 days (`licence.overdueToGraceDays`,
+    vendor-controlled). This must match the subscription agreement (LIC-009).
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
 revocation), #12 (P0-14a client-side token handling), #13 (P0-14b console storage of keys and
-sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning), P0-17a
-(installation identity, signed requests and enrolment of the Control Plane), P0-17b (the
-installation key on the PC and its signing client; this PR).
+sessions, CSP), #14 (P0-15 LAN CA, key storage, certificate renewal and pinning), #16 (P0-17a
+installation identity, signed requests and enrolment of the Control Plane), #17 (P0-17b the
+installation key on the PC and its signing client), P1-01a (who may change which setting,
+including the Owner's second factor for tax and data settings; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -215,6 +236,57 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-01a settings registry
+
+Split P1-01 into P1-01a (settings) and P1-01b (restaurant profile, GSTIN, tax groups, invoice
+series). Built:
+
+- `@rp/contracts` `settings.ts`: 66 settings covering every ⚙ in the BRD, except the few kept
+  with the thing they configure (listed in the file). Each has a schema with bounds, a default, a
+  scope (`RESTAURANT`, or `VENDOR` = read-only locally, UPD-010), the capability to change it, a
+  description, requirement IDs and a unit.
+  - Rates are basis points and money is paise, never fractions.
+  - Rules between settings: red age after amber, critical storage above warning.
+  - API contracts `SettingView`, `SettingsResponse` and `UpdateSettingRequest`, and a new domain
+    event `SettingsChanged` (keys only).
+- `apps/server/src/settings`: `SettingsService` and `SettingsController`.
+  - Effective values: the stored value when valid, else the default; cached 30 s.
+  - `GET /api/v1/settings` and `PUT /api/v1/settings/:key` (route: `OPERATIONS_CONFIGURE`, plus
+    each setting's own capability). Changes to `TAX_AND_INVOICE_SETTINGS` and `DATA_ADMIN`
+    settings need the Owner's fresh second factor. Vendor settings are refused.
+  - Each change is written in one transaction with its `SETTING_CHANGED` audit entry (before and
+    after, reason) and the event. The same value again is a no-op.
+  - `SettingsChanged` goes to every screen.
+  - `AuthSettingsService` reads through the registry, so the auth defaults now have one source.
+    The step-up rule is a shared pure function.
+- Migration `20260926120000_price_mode_setting` drops the unused `restaurants.price_mode` column
+  (P0-08): `billing.priceMode` is the one source. Invoices keep their own `price_mode` snapshot.
+- Tests: 73 catalogue tests (every default against its schema, range probes, the BRD defaults,
+  vendor scope, cross rules) and 8 integration tests. The integration tests cover:
+  - listing with editability per role;
+  - waiter refused;
+  - an audited change with its event, and the no-op repeat;
+  - invalid and conflicting values, unknown and malformed keys;
+  - vendor settings read-only;
+  - Owner-only settings needing the second factor, and a nullable value;
+  - auth settings applied at once;
+  - fallback from a stored value that no longer validates.
+
+  Server: 442 tests.
+
+Decisions: the defaults where the BRD gives none (Decisions 11 to 16).
+
+Notes for the next session:
+
+- P1-01b: the restaurant profile (the business-day cut-off lives there), GSTIN checksum, tax
+  groups and invoice series. The Owner-only endpoints use `TAX_AND_INVOICE_SETTINGS` (the guard
+  asks for the second factor).
+- Screens that need settings (KDS thresholds, time format) get a device-scoped read of the
+  settings they use, when those screens are built (P1-08, P1-09). They listen for
+  `SettingsChanged` and read again.
+- The vendor settings are refreshed from the Control Plane once it pushes remote configuration
+  (UPD-010, P7-08).
 
 ### 2026-09-26: P0-17b local server heartbeat client (P0-17 done)
 

@@ -202,20 +202,19 @@ enum CounterKind {
 /// The restaurant this installation serves. The local database holds exactly one (SEC-005),
 /// but every record still carries restaurant_id for consistency with the cloud.
 model Restaurant {
-  id                String    @id @default(uuid(7)) @db.Uuid
-  legalName         String?   @map("legal_name")
-  displayName       String    @map("display_name")
+  id                String   @id @default(uuid(7)) @db.Uuid
+  legalName         String?  @map("legal_name")
+  displayName       String   @map("display_name")
   gstin             String?
-  fssaiNumber       String?   @map("fssai_number")
+  fssaiNumber       String?  @map("fssai_number")
   /// GST state code (two digits) of the place of supply.
-  stateCode         String?   @map("state_code")
+  stateCode         String?  @map("state_code")
   address           Json?
-  timeZone          String    @default("Asia/Kolkata") @map("time_zone")
+  timeZone          String   @default("Asia/Kolkata") @map("time_zone")
   /// Business-day cut-off, local time HH:MM (default 04:00).
-  businessDayCutoff String    @default("04:00") @map("business_day_cutoff")
-  priceMode         PriceMode @default(TAX_EXCLUSIVE) @map("price_mode")
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  businessDayCutoff String   @default("04:00") @map("business_day_cutoff")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("restaurants")
 }

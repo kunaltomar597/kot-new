@@ -177,6 +177,11 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     );
   });
 
+  it('[MGR-007] tells every screen which settings changed (keys only)', () => {
+    const targets = roomsForEvent(domainEvent('SettingsChanged', rid, { keys: ['ui.timeFormat'] }));
+    expect(targets).toEqual([rooms.all(rid)]);
+  });
+
   it('keeps device events for the roles that manage devices', () => {
     const targets = roomsForEvent(
       domainEvent('DeviceStatusChanged', rid, {
@@ -292,5 +297,7 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', online: true });
     case 'DeviceRevoked':
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', reason: 'Lost' });
+    case 'SettingsChanged':
+      return domainEvent(type, rid, { keys: ['kds.ageAmberMinutes'] });
   }
 }
