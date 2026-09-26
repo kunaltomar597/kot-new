@@ -42,6 +42,7 @@ import { StationsService } from './stations.service.js';
     PrintersService,
     KotTicketsService,
     PrintQueueService,
+    PrinterStatusService,
     PrinterTransport,
   ],
 })

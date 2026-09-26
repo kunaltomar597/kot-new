@@ -206,8 +206,36 @@ export const InvoiceView = z.object({
   roundOff: SignedPaise,
   grandTotal: Paise,
   printCount: z.int().min(0),
+  voidedAt: Timestamp.nullable(),
+  voidReason: z.string().nullable(),
+  /** The voided invoice this one replaces (BILL-010). */
+  replacesInvoiceId: Id.nullable(),
 });
 export type InvoiceView = z.infer<typeof InvoiceView>;
 
 export const InvoiceParams = z.strictObject({ id: Id });
 export type InvoiceParams = z.infer<typeof InvoiceParams>;
+
+/** Print an issued invoice (BILL-014); every print after the first is a DUPLICATE (BILL-009). */
+export const PrintInvoiceRequest = z.strictObject({
+  /** A printer other than the bill printer set in `bills.printerId`. */
+  printerId: Id.nullable().default(null),
+});
+export type PrintInvoiceRequest = z.input<typeof PrintInvoiceRequest>;
+
+export const PrintInvoiceResponse = z.object({
+  printed: z.boolean(),
+  /** Why it did not print, in plain words. */
+  error: z.string().nullable(),
+  /** This print was marked DUPLICATE. */
+  duplicate: z.boolean(),
+  printCount: z.int().min(0),
+});
+export type PrintInvoiceResponse = z.infer<typeof PrintInvoiceResponse>;
+
+/**
+ * Void an invoice with a reason (BILL-010). It keeps its number with status VOIDED; the bill opens
+ * again so it can be corrected and issued with a new number. Cashiers need a manager's PIN.
+ */
+export const VoidInvoiceRequest = z.strictObject({ reason: Reason });
+export type VoidInvoiceRequest = z.infer<typeof VoidInvoiceRequest>;

@@ -1,0 +1,23 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "printed": { "type": "boolean" },
+      "error": { "type": ["string", "null"] },
+      "duplicate": { "type": "boolean" },
+      "printCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["printed", "error", "duplicate", "printCount"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "printed": { "type": "boolean" },
+      "error": { "type": ["string", "null"] },
+      "duplicate": { "type": "boolean" },
+      "printCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["printed", "error", "duplicate", "printCount"],
+    "additionalProperties": false
+  }
+}

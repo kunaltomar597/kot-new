@@ -10,14 +10,18 @@ import {
   IssueInvoiceRequest,
   OpenBillRequest,
   OVERRIDE_TOKEN_HEADER,
+  PrintInvoiceRequest,
+  type PrintInvoiceResponse,
   RevokeDiscountRequest,
   ServiceChargeRequest,
+  VoidInvoiceRequest,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { BillsService, type ParsedDiscount } from './bills.service.js';
+import { InvoiceActionsService } from './invoice-actions.service.js';
 import { InvoicesService } from './invoices.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
@@ -117,10 +121,36 @@ export class BillsController {
   }
 }
 
-/** Issued invoices (P1-10a, BILL-002). */
+/** Issued invoices (P1-10a, BILL-002): view, print or reprint, and void (P1-10b). */
 @Controller('invoices')
 export class InvoicesController {
-  constructor(private readonly invoices: InvoicesService) {}
+  constructor(
+    private readonly invoices: InvoicesService,
+    private readonly actions: InvoiceActionsService,
+  ) {}
+
+  @Post(':id/print')
+  @HttpCode(200)
+  @RequireCapability('BILL_REPRINT')
+  print(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,
+    @Body(new ZodValidationPipe(PrintInvoiceRequest))
+    body: ReturnType<typeof PrintInvoiceRequest.parse>,
+  ): Promise<PrintInvoiceResponse> {
+    return this.actions.print(principalOf(request), params.id, body.printerId);
+  }
+
+  @Post(':id/void')
+  @HttpCode(200)
+  @RequireCapability('INVOICE_VOID')
+  void(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,
+    @Body(new ZodValidationPipe(VoidInvoiceRequest)) body: VoidInvoiceRequest,
+  ): Promise<InvoiceView> {
+    return this.actions.void(principalOf(request), params.id, body.reason, request.override);
+  }
 
   @Get(':id')
   @RequireCapability('BILL_PRINT_AND_PAYMENT')

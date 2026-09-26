@@ -1764,6 +1764,148 @@
         "x-requirements": ["BILL-002", "BILL-014"]
       }
     },
+    "/api/v1/invoices/{id}/print": {
+      "post": {
+        "operationId": "printInvoice",
+        "summary": "Print an invoice on the bill printer; later prints are marked DUPLICATE",
+        "description": "BILL-014, BILL-009. The first successful print is the original; every later one is marked DUPLICATE and audited. Answers whether it printed.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PrintInvoiceRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The result.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PrintInvoiceResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The invoice is voided.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "No bill printer is set, or the printer is unknown.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_REPRINT",
+        "x-requirements": ["BILL-014", "BILL-009", "AUD-001"]
+      }
+    },
+    "/api/v1/invoices/{id}/void": {
+      "post": {
+        "operationId": "voidInvoice",
+        "summary": "Void an invoice so the bill can be corrected and issued again",
+        "description": "BILL-010, BILL-003. The invoice keeps its number with status VOIDED; the bill opens again and its next invoice gets a new number and points back at this one. Cashiers need a manager’s override token. Audited with the approver.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VoidInvoiceRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The voided invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Already voided, or its bill has a newer invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INVOICE_VOID",
+        "x-requirements": ["BILL-010", "BILL-003", "AUTH-011", "AUD-001"]
+      }
+    },
     "/api/v1/kots/{id}/reprint": {
       "post": {
         "operationId": "reprintKot",
@@ -6482,7 +6624,14 @@
           "taxTotal": { "$ref": "#/components/schemas/Paise" },
           "roundOff": { "$ref": "#/components/schemas/SignedPaise" },
           "grandTotal": { "$ref": "#/components/schemas/Paise" },
-          "printCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          "printCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "voidedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "voidReason": { "type": ["string", "null"] },
+          "replacesInvoiceId": {
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          }
         },
         "required": [
           "id",
@@ -6506,7 +6655,10 @@
           "taxTotal",
           "roundOff",
           "grandTotal",
-          "printCount"
+          "printCount",
+          "voidedAt",
+          "voidReason",
+          "replacesInvoiceId"
         ],
         "additionalProperties": false
       },
@@ -7760,6 +7912,38 @@
         "additionalProperties": false
       },
       "PriceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] },
+      "PrintInvoiceRequest": {
+        "type": "object",
+        "properties": {
+          "printerId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          }
+        },
+        "required": ["printerId"],
+        "additionalProperties": false
+      },
+      "PrintInvoiceRequestInput": {
+        "type": "object",
+        "properties": {
+          "printerId": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PrintInvoiceResponse": {
+        "type": "object",
+        "properties": {
+          "printed": { "type": "boolean" },
+          "error": { "type": ["string", "null"] },
+          "duplicate": { "type": "boolean" },
+          "printCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["printed", "error", "duplicate", "printCount"],
+        "additionalProperties": false
+      },
       "PrintQueuePrinter": {
         "type": "object",
         "properties": {
@@ -9180,6 +9364,12 @@
           "buildId": { "type": "string" }
         },
         "required": ["name", "version", "apiVersion", "node"],
+        "additionalProperties": false
+      },
+      "VoidInvoiceRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "WaiterAssignmentInput": {
