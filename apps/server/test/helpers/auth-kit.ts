@@ -8,11 +8,10 @@ import {
   LoginResponse,
 } from '@rp/contracts';
 import { ROLES, type Role } from '@rp/domain';
-import request from 'supertest';
 import { authSettingKey, AuthSettingsService } from '../../src/auth/auth-settings.js';
 import { CredentialHasher } from '../../src/auth/credential-hasher.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
-import { httpServer } from './test-app.js';
+import { api } from './test-app.js';
 
 export const TEST_PINS: Readonly<Record<Role, string>> = {
   OWNER: '1111',
@@ -42,9 +41,9 @@ export async function authenticateDevice(
   privateKey: KeyObject,
 ): Promise<string> {
   const { challenge } = DeviceChallengeResponse.parse(
-    (await request(httpServer(app)).post('/api/v1/devices/challenge').send({ deviceId })).body,
+    (await api(app).post('/api/v1/devices/challenge').send({ deviceId })).body,
   );
-  const response = await request(httpServer(app))
+  const response = await api(app)
     .post('/api/v1/devices/token')
     .send({
       deviceId,
@@ -178,7 +177,7 @@ export async function signIn(
   role: Role,
   deviceId: string = kit.deviceId,
 ): Promise<LoginResponse> {
-  const response = await request(httpServer(app))
+  const response = await api(app)
     .post('/api/v1/auth/pin-login')
     .set(authHeaders(deviceId))
     .send({ staffId: kit.staff[role], pin: TEST_PINS[role] });

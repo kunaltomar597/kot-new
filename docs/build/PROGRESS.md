@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-09-25.
+Last updated: 2026-09-26.
 
 What exists:
 
@@ -14,15 +14,16 @@ What exists:
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
   state machines, permissions, menu selection, KOT split. 89 tests, ~99 % line coverage.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
-  devices, the real-time protocol, health and version; route registry with generated
-  OpenAPI/AsyncAPI docs. 140 tests.
+  devices, the real-time protocol, health, version and the LAN CA; route registry with generated
+  OpenAPI/AsyncAPI docs. 142 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
   gap-free numbering and a development seed (P0-08); audit hash chain (P0-09); authentication,
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
   (P0-11); transactional outbox, event bus with durable consumers and the Socket.io gateway with
-  rooms, resync and revocation (P0-12). 387 tests.
+  rooms, resync and revocation (P0-12); HTTPS/WSS with the installation's own CA, automatic
+  certificate renewal and CA pinning at pairing (P0-15, ADR-0011). 419 tests.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b).
@@ -39,9 +40,9 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P0-15 LAN TLS decision and implementation (browsers other than the server PC need https:// to
-  pair).
 - P0-17 Minimal Vendor Control Plane (the parts that need no hosting account).
+- P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
+  the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -63,7 +64,7 @@ Recommended next WPs (dependencies met):
 - [x] P0-13 Design tokens and web UI library
 - [x] P0-14a API client and i18n
 - [x] P0-14b Web console shell
-- [ ] P0-15 LAN TLS decision and implementation
+- [x] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
 - [ ] P0-17 Minimal Vendor Control Plane (needs hosting account)
 - [ ] P0-H1 Pager battery prototype [H]
@@ -189,14 +190,14 @@ Decided 2026-09-25:
    7-day grace; OI-09 no third-party POS in v1; OI-10 escrow released on the Owner's authenticated
    request; OI-11 kitchen may mark out of stock; OI-12 service charge off; OI-13 no missing blueprint
    requirements assumed. OI-04 (hardware models), OI-05 (MDM vendor) and OI-07 (LAN TLS) are decided
-   in their WPs (P0-H1 to P0-H4, P3-01, P0-15).
+   in their WPs (P0-H1 to P0-H4, P3-01, P0-15; OI-07 is settled by ADR-0011: a private CA).
 10. TypeScript stays on 6.0 until typescript-eslint supports 7 (ADR-0002).
 
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
-revocation), #12 (P0-14a client-side token handling), P0-14b (console storage of keys and
-sessions, CSP; this PR).
+revocation), #12 (P0-14a client-side token handling), #13 (P0-14b console storage of keys and
+sessions, CSP), P0-15 (LAN CA, key storage, certificate renewal and pinning; this PR).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -204,6 +205,57 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P0-15 LAN TLS decision and implementation
+
+ADR-0011 (Accepted) settles open item OI-07: option (a), a private CA per installation that our
+apps pin and browsers install once; option (b), public certificates through the Control Plane,
+stays possible later for manager browsers. Built (see the server README "LAN TLS"):
+
+- `src/tls/certificates.ts`: CA (ECDSA P-256, 10 years, path length 0, certificate signing only)
+  and server certificates (397 days, `serverAuth`, SANs for every LAN IPv4 address, `127.0.0.1`,
+  `localhost`, the computer name, `<name>.local` and `RP_TLS_HOSTNAMES`) with `@peculiar/x509`
+  2.1 (MIT) on Node's WebCrypto; renewal rules (30 days before expiry, a missing name or address,
+  not valid yet, another issuer).
+- `src/tls/tls-store.ts`: one AES-256-GCM sealed file per certificate and key under
+  `<RP_DATA_DIR>/tls` (new secret `tls-key-encryption-key`), plain `ca.crt`, serialised renewals.
+- `RP_TLS=on`: `createApp` serves HTTPS/WSS on `PORT` with TLS 1.2 minimum; `TlsService` checks
+  every minute and hot-swaps a renewed certificate with `setSecureContext`.
+- Pinning: `GET /api/v1/tls/ca` (public, contract `TlsCaResponse`), `caSha256` in
+  `PairingCodeResponse` and `ca` in its QR payload; `/ca.crt` for browsers.
+- Runbook `docs/runbooks/lan-tls.md`: installing the CA on Android, iOS, Windows, macOS and
+  Firefox with a fingerprint check, and troubleshooting.
+- Tests: 6 unit tests (certificates, renewal rules, sealed storage, serialisation) and 10
+  integration tests on the real server over HTTPS and WSS: a client that pinned the CA connects,
+  clients trusting another CA or only public CAs are rejected, host names outside the certificate
+  are rejected, TLS 1.2 works and TLS 1.1 is refused by the server, the pairing QR carries the
+  fingerprint of the CA the public endpoint serves, rotation swaps the certificate in the running
+  server with the same CA, a restart keeps it, and a server without TLS answers 404
+  `TLS_NOT_ENABLED`. Test helpers: `createTestApp({ config: { tls: true } })`, `api(app)` (a
+  supertest client that trusts only the app's CA), socket `ca` option.
+
+Decisions:
+
+- The CA is created at the server's first start (which happens during installation) rather than
+  by the installer itself: one code path, and a repair that keeps the data folder keeps the CA.
+- The certificate is checked every minute, not daily: devices are configured with the server's
+  address (BRD §10.4), so after an address change the certificate must follow quickly.
+- A certificate that is not valid yet (issued while the PC's clock was ahead) is renewed.
+- `/ca.crt` is served outside `/api` (a file for people, not an API; not in the route registry).
+
+Notes for the next session:
+
+- P0-16: the installer sets `RP_TLS=on`; the Electron POS opens `https://localhost:<port>` and
+  checks the CA fingerprint in `setCertificateVerifyProc`; the DPAPI secret store must include
+  `tls-key-encryption-key`.
+- P2-01: the waiter app's first `GET /api/v1/tls/ca` cannot be verified yet; it must compare the
+  CA's fingerprint with the QR code before sending anything else, then load the CA into a custom
+  OkHttp client at run time. The QR payload has no server address yet (BRD §10.4: configured
+  address); consider adding it there.
+- P2-04: the MQTT broker reuses the server certificate and must pick up renewals too.
+- P4 (manager dashboard) or the device settings screen should show the CA fingerprint so people
+  can compare it without the log.
+- P7-05: backups must include `<RP_DATA_DIR>/tls` and the secret store.
 
 ### 2026-09-26: P0-14b web console shell
 

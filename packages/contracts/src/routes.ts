@@ -34,7 +34,7 @@ import {
   RevokeDeviceRequest,
 } from './devices.js';
 import { SubmitOrderRequest, SubmitOrderResponse } from './order.js';
-import { HealthResponse, VersionResponse } from './system.js';
+import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
 
 /**
  * REST route registry (INT-002). Each entry ties an endpoint to the contract schemas it accepts
@@ -140,6 +140,23 @@ export const ROUTES = [
     capability: 'PUBLIC',
     responses: {
       200: { description: 'Component and API version.', schema: VersionResponse },
+    },
+  },
+  {
+    operationId: 'getTlsCa',
+    method: 'GET',
+    path: '/api/v1/tls/ca',
+    summary: 'The LAN certificate authority to pin or install',
+    description:
+      'Public because a device needs it before it can pair: apps pin the CA and browsers install ' +
+      'it (ADR-0011). It is a public certificate; people compare its fingerprint with the one the ' +
+      'POS shows. 404 when the server runs without TLS (development).',
+    tags: ['system'],
+    requirements: ['SEC-001', 'SEC-010'],
+    capability: 'PUBLIC',
+    responses: {
+      200: { description: 'The CA certificate.', schema: TlsCaResponse },
+      404: { description: 'This server does not use TLS.', schema: ApiError },
     },
   },
   {

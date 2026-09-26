@@ -190,6 +190,25 @@ notifications, mqtt, service-requests, recommendations, sync, licensing, backup,
   restored session with it, and it counts as activity (keep-alive for AUTH-005).
 - `GET /api/v1/devices/current` (paired device): the device's own type, name and binding.
 
+## LAN TLS (P0-15)
+
+- `RP_TLS=on` (`tls`): HTTPS and WSS on `PORT` (TLS 1.2 minimum) with a certificate from the
+  installation's own CA (ADR-0011). Development and tests use plain HTTP unless a test passes
+  `config: { tls: true }` to `createTestApp`.
+- `src/tls/certificates.ts` creates the CA (ECDSA P-256, 10 years, may only sign) and server
+  certificates (397 days, `serverAuth`, every LAN IPv4 address, `127.0.0.1`, `localhost`, the
+  computer name and `RP_TLS_HOSTNAMES`) with `@peculiar/x509` on Node's WebCrypto.
+- `src/tls/tls-store.ts` keeps each certificate with its key in one AES-256-GCM sealed file under
+  `<RP_DATA_DIR>/tls` (key `tls-key-encryption-key` from the secret store) plus a plain `ca.crt`.
+  `createApp` loads them before listening (`httpsOptionsFor`); `TlsService` checks every minute
+  and hot-swaps a renewed certificate with `setSecureContext` (near expiry, new address, not valid
+  yet).
+- Pinning: `GET /api/v1/tls/ca` (public) returns the CA and its SHA-256 fingerprint, pairing codes
+  carry it (`caSha256`, `ca` in the QR payload), and `/ca.crt` offers it as a file browsers install
+  (`docs/runbooks/lan-tls.md`).
+- Tests: `test/integration/tls.int.test.ts` runs the real server over HTTPS and WSS; `api(app)`
+  (`test/helpers/test-app.ts`) is a supertest client that trusts only the app's CA.
+
 ## Commands
 
 ```

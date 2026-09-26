@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { Logger, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
@@ -12,7 +11,7 @@ import { DeviceTokenAuthenticator } from './device-token.authenticator.js';
 import { DeviceTokenService } from './device-token.service.js';
 import { PermissionGuard } from './permission.guard.js';
 import { RateLimiter } from './rate-limiter.js';
-import { FileSecretStore, SECRET_STORE } from './secret-store.js';
+import { createSecretStore, SECRET_STORE } from './secret-store.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './tokens.js';
 
@@ -33,7 +32,7 @@ import { TokenService } from './tokens.js';
             'Using file secrets; the installed server must use the Windows DPAPI store (SEC-006).',
           );
         }
-        return new FileSecretStore(join(config.dataDir, 'secrets'));
+        return createSecretStore(config);
       },
     },
     DeviceTokenService,

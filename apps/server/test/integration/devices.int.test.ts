@@ -129,6 +129,8 @@ function pair(code: string, key: DeviceKeys, proofKey: DeviceKeys = key) {
 describe('[AUTH-007] pairing', () => {
   it('pairs a device with a manager code and its key; the device can then sign in', async () => {
     const code = await createCode({ type: 'WAITER_PHONE', name: 'Ravi phone' });
+    // No TLS in this test app, so no CA fingerprint to pin (see tls.int.test.ts).
+    expect(code.caSha256).toBeNull();
     expect(JSON.parse(code.qrPayload)).toEqual({ v: 1, code: code.code });
     const key = keys('ES256');
     const response = await pair(code.code, key);

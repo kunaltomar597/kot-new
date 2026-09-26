@@ -9,6 +9,8 @@ import { z } from 'zod';
 export const APP_CONFIG = Symbol('APP_CONFIG');
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
+const HOSTNAME =
+  /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
 
 const booleanFlag = z
   .enum(['true', 'false', '1', '0'])
@@ -33,6 +35,19 @@ export const AppConfigSchema = z.object({
   buildId: z.string().max(64).optional(),
   /** Folder of the built web console (`apps/console/dist`), served at `/` when set (P0-14b). */
   consoleDir: z.string().min(1).optional(),
+  /** Serve HTTPS/WSS with the installation's private CA (ADR-0011, SEC-001). */
+  tls: booleanFlag,
+  /** Extra host names for the server certificate, e.g. `pos.local` (comma-separated). */
+  tlsHostnames: z
+    .string()
+    .optional()
+    .transform((value) =>
+      (value ?? '')
+        .split(',')
+        .map((name) => name.trim().toLowerCase())
+        .filter((name) => name !== ''),
+    )
+    .pipe(z.array(z.string().regex(HOSTNAME, 'RP_TLS_HOSTNAMES must be host names'))),
 });
 
 export type AppConfig = Readonly<z.infer<typeof AppConfigSchema>>;
@@ -67,6 +82,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     logPretty: env.LOG_PRETTY,
     buildId: env.RP_BUILD_ID,
     consoleDir: env.RP_CONSOLE_DIR,
+    tls: env.RP_TLS,
+    tlsHostnames: env.RP_TLS_HOSTNAMES,
   });
   if (!result.success) {
     const problems = result.error.issues
