@@ -304,6 +304,8 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', reason: 'Lost' });
     case 'SettingsChanged':
       return domainEvent(type, rid, { keys: ['kds.ageAmberMinutes'] });
+    case 'TableWaiterChanged':
+      return domainEvent(type, rid, { tableId: id(), tableSessionId: id(), waiterId: id() });
     case 'RestaurantChanged':
       return domainEvent(type, rid, { part: 'PROFILE' });
   }

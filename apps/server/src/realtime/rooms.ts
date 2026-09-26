@@ -75,6 +75,7 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   TableMoved: 'ORDER_CREATE',
   TableClosed: 'ORDER_CREATE',
   TableStateChanged: 'ORDER_CREATE',
+  TableWaiterChanged: 'ORDER_CREATE',
   OrderSubmitted: 'ORDER_CREATE',
   OrderApproved: 'ORDER_CREATE',
   OrderRejected: 'ORDER_CREATE',
@@ -113,6 +114,10 @@ function named(event: DomainEvent): Required<EventAudience> {
     case 'TableStateChanged':
     case 'ServiceRequestRaised':
       found.tableIds.push(event.payload.tableId);
+      break;
+    case 'TableWaiterChanged':
+      found.tableIds.push(event.payload.tableId);
+      found.staffIds.push(event.payload.waiterId);
       break;
     case 'TableMoved':
       found.tableIds.push(event.payload.fromTableId, event.payload.toTableId);

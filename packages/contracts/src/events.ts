@@ -46,6 +46,11 @@ export const TableMoved = event(
   z.object({ tableSessionId: Id, fromTableId: Id, toTableId: Id }),
 );
 export const TableClosed = event('TableClosed', z.object({ tableId: Id, tableSessionId: Id }));
+/** Another waiter now looks after an open table (TBL-002 per-session override, P1-02b). */
+export const TableWaiterChanged = event(
+  'TableWaiterChanged',
+  z.object({ tableId: Id, tableSessionId: Id, waiterId: Id }),
+);
 export const TableStateChanged = event(
   'TableStateChanged',
   z.object({ tableId: Id, state: TableState }),
@@ -174,6 +179,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   TableMoved,
   TableClosed,
   TableStateChanged,
+  TableWaiterChanged,
   OrderSubmitted,
   OrderApproved,
   OrderRejected,

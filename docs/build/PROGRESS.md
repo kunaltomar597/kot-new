@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor (P1-02a). 303 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02). 314 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a). 468 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b). 477 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -53,8 +53,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-02b Table sessions, move table, takeaway tokens, overview (P1-02a done).
 - P1-03 Menu management API (P1-01 done).
+- P1-06 Order engine after P1-03 (P1-02 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -92,7 +92,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-01a Settings registry
 - [x] P1-01b Restaurant profile, tax groups and invoice series
 - [x] P1-02a Floor (sections, tables) and waiter assignment
-- [ ] P1-02b Table sessions, move table, takeaway tokens, overview
+- [x] P1-02b Table sessions, move table, takeaway tokens, overview
 - [ ] P1-03 Menu management API
 - [ ] P1-04 Menu photos
 - [ ] P1-05 Excel/CSV menu import
@@ -254,6 +254,14 @@ Decided 2026-09-26 (P1-02a):
 23. Table labels stay unique including archived tables; an archived table is restored, not
     recreated.
 
+Decided 2026-09-26 (P1-02b):
+
+24. Closing a table without a bill needs `ORDER_CREATE` (whoever can open a table), a reason, and
+    no item that is billable or awaiting approval. Handing an open table to another waiter needs
+    `STAFF_MANAGE`.
+25. A moved table keeps its state (for example BILL_REQUESTED). Tickets are not reprinted: the
+    kitchen screens and printers hear `TableMoved` and show the new table (TBL-005).
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -270,6 +278,44 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-02b table sessions, move table and overview (P1-02 done)
+
+Built:
+
+- `@rp/contracts` `table-sessions.ts`: the open, close, move and waiter requests, the session
+  view, the overview, and 6 routes. New event `TableWaiterChanged`, routed to the table and the
+  waiter.
+- `apps/server/src/floor/table-sessions.*`: open, request bill, close without bill, move, hand
+  over, and the overview. Each runs under row locks with the table machine, the audit entry and
+  the events in one transaction.
+- Tests: 2 contract tests and 9 integration tests:
+  - open with the assigned waiter, with audit and events;
+  - refusals: occupied table, kitchen staff, unknown table, a waiter who cannot take tables;
+  - two concurrent opens, of which exactly one wins;
+  - bill requested, and invalid transitions refused;
+  - close without bill refused while an item awaits approval;
+  - hand-over;
+  - move with a sent ticket (S7): same number of tickets, `TableMoved` with the station audience;
+  - waiters moving only their own tables;
+  - the overview with the amount so far.
+
+  Totals: server 477 tests.
+
+Decisions: 24 and 25.
+
+Notes for the next sessions:
+
+- P1-06: allocate the takeaway token with `allocateDailyNumber(..., 'TAKEAWAY_TOKEN')`.
+  - Dine-in orders need an open session. Take the table row lock (`FOR SHARE` is enough) so a
+    move or close cannot race the order.
+  - Adding items to a BILL_REQUESTED or BILL_PRINTED table applies `ADD_ITEMS` (back to
+    OCCUPIED).
+- P1-09 (KDS): on `TableMoved`, refresh the table label shown on the station's tickets.
+- P1-10/P1-11: print the bill (`PRINT_BILL`), then settle and close (`SETTLE_AND_CLOSE`), in the
+  same way as here: lock the table row, apply the transition, write the audit entry and the
+  events.
+- Service requests (P2, P3) fill in `activeServiceRequests` on the overview.
 
 ### 2026-09-26: P1-02a floor and waiter assignment
 
