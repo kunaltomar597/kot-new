@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import type { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { DayEndModule } from './day-end/day-end.module.js';
 import { DevicesModule } from './devices/devices.module.js';
 import { EventsModule } from './events/events.module.js';
 import { ApiExceptionFilter } from './errors/api-exception.filter.js';
@@ -47,6 +48,7 @@ export class AppModule {
         PrintingModule,
         BillingModule,
         PaymentsModule,
+        DayEndModule,
         DevicesModule,
         EventsModule,
         RealtimeModule,

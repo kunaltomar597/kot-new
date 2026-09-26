@@ -38,6 +38,7 @@ import {
   UnlockStaffRequest,
 } from './auth.js';
 import { ApiError, Id } from './common.js';
+import { CloseDayRequest, DayEndParams, DayEndPreview, DayEndView } from './day-end.js';
 import {
   BindTableRequest,
   CreatePairingCodeRequest,
@@ -2103,6 +2104,57 @@ export const ROUTES = [
       200: { description: 'The payments.', schema: InvoicePaymentsView },
       ...standardErrors,
       404: { description: 'No such invoice.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'previewDayEnd',
+    method: 'GET',
+    path: '/api/v1/day-end',
+    summary: 'The current business date’s Z-report and what blocks closing it',
+    tags: ['day-end'],
+    requirements: ['BILL-013', 'RPT-005'],
+    capability: 'DAY_END_CLOSE',
+    responses: {
+      200: { description: 'The preview.', schema: DayEndPreview },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'closeDay',
+    method: 'POST',
+    path: '/api/v1/day-end',
+    summary: 'Close the business date and keep its Z-report',
+    description:
+      'BILL-013. Refused while shifts are open or takeaway bills are unpaid; open tables block ' +
+      'unless carried forward to the next business date. Afterwards everything recorded belongs ' +
+      'to the next business date. Audited.',
+    tags: ['day-end'],
+    requirements: ['BILL-013', 'RPT-005', 'AUD-001'],
+    capability: 'DAY_END_CLOSE',
+    request: { body: CloseDayRequest },
+    responses: {
+      201: { description: 'The closed day and its Z-report.', schema: DayEndView },
+      ...standardErrors,
+      409: {
+        description:
+          'Blocked (details list the blockers), already closed, or not the current date.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getDayEnd',
+    method: 'GET',
+    path: '/api/v1/day-ends/:businessDate',
+    summary: 'The Z-report kept when a business date was closed',
+    tags: ['day-end'],
+    requirements: ['RPT-005'],
+    capability: 'DAY_END_CLOSE',
+    request: { params: DayEndParams },
+    responses: {
+      200: { description: 'The closed day.', schema: DayEndView },
+      ...standardErrors,
+      404: { description: 'That date is not closed.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition[];

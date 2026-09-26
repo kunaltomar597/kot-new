@@ -12,13 +12,13 @@ What exists:
 
 - Monorepo tooling, CI, Claude workflow (CLAUDE.md, `/next-step` skill, session-start hook).
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
-  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment, bill splitting, payments and shift cash.
-  128 tests.
+  state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment, bill splitting, payments and shift cash, the Z-report.
+  131 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a). 409 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a); day-end (P1-11b). 416 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -30,7 +30,7 @@ What exists:
   Control Plane and signed heartbeats that discover releases (P0-17b); the settings registry
   with audited changes and `SettingsChanged` events (P1-01a); the restaurant profile, tax groups
   and invoice series with Owner-only changes (P1-01b); sections, tables and the day's waiter
-  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills (P1-10d); shifts, cash and payments with table settlement (P1-11a). 572 tests.
+  assignment (P1-02a); table sessions, move table and the live overview (P1-02b); the draft menu, combos, live availability and published versions (P1-03); the order engine: submission, KOTs, item status, cancel, void and modify (P1-06); stations, printers, ESC/POS kitchen tickets, the print queue with offline alerts, redirect and reprint (P1-07); bills, discounts and GST invoices (P1-10a); bill printing with DUPLICATE reprints, void and re-issue (P1-10b); editing a printed bill under its number (P1-10c); split bills (P1-10d); shifts, cash and payments with table settlement (P1-11a); day-end with the Z-report and carry-forward (P1-11b). 576 tests.
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -55,7 +55,8 @@ Recommended next WPs (dependencies met):
 
 - P1-04 Menu photos (P1-03 done).
 - P1-09 KDS UI (P1-06 and P1-07 done).
-- P1-11b Day-end and Z-report (P1-11a done).
+- P1-12 POS billing UI (P1-10 and P1-11 done).
+- P1-13 Core reports v1 (P1-11 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -109,7 +110,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-10c Edit after print
 - [x] P1-10d Split bill
 - [x] P1-11a Shifts, cash and payments
-- [ ] P1-11b Day-end and Z-report
+- [x] P1-11b Day-end and Z-report
 - [ ] P1-12 POS billing UI
 - [ ] P1-13 Core reports v1
 - [ ] P1-14 Phase 1 exit test
@@ -377,6 +378,17 @@ Decided 2026-09-26 (P1-11a):
 58. A cashier moves cash and closes only their own shift (§4.2 OWN). Managers and the Owner can
     handle any shift.
 
+Decided 2026-09-26 (P1-11b):
+
+59. Day-end is closed by a manager or the Owner (`DAY_END_CLOSE`). Carrying open tables forward is
+    that same person's decision, recorded in the audit log. The manager's own sign-in is the PIN
+    BILL-013 asks for.
+60. Open shifts block day-end, and so do unpaid bills with no open table (takeaway): count the
+    cash, and collect or void the bills first. A carried-forward table moves to the next business
+    date; its orders and printed bill keep their original date.
+61. After day-end, anything recorded before the next cut-off belongs to the next business date.
+    Closing a past date that was left open is allowed; a future date is not.
+
 Security-sensitive PRs for the P8-03 human review: #7 (P0-08 database roles and protection), #8
 (P0-09 audit hash chain and permission guard), #9 (P0-10 authentication, sessions, override), #10
 (P0-11 device pairing and device tokens), #11 (P0-12 socket authentication, room filtering and
@@ -396,6 +408,36 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-11b day-end and Z-report (P1-11 done)
+
+Built:
+
+- `@rp/domain` `buildZReport`.
+- `@rp/contracts` `day-end.ts`: Z-report, blockers, preview, close request and view, with 3 routes.
+- `DayEndService`: preview, close (blockers, carry-forward, `day_ends`, `business_days`, audit) and
+  the kept report. `currentBusinessDate` skips closed dates.
+- Tests:
+  - 3 domain tests;
+  - 1 contract test;
+  - 4 integration tests:
+    - the preview listing an open shift, an open table and an unpaid takeaway bill, with the
+      Z-report totals, tax and register (voided number included);
+    - the close refused for each blocker and for a future date;
+    - the close with carry-forward keeping the report, with the variance and payments by mode, the
+      session moved to the next date, audit entries, a second close refused and the kept report
+      readable;
+    - after day-end, new orders on the next business date.
+
+  Totals: domain 131 tests, contracts 416, server 576.
+
+Decisions: 59 to 61.
+
+Notes for the next sessions:
+
+- The reports (P1-13) can read `day_ends.report` for closed days and `DayEndService.report` for the
+  open one.
+- A Z-report printout (ESC/POS) is not built yet. P1-12 can add it with `renderBill`'s helpers.
 
 ### 2026-09-26: P1-11a shifts, cash and payments
 

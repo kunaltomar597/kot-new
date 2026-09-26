@@ -10,6 +10,7 @@ export * from './printing.js';
 export * from './realtime.js';
 export * from './restaurant.js';
 export * from './billing.js';
+export * from './day-end.js';
 export * from './events.js';
 export * from './payments.js';
 export * from './routes.js';

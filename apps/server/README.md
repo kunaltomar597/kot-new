@@ -341,6 +341,8 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 
 - `src/payments/shifts.service.ts` (P1-11a): shifts with a float, cash in and out, and closing
   with counted cash and variance.
+- `src/day-end/day-end.service.ts` (P1-11b): the Z-report, day-end blockers, carry-forward and
+  closing the business date. `currentBusinessDate` skips closed dates.
 - `src/payments/payments.service.ts`: idempotent payment recording, settlement, and freeing the
   table when its last bill is paid.
 

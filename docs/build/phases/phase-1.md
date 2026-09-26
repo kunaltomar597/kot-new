@@ -648,6 +648,27 @@ As built: `@rp/domain` `payments.ts`, migration `20260927000000_payment_mode_lab
   - A manager can carry open tables forward to the next business date with a PIN.
 - Acceptance: day-end blocking and carry-forward, and Z-report totals equal the settled invoices.
 
+As built: `@rp/domain` `z-report.ts` and `apps/server/src/day-end/`.
+
+- `buildZReport` covers:
+  - the orders and the invoice register (every number, voided ones listed);
+  - gross, discounts, service charge, tax, round-off, net and settled sales;
+  - tax per component and rate;
+  - payments per mode (with the other-mode name);
+  - cash in and out, and each shift with its variance.
+  - Voided invoices count in no totals.
+- `GET /api/v1/day-end` (`DAY_END_CLOSE`) returns the current business date, its blockers and the
+  Z-report as it stands. The blockers are open shifts, open tables up to the date, and unpaid
+  invoices without an open table.
+- `POST /api/v1/day-end` closes the date.
+  - It runs under a restaurant advisory lock, and refuses a future date, a closed date or any
+    blocker.
+  - With `carryForwardTables` it moves open table sessions to the next date (audited).
+  - It stores `day_ends` (the totals and the report) and closes `business_days`, audited.
+- `GET /api/v1/day-ends/:businessDate` returns the kept report.
+- `currentBusinessDate` skips closed dates, so anything recorded after day-end, before the next
+  cut-off, belongs to the next business date.
+
 ## P1-12 POS billing UI
 
 Goal: the cashier settles bills quickly.
