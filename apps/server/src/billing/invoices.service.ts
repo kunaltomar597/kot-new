@@ -16,13 +16,31 @@ import { allocateInvoiceSequence } from '../database/numbering.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
-import type { Invoice, InvoiceLine, TaxLine } from '../generated/prisma/client.js';
-import { SettingsService } from '../settings/settings.service.js';
+import type { Invoice, InvoiceLine, Restaurant, TaxLine } from '../generated/prisma/client.js';
+import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
 import { describeItem } from './bill-calculation.js';
-import { BillsService } from './bills.service.js';
+import { type BillContext, BillsService } from './bills.service.js';
 
 /** Sequence key of a series that runs on across financial years (PROGRESS decision 17). */
 export const CONTINUOUS_SEQUENCE = '0000-00';
+
+/** The seller's particulars as they are now, kept on each invoice as issued (BILL-002). */
+export function particularsOf(
+  restaurant: Restaurant,
+  snapshot: SettingsSnapshot,
+): InvoiceParticulars {
+  return {
+    displayName: restaurant.displayName,
+    legalName: restaurant.legalName,
+    address: (restaurant.address ?? null) as InvoiceParticulars['address'],
+    gstin: restaurant.gstin,
+    fssaiNumber: restaurant.fssaiNumber,
+    placeOfSupply: restaurant.stateCode,
+    phone: restaurant.phone,
+    headerLines: snapshot.get('bills.headerLines'),
+    footerLines: snapshot.get('bills.footerLines'),
+  };
+}
 
 type InvoiceRow = Invoice & {
   lines: InvoiceLine[];
@@ -74,29 +92,10 @@ export class InvoicesService {
       // A voided invoice of this bill not yet replaced: the new one replaces it (BILL-010).
       const replaces = await tx.invoice.findFirst({
         where: { billId, status: 'VOIDED', replacedBy: { none: {} } },
-        orderBy: { issuedAt: 'desc' },
+        orderBy: [{ voidedAt: 'desc' }, { sequence: 'desc' }],
         select: { id: true },
       });
-      if (bill.tableSessionId !== null && replaces === null) {
-        const session = await tx.tableSession.findUniqueOrThrow({
-          where: { id: bill.tableSessionId },
-          select: { status: true },
-        });
-        if (session.status !== 'OPEN') {
-          throw new AppError(409, 'SESSION_CLOSED', 'This table session is already closed.');
-        }
-      }
-      if (context.awaitingApproval > 0) {
-        throw new AppError(
-          409,
-          'ITEMS_AWAITING_APPROVAL',
-          `${String(context.awaitingApproval)} items are waiting for approval. Approve or reject them first.`,
-          { awaitingApproval: context.awaitingApproval },
-        );
-      }
-      if (result.lines.length === 0) {
-        throw new AppError(409, 'NOTHING_TO_BILL', 'There is nothing on this bill yet.');
-      }
+      await this.assertBillable(tx, context, replaces !== null);
 
       // A printed invoice reopened for editing is updated in place, keeping its number (BILL-010).
       const editing =
@@ -112,7 +111,7 @@ export class InvoicesService {
         editing === null
           ? {
               kind: 'NEW' as const,
-              numbering: await this.number(
+              numbering: await this.nextNumber(
                 tx,
                 principal.restaurantId,
                 seriesId,
@@ -126,17 +125,7 @@ export class InvoicesService {
       const businessDate = await currentBusinessDate(tx, principal.restaurantId, now);
       const version = editing === null ? 1 : editing.version + 1;
 
-      const particulars: InvoiceParticulars = {
-        displayName: restaurant.displayName,
-        legalName: restaurant.legalName,
-        address: (restaurant.address ?? null) as InvoiceParticulars['address'],
-        gstin: restaurant.gstin,
-        fssaiNumber: restaurant.fssaiNumber,
-        placeOfSupply: restaurant.stateCode,
-        phone: restaurant.phone,
-        headerLines: snapshot.get('bills.headerLines'),
-        footerLines: snapshot.get('bills.footerLines'),
-      };
+      const particulars = particularsOf(restaurant, snapshot);
       const itemsById = new Map(context.items.map((item) => [item.id, item]));
       const realGroup = (key: string) => calculated.groupIdOf.get(key) ?? key;
       const sacOf = (groupId: string) => context.taxGroups.get(groupId)?.sacCode ?? null;
@@ -441,8 +430,40 @@ export class InvoicesService {
     };
   }
 
+  /**
+   * Refuses to bill a closed session (unless replacing a voided invoice), items still awaiting
+   * approval, or an empty bill.
+   */
+  async assertBillable(
+    tx: TransactionClient,
+    context: BillContext,
+    replacing: boolean,
+  ): Promise<void> {
+    const { bill } = context;
+    if (bill.tableSessionId !== null && !replacing) {
+      const session = await tx.tableSession.findUniqueOrThrow({
+        where: { id: bill.tableSessionId },
+        select: { status: true },
+      });
+      if (session.status !== 'OPEN') {
+        throw new AppError(409, 'SESSION_CLOSED', 'This table session is already closed.');
+      }
+    }
+    if (context.awaitingApproval > 0) {
+      throw new AppError(
+        409,
+        'ITEMS_AWAITING_APPROVAL',
+        `${String(context.awaitingApproval)} items are waiting for approval. Approve or reject them first.`,
+        { awaitingApproval: context.awaitingApproval },
+      );
+    }
+    if (context.calculated.result.lines.length === 0) {
+      throw new AppError(409, 'NOTHING_TO_BILL', 'There is nothing on this bill yet.');
+    }
+  }
+
   /** The next number of the series (BILL-003), with the invoice date and financial year. */
-  private async number(
+  async nextNumber(
     tx: TransactionClient,
     restaurantId: string,
     seriesId: string | null,

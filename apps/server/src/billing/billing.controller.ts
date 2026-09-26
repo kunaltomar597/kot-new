@@ -15,12 +15,15 @@ import {
   ReopenInvoiceRequest,
   RevokeDiscountRequest,
   ServiceChargeRequest,
+  SplitBillRequest,
+  type SplitBillResponse,
   VoidInvoiceRequest,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { BillSplitService, type ParsedSplit } from './bill-split.service.js';
 import { BillsService, type ParsedDiscount } from './bills.service.js';
 import { InvoiceActionsService } from './invoice-actions.service.js';
 import { InvoicesService } from './invoices.service.js';
@@ -41,7 +44,18 @@ export class BillsController {
   constructor(
     private readonly bills: BillsService,
     private readonly invoices: InvoicesService,
+    private readonly splits: BillSplitService,
   ) {}
+
+  @Post(':id/split')
+  @RequireCapability('BILL_PRINT_AND_PAYMENT')
+  split(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(BillParams)) params: BillParams,
+    @Body(new ZodValidationPipe(SplitBillRequest)) body: ParsedSplit,
+  ): Promise<SplitBillResponse> {
+    return this.splits.split(principalOf(request), params.id, body);
+  }
 
   @Post()
   @HttpCode(200)
