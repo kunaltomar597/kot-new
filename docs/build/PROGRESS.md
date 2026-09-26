@@ -18,7 +18,7 @@ What exists:
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
   (`@rp/contracts/control-plane`, P0-17a); the settings catalogue of every BRD ⚙ value (P1-01a);
-  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a). 402 tests.
+  the restaurant profile, tax groups and invoice series (P1-01b); the floor and table sessions (P1-02); the menu (P1-03); orders and item changes (P1-06); stations, printers and the print queue (P1-07); bills and invoices (P1-10); shifts and payments (P1-11a). 409 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (58 tables), least-privilege roles, audit/invoice protection triggers,
@@ -421,7 +421,7 @@ Built:
     - cash in and out with OWN enforced;
     - close by denominations with the variance.
 
-  Totals: domain 128 tests, contracts 402, server 572.
+  Totals: domain 128 tests, contracts 409, server 572.
 
 Decisions: 55 to 58.
 
@@ -430,6 +430,10 @@ Notes for the next sessions:
 - P1-11b: open shifts and open tables block day-end; a manager with a PIN carries open tables
   forward. The Z-report reads settled and voided invoices of the business date (invoice lines at
   their current `version`), payments by mode, and shifts.
+- CI also runs `pnpm test:coverage`, which `pnpm check` does not. The first push failed on the
+  contracts function-coverage threshold, because the new request schemas' refinements were
+  untested (fixed with `billing-payments.test.ts`). Run `pnpm test:coverage` before pushing a WP
+  that adds contracts.
 - Voiding a settled invoice still leaves its payments CAPTURED. Refunds or reversals are
   undesigned (BILL-010 re-issue after a settled void). Decide in P1-11b or P1-12.
 
