@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "contentBase64": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 6990508,
+        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+      }
+    },
+    "required": ["contentBase64"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "contentBase64": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 6990508,
+        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+      }
+    },
+    "required": ["contentBase64"],
+    "additionalProperties": false
+  }
+}

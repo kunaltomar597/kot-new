@@ -57,7 +57,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P1-04 Menu photos (P1-03 done).
 - P1-05 Menu import (P1-03 done).
 - P1-14 Phase 1 exit test (after the P1 UIs).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -100,7 +99,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-02b Table sessions, move table, takeaway tokens, overview
 - [x] P1-03a Draft menu: categories, items, variants, modifier groups
 - [x] P1-03b Combos, availability and stock, menu publishing
-- [ ] P1-04 Menu photos
+- [x] P1-04 Menu photos
 - [ ] P1-05 Excel/CSV menu import
 - [x] P1-06a Order submission and KOTs
 - [x] P1-06b Item status, modify, cancel and void
@@ -429,6 +428,21 @@ Decided 2026-09-26 (P1-08a):
 70. Opening a table asks for guests and, optionally, a waiter; with none chosen the server applies
     the day's assignment (TBL-002). Seated time is shown in whole minutes, refreshed every 30 s.
 
+Decided 2026-09-26 (P1-04):
+
+86. Photos are uploaded as base64 in JSON (up to 5 MB decoded) rather than multipart, so the
+    upload uses the same typed client, validation and error shape as every other endpoint. The
+    cost is a third more bytes on the LAN.
+87. Photo renditions are served without a token: an `<img>` cannot send one. Menu photos are
+    public on the QR menu anyway, ids are random UUIDs, and the files carry no metadata. Uploading
+    needs `MENU_MANAGE`.
+88. The DATA-007 clean-up counts a photo's age from its upload: an unused photo older than
+    `retention.operationalDays` (default 90) is removed. Photos in use by an item (archived ones
+    included), a staff member, the logo or the latest published menu are kept.
+89. libvips, the LGPL image library behind `sharp`, is accepted as a licence exception: it is
+    shipped unmodified as a separate shared library. The installer's third-party notices (P0-16)
+    must list it with its source offer.
+
 Decided 2026-09-26 (P1-12b):
 
 83. A split prints every part's invoice straight away; each part is then paid on its own from the
@@ -500,7 +514,8 @@ invoice numbering and the invoice snapshot; the BRD asks for two reviewers, NFR-
 number, with override), P1-10d (split bills: allocation and numbering), P1-11a (payments and cash shifts), P1-13b (who may export which report, CSV formula
 neutralising), #38 (P1-09a station mode: device-only kitchen access
 in the permission guard), #40 (P1-12a manager approval prompt and payment
-idempotency on the POS), P1-12b (void and edit-after-print approvals on the POS).
+idempotency on the POS), P1-12b (void and edit-after-print approvals on the POS), P1-04 (upload checks, image decoding
+of untrusted files, the public rendition route).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -508,6 +523,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P1-04 Menu photos
+
+Built:
+
+- Contracts `photos.ts` (`UploadPhotoRequest`, `PhotoView`, `PhotoRenditionParams`, `photoUrl`)
+  and the routes `uploadPhoto` and `getPhotoRendition`.
+- `apps/server/src/photos/`: processing with `sharp`, the file store, upload, serving, and the
+  daily clean-up. The upload path alone gets a 7 MB JSON limit.
+- Tests:
+  - 5 unit tests: EXIF removed and orientation applied; PNG, WebP and HEIF accepted and never
+    enlarged; SVG, GIF, text and truncated files refused; the size and pixel limits; the store's
+    path checks.
+  - 4 integration tests: upload and serve with headers, refusals, 404 and 400, and the clean-up.
+
+Gotchas: HEVC-compressed HEIC cannot be decoded by prebuilt libvips; the console should convert in
+the browser (P4). The logo is still not printed on bills; ESC/POS raster printing of the logo can
+now use the 160 px rendition.
+
+Decisions: 86 to 89.
 
 ### 2026-09-26: P1-12b split bill, void and re-issue, day-end screen
 
