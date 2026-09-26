@@ -1,0 +1,28 @@
+{
+  "name": "@rp/mobile-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared core of the waiter app and table tablet: secure credential storage, the persistent outbox of unsent submissions, the menu cache and the client factory (P2-01, WTR-012, MENU-013).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@rp/api-client": "workspace:*",
+    "@rp/contracts": "workspace:*"
+  }
+}
