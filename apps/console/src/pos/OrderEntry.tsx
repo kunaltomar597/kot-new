@@ -27,6 +27,7 @@ import {
   requestLines,
   updateLine,
 } from './cart.js';
+import { useOpenBill } from '../billing/use-open-bill.js';
 import { ItemDialog } from './ItemDialog.js';
 import { displayState } from './order-state.js';
 import {
@@ -137,6 +138,7 @@ export function OrderEntry({ target, onBack }: { target: OrderTarget; onBack: ()
         <h2 id="pos-order-title" className="pos-floor__heading">
           {title}
         </h2>
+        {target.kind === 'table' ? <BillButton sessionId={target.sessionId} /> : null}
       </header>
       <div className="pos-order__body">
         <div className="pos-order__menu">
@@ -373,6 +375,22 @@ function Cart({
   );
 }
 
+function BillButton({ sessionId }: { sessionId: string }) {
+  const t = useT();
+  const { openBill, opening } = useOpenBill();
+  return (
+    <Button
+      variant="secondary"
+      loading={opening}
+      onClick={() => {
+        openBill({ tableSessionId: sessionId });
+      }}
+    >
+      {t('pos.billTable')}
+    </Button>
+  );
+}
+
 function SentOrders({
   target,
   data,
@@ -381,6 +399,7 @@ function SentOrders({
   data: ReturnType<typeof useLive<OrderView[]>>['data'];
 }) {
   const t = useT();
+  const { openBill, opening } = useOpenBill();
   if (data.status !== 'ready') return null;
   const heading = target.kind === 'table' ? t('pos.sent.title') : t('pos.sent.openTakeaway');
   return (
@@ -416,6 +435,17 @@ function SentOrders({
                 </li>
               ))}
           </ul>
+          {target.kind === 'takeaway' ? (
+            <Button
+              variant="secondary"
+              loading={opening}
+              onClick={() => {
+                openBill({ orderId: order.id });
+              }}
+            >
+              {t('pos.billOrder', { number: order.orderNumber })}
+            </Button>
+          ) : null}
         </article>
       ))}
     </section>
