@@ -365,6 +365,15 @@ importers:
 
   packages/i18n: {}
 
+  packages/mobile-core:
+    dependencies:
+      '@rp/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+      '@rp/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   packages/test-postgres:
     dependencies:
       pg:

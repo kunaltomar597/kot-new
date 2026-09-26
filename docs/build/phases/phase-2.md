@@ -29,6 +29,39 @@ use EAS secrets; never commit keystores.
 Acceptance: both apps build as development APKs in CI (EAS or local Gradle), pair with a local
 server, log in, and show live data.
 
+P2-01 is split in three.
+
+### P2-01a Mobile core (done)
+
+`packages/mobile-core`, free of React Native and tested with Vitest:
+
+- `KeyValueStore` and `MemoryStore`.
+- `createMobileClient`: the `ApiClient` with credentials restored from, and written back to, the
+  secure store on every change, in order.
+- `PersistentOutbox`: unsent submissions keyed by idempotency key.
+  - Sent oldest first; a flush stops at the first network failure.
+  - Refused submissions are kept until dismissed or corrected.
+  - A send cut short by the app closing becomes pending again.
+  - One flush runs at a time.
+- `MenuCache`: works offline, refreshes on a newer version or on reconnect, and applies
+  availability changes.
+
+### P2-01b React Native component library
+
+`packages/ui-native`: PinPad, Button, Sheet, Toast, StatusChip, menu item card, variant/modifier
+popup and combo picker using `@rp/domain` menu-selection, with the same tokens as `ui-web`.
+Tested with React Native Testing Library.
+
+### P2-01c Expo apps, builds and smoke flows
+
+`apps/waiter-app` and `apps/table-tablet` as Expo development builds:
+
+- the Keystore key through `expo-secure-store` and a native signer;
+- AsyncStorage for the outbox and menu;
+- EAS Build and Update profiles (the keystore comes from EAS secrets, never committed);
+- Maestro flows;
+- a CI job that builds debug APKs with Gradle.
+
 ## P2-02 Waiter app: tables and order taking
 
 Goal: waiters take orders and manage their tables.

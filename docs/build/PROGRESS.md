@@ -57,9 +57,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-01 React Native foundation (P0-11 to P0-14 done).
+- P2-01b React Native component library (P2-01a done).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
-- P2-01 React Native foundation (P0-11 to P0-14 done).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -124,7 +123,9 @@ Recommended next WPs (dependencies met):
 
 ### Phase 2: Waiter app, notifications, pagers
 
-- [ ] P2-01 React Native foundation
+- [x] P2-01a Mobile core (credentials, outbox, menu cache)
+- [ ] P2-01b React Native component library
+- [ ] P2-01c Expo apps, builds and smoke flows
 - [ ] P2-02 Waiter app: tables and order taking
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
@@ -596,6 +597,15 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P2-01a Mobile core
+
+P2-01 was split into P2-01a (this), P2-01b (`ui-native`) and P2-01c (the Expo apps and builds).
+
+Built: `packages/mobile-core` (secure credential persistence, the persistent outbox and the menu
+cache). Tests: 8, at 98 % line coverage.
+
+Decisions: 110 and 111.
 
 ### 2026-09-26: P2-04a Pager broker, credentials, delivery and heartbeats
 
