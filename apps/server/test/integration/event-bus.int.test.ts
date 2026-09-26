@@ -236,6 +236,8 @@ describe('[NTF-006] durable consumers: at least once, never lost, never twice', 
     await produce(app, [first, second, third]);
 
     await until(() => probe.handled.includes(third.eventId), 5_000, 'the retried consumer');
+    // `handled` is recorded inside the consumer's transaction; let it commit before counting.
+    await bus.drain();
     const ids = [first, second, third].map((event) => event.eventId);
     expect(probe.handled.filter((id) => ids.includes(id))).toEqual(ids);
     // The failed attempts rolled back their writes: one effect per event.
