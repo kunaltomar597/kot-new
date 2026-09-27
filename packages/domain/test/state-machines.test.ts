@@ -20,6 +20,7 @@ import {
   restrictionEffectiveAt,
   SERVICE_REQUEST_ALERTS,
   serviceRequestMachine,
+  type ServiceRequestState,
   tableMachine,
   transition,
 } from '../src/index.js';
@@ -163,7 +164,7 @@ describe('[TAB-004] service request state machine', () => {
     expect(resolveEvents('RESOLVED')).toEqual([]);
     // Every sequence it gives is one the machine allows.
     for (const from of ['ACTIVE', 'ESCALATED', 'ACKNOWLEDGED'] as const) {
-      const to = resolveEvents(from).reduce(
+      const to = resolveEvents(from).reduce<ServiceRequestState>(
         (state, event) => transition(serviceRequestMachine, state, event).to,
         from,
       );
