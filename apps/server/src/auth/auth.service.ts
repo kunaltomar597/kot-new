@@ -240,6 +240,11 @@ export class AuthService {
   async logout(principal: Principal): Promise<void> {
     await this.prisma.transaction(async (tx) => {
       await this.sessions.revoke(principal.sessionId, 'LOGOUT', tx);
+      // Signing out on a waiter phone also stops it alerting the person (P2-06a).
+      await tx.device.updateMany({
+        where: { id: principal.deviceId, type: 'WAITER_PHONE', staffId: principal.staffId },
+        data: { staffId: null },
+      });
       await this.audit.record(tx, {
         action: 'LOGOUT',
         entityType: 'session',

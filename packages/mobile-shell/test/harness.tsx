@@ -1,5 +1,10 @@
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession, MemoryStore, type ServerTrust } from '@rp/mobile-core';
+import {
+  DeviceSession,
+  type DeviceSessionOptions,
+  MemoryStore,
+  type ServerTrust,
+} from '@rp/mobile-core';
 import { FakeKeys, type FakeServer, fakeLocalServer, SocketFactory } from '@rp/mobile-core/testing';
 import { render } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
@@ -9,7 +14,11 @@ export const ADDRESS = 'http://pos.test:3000';
 export const translator = createTranslator();
 export const fakeServer = (): FakeServer => fakeLocalServer();
 
-export function newSession(server: Pick<FakeServer, 'fetch'> = fakeServer(), trust?: ServerTrust) {
+export function newSession(
+  server: Pick<FakeServer, 'fetch'> = fakeServer(),
+  trust?: ServerTrust,
+  options: Pick<DeviceSessionOptions, 'followAlerts' | 'alertNotifier'> = {},
+) {
   const sockets = new SocketFactory();
   const session = new DeviceSession({
     secureStore: new MemoryStore(),
@@ -18,6 +27,7 @@ export function newSession(server: Pick<FakeServer, 'fetch'> = fakeServer(), tru
     ...(trust !== undefined && { trust }),
     fetch: server.fetch,
     connect: sockets.connect,
+    ...options,
   });
   return { session, sockets };
 }

@@ -4,7 +4,7 @@ React Native + Expo SDK 57 (development builds, not Expo Go), Android only. A pa
 staff PIN login (WTR-001). Built by P2-01 (foundation, done), P2-02, P2-06, P3-03 (approvals
 inbox) and P3-05 (upsell).
 
-What it does today (P2-01c, P2-01d, P2-02a to P2-02c): pairs with the local server by scanning the
+What it does today (P2-01c, P2-01d, P2-02a to P2-02c, P2-06a): pairs with the local server by scanning the
 manager's QR code, or with the address and code typed (the device key is created in the Android
 Keystore, and over TLS only the restaurant's CA is trusted from then on), lists the staff who may
 use a waiter phone (waiters, managers, the owner) and signs one in with their PIN. Home is "My
@@ -30,6 +30,14 @@ has not started it (waiters on their own tables), or void it with a reason after
 approves by entering their PIN on the phone (AUTH-011). Home shows how many dishes are ready at
 the pass for each table.
 
+The phone alerts the person who last signed in on it, as their pager does (P2-06a, WTR-006): food
+ready, a new order to approve, a bill asked for, a manager's message and anything escalated to a
+manager. The newest open alert shows over every screen with Acknowledge, and a tap lists them all;
+acknowledging on the phone stops the pager too (NTF-004). An inactivity sign-out keeps the alerts
+coming, shown on the sign-in screen; signing out on the phone, or signing in on another phone,
+ends them. With the app in the background or the screen locked, Android notifications come in
+P2-06b.
+
 Where things are:
 
 - `src/App.tsx`: pairing → login → signed in, from the device session's state.
@@ -47,7 +55,9 @@ Where things are:
 - `src/PagerCard.tsx`: the waiter's own pager (`GET /api/v1/pagers/mine`), read again on
   `DeviceStatusChanged` and every minute for the battery level.
 - `src/Root.tsx`: wires `@rp/mobile-core`'s `DeviceSession` to the Keystore key, the secure
-  and plain stores and the LAN CA pinning (`AndroidServerTrust`) from `@rp/mobile-native`.
+  and plain stores and the LAN CA pinning (`AndroidServerTrust`) from `@rp/mobile-native`, and
+  follows the holder's alerts (`followAlerts`).
+- The alert banner and list are `@rp/mobile-shell` `AlertBanner`, on every screen.
 - Shared screens and hooks (pairing, PIN login, connection banner, `useLive`, `useMenu`,
   `useUnsentOrders`) are in `@rp/mobile-shell`; cart, menu and reorder rules shared with the POS
   are in `@rp/ordering`.
@@ -58,7 +68,7 @@ Where things are:
   the network; the microphone is blocked.
 - `eas.json`: EAS Build profiles (APKs) and EAS Update channels.
 - `.maestro/`: the smoke flow (pair, sign in, open a free table, order a dish and send the KOT,
-  serve it once the kitchen marks it ready, ask for the bill). It types the development server's
+  acknowledge the alert and serve it once the kitchen marks it ready, ask for the bill). It types the development server's
   `http://` address, as an emulator cannot scan the QR code.
 
 ## Commands

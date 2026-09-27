@@ -33,6 +33,30 @@ interface SessionRow {
 export type AccessResult = { readonly principal: Principal } | { readonly failure: AppError };
 
 /**
+ * A waiter phone alerts the person who last signed in on it, as a pager alerts its wearer (P2-06a,
+ * WTR-006), and goes on doing so after an inactivity sign-out. One phone alerts a person: the
+ * phone they used before stops.
+ */
+async function holdPhone(
+  tx: TransactionClient,
+  device: AuthenticatedDevice,
+  staffId: string,
+): Promise<void> {
+  await tx.device.updateMany({
+    where: {
+      restaurantId: device.restaurantId,
+      type: 'WAITER_PHONE',
+      staffId,
+      id: { not: device.deviceId },
+    },
+    data: { staffId: null },
+  });
+  if (device.staffId !== staffId) {
+    await tx.device.update({ where: { id: device.deviceId }, data: { staffId } });
+  }
+}
+
+/**
  * Staff sessions on a device (AUTH-005): a refresh token (stored hashed, rotated on every use), a
  * short-lived access token, an absolute lifetime and an inactivity timeout renewed by activity.
  */
@@ -77,6 +101,7 @@ export class SessionService {
       },
       select: { id: true, restaurantId: true, expiresAt: true, secondFactorAt: true },
     });
+    if (input.device.type === 'WAITER_PHONE') await holdPhone(tx, input.device, input.staffId);
     return { session, refreshToken };
   }
 

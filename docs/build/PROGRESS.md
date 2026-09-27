@@ -15,7 +15,7 @@ What exists:
   state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment,
   bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export, menu
   import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a), including the
-  low-battery check (P2-02a). 174 tests.
+  low-battery check (P2-02a), and what reaches a pager and the waiter app (P2-06a). 176 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -27,7 +27,8 @@ What exists:
   (P1-13); alerts (P2-03a); nudges and breaks (P2-03b); pagers and their MQTT channels (P2-04a);
   the signed-in person's own pager (P2-02a); each KOT's station and print status on orders and
   `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c);
-  the pairing QR code with the server's addresses and CA fingerprint (P2-01d). 485 tests.
+  the pairing QR code with the server's addresses and CA fingerprint (P2-01d); a waiter phone's
+  own alerts (P2-06a). 485 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (61 tables after the later migrations), least-privilege roles,
@@ -56,7 +57,9 @@ What exists:
   KOT print status announced to the floor, and the phones' order outbox tested against the server
   (P2-02b); a combo line that follows its parts, voided combos that cancel their unstarted parts,
   and dishes ready per table (P2-02c); the server's LAN addresses with every pairing code
-  (P2-01d). 654 tests (4 skipped without a real install).
+  (P2-01d); a waiter phone that alerts the person who last signed in on it, also after an
+  inactivity sign-out, with its own alert routes and room (P2-06a). 665 tests (4 skipped
+  without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -64,8 +67,8 @@ What exists:
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
-  the server from the pairing QR code and pinning its CA before the code is sent (P2-01d).
-  47 tests.
+  the server from the pairing QR code and pinning its CA before the code is sent (P2-01d); the
+  waiter phone's alert centre (P2-06a). 58 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
@@ -76,7 +79,8 @@ What exists:
   `crypto.getRandomValues` that Hermes lacks, from `expo-crypto` (P2-02b); `useOverride`, a
   manager's approval with their PIN on the phone (P2-02c); the LAN CA pinned in every React
   Native HTTP and WebSocket client (an Expo module installed at app start), the QR code scanner
-  and the fingerprint check for a typed address (P2-01d). Shell 27 tests, mobile-native 22.
+  and the fingerprint check for a typed address (P2-01d); the alert banner and list on every
+  screen (P2-06a). Shell 34 tests, mobile-native 22.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
@@ -85,11 +89,14 @@ What exists:
   can be marked picked up or served (all ready dishes in one tap), cancelled before the kitchen
   starts it, or voided after with a manager's PIN on the phone (P2-02c). Both apps pair by
   scanning the manager's QR code and then trust only the restaurant's CA over TLS, so preview
-  and production builds can pair with a real server (P2-01d). Waiter app 38 tests.
+  and production builds can pair with a real server (P2-01d). The phone shows its holder's
+  alerts over every screen, acknowledged in one tap, also after an inactivity sign-out (P2-06a).
+  Waiter app 40 tests.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
-  line and dishes ready on the tiles (P2-02c). 27 tests.
+  line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a).
+  34 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -112,7 +119,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-06 Waiter alerts, service-request inbox, nudge, Notify manager (P2-02a done).
+- P2-06b Background alerts on Android (P2-06a done), then P2-06c (POS alert centre and nudge)
+  and P2-06d (service requests and the waiter's inbox).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -190,13 +198,16 @@ Recommended next WPs (dependencies met):
 - [x] P2-04a Pager broker, credentials, delivery and heartbeats
 - [ ] P2-04b Pager firmware OTA distribution
 - [ ] P2-05 Pager firmware [H]
-- [ ] P2-06 Waiter alerts, service-request inbox, nudge, Notify manager
+- [x] P2-06a Alerts in the waiter app
+- [ ] P2-06b Background alerts on Android
+- [ ] P2-06c POS alert centre and manager nudge
+- [ ] P2-06d Service requests and the waiter's inbox
 - [ ] P2-07 Phase 2 exit test on the lab rig [H]
 
 ### Phase 3: Table tablet and recommendations v1
 
 - [ ] P3-01 Table tablet app: kiosk, pairing, lifecycle, health
-- [ ] P3-02 Service requests end to end
+- [ ] P3-02 Service requests on the tablet (server side in P2-06d)
 - [ ] P3-03 Customer ordering and waiter approval
 - [ ] P3-04 Recommendation engine v1
 - [ ] P3-05 Recommendation UI and feedback
@@ -492,6 +503,42 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-27 (P2-06a):
+
+147. A waiter phone alerts its holder: the person who last signed in on it (`devices.staff_id`, as
+     a pager alerts its wearer). The holder stays after an inactivity sign-out, so a phone in a
+     pocket goes on alerting like the pager, while anything else still needs the PIN (AUTH-005).
+     Signing out on the phone, signing in on another phone and unpairing end it. Reason: WTR-006
+     asks for every pager alert in the app, and the inactivity timeout would otherwise silence the
+     phone minutes after the waiter pockets it.
+148. A person holds one phone at a time: signing in on another phone moves their alerts there, and
+     the first phone's connection is renewed without them.
+149. The phone lists and acknowledges its holder's alerts through device-authenticated routes, like
+     the pager's button: an acknowledgement there is the holder's, recorded as them. The phone can
+     acknowledge only what it shows its holder; anything else is "no such alert" (404).
+150. The phone's own connection joins an alert room for its holder that hears only alert events,
+     not the tables and orders the person's role would see; those need the person signed in.
+151. A phone holding a person counts as their app being connected (NTF-007), so an alert raised
+     while it is connected escalates after N, not at once.
+152. Pagers and phones show the same alerts: those the person receives whose rule names the pager
+     or the waiter app, and any escalated to them (`reachesPagerAndApp`). This also stops a
+     manager's pager buzzing for alerts meant for the POS and dashboard only (an offline printer,
+     a full disk), which P2-04a sent to every recipient's pager.
+153. The alert banner shows the newest open alert over every screen, with how many more and
+     Acknowledge in one tap; a tap on it lists every open alert, newest first, with its age,
+     reminders and escalation. It shows on the sign-in screen too, naming whose alerts they are.
+     An alert reads like the pager, table first ("Table 5 · Food ready", then the dishes); a
+     manager's nudge shows the message and who sent it. The wording is in `@rp/ordering` so the
+     POS alert centre (P2-06c) says the same.
+154. When a connection's session has ended and its device changed in the same sweep, the gateway
+     reports SESSION_ENDED first (signing out on a phone now changes its device row too).
+155. P2-06 is split into P2-06a (alerts in the waiter app), P2-06b (background alerts on Android),
+     P2-06c (the POS alert centre and nudge) and P2-06d (service requests and the waiter's inbox).
+     The service-request server module moves forward from P3-02 to P2-06d, since WTR-005's inbox
+     needs it; P3-02 keeps the tablet's buttons.
+156. Decision 126 stands with shared phones: an order kept on a phone still goes only while the
+     person who took it is signed in, whoever holds the phone's alerts.
 
 Decided 2026-09-27 (P2-01d):
 
@@ -821,6 +868,42 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-06a Alerts in the waiter app
+
+Merged #57 (P2-01d) once green. Split P2-06 in four and moved the service-request server module
+forward from P3-02 to P2-06d (decision 155).
+
+Built: the server makes the person who signs in on a waiter phone its holder (`devices.staff_id`),
+keeps them after an inactivity sign-out and clears them on sign-out there or sign-in on another
+phone; `GET /api/v1/devices/current/alerts` and `POST .../:alertId/acknowledge` serve the phone
+itself; `AlertView` has `tableLabel` and `raisedByName`; the phone's connection joins its
+holder's alert room and counts for presence. `reachesPagerAndApp` (`@rp/domain`) decides what
+reaches a pager and a phone, in the pager broker too. `@rp/mobile-core` `AlertCenter`
+(`DeviceSession.alerts`, on with `followAlerts`) reads the holder's alerts on every (re)connect
+and alert event, announces each alert and repeat once to an `AlertNotifier` (P2-06b) and
+acknowledges. `@rp/ordering` `describeAlert` and `alertAge` word them; `@rp/mobile-shell`
+`AlertBanner` shows them on every `Screen` with a list sheet. The waiter app follows alerts, and
+its Maestro flow acknowledges the food-ready alert.
+
+Tests: domain 176 (was 174), server 665 (was 654: `phone-alerts.int.test.ts`, the phone's
+acknowledgement stopping the pager's repeats, the alert rooms, the renewed phone connection),
+ordering 34 (was 27), mobile-core 58 (was 47), mobile-shell 34 (was 27), waiter app 40 (was 38).
+
+Gotchas:
+
+- Signing out on a phone now changes its device row, so the gateway sweep saw an ended session and
+  a changed device at once; it reports SESSION_ENDED first. "Ends the connection when the person
+  signs out" moved to a POS and a cashier; a phone test covers its device-only connection ending
+  with DEVICE_CHANGED.
+- An inactivity sign-out on a phone must never go through `POST /auth/logout`, which ends its
+  alerts; `DeviceSession.signOut` says so. The phones have no inactivity timer of their own today.
+- `@rp/mobile-shell` depends on `@rp/ordering` at run time now; Jest maps workspace packages to
+  their `dist/`, so build ordering before the shell's and the apps' tests.
+- A bill asked for on the waiter app alerts the waiter who asked (the P2-03 trigger alerts the
+  responsible waiter); P2-06d changes that.
+
+Decisions: 147 to 156.
 
 ### 2026-09-27: P2-01d LAN TLS pinning and QR pairing on Android
 

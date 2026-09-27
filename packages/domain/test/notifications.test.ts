@@ -7,6 +7,7 @@ import {
   NOTIFICATION_EVENTS,
   type NotificationEvent,
   pagerTextFor,
+  reachesPagerAndApp,
   type RecipientContext,
   resolveRecipients,
 } from '../src/index.js';
@@ -144,5 +145,26 @@ describe('[NTF-008] pager text', () => {
     );
     expect(pagerTextFor('{table} BILL', { table: null })).toBe('BILL');
     expect(pagerTextFor(null, {})).toBeNull();
+  });
+});
+
+describe('[WTR-006] [NTF-005] what reaches the pager and the waiter app', () => {
+  const alert = (channels: readonly string[], escalatedTo: readonly string[] = []) => ({
+    recipientIds: ['ravi', 'vikram'],
+    channels,
+    escalatedTo,
+  });
+
+  it('shows a recipient every alert whose rule names the pager or the app', () => {
+    expect(reachesPagerAndApp(alert(['PAGER', 'WAITER_APP', 'POS']), 'ravi')).toBe(true);
+    expect(reachesPagerAndApp(alert(['PAGER']), 'ravi')).toBe(true);
+    expect(reachesPagerAndApp(alert(['WAITER_APP']), 'ravi')).toBe(true);
+    expect(reachesPagerAndApp(alert(['PAGER']), 'sunita')).toBe(false);
+  });
+
+  it('keeps POS and dashboard alerts off pagers and phones, unless escalated to the person', () => {
+    expect(reachesPagerAndApp(alert(['POS', 'DASHBOARD']), 'vikram')).toBe(false);
+    expect(reachesPagerAndApp(alert(['POS', 'DASHBOARD'], ['vikram']), 'vikram')).toBe(true);
+    expect(reachesPagerAndApp(alert(['POS', 'DASHBOARD'], ['vikram']), 'ravi')).toBe(false);
   });
 });

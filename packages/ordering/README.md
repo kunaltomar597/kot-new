@@ -1,7 +1,7 @@
 # @rp/ordering
 
-Ordering and floor helpers shared by the POS console and the waiter app (P2-02a, NFR-M01), free
-of any UI framework so both use the same rules and one set of tests:
+Ordering, floor and alert helpers shared by the POS console and the waiter app (P2-02a,
+NFR-M01), free of any UI framework so both use the same rules and one set of tests:
 
 - `cart.ts`: the cart before submission (lines, quantities, instructions) and the order request
   it becomes. Prices are shown as estimates; the server prices every order (ORD-014).
@@ -21,6 +21,10 @@ of any UI framework so both use the same rules and one set of tests:
   waiter, approvals, dishes ready at the pass, requests), "My tables" (`myTableIds`, WTR-002,
   from the day's waiter assignments and the responsible waiter, TBL-002), free tables to move to
   (TBL-005), and which events mean the floor must be read again.
+- `alert-text.ts`: what an alert says on a screen (`describeAlert`: where and what, like the
+  pager's "T5 READY", then its detail: the dishes, the order, who asked, a manager's message) and
+  how long it has waited (`alertAge`). The waiter app's alert banner uses it (P2-06a); so will the
+  POS alert centre (P2-06c).
 
 `@rp/ordering/testing` holds a sample menu for tests. Business rules that are not about showing or
 collecting an order (money, tax, permissions, table states) stay in `@rp/domain`.

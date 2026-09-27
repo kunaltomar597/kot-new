@@ -1,4 +1,6 @@
 import type {
+  AlertView,
+  DeviceAlertsResponse,
   FloorResponse,
   MenuSnapshot,
   MyPagerResponse,
@@ -111,6 +113,10 @@ export class Restaurant {
   assignments: WaiterAssignmentsResponse['current']['assignments'] = [
     { staffId: RAVI, staffName: 'Ravi', sectionIds: [HALL], tableIds: [] },
   ];
+
+  /** Ravi signed in on the phone, so it alerts him (P2-06a); his open alerts, oldest first. */
+  holder: DeviceAlertsResponse['holder'] = { staffId: RAVI, displayName: 'Ravi' };
+  alerts: AlertView[] = [];
 
   /** The menu the server hands out; tests change it as the kitchen runs out. */
   menu: MenuSnapshot = MENU;
@@ -417,6 +423,18 @@ export class Restaurant {
         const sessionId = call.path.split('/')[4] ?? '';
         return { status: 200, body: { orders: this.orders.get(sessionId) ?? [] } };
       })
+      .on('GET', '/api/v1/devices/current/alerts', () => ({
+        status: 200,
+        body: { holder: this.holder, alerts: this.alerts } satisfies DeviceAlertsResponse,
+      }))
+      .on('POST', '/api/v1/devices/current/alerts/:alertId/acknowledge', (call) => {
+        const alert = this.alerts.find((open) => call.path.includes(open.id));
+        if (alert === undefined) {
+          return { status: 404, body: { code: 'ALERT_NOT_FOUND', message: 'No such alert.' } };
+        }
+        this.alerts = this.alerts.filter((open) => open !== alert);
+        return { status: 200, body: { ...alert, status: 'ACKNOWLEDGED', acknowledgedById: RAVI } };
+      })
       .on('GET', '/api/v1/pagers/mine', () => ({
         status: 200,
         body: { pager: this.pager, lowBatteryPercent: 15 } satisfies MyPagerResponse,
@@ -480,6 +498,7 @@ export async function signedInApp(
     keys: new FakeKeys(),
     fetch: server.fetch,
     connect: sockets.connect,
+    followAlerts: true,
   });
   await session.start();
   await session.pair('http://pos.test:3000', 'ABCD-EFGH');

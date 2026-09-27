@@ -37,7 +37,10 @@ export const CreatePairingCodeRequest = z
     tableId: Id.optional(),
     /** For kitchen screens: the station whose tickets it shows (KDS-002). */
     stationId: Id.optional(),
-    /** For pagers: the person wearing it. */
+    /**
+     * For pagers: the person wearing it. For waiter phones: the person it alerts until someone
+     * signs in on it (P2-06a).
+     */
     staffId: Id.optional(),
   })
   .refine((request) => request.type !== 'TABLE_TABLET' || request.tableId !== undefined, {

@@ -26,6 +26,8 @@ async function createSession(): Promise<DeviceSession> {
     plainStore: await plainStore(),
     keys: new KeystoreDeviceKeys(),
     trust: new AndroidServerTrust(),
+    // The phone alerts the person who last signed in on it, like their pager (P2-06a, WTR-006).
+    followAlerts: true,
     ...(Constants.expoConfig?.version !== undefined && {
       appVersion: Constants.expoConfig.version,
     }),

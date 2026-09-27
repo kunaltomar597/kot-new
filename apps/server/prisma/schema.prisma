@@ -385,7 +385,7 @@ model Device {
   /// Station a kitchen screen shows (KDS-002).
   stationId              String?      @map("station_id") @db.Uuid
   station                Station?     @relation(fields: [stationId], references: [id])
-  /// Person wearing a pager.
+  /// Person wearing a pager, or holding a waiter phone: whom it alerts (P2-06a).
   staffId                String?      @map("staff_id") @db.Uuid
   /// Serial printed (and in the QR code) on a pager (PGR-012).
   serial                 String?

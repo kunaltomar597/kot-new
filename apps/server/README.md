@@ -408,7 +408,24 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - Acknowledging and clearing emit `AlertAcknowledged` and `AlertCleared` to every recipient.
 - `notification-triggers.ts` is the durable event-bus consumer that raises and clears alerts from
   domain events.
-- `PRESENCE` says who is reachable; today that is the gateway's live connections.
+- `PRESENCE` says who is reachable: the gateway's live connections (a waiter phone holding a
+  person counts as their app, P2-06a) and the connected pagers.
+
+## Alerts on the waiter phone (P2-06a)
+
+- A waiter phone alerts its holder, `devices.staff_id`: the person who last signed in on it
+  (`session.service.ts`), as a pager alerts its wearer. The holder stays after an inactivity
+  sign-out; signing out on the phone (`auth.service.ts` `logout`) or signing in on another phone
+  clears it.
+- `DeviceAlertsController` (`GET /api/v1/devices/current/alerts`, `POST .../:alertId/acknowledge`)
+  is device-authenticated, so a phone signed out for inactivity still lists and acknowledges its
+  holder's alerts; acknowledging there is the holder acknowledging, like the pager's button.
+- What reaches a pager and a phone is one rule, `@rp/domain` `reachesPagerAndApp`: the person is a
+  recipient and the rule names the pager or the app, or the alert was escalated to them.
+- The phone's connection joins `rooms.alerts(restaurant, holder)`, which hears only
+  `AlertRaised`, `AlertAcknowledged` and `AlertCleared`. When the holder changes, the gateway's
+  sweep ends the connection (`DEVICE_CHANGED`) so the phone reconnects to the right room. See
+  `test/integration/phone-alerts.int.test.ts`.
 
 ## Pagers (P2-04a)
 
@@ -416,8 +433,9 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   when `RP_TLS` is on.
 - Each pager signs in with its device id and its own secret, and the ACL keeps it to its own
   topics: `rp/<restaurant>/pagers/<device>/alerts|ack|heartbeat`.
-- Alert events reach the recipients' pagers at QoS 1, and a pager that connects is sent its
-  wearer's open alerts again. Heartbeats feed battery, signal and offline detection.
+- Alert events reach the recipients' pagers at QoS 1 (only the alerts `reachesPagerAndApp` lets
+  through), and a pager that connects is sent its wearer's open alerts again. Heartbeats feed
+  battery, signal and offline detection.
 - `src/pagers/pagers.service.ts` registers pagers, replaces credentials and assigns wearers.
 - Tests start the broker with `config: { mqtt: 'on', mqttPort: 0 }`. See
   `test/integration/pagers.int.test.ts`.

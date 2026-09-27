@@ -26,6 +26,11 @@ export const rooms = {
   /** Kitchen screens not bound to one station (expo, single-screen kitchens). */
   allStations: (restaurantId: string) => `r:${restaurantId}:stations`,
   device: (restaurantId: string, deviceId: string) => `r:${restaurantId}:device:${deviceId}`,
+  /**
+   * A person's alerts only: the waiter phone that alerts them joins it, signed in or not (P2-06a),
+   * so a phone whose session timed out hears nothing but its holder's alerts.
+   */
+  alerts: (restaurantId: string, staffId: string) => `r:${restaurantId}:alerts:${staffId}`,
 };
 
 /** Who is connected: the device and, if someone is signed in on it, the person. */
@@ -52,6 +57,9 @@ export function roomsForConnection(identity: ConnectionIdentity): string[] {
     joined.push(
       device.stationId === null ? rooms.allStations(rid) : rooms.station(rid, device.stationId),
     );
+  }
+  if (device.type === 'WAITER_PHONE' && device.staffId !== null) {
+    joined.push(rooms.alerts(rid, device.staffId));
   }
   if (person !== undefined) {
     joined.push(rooms.role(rid, person.role), rooms.staff(rid, person.staffId));
@@ -182,6 +190,14 @@ export function roomsForEvent(
   }
   for (const staffId of [...own.staffIds, ...(audience.staffIds ?? [])]) {
     targets.add(rooms.staff(rid, staffId));
+  }
+  // The recipients' phones hear their alerts even when nobody is signed in on them (P2-06a).
+  if (
+    event.type === 'AlertRaised' ||
+    event.type === 'AlertAcknowledged' ||
+    event.type === 'AlertCleared'
+  ) {
+    for (const staffId of event.payload.recipients) targets.add(rooms.alerts(rid, staffId));
   }
   return [...targets];
 }

@@ -6,6 +6,7 @@ import {
   AlertView,
   BreakRequest,
   BreakView,
+  DeviceAlertsResponse,
   NudgeRequest,
   NudgeResponse,
 } from './alerts.js';
@@ -1744,6 +1745,45 @@ export const ROUTES = [
       200: { description: 'The alert.', schema: AlertView },
       ...standardErrors,
       404: { description: 'No such alert, or not one for you.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listDeviceAlerts',
+    method: 'GET',
+    path: '/api/v1/devices/current/alerts',
+    summary: "This waiter phone's alerts: those of the person it alerts",
+    description:
+      "WTR-006, NTF-006: the open alerts of the phone's holder, the person who last signed in " +
+      'on it, that go to their pager or app, oldest first. The holder stays after an inactivity ' +
+      'sign-out, so the phone keeps alerting like a pager; signing out on the phone, signing in ' +
+      'on another phone or unpairing ends it. Only waiter phones.',
+    tags: ['notifications'],
+    requirements: ['WTR-006', 'NTF-006', 'AUTH-005'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The holder and their open alerts.', schema: DeviceAlertsResponse },
+      ...deviceErrors,
+      403: { description: 'Not a waiter phone.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'acknowledgeDeviceAlert',
+    method: 'POST',
+    path: '/api/v1/devices/current/alerts/:alertId/acknowledge',
+    summary: "Acknowledge one of the phone's alerts, as its holder",
+    description:
+      "WTR-006, NTF-004: like the button on the pager, the phone acknowledges its holder's " +
+      'alert in their name, signed in or not, which stops its repeats and escalation everywhere. ' +
+      'Acknowledging again returns the alert as it is.',
+    tags: ['notifications'],
+    requirements: ['WTR-006', 'NTF-004'],
+    capability: 'DEVICE',
+    request: { params: AlertParams },
+    responses: {
+      200: { description: 'The alert.', schema: AlertView },
+      ...deviceErrors,
+      403: { description: 'Not a waiter phone.', schema: ApiError },
+      404: { description: "No such alert for the phone's holder.", schema: ApiError },
     },
   },
   {

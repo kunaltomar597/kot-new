@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import {
+  DeviceAlertsResponse,
   type LoginResponse,
   MyPagerResponse,
   PagerAlertMessage,
@@ -13,8 +14,15 @@ import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { NOTIFICATION_CLOCK, NOTIFICATION_OPTIONS } from '../../src/notifications/clock.js';
+import { NotificationsService } from '../../src/notifications/notifications.service.js';
 import { PAGER_OPTIONS, PagerBroker } from '../../src/pagers/pager-broker.js';
-import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
+import {
+  addDevice,
+  authHeaders,
+  type AuthKit,
+  createAuthKit,
+  signIn,
+} from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
 import { until } from '../helpers/wait.js';
@@ -243,6 +251,86 @@ describe('[PGR-006] [PGR-008] [NFR-P03] alerts on the pager', () => {
     );
     await until(() => a.messages.length - before >= 30, 5_000, 'thirty nudges');
     expect(performance.now() - started).toBeLessThan(2_000 + 1_000);
+  });
+});
+
+describe('[WTR-006] [NTF-004] the waiter phone and the pager share one acknowledgement', () => {
+  it('stops the pager repeats when the phone acknowledges, and tells the pager', async () => {
+    const phone = await addDevice(app, kit, 'WAITER_PHONE');
+    await signIn(app, kit, 'WAITER', phone);
+    const a = await connect(pagerA);
+    const alertId = await requestBill('6');
+    await until(
+      () => a.messages.find((entry) => entry.alertId === alertId && entry.seq === 0),
+      5_000,
+      'the alert on the pager',
+    );
+    // Unacknowledged after R, it comes back on the pager, and the phone shows the same alert.
+    await app.get(NotificationsService).processDue(new Date(now.getTime() + 61_000));
+    await until(
+      () => a.messages.find((entry) => entry.alertId === alertId && entry.seq === 1),
+      5_000,
+      'the repeat on the pager',
+    );
+    const listed = DeviceAlertsResponse.parse(
+      (await server().get('/api/v1/devices/current/alerts').set(authHeaders(phone))).body,
+    );
+    expect(listed.alerts.find((alert) => alert.id === alertId)).toMatchObject({ repeatCount: 1 });
+
+    // Acknowledged on the phone, as its holder: the pager hears it and the repeats stop.
+    const acknowledged = await server()
+      .post(`/api/v1/devices/current/alerts/${alertId}/acknowledge`)
+      .set(authHeaders(phone));
+    expect(acknowledged.status, JSON.stringify(acknowledged.body)).toBe(200);
+    await until(
+      () => a.messages.find((entry) => entry.alertId === alertId && entry.state === 'ACKNOWLEDGED'),
+      5_000,
+      'the acknowledgement on the pager',
+    );
+    await app.get(NotificationsService).processDue(new Date(now.getTime() + 300_000));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(
+      a.messages.filter((entry) => entry.alertId === alertId && entry.state === 'ALERT'),
+    ).toHaveLength(2);
+    expect(
+      (await prisma.alert.findUniqueOrThrow({ where: { id: alertId } })).acknowledgedById,
+    ).toBe(kit.staff.WAITER);
+  });
+
+  it('keeps alerts meant for the POS and dashboard off the pager', async () => {
+    const a = await connect(pagerA);
+    const before = a.messages.length;
+    // A printer alert goes to the managers and cashiers on the POS and dashboard only.
+    await server()
+      .put(`/api/v1/pagers/${pagerB.deviceId}/wearer`)
+      .set(as(manager))
+      .send({ staffId: kit.staff.CASHIER });
+    const b = await connect(pagerB);
+    await app.get(PrismaService).transaction((tx) =>
+      app.get(NotificationsService).raise(tx, {
+        restaurantId: kit.restaurantId,
+        type: 'PRINTER_OFFLINE',
+        dedupeKey: 'printer:test',
+        payload: { printerName: 'Counter' },
+      }),
+    );
+    const nudge = await server()
+      .post('/api/v1/alerts/nudge')
+      .set(as(manager))
+      .send({ staffIds: [kit.staff.CASHIER], message: 'Printer check' });
+    const [nudgeId] = (nudge.body as { alertIds: string[] }).alertIds;
+    // The nudge arrives after the printer alert, so by then the printer alert would have too.
+    await until(
+      () => b.messages.find((entry) => entry.alertId === nudgeId),
+      5_000,
+      'the nudge on the cashier’s pager',
+    );
+    expect(b.messages.map((entry) => entry.type)).not.toContain('PRINTER_OFFLINE');
+    expect(a.messages.slice(before).map((entry) => entry.type)).not.toContain('PRINTER_OFFLINE');
+    await server()
+      .put(`/api/v1/pagers/${pagerB.deviceId}/wearer`)
+      .set(as(manager))
+      .send({ staffId: null });
   });
 });
 

@@ -31,6 +31,9 @@ after ack, Cancel choosing between multiple active requests.
 Acceptance: integration and Maestro tests covering raise → re-alert every R → escalate after N →
 ack → Cancel resolves; duplicate raise blocked.
 
+The server module, its events and alerts, and the waiter's inbox were moved forward to P2-06d;
+P3-02 builds the tablet's buttons on them and the Maestro test.
+
 ## P3-03 Customer ordering and waiter approval workflow
 
 Goal: diners order from the tablet; the waiter approves before the kitchen sees it.

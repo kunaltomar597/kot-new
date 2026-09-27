@@ -1,3 +1,4 @@
+export * from './alert-center.js';
 export * from './client.js';
 export * from './device-session.js';
 export * from './menu-cache.js';

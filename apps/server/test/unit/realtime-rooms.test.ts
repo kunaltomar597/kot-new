@@ -87,6 +87,29 @@ describe('[AUTH-009] [SEC-003] rooms a connection joins', () => {
       rooms.device(rid, pos.deviceId),
     ]);
   });
+
+  it('[WTR-006] keeps a waiter phone in its holder’s alert room, signed in or not (P2-06a)', () => {
+    const phone = device({ type: 'WAITER_PHONE', staffId: waiter });
+    expect(roomsForConnection({ device: phone })).toEqual([
+      rooms.all(rid),
+      rooms.device(rid, phone.deviceId),
+      rooms.alerts(rid, waiter),
+    ]);
+    expect(
+      roomsForConnection({ device: phone, person: { staffId: waiter, role: 'WAITER' } }),
+    ).toEqual([
+      rooms.all(rid),
+      rooms.device(rid, phone.deviceId),
+      rooms.alerts(rid, waiter),
+      rooms.role(rid, 'WAITER'),
+      rooms.staff(rid, waiter),
+    ]);
+    // A pager's wearer or a phone nobody holds joins no alert room here.
+    expect(roomsForConnection({ device: device({ type: 'WAITER_PHONE' }) })).toHaveLength(2);
+    expect(roomsForConnection({ device: device({ type: 'POS', staffId: waiter }) })).not.toContain(
+      rooms.alerts(rid, waiter),
+    );
+  });
 });
 
 describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
@@ -259,6 +282,46 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     expect(targets.sort()).toEqual(
       [rooms.role(rid, 'OWNER'), rooms.role(rid, 'MANAGER'), rooms.staff(rid, waiter)].sort(),
     );
+  });
+
+  it('[WTR-006] sends an alert to its recipients’ own and alert rooms, and to managers', () => {
+    const alertId = randomUUID();
+    for (const event of [
+      domainEvent('AlertRaised', rid, {
+        alertId,
+        eventType: 'ITEM_READY',
+        recipients: [waiter],
+        pagerText: 'T5 READY',
+        tableId: table1,
+        repeat: 0,
+        escalated: false,
+      }),
+      domainEvent('AlertAcknowledged', rid, {
+        alertId,
+        acknowledgedBy: waiter,
+        recipients: [waiter],
+      }),
+      domainEvent('AlertCleared', rid, { alertId, recipients: [waiter] }),
+    ]) {
+      expect(roomsForEvent(event).sort()).toEqual(
+        [
+          rooms.role(rid, 'OWNER'),
+          rooms.role(rid, 'MANAGER'),
+          rooms.staff(rid, waiter),
+          rooms.alerts(rid, waiter),
+        ].sort(),
+      );
+    }
+    // The alert room hears nothing but alerts: not the tables its holder looks after.
+    const phone = new Set(
+      roomsForConnection({ device: device({ type: 'WAITER_PHONE', staffId: waiter }) }),
+    );
+    const moved = domainEvent('TableWaiterChanged', rid, {
+      tableId: table1,
+      tableSessionId: randomUUID(),
+      waiterId: waiter,
+    });
+    expect(reaches(roomsForEvent(moved), phone)).toBe(false);
   });
 
   it('follows the permission matrix: a role denied the capability hears nothing', () => {

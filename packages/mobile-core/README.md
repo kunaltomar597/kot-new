@@ -24,6 +24,13 @@ here with Vitest:
   (P2-02b).
 - `MenuCache`: the published menu on the device, refreshed on a newer version or reconnect, with
   availability changes applied (MENU-006, MENU-013).
+- `AlertCenter` (P2-06a, WTR-006): on a waiter phone (`followAlerts`), the open alerts of the
+  person the phone alerts, its holder: whoever last signed in on it, kept after an inactivity
+  sign-out so the phone goes on alerting like a pager (AUTH-005). They are read through the
+  device's own endpoint when the connection comes up or back (NTF-006) and after an alert event for
+  the holder; each alert and each repeat is announced once to the `AlertNotifier` (the Android
+  notifications of P2-06b), and acknowledging acknowledges everywhere, the pager included
+  (NTF-004). Unpairing or pairing again forgets them.
 - `OrderOutbox`: orders from this device on their way to the kitchen (WTR-012, ORD-013). Each is
   kept before it is sent and sent again with the same idempotency key until the server answers;
   orders go only while the person who took them is signed in; a refused order stays with the
@@ -31,5 +38,5 @@ here with Vitest:
   in `apps/server/test/integration/order-outbox.int.test.ts`.
 
 `@rp/mobile-core/testing` holds the test doubles (a fake local server behind `fetch`, a fake
-Socket.io client, a fake Keystore, a fake trust module with sample CAs) used by this package,
-`@rp/mobile-shell` and the apps.
+Socket.io client, a fake Keystore, a fake trust module with sample CAs, a fake alert notifier and
+sample alerts) used by this package, `@rp/mobile-shell` and the apps.

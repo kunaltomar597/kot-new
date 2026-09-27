@@ -454,6 +454,24 @@ describe('[AUTH-008] [AUTH-005] live connections end when their credentials do',
   });
 
   it('ends the connection when the person signs out', async () => {
+    const pos = await addDevice(app, kit, 'POS');
+    const cashier = await signIn(app, kit, 'CASHIER', pos);
+    const client = await connect(auth(pos, cashier.accessToken));
+    const deviceOnly = await connect(auth(pos));
+
+    await request(httpServer(app))
+      .post('/api/v1/auth/logout')
+      .set(authHeaders(pos, cashier.accessToken))
+      .expect(204);
+
+    expect(await client.waitForDisconnect(5_000)).toBe('io server disconnect');
+    expect(client.endings).toEqual([{ reason: 'SESSION_ENDED' }]);
+    // The device itself is still paired: its own connection stays.
+    await app.get(RealtimeGateway).sweep();
+    expect(deviceOnly.disconnectReason).toBeUndefined();
+  });
+
+  it('[WTR-006] renews a waiter phone’s own connection when signing out ends its alerts', async () => {
     const phone = await addDevice(app, kit, 'WAITER_PHONE');
     const waiter = await signIn(app, kit, 'WAITER', phone);
     const client = await connect(auth(phone, waiter.accessToken));
@@ -466,9 +484,9 @@ describe('[AUTH-008] [AUTH-005] live connections end when their credentials do',
 
     expect(await client.waitForDisconnect(5_000)).toBe('io server disconnect');
     expect(client.endings).toEqual([{ reason: 'SESSION_ENDED' }]);
-    // The device itself is still paired: its own connection stays.
-    await app.get(RealtimeGateway).sweep();
-    expect(deviceOnly.disconnectReason).toBeUndefined();
+    // The phone no longer alerts the waiter (P2-06a): it reconnects without their alert room.
+    expect(await deviceOnly.waitForDisconnect(5_000)).toBe('io server disconnect');
+    expect(deviceOnly.endings).toEqual([{ reason: 'DEVICE_CHANGED' }]);
   });
 
   it('ends the connection when the person’s role changes', async () => {

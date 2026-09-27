@@ -1,5 +1,6 @@
 import type { DeviceKey } from '@rp/api-client';
-import type { DeviceSummary, LoginResponse, StaffTile } from '@rp/contracts';
+import type { AlertView, DeviceSummary, LoginResponse, StaffTile } from '@rp/contracts';
+import type { AlertHolder, AlertNotifier } from '../alert-center.js';
 import type { DeviceKeyStore } from '../device-session.js';
 import type { ServerAuthority, ServerTrust } from '../server-trust.js';
 import { FakeServer } from './fake-server.js';
@@ -209,6 +210,85 @@ export class FakeTrust implements ServerTrust {
   }
 }
 
+/** An open alert of the waiter's, as the server lists it (P2-06a): food ready at table 5. */
+export function alertView(overrides: Partial<AlertView> = {}): AlertView {
+  return {
+    id: '0199a0e0-0000-7000-8000-0000000a1e01',
+    type: 'ITEM_READY',
+    status: 'OPEN',
+    tableId: '0199a0e0-0000-7000-8000-00000000b005',
+    tableLabel: '5',
+    tableSessionId: '0199a0e0-0000-7000-8000-00000000c005',
+    orderId: null,
+    pagerText: 'T5 READY',
+    payload: { items: ['Paneer Tikka'] },
+    raisedByName: null,
+    recipientIds: [STAFF.WAITER.staffId],
+    channels: ['PAGER', 'WAITER_APP', 'TABLET'],
+    repeatCount: 0,
+    escalatedAt: null,
+    escalatedTo: [],
+    createdAt: '2026-09-26T08:40:00.000Z',
+    acknowledgedAt: null,
+    acknowledgedById: null,
+    clearedAt: null,
+    ...overrides,
+  };
+}
+
+/** The phone's holder in tests: the waiter. */
+export const HOLDER: AlertHolder = {
+  staffId: STAFF.WAITER.staffId,
+  displayName: STAFF.WAITER.displayName,
+};
+
+/**
+ * The Android notifier's stand-in (P2-06b): what rang, what was taken off, and whether it listens.
+ * `pressAcknowledge` is a person pressing Acknowledge on a notification.
+ */
+export class FakeNotifier implements AlertNotifier {
+  readonly announced: AlertView[] = [];
+  readonly dismissed: string[] = [];
+  /** Whom it listens for; null when stopped. */
+  holder: AlertHolder | null = null;
+  starts = 0;
+  stops = 0;
+  private readonly listeners = new Set<(alertId: string) => void>();
+
+  start(holder: AlertHolder): Promise<void> {
+    this.holder = holder;
+    this.starts += 1;
+    return Promise.resolve();
+  }
+
+  stop(): Promise<void> {
+    this.holder = null;
+    this.stops += 1;
+    return Promise.resolve();
+  }
+
+  announce(alert: AlertView): Promise<void> {
+    this.announced.push(alert);
+    return Promise.resolve();
+  }
+
+  dismiss(alertId: string): Promise<void> {
+    this.dismissed.push(alertId);
+    return Promise.resolve();
+  }
+
+  onAcknowledge(listener: (alertId: string) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  pressAcknowledge(alertId: string): void {
+    for (const listener of this.listeners) listener(alertId);
+  }
+}
+
 /** A local server that pairs a device of `type`, lists staff and signs a waiter in. */
 export function fakeLocalServer(
   device: Partial<DeviceSummary> = { type: 'WAITER_PHONE', name: 'Waiter phone 1' },
@@ -245,7 +325,11 @@ export function fakeLocalServer(
     .on('GET', '/api/v1/auth/session', () => {
       const { session, staff, secondFactorValidUntil } = login('WAITER');
       return { status: 200, body: { session, staff, secondFactorValidUntil } };
-    });
+    })
+    .on('GET', '/api/v1/devices/current/alerts', () => ({
+      status: 200,
+      body: { holder: null, alerts: [] },
+    }));
 }
 
 /** A valid `event` frame for tests of live updates; its payload must match the event's contract. */
@@ -262,6 +346,19 @@ export function eventFrame(sequence: number, type: string, payload: Record<strin
       payload,
     },
   };
+}
+
+/** An `AlertRaised` frame for `alert` (its first delivery, or the repeat given). */
+export function alertRaisedFrame(sequence: number, alert: AlertView, repeat = alert.repeatCount) {
+  return eventFrame(sequence, 'AlertRaised', {
+    alertId: alert.id,
+    eventType: alert.type,
+    recipients: alert.recipientIds,
+    pagerText: alert.pagerText,
+    tableId: alert.tableId,
+    repeat,
+    escalated: alert.escalatedAt !== null,
+  });
 }
 
 /** A valid `event` frame (an item became ready) for tests of live updates. */

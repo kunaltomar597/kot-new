@@ -1,3 +1,4 @@
+export * from './alert-text.js';
 export * from './cart.js';
 export * from './floor-view.js';
 export * from './item-actions.js';
