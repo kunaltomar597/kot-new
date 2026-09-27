@@ -25,7 +25,8 @@ What exists:
   stations, printers and the print queue (P1-07); the KDS (P1-09a); bills and invoices (P1-10);
   shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down
   (P1-13); alerts (P2-03a); nudges and breaks (P2-03b); pagers and their MQTT channels (P2-04a);
-  the signed-in person's own pager (P2-02a). 478 tests.
+  the signed-in person's own pager (P2-02a); each KOT's station and print status on orders and
+  `KotPrintStatusChanged` (P2-02b). 480 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (61 tables after the later migrations), least-privilege roles,
@@ -50,27 +51,33 @@ What exists:
   drill-down (P1-13); the Phase 1 exit scenario (P1-14); the notification engine core with
   acknowledgement, repeats and escalation (P2-03a); nudges, breaks, device, printer and disk
   alerts (P2-03b); the pager MQTT broker with per-pager credentials, ACL, alert delivery, acks and
-  heartbeats (P2-04a); the waiter's own pager and low-battery levels per device type (P2-02a).
-  646 tests (4 skipped without a real install).
+  heartbeats (P2-04a); the waiter's own pager and low-battery levels per device type (P2-02a);
+  KOT print status announced to the floor, and the phones' order outbox tested against the server
+  (P2-02b). 651 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
   account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
-  for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c).
-  26 tests.
+  for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
+  order outbox, with the device session owning the menu cache and the outbox (P2-02b).
+  36 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
-  pickers) (P2-01b), table tiles and a segmented control (P2-02a). 26 tests.
+  pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
+  29 tests.
 - `packages/mobile-native` (the Keystore device key as a local Expo module, secure and plain
   stores) and `packages/mobile-shell` (pairing and login screens, connection banner, live data)
-  (P2-01c), with `useNow` for clocks on screen (P2-02a).
+  (P2-01c), with `useNow` for clocks on screen (P2-02a); `useMenu`, `useUnsentOrders`, and the
+  `crypto.getRandomValues` that Hermes lacks, from `expo-crypto` (P2-02b).
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
-  and the waiter's own pager (P2-02a).
+  and the waiter's own pager (P2-02a); each table has its screen with the menu, the new items,
+  Send KOT through the offline outbox, each KOT's delivery and "Again" (P2-02b).
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
-  "my tables", cart lines, the menu tree), moved out of the console (P2-02a). 13 tests.
+  "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
+  "Again", live checks of cart lines and KOT delivery (P2-02b). 22 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -94,7 +101,7 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P2-01d LAN TLS pinning and QR pairing on Android (P2-01c done).
-- P2-02b Waiter app: order taking (P2-02a done; runs against development servers until P2-01d).
+- P2-02c Waiter app: serving, cancellations and voids (P2-02b done).
 - P2-06 Waiter alerts, service-request inbox, nudge, Notify manager (P2-02a done).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -166,7 +173,8 @@ Recommended next WPs (dependencies met):
 - [x] P2-01c Expo apps, builds and smoke flows
 - [ ] P2-01d LAN TLS pinning and QR pairing on Android
 - [x] P2-02a Waiter tables and pager status
-- [ ] P2-02b Waiter app: order taking
+- [x] P2-02b Waiter app: order taking
+- [ ] P2-02c Waiter app: serving, cancellations and voids
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
 - [x] P2-04a Pager broker, credentials, delivery and heartbeats
@@ -475,6 +483,42 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-09-27 (P2-02b):
+
+124. Tapping an open table on the phone opens its table screen (new items, menu, what was sent,
+     move and bill) instead of an actions sheet; opening a free table lands there too. The screen
+     follows the table session, so after a move it shows the same guests under the new name.
+125. Send KOT keeps the order on the phone first, with a new idempotency key per order, then sends
+     it; the new items are emptied once the order is kept, not when the server answers. An order
+     without an answer stays on the phone, shown on its table and on home, and goes again with the
+     same key on reconnect or "Send now" (WTR-012, ORD-013).
+126. Orders kept on a phone are sent only while the person who took them is signed in on it, so
+     they always go in that person's name; another person's order waits, shown as theirs, until
+     they sign in again. Nobody else can send or throw away someone else's kept order yet; to be
+     reviewed with P2-06 if phones are shared between waiters.
+127. When the server refuses an order (some lines, ORD-017, or the whole order), its items come back
+     into the table's new items marked with the server's reasons; sending them again is a new order
+     with a new key (the server does not keep refused keys). An order refused while it waited in
+     the background stays on the phone as not sent until the waiter changes it, or discards it
+     after a confirmation.
+128. Each sent order lists its KOTs with the station and whether each reached the kitchen: on the
+     kitchen screen (screen stations, and screen-and-printer stations whatever the printer does),
+     printed, printing, or not printed because of a printer problem. It comes from the KOT's print
+     status and the new `KotPrintStatusChanged` event, which goes to the floor roles, not the
+     kitchen screens.
+129. "Again" orders one more of a sent line with the same size, add-ons, combo choices and note,
+     priced as the menu is now; when the menu changed how the dish is ordered, the item sheet opens
+     to choose again. Reorder and send is 3 taps from the tables (table, Again, Send KOT).
+130. A new item that is sold out, switched off, no longer on the waiter-app menu, or more than the
+     stock left blocks Send KOT until it is removed or changed, checked live against the phone's
+     menu; the server checks again.
+131. `DeviceSession` owns the device's menu cache and order outbox: the menu is fetched on reconnect
+     and on `MenuPublished`, availability changes apply live, and kept orders are sent when the
+     connection returns. The table tablet uses the same menu cache.
+132. The phones install `crypto.getRandomValues` from `expo-crypto` at start-up: Hermes has no Web
+     Crypto, and `@rp/api-client` builds every correlation id and idempotency key from it. Without
+     it the P2-01c apps could not have made their first request on a real phone.
+
 Decided 2026-09-27 (P2-02a):
 
 119. Low battery has a level per device type: `pager.lowBatteryPercent` (15 %, PGR-013) for pagers,
@@ -707,6 +751,42 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-02b Waiter app: order taking
+
+Merged #54 (P2-02a) once green. P2-02 is now split in three: P2-02c takes serving, cancellations
+and voids.
+
+Built: the waiter app's table screen (open table → order), menu browser, item sheet, new items,
+unsent and sent orders with each KOT's delivery and "Again"; `OrderOutbox` in `@rp/mobile-core`,
+with `DeviceSession` owning it and the menu cache; `useMenu`, `useUnsentOrders` and a `Screen`
+footer in `@rp/mobile-shell`; `TextField` and `Button` `selected` in `@rp/ui-native`;
+`item-choice.ts`, `reorder.ts` and `kotDelivery` in `@rp/ordering`; KOT station names and print
+status on `OrderView`, variant and option ids on its items, and `KotPrintStatusChanged` from the
+print queue. Found and fixed: Hermes has no `crypto.getRandomValues`, so every request from a real
+phone would have failed at its correlation id; the apps now install it from `expo-crypto`
+(decision 132). The Maestro flow now orders a dish and sends it.
+
+Tests: waiter app 31 (was 14), mobile-shell 12 (was 10), mobile-core 36 (was 26),
+ui-native 29 (was 26), ordering 22 (was 13), mobile-native 20 (was 18), table tablet 3, contracts
+480, server 651 (the outbox against the real server: a lost answer gives one order, one KOT set
+and one stock deduction; an offline order is sent once; an order refused while waiting makes
+nothing).
+
+Gotchas:
+
+- `DeviceSession` fetches the menu only once the live connection syncs; the app tests seed it with
+  `session.menu.refresh(() => session.api.getMenu())` before rendering, and `sockets.sync(0)`
+  both brings the phone online and sends what it kept.
+- The fake restaurant in `apps/waiter-app/test/restaurant.tsx` takes orders once per key and has
+  a `network` switch (`down` fails before the server, `loseAnswers` after it answered).
+- `POST /api/v1/orders` answers 200 for both accepted and refused orders (the contract has no
+  201); a fake answering 201 makes the client return nothing.
+- Switching the table screen between Order and Menu remounts the menu, so its search is cleared.
+- React Native's jest preset runs as iOS, where `BackHandler` does nothing: spy on
+  `addEventListener` to press the Android back button in a test.
+
+Decisions: 124 to 132.
 
 ### 2026-09-27: P2-02a Waiter tables and pager status
 

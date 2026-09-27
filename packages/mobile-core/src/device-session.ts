@@ -9,6 +9,8 @@ import type {
 } from '@rp/api-client';
 import type { DeviceSummary, DomainEvent, LoginResponse, StaffTile } from '@rp/contracts';
 import { createMobileClient, CREDENTIALS_KEY, loadCredentials } from './client.js';
+import { MenuCache } from './menu-cache.js';
+import { OrderOutbox } from './order-outbox.js';
 import { type KeyValueStore, readJson } from './storage.js';
 
 /** Where the device key lives: the Android Keystore in the apps, a fake in tests. */
@@ -94,9 +96,15 @@ export function normalizeServerUrl(input: string): string {
  * The phone's or tablet's link to the local server, outside React so it can be tested on its own
  * (AUTH-005, AUTH-007, AUTH-008): pairing with a Keystore key, signing staff in and out, the live
  * connection with resume, and what happens when the server ends the session or unpairs the device.
- * Screens read `getSnapshot()` through `useSyncExternalStore` and call the actions.
+ * It also keeps the menu on the device current (MENU-013, MENU-006) and sends unsent orders when
+ * the connection comes back (WTR-012). Screens read `getSnapshot()` through
+ * `useSyncExternalStore` and call the actions.
  */
 export class DeviceSession {
+  /** The published menu on the device, fetched again on reconnect and when a new one is out. */
+  readonly menu: MenuCache;
+  /** Orders on their way to the kitchen; sent again on every reconnect. */
+  readonly orders: OrderOutbox;
   private snapshot: DeviceSessionSnapshot = INITIAL;
   private readonly listeners = new Set<() => void>();
   private readonly eventListeners = new Set<(event: DomainEvent) => void>();
@@ -105,7 +113,14 @@ export class DeviceSession {
   /** Bumped whenever the client is replaced, so late callbacks of an old client are ignored. */
   private generation = 0;
 
-  constructor(private readonly options: DeviceSessionOptions) {}
+  constructor(private readonly options: DeviceSessionOptions) {
+    this.menu = new MenuCache(options.plainStore);
+    this.orders = new OrderOutbox({
+      store: options.plainStore,
+      api: () => this.api,
+      staffId: () => this.snapshot.person?.id ?? null,
+    });
+  }
 
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -172,6 +187,8 @@ export class DeviceSession {
     const device = await client.api.getCurrentDevice();
     await this.options.plainStore.setItem(SERVER_KEY, serverUrl);
     await this.options.plainStore.removeItem(RESUME_KEY);
+    // Another restaurant's menu is no use here.
+    await this.menu.clear();
     this.update({
       phase: 'paired',
       serverUrl,
@@ -305,10 +322,17 @@ export class DeviceSession {
       ...(resume !== undefined && { resume }),
       ...(this.options.connect !== undefined && { connect: this.options.connect }),
       onEvent: (event) => {
+        this.keepMenuCurrent(event);
         for (const listener of this.eventListeners) listener(event);
       },
       onStatus: (status) => {
-        if (this.connection === connection) this.update({ connection: status });
+        if (this.connection !== connection) return;
+        const cameOnline = status === 'online' && this.snapshot.connection !== 'online';
+        this.update({ connection: status });
+        if (cameOnline) {
+          this.refreshMenu({ force: true });
+          this.orders.flush().catch((error: unknown) => this.options.onError?.(error));
+        }
       },
       onResumePoint: (point) => {
         this.saveResume(point);
@@ -316,6 +340,25 @@ export class DeviceSession {
     });
     this.connection = connection;
     connection.start();
+  }
+
+  /** A newer menu is fetched; availability changes apply to the stored one (MENU-006). */
+  private keepMenuCurrent(event: DomainEvent): void {
+    if (event.type === 'MenuPublished') {
+      this.refreshMenu({ announcedVersion: event.payload.menuVersion });
+    } else if (event.type === 'ItemAvailabilityChanged') {
+      this.menu
+        .applyAvailability(event.payload)
+        .catch((error: unknown) => this.options.onError?.(error));
+    }
+  }
+
+  private refreshMenu(options: { announcedVersion?: number; force?: boolean }): void {
+    const client = this.client;
+    if (client === undefined) return;
+    this.menu
+      .refresh(() => client.api.getMenu(), options)
+      .catch((error: unknown) => this.options.onError?.(error));
   }
 
   private update(changes: Partial<DeviceSessionSnapshot>): void {

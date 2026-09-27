@@ -119,6 +119,7 @@ export function sentOrder(
         itemId: IDS.dal,
         parentOrderItemId: null,
         name: 'Dal Makhani',
+        variantId: null,
         variantName: null,
         modifiers: [],
         quantity: 1,

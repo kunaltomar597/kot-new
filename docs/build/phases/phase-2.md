@@ -97,7 +97,7 @@ PIN on the device; out-of-stock shown live; own pager battery/connection status.
 Acceptance: Maestro flows for open → order → send → served; offline draft resent on reconnect
 without duplicates (idempotency test against the server).
 
-P2-02 is split in two.
+P2-02 is split in three.
 
 ### P2-02a Waiter tables and pager status (done)
 
@@ -129,24 +129,58 @@ As built:
   `@rp/mobile-core/testing`: `eventFrame`, and the fake server matches `:param` path segments.
 - The Maestro flow `pair-login-tables.yaml` now opens a table and asks for its bill.
 
-### P2-02b Order taking
+### P2-02b Order taking and sending (done)
 
 Depends on: P2-02a, P1-06.
-Deliverables:
+Acceptance: the idempotency test against the server (an order whose answer is lost is resent on
+reconnect and creates one order, one set of KOTs and one stock deduction; an order made offline is
+sent once); a Maestro flow open → order → send.
 
-- Order taking from a table: categories, search, item details, the shared selection popup (sizes,
-  add-ons, combos), quantity and instructions, reusing `@rp/ordering`'s cart and menu helpers and
-  the cached menu.
-- Send KOT through the outbox with one idempotency key per submission, and per-KOT delivery
-  confirmation (WTR-003, WTR-012); a draft made offline is sent on reconnect without duplicates.
-- Live item status on the table, and marking items picked up and served (WTR-007).
-- Cancellations and voids with a manager PIN on the device (WTR-009, ORD-011), using the
-  server's override.
-- Out-of-stock items shown live and blocked (WTR-010).
-- Reorder plus send in at most 5 taps (NFR-U03).
+As built:
 
-Acceptance: a Maestro flow open → order → send → served; the idempotency test against the server
-(an offline draft resent on reconnect creates one order, one set of KOTs and one stock deduction).
+- `apps/waiter-app`:
+  - `TableScreen`: tapping an open table opens it; a free table is opened with its guests first
+    (`OpenTableSheet`) and lands there. It follows the table session, so a moved table stays open
+    under its new name. It has an Order view (unsent orders, the new items, what was sent) and a
+    Menu view, Move table (`MoveSheet`) and Request bill, and the phone's back button.
+  - `MenuBrowser` and `ItemSheet`: categories, search by name, short code or synonym, and the
+    shared selection rules for sizes, add-ons and combos, quantity and instructions (WTR-003,
+    MENU-012), from the menu kept on the phone (`useMenu`, MENU-013).
+  - `CartList`: quantity, instructions and remove per line; a line that is sold out, switched off,
+    off the waiter-app menu or more than the stock left is marked live and blocks Send KOT
+    (WTR-010, `lineProblems`).
+  - Send KOT keeps the order on the phone first with a new idempotency key and sends it through
+    `OrderOutbox`; without an answer it stays, shown on its table (`UnsentOrders`) and on home
+    (`UnsentHome`), and goes again with the same key on reconnect or "Send now", while the person
+    who took it is signed in (WTR-012, ORD-013). A refused order comes back into the new items
+    marked with the server's reasons (ORD-017); one refused in the background stays on the phone
+    until it is changed or discarded after a confirmation.
+  - `SentOrders`: each order with its KOTs and whether each reached the kitchen (on the kitchen
+    screen, printed, printing, or a printer problem; `kotDelivery`), each item's state, and "Again"
+    with the same choices (`againLine`): reorder and send in 3 taps from the tables (NFR-U03).
+- `@rp/mobile-core`: `OrderOutbox` (on `PersistentOutbox`, which now takes a filter and replaces a
+  refused entry's body); `DeviceSession` owns the menu cache and the outbox, refreshes the menu on
+  reconnect and `MenuPublished`, applies `ItemAvailabilityChanged`, and sends kept orders when the
+  connection returns. The table tablet reads its menu from the session.
+- `@rp/mobile-native`: `installRandomValues()` gives Hermes `crypto.getRandomValues` from
+  `expo-crypto`; `@rp/api-client` builds correlation ids and idempotency keys from it.
+- `@rp/ordering`: `item-choice.ts` (moved from the console's item dialog, plus `menuNote`),
+  `reorder.ts` (`againLine`, `lineProblems`) and `kotDelivery`.
+- Server and contracts: `OrderView` items carry `variantId` and each modifier's `optionId`; KOTs
+  carry `stationName` and `printStatus`; the print queue announces `KotPrintStatusChanged` to the
+  floor roles (not the kitchen screens) when a KOT prints, fails or is reprinted.
+- `@rp/ui-native`: `TextField`, and `Button` `selected`. `@rp/mobile-shell`: `useMenu`,
+  `useUnsentOrders`, `Screen` `footer`.
+- Tests: `apps/server/test/integration/order-outbox.int.test.ts` runs the phone's outbox against
+  the real server; the Maestro flow now finds a dish, sends the KOT and sees it reach the kitchen.
+
+### P2-02c Serving, cancellations and voids
+
+Depends on: P2-02b.
+Deliverables: live item status per table with marking items picked up and served (WTR-007,
+KDS-007); cancelling an item before preparation with a reason, and voiding it after with a
+manager's PIN entered on the phone (WTR-009, ORD-011, AUTH-011), through the server's override.
+Acceptance: the Maestro flow runs open → order → send → served.
 
 ## P2-03 Notification and escalation engine
 

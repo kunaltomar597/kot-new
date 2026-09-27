@@ -187,7 +187,7 @@ async function orderOf(response: request.Response): Promise<OrderView> {
 describe('[ORD-001] [ORD-014] submitting an order', () => {
   let session: TableSessionView;
 
-  it('prices every line on the server and sends staff orders to the kitchen by station', async () => {
+  it('[WTR-012] prices every line on the server and sends staff orders to the kitchen by station', async () => {
     session = await openTable('T1');
     const response = await submit({
       idempotencyKey: randomUUID(),
@@ -214,18 +214,22 @@ describe('[ORD-001] [ORD-014] submitting an order', () => {
     const order = await orderOf(response);
     const tikka = order.items.find((item) => item.name === 'Paneer Tikka');
     // Half (₹160) + extra cheese (₹40) = ₹200 each, two of them.
+    // The chosen variant and options by id too, so the same can be ordered again (NFR-U03).
     expect(tikka).toMatchObject({
+      variantId: id('half'),
       variantName: 'Half',
       unitPrice: 20_000,
       lineTotal: 40_000,
       state: 'SENT',
       instructions: 'Less spicy',
-      modifiers: [{ name: 'Extra cheese', priceDelta: 4_000 }],
+      modifiers: [{ optionId: id('cheese'), name: 'Extra cheese', priceDelta: 4_000 }],
     });
-    // One ticket per station, numbered for the day; the bar screen prints nothing.
-    expect(order.kots.map((kot) => [kot.kotNumber, kot.stationId])).toEqual([
-      [1, id('kitchen')],
-      [2, id('bar')],
+    // One ticket per station, numbered for the day; the bar screen prints nothing (WTR-012).
+    expect(
+      order.kots.map((kot) => [kot.kotNumber, kot.stationId, kot.stationName, kot.printStatus]),
+    ).toEqual([
+      [1, id('kitchen'), 'Kitchen', 'PENDING'],
+      [2, id('bar'), 'Bar', 'NOT_REQUIRED'],
     ]);
     const kots = await prisma.kot.findMany({ orderBy: { kotNumber: 'asc' } });
     expect(kots.map((kot) => kot.printStatus)).toEqual(['PENDING', 'NOT_REQUIRED']);

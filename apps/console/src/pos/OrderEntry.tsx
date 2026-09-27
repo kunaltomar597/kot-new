@@ -31,11 +31,11 @@ import { useOpenBill } from '../billing/use-open-bill.js';
 import { ItemDialog } from './ItemDialog.js';
 import { displayState } from '@rp/ordering';
 import {
-  comboOf,
   displayPrice,
-  needsOptions,
   channelItems,
   menuCategories,
+  menuNote,
+  needsOptions,
   visibleItems,
 } from '@rp/ordering';
 
@@ -276,7 +276,7 @@ function MenuBrowser({
               price={displayPrice(item)}
               foodType={item.foodType}
               foodTypeLabel={t(`pos.menu.foodType.${item.foodType}`)}
-              {...noteOf(menu, item, t)}
+              {...menuNote(menu, item, t)}
               onSelect={() => {
                 onChoose(item, menu);
               }}
@@ -286,19 +286,6 @@ function MenuBrowser({
       )}
     </div>
   );
-}
-
-function noteOf(
-  menu: MenuSnapshot,
-  item: MenuItem,
-  t: ReturnType<typeof useT>,
-): { note?: string; unavailable?: string } {
-  if (item.stockCount === 0) return { unavailable: t('pos.menu.soldOut') };
-  if (!item.available) return { unavailable: t('pos.menu.notAvailable') };
-  if (item.stockCount !== null) return { note: t('pos.menu.left', { count: item.stockCount }) };
-  if (comboOf(menu, item) !== undefined) return { note: t('pos.menu.combo') };
-  if (needsOptions(menu, item)) return { note: t('pos.menu.options') };
-  return {};
 }
 
 function Cart({

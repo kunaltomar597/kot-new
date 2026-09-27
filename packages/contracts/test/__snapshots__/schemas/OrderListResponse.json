@@ -84,12 +84,27 @@
                     ]
                   },
                   "name": { "type": "string" },
+                  "variantId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      { "type": "null" }
+                    ]
+                  },
                   "variantName": { "type": ["string", "null"] },
                   "modifiers": {
                     "type": "array",
                     "items": {
                       "type": "object",
                       "properties": {
+                        "optionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
                         "name": { "type": "string" },
                         "priceDelta": {
                           "type": "integer",
@@ -97,7 +112,7 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": ["name", "priceDelta"]
+                      "required": ["optionId", "name", "priceDelta"]
                     }
                   },
                   "quantity": {
@@ -133,6 +148,7 @@
                   "itemId",
                   "parentOrderItemId",
                   "name",
+                  "variantId",
                   "variantName",
                   "modifiers",
                   "quantity",
@@ -164,9 +180,14 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] }
+                  "stationName": { "type": "string" },
+                  "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] },
+                  "printStatus": {
+                    "type": "string",
+                    "enum": ["NOT_REQUIRED", "PENDING", "PRINTED", "FAILED"]
+                  }
                 },
-                "required": ["id", "kotNumber", "stationId", "kind"]
+                "required": ["id", "kotNumber", "stationId", "stationName", "kind", "printStatus"]
               }
             }
           },
@@ -276,12 +297,27 @@
                     ]
                   },
                   "name": { "type": "string" },
+                  "variantId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      { "type": "null" }
+                    ]
+                  },
                   "variantName": { "type": ["string", "null"] },
                   "modifiers": {
                     "type": "array",
                     "items": {
                       "type": "object",
                       "properties": {
+                        "optionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
                         "name": { "type": "string" },
                         "priceDelta": {
                           "type": "integer",
@@ -289,7 +325,7 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": ["name", "priceDelta"],
+                      "required": ["optionId", "name", "priceDelta"],
                       "additionalProperties": false
                     }
                   },
@@ -326,6 +362,7 @@
                   "itemId",
                   "parentOrderItemId",
                   "name",
+                  "variantId",
                   "variantName",
                   "modifiers",
                   "quantity",
@@ -358,9 +395,14 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] }
+                  "stationName": { "type": "string" },
+                  "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] },
+                  "printStatus": {
+                    "type": "string",
+                    "enum": ["NOT_REQUIRED", "PENDING", "PRINTED", "FAILED"]
+                  }
                 },
-                "required": ["id", "kotNumber", "stationId", "kind"],
+                "required": ["id", "kotNumber", "stationId", "stationName", "kind", "printStatus"],
                 "additionalProperties": false
               }
             }

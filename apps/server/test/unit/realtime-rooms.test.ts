@@ -228,6 +228,26 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     );
   });
 
+  it('[WTR-012] tells the floor whether a ticket was printed, not the kitchen screens', () => {
+    const targets = roomsForEvent(
+      domainEvent('KotPrintStatusChanged', rid, {
+        kotId: randomUUID(),
+        kotNumber: 12,
+        orderId: randomUUID(),
+        stationId: randomUUID(),
+        printStatus: 'FAILED',
+      }),
+    );
+    expect(targets.sort()).toEqual(
+      [
+        rooms.role(rid, 'OWNER'),
+        rooms.role(rid, 'MANAGER'),
+        rooms.role(rid, 'CASHIER'),
+        rooms.role(rid, 'WAITER'),
+      ].sort(),
+    );
+  });
+
   it('sends an escalation to managers and the people it names', () => {
     const targets = roomsForEvent(
       domainEvent('AlertEscalated', rid, {
@@ -304,6 +324,14 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       });
     case 'KotBumped':
       return domainEvent(type, rid, { kotId: id(), stationId: id(), bumped: true });
+    case 'KotPrintStatusChanged':
+      return domainEvent(type, rid, {
+        kotId: id(),
+        kotNumber: 4,
+        orderId: id(),
+        stationId: id(),
+        printStatus: 'PRINTED',
+      });
     case 'ItemStatusChanged':
       return domainEvent(type, rid, {
         orderId: id(),

@@ -28,14 +28,19 @@ export function ConnectionBanner() {
   );
 }
 
-/** A full screen with the connection banner, a title and scrolling content. */
+/**
+ * A full screen with the connection banner, a title and scrolling content; `footer` stays at the
+ * bottom while the content scrolls (e.g. the order's Send button).
+ */
 export function Screen({
   title,
   actions,
+  footer,
   children,
 }: {
   title?: string;
   actions?: ReactNode;
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   const { colors } = useTheme();
@@ -53,6 +58,16 @@ export function Screen({
         )}
         {children}
       </ScrollView>
+      {footer === undefined ? null : (
+        <View
+          style={[
+            styles.footer,
+            { backgroundColor: colors.surface, borderTopColor: colors.border },
+          ]}
+        >
+          {footer}
+        </View>
+      )}
     </View>
   );
 }
@@ -92,5 +107,6 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   title: { fontSize: fontSize.xl, fontWeight: weight(fontWeight.bold) },
+  footer: { padding: spacing[3], gap: spacing[2], borderTopWidth: 1 },
   note: { fontSize: fontSize.md },
 });

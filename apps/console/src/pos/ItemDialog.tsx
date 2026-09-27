@@ -1,12 +1,5 @@
 import type { MenuItem, MenuSnapshot } from '@rp/contracts';
-import {
-  type ItemSelection,
-  type ModifierGroupDef,
-  type SelectionIssue,
-  unitPriceOf,
-  validateSelection,
-} from '@rp/domain';
-import type { Translator } from '@rp/i18n';
+import { type ItemSelection, unitPriceOf, validateSelection } from '@rp/domain';
 import {
   Button,
   ComboChoices,
@@ -18,63 +11,15 @@ import {
 } from '@rp/ui-web';
 import { useId, useState } from 'react';
 import { useT } from '../app/i18n.js';
-import type { NewCartLine } from '@rp/ordering';
-import { comboOf, comboSlots, selectable } from '@rp/ordering';
-
-export function ruleOf(group: ModifierGroupDef, t: Translator): string {
-  if (group.minSelections === 0) return t('pos.item.ruleOptional', { max: group.maxSelections });
-  if (group.minSelections === group.maxSelections) {
-    return t('pos.item.ruleExactly', { count: group.minSelections });
-  }
-  return t('pos.item.ruleRange', { min: group.minSelections, max: group.maxSelections });
-}
-
-export function issueText(
-  issue: SelectionIssue,
-  groups: readonly ModifierGroupDef[],
-  t: Translator,
-) {
-  const group = groups.find((candidate) => candidate.id === issue.groupId);
-  switch (issue.code) {
-    case 'VARIANT_REQUIRED':
-      return t('pos.item.issue.VARIANT_REQUIRED');
-    case 'TOO_FEW_MODIFIERS':
-      return t('pos.item.issue.TOO_FEW_MODIFIERS', { min: group?.minSelections ?? 1 });
-    case 'TOO_MANY_MODIFIERS':
-      return t('pos.item.issue.TOO_MANY_MODIFIERS', { max: group?.maxSelections ?? 1 });
-    default:
-      return t('pos.item.issue.other');
-  }
-}
-
-/** "Full · Cheese, Butter · Dessert: Rasmalai": a line's choices in words. */
-export function summaryOf(
-  menu: MenuSnapshot,
-  item: MenuItem,
-  selection: ItemSelection,
-  comboChoices: readonly string[] | undefined,
-): string {
-  const def = selectable(menu, item);
-  const parts: string[] = [];
-  const variant = def.variants.find((candidate) => candidate.id === selection.variantId);
-  if (variant !== undefined) parts.push(variant.name);
-  for (const entry of selection.modifiers ?? []) {
-    const group = def.modifierGroups.find((candidate) => candidate.id === entry.groupId);
-    const names = entry.optionIds.flatMap((id) => {
-      const option = group?.options.find((candidate) => candidate.id === id);
-      return option === undefined ? [] : [option.name];
-    });
-    if (names.length > 0) parts.push(names.join(', '));
-  }
-  const combo = comboOf(menu, item);
-  if (combo !== undefined && comboChoices !== undefined) {
-    comboSlots(menu, combo).forEach((slot, index) => {
-      const chosen = slot.options.find((option) => option.id === comboChoices[index]);
-      if (chosen !== undefined) parts.push(`${slot.label}: ${chosen.name}`);
-    });
-  }
-  return parts.join(' · ');
-}
+import {
+  comboOf,
+  comboSlots,
+  issueText,
+  type NewCartLine,
+  ruleOf,
+  selectable,
+  summaryOf,
+} from '@rp/ordering';
 
 /**
  * Choose a dish's size, modifiers and combo parts, how many and a note for the kitchen

@@ -52,6 +52,7 @@
     "@nestjs/testing": "^12.1.0",
     "@rp/api-client": "workspace:*",
     "@rp/control-plane": "workspace:*",
+    "@rp/mobile-core": "workspace:*",
     "@rp/test-postgres": "workspace:*",
     "@swc/core": "^1.16.2",
     "@types/express": "^5.0.6",

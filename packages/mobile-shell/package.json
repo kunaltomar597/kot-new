@@ -2,7 +2,7 @@
   "name": "@rp/mobile-shell",
   "version": "0.1.0",
   "private": true,
-  "description": "Screens and hooks shared by the waiter app and table tablet: pairing, staff login, the connection banner and live data over the device session (P2-01c).",
+  "description": "Screens and hooks shared by the waiter app and table tablet: pairing, staff login, the connection banner, live data, and the menu and unsent orders kept on the device (P2-01c, P2-02b).",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -37,6 +37,7 @@
     "@babel/core": "^8.0.6",
     "@react-native/babel-preset": "0.86.3",
     "@react-native/jest-preset": "0.86.3",
+    "@rp/ordering": "workspace:*",
     "@testing-library/react-native": "^14.0.1",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.0",

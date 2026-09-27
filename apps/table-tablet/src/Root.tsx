@@ -1,43 +1,44 @@
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession, MenuCache } from '@rp/mobile-core';
-import { KeystoreDeviceKeys, plainStore, secureStore } from '@rp/mobile-native';
+import { DeviceSession } from '@rp/mobile-core';
+import {
+  installRandomValues,
+  KeystoreDeviceKeys,
+  plainStore,
+  secureStore,
+} from '@rp/mobile-native';
 import Constants from 'expo-constants';
 import { useEffect, useState } from 'react';
 import { App } from './App';
 
 const translator = createTranslator();
 
-interface Services {
-  readonly session: DeviceSession;
-  readonly menu: MenuCache;
-}
-
-/** Wires the device session and menu cache to the Keystore, secure store and AsyncStorage. */
-async function createServices(): Promise<Services> {
-  const plain = await plainStore();
-  return {
-    session: new DeviceSession({
-      secureStore: await secureStore(),
-      plainStore: plain,
-      keys: new KeystoreDeviceKeys(),
-      ...(Constants.expoConfig?.version !== undefined && {
-        appVersion: Constants.expoConfig.version,
-      }),
+/**
+ * Wires the device session to the Keystore, the secure store and AsyncStorage; the session keeps
+ * the menu cache in AsyncStorage (P2-01c). Secure random values first: every request carries a
+ * random correlation id.
+ */
+async function createSession(): Promise<DeviceSession> {
+  await installRandomValues();
+  return new DeviceSession({
+    secureStore: await secureStore(),
+    plainStore: await plainStore(),
+    keys: new KeystoreDeviceKeys(),
+    ...(Constants.expoConfig?.version !== undefined && {
+      appVersion: Constants.expoConfig.version,
     }),
-    menu: new MenuCache(plain),
-  };
+  });
 }
 
 export function Root() {
-  const [services, setServices] = useState<Services | null>(null);
+  const [session, setSession] = useState<DeviceSession | null>(null);
   useEffect(() => {
-    let current: Services | undefined;
-    void createServices().then((created) => {
+    let current: DeviceSession | undefined;
+    void createSession().then((created) => {
       current = created;
-      setServices(created);
-      return created.session.start();
+      setSession(created);
+      return created.start();
     });
-    return () => current?.session.stop();
+    return () => current?.stop();
   }, []);
-  return services === null ? null : <App {...services} translator={translator} />;
+  return session === null ? null : <App session={session} translator={translator} />;
 }

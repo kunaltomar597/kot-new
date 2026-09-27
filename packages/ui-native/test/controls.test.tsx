@@ -7,6 +7,7 @@ import {
   ORDER_ITEM_STATE_STYLES,
   PinPad,
   StatusChip,
+  TextField,
   toneColors,
   useTheme,
 } from '../src/index.js';
@@ -31,6 +32,21 @@ describe('[NFR-U01] Button', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('says whether a choice button is the chosen one', async () => {
+    await renderUi(
+      <>
+        <Button variant="primary" selected>
+          Starters
+        </Button>
+        <Button variant="secondary" selected={false}>
+          Mains
+        </Button>
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Starters' })).toBeSelected();
+    expect(screen.getByRole('button', { name: 'Mains' })).not.toBeSelected();
+  });
+
   it('renders every variant with the theme colours', async () => {
     for (const variant of ['primary', 'secondary', 'ghost', 'accent'] as const) {
       await renderUi(
@@ -41,6 +57,47 @@ describe('[NFR-U01] Button', () => {
       );
       expect(screen.getByRole('button', { name: `${variant} button` })).toBeDisabled();
     }
+  });
+});
+
+describe('[NFR-U03] TextField', () => {
+  it('names the input by its label, and reports each change', async () => {
+    const onChangeText = jest.fn();
+    await renderUi(
+      <TextField
+        label="Search the menu"
+        value="pan"
+        onChangeText={onChangeText}
+        hint="Name or short code"
+        returnKeyType="search"
+        maxLength={40}
+        testID="search"
+      />,
+    );
+    const input = screen.getByLabelText('Search the menu');
+    expect(input).toHaveDisplayValue('pan');
+    expect(input).toHaveProp('maxLength', 40);
+    expect(screen.getByText('Name or short code')).toBeOnTheScreen();
+    await fireEvent.changeText(input, 'paneer');
+    expect(onChangeText).toHaveBeenCalledWith('paneer');
+  });
+
+  it('announces an error, and cannot be edited when disabled', async () => {
+    await renderUi(
+      <TextField
+        label="Instructions for the kitchen"
+        value=""
+        onChangeText={jest.fn()}
+        error="Too long"
+        disabled
+        multiline
+      />,
+      'dark',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Too long');
+    const input = screen.getByLabelText('Instructions for the kitchen');
+    expect(input).toHaveProp('editable', false);
+    expect(input).toHaveStyle({ borderColor: themes.dark.danger });
   });
 });
 

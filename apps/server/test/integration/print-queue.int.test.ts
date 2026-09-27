@@ -202,6 +202,15 @@ async function statusEvents() {
   return rows.map((row) => (row.payload as { payload: Record<string, unknown> }).payload);
 }
 
+/** Whether each ticket reached its printer, as the floor hears it (WTR-012). */
+async function printEvents() {
+  const rows = await prisma.outboxEvent.findMany({
+    where: { eventType: 'KotPrintStatusChanged' },
+    orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+  });
+  return rows.map((row) => (row.payload as { payload: Record<string, unknown> }).payload);
+}
+
 async function printerRow(name: string) {
   return prisma.printer.findUniqueOrThrow({ where: { id: id(name) } });
 }
@@ -224,6 +233,16 @@ describe('[KDS-008] [NFR-P02] the print queue', () => {
     });
     expect(bar.printStatus).toBe('NOT_REQUIRED');
     expect((await printerRow('kitchenPrinter')).lastSeenAt).not.toBeNull();
+    // [WTR-012] The floor hears that the kitchen ticket printed; the bar's has no printer.
+    expect(await printEvents()).toEqual([
+      {
+        kotId: kot.id,
+        kotNumber: kot.kotNumber,
+        orderId: kot.orderId,
+        stationId: id('kitchen'),
+        printStatus: 'PRINTED',
+      },
+    ]);
 
     // Nothing left: another pass prints nothing again.
     expect(await queue.drain()).toEqual({ printed: 0, failed: 0 });
@@ -249,6 +268,9 @@ describe('[KDS-008] [NFR-P02] the print queue', () => {
     const offline = await printerRow('kitchenPrinter');
     expect(offline.offlineSince).not.toBeNull();
     expect(offline.lastError).toContain('refused the connection');
+    // [WTR-012] One "not printed" for the ticket that failed, however often it is tried again.
+    const failed = (await printEvents()).slice(1);
+    expect(failed).toEqual([expect.objectContaining({ kotId: second.id, printStatus: 'FAILED' })]);
 
     expect(await statusEvents()).toEqual([
       {
@@ -284,6 +306,11 @@ describe('[KDS-008] [NFR-P02] the print queue', () => {
     expect((await printerRow('kitchenPrinter')).offlineSince).toBeNull();
     // Back online as soon as it took the first; the second was still waiting then.
     expect((await statusEvents()).at(-1)).toMatchObject({ online: true, error: null, queued: 1 });
+    // [WTR-012] Both waiting tickets now count as printed.
+    const [second, third] = (await printEvents()).slice(-2);
+    expect(second).toMatchObject({ printStatus: 'PRINTED' });
+    expect(third).toMatchObject({ printStatus: 'PRINTED' });
+    expect(Number(third?.kotNumber)).toBeGreaterThan(Number(second?.kotNumber));
   });
 
   it('[KDS-008] redirects a broken printer to another one chosen by a manager', async () => {
@@ -411,5 +438,19 @@ describe('[KDS-008] [NFR-P02] the print queue', () => {
     expect((await printerRow('kitchenPrinter')).offlineSince).toBeNull();
     expect(await queue.drain()).toEqual({ printed: 1, failed: 0 });
     expect(kitchenPaper.jobs.at(-1)).toContain('! Waiting order');
+  });
+
+  it('[WTR-012] a waiting ticket reprinted elsewhere counts as printed, and the floor hears it', async () => {
+    await kitchenPaper.stop();
+    const kot = await order('T2', 'Reprinted order');
+    expect(await queue.drain()).toEqual({ printed: 0, failed: 1 });
+    const reprinted = await server()
+      .post(`/api/v1/kots/${kot.id}/reprint`)
+      .set(as(waiter))
+      .send({ printerId: id('sparePrinter'), reason: 'Kitchen printer jammed' });
+    expect(TestPrintResponse.parse(reprinted.body).printed).toBe(true);
+    const heard = (await printEvents()).filter((event) => event.kotId === kot.id);
+    expect(heard.map((event) => event.printStatus)).toEqual(['FAILED', 'PRINTED']);
+    await kitchenPaper.start();
   });
 });

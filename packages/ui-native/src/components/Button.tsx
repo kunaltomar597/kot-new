@@ -25,6 +25,8 @@ export interface ButtonProps {
   /** Shows a spinner, marks the button busy and blocks repeat presses (e.g. double submission). */
   loading?: boolean;
   disabled?: boolean;
+  /** For a button that is one of a set of choices (e.g. a menu category): whether it is chosen. */
+  selected?: boolean;
   startIcon?: ReactNode;
   /** A longer accessible name when the words alone are not enough. */
   accessibilityLabel?: string;
@@ -41,6 +43,7 @@ export function Button({
   fullWidth = false,
   loading = false,
   disabled = false,
+  selected,
   startIcon,
   accessibilityLabel,
   testID,
@@ -59,7 +62,11 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: inactive, busy: loading }}
+      accessibilityState={{
+        disabled: inactive,
+        busy: loading,
+        ...(selected !== undefined && { selected }),
+      }}
       disabled={inactive}
       onPress={onPress}
       testID={testID}

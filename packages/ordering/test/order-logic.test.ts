@@ -1,3 +1,4 @@
+import { createTranslator } from '@rp/i18n';
 import { describe, expect, it } from 'vitest';
 import {
   addLine,
@@ -18,7 +19,7 @@ import {
   selectable,
   visibleItems,
 } from '../src/menu-view.js';
-import { displayState } from '../src/order-state.js';
+import { displayState, kotDelivery, kotDeliveryText } from '../src/order-state.js';
 import { IDS, MENU, sentOrder } from '../src/testing/index.js';
 
 let next = 0;
@@ -149,5 +150,49 @@ describe('[ORD-010] the state a line shows', () => {
     expect(displayState(plain, [plain])).toBe('PREPARING');
     const voided = item('voided', 'VOIDED');
     expect(displayState(voided, [voided, item('d', 'READY', 'voided')])).toBe('VOIDED');
+  });
+});
+
+describe('[WTR-012] whether each ticket reached the kitchen', () => {
+  const t = createTranslator();
+  const bar = '0199a0e0-0000-7000-8000-000000000005';
+  const pass = '0199a0e0-0000-7000-8000-000000000006';
+  const stations = [
+    ...MENU.stations,
+    { id: bar, name: 'Bar', mode: 'PRINT' as const },
+    { id: pass, name: 'Pass', mode: 'BOTH' as const },
+  ];
+  const kot = (
+    stationId: string,
+    printStatus: 'NOT_REQUIRED' | 'PENDING' | 'PRINTED' | 'FAILED',
+  ) => ({
+    id: 'kot',
+    kotNumber: 1,
+    stationId,
+    stationName: 'Station',
+    kind: 'NEW' as const,
+    printStatus,
+  });
+  const text = (stationId: string, status: Parameters<typeof kot>[1]) => {
+    const delivery = kotDelivery(kot(stationId, status), stations);
+    return [delivery.reached, kotDeliveryText(delivery, t)];
+  };
+
+  it('says a screen ticket is on the screen, and a printed one whether it printed', () => {
+    expect(text(IDS.kitchen, 'NOT_REQUIRED')).toEqual([true, 'On the kitchen screen']);
+    expect(text(bar, 'PENDING')).toEqual([false, 'Printing']);
+    expect(text(bar, 'PRINTED')).toEqual([true, 'Printed']);
+    expect(text(bar, 'FAILED')).toEqual([false, 'Not printed: printer problem']);
+  });
+
+  it('counts a screen-and-printer station as reached whatever the printer does', () => {
+    expect(text(pass, 'FAILED')).toEqual([
+      true,
+      'On the kitchen screen · Not printed: printer problem',
+    ]);
+    expect(text(pass, 'PRINTED')).toEqual([true, 'On the kitchen screen · Printed']);
+    // A station the phone's menu does not know yet: only what the ticket says.
+    expect(text('unknown', 'PENDING')).toEqual([false, 'Printing']);
+    expect(text('unknown', 'NOT_REQUIRED')).toEqual([true, 'On the kitchen screen']);
   });
 });

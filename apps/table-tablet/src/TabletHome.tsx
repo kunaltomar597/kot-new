@@ -1,7 +1,6 @@
 import type { MenuSnapshot, RestaurantProfile } from '@rp/contracts';
 import { fontSize, fontWeight, spacing } from '@rp/design-tokens';
-import type { MenuCache } from '@rp/mobile-core';
-import { Note, Screen, useDeviceSession, useSessionState, useT } from '@rp/mobile-shell';
+import { Note, Screen, useDeviceSession, useMenu, useSessionState, useT } from '@rp/mobile-shell';
 import { useTheme, weight } from '@rp/ui-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -14,63 +13,15 @@ export function orderableCount(menu: MenuSnapshot): number {
 }
 
 /**
- * Keeps the menu on the tablet current (MENU-013): the cached copy at once, even offline, then a
- * fresh one when a newer version is published, on reconnect, and availability changes live.
+ * The tablet's idle screen: restaurant, table and today's menu, kept live by the device session
+ * (MENU-013, MENU-006; P2-01c smoke flow).
  */
-function useMenu(menu: MenuCache): MenuSnapshot | null {
-  const session = useDeviceSession();
-  const { connection } = useSessionState();
-  const [snapshot, setSnapshot] = useState<MenuSnapshot | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const show = (value: MenuSnapshot | null) => {
-      if (active && value !== null) setSnapshot(value);
-    };
-    const fetchMenu = () => session.api.getMenu();
-    void menu.get().then(show);
-    const unsubscribe = session.onEvent((event) => {
-      if (event.type === 'MenuPublished') {
-        menu
-          .refresh(fetchMenu, { announcedVersion: event.payload.menuVersion })
-          .then((result) => {
-            show(result.menu);
-          })
-          .catch(() => undefined);
-      } else if (event.type === 'ItemAvailabilityChanged') {
-        void menu.applyAvailability(event.payload).then(show);
-      }
-    });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [menu, session]);
-
-  useEffect(() => {
-    if (connection !== 'online') return;
-    let active = true;
-    menu
-      .refresh(() => session.api.getMenu(), { force: true })
-      .then((result) => {
-        if (active) setSnapshot(result.menu);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [connection, menu, session]);
-
-  return snapshot;
-}
-
-/** The tablet's idle screen: restaurant, table and today's menu, kept live (P2-01c smoke flow). */
-export function TabletHome({ menu }: { menu: MenuCache }) {
+export function TabletHome() {
   const session = useDeviceSession();
   const { device, connection } = useSessionState();
   const t = useT();
   const { colors } = useTheme();
-  const snapshot = useMenu(menu);
+  const snapshot = useMenu();
   const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
 
   useEffect(() => {
@@ -98,7 +49,7 @@ export function TabletHome({ menu }: { menu: MenuCache }) {
         {device !== undefined && (
           <Text style={[styles.table, { color: colors.textMuted }]}>{device.name}</Text>
         )}
-        {snapshot === null ? (
+        {snapshot === null || snapshot === undefined ? (
           <Note>{t('mobile.tablet.menuWaiting')}</Note>
         ) : (
           <Note tone="text" testID="menu-count">

@@ -10,19 +10,13 @@ import {
   useSessionState,
   useT,
 } from '@rp/mobile-shell';
-import {
-  affectsFloor,
-  floorSections,
-  freeTables,
-  myTableIds,
-  tileAlert,
-  tileDetails,
-} from '@rp/ordering';
+import { affectsFloor, floorSections, myTableIds, tileAlert, tileDetails } from '@rp/ordering';
 import { Button, SegmentedControl, TableTile, useTheme, useToast, weight } from '@rp/ui-native';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { OpenTableSheet } from './OpenTableSheet';
 import { PagerCard } from './PagerCard';
-import { TableSheet } from './TableSheet';
+import { UnsentHome } from './UnsentOrders';
 
 type TablesView = 'mine' | 'all';
 
@@ -32,10 +26,11 @@ const CLOCK_MS = 30_000;
 /**
  * The waiter app's home (WTR-002): "My tables" (the waiter's sections and tables for today, and
  * any table they are responsible for) or all tables, grouped by section, each with its state,
- * guests, time seated, waiter and anything waiting for staff; the waiter's pager (WTR-014); and a
- * table's actions on a tap. Read again after table, order, bill and service-request events.
+ * guests, time seated, waiter and anything waiting for staff; orders on this phone not yet sent
+ * (WTR-012); and the waiter's pager (WTR-014). A tap opens an open table, or opens a free one
+ * with its guests first. Read again after table, order, bill and service-request events.
  */
-export function TablesScreen() {
+export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string) => void }) {
   const session = useDeviceSession();
   const { person } = useSessionState();
   const t = useT();
@@ -43,7 +38,7 @@ export function TablesScreen() {
   const toast = useToast();
   const now = useNow(CLOCK_MS);
   const [view, setView] = useState<TablesView>(person?.role === 'WAITER' ? 'mine' : 'all');
-  const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [openingId, setOpeningId] = useState<string | undefined>();
   const { data, reload } = useLive(async () => {
     const [overview, assignments, floor] = await Promise.all([
       session.api.getTableOverview(),
@@ -73,9 +68,9 @@ export function TablesScreen() {
     shown?.length === 0 &&
     data.status === 'ready' &&
     data.value.overview.tables.length > 0;
-  const selected: TableOverviewEntry | undefined =
-    data.status === 'ready' && selectedId !== undefined
-      ? data.value.overview.tables.find((table) => table.tableId === selectedId)
+  const opening: TableOverviewEntry | undefined =
+    data.status === 'ready' && openingId !== undefined
+      ? data.value.overview.tables.find((table) => table.tableId === openingId)
       : undefined;
 
   return (
@@ -88,6 +83,7 @@ export function TablesScreen() {
       }
     >
       <Note>{t('mobile.signedInAs', { name: person.displayName })}</Note>
+      <UnsentHome onOpen={onOpenTable} />
       <PagerCard />
       <SegmentedControl
         label={t('mobile.tables.view')}
@@ -132,30 +128,28 @@ export function TablesScreen() {
                 {...(alert !== undefined && { alert })}
                 testID={`table-${table.tableId}`}
                 onPress={() => {
-                  setSelectedId(table.tableId);
+                  if (table.session === null) setOpeningId(table.tableId);
+                  else onOpenTable(table.session.id);
                 }}
               />
             );
           })}
         </View>
       ))}
-      {selected !== undefined && data.status === 'ready' ? (
-        <TableSheet
-          key={`${selected.tableId}:${selected.session?.id ?? 'free'}`}
-          table={selected}
-          freeTables={freeTables(data.value.overview)}
-          person={person}
-          now={now}
+      {opening === undefined ? null : (
+        <OpenTableSheet
+          key={opening.tableId}
+          table={opening}
           onClose={() => {
-            setSelectedId(undefined);
+            setOpeningId(undefined);
           }}
-          onDone={(message) => {
-            setSelectedId(undefined);
-            toast.show({ title: message, tone: 'success' });
-            reload();
+          onOpened={(opened) => {
+            setOpeningId(undefined);
+            toast.show({ title: t('pos.open.opened', { table: opening.label }), tone: 'success' });
+            onOpenTable(opened.id);
           }}
         />
-      ) : null}
+      )}
     </Screen>
   );
 }

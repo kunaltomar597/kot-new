@@ -22,12 +22,15 @@ export interface OutboxEntry<T = unknown> {
 }
 
 /** What sending one entry came to. */
-export type SendOutcome =
+export type SendOutcome<T = never> =
   | { readonly kind: 'SENT' }
   /** No answer or a server error: try again later with the same key. */
   | { readonly kind: 'RETRY'; readonly error: string }
-  /** The server refused it (e.g. an item ran out): keep it for a person to fix or dismiss. */
-  | { readonly kind: 'REJECTED'; readonly reason: string };
+  /**
+   * The server refused it (e.g. an item ran out): keep it for a person to fix or dismiss. `body`
+   * replaces the stored one, e.g. with the refused lines marked.
+   */
+  | { readonly kind: 'REJECTED'; readonly reason: string; readonly body?: T };
 
 export interface FlushResult {
   readonly sent: number;
@@ -86,11 +89,16 @@ export class PersistentOutbox<T = unknown> {
   }
 
   /**
-   * Sends every pending entry, oldest first, one at a time (orders keep their order). Stops at
-   * the first RETRY: the network is down and later entries would fail too. One flush at a time.
+   * Sends every pending entry, oldest first, one at a time (orders keep their order), including
+   * entries added while it runs. Stops at the first RETRY: the network is down and later entries
+   * would fail too. `only` leaves other entries waiting (e.g. another person's). One flush at a
+   * time: a flush asked for while one runs joins it.
    */
-  flush(send: (entry: OutboxEntry<T>) => Promise<SendOutcome>): Promise<FlushResult> {
-    this.flushing ??= this.run(send).finally(() => {
+  flush(
+    send: (entry: OutboxEntry<T>) => Promise<SendOutcome<T>>,
+    only: (entry: OutboxEntry<T>) => boolean = () => true,
+  ): Promise<FlushResult> {
+    this.flushing ??= this.run(send, only).finally(() => {
       this.flushing = undefined;
     });
     return this.flushing;
@@ -101,14 +109,23 @@ export class PersistentOutbox<T = unknown> {
     return () => this.listeners.delete(listener);
   }
 
-  private async run(send: (entry: OutboxEntry<T>) => Promise<SendOutcome>): Promise<FlushResult> {
+  private async run(
+    send: (entry: OutboxEntry<T>) => Promise<SendOutcome<T>>,
+    only: (entry: OutboxEntry<T>) => boolean,
+  ): Promise<FlushResult> {
     let sent = 0;
     let rejected = 0;
     let retry = 0;
-    for (const entry of await this.load()) {
-      if (entry.status === 'REJECTED') continue;
+    const tried = new Set<string>();
+    for (;;) {
+      const entry = (await this.load()).find(
+        (candidate) =>
+          candidate.status === 'PENDING' && !tried.has(candidate.key) && only(candidate),
+      );
+      if (entry === undefined) break;
+      tried.add(entry.key);
       await this.replace(entry.key, { status: 'SENDING', attempts: entry.attempts + 1 });
-      let outcome: SendOutcome;
+      let outcome: SendOutcome<T>;
       try {
         outcome = await send(entry);
       } catch (error) {
@@ -118,11 +135,17 @@ export class PersistentOutbox<T = unknown> {
         await this.save((await this.load()).filter((candidate) => candidate.key !== entry.key));
         sent += 1;
       } else if (outcome.kind === 'REJECTED') {
-        await this.replace(entry.key, { status: 'REJECTED', lastError: outcome.reason });
+        await this.replace(entry.key, {
+          status: 'REJECTED',
+          lastError: outcome.reason,
+          ...(outcome.body !== undefined && { body: outcome.body }),
+        });
         rejected += 1;
       } else {
         await this.replace(entry.key, { status: 'PENDING', lastError: outcome.error });
-        retry = (await this.load()).filter((candidate) => candidate.status === 'PENDING').length;
+        retry = (await this.load()).filter(
+          (candidate) => candidate.status === 'PENDING' && only(candidate),
+        ).length;
         break;
       }
     }

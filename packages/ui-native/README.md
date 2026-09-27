@@ -6,7 +6,9 @@ state styles, and the same `@rp/domain` menu-selection rules (MENU-012, ORD-014)
 
 Components:
 
-- `Button`, `Money`, `StatusChip`, `Glyph` (decorative text symbols, so no icon font is needed).
+- `Button` (with `selected` for a set of choices such as menu categories), `Money`, `StatusChip`,
+  `Glyph` (decorative text symbols, so no icon font is needed).
+- `TextField`: a labelled input with a hint and an error (search, instructions, pairing).
 - `PinPad`: dots only, progress announced without the digits (AUTH-002, AUTH-004).
 - `Sheet`: the bottom sheet for item options, table actions and confirmations.
 - `ToastProvider` and `useToast`: the same API as the web toasts; errors stay until dismissed.

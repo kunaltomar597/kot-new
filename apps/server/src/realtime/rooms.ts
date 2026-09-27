@@ -82,6 +82,8 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   KotCreated: 'ORDER_CREATE',
   // Kitchen screens hear it through their station room, like tickets; managers see every bump.
   KotBumped: 'MANAGERS',
+  // The floor sees whether each ticket was printed (WTR-012).
+  KotPrintStatusChanged: 'ORDER_CREATE',
   ItemStatusChanged: 'ORDER_CREATE',
   ServiceRequestRaised: 'ORDER_CREATE',
   ServiceRequestAcknowledged: 'ORDER_CREATE',

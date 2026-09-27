@@ -1,53 +1,8 @@
-import { fontSize, radius, spacing } from '@rp/design-tokens';
-import { Button, useTheme } from '@rp/ui-native';
+import { Button, TextField } from '@rp/ui-native';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useDeviceSession, useSessionState, useT } from './context.js';
 import { formatPairingCode, messageOf } from './messages.js';
 import { Note, Screen } from './Screen.js';
-
-function Field({
-  label,
-  hint,
-  value,
-  onChangeText,
-  testID,
-  autoCapitalize,
-  keyboardType,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  testID: string;
-  autoCapitalize: 'none' | 'characters';
-  keyboardType: 'url' | 'default';
-}) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.field}>
-      <Text nativeID={`${testID}-label`} style={[styles.label, { color: colors.text }]}>
-        {label}
-      </Text>
-      <TextInput
-        testID={testID}
-        accessibilityLabel={label}
-        accessibilityLabelledBy={`${testID}-label`}
-        {...(hint !== undefined && { accessibilityHint: hint })}
-        value={value}
-        onChangeText={onChangeText}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={false}
-        keyboardType={keyboardType}
-        style={[
-          styles.input,
-          { borderColor: colors.borderStrong, color: colors.text, backgroundColor: colors.surface },
-        ]}
-      />
-      {hint !== undefined && <Note>{hint}</Note>}
-    </View>
-  );
-}
 
 /**
  * Pairing with the local server (AUTH-007): the server address and the code a manager created in
@@ -80,16 +35,17 @@ export function PairingScreen() {
     <Screen title={t('pairing.title')}>
       {notice === 'revoked' && <Note tone="danger">{t('pairing.revoked')}</Note>}
       <Note>{t('pairing.intro')}</Note>
-      <Field
+      <TextField
         label={t('mobile.serverLabel')}
         hint={t('mobile.serverHint')}
         value={server}
         onChangeText={setServer}
         testID="pairing-server"
         autoCapitalize="none"
+        autoCorrect={false}
         keyboardType="url"
       />
-      <Field
+      <TextField
         label={t('pairing.codeLabel')}
         value={code}
         onChangeText={(value) => {
@@ -97,7 +53,7 @@ export function PairingScreen() {
         }}
         testID="pairing-code"
         autoCapitalize="characters"
-        keyboardType="default"
+        autoCorrect={false}
       />
       {error !== null && (
         <Note tone="danger" testID="pairing-error">
@@ -117,15 +73,3 @@ export function PairingScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  field: { gap: spacing[1] },
-  label: { fontSize: fontSize.md },
-  input: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing[3],
-    fontSize: fontSize.lg,
-  },
-});

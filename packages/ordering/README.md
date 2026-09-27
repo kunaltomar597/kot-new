@@ -7,7 +7,12 @@ of any UI framework so both use the same rules and one set of tests:
   it becomes. Prices are shown as estimates; the server prices every order (ORD-014).
 - `menu-view.ts`: the published menu for one sales channel (`channelItems`, `menuCategories`),
   search, and why an item cannot be ordered now (MENU-006, MENU-012).
-- `order-state.ts`: how each order item's state is shown and which steps a person may take.
+- `item-choice.ts`: a dish's choices in words (modifier rules, what is wrong with a choice, the
+  line summary) and what its menu card says (sold out, not available, how many are left).
+- `reorder.ts`: "Again" on a sent line with the same variant, options, combo choices and note
+  (NFR-U03), and the cart lines the live menu says cannot be sent now (WTR-010).
+- `order-state.ts`: how each order item's state is shown, and whether each kitchen ticket reached
+  the kitchen: on its screen, printed, printing or held by a printer problem (WTR-012).
 - `floor-view.ts`: the live floor by section (`floorSections`), tile facts (guests, time seated,
   waiter, approvals, requests), "My tables" (`myTableIds`, WTR-002, from the day's waiter
   assignments and the responsible waiter, TBL-002), free tables to move to (TBL-005), and which

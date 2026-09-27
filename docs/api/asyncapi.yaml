@@ -66,6 +66,11 @@ channels:
     messages:
       KotBumped:
         $ref: '#/components/messages/KotBumped'
+  KotPrintStatusChanged:
+    address: KotPrintStatusChanged
+    messages:
+      KotPrintStatusChanged:
+        $ref: '#/components/messages/KotPrintStatusChanged'
   ItemStatusChanged:
     address: ItemStatusChanged
     messages:
@@ -246,6 +251,12 @@ operations:
       $ref: '#/channels/KotBumped'
     messages:
       - $ref: '#/channels/KotBumped/messages/KotBumped'
+  receiveKotPrintStatusChanged:
+    action: receive
+    channel:
+      $ref: '#/channels/KotPrintStatusChanged'
+    messages:
+      - $ref: '#/channels/KotPrintStatusChanged/messages/KotPrintStatusChanged'
   receiveItemStatusChanged:
     action: receive
     channel:
@@ -434,6 +445,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/KotBumped'
+    KotPrintStatusChanged:
+      name: KotPrintStatusChanged
+      title: KotPrintStatusChanged v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/KotPrintStatusChanged'
     ItemStatusChanged:
       name: ItemStatusChanged
       title: ItemStatusChanged v1
@@ -1194,6 +1211,63 @@ components:
             - stationId
             - orderId
             - kind
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    KotPrintStatusChanged:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: KotPrintStatusChanged
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            kotId:
+              $ref: '#/components/schemas/Id'
+            kotNumber:
+              type: integer
+              exclusiveMinimum: 0
+              maximum: 9007199254740991
+            orderId:
+              $ref: '#/components/schemas/Id'
+            stationId:
+              $ref: '#/components/schemas/Id'
+            printStatus:
+              type: string
+              enum:
+                - PENDING
+                - PRINTED
+                - FAILED
+          required:
+            - kotId
+            - kotNumber
+            - orderId
+            - stationId
+            - printStatus
           additionalProperties: false
       required:
         - eventId
