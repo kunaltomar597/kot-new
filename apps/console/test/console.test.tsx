@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import type { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STAFF } from './fakes.js';
@@ -162,16 +162,34 @@ describe('[NFR-P11] connection banner', () => {
 });
 
 describe('[AUTH-005] inactivity', () => {
-  it('warns, then signs the person out and says why', async () => {
-    const { user } = await renderConsole({ fake: signsInAs(server(), 'CASHIER', 2) });
-    await signIn(user, 'Asha', '3333');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('warns with a countdown, then signs the person out and says why', async () => {
+    // Fake time drives the countdown, so a busy machine cannot sleep through the warning. It still
+    // moves with real time, which the fake server and the testing library's waits rely on.
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    await renderConsole({
+      fake: signsInAs(server(), 'CASHIER', 60),
+      signedIn: 'CASHIER',
+      path: '/pos',
+    });
     await screen.findByRole('heading', { level: 1, name: t('modes.pos') });
+    const warning = (seconds: number) => t('session.inactivityWarning', { seconds });
+    expect(screen.queryByText(warning(30))).toBeNull();
+
+    // A 60 s timeout warns for its last 30 s, counting down every second.
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+    expect(screen.getByText(warning(30))).toBeVisible();
+    await act(() => vi.advanceTimersByTimeAsync(29_000));
     expect(
-      await screen.findByText(/Signing out in 1 second/, {}, { timeout: 3_000 }),
+      screen.getByText('Signing out in 1 second. Tap anywhere to stay signed in.'),
     ).toBeVisible();
-    expect(
-      await screen.findByText(t('login.signedOutInactive'), {}, { timeout: 3_000 }),
-    ).toBeVisible();
+
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(await screen.findByText(t('login.signedOutInactive'))).toBeVisible();
+    expect(screen.getByRole('heading', { name: t('login.title') })).toBeInTheDocument();
   });
 
   it('shows the pairing screen again after the device is unpaired', async () => {

@@ -704,6 +704,10 @@ Gotchas:
   `itemReadyFrame` from `@rp/mobile-core/testing`.
 - The Kotlin module has only been compiled by CI, not run on a phone: the first real pairing is part
   of the P2-07 lab run.
+- Two console screen tests were timing races on a busy CI runner and are now deterministic: the
+  inactivity test drives a fake clock, and the kitchen sound test waits for the effect that plays
+  the chime. Fake timers with the testing library need `shouldAdvanceTime: true` and only
+  `setTimeout`, `clearTimeout` and `Date` faked, because its waits end with a `setTimeout(0)`.
 
 Decisions: 114 to 118.
 
