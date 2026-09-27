@@ -82,7 +82,7 @@ const rule = (id: string, changes: Partial<RecommendationRuleDef> = {}): Recomme
   timeWindow: null,
   activeFrom: null,
   activeUntil: null,
-  reason: null,
+  label: null,
   ...changes,
 });
 
@@ -234,7 +234,7 @@ describe('[REC-005] filters on every layer', () => {
 
 describe('[REC-002] manual rules', () => {
   it('suggests what a rule names when the order has its dish, before any best seller', () => {
-    const rules = [rule('biryani-raita', { reason: 'Cools the spice' })];
+    const rules = [rule('biryani-raita', { label: 'Cools the spice' })];
     const suggestions = recommend(input({ rules, ordered: ['veg-biryani'], limit: 3 }));
     expect(suggestions[0]).toEqual({
       itemId: 'raita',
@@ -242,7 +242,7 @@ describe('[REC-002] manual rules', () => {
       reason: {
         kind: 'RULE',
         ruleId: 'biryani-raita',
-        text: 'Cools the spice',
+        label: 'Cools the spice',
         becauseOf: 'Veg Biryani',
       },
     });

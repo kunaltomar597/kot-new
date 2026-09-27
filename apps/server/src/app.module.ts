@@ -25,6 +25,7 @@ import { PagersModule } from './pagers/pagers.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PhotosModule } from './photos/photos.module.js';
 import { PrintingModule } from './printing/printing.module.js';
+import { RecommendationsModule } from './recommendations/recommendations.module.js';
 import { RestaurantModule } from './restaurant/restaurant.module.js';
 import { ServiceRequestsModule } from './service-requests/service-requests.module.js';
 import { SettingsModule } from './settings/settings.module.js';
@@ -53,6 +54,7 @@ export class AppModule {
         NotificationsModule,
         ServiceRequestsModule,
         OrdersModule,
+        RecommendationsModule,
         PrintingModule,
         BillingModule,
         PagersModule,

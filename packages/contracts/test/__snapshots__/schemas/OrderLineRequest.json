@@ -53,7 +53,25 @@
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
-      "instructions": { "type": "string", "maxLength": 500 }
+      "instructions": { "type": "string", "maxLength": 500 },
+      "recommendation": {
+        "type": "object",
+        "properties": {
+          "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+          "ruleId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["layer", "ruleId"],
+        "additionalProperties": false
+      }
     },
     "required": ["clientLineId", "itemId", "quantity"],
     "additionalProperties": false
@@ -112,7 +130,25 @@
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
-      "instructions": { "type": "string", "maxLength": 500 }
+      "instructions": { "type": "string", "maxLength": 500 },
+      "recommendation": {
+        "type": "object",
+        "properties": {
+          "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+          "ruleId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["layer", "ruleId"],
+        "additionalProperties": false
+      }
     },
     "required": ["clientLineId", "itemId", "quantity", "modifiers"],
     "additionalProperties": false

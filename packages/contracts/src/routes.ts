@@ -183,6 +183,17 @@ import {
   UpdateRestaurantProfileRequest,
 } from './restaurant.js';
 import {
+  RecommendationRuleListResponse,
+  RecommendationRuleParams,
+  RecommendationRuleRequest,
+  RecommendationRuleView,
+  RecommendationsQuery,
+  RecommendationsResponse,
+  RecordRecommendationEventsRequest,
+  RecordTableRecommendationEventsRequest,
+  TableRecommendationsQuery,
+} from './recommendations.js';
+import {
   RaiseServiceRequest,
   ServiceRequestListResponse,
   ServiceRequestParams,
@@ -1945,6 +1956,162 @@ export const ROUTES = [
       ...deviceErrors,
       403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
       404: { description: 'No such request at this table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getRecommendations',
+    method: 'GET',
+    path: '/api/v1/recommendations',
+    summary: "Suggestions for a table's order, each with its reason",
+    description:
+      'REC-001 to REC-006: the rules the order triggers (by priority), then learned pairings, then ' +
+      'best sellers of the time of day, without what cannot be served on the channel now, what is ' +
+      'in the order already unless repeatable, and anything not veg for a veg-only table; the next ' +
+      'course first. `cart` names the items not yet sent; the sent ones are read from the table ' +
+      'session. Without a table session, from the cart alone. Table-level only (REC-007).',
+    tags: ['recommendations'],
+    requirements: [
+      'REC-001',
+      'REC-002',
+      'REC-004',
+      'REC-005',
+      'REC-006',
+      'REC-007',
+      'REC-011',
+      'WTR-011',
+    ],
+    capability: 'ORDER_CREATE',
+    request: { query: RecommendationsQuery },
+    responses: {
+      200: { description: 'Suggestions, best first.', schema: RecommendationsResponse },
+      ...standardErrors,
+      404: { description: 'No such table session, or no menu published yet.', schema: ApiError },
+      409: { description: 'The table session is closed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getTableRecommendations',
+    method: 'GET',
+    path: '/api/v1/devices/current/recommendations',
+    summary: "Suggestions for this table tablet's table",
+    description:
+      "TAB-011, AUTH-009: as `getRecommendations` for the session open at the tablet's own " +
+      'table, on the tablet channel. Only table tablets.',
+    tags: ['recommendations'],
+    requirements: ['TAB-011', 'REC-001', 'REC-005', 'REC-006', 'REC-007', 'REC-011', 'AUTH-009'],
+    capability: 'DEVICE',
+    request: { query: TableRecommendationsQuery },
+    responses: {
+      200: { description: 'Suggestions, best first.', schema: RecommendationsResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      404: { description: 'No menu published yet.', schema: ApiError },
+      409: { description: 'The table is not open.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'recordRecommendationEvents',
+    method: 'POST',
+    path: '/api/v1/recommendations/events',
+    summary: 'Count suggestions shown, opened and put in the cart',
+    description:
+      'REC-008: up to 50 events per call, for a table session open or just closed (events sent ' +
+      'in batches may arrive after the bill). An order line sent with its `recommendation` is ' +
+      'counted as ORDERED by the server; clients never send ORDERED.',
+    tags: ['recommendations'],
+    requirements: ['REC-008'],
+    capability: 'ORDER_CREATE',
+    request: { body: RecordRecommendationEventsRequest },
+    responses: {
+      204: { description: 'Recorded.' },
+      ...standardErrors,
+      404: { description: 'No such table session.', schema: ApiError },
+      422: { description: 'An item or rule does not exist here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'recordTableRecommendationEvents',
+    method: 'POST',
+    path: '/api/v1/devices/current/recommendations/events',
+    summary: "Count this table tablet's suggestions shown, opened and put in the cart",
+    description: "REC-008, AUTH-009: for the session open at the tablet's own table.",
+    tags: ['recommendations'],
+    requirements: ['REC-008', 'TAB-011', 'AUTH-009'],
+    capability: 'DEVICE',
+    request: { body: RecordTableRecommendationEventsRequest },
+    responses: {
+      204: { description: 'Recorded.' },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      409: { description: 'The table is not open.', schema: ApiError },
+      422: { description: 'An item or rule does not exist here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listRecommendationRules',
+    method: 'GET',
+    path: '/api/v1/recommendation-rules',
+    summary: 'The recommendation rules, highest priority first',
+    description: 'REC-002: every rule not archived, paused ones included. The editor is P4-03.',
+    tags: ['recommendations'],
+    requirements: ['REC-002'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The rules.', schema: RecommendationRuleListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'createRecommendationRule',
+    method: 'POST',
+    path: '/api/v1/recommendation-rules',
+    summary: 'Add a rule: if the order contains X, suggest Y',
+    description:
+      'REC-002: X and Y are active items or categories (a category includes its ' +
+      'sub-categories). Audited.',
+    tags: ['recommendations'],
+    requirements: ['REC-002', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { body: RecommendationRuleRequest },
+    responses: {
+      201: { description: 'The new rule.', schema: RecommendationRuleView },
+      ...standardErrors,
+      422: { description: 'An item or category it names is not active here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateRecommendationRule',
+    method: 'PUT',
+    path: '/api/v1/recommendation-rules/:ruleId',
+    summary: 'Change or pause a rule',
+    description: 'REC-002: audited with before and after. An archived rule cannot be changed.',
+    tags: ['recommendations'],
+    requirements: ['REC-002', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: RecommendationRuleParams, body: RecommendationRuleRequest },
+    responses: {
+      200: { description: 'The rule as it is now.', schema: RecommendationRuleView },
+      ...standardErrors,
+      404: { description: 'No such rule, or it is archived.', schema: ApiError },
+      422: { description: 'An item or category it names is not active here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'archiveRecommendationRule',
+    method: 'POST',
+    path: '/api/v1/recommendation-rules/:ruleId/archive',
+    summary: 'Remove a rule for good',
+    description:
+      'REC-002: rules are archived, never deleted, so what they suggested stays in the reports ' +
+      '(REC-008). Audited with the reason. Archiving an archived rule changes nothing.',
+    tags: ['recommendations'],
+    requirements: ['REC-002', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: RecommendationRuleParams, body: ArchiveRequest },
+    responses: {
+      200: { description: 'Archived.', schema: RecommendationRuleView },
+      ...standardErrors,
+      404: { description: 'No such rule.', schema: ApiError },
     },
   },
   {

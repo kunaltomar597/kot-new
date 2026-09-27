@@ -72,7 +72,7 @@ export interface RecommendationRuleDef {
   readonly activeFrom: string | null;
   readonly activeUntil: string | null;
   /** The restaurant's own words for why ("Perfect with biryani"); null for the standard reason. */
-  readonly reason: string | null;
+  readonly label: string | null;
 }
 
 /** A pairing learned from the restaurant's orders (P6-02): the higher the score, the stronger. */
@@ -94,7 +94,7 @@ export type RecommendationReason =
       readonly kind: 'RULE';
       readonly ruleId: string;
       /** The restaurant's own words, when the rule has them. */
-      readonly text: string | null;
+      readonly label: string | null;
       /** The item or category in the order that triggered the rule. */
       readonly becauseOf: string;
     }
@@ -270,7 +270,7 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     const reason: RecommendationReason = {
       kind: 'RULE',
       ruleId: rule.id,
-      text: rule.reason,
+      label: rule.label,
       becauseOf,
     };
     if (rule.suggest.kind === 'CATEGORY') {

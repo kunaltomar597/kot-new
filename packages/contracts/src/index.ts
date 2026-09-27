@@ -18,6 +18,7 @@ export * from './events.js';
 export * from './pagers.js';
 export * from './payments.js';
 export * from './photos.js';
+export * from './recommendations.js';
 export * from './reports.js';
 export * from './routes.js';
 export * from './service-requests.js';

@@ -10,14 +10,12 @@ import type {
   SubmitOrderResponse,
 } from '@rp/contracts';
 import {
-  calendarDateOf,
   canonicalJson,
   initialOrderItemState,
   type OrderItemState,
   type OrderSource,
   splitIntoKots,
   tableMachine,
-  toLocalDateTime,
   transition,
   unitPriceOf,
   validateSelection,
@@ -31,6 +29,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { appendEvent, type EventAudience } from '../events/outbox.js';
+import { comboOnNow } from '../menu/menu-content.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
@@ -74,18 +73,6 @@ function sha256(text: string): string {
 
 function reject(line: OrderLineRequest, code: RejectedLine['code'], message: string): RejectedLine {
   return { clientLineId: line.clientLineId, code, message };
-}
-
-/** Whether a combo is offered at `now`: its date range and daily time window (MENU-005). */
-function comboOnNow(combo: MenuSnapshot['combos'][number], now: Date, timeZone: string): boolean {
-  const today = calendarDateOf(now, timeZone);
-  if (combo.activeFrom !== undefined && today < combo.activeFrom) return false;
-  if (combo.activeUntil !== undefined && today > combo.activeUntil) return false;
-  if (combo.timeWindow === undefined) return true;
-  const local = toLocalDateTime(now, timeZone);
-  const time = `${String(local.hour).padStart(2, '0')}:${String(local.minute).padStart(2, '0')}`;
-  const { start, end } = combo.timeWindow;
-  return start <= end ? time >= start && time < end : time >= start || time < end;
 }
 
 /**
@@ -530,6 +517,8 @@ export class OrdersService {
           lineTotal: line.unitPrice * lineRequest.quantity,
           stationId: item.stationId,
           instructions: lineRequest.instructions ?? null,
+          recommendationLayer: lineRequest.recommendation?.layer ?? null,
+          recommendationRuleId: lineRequest.recommendation?.ruleId ?? null,
           modifiers: {
             create: line.modifiers.map((modifier) => ({
               restaurantId,

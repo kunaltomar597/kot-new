@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import type { ComboView } from '@rp/contracts';
-import { canonicalJson } from '@rp/domain';
+import type { ComboView, MenuSnapshot } from '@rp/contracts';
+import { calendarDateOf, canonicalJson, inTimeWindow, timeOfDayOf } from '@rp/domain';
 import { isoDateOf } from '../common/business-dates.js';
 import type { TransactionClient } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -168,4 +168,21 @@ export async function buildMenuContent(tx: MenuContentClient, restaurantId: stri
       mode: station.mode,
     })),
   };
+}
+
+/**
+ * Whether a combo is offered at `now`: its date range (calendar dates) and daily time window
+ * (MENU-005). The order engine refuses a combo outside them, and nothing suggests one (REC-005).
+ */
+export function comboOnNow(
+  combo: MenuSnapshot['combos'][number],
+  now: Date,
+  timeZone: string,
+): boolean {
+  const today = calendarDateOf(now, timeZone);
+  if (combo.activeFrom !== undefined && today < combo.activeFrom) return false;
+  if (combo.activeUntil !== undefined && today > combo.activeUntil) return false;
+  return (
+    combo.timeWindow === undefined || inTimeWindow(timeOfDayOf(now, timeZone), combo.timeWindow)
+  );
 }
