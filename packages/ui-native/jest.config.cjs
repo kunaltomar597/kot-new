@@ -2,9 +2,11 @@
 module.exports = {
   preset: '@react-native/jest-preset',
   testMatch: ['<rootDir>/test/**/*.test.tsx'],
-  // The first render in a file loads React Native's renderer; on a busy CI runner (Turborepo runs
-  // every package's tests at once) that alone took over Jest's 5 s default.
-  testTimeout: 30_000,
+  // The first render in each test file transforms and loads React Native's renderer. On a CI runner
+  // with every package's tests running at once and a cold transform cache, that alone has taken
+  // over 30 s, so tests get 2 minutes; CI keeps the transform cache between runs (ci.yml).
+  testTimeout: 120_000,
+  cacheDirectory: '<rootDir>/../../node_modules/.cache/jest',
   // Sources import with NodeNext `.js` extensions; Jest resolves them to the `.ts(x)` files.
   // The preset's resolver ignores `exports`, so the workspace packages point at their builds.
   moduleNameMapper: {

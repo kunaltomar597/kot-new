@@ -708,6 +708,9 @@ Gotchas:
   inactivity test drives a fake clock, and the kitchen sound test waits for the effect that plays
   the chime. Fake timers with the testing library need `shouldAdvanceTime: true` and only
   `setTimeout`, `clearTimeout` and `Date` faked, because its waits end with a `setTimeout(0)`.
+- The first render in a React Native Jest file transforms React Native's renderer: with four RN
+  packages testing at once on a cold CI runner it passed 30 s. RN Jest configs allow 2 minutes and
+  share `node_modules/.cache/jest`, which CI keeps between runs.
 
 Decisions: 114 to 118.
 

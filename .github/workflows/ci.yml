@@ -45,6 +45,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # React Native's sources are transformed by Babel for Jest; a warm cache keeps the first
+      # render of each test file fast (see the Jest configs).
+      - name: Jest transform cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/jest
+          key: jest-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', '**/babel.config.cjs') }}
+          restore-keys: jest-${{ runner.os }}-
+
       - name: Format
         run: pnpm format:check
 
