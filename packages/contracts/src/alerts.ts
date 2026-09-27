@@ -68,10 +68,14 @@ export type DeviceAlertsResponse = z.infer<typeof DeviceAlertsResponse>;
 export const AlertParams = z.strictObject({ alertId: Id });
 export type AlertParams = z.infer<typeof AlertParams>;
 
+/** NTF-008: the longest nudge message, and the most people one nudge goes to. */
+export const NUDGE_MESSAGE_MAX = 40;
+export const NUDGE_STAFF_MAX = 20;
+
 /** NTF-008: a manager nudges one or more waiters with a preset or a short text for the pager. */
 export const NudgeRequest = z.strictObject({
-  staffIds: z.array(Id).min(1).max(20),
-  message: z.string().trim().min(1).max(40),
+  staffIds: z.array(Id).min(1).max(NUDGE_STAFF_MAX),
+  message: z.string().trim().min(1).max(NUDGE_MESSAGE_MAX),
 });
 export type NudgeRequest = z.infer<typeof NudgeRequest>;
 

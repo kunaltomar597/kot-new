@@ -94,6 +94,39 @@ export const en = {
       off: 'Notifications are off, so alerts ring only while this app is open.',
       turnOn: 'Turn on',
     },
+    /** The console's alert centre, on the POS and the manager dashboard (P2-06c, MGR-008). */
+    centre: {
+      button: '{count, plural, =0 {Alerts} one {Alerts, # needs you} other {Alerts, # need you}}',
+      none: 'No open alerts. New ones show here as they come in.',
+      loadFailed: 'The alerts could not be loaded.',
+      show: 'Show',
+      escalated: 'Escalated',
+      groups: {
+        mine: 'For you',
+        escalated: 'Escalated to the managers',
+        kitchen: 'Kitchen',
+        tables: 'Tables',
+        staff: 'Staff',
+        system: 'Devices and system',
+      },
+      groupHeading: '{group} ({count})',
+      dashboardLater: 'The rest of the dashboard arrives in a later update.',
+    },
+    /** A manager's message to waiters' pagers and phones (P2-06c, NTF-008). */
+    nudge: {
+      open: 'Nudge waiters',
+      title: 'Nudge waiters',
+      description: 'Their pagers and phones buzz with your message until they acknowledge it.',
+      waiters: 'Waiters',
+      waitersHint: 'Choose one or more.',
+      noWaiters: 'No waiters can sign in yet.',
+      staffFailed: 'The waiters could not be loaded: {message}',
+      presets: 'Quick messages',
+      message: 'Message',
+      messageHint: '{count} of {max} characters',
+      send: 'Send',
+      sent: '{count, plural, one {Sent to {name}} other {Sent to # waiters}}',
+    },
   },
   pairing: {
     title: 'Pair this device',
@@ -263,7 +296,6 @@ export const en = {
     pos: 'POS',
     kds: 'Kitchen display',
     manage: 'Manage',
-    comingSoon: 'The {mode} screens arrive in a later update.',
     notAllowed: 'Your role cannot open {mode}.',
   },
   pos: {

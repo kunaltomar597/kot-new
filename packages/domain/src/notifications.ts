@@ -211,6 +211,21 @@ export function reachesPagerAndApp(alert: AlertDelivery, staffId: string): boole
   );
 }
 
+/**
+ * Whether an alert asks for the person at the console, on the POS or the manager dashboard
+ * (P2-06c, MGR-008): they receive it and its rule names one of those, or it was escalated to them,
+ * which reaches the managers' screens whatever its channels (NTF-005). Managers also see everyone
+ * else's open alerts there, without being asked to act on them.
+ */
+export function reachesConsole(alert: AlertDelivery, staffId: string): boolean {
+  if (!alert.recipientIds.includes(staffId)) return false;
+  return (
+    alert.channels.includes('POS') ||
+    alert.channels.includes('DASHBOARD') ||
+    alert.escalatedTo.includes(staffId)
+  );
+}
+
 /** The restaurant's people as they are right now, for resolving a rule. */
 export interface RecipientContext {
   readonly responsibleWaiterId: string | null;

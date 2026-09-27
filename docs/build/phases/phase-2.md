@@ -481,7 +481,7 @@ As built:
   app from the recents list is a manual step in the README; `docs/runbooks/waiter-phone.md` covers
   battery settings by phone maker.
 
-### P2-06c POS alert centre and manager nudge
+### P2-06c POS alert centre and manager nudge (done)
 
 Requirements: MGR-008, NTF-008, NTF-004, KDS-006.
 
@@ -490,6 +490,23 @@ Requirements: MGR-008, NTF-008, NTF-004, KDS-006.
 - Manager nudge: pick one or more waiters, then a preset (`notifications.nudgePresets`) or up to 40
   characters.
 - Acceptance: component tests and a Playwright flow (nudge a waiter, acknowledge an alert).
+
+As built:
+
+- `@rp/domain` `reachesConsole`: an alert asks for a person at the console when they receive it and
+  its rule names the POS or the dashboard, or it was escalated to them (NTF-005).
+- Console `src/alerts/`: `AlertsProvider` (POS and manage modes, not the kitchen display) reads the
+  person's open alerts (managers and the Owner: every open alert) and reads again after each alert
+  event and after a reconnect. The header's Alerts button counts the alerts that ask for the
+  person and opens the alert centre in a side sheet over any screen; the dashboard's home shows it
+  as well. Groups: for you, escalated to the managers, kitchen, tables, staff, devices and system;
+  escalations first, then the longest waiting. Each row says what and where, the detail, how long
+  ago, for whom, reminders and escalation, with Acknowledge. A new alert for the person, or one
+  escalated to them, pops up as a toast; an escalation's stays until dismissed.
+- `NudgeDialog` (managers, `STAFF_MANAGE`): the active waiters from the staff tiles, the quick
+  messages from the setting (none when it cannot be read) and a text field limited to
+  `NUDGE_MESSAGE_MAX` (40, in `@rp/contracts`).
+- Playwright: a manager nudges Ravi with a quick message and acknowledges it in the alert centre.
 
 ### P2-06d Service requests and the waiter's inbox
 

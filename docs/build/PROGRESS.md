@@ -15,7 +15,8 @@ What exists:
   state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment,
   bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export, menu
   import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a), including the
-  low-battery check (P2-02a), and what reaches a pager and the waiter app (P2-06a). 176 tests.
+  low-battery check (P2-02a), what reaches a pager and the waiter app (P2-06a), and what asks for
+  a person at the POS or dashboard (P2-06c). 178 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -110,7 +111,9 @@ What exists:
   move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b); the
   kitchen display with steps, bump, recall, notify manager, sounds and resync (P1-09b); bills,
   discounts with manager approval, payments and shifts on the POS (P1-12a); split bills, void,
-  edit after print and the day-end screen (P1-12b).
+  edit after print and the day-end screen (P1-12b); the alert centre on the POS and the
+  dashboard, live, with Acknowledge, a count of what asks for the person and toasts, and the
+  manager's nudge to waiters (P2-06c). 105 tests, and 11 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -124,8 +127,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-06c POS alert centre and manager nudge (P2-06a done), then P2-06d (service requests and
-  the waiter's inbox).
+- P2-06d Service requests and the waiter's inbox (P2-06a done).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -205,7 +207,7 @@ Recommended next WPs (dependencies met):
 - [ ] P2-05 Pager firmware [H]
 - [x] P2-06a Alerts in the waiter app
 - [x] P2-06b Background alerts on Android
-- [ ] P2-06c POS alert centre and manager nudge
+- [x] P2-06c POS alert centre and manager nudge
 - [ ] P2-06d Service requests and the waiter's inbox
 - [ ] P2-07 Phase 2 exit test on the lab rig [H]
 
@@ -508,6 +510,29 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-27 (P2-06c):
+
+166. The console shows alerts in the POS and manage modes, not on the kitchen display, which has
+     its own flags and "Notify manager" (KDS-006). The alert centre opens as a side sheet from the
+     header over any screen, and the dashboard's home shows it until the rest of the dashboard
+     arrives (P4-01).
+167. An alert asks for a person at the console (`reachesConsole`) when they receive it and its
+     rule names the POS or the dashboard, or it was escalated to them. Managers and the Owner see
+     every open alert, grouped, but the header counts and pops up only those that ask for them, so
+     waiters' routine alerts do not ring at the manager's desk.
+168. Groups: for you; escalated to the managers; kitchen (food waiting at the pass, order changes);
+     tables (orders to approve, food ready, water, waiter, bill); staff (nudges, a waiter who
+     cannot be reached); devices and system. Escalations first, then the longest waiting.
+169. A new alert for the person pops up as a toast with Show; an escalation to them stays until
+     dismissed. The console plays no sound for alerts in v1: the pager and the phone ring, and the
+     kitchen display has its own sounds.
+170. A manager may acknowledge anyone's alert from the centre (the server allows managers and the
+     Owner, NTF-004), which stops its repeats everywhere.
+171. The nudge offers the active waiters from the staff tiles (at most 20 at once,
+     `NUDGE_STAFF_MAX`) and the quick messages from `notifications.nudgePresets`. A quick message
+     fills the text field, which the manager may change, up to 40 characters (`NUDGE_MESSAGE_MAX`).
+     When the settings cannot be read, the manager types the message.
 
 Decided 2026-09-27 (P2-06b):
 
@@ -921,6 +946,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-06c POS alert centre and manager nudge
+
+Merged #59 (P2-06b) once green; the Android job compiled the new Kotlin and checked both APKs'
+permissions.
+
+Built: `reachesConsole` in `@rp/domain`; the console's `src/alerts/`: `AlertsProvider` (the
+person's open alerts, read again after alert events and reconnects, toasts for new ones),
+`alert-view.ts` (groups, order, what to announce), `AlertCentre` with Acknowledge, the header's
+Alerts button with its count, the side sheet, and `NudgeDialog`. The dashboard's home shows the
+alert centre. `NUDGE_MESSAGE_MAX` and `NUDGE_STAFF_MAX` in `@rp/contracts`, used by the nudge
+request and the presets setting. Playwright: a manager nudges Ravi with a quick message and
+acknowledges it in the alert centre.
+
+Tests: domain 178 (was 176), console 105 (was 84), Playwright 11 (was 10).
+
+Gotchas:
+
+- The console's test harness serves an empty alert list; a test that needs alerts replaces
+  `GET /api/v1/alerts` with one answer per read (the last one repeats).
+- On the POS floor in the harness, the floor's own error state is also `role="alert"`: look for
+  toasts inside the notifications region.
+- `useLive` keeps the last good list when a read fails, so after an acknowledgement whose reload
+  fails the row stays, with its button enabled again; acknowledging again is harmless.
+
+Decisions: 166 to 171.
 
 ### 2026-09-27: P2-06b Background alerts on Android
 

@@ -5,7 +5,8 @@ role-based modes:
 
 - POS (`/pos`): tables, order entry, billing, shifts, day-end (Phase 1);
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
-- Manager dashboard (`/manage`): live views, management, configuration, reports (Phase 4).
+- Manager dashboard (`/manage`): the alert centre (P2-06c); live views, management,
+  configuration, reports (Phase 4).
 
 Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
 `@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
@@ -44,6 +45,16 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   limit, `override.tsx`), service charge, customer, print (issue and print), payments across
   modes with change and one idempotency key per set, and the cashier's shift. P1-12b adds split
   bills (`SplitDialog`), void and edit after print with approval, and `/pos/day-end`.
+- Alerts (P2-06c, MGR-008, NTF-004, NTF-008): `src/alerts/` reads the signed-in person's open
+  alerts in the POS and manage modes (managers and the Owner see every open alert) and reads them
+  again after each alert event and after a reconnect. The header's Alerts button counts those
+  that ask for the person (`reachesConsole` in `@rp/domain`: theirs on the POS or dashboard
+  channel, or escalated to them) and opens the alert centre in a side sheet over any screen; the
+  dashboard's home shows it too. Groups (`alert-view.ts`): for you, escalated, kitchen, tables,
+  staff, devices and system, each alert with Acknowledge. A new alert for the person pops up as a
+  toast. Managers nudge waiters from there (`NudgeDialog`): waiters from the staff tiles, the
+  quick messages from `notifications.nudgePresets`, or up to 40 characters of their own. The
+  kitchen display has no alerts button.
 - `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
   screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
 
@@ -60,5 +71,6 @@ pnpm --filter @rp/console e2e          Playwright against the built server and c
 
 The e2e tests (`e2e/`) start PostgreSQL, seed it, run `apps/server/dist/main.js` with the built
 console, pair a real Chromium, sign each role in and stop and restart the server to check the
-offline banner. In cloud sessions they use the preinstalled Chromium (`/opt/pw-browsers`); CI
+offline banner; then they walk through the floor, orders, the kitchen display, billing and a
+manager's nudge acknowledged in the alert centre. In cloud sessions they use the preinstalled Chromium (`/opt/pw-browsers`); CI
 installs Playwright's own.
