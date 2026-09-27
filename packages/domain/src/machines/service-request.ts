@@ -1,8 +1,19 @@
+import type { NotificationEvent } from '../notifications.js';
 import { defineStateMachine } from '../state-machine.js';
 
 /** Diner service buttons on the table tablet (TAB-004) and QR page (QR-011). */
 export const SERVICE_REQUEST_TYPES = ['WATER', 'WAITER', 'BILL'] as const;
 export type ServiceRequestType = (typeof SERVICE_REQUEST_TYPES)[number];
+
+/**
+ * The alert each request raises (NTF-003, BRD Appendix C): the responsible waiter's pager and app,
+ * and for the bill the cashier too (BILL-015). It repeats every R and escalates after N.
+ */
+export const SERVICE_REQUEST_ALERTS: Readonly<Record<ServiceRequestType, NotificationEvent>> = {
+  WATER: 'WATER_REQUEST',
+  WAITER: 'WAITER_REQUEST',
+  BILL: 'BILL_REQUEST',
+};
 
 export const SERVICE_REQUEST_STATES = [
   'ACTIVE',
@@ -42,8 +53,26 @@ export function cancelButtonEvent(state: ServiceRequestState): ServiceRequestEve
   return undefined;
 }
 
+/**
+ * The events Resolve in the waiter app produces (WTR-005): it clears the request like Cancel on the
+ * tablet, but the waiter handled it, so one not yet acknowledged is acknowledged first (the time
+ * counts for reports, NTF-004) and then resolved. A closed request needs nothing.
+ */
+export function resolveEvents(state: ServiceRequestState): ServiceRequestEvent[] {
+  if (state === 'ACTIVE' || state === 'ESCALATED') return ['ACKNOWLEDGE', 'RESOLVE'];
+  if (state === 'ACKNOWLEDGED') return ['RESOLVE'];
+  return [];
+}
+
+/** A request that still shows on the tablet and in the waiter's inbox: not cancelled or resolved. */
+export const OPEN_SERVICE_REQUEST_STATES = [
+  'ACTIVE',
+  'ESCALATED',
+  'ACKNOWLEDGED',
+] as const satisfies readonly ServiceRequestState[];
+
 export function isOpenServiceRequest(state: ServiceRequestState): boolean {
-  return state === 'ACTIVE' || state === 'ESCALATED' || state === 'ACKNOWLEDGED';
+  return (OPEN_SERVICE_REQUEST_STATES as readonly ServiceRequestState[]).includes(state);
 }
 
 /** Anti-spam: the same type cannot be raised again while one is open for the table (TAB-004). */

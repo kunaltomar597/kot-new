@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "type": { "type": "string", "enum": ["WATER", "WAITER", "BILL"] } },
+    "required": ["type"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "type": { "type": "string", "enum": ["WATER", "WAITER", "BILL"] } },
+    "required": ["type"],
+    "additionalProperties": false
+  }
+}

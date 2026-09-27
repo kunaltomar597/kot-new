@@ -404,6 +404,8 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       });
     case 'ServiceRequestRaised':
       return domainEvent(type, rid, { serviceRequestId: id(), tableId: id(), type: 'WATER' });
+    case 'ServiceRequestEscalated':
+      return domainEvent(type, rid, { serviceRequestId: id() });
     case 'ServiceRequestAcknowledged':
       return domainEvent(type, rid, { serviceRequestId: id(), acknowledgedBy: id() });
     case 'ServiceRequestCancelled':

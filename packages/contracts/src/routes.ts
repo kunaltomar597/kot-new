@@ -183,6 +183,13 @@ import {
   UpdateRestaurantProfileRequest,
 } from './restaurant.js';
 import {
+  RaiseServiceRequest,
+  ServiceRequestListResponse,
+  ServiceRequestParams,
+  ServiceRequestView,
+  TableServiceRequestsResponse,
+} from './service-requests.js';
+import {
   SettingKeyParams,
   SettingsResponse,
   SettingView,
@@ -1820,6 +1827,124 @@ export const ROUTES = [
     responses: {
       200: { description: 'The break state.', schema: BreakView },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'listServiceRequests',
+    method: 'GET',
+    path: '/api/v1/service-requests',
+    summary: "Open water, waiter and bill requests: the waiter's inbox",
+    description:
+      'WTR-005: every open request of the restaurant, oldest first, with its table and who is on ' +
+      "the way; the app shows those of the waiter's tables. Read again after service request " +
+      'events.',
+    tags: ['service-requests'],
+    requirements: ['WTR-005', 'TBL-007'],
+    capability: 'ORDER_CREATE',
+    responses: {
+      200: { description: 'Open requests, oldest first.', schema: ServiceRequestListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'acknowledgeServiceRequest',
+    method: 'POST',
+    path: '/api/v1/service-requests/:requestId/acknowledge',
+    summary: 'Say you are on the way: the tablet shows "Waiter is on the way"',
+    description:
+      'WTR-005, NTF-004: acknowledges the request and its alert, which stops the repeats and the ' +
+      'escalation everywhere. A request acknowledged or closed already is returned as it is.',
+    tags: ['service-requests'],
+    requirements: ['WTR-005', 'NTF-004', 'TAB-004'],
+    capability: 'ORDER_CREATE',
+    request: { params: ServiceRequestParams },
+    responses: {
+      200: { description: 'The request.', schema: ServiceRequestView },
+      ...standardErrors,
+      404: { description: 'No such request.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'resolveServiceRequest',
+    method: 'POST',
+    path: '/api/v1/service-requests/:requestId/resolve',
+    summary: 'Clear a request that was dealt with, like Cancel on the tablet',
+    description:
+      'WTR-005: a request nobody acknowledged yet is acknowledged first (the time counts for ' +
+      'reports), then resolved; the tablet clears it. A closed request is returned as it is.',
+    tags: ['service-requests'],
+    requirements: ['WTR-005', 'TAB-004', 'NTF-004'],
+    capability: 'ORDER_CREATE',
+    request: { params: ServiceRequestParams },
+    responses: {
+      200: { description: 'The request.', schema: ServiceRequestView },
+      ...standardErrors,
+      404: { description: 'No such request.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listTableServiceRequests',
+    method: 'GET',
+    path: '/api/v1/devices/current/service-requests',
+    summary: "This table tablet's open requests",
+    description:
+      "TAB-004, AUTH-009: the open requests of the session at the tablet's own table, for " +
+      '"Requested, waiter notified" with the time and "Waiter is on the way". Only table tablets.',
+    tags: ['service-requests'],
+    requirements: ['TAB-004', 'AUTH-009'],
+    capability: 'DEVICE',
+    responses: {
+      200: {
+        description: 'The open session and its requests.',
+        schema: TableServiceRequestsResponse,
+      },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'raiseServiceRequest',
+    method: 'POST',
+    path: '/api/v1/devices/current/service-requests',
+    summary: 'Water, Waiter or Bill from the table tablet',
+    description:
+      'TAB-004, BILL-015: alerts the responsible waiter (and the cashier for the bill, which also ' +
+      'sets the table to Bill requested), repeating every R until acknowledged and escalating to ' +
+      'the managers after N. The same type cannot be raised again while one is open, and a tablet ' +
+      'may raise only `tablet.serviceRequestsPerMinute` requests a minute (SEC-009).',
+    tags: ['service-requests'],
+    requirements: ['TAB-004', 'BILL-015', 'NTF-003', 'NTF-005', 'SEC-009'],
+    capability: 'DEVICE',
+    request: { body: RaiseServiceRequest },
+    responses: {
+      201: { description: 'The request, active.', schema: ServiceRequestView },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      409: {
+        description: 'The table is not open, or a request of this type is already open.',
+        schema: ApiError,
+      },
+      429: { description: 'Too many requests from this tablet this minute.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'cancelTableServiceRequest',
+    method: 'POST',
+    path: '/api/v1/devices/current/service-requests/:requestId/cancel',
+    summary: 'Cancel on the table tablet, like a cabin call button',
+    description:
+      'TAB-004: a request not yet acknowledged is cancelled (no longer needed) and its alert ' +
+      'cleared; one acknowledged is resolved (the waiter arrived). Only requests of the ' +
+      "tablet's own table; a closed request is returned as it is.",
+    tags: ['service-requests'],
+    requirements: ['TAB-004', 'AUTH-009'],
+    capability: 'DEVICE',
+    request: { params: ServiceRequestParams },
+    responses: {
+      200: { description: 'The request.', schema: ServiceRequestView },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      404: { description: 'No such request at this table.', schema: ApiError },
     },
   },
   {

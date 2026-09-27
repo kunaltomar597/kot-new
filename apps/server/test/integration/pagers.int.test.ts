@@ -126,7 +126,8 @@ async function requestBill(label: string): Promise<string> {
         .send({ covers: 2, waiterId: kit.staff.WAITER })
     ).body,
   );
-  await server().post(`/api/v1/table-sessions/${session.id}/request-bill`).set(as(waiter));
+  // Asked by the manager: the waiter who asks for a bill is not alerted about it (P2-06d).
+  await server().post(`/api/v1/table-sessions/${session.id}/request-bill`).set(as(manager));
   const alert = await until(
     () =>
       prisma.alert

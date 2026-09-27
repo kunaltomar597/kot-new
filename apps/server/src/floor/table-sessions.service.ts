@@ -8,6 +8,7 @@ import type {
 import {
   grantFor,
   isBillable,
+  OPEN_SERVICE_REQUEST_STATES,
   ORDER_ITEM_STATES,
   responsibleWaiters,
   tableMachine,
@@ -54,7 +55,10 @@ export class TableSessionsService {
     private readonly assignments: WaiterAssignmentsService,
   ) {}
 
-  /** The live table overview (TBL-007): active tables in floor order. */
+  /**
+   * The live table overview (TBL-007): active tables in floor order, each with its amount so far,
+   * pending approvals, ready dishes and open service requests (P2-06d).
+   */
   async overview(restaurantId: string): Promise<TableOverviewEntry[]> {
     const tables = await this.prisma.diningTable.findMany({
       where: { restaurantId, archivedAt: null, section: { archivedAt: null } },
@@ -67,7 +71,7 @@ export class TableSessionsService {
     });
     const sessions = tables.flatMap((table) => table.sessions);
     const sessionIds = sessions.map((session) => session.id);
-    const [names, items] = await Promise.all([
+    const [names, items, requests] = await Promise.all([
       this.staffNames(sessions.map((session) => session.waiterId).filter((id) => id !== null)),
       this.prisma.orderItem.findMany({
         where: { order: { tableSessionId: { in: sessionIds } } },
@@ -78,7 +82,18 @@ export class TableSessionsService {
           order: { select: { tableSessionId: true } },
         },
       }),
+      this.prisma.serviceRequest.groupBy({
+        by: ['tableSessionId'],
+        where: {
+          tableSessionId: { in: sessionIds },
+          state: { in: [...OPEN_SERVICE_REQUEST_STATES] },
+        },
+        _count: { _all: true },
+      }),
     ]);
+    const openRequests = new Map(
+      requests.map((group) => [group.tableSessionId, group._count._all]),
+    );
     const amounts = new Map<string, number>();
     const pending = new Map<string, number>();
     const ready = new Map<string, number>();
@@ -114,7 +129,7 @@ export class TableSessionsService {
                 pendingApprovals: pending.get(session.id) ?? 0,
                 readyItems: ready.get(session.id) ?? 0,
               },
-        activeServiceRequests: 0,
+        activeServiceRequests: session === undefined ? 0 : (openRequests.get(session.id) ?? 0),
       };
     });
   }
@@ -177,10 +192,7 @@ export class TableSessionsService {
       await this.emit(tx, principal.restaurantId, isoDateOf(session.businessDate), sessionId, [
         {
           type: 'BillRequested',
-          payload: {
-            tableSessionId: sessionId,
-            requestedFrom,
-          },
+          payload: { tableSessionId: sessionId, requestedFrom, requestedBy: principal.staffId },
         },
         { type: 'TableStateChanged', payload: { tableId: session.tableId, state: to } },
       ]);

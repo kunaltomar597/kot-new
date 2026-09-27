@@ -25,6 +25,7 @@
     { "name": "printing" },
     { "name": "reports" },
     { "name": "restaurant" },
+    { "name": "service-requests" },
     { "name": "settings" },
     { "name": "system" },
     { "name": "tables" }
@@ -1661,6 +1662,154 @@
         },
         "x-capability": "DEVICE",
         "x-requirements": ["WTR-006", "NTF-004"]
+      }
+    },
+    "/api/v1/devices/current/service-requests": {
+      "get": {
+        "operationId": "listTableServiceRequests",
+        "summary": "This table tablet's open requests",
+        "description": "TAB-004, AUTH-009: the open requests of the session at the tablet's own table, for \"Requested, waiter notified\" with the time and \"Waiter is on the way\". Only table tablets.",
+        "tags": ["service-requests"],
+        "responses": {
+          "200": {
+            "description": "The open session and its requests.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TableServiceRequestsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet bound to a table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["TAB-004", "AUTH-009"]
+      },
+      "post": {
+        "operationId": "raiseServiceRequest",
+        "summary": "Water, Waiter or Bill from the table tablet",
+        "description": "TAB-004, BILL-015: alerts the responsible waiter (and the cashier for the bill, which also sets the table to Bill requested), repeating every R until acknowledged and escalating to the managers after N. The same type cannot be raised again while one is open, and a tablet may raise only `tablet.serviceRequestsPerMinute` requests a minute (SEC-009).",
+        "tags": ["service-requests"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RaiseServiceRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The request, active.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ServiceRequestView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet bound to a table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table is not open, or a request of this type is already open.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this tablet this minute.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["TAB-004", "BILL-015", "NTF-003", "NTF-005", "SEC-009"]
+      }
+    },
+    "/api/v1/devices/current/service-requests/{requestId}/cancel": {
+      "post": {
+        "operationId": "cancelTableServiceRequest",
+        "summary": "Cancel on the table tablet, like a cabin call button",
+        "description": "TAB-004: a request not yet acknowledged is cancelled (no longer needed) and its alert cleared; one acknowledged is resolved (the waiter arrived). Only requests of the tablet's own table; a closed request is returned as it is.",
+        "tags": ["service-requests"],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ServiceRequestView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet bound to a table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such request at this table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["TAB-004", "AUTH-009"]
       }
     },
     "/api/v1/devices/pair": {
@@ -5967,6 +6116,156 @@
         "x-requirements": ["TBL-001", "AUD-001"]
       }
     },
+    "/api/v1/service-requests": {
+      "get": {
+        "operationId": "listServiceRequests",
+        "summary": "Open water, waiter and bill requests: the waiter's inbox",
+        "description": "WTR-005: every open request of the restaurant, oldest first, with its table and who is on the way; the app shows those of the waiter's tables. Read again after service request events.",
+        "tags": ["service-requests"],
+        "responses": {
+          "200": {
+            "description": "Open requests, oldest first.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ServiceRequestListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["WTR-005", "TBL-007"]
+      }
+    },
+    "/api/v1/service-requests/{requestId}/acknowledge": {
+      "post": {
+        "operationId": "acknowledgeServiceRequest",
+        "summary": "Say you are on the way: the tablet shows \"Waiter is on the way\"",
+        "description": "WTR-005, NTF-004: acknowledges the request and its alert, which stops the repeats and the escalation everywhere. A request acknowledged or closed already is returned as it is.",
+        "tags": ["service-requests"],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ServiceRequestView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such request.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["WTR-005", "NTF-004", "TAB-004"]
+      }
+    },
+    "/api/v1/service-requests/{requestId}/resolve": {
+      "post": {
+        "operationId": "resolveServiceRequest",
+        "summary": "Clear a request that was dealt with, like Cancel on the tablet",
+        "description": "WTR-005: a request nobody acknowledged yet is acknowledged first (the time counts for reports), then resolved; the tablet clears it. A closed request is returned as it is.",
+        "tags": ["service-requests"],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ServiceRequestView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such request.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["WTR-005", "TAB-004", "NTF-004"]
+      }
+    },
     "/api/v1/settings": {
       "get": {
         "operationId": "listSettings",
@@ -8047,7 +8346,8 @@
               "requestedFrom": {
                 "type": "string",
                 "enum": ["TABLE_TABLET", "WAITER_APP", "QR", "POS"]
-              }
+              },
+              "requestedBy": { "$ref": "#/components/schemas/Id" }
             },
             "required": ["tableSessionId", "requestedFrom"],
             "additionalProperties": false
@@ -8951,6 +9251,7 @@
           { "$ref": "#/components/schemas/KotPrintStatusChanged" },
           { "$ref": "#/components/schemas/ItemStatusChanged" },
           { "$ref": "#/components/schemas/ServiceRequestRaised" },
+          { "$ref": "#/components/schemas/ServiceRequestEscalated" },
           { "$ref": "#/components/schemas/ServiceRequestAcknowledged" },
           { "$ref": "#/components/schemas/ServiceRequestCancelled" },
           { "$ref": "#/components/schemas/BillRequested" },
@@ -12008,6 +12309,12 @@
         "required": ["id"],
         "additionalProperties": false
       },
+      "RaiseServiceRequest": {
+        "type": "object",
+        "properties": { "type": { "$ref": "#/components/schemas/ServiceRequestType" } },
+        "required": ["type"],
+        "additionalProperties": false
+      },
       "RealtimeEndReason": {
         "type": "string",
         "enum": ["DEVICE_REVOKED", "DEVICE_CHANGED", "SESSION_ENDED"]
@@ -12485,7 +12792,9 @@
             "type": "object",
             "properties": {
               "serviceRequestId": { "$ref": "#/components/schemas/Id" },
-              "acknowledgedBy": { "$ref": "#/components/schemas/Id" }
+              "acknowledgedBy": {
+                "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+              }
             },
             "required": ["serviceRequestId", "acknowledgedBy"],
             "additionalProperties": false
@@ -12537,6 +12846,55 @@
         ],
         "additionalProperties": false
       },
+      "ServiceRequestEscalated": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "ServiceRequestEscalated" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": { "serviceRequestId": { "$ref": "#/components/schemas/Id" } },
+            "required": ["serviceRequestId"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "ServiceRequestListResponse": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ServiceRequestView" }
+          }
+        },
+        "required": ["requests"],
+        "additionalProperties": false
+      },
+      "ServiceRequestParams": {
+        "type": "object",
+        "properties": { "requestId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["requestId"],
+        "additionalProperties": false
+      },
       "ServiceRequestRaised": {
         "type": "object",
         "properties": {
@@ -12573,11 +12931,54 @@
         ],
         "additionalProperties": false
       },
+      "ServiceRequestSource": { "type": "string", "enum": ["TABLE_TABLET", "QR"] },
       "ServiceRequestState": {
         "type": "string",
         "enum": ["ACTIVE", "ESCALATED", "ACKNOWLEDGED", "CANCELLED", "RESOLVED"]
       },
       "ServiceRequestType": { "type": "string", "enum": ["WATER", "WAITER", "BILL"] },
+      "ServiceRequestView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/ServiceRequestType" },
+          "state": { "$ref": "#/components/schemas/ServiceRequestState" },
+          "source": { "$ref": "#/components/schemas/ServiceRequestSource" },
+          "tableId": { "$ref": "#/components/schemas/Id" },
+          "tableLabel": { "type": "string" },
+          "tableSessionId": { "$ref": "#/components/schemas/Id" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "escalatedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "acknowledgedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "acknowledgedById": {
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "acknowledgedByName": { "type": ["string", "null"] },
+          "closedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "state",
+          "source",
+          "tableId",
+          "tableLabel",
+          "tableSessionId",
+          "createdAt",
+          "escalatedAt",
+          "acknowledgedAt",
+          "acknowledgedById",
+          "acknowledgedByName",
+          "closedAt"
+        ],
+        "additionalProperties": false
+      },
       "SettingKeyParams": {
         "type": "object",
         "properties": {
@@ -13235,6 +13636,20 @@
           "displayOrder": { "type": "integer", "minimum": 0, "maximum": 9999 }
         },
         "required": ["label", "capacity", "sectionId", "displayOrder"],
+        "additionalProperties": false
+      },
+      "TableServiceRequestsResponse": {
+        "type": "object",
+        "properties": {
+          "tableSessionId": {
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "requests": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ServiceRequestView" }
+          }
+        },
+        "required": ["tableSessionId", "requests"],
         "additionalProperties": false
       },
       "TableSessionParams": {

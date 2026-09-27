@@ -555,6 +555,7 @@ model TableSession {
   movedFromSessionId String?            @map("moved_from_session_id") @db.Uuid
   orders             Order[]
   invoices           Invoice[]
+  serviceRequests    ServiceRequest[]
   createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   bill               Bill?
@@ -1194,6 +1195,61 @@ model Alert {
   @@index([status, nextRepeatAt])
   @@index([restaurantId, dedupeKey])
   @@map("alerts")
+}
+
+/// @rp/domain SERVICE_REQUEST_TYPES.
+enum ServiceRequestType {
+  WATER
+  WAITER
+  BILL
+}
+
+/// @rp/domain SERVICE_REQUEST_STATES.
+enum ServiceRequestState {
+  ACTIVE
+  ESCALATED
+  ACKNOWLEDGED
+  CANCELLED
+  RESOLVED
+}
+
+/// Where a diner raised a service request: the table tablet, or the QR page later (QR-011).
+enum ServiceRequestSource {
+  TABLE_TABLET
+  QR
+}
+
+/// A diner's call for water, a waiter or the bill (TAB-004, P2-06d). Like a flight-cabin call
+/// light it stays on until it is cancelled or resolved; its alert calls the responsible waiter
+/// (and the cashier for the bill), repeats and escalates (NTF-005). Never deleted.
+model ServiceRequest {
+  id               String               @id @default(uuid(7)) @db.Uuid
+  restaurantId     String               @map("restaurant_id") @db.Uuid
+  businessDate     DateTime             @map("business_date") @db.Date
+  tableSessionId   String               @map("table_session_id") @db.Uuid
+  tableSession     TableSession         @relation(fields: [tableSessionId], references: [id])
+  /// The table it was raised at; the guests are wherever the session is now.
+  tableId          String               @map("table_id") @db.Uuid
+  type             ServiceRequestType
+  state            ServiceRequestState  @default(ACTIVE)
+  source           ServiceRequestSource
+  raisedByDeviceId String?              @map("raised_by_device_id") @db.Uuid
+  /// The alert calling the staff; its acknowledgement and escalation move the request on.
+  alertId          String?              @unique @map("alert_id") @db.Uuid
+  escalatedAt      DateTime?            @map("escalated_at") @db.Timestamptz(3)
+  acknowledgedAt   DateTime?            @map("acknowledged_at") @db.Timestamptz(3)
+  acknowledgedById String?              @map("acknowledged_by_id") @db.Uuid
+  /// Cancelled or resolved.
+  closedAt         DateTime?            @map("closed_at") @db.Timestamptz(3)
+  /// Who resolved it in the app; null when the tablet or the table closing ended it.
+  closedById       String?              @map("closed_by_id") @db.Uuid
+  closedByDeviceId String?              @map("closed_by_device_id") @db.Uuid
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, state])
+  @@index([tableSessionId, state])
+  @@map("service_requests")
 }
 
 /// A note printed at a station that is not a kitchen ticket, e.g. "Moved from T4 to T7" when a

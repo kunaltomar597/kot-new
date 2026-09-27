@@ -26,6 +26,7 @@ import { PaymentsModule } from './payments/payments.module.js';
 import { PhotosModule } from './photos/photos.module.js';
 import { PrintingModule } from './printing/printing.module.js';
 import { RestaurantModule } from './restaurant/restaurant.module.js';
+import { ServiceRequestsModule } from './service-requests/service-requests.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { TlsModule } from './tls/tls.module.js';
 
@@ -50,6 +51,7 @@ export class AppModule {
         FloorModule,
         MenuModule,
         NotificationsModule,
+        ServiceRequestsModule,
         OrdersModule,
         PrintingModule,
         BillingModule,

@@ -9,6 +9,8 @@ export interface RecipientSubject {
   readonly tableSessionId: string | null;
   readonly selectedIds?: readonly string[];
   readonly wearerId?: string | null;
+  /** The person whose own request it is (a waiter asking for the bill): not alerted (P2-06d). */
+  readonly askedById?: string | null;
 }
 
 /**
@@ -77,6 +79,7 @@ export async function recipientContext(
     ownerIds: byRole(['OWNER']),
     selectedIds: subject.selectedIds ?? [],
     wearerId: subject.wearerId ?? null,
+    askedById: subject.askedById ?? null,
     onBreak: new Set(
       staff.filter((person) => person.onBreakSince !== null).map((person) => person.id),
     ),
