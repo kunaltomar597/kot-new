@@ -1,0 +1,31 @@
+# Smoke flow (P2-01c, MENU-013): pair the tablet to its table and see the live menu, no login.
+# Run against a development build with Metro running (see apps/table-tablet/README.md):
+#   maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE_NAME="Table T4" apps/table-tablet/.maestro
+appId: ${APP_ID}
+env:
+  APP_ID: in.rp.tablet.dev
+  METRO: http://10.0.2.2:8081
+  SERVER: http://10.0.2.2:3000
+---
+- launchApp:
+    clearState: true
+- openLink: exp+rp-table-tablet://expo-development-client/?url=${METRO}
+- extendedWaitUntil:
+    visible:
+      id: pairing-server
+    timeout: 60000
+- tapOn:
+    id: pairing-server
+- inputText: ${SERVER}
+- tapOn:
+    id: pairing-code
+- inputText: ${PAIRING_CODE}
+- hideKeyboard
+- tapOn:
+    id: pairing-submit
+- assertVisible: ${TABLE_NAME}
+- extendedWaitUntil:
+    visible:
+      id: menu-count
+    timeout: 15000
+- assertVisible: .*on the menu today

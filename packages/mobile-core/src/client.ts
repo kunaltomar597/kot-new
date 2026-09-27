@@ -1,7 +1,7 @@
 import { ApiClient, type DeviceSigner, type StoredCredentials } from '@rp/api-client';
 import { type KeyValueStore, readJson } from './storage.js';
 
-const CREDENTIALS_KEY = 'rp.credentials.v1';
+export const CREDENTIALS_KEY = 'rp.credentials.v1';
 
 /** Reads what the secure store holds for this device (nothing on a fresh install). */
 export function loadCredentials(secureStore: KeyValueStore): Promise<StoredCredentials | null> {

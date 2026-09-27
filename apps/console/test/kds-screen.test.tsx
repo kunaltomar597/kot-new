@@ -265,16 +265,21 @@ describe('[KDS-009] [KDS-012] sounds and reconnecting', () => {
       sockets.last.fire('event', kotEvent(1, 'NEW'));
     });
     await card(/^KOT 2/);
-    expect(FakeAudioContext.played.map((note) => note.frequency)).toEqual([880, 1320]);
+    // The sound plays from an effect that runs just after the new ticket is on the screen.
+    await waitFor(() => {
+      expect(FakeAudioContext.played.map((note) => note.frequency)).toEqual([880, 1320]);
+    });
 
     act(() => {
       sockets.last.fire('event', kotEvent(2, 'CANCELLED'));
     });
     await card(/^KOT 3/);
-    expect(FakeAudioContext.played.slice(2)).toEqual([
-      { frequency: 330, type: 'square' },
-      { frequency: 330, type: 'square' },
-    ]);
+    await waitFor(() => {
+      expect(FakeAudioContext.played.slice(2)).toEqual([
+        { frequency: 330, type: 'square' },
+        { frequency: 330, type: 'square' },
+      ]);
+    });
   });
 
   it('covers the board while disconnected and reads it again on reconnect', async () => {

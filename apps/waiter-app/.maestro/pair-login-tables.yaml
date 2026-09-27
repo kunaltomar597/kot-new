@@ -1,0 +1,36 @@
+# Smoke flow (P2-01c, WTR-001): pair with the local server, sign a waiter in, see the live tables.
+# Run against a development build with Metro running (see apps/waiter-app/README.md):
+#   maestro test -e PAIRING_CODE=ABCD-EFGH apps/waiter-app/.maestro
+appId: ${APP_ID}
+env:
+  APP_ID: in.rp.waiter.dev
+  METRO: http://10.0.2.2:8081
+  SERVER: http://10.0.2.2:3000
+  STAFF_NAME: Ravi
+  PIN: '4444'
+---
+- launchApp:
+    clearState: true
+- openLink: exp+rp-waiter://expo-development-client/?url=${METRO}
+- extendedWaitUntil:
+    visible:
+      id: pairing-server
+    timeout: 60000
+- tapOn:
+    id: pairing-server
+- inputText: ${SERVER}
+- tapOn:
+    id: pairing-code
+- inputText: ${PAIRING_CODE}
+- hideKeyboard
+- tapOn:
+    id: pairing-submit
+- tapOn: ${STAFF_NAME}
+- tapOn: ${PIN.charAt(0)}
+- tapOn: ${PIN.charAt(1)}
+- tapOn: ${PIN.charAt(2)}
+- tapOn: ${PIN.charAt(3)}
+- assertVisible: Tables
+- assertVisible: Signed in as ${STAFF_NAME}
+- tapOn: Sign out
+- assertVisible: Tap your name

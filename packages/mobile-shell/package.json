@@ -1,0 +1,49 @@
+{
+  "name": "@rp/mobile-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Screens and hooks shared by the waiter app and table tablet: pairing, staff login, the connection banner and live data over the device session (P2-01c).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@rp/api-client": "workspace:*",
+    "@rp/contracts": "workspace:*",
+    "@rp/design-tokens": "workspace:*",
+    "@rp/i18n": "workspace:*",
+    "@rp/mobile-core": "workspace:*",
+    "@rp/ui-native": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "react-native": ">=0.81"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.6",
+    "@react-native/babel-preset": "0.86.3",
+    "@react-native/jest-preset": "0.86.3",
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.2.0",
+    "babel-jest": "^30.5.2",
+    "jest": "^30.5.2",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "test-renderer": "^1.3.0"
+  }
+}
