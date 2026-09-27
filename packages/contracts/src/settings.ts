@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NotificationEventType } from './alerts.js';
+import { NotificationEventType, NUDGE_MESSAGE_MAX } from './alerts.js';
 import { Capability } from './auth.js';
 import { Timestamp } from './common.js';
 
@@ -413,7 +413,7 @@ export const SETTINGS = [
   }),
   setting({
     key: 'notifications.nudgePresets',
-    schema: z.array(z.string().trim().min(1).max(40)).max(12),
+    schema: z.array(z.string().trim().min(1).max(NUDGE_MESSAGE_MAX)).max(12),
     defaultValue: [
       'Come to counter',
       'Check your tables',

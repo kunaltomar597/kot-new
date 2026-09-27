@@ -629,3 +629,125 @@ body {
   width: 1.25em;
   height: 1.25em;
 }
+
+/* The alert centre (P2-06c, MGR-008): on the manager dashboard and in the POS's side sheet. */
+
+.console-header__alerts .rp-badge {
+  margin-inline-start: var(--rp-space-2);
+}
+
+.manage-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+  max-width: 56rem;
+}
+
+.manage-home__heading {
+  margin: 0;
+  font-size: var(--rp-font-size-xl);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.manage-home__later {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.alert-centre {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-5);
+}
+
+.alert-centre__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.alert-centre__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+}
+
+.alert-centre__heading {
+  margin: 0;
+  font-size: var(--rp-font-size-md);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.alert-centre__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alert-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-3);
+  padding: var(--rp-space-3) var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-inline-start: 4px solid var(--rp-color-warning);
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface);
+}
+
+.alert-row[data-escalated] {
+  border-inline-start-color: var(--rp-color-danger);
+}
+
+.alert-row__text {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+  min-width: 0;
+}
+
+.alert-row__title {
+  margin: 0;
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.alert-row__detail {
+  margin: 0;
+}
+
+.alert-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-3);
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.nudge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+}
+
+.nudge__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.nudge__legend {
+  margin-bottom: var(--rp-space-2);
+  padding: 0;
+  font-weight: var(--rp-font-weight-semibold);
+}

@@ -7,6 +7,7 @@ import {
   NOTIFICATION_EVENTS,
   type NotificationEvent,
   pagerTextFor,
+  reachesConsole,
   reachesPagerAndApp,
   type RecipientContext,
   resolveRecipients,
@@ -166,5 +167,25 @@ describe('[WTR-006] [NTF-005] what reaches the pager and the waiter app', () => 
     expect(reachesPagerAndApp(alert(['POS', 'DASHBOARD']), 'vikram')).toBe(false);
     expect(reachesPagerAndApp(alert(['POS', 'DASHBOARD'], ['vikram']), 'vikram')).toBe(true);
     expect(reachesPagerAndApp(alert(['POS', 'DASHBOARD'], ['vikram']), 'ravi')).toBe(false);
+  });
+});
+
+describe('[MGR-008] [NTF-005] what asks for a person at the POS and the dashboard', () => {
+  const alert = (channels: readonly string[], escalatedTo: readonly string[] = []) => ({
+    recipientIds: ['neha', 'vikram'],
+    channels,
+    escalatedTo,
+  });
+
+  it('asks a recipient when the rule names the POS or the dashboard', () => {
+    expect(reachesConsole(alert(['PAGER', 'WAITER_APP', 'POS']), 'neha')).toBe(true);
+    expect(reachesConsole(alert(['DASHBOARD']), 'vikram')).toBe(true);
+    expect(reachesConsole(alert(['POS']), 'sunita')).toBe(false);
+  });
+
+  it('keeps pager and phone alerts off the console, unless escalated to the person', () => {
+    expect(reachesConsole(alert(['PAGER', 'WAITER_APP']), 'vikram')).toBe(false);
+    expect(reachesConsole(alert(['PAGER', 'WAITER_APP'], ['vikram']), 'vikram')).toBe(true);
+    expect(reachesConsole(alert(['PAGER', 'WAITER_APP'], ['vikram']), 'neha')).toBe(false);
   });
 });

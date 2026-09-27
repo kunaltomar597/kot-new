@@ -78,6 +78,7 @@ export function server(type: 'POS' | 'KDS' = 'POS'): FakeServer {
       body: { staff: Object.values(STAFF) },
     }))
     .on('GET', '/api/v1/kds/tickets', () => ({ status: 200, body: EMPTY_KDS }))
+    .on('GET', '/api/v1/alerts', () => ({ status: 200, body: { alerts: [] } }))
     .on('POST', '/api/v1/auth/logout', () => ({ status: 204 }))
     .on('GET', '/api/v1/auth/session', () => ({ status: 200, body: {} }));
 }

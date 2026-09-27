@@ -7,6 +7,8 @@ import { useConsole, useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { InactivityTracker } from '../app/inactivity.js';
 import { modeOfPath, modesFor } from '../app/modes.js';
+import { AlertPanels, AlertsButton } from '../alerts/AlertCentre.js';
+import { AlertsProvider } from '../alerts/alerts-context.js';
 
 /** Warn this long before signing an idle person out. */
 const WARN_MS = 30_000;
@@ -24,7 +26,8 @@ function bannerStatus(
 
 /**
  * The frame of every mode: who is signed in, the modes they may open, sign-out, the connection
- * banner (NFR-P11) and the inactivity sign-out (AUTH-005).
+ * banner (NFR-P11), the inactivity sign-out (AUTH-005) and, on the POS and the dashboard, the
+ * person's alerts (P2-06c, MGR-008).
  */
 export function ModeLayout() {
   const t = useT();
@@ -35,15 +38,14 @@ export function ModeLayout() {
   if (state.phase !== 'paired') return <Navigate to="/pair" replace />;
   const { person, session } = state;
   const status = bannerStatus(state.connection);
+  const mode = modeOfPath(pathname);
 
-  return (
-    <ThemeRoot
-      className="console-shell"
-      {...(modeOfPath(pathname) === 'kds' && { theme: 'kds' as const })}
-    >
+  const frame = (
+    <ThemeRoot className="console-shell" {...(mode === 'kds' && { theme: 'kds' as const })}>
       <header className="console-header">
         <span className="console-header__app">{t('app.name')}</span>
         {person === undefined ? null : <ModeLinks role={person.role} />}
+        <AlertsButton />
         <span className="console-header__device">{state.device?.name}</span>
         {person === undefined ? null : (
           <>
@@ -71,7 +73,15 @@ export function ModeLayout() {
       <main className="console-main">
         <Outlet />
       </main>
+      <AlertPanels />
     </ThemeRoot>
+  );
+  // The kitchen display has its own flags (KDS-006); the POS and the dashboard show alerts.
+  if (person === undefined || mode === 'kds') return frame;
+  return (
+    <AlertsProvider key={person.id} person={person}>
+      {frame}
+    </AlertsProvider>
   );
 }
 

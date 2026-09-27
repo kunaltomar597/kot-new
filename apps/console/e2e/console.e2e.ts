@@ -4,7 +4,8 @@ import { type RunningServer, startServer } from './server.js';
 
 /**
  * P0-14b acceptance: a real browser pairs with the real server, people sign in with their PIN and
- * land in their mode, and the offline banner shows while the server is down (NFR-P11).
+ * land in their mode, and the offline banner shows while the server is down (NFR-P11). Later work
+ * packages add their flows: the POS floor, orders, the kitchen display, billing and alerts.
  */
 
 const t = createTranslator();
@@ -315,5 +316,28 @@ test.describe.serial('the web console', () => {
 
     await page.getByRole('button', { name: t('pos.backToTables') }).click();
     await expect(hall.getByRole('button', { name: '2, Free' })).toBeVisible();
+  });
+
+  test('[NTF-008] [NTF-004] [MGR-008] a manager nudges a waiter and acknowledges the alert', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await expect(page.getByRole('heading', { level: 2, name: t('alerts.title') })).toBeVisible();
+
+    await page.getByRole('button', { name: t('alerts.nudge.open') }).click();
+    const nudge = page.getByRole('dialog', { name: t('alerts.nudge.title') });
+    await nudge.getByRole('checkbox', { name: 'Ravi' }).check();
+    await nudge.getByRole('button', { name: 'Come to counter' }).click();
+    await nudge.getByRole('button', { name: t('alerts.nudge.send') }).click();
+    await expect(page.getByText(t('alerts.nudge.sent', { count: 1, name: 'Ravi' }))).toBeVisible();
+
+    // Managers see every open alert: Ravi's nudge shows, live, until someone acknowledges it.
+    const acknowledge = page.getByRole('button', {
+      name: t('alerts.acknowledgeOf', { title: 'Come to counter' }),
+    });
+    await expect(acknowledge).toBeVisible();
+    await acknowledge.click();
+    await expect(acknowledge).toHaveCount(0);
   });
 });
