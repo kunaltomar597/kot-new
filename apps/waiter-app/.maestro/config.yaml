@@ -1,0 +1,7 @@
+# Maestro workspace settings for the waiter app's flows. The smoke flow pairs the phone; the
+# background alert flow uses that pairing, so it runs second.
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - pair-login-tables
+    - background-alert

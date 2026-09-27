@@ -17,15 +17,18 @@ export interface AlertCenterSnapshot {
  * listening with the screen off, and a notification per alert (P2-06b, WTR-005).
  */
 export interface AlertNotifier {
-  /** The phone holds a person: keep listening for their alerts until `stop`. */
+  /**
+   * The phone holds a person: keep listening for their alerts until `stop`. Called again when the
+   * app starts or their name changes, so starting while listening only updates what it shows.
+   */
   start(holder: AlertHolder): Promise<void>;
-  /** Nobody to alert any more: the person signed out, or holds another phone now. */
+  /** Nobody to alert: the person signed out or holds another phone. Also when not listening. */
   stop(): Promise<void>;
   /** An alert that is new here or came back (a repeat): show it, ring and vibrate. */
   announce(alert: AlertView): Promise<void>;
   /** The alert was acknowledged or cleared, anywhere. */
   dismiss(alertId: string): Promise<void>;
-  /** Acknowledge pressed on a notification. Returns how to stop listening. */
+  /** Acknowledge pressed on a notification, which takes it off. Returns how to stop listening. */
   onAcknowledge(listener: (alertId: string) => void): () => void;
 }
 
@@ -54,10 +57,12 @@ export class AlertCenter {
   private readingAgain: Promise<void> | undefined;
   /** Bumped by `reset`, so a read that was on its way when the phone was unpaired is dropped. */
   private generation = 0;
+  /** Acknowledge pressed on a notification before the first read: sent after it. */
+  private readonly waiting = new Set<string>();
 
   constructor(private readonly options: AlertCenterOptions) {
     options.notifier?.onAcknowledge((alertId) => {
-      this.acknowledge(alertId).catch((error: unknown) => this.options.onError?.(error));
+      this.acknowledgeFromNotification(alertId);
     });
   }
 
@@ -132,9 +137,27 @@ export class AlertCenter {
     this.generation += 1;
     const had = this.snapshot;
     this.announced.clear();
+    this.waiting.clear();
     this.update(IDLE);
     for (const alert of had.alerts) this.notify((notifier) => notifier.dismiss(alert.id));
     if (had.holder !== null) this.notify((notifier) => notifier.stop());
+  }
+
+  /**
+   * Acknowledge pressed on a notification (P2-06b). The notification went when it was pressed, so
+   * if the acknowledgement fails the alert, still open, is announced again. Pressed while the app
+   * was starting, it waits for the first read.
+   */
+  private acknowledgeFromNotification(alertId: string): void {
+    if (this.snapshot.status !== 'ready') {
+      this.waiting.add(alertId);
+      return;
+    }
+    this.acknowledge(alertId).catch((error: unknown) => {
+      this.options.onError?.(error);
+      const open = this.snapshot.alerts.find((alert) => alert.id === alertId);
+      if (open !== undefined) this.notify((notifier) => notifier.announce(open));
+    });
   }
 
   /**
@@ -173,11 +196,20 @@ export class AlertCenter {
         this.notify((notifier) => notifier.dismiss(alert.id));
       }
     }
-    if (!samePerson || before.holder?.displayName !== holder?.displayName) {
+    // The first read says who the phone listens for, also to a notifier left listening by an
+    // earlier start of the app (Android restarts its service): it stops when nobody holds it.
+    if (
+      before.status !== 'ready' ||
+      !samePerson ||
+      before.holder?.displayName !== holder?.displayName
+    ) {
       this.notify((notifier) => (holder === null ? notifier.stop() : notifier.start(holder)));
     }
     this.update({ status: 'ready', holder, alerts });
     for (const alert of alerts) this.announce(alert);
+    const waiting = [...this.waiting];
+    this.waiting.clear();
+    for (const alertId of waiting) this.acknowledgeFromNotification(alertId);
   }
 
   /** Rings for an alert new here, or come back since it last rang (NTF-006: once per repeat). */

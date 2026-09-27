@@ -439,7 +439,7 @@ As built:
   waiter-app tests (a new alert, and acknowledging on the sign-in screen after an inactivity
   sign-out). The Maestro smoke flow acknowledges the food-ready alert.
 
-### P2-06b Background alerts on Android
+### P2-06b Background alerts on Android (done)
 
 Requirements: WTR-005 (banner, sound and vibration in the background or locked), WTR-006.
 
@@ -453,6 +453,33 @@ Requirements: WTR-005 (banner, sound and vibration in the background or locked),
 - The device session outlives the screen: closing the app from the recents list keeps alerts coming.
 - Acceptance: Maestro flow with the app in the background (a person marks a dish ready on the
   kitchen screen; the flow acknowledges from the notification shade); the Debug APK builds.
+
+As built:
+
+- `@rp/mobile-native`: `RpAlertService` (a `HeadlessJsTaskService`, `specialUse`, `START_STICKY`)
+  runs the keep-alive task `RpAlertKeepAlive`, which never finishes by itself; the service finishes
+  it when it stops, and a task that ends does not stop the service. A restart Android refuses in the
+  background ends the service; the app alerts while open. `AlertNotifications` has the alerts
+  channel (high importance, sound, vibration, public on the lock screen) and the service's silent
+  channel; an alert is a notification tagged with its id with an Acknowledge action, posted again
+  on a repeat; in the foreground, or with notifications off, the phone rings and vibrates as the
+  ringer mode allows. `RpAlertActionReceiver` (not exported) takes the notification off and sends
+  the press to JavaScript, keeping it in private preferences while JavaScript is not listening.
+  `RpAlertsModule` (`RpAlerts`) and `AndroidAlertNotifier` in TypeScript; the library manifest
+  declares the service, the receiver and `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`,
+  `POST_NOTIFICATIONS`, `VIBRATE` and `WAKE_LOCK`.
+- `@rp/mobile-core` `AlertCenter`: the first read tells the notifier to start or stop (it stops a
+  service Android restarted for someone who has signed out since); an Acknowledge pressed before
+  the first read is sent after it; one that fails announces the alert again.
+- Waiter app: the device session is a module singleton (`src/session.ts`) the screen and the task
+  share, never stopped; `index.ts` registers the task; `NotificationsProvider` asks for
+  notifications when someone signs in and checks again when the app comes back, and home shows
+  "Notifications are off" with a button to the settings.
+- The table tablet blocks the notification, foreground service and vibration permissions; the
+  Android CI job checks both APKs' permissions and the service's type.
+- Maestro: `background-alert.yaml` after the smoke flow (`config.yaml` sets the order). Closing the
+  app from the recents list is a manual step in the README; `docs/runbooks/waiter-phone.md` covers
+  battery settings by phone maker.
 
 ### P2-06c POS alert centre and manager nudge
 

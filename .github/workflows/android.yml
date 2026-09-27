@@ -1,9 +1,9 @@
 name: Android
 
 # Builds debug APKs of the waiter app and the table tablet with Gradle (P2-01c), so native
-# configuration (Expo modules, the Keystore device key module, autolinking in the monorepo) is
-# checked on every change that could affect it. Signed release APKs are built by EAS Build with
-# the owner's keystore held as an EAS secret, never here.
+# configuration (Expo modules, the Keystore device key module, autolinking in the monorepo, the
+# alert service and its permissions) is checked on every change that could affect it. Signed
+# release APKs are built by EAS Build with the owner's keystore held as an EAS secret, never here.
 
 on:
   push:
@@ -72,6 +72,29 @@ jobs:
       - name: Assemble the debug APK
         working-directory: apps/${{ matrix.app }}/android
         run: ./gradlew assembleDebug --no-daemon
+
+      # The waiter phone's background alerts (P2-06b) need notifications and a foreground service;
+      # the table tablet alerts nobody and blocks them (SEC-002 least privilege).
+      - name: Check the alert permissions and service in the APK
+        working-directory: apps/${{ matrix.app }}/android/app/build/outputs/apk/debug
+        run: |
+          aapt2="$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort -V | tail -n 1)"
+          "$aapt2" dump permissions app-debug.apk | tee permissions.txt
+          "$aapt2" dump xmltree --file AndroidManifest.xml app-debug.apk > manifest.txt
+          for permission in POST_NOTIFICATIONS FOREGROUND_SERVICE_SPECIAL_USE; do
+            if grep -q "android.permission.$permission'" permissions.txt; then
+              [ "${{ matrix.app }}" = waiter-app ] || { echo "::error::The table tablet asks for $permission"; exit 1; }
+            else
+              [ "${{ matrix.app }}" != waiter-app ] || { echo "::error::The waiter app lacks $permission"; exit 1; }
+            fi
+          done
+          if [ "${{ matrix.app }}" = waiter-app ]; then
+            grep -A6 'com.rp.mobilenative.RpAlertService' manifest.txt | tee service.txt
+            grep -q -E 'foregroundServiceType.*(0x40000000|1073741824|specialUse)' service.txt || {
+              echo '::error::The alert service is not a specialUse foreground service'
+              exit 1
+            }
+          fi
 
       - name: Keep the APK
         uses: actions/upload-artifact@v4

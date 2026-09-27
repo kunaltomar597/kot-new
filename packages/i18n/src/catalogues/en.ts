@@ -85,6 +85,15 @@ export const en = {
       '{type, select, PAGER {The pager} TABLE_TABLET {The table tablet} KDS {The kitchen screen} other {A device}}',
     deviceBattery: '{device}: {percent}% battery left. Charge it soon.',
     deviceOffline: '{device} is not connected. Check it is switched on and in Wi-Fi range.',
+    /** Android notifications on the waiter phone (P2-06b, WTR-005). */
+    notification: {
+      listeningTitle: 'Alerts for {name}',
+      listeningText: 'This phone rings for {name}’s alerts, also when it is locked.',
+      alertsChannel: 'Alerts',
+      listeningChannel: 'Staying connected for alerts',
+      off: 'Notifications are off, so alerts ring only while this app is open.',
+      turnOn: 'Turn on',
+    },
   },
   pairing: {
     title: 'Pair this device',

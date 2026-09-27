@@ -1,2 +1,28 @@
-<manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    Background alerts on the waiter phone (P2-06b, WTR-005): a foreground service keeps it
+    listening with the screen off, a notification per alert rings and vibrates. The table tablet
+    blocks these permissions in its app config and never starts the service.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application>
+    <service
+      android:name="com.rp.mobilenative.RpAlertService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Keeps a restaurant waiter's work phone connected to the restaurant's own server on the local network while the screen is off, so kitchen and table alerts for the waiter ring at once, like their pager." />
+    </service>
+
+    <receiver
+      android:name="com.rp.mobilenative.RpAlertActionReceiver"
+      android:exported="false" />
+  </application>
 </manifest>

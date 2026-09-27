@@ -17,6 +17,7 @@ import type {
 import { canTransition, type OrderItemState, orderItemMachine, transition } from '@rp/domain';
 import { createTranslator } from '@rp/i18n';
 import { DeviceSession, MemoryStore } from '@rp/mobile-core';
+import type { NotificationPermission } from '@rp/mobile-native';
 import {
   FakeKeys,
   fakeLocalServer,
@@ -486,10 +487,18 @@ export interface SignedInApp {
   readonly sockets: SocketFactory;
 }
 
+export interface SignedInAppOptions {
+  /** Android's notifications (P2-06b); left out, as on a phone that cannot say. */
+  readonly notifications?: NotificationPermission;
+  /** False: paired, with nobody signed in yet. */
+  readonly signIn?: boolean;
+}
+
 /** A paired waiter phone with Ravi signed in, showing the app. */
 export async function signedInApp(
   restaurant = new Restaurant(),
   server = restaurant.server(),
+  options: SignedInAppOptions = {},
 ): Promise<SignedInApp> {
   const sockets = new SocketFactory();
   const session = new DeviceSession({
@@ -502,9 +511,15 @@ export async function signedInApp(
   });
   await session.start();
   await session.pair('http://pos.test:3000', 'ABCD-EFGH');
-  await session.signIn(RAVI, '4444');
+  if (options.signIn !== false) await session.signIn(RAVI, '4444');
   // The phone keeps the menu from an earlier connection (MENU-013).
   await session.menu.refresh(() => session.api.getMenu());
-  await render(<App session={session} translator={translator} />);
+  await render(
+    <App
+      session={session}
+      translator={translator}
+      {...(options.notifications !== undefined && { notifications: options.notifications })}
+    />,
+  );
   return { restaurant, server, session, sockets };
 }
