@@ -31,8 +31,11 @@ after ack, Cancel choosing between multiple active requests.
 Acceptance: integration and Maestro tests covering raise → re-alert every R → escalate after N →
 ack → Cancel resolves; duplicate raise blocked.
 
-The server module, its events and alerts, and the waiter's inbox were moved forward to P2-06d;
-P3-02 builds the tablet's buttons on them and the Maestro test.
+The server module, its events and alerts, and the waiter's inbox were moved forward to P2-06d and
+are built. The tablet's routes are `GET` and `POST /api/v1/devices/current/service-requests` and
+`POST /api/v1/devices/current/service-requests/:requestId/cancel` (its own table only; at most
+`tablet.serviceRequestsPerMinute` raises a minute), and the tablet hears the request events in its
+table's room. P3-02 builds the tablet's buttons on them and the Maestro test.
 
 ## P3-03 Customer ordering and waiter approval workflow
 

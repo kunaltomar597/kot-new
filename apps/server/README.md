@@ -112,7 +112,7 @@ of truth for the restaurant.
   kitchen 6666 (development only).
 
 Each area is one Nest module registered in `src/app.module.ts`. Still to come:
-service-requests, recommendations, sync, licensing, backup, updates and diagnostics.
+recommendations, sync, licensing, backup, updates and diagnostics.
 
 ## Devices (P0-11)
 
@@ -426,6 +426,24 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `AlertRaised`, `AlertAcknowledged` and `AlertCleared`. When the holder changes, the gateway's
   sweep ends the connection (`DEVICE_CHANGED`) so the phone reconnects to the right room. See
   `test/integration/phone-alerts.int.test.ts`.
+
+## Service requests (P2-06d)
+
+- `src/service-requests/service-requests.service.ts`: Water, Waiter and Bill from the table tablet
+  (`/api/v1/devices/current/service-requests`, the tablet's own table only) and the waiter's inbox
+  (`/api/v1/service-requests`, ORDER_CREATE), following `@rp/domain` `serviceRequestMachine`. A
+  raise locks the table row, refuses the same type while one is open (409
+  `SERVICE_REQUEST_ACTIVE`) and more than `tablet.serviceRequestsPerMinute` a minute per tablet
+  (429), and raises the request's alert in the same transaction (dedupe key `service:<id>`); a bill
+  also moves the table to Bill requested and emits `BillRequested`.
+- Acknowledge and resolve are idempotent (the first acknowledgement stands, a closed request stays
+  closed); Resolve acknowledges first when nobody has. Closing a request clears its alert.
+- `service-request-alerts.ts` is the durable consumer that keeps a request in step with its alert
+  (acknowledged on a pager, a phone or the POS; escalated after N) and ends a closed table's open
+  requests. Request events go to the table's room. See
+  `test/integration/service-requests.int.test.ts`.
+- A bill asked for on a phone or at the POS carries `requestedBy`: the trigger does not alert the
+  asker (`askedById`); one from the tablet is the service request's alert.
 
 ## Pagers (P2-04a)
 

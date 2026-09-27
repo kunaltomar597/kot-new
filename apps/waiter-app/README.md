@@ -4,7 +4,7 @@ React Native + Expo SDK 57 (development builds, not Expo Go), Android only. A pa
 staff PIN login (WTR-001). Built by P2-01 (foundation, done), P2-02, P2-06, P3-03 (approvals
 inbox) and P3-05 (upsell).
 
-What it does today (P2-01c, P2-01d, P2-02a to P2-02c, P2-06a, P2-06b): pairs with the local
+What it does today (P2-01c, P2-01d, P2-02a to P2-02c, P2-06a to P2-06d): pairs with the local
 server by scanning the manager's QR code, or with the address and code typed (the device key is created in the Android
 Keystore, and over TLS only the restaurant's CA is trusted from then on), lists the staff who may
 use a waiter phone (waiters, managers, the owner) and signs one in with their PIN. Home is "My
@@ -45,6 +45,11 @@ screen the banner shows the alert and the phone rings and vibrates. Android 13 a
 notifications when someone signs in; while they are off, home says alerts ring only while the app
 is open, with a button to the settings.
 
+Requests from the tables (Water, Waiter, Bill) show on home for the tables shown, and on each
+table's screen for that table (P2-06d, WTR-005): oldest first, with the table, how long ago, who is
+on the way or that the managers were alerted. Acknowledge says the waiter is on the way and stops
+the reminders on the pager and the phone; Resolve clears the request, as Cancel on the tablet does.
+
 Where things are:
 
 - `src/App.tsx`: pairing → login → signed in, from the device session's state.
@@ -59,6 +64,8 @@ Where things are:
   (`src/SentOrders.tsx`, `src/EndItemSheet.tsx`, `@rp/mobile-shell` `useOverride` for the
   manager's PIN), unsent orders (`src/UnsentOrders.tsx`), moving (`src/MoveSheet.tsx`) and the
   bill request. Orders go through the device session's `OrderOutbox` (`@rp/mobile-core`).
+- `src/ServiceRequests.tsx`: the open requests from the tables (`GET /api/v1/service-requests`),
+  with Acknowledge and Resolve, read again after request, move and close events.
 - `src/PagerCard.tsx`: the waiter's own pager (`GET /api/v1/pagers/mine`), read again on
   `DeviceStatusChanged` and every minute for the battery level.
 - `src/session.ts`: the phone's one `DeviceSession` (`@rp/mobile-core`), wired to the Keystore
