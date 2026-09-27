@@ -240,6 +240,12 @@ export interface RecipientContext {
   readonly onBreak: ReadonlySet<string>;
   /** Whether a person's pager or waiter app is connected (NTF-007). */
   readonly reachable: (staffId: string) => boolean;
+  /**
+   * The person whose own request raised the alert, e.g. a waiter asking for the bill on their phone
+   * (P2-06d): they know already, so they are not alerted, and as the responsible waiter they are
+   * not missing either, so the managers are not called at once on their account.
+   */
+  readonly askedById?: string | null;
 }
 
 export interface ResolvedRecipients {
@@ -281,6 +287,10 @@ export function resolveRecipients(
     switch (kind) {
       case 'RESPONSIBLE_WAITER': {
         const waiter = context.responsibleWaiterId;
+        if (waiter !== null && waiter === context.askedById) {
+          waiterFound = true;
+          break;
+        }
         if (waiter === null || context.onBreak.has(waiter) || !context.reachable(waiter)) {
           escalateNow = true;
         }
@@ -315,6 +325,10 @@ export function resolveRecipients(
         stations = true;
         break;
     }
+  }
+  // Whoever asked knows already; an escalation still reaches every manager on duty.
+  if (context.askedById !== undefined && context.askedById !== null) {
+    people.delete(context.askedById);
   }
   // Nobody to take a waiter's alert: the managers take it at once.
   if (waiterWanted && !waiterFound) escalateNow = true;

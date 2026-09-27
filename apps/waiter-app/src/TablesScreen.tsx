@@ -1,4 +1,4 @@
-import type { TableOverviewEntry } from '@rp/contracts';
+import type { ServiceRequestView, TableOverviewEntry } from '@rp/contracts';
 import { fontSize, fontWeight, spacing } from '@rp/design-tokens';
 import {
   messageOf,
@@ -12,11 +12,12 @@ import {
 } from '@rp/mobile-shell';
 import { affectsFloor, floorSections, myTableIds, tileAlert, tileDetails } from '@rp/ordering';
 import { Button, SegmentedControl, TableTile, useTheme, useToast, weight } from '@rp/ui-native';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NotificationsOff } from './notifications';
 import { OpenTableSheet } from './OpenTableSheet';
 import { PagerCard } from './PagerCard';
+import { ServiceRequests } from './ServiceRequests';
 import { UnsentHome } from './UnsentOrders';
 
 type TablesView = 'mine' | 'all';
@@ -28,8 +29,9 @@ const CLOCK_MS = 30_000;
  * The waiter app's home (WTR-002): "My tables" (the waiter's sections and tables for today, and
  * any table they are responsible for) or all tables, grouped by section, each with its state,
  * guests, time seated, waiter and anything waiting for staff; orders on this phone not yet sent
- * (WTR-012); and the waiter's pager (WTR-014). A tap opens an open table, or opens a free one
- * with its guests first. Read again after table, order, bill and service-request events.
+ * (WTR-012); the waiter's pager (WTR-014); and the requests from the tables shown (WTR-005). A
+ * tap opens an open table, or opens a free one with its guests first. Read again after table,
+ * order, bill and service-request events.
  */
 export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string) => void }) {
   const session = useDeviceSession();
@@ -49,19 +51,27 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
     return { overview, assignments: assignments.current.assignments, floor };
   }, affectsFloor);
 
-  const shown = useMemo(() => {
+  const mine = useMemo(() => {
     if (data.status !== 'ready' || person === undefined) return undefined;
-    const { overview, assignments, floor } = data.value;
-    const sections = floorSections(floor, overview);
+    return myTableIds(person.id, data.value.overview, data.value.assignments);
+  }, [data, person]);
+  const shown = useMemo(() => {
+    if (data.status !== 'ready') return undefined;
+    const sections = floorSections(data.value.floor, data.value.overview);
     if (view === 'all') return sections;
-    const mine = myTableIds(person.id, overview, assignments);
+    if (mine === undefined) return undefined;
     return sections
       .map((section) => ({
         ...section,
         tables: section.tables.filter((table) => mine.has(table.tableId)),
       }))
       .filter((section) => section.tables.length > 0);
-  }, [data, person, view]);
+  }, [data, mine, view]);
+  // The requests from the tables shown (WTR-005): the waiter's own, or every table's.
+  const showRequest = useCallback(
+    (request: ServiceRequestView) => view === 'all' || mine?.has(request.tableId) === true,
+    [mine, view],
+  );
 
   if (person === undefined) return null;
   const noneMine =
@@ -98,6 +108,7 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
           setView(next === 'all' ? 'all' : 'mine');
         }}
       />
+      <ServiceRequests show={showRequest} />
       {data.status === 'loading' && <Note>{t('states.loading')}</Note>}
       {data.status === 'error' && (
         <>

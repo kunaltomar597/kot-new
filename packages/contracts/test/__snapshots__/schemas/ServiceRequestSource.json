@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["TABLE_TABLET", "QR"] },
+  "output": { "type": "string", "enum": ["TABLE_TABLET", "QR"] }
+}

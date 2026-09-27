@@ -508,7 +508,7 @@ As built:
   `NUDGE_MESSAGE_MAX` (40, in `@rp/contracts`).
 - Playwright: a manager nudges Ravi with a quick message and acknowledges it in the alert centre.
 
-### P2-06d Service requests and the waiter's inbox
+### P2-06d Service requests and the waiter's inbox (done)
 
 Requirements: WTR-005, TAB-004 (server side), NTF-003, NTF-004, NTF-005, BILL-015, TBL-007,
 SEC-009.
@@ -524,6 +524,46 @@ SEC-009.
   alerts the responsible waiter whoever asked); the cashier still gets it.
 - Acceptance: integration tests (raise, repeat every R, escalate after N, acknowledge, resolve,
   duplicate refused) and waiter-app tests.
+
+As built:
+
+- Schema: `service_requests` (migration `20260928040000_service_requests`): type, state and source,
+  the table session and the table it was raised at, its alert (unique), and when it escalated,
+  was acknowledged (and by whom) and closed (by whom, or which device). `rp_app` has no DELETE on
+  it.
+- `@rp/domain`: `SERVICE_REQUEST_ALERTS` (Water, Waiter and Bill to their Appendix C alerts),
+  `resolveEvents` (Resolve acknowledges first when nobody has) and `OPEN_SERVICE_REQUEST_STATES`.
+  `resolveRecipients` takes `askedById`: whoever asked is neither alerted nor counted missing, and
+  an escalation still reaches every manager on duty.
+- Contracts: `ServiceRequestView` (the session's table now, who is on the way),
+  `ServiceRequestListResponse`, `TableServiceRequestsResponse`, `RaiseServiceRequest`; the event
+  `ServiceRequestEscalated`; `ServiceRequestAcknowledged.acknowledgedBy` nullable;
+  `BillRequested.requestedBy`. Routes: `listServiceRequests`, `acknowledgeServiceRequest` and
+  `resolveServiceRequest` (ORDER_CREATE), and the tablet's `listTableServiceRequests`,
+  `raiseServiceRequest` and `cancelTableServiceRequest` (its own table only, AUTH-009). Setting
+  `tablet.serviceRequestsPerMinute` (10, SEC-009).
+- Server `src/service-requests/`: `ServiceRequestsService` raises under a lock on the table row
+  (409 `TABLE_NOT_OPEN`; 409 `SERVICE_REQUEST_ACTIVE` with the open request's id; 429
+  `RATE_LIMITED`), raises its alert in the same transaction (dedupe key `service:<id>`), and for a
+  bill moves the table to Bill requested and emits `BillRequested`. Acknowledge and resolve are
+  idempotent: the first acknowledgement stands and a closed request stays closed. Cancel on the
+  tablet follows `cancelButtonEvent`. Closing a request clears its alert. The durable consumer
+  `ServiceRequestAlerts` acknowledges a request when its alert is acknowledged anywhere (pager,
+  phone, POS), records the escalation, and ends a closed table's requests (cancelled when nobody
+  came, resolved when someone did). Request events go to the table's room, so the tablet hears
+  them; the table overview's `activeServiceRequests` counts the open ones.
+- A bill asked for on a phone or at the POS carries `requestedBy`, and the P2-03 trigger alerts the
+  cashier and the responsible waiter except the asker; a bill from the tablet (or the QR page) is
+  a service request, whose single alert the module raises.
+- Waiter app: `ServiceRequests` on the tables screen (the requests from the tables shown, mine or
+  all) and on a table's screen (its own), shown while one is open, oldest first: the table and what
+  was asked, as the alert says it, the age, who is on the way or that the managers were alerted;
+  Acknowledge until someone has, and Resolve, each in one tap.
+- Tests: `service-requests.int.test.ts` (raise and a duplicate refused; repeat every R, escalate
+  after N, acknowledge; an alert acknowledged on a pager; cancel clears the alert; resolve from the
+  inbox; the bill from the tablet and from a phone; a table closed; a tablet's own table; the rate
+  limit), domain tests for the asker and the helpers, and `requests.test.tsx` in the waiter app.
+  The Maestro flow comes with P3-02, when the tablet has its buttons.
 
 ## P2-07 Phase 2 exit test: latency and escalation on the lab rig
 

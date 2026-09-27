@@ -126,7 +126,8 @@ describe('[WTR-006] [AUTH-005] a waiter phone alerts its holder, signed in or no
       type: 'BILL_REQUEST',
       tableLabel: '5',
       pagerText: 'T5 BILL',
-      raisedByName: null,
+      // The manager asked for it at the POS (P2-06d names who asked).
+      raisedByName: 'Test manager',
       status: 'OPEN',
     });
     // Neither pager nor app was connected, so the managers had it at once (NTF-007).

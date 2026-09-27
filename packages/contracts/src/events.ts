@@ -117,9 +117,18 @@ export const ServiceRequestRaised = event(
   'ServiceRequestRaised',
   z.object({ serviceRequestId: Id, tableId: Id, type: ServiceRequestType }),
 );
+/**
+ * Nobody acknowledged its alert within N seconds: it went to the managers on duty (NTF-005). The
+ * request stays active for the tablet, which still shows "Requested, waiter notified".
+ */
+export const ServiceRequestEscalated = event(
+  'ServiceRequestEscalated',
+  z.object({ serviceRequestId: Id }),
+);
+/** On the way: acknowledged in the app, or its alert on a pager, a phone or the POS (NTF-004). */
 export const ServiceRequestAcknowledged = event(
   'ServiceRequestAcknowledged',
-  z.object({ serviceRequestId: Id, acknowledgedBy: Id }),
+  z.object({ serviceRequestId: Id, acknowledgedBy: Id.nullable() }),
 );
 export const ServiceRequestCancelled = event(
   'ServiceRequestCancelled',
@@ -131,6 +140,8 @@ export const BillRequested = event(
   z.object({
     tableSessionId: Id,
     requestedFrom: z.enum(['TABLE_TABLET', 'WAITER_APP', 'QR', 'POS']),
+    /** The staff member who asked, on their phone or the POS: they are not alerted (P2-06d). */
+    requestedBy: Id.optional(),
   }),
 );
 export const BillPrinted = event(
@@ -252,6 +263,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   KotPrintStatusChanged,
   ItemStatusChanged,
   ServiceRequestRaised,
+  ServiceRequestEscalated,
   ServiceRequestAcknowledged,
   ServiceRequestCancelled,
   BillRequested,

@@ -61,6 +61,8 @@ export interface RaiseAlert {
   readonly stationIds?: readonly string[];
   readonly raisedById?: string | null;
   readonly raisedByDeviceId?: string | null;
+  /** Whose own request it is, e.g. the waiter who asked for the bill: they are not alerted. */
+  readonly askedById?: string | null;
 }
 
 const MANAGER_ROLES = new Set(['OWNER', 'MANAGER']);
@@ -205,6 +207,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
         tableSessionId: input.tableSessionId ?? null,
         ...(input.selectedIds !== undefined && { selectedIds: input.selectedIds }),
         ...(input.wearerId !== undefined && { wearerId: input.wearerId }),
+        ...(input.askedById !== undefined && { askedById: input.askedById }),
       },
       now,
       (staffId) => this.presence.reachable(restaurantId, staffId),
@@ -437,30 +440,56 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     allowed: (row: Alert) => boolean,
   ): Promise<AlertView> {
     return this.prisma.transaction(async (tx) => {
-      const [alert] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM alerts WHERE id = ${alertId}::uuid AND restaurant_id = ${restaurantId}::uuid
-        FOR UPDATE`;
-      const row =
-        alert === undefined ? null : await tx.alert.findUnique({ where: { id: alert.id } });
+      const row = await this.lockAlert(tx, restaurantId, alertId);
       if (row === null || !allowed(row)) throw alertNotFound();
-      if (row.status !== 'OPEN') return this.viewOf(tx, row);
-      const now = this.clock.now();
-      const acknowledged = await tx.alert.update({
-        where: { id: row.id },
-        data: {
-          status: 'ACKNOWLEDGED',
-          acknowledgedAt: now,
-          acknowledgedById: staffId,
-          escalateAt: null,
-          nextRepeatAt: null,
-        },
-      });
-      await this.emit(tx, acknowledged, now, {
-        type: 'AlertAcknowledged',
-        payload: { alertId: row.id, acknowledgedBy: staffId, recipients: row.recipientIds },
-      });
-      return this.viewOf(tx, acknowledged);
+      return this.viewOf(tx, await this.acknowledgeRow(tx, row, staffId));
     });
+  }
+
+  /**
+   * Acknowledges an alert inside the caller's transaction, e.g. when the waiter acknowledges the
+   * service request that raised it (P2-06d); an alert no longer open is left as it is.
+   */
+  async acknowledgeInTx(
+    tx: TransactionClient,
+    restaurantId: string,
+    alertId: string,
+    staffId: string,
+  ): Promise<void> {
+    const row = await this.lockAlert(tx, restaurantId, alertId);
+    if (row !== null) await this.acknowledgeRow(tx, row, staffId);
+  }
+
+  private async lockAlert(
+    tx: TransactionClient,
+    restaurantId: string,
+    alertId: string,
+  ): Promise<Alert | null> {
+    const [alert] = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM alerts WHERE id = ${alertId}::uuid AND restaurant_id = ${restaurantId}::uuid
+      FOR UPDATE`;
+    return alert === undefined ? null : tx.alert.findUnique({ where: { id: alert.id } });
+  }
+
+  /** NTF-004: stops the repeats and the escalation; every device of every recipient hears it. */
+  private async acknowledgeRow(tx: TransactionClient, row: Alert, staffId: string): Promise<Alert> {
+    if (row.status !== 'OPEN') return row;
+    const now = this.clock.now();
+    const acknowledged = await tx.alert.update({
+      where: { id: row.id },
+      data: {
+        status: 'ACKNOWLEDGED',
+        acknowledgedAt: now,
+        acknowledgedById: staffId,
+        escalateAt: null,
+        nextRepeatAt: null,
+      },
+    });
+    await this.emit(tx, acknowledged, now, {
+      type: 'AlertAcknowledged',
+      payload: { alertId: row.id, acknowledgedBy: staffId, recipients: row.recipientIds },
+    });
+    return acknowledged;
   }
 
   private async viewOf(tx: TransactionClient, alert: Alert): Promise<AlertView> {

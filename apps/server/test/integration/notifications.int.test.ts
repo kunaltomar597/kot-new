@@ -88,10 +88,11 @@ async function openTable(label: string): Promise<TableSessionView> {
   return TableSessionView.parse(response.body);
 }
 
+/** The manager asks at the POS, so the waiter and the cashier are both alerted (BILL-015). */
 async function requestBill(session: TableSessionView) {
   const response = await server()
     .post(`/api/v1/table-sessions/${session.id}/request-bill`)
-    .set(as(waiter));
+    .set(as(manager));
   expect(response.status, JSON.stringify(response.body)).toBe(200);
   return until(
     () =>

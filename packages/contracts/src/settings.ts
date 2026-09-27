@@ -519,6 +519,17 @@ export const SETTINGS = [
     requirements: ['TAB-003'],
   }),
   setting({
+    key: 'tablet.serviceRequestsPerMinute',
+    schema: int(3, 60),
+    defaultValue: 10,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Water, Waiter and Bill requests one table tablet may raise in a minute; more are refused ' +
+      'until the minute has passed (anti-spam, our default).',
+    requirements: ['SEC-009', 'TAB-004'],
+  }),
+  setting({
     key: 'pager.vibrationPatterns',
     schema: z.strictObject({
       READY: z.enum(PAGER_PATTERNS),

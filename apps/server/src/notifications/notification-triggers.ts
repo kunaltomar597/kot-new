@@ -66,17 +66,23 @@ export class NotificationTriggers implements OnModuleInit {
         });
         return;
       case 'BillRequested': {
+        // A diner's Bill is a service request, which raised its own alert (P2-06d).
+        const { requestedFrom, requestedBy } = event.payload;
+        if (requestedFrom === 'TABLE_TABLET' || requestedFrom === 'QR') return;
         const session = await tx.tableSession.findUnique({
           where: { id: event.payload.tableSessionId },
           select: { tableId: true },
         });
+        // Whoever asked, on their phone or at the POS, knows already: the others are told.
         await this.notifications.raise(tx, {
           restaurantId,
           type: 'BILL_REQUEST',
           tableId: session?.tableId ?? null,
           tableSessionId: event.payload.tableSessionId,
           dedupeKey: `bill:${event.payload.tableSessionId}`,
-          payload: { requestedFrom: event.payload.requestedFrom },
+          payload: { requestedFrom },
+          raisedById: requestedBy ?? null,
+          askedById: requestedBy ?? null,
         });
         return;
       }

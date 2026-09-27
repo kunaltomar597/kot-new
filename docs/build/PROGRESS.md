@@ -15,8 +15,9 @@ What exists:
   state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment,
   bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export, menu
   import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a), including the
-  low-battery check (P2-02a), what reaches a pager and the waiter app (P2-06a), and what asks for
-  a person at the POS or dashboard (P2-06c). 178 tests.
+  low-battery check (P2-02a), what reaches a pager and the waiter app (P2-06a), what asks for
+  a person at the POS or dashboard (P2-06c), and service requests' alerts, Resolve and the asker
+  who is not alerted (P2-06d). 181 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -29,10 +30,11 @@ What exists:
   the signed-in person's own pager (P2-02a); each KOT's station and print status on orders and
   `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c);
   the pairing QR code with the server's addresses and CA fingerprint (P2-01d); a waiter phone's
-  own alerts (P2-06a). 486 tests.
+  own alerts (P2-06a); service requests, their routes and `ServiceRequestEscalated` (P2-06d).
+  494 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
-  harness; core data model (61 tables after the later migrations), least-privilege roles,
+  harness; core data model (62 tables after the later migrations), least-privilege roles,
   audit/invoice protection triggers,
   gap-free numbering and a development seed (P0-08); audit hash chain (P0-09); authentication,
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
@@ -59,8 +61,10 @@ What exists:
   (P2-02b); a combo line that follows its parts, voided combos that cancel their unstarted parts,
   and dishes ready per table (P2-02c); the server's LAN addresses with every pairing code
   (P2-01d); a waiter phone that alerts the person who last signed in on it, also after an
-  inactivity sign-out, with its own alert routes and room (P2-06a). 665 tests (4 skipped
-  without a real install).
+  inactivity sign-out, with its own alert routes and room (P2-06a); service requests from the
+  table tablet with anti-spam and a rate limit, their alerts kept in step, the waiter's inbox,
+  requests ended when the table closes, and a bill asker who is not alerted (P2-06d).
+  679 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -97,7 +101,9 @@ What exists:
   alerts over every screen, acknowledged in one tap, also after an inactivity sign-out (P2-06a),
   and rings for them with the screen off or the app closed, with notifications acknowledged from
   the lock screen; it asks for notifications at sign-in and says when they are off; the table
-  tablet blocks those permissions (P2-06b). Waiter app 44 tests.
+  tablet blocks those permissions (P2-06b). The tables screen lists the open requests from the
+  tables shown, and each table's screen its own, with Acknowledge and Resolve (P2-06d). Waiter
+  app 52 tests.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
@@ -127,7 +133,10 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-06d Service requests and the waiter's inbox (P2-06a done).
+- P3-04 Recommendation engine v1 (P1-06 done).
+- P4-01 Dashboard shell and live views (P0-14, P1-02 and P1-06 done).
+- P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
+  be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -208,7 +217,7 @@ Recommended next WPs (dependencies met):
 - [x] P2-06a Alerts in the waiter app
 - [x] P2-06b Background alerts on Android
 - [x] P2-06c POS alert centre and manager nudge
-- [ ] P2-06d Service requests and the waiter's inbox
+- [x] P2-06d Service requests and the waiter's inbox
 - [ ] P2-07 Phase 2 exit test on the lab rig [H]
 
 ### Phase 3: Table tablet and recommendations v1
@@ -510,6 +519,34 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-27 (P2-06d):
+
+172. Whoever asked for a bill on their phone or at the POS is not alerted for it and is not counted
+     as a missing waiter (`askedById` in `resolveRecipients`); the cashier and the responsible
+     waiter, if someone else, still are. A manager who asked while nobody looks after the table
+     still gets the escalation with the other managers.
+173. A bill from the table tablet (and later the QR page) is a service request with one
+     BILL_REQUEST alert, raised by the service-requests module with the request; the P2-03 trigger
+     raises it only for bills asked for on a phone or at the POS, so a table never gets two.
+174. Resolve in the waiter's inbox acknowledges first when nobody has, then resolves, as Cancel on
+     the tablet does when the waiter arrives, so the request records who dealt with it. Acknowledge
+     and resolve are idempotent: the first acknowledgement stands and a closed request stays as it
+     is (200 with its view), so two waiters pressing at once see the same result.
+175. A request is acknowledged wherever its alert is (a pager's button, a phone, the POS alert
+     centre), and closing a request clears its alert. The escalation is recorded on the request
+     with a new event, `ServiceRequestEscalated`, so the inbox (and later the tablet) can say the
+     managers were called. `ServiceRequestAcknowledged.acknowledgedBy` is nullable, for an alert
+     acknowledged with nobody recorded.
+176. Closing a table (paid, or closed without a bill) ends its open requests as Cancel on the
+     tablet would: cancelled when nobody came, resolved when someone did, so nothing stays on for
+     the next guests (TBL-007). A request needs an open table (409 `TABLE_NOT_OPEN`).
+177. A tablet may raise at most `tablet.serviceRequestsPerMinute` requests a minute (default 10,
+     SEC-009), counted per device in memory; more get 429 with words a diner understands. The same
+     type cannot be raised again while one is open (409 `SERVICE_REQUEST_ACTIVE`, with its id).
+178. The inbox shows on the tables screen for the tables shown (mine or all) and on each table's
+     screen for that table, only while a request is open, oldest first. Any waiter may act on any
+     table's request (ORDER_CREATE), as with other table work.
 
 Decided 2026-09-27 (P2-06c):
 
@@ -946,6 +983,36 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-06d Service requests and the waiter's inbox (P2-06 done)
+
+Merged #60 (P2-06c) once green.
+
+Built: the `service_requests` table and migration; `@rp/domain` `SERVICE_REQUEST_ALERTS`,
+`resolveEvents`, `OPEN_SERVICE_REQUEST_STATES` and `askedById` in `resolveRecipients`; contracts
+for the request views, the inbox and tablet routes, `ServiceRequestEscalated` and
+`BillRequested.requestedBy`; the setting `tablet.serviceRequestsPerMinute`; the server's
+`service-requests` module (`ServiceRequestsService`, the `ServiceRequestAlerts` consumer and two
+controllers); `NotificationsService.acknowledgeInTx` for acknowledging an alert inside another
+transaction; the bill trigger's asker rule; open requests counted on the table overview; the
+waiter app's `ServiceRequests` card on the tables and table screens.
+
+Tests: domain 181 (was 178), contracts 494 (was 486), server 679 (was 665),
+waiter app 52 (was 44).
+
+Gotchas:
+
+- Existing tests that asked for the bill as the waiter and expected that waiter's alert now ask as
+  the manager: the asker is not alerted any more.
+- `raisedById` of a bill alert is now the asker, so the phone's alert says "From Test manager".
+- In a server integration test, sign people in before a request, not inside `.set(...)` of another
+  request on the same server: two requests at once there end in ECONNREFUSED.
+- The waiter app's fake server keeps requests like the server (`Restaurant.ask`, `update`), with
+  T2's water open from the start; a test that counts T2's requests sees one.
+
+Deferred: the tablet's buttons and the Maestro flow (P3-02); QR requests (P5).
+
+Decisions: 172 to 178.
 
 ### 2026-09-27: P2-06c POS alert centre and manager nudge
 

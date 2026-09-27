@@ -20,6 +20,7 @@ export * from './payments.js';
 export * from './photos.js';
 export * from './reports.js';
 export * from './routes.js';
+export * from './service-requests.js';
 export * from './settings.js';
 export * from './table-sessions.js';
 export * from './system.js';

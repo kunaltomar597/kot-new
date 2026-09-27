@@ -94,6 +94,7 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   KotPrintStatusChanged: 'ORDER_CREATE',
   ItemStatusChanged: 'ORDER_CREATE',
   ServiceRequestRaised: 'ORDER_CREATE',
+  ServiceRequestEscalated: 'ORDER_CREATE',
   ServiceRequestAcknowledged: 'ORDER_CREATE',
   ServiceRequestCancelled: 'ORDER_CREATE',
   BillRequested: 'BILL_REQUEST',

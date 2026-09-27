@@ -81,6 +81,11 @@ channels:
     messages:
       ServiceRequestRaised:
         $ref: '#/components/messages/ServiceRequestRaised'
+  ServiceRequestEscalated:
+    address: ServiceRequestEscalated
+    messages:
+      ServiceRequestEscalated:
+        $ref: '#/components/messages/ServiceRequestEscalated'
   ServiceRequestAcknowledged:
     address: ServiceRequestAcknowledged
     messages:
@@ -269,6 +274,12 @@ operations:
       $ref: '#/channels/ServiceRequestRaised'
     messages:
       - $ref: '#/channels/ServiceRequestRaised/messages/ServiceRequestRaised'
+  receiveServiceRequestEscalated:
+    action: receive
+    channel:
+      $ref: '#/channels/ServiceRequestEscalated'
+    messages:
+      - $ref: '#/channels/ServiceRequestEscalated/messages/ServiceRequestEscalated'
   receiveServiceRequestAcknowledged:
     action: receive
     channel:
@@ -463,6 +474,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/ServiceRequestRaised'
+    ServiceRequestEscalated:
+      name: ServiceRequestEscalated
+      title: ServiceRequestEscalated v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/ServiceRequestEscalated'
     ServiceRequestAcknowledged:
       name: ServiceRequestAcknowledged
       title: ServiceRequestAcknowledged v1
@@ -851,6 +868,8 @@ components:
                 - WAITER_APP
                 - QR
                 - POS
+            requestedBy:
+              $ref: '#/components/schemas/Id'
           required:
             - tableSessionId
             - requestedFrom
@@ -1700,7 +1719,9 @@ components:
             serviceRequestId:
               $ref: '#/components/schemas/Id'
             acknowledgedBy:
-              $ref: '#/components/schemas/Id'
+              anyOf:
+                - $ref: '#/components/schemas/Id'
+                - type: 'null'
           required:
             - serviceRequestId
             - acknowledgedBy
@@ -1749,6 +1770,45 @@ components:
           required:
             - serviceRequestId
             - resolution
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    ServiceRequestEscalated:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: ServiceRequestEscalated
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            serviceRequestId:
+              $ref: '#/components/schemas/Id'
+          required:
+            - serviceRequestId
           additionalProperties: false
       required:
         - eventId

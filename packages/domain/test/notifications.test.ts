@@ -92,6 +92,25 @@ describe('[NTF-005] [NTF-007] [NTF-009] recipients', () => {
     ]);
   });
 
+  it('[BILL-015] does not alert the waiter who asked for the bill; the cashier still hears', () => {
+    const bill = DEFAULT_NOTIFICATION_RULES.BILL_REQUEST;
+    // Ravi asked on his phone: not alerted, and not "missing", even with his pager off.
+    expect(
+      resolveRecipients(bill, context({ askedById: 'ravi', reachable: (id) => id !== 'ravi' })),
+    ).toEqual({ staffIds: ['neha'], stations: false, escalateNow: false });
+    // Neha asked at the POS: Ravi is told, Neha is not.
+    expect(resolveRecipients(bill, context({ askedById: 'neha' })).staffIds).toEqual(['ravi']);
+    // Someone else's request changes nothing.
+    expect(resolveRecipients(bill, context({ askedById: null })).staffIds).toEqual([
+      'ravi',
+      'neha',
+    ]);
+    // A manager who asked while nobody looks after the table is still called with the others.
+    expect(
+      resolveRecipients(bill, context({ askedById: 'vikram', responsibleWaiterId: null })),
+    ).toEqual({ staffIds: ['neha', 'vikram'], stations: false, escalateNow: true });
+  });
+
   it('lets a manager send an event to all waiters or a cashier instead (NTF-002)', () => {
     const rule = effectiveRule('WATER_REQUEST', {
       WATER_REQUEST: { recipients: ['ALL_WAITERS', 'CASHIER'], escalate: false },

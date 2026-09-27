@@ -14,9 +14,13 @@ import {
   isTerminal,
   licenseCapabilities,
   licenseMachine,
+  OPEN_SERVICE_REQUEST_STATES,
   orderItemMachine,
+  resolveEvents,
   restrictionEffectiveAt,
+  SERVICE_REQUEST_ALERTS,
   serviceRequestMachine,
+  type ServiceRequestState,
   tableMachine,
   transition,
 } from '../src/index.js';
@@ -149,6 +153,31 @@ describe('[TAB-004] service request state machine', () => {
     expect(canRaiseServiceRequest('WATER', [{ type: 'WATER', state: 'ACTIVE' }])).toBe(false);
     expect(canRaiseServiceRequest('WATER', [{ type: 'WATER', state: 'RESOLVED' }])).toBe(true);
     expect(canRaiseServiceRequest('BILL', [{ type: 'WATER', state: 'ACTIVE' }])).toBe(true);
+    expect(OPEN_SERVICE_REQUEST_STATES).toEqual(['ACTIVE', 'ESCALATED', 'ACKNOWLEDGED']);
+  });
+
+  it('[WTR-005] resolves from the app, acknowledging first when nobody has yet', () => {
+    expect(resolveEvents('ACTIVE')).toEqual(['ACKNOWLEDGE', 'RESOLVE']);
+    expect(resolveEvents('ESCALATED')).toEqual(['ACKNOWLEDGE', 'RESOLVE']);
+    expect(resolveEvents('ACKNOWLEDGED')).toEqual(['RESOLVE']);
+    expect(resolveEvents('CANCELLED')).toEqual([]);
+    expect(resolveEvents('RESOLVED')).toEqual([]);
+    // Every sequence it gives is one the machine allows.
+    for (const from of ['ACTIVE', 'ESCALATED', 'ACKNOWLEDGED'] as const) {
+      const to = resolveEvents(from).reduce<ServiceRequestState>(
+        (state, event) => transition(serviceRequestMachine, state, event).to,
+        from,
+      );
+      expect(to).toBe('RESOLVED');
+    }
+  });
+
+  it('[NTF-003] [BILL-015] raises the water, waiter and bill alerts', () => {
+    expect(SERVICE_REQUEST_ALERTS).toEqual({
+      WATER: 'WATER_REQUEST',
+      WAITER: 'WAITER_REQUEST',
+      BILL: 'BILL_REQUEST',
+    });
   });
 });
 
