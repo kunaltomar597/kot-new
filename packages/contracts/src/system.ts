@@ -25,6 +25,9 @@ export const VersionResponse = z.object({
 });
 export type VersionResponse = z.infer<typeof VersionResponse>;
 
+/** A certificate's SHA-256 fingerprint: 32 bytes in upper-case hex, `AB:CD:…:EF`. */
+export const CaFingerprint = z.string().regex(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
+
 /**
  * The installation's LAN certificate authority (ADR-0011, SEC-001): apps pin it, browsers install
  * it once. Compare `sha256` with the fingerprint shown on the POS before trusting it.
@@ -33,7 +36,7 @@ export const TlsCaResponse = z.object({
   /** PEM, to save as a `.crt` file. */
   certificate: z.string().startsWith('-----BEGIN CERTIFICATE-----'),
   /** SHA-256 fingerprint, `AB:CD:…` (32 bytes). */
-  sha256: z.string().regex(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/),
+  sha256: CaFingerprint,
   /** When the CA expires (10 years after the installation created it). */
   expiresAt: Timestamp,
 });

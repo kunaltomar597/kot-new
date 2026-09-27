@@ -11,6 +11,7 @@ import {
   type PairDeviceRequest,
   type PairedDevice,
   type PairingCodeResponse,
+  type PairingQrPayload,
   pairingProofMessage,
 } from '@rp/contracts';
 import { businessDateOf } from '@rp/domain';
@@ -436,13 +437,22 @@ export class DevicesService {
       },
       ...(createdById === null && { reason: 'Bootstrap code for the POS on the server PC' }),
     });
-    // The app pins the CA from the QR code before it connects (ADR-0011).
+    // The app pins the CA from the QR code before it connects (ADR-0011), and finds the server
+    // at one of its addresses, so nothing needs typing.
     const caSha256 = this.tls.caFingerprint();
+    const serverUrls = this.tls.lanUrls();
+    const qr: PairingQrPayload = {
+      v: 1,
+      code,
+      ...(caSha256 !== null && { ca: caSha256 }),
+      ...(serverUrls.length > 0 && { urls: serverUrls }),
+    };
     return {
       code,
       expiresAt: expiresAt.toISOString(),
       caSha256,
-      qrPayload: JSON.stringify({ v: 1, code, ...(caSha256 !== null && { ca: caSha256 }) }),
+      serverUrls,
+      qrPayload: JSON.stringify(qr),
     };
   }
 

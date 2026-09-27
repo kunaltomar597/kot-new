@@ -2,7 +2,7 @@
   "name": "@rp/mobile-shell",
   "version": "0.1.0",
   "private": true,
-  "description": "Screens and hooks shared by the waiter app and table tablet: pairing, staff login, the connection banner, live data, the menu and unsent orders kept on the device, and a manager's approval on the device (P2-01c, P2-02b, P2-02c).",
+  "description": "Screens and hooks shared by the waiter app and table tablet: pairing (with the QR code scanner), staff login, the connection banner, live data, the menu and unsent orders kept on the device, and a manager's approval on the device (P2-01c, P2-02b, P2-02c).",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -31,11 +31,13 @@
     "@rp/ui-native": "workspace:*"
   },
   "peerDependencies": {
+    "expo-camera": "^57.0.0",
     "react": "^19.2.0",
     "react-native": ">=0.81"
   },
   "devDependencies": {
     "@babel/core": "^8.0.6",
+    "@babel/plugin-transform-dynamic-import": "7.29.7",
     "@react-native/babel-preset": "0.86.3",
     "@react-native/jest-preset": "0.86.3",
     "@rp/ordering": "workspace:*",
@@ -43,6 +45,8 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.0",
     "babel-jest": "^30.5.2",
+    "expo": "57.0.25",
+    "expo-camera": "~57.0.5",
     "jest": "^30.5.2",
     "react": "19.2.3",
     "react-native": "0.86.3",

@@ -26,8 +26,8 @@ What exists:
   shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down
   (P1-13); alerts (P2-03a); nudges and breaks (P2-03b); pagers and their MQTT channels (P2-04a);
   the signed-in person's own pager (P2-02a); each KOT's station and print status on orders and
-  `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c).
-  480 tests.
+  `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c);
+  the pairing QR code with the server's addresses and CA fingerprint (P2-01d). 485 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (61 tables after the later migrations), least-privilege roles,
@@ -55,15 +55,17 @@ What exists:
   heartbeats (P2-04a); the waiter's own pager and low-battery levels per device type (P2-02a);
   KOT print status announced to the floor, and the phones' order outbox tested against the server
   (P2-02b); a combo line that follows its parts, voided combos that cancel their unstarted parts,
-  and dishes ready per table (P2-02c). 653 tests (4 skipped without a real install).
+  and dishes ready per table (P2-02c); the server's LAN addresses with every pairing code
+  (P2-01d). 654 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
   account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
-  order outbox, with the device session owning the menu cache and the outbox (P2-02b).
-  36 tests.
+  order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
+  the server from the pairing QR code and pinning its CA before the code is sent (P2-01d).
+  47 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
@@ -72,14 +74,18 @@ What exists:
   stores) and `packages/mobile-shell` (pairing and login screens, connection banner, live data)
   (P2-01c), with `useNow` for clocks on screen (P2-02a); `useMenu`, `useUnsentOrders`, and the
   `crypto.getRandomValues` that Hermes lacks, from `expo-crypto` (P2-02b); `useOverride`, a
-  manager's approval with their PIN on the phone (P2-02c). Shell 16 tests.
+  manager's approval with their PIN on the phone (P2-02c); the LAN CA pinned in every React
+  Native HTTP and WebSocket client (an Expo module installed at app start), the QR code scanner
+  and the fingerprint check for a typed address (P2-01d). Shell 27 tests, mobile-native 22.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
   and the waiter's own pager (P2-02a); each table has its screen with the menu, the new items,
   Send KOT through the offline outbox, each KOT's delivery and "Again" (P2-02b); each sent dish
   can be marked picked up or served (all ready dishes in one tap), cancelled before the kitchen
-  starts it, or voided after with a manager's PIN on the phone (P2-02c). Waiter app 38 tests.
+  starts it, or voided after with a manager's PIN on the phone (P2-02c). Both apps pair by
+  scanning the manager's QR code and then trust only the restaurant's CA over TLS, so preview
+  and production builds can pair with a real server (P2-01d). Waiter app 38 tests.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
@@ -106,7 +112,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-01d LAN TLS pinning and QR pairing on Android (P2-01c done).
 - P2-06 Waiter alerts, service-request inbox, nudge, Notify manager (P2-02a done).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -176,7 +181,7 @@ Recommended next WPs (dependencies met):
 - [x] P2-01a Mobile core (credentials, outbox, menu cache)
 - [x] P2-01b React Native component library
 - [x] P2-01c Expo apps, builds and smoke flows
-- [ ] P2-01d LAN TLS pinning and QR pairing on Android
+- [x] P2-01d LAN TLS pinning and QR pairing on Android
 - [x] P2-02a Waiter tables and pager status
 - [x] P2-02b Waiter app: order taking
 - [x] P2-02c Waiter app: serving, cancellations and voids
@@ -488,6 +493,32 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-09-27 (P2-01d):
+
+140. The pairing QR payload carries the server's addresses as `urls` (optional; `v` stays 1): its
+     non-loopback IPv4 addresses, then `RP_TLS_HOSTNAMES`, with the scheme and the port it listens
+     on, at most 8. The pairing code response gives them as `serverUrls`. A scanned code needs
+     nothing typed, which settles the open point in decision 115.
+141. A phone tries every address at once and pairs with the first that answers. Over TLS the CA it
+     downloads must match the QR code's fingerprint, else that address is refused, so a device on
+     another address cannot stand in for the server. When the QR code names a CA, plain-HTTP
+     addresses are not tried.
+142. A typed address over TLS pairs only after a person compares the server's certificate
+     fingerprint, shown in four lines of eight pairs, with the server PC's and taps "They match,
+     pair": the phone never pins a CA nobody checked. A QR code without addresses fills in the code,
+     and its fingerprint still checks the typed address.
+143. The pin applies to the paired server's host; other hosts keep the phone's trust store, which
+     development tools such as Metro need. A stored pin that cannot be read trusts nothing for that
+     host instead of falling back to the phone's store. Unpairing forgets the pin.
+144. The CA is downloaded before pairing with a client that checks no certificate, follows no
+     redirect and carries no credential, because the phone trusts nothing yet. The fingerprint is
+     computed on the phone from the certificate itself, never taken from the server's answer.
+145. The camera is asked for only when a person taps Scan, and the scanner with `expo-camera` is
+     loaded then; the microphone permission stays blocked. A tablet can switch to its front camera.
+146. If the server ever gets a new CA (its TLS folder or secret store lost), phones no longer
+     connect and are paired again after clearing the app's storage (runbook). No in-app control is
+     added for so rare a case; clearing storage also drops the old device key and credentials.
+
 Decided 2026-09-27 (P2-02c):
 
 133. A combo line follows its parts on the server: it is in preparation once the kitchen starts any
@@ -781,6 +812,8 @@ Security-sensitive PRs for the P8-03 human review:
   correlation ids, and the offline order outbox.
 - #56 P2-02c: a manager's PIN entered on a waiter's phone for voids (the override flow on the
   phones), and own-table cancel checks.
+- #57 P2-01d: the phones' trust manager pinning the LAN CA, the untrusted CA download before
+  pairing, the server addresses in the pairing QR code, and the camera permission.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -788,6 +821,42 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-01d LAN TLS pinning and QR pairing on Android
+
+Merged #56 (P2-02c) once green.
+
+Built: the server sends its LAN addresses with every pairing code and in the QR payload (`urls`);
+`parsePairingQr` in `@rp/contracts`. In `@rp/mobile-native`, `LanTrust.kt` pins the restaurant's CA
+for every React Native HTTP path (Expo `fetch` and images through `OkHttpClientProvider`'s factory,
+XHR and WebSocket through the custom client builders), installed at app start by
+`RpLanTrustPackage`; `RpLanTrustModule` downloads, pins and forgets the CA; `AndroidServerTrust`
+is its JavaScript side. In `@rp/mobile-core`, `findServer` tries the addresses at once and checks
+the CA against the QR code's fingerprint, and `DeviceSession.pair` pins before the code is sent.
+In `@rp/mobile-shell`, `PairingScreen` scans the QR code (`QrScanner`, loaded on demand) and shows
+the fingerprint of a typed address to compare. Both apps pass the trust module and ask for the
+camera without the microphone.
+
+Tests: contracts 485 (was 480), server 654 (was 653: the LAN addresses; the pairing and TLS
+integration tests check `serverUrls` and the QR payload), mobile-core 47 (was 36), mobile-native
+22 (was 20), mobile-shell 27 (was 16).
+
+Gotchas:
+
+- Expo's `fetch` builds its OkHttp client once, lazily, from `OkHttpClientProvider.createClient`
+  and casts its cookie jar to `CookieJarContainer`: the factory must start from
+  `createClientBuilder(context)`, which keeps React Native's cookie jar.
+- One trust manager serves every client and reads the pin on each handshake, so pinning takes
+  effect without rebuilding any client; the host comes from the handshake session's `peerHost`.
+- The Kotlin is only compiled by the Android CI job (the container cannot reach Google's Maven);
+  check the Debug APK jobs on every change to `packages/mobile-native/android`.
+- `@react-native/babel-preset` leaves `import()` alone for Metro, so Jest could not run the
+  lazily loaded scanner: `@rp/mobile-shell`'s Babel config adds
+  `@babel/plugin-transform-dynamic-import` (tests only). The apps' tests never load the camera.
+- An emulator cannot scan, so the Maestro flows keep typing a development `http://` address;
+  pairing a real phone over TLS (scan, and typed with the fingerprint) is a manual check.
+
+Decisions: 140 to 146.
 
 ### 2026-09-27: P2-02c Waiter app: serving, cancellations and voids (P2-02 done)
 

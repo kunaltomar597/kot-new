@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "maxLength": 200, "format": "uri" },
+  "output": { "type": "string", "maxLength": 200, "format": "uri" }
+}

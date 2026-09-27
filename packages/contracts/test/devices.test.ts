@@ -6,7 +6,9 @@ import {
   deviceTokenMessage,
   PairDeviceRequest,
   PairingCode,
+  PairingCodeResponse,
   pairingProofMessage,
+  parsePairingQr,
 } from '../src/index.js';
 
 const id = '0199a000-0000-7000-8000-000000000001';
@@ -50,6 +52,54 @@ describe('[AUTH-007] device pairing contracts', () => {
     expect(PairDeviceRequest.safeParse({ ...request, extra: 1 }).success).toBe(false);
     expect(
       DeviceTokenRequest.safeParse({ deviceId: id, challenge: 'short', signature: 'c2ln' }).success,
+    ).toBe(false);
+  });
+
+  it('[AUTH-007] [SEC-010] reads the pairing QR code: code, CA fingerprint and server addresses', () => {
+    const ca = Array.from({ length: 32 }, (_, index) =>
+      (index + 16).toString(16).toUpperCase(),
+    ).join(':');
+    const scanned = parsePairingQr(
+      JSON.stringify({
+        v: 1,
+        code: 'K7Q2-M9XD',
+        ca,
+        urls: ['https://192.168.1.20:8443', 'http://10.0.2.2:3000'],
+        later: 'a field a newer server adds',
+      }),
+    );
+    expect(scanned).toEqual({
+      v: 1,
+      code: 'K7Q2-M9XD',
+      ca,
+      urls: ['https://192.168.1.20:8443', 'http://10.0.2.2:3000'],
+    });
+    // Older servers and development servers leave out the addresses and the CA.
+    expect(parsePairingQr('{"v":1,"code":"K7Q2-M9XD"}')).toEqual({ v: 1, code: 'K7Q2-M9XD' });
+    for (const bad of [
+      'not json',
+      'https://example.com',
+      '{"v":2,"code":"K7Q2-M9XD"}',
+      '{"v":1,"code":"k7q2-m9xd"}',
+      '{"v":1,"code":"K7Q2-M9XD","ca":"3a:7f"}',
+      '{"v":1,"code":"K7Q2-M9XD","urls":["ftp://192.168.1.20"]}',
+      'null',
+    ]) {
+      expect(parsePairingQr(bad), bad).toBeUndefined();
+    }
+  });
+
+  it('[AUTH-007] lists where devices reach the server with every pairing code', () => {
+    const response = {
+      code: 'K7Q2-M9XD',
+      expiresAt: '2026-09-27T10:10:00.000Z',
+      caSha256: null,
+      serverUrls: ['http://192.168.1.20:8080'],
+      qrPayload: '{"v":1,"code":"K7Q2-M9XD","urls":["http://192.168.1.20:8080"]}',
+    };
+    expect(PairingCodeResponse.safeParse(response).success).toBe(true);
+    expect(
+      PairingCodeResponse.safeParse({ ...response, caSha256: 'not a fingerprint' }).success,
     ).toBe(false);
   });
 

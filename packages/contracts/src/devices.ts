@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DeviceType, Id, Timestamp } from './common.js';
+import { CaFingerprint } from './system.js';
 
 /** Header carrying the device token on every request of a paired device (AUTH-007). */
 export const DEVICE_TOKEN_HEADER = 'x-device-token';
@@ -45,6 +46,36 @@ export const CreatePairingCodeRequest = z
   });
 export type CreatePairingCodeRequest = z.infer<typeof CreatePairingCodeRequest>;
 
+/** The local server's address on the LAN, e.g. `https://192.168.1.20:8443` (http in development). */
+export const ServerUrl = z.url({ protocol: /^https?$/ }).max(200);
+
+/**
+ * What the pairing QR code holds, as JSON (AUTH-007, ADR-0011):
+ * `{"v":1,"code":"ABCD-EFGH","ca":"3A:7F:…","urls":["https://192.168.1.20:8443"]}`. `ca` is the
+ * fingerprint of the CA the device must pin, absent on a development server without TLS; `urls`
+ * are the addresses the server answers on, so nothing needs typing. Fields a device does not know
+ * are ignored, so the payload can grow without a new version.
+ */
+export const PairingQrPayload = z.object({
+  v: z.literal(1),
+  code: PairingCode,
+  ca: CaFingerprint.optional(),
+  urls: z.array(ServerUrl).max(8).optional(),
+});
+export type PairingQrPayload = z.infer<typeof PairingQrPayload>;
+
+/** The pairing details in a scanned QR code, or undefined when it is not a pairing code. */
+export function parsePairingQr(text: string): PairingQrPayload | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  const parsed = PairingQrPayload.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
 export const PairingCodeResponse = z.object({
   code: PairingCode,
   expiresAt: Timestamp,
@@ -52,8 +83,13 @@ export const PairingCodeResponse = z.object({
    * SHA-256 fingerprint of the installation's LAN CA when the server uses TLS (ADR-0011): the app
    * pins it before connecting. Null on a development server without TLS.
    */
-  caSha256: z.string().nullable(),
-  /** JSON for the QR code the device scans: `{"v":1,"code":"...","ca":"<caSha256>"}`. */
+  caSha256: CaFingerprint.nullable(),
+  /**
+   * Where devices reach the server on the LAN: one address per network address of the server PC
+   * (and any configured host name), for pairing without typing and to show next to the code.
+   */
+  serverUrls: z.array(ServerUrl).max(8),
+  /** JSON for the QR code the device scans (`PairingQrPayload`). */
   qrPayload: z.string(),
 });
 export type PairingCodeResponse = z.infer<typeof PairingCodeResponse>;

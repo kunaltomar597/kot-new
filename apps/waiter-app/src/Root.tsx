@@ -1,6 +1,7 @@
 import { createTranslator } from '@rp/i18n';
 import { DeviceSession } from '@rp/mobile-core';
 import {
+  AndroidServerTrust,
   installRandomValues,
   KeystoreDeviceKeys,
   plainStore,
@@ -13,9 +14,10 @@ import { App } from './App';
 const translator = createTranslator();
 
 /**
- * Wires the device session to the Keystore, the secure store and AsyncStorage (P2-01c). Secure
- * random values first: every request carries a random correlation id, and every order a random
- * idempotency key (ORD-013).
+ * Wires the device session to the Keystore, the secure store and AsyncStorage (P2-01c), and to the
+ * restaurant's LAN certificate pinned at pairing (P2-01d, ADR-0011). Secure random values first:
+ * every request carries a random correlation id, and every order a random idempotency key
+ * (ORD-013).
  */
 async function createSession(): Promise<DeviceSession> {
   await installRandomValues();
@@ -23,6 +25,7 @@ async function createSession(): Promise<DeviceSession> {
     secureStore: await secureStore(),
     plainStore: await plainStore(),
     keys: new KeystoreDeviceKeys(),
+    trust: new AndroidServerTrust(),
     ...(Constants.expoConfig?.version !== undefined && {
       appVersion: Constants.expoConfig.version,
     }),

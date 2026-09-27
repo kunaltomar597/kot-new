@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { httpsOptionsFor } from '../../src/app.factory.js';
 import { APP_CONFIG, type AppConfig } from '../../src/config/app-config.js';
 import { createCertificateAuthority, isIssuedBy } from '../../src/tls/certificates.js';
+import { localServerNames } from '../../src/tls/tls-store.js';
 import { TlsService } from '../../src/tls/tls.service.js';
 import {
   authHeaders,
@@ -186,7 +187,7 @@ describe('[SEC-001] [SEC-010] WSS with the installation CA', () => {
 });
 
 describe('[SEC-010] pinning the CA while pairing', () => {
-  it('puts the CA fingerprint in the pairing code and its QR payload', async () => {
+  it('[AUTH-007] puts the CA fingerprint and the HTTPS addresses in the pairing code and its QR payload', async () => {
     const manager = await signIn(app, kit, 'MANAGER');
     const response = await api(app)
       .post('/api/v1/devices/pairing-codes')
@@ -195,7 +196,17 @@ describe('[SEC-010] pinning the CA while pairing', () => {
     expect(response.status, JSON.stringify(response.body)).toBe(201);
     const code = PairingCodeResponse.parse(response.body);
     expect(code.caSha256).toBe(caSha256);
-    expect(JSON.parse(code.qrPayload)).toEqual({ v: 1, code: code.code, ca: caSha256 });
+    // Every address the server certificate covers except loopback, on the port it listens on.
+    const covered = localServerNames().ipAddresses.filter((address) => address !== '127.0.0.1');
+    expect(code.serverUrls).toEqual(
+      covered.slice(0, 8).map((address) => `https://${address}:${String(port)}`),
+    );
+    expect(JSON.parse(code.qrPayload)).toEqual({
+      v: 1,
+      code: code.code,
+      ca: caSha256,
+      ...(code.serverUrls.length > 0 && { urls: code.serverUrls }),
+    });
   });
 
   it('publishes the CA without credentials; its fingerprint is the one in the QR code', async () => {

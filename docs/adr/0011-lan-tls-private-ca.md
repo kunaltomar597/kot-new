@@ -53,12 +53,15 @@ CA <installation>`, valid 10 years, path length 0, key usage certificate and CRL
   rather than left to Node's default; nothing on the LAN is served without TLS. Development and
   tests keep plain HTTP (`RP_TLS` unset).
 - Pinning: `GET /api/v1/tls/ca` returns the CA certificate and its SHA-256 fingerprint; the pairing
-  code response carries the fingerprint (`caSha256`, and `ca` in its QR payload), so an app
-  scanning the manager's QR code checks the CA it downloads against it and then trusts only that
+  code response carries the fingerprint (`caSha256`, and `ca` in its QR payload) and the server's
+  LAN addresses (`serverUrls`, `urls` in the QR payload), so an app scanning the manager's QR code
+  finds the server, checks the CA it downloads against the fingerprint and then trusts only that
   CA. React Native apps load the pinned CA into their HTTP and WebSocket client at run time (a
   custom OkHttp client on Android: the static network security configuration cannot hold a
-  per-installation CA; P2-01), the Electron POS checks it in `setCertificateVerifyProc` (P0-16),
-  Node clients pass it as `ca`.
+  per-installation CA; P2-01d), the Electron POS checks it in `setCertificateVerifyProc` (P0-16),
+  Node clients pass it as `ca`. On Android the pin applies to the paired server's host; other
+  hosts keep the phone's trust store (development tools). With a typed address instead of the QR
+  code, a person compares the fingerprint the app shows with the server PC's before pairing.
 - Browsers: the KDS and manager browsers download the CA from `https://<server>:<port>/ca.crt` and
   install it once, after comparing its fingerprint with the one the server PC shows (runbook
   `docs/runbooks/lan-tls.md`).

@@ -11,6 +11,16 @@ import type { DeviceSummary, DomainEvent, LoginResponse, StaffTile } from '@rp/c
 import { createMobileClient, CREDENTIALS_KEY, loadCredentials } from './client.js';
 import { MenuCache } from './menu-cache.js';
 import { OrderOutbox } from './order-outbox.js';
+import { normalizeServerUrl } from './server-url.js';
+import {
+  findServer,
+  type FoundServer,
+  type PairingTarget,
+  type ServerAuthority,
+  ServerMismatchError,
+  type ServerTrust,
+  UnverifiedServerError,
+} from './server-trust.js';
 import { type KeyValueStore, readJson } from './storage.js';
 
 /** Where the device key lives: the Android Keystore in the apps, a fake in tests. */
@@ -40,6 +50,11 @@ export interface DeviceSessionOptions {
   /** AsyncStorage: the server address and the live-update resume point (not secret). */
   readonly plainStore: KeyValueStore;
   readonly keys: DeviceKeyStore;
+  /**
+   * The LAN CA pinning of the device's HTTP clients (ADR-0011): the Android module in the apps.
+   * Without it (tests, development tools) nothing is pinned.
+   */
+  readonly trust?: ServerTrust;
   readonly appVersion?: string;
   readonly fetch?: typeof fetch;
   /** Socket.io's `io`; tests pass a fake. */
@@ -60,37 +75,6 @@ const INITIAL: DeviceSessionSnapshot = {
   connection: 'stopped',
   notice: undefined,
 };
-
-/** Thrown for a server address that is not `host[:port]` or an http(s) URL. */
-export class InvalidServerAddressError extends Error {
-  constructor() {
-    super('Enter the server address shown on the POS, for example 192.168.1.20:8443.');
-    this.name = 'InvalidServerAddressError';
-  }
-}
-
-/**
- * The local server's base URL from what a person typed: `192.168.1.20:8443` becomes
- * `https://192.168.1.20:8443` (the LAN is served over TLS, ADR-0011); an explicit `http://` is kept
- * for development servers.
- */
-export function normalizeServerUrl(input: string): string {
-  const text = input.trim();
-  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`;
-  let url: URL;
-  try {
-    url = new URL(withScheme);
-  } catch {
-    throw new InvalidServerAddressError();
-  }
-  if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.hostname === '') {
-    throw new InvalidServerAddressError();
-  }
-  if (url.pathname !== '/' || url.search !== '' || url.hash !== '' || url.username !== '') {
-    throw new InvalidServerAddressError();
-  }
-  return url.origin;
-}
 
 /**
  * The phone's or tablet's link to the local server, outside React so it can be tested on its own
@@ -172,9 +156,25 @@ export class DeviceSession {
     this.connect(await this.loadResume());
   }
 
-  /** Pairs with a manager's code (AUTH-007): a new Keystore key, then the server's device token. */
-  async pair(serverAddress: string, code: string): Promise<void> {
+  /**
+   * Finds the server to pair with among the addresses typed or scanned, checking a TLS server's CA
+   * against the QR code's fingerprint (ADR-0011). Pass the result to `pair`.
+   */
+  findServer(target: PairingTarget): Promise<FoundServer> {
+    return findServer(target, {
+      ...(this.options.trust !== undefined && { trust: this.options.trust }),
+      ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
+    });
+  }
+
+  /**
+   * Pairs with a manager's code (AUTH-007): a new Keystore key, then the server's device token.
+   * Over TLS, the server's CA is pinned first (`authority`, from `findServer`), so the code only
+   * ever travels to the server that CA vouches for (ADR-0011, SEC-010).
+   */
+  async pair(serverAddress: string, code: string, authority?: ServerAuthority): Promise<void> {
     const serverUrl = normalizeServerUrl(serverAddress);
+    await this.trustServer(serverUrl, authority);
     const key = await this.options.keys.create();
     await this.options.secureStore.removeItem(CREDENTIALS_KEY);
     await this.replaceClient(serverUrl, key);
@@ -245,6 +245,21 @@ export class DeviceSession {
     this.connection = undefined;
   }
 
+  /** Pins the server's CA before anything is sent to it; nothing to pin without TLS. */
+  private async trustServer(
+    serverUrl: string,
+    authority: ServerAuthority | undefined,
+  ): Promise<void> {
+    const trust = this.options.trust;
+    if (trust === undefined || !serverUrl.startsWith('https:')) return;
+    if (authority === undefined) throw new UnverifiedServerError();
+    const pinned = await trust.pin(authority.certificate, serverUrl);
+    if (pinned !== authority.sha256) {
+      await trust.clear();
+      throw new ServerMismatchError();
+    }
+  }
+
   private requireClient(): ApiClient {
     if (this.client === undefined) throw new Error('The device is not paired');
     return this.client;
@@ -295,6 +310,7 @@ export class DeviceSession {
     try {
       await this.options.keys.remove();
       await this.options.plainStore.removeItem(RESUME_KEY);
+      await this.options.trust?.clear();
     } catch (error) {
       this.options.onError?.(error);
     }

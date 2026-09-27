@@ -28,6 +28,7 @@
     "@rp/ui-native": "workspace:*",
     "expo": "57.0.25",
     "expo-build-properties": "~57.0.22",
+    "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.19",
     "expo-crypto": "~57.0.3",
     "expo-dev-client": "~57.0.19",

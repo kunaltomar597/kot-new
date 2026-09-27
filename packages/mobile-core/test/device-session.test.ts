@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
   DeviceSession,
+  findServer,
   InvalidServerAddressError,
   MemoryStore,
   normalizeServerUrl,
+  ServerMismatchError,
+  type ServerTrust,
+  ServerUnreachableError,
+  UnverifiedServerError,
 } from '../src/index.js';
 import {
   DEVICE_ID,
   FakeKeys,
+  FakeTrust,
   itemReadyFrame,
+  LAN_CA,
+  OTHER_CA,
   type FakeServer,
   fakeLocalServer as server,
   SocketFactory,
@@ -16,6 +24,9 @@ import {
 } from '../src/testing/index.js';
 
 const ADDRESS = 'http://pos.test:3000';
+/** The restaurant's server over TLS, and another address on the same network. */
+const LAN = 'https://192.168.1.20:8443';
+const ELSEWHERE = 'https://10.0.0.5:8443';
 
 interface Device {
   readonly secureStore: MemoryStore;
@@ -27,17 +38,35 @@ function newDevice(): Device {
   return { secureStore: new MemoryStore(), plainStore: new MemoryStore(), keys: new FakeKeys() };
 }
 
-function setup(fake: Pick<FakeServer, 'fetch'> = server(), device = newDevice()) {
+function setup(
+  fake: Pick<FakeServer, 'fetch'> = server(),
+  device = newDevice(),
+  trust?: ServerTrust,
+) {
   const sockets = new SocketFactory();
   const errors: unknown[] = [];
   const session = new DeviceSession({
     ...device,
+    ...(trust !== undefined && { trust }),
     fetch: fake.fetch,
     connect: sockets.connect,
     appVersion: '0.1.0-test',
     onError: (error) => errors.push(error),
   });
   return { session, sockets, device, errors };
+}
+
+/** A server that no longer knows the device: it was unpaired while the device was away. */
+function unpairingServer(): FakeServer {
+  return server()
+    .on('GET', '/api/v1/devices/current', () => ({
+      status: 401,
+      body: { code: 'DEVICE_NOT_RECOGNISED', message: 'Pair it.' },
+    }))
+    .on('POST', '/api/v1/devices/token', () => ({
+      status: 401,
+      body: { code: 'DEVICE_AUTH_FAILED', message: 'Pair it again.' },
+    }));
 }
 
 async function paired() {
@@ -117,16 +146,7 @@ describe('[AUTH-007] [SEC-010] pairing a phone or tablet', () => {
   it('forgets a device that was unpaired while it was away, key and all', async () => {
     const first = await paired();
     first.session.stop();
-    const refusing = server()
-      .on('GET', '/api/v1/devices/current', () => ({
-        status: 401,
-        body: { code: 'DEVICE_NOT_RECOGNISED', message: 'Pair it.' },
-      }))
-      .on('POST', '/api/v1/devices/token', () => ({
-        status: 401,
-        body: { code: 'DEVICE_AUTH_FAILED', message: 'Pair it again.' },
-      }));
-    const again = setup(refusing, first.device);
+    const again = setup(unpairingServer(), first.device);
     await again.session.start();
     await expect.poll(() => again.session.getSnapshot().phase).toBe('unpaired');
     expect(again.session.getSnapshot().notice).toBe('revoked');
@@ -141,6 +161,174 @@ describe('[AUTH-007] [SEC-010] pairing a phone or tablet', () => {
       InvalidServerAddressError,
     );
     expect(device.keys.created).toBe(0);
+  });
+});
+
+describe('[SEC-010] [AUTH-007] pairing over the restaurant LAN certificate (ADR-0011)', () => {
+  it('pairs from the QR code with the server whose CA it names, pinned before the code is sent', async () => {
+    const trust = new FakeTrust().serve(LAN, LAN_CA);
+    const fake = server();
+    let pinnedAtFirstRequest: FakeTrust['pinned'] | 'no request' = 'no request';
+    const recording: typeof fetch = (input, init) => {
+      if (pinnedAtFirstRequest === 'no request') pinnedAtFirstRequest = trust.pinned;
+      return fake.fetch(input, init);
+    };
+    const { session } = setup({ fetch: recording }, newDevice(), trust);
+    await session.start();
+
+    const found = await session.findServer({
+      servers: [ELSEWHERE, LAN],
+      caSha256: LAN_CA.sha256,
+    });
+    expect(found).toEqual({ serverUrl: LAN, authority: LAN_CA, verified: true });
+    await session.pair(found.serverUrl, 'ABCD-EFGH', found.authority);
+
+    expect(pinnedAtFirstRequest).toEqual({ certificate: LAN_CA.certificate, serverUrl: LAN });
+    expect(session.getSnapshot()).toMatchObject({ phase: 'paired', serverUrl: LAN });
+    expect(fake.callsTo('POST', '/api/v1/devices/pair')).toHaveLength(1);
+  });
+
+  it('passes over a stranger with another CA for the server the QR code names', async () => {
+    const trust = new FakeTrust().serve(ELSEWHERE, OTHER_CA).serve(LAN, LAN_CA);
+    const { session } = setup(server(), newDevice(), trust);
+    await expect(
+      session.findServer({ servers: [ELSEWHERE, LAN], caSha256: LAN_CA.sha256 }),
+    ).resolves.toMatchObject({ serverUrl: LAN, verified: true });
+  });
+
+  it('refuses a server whose CA is not the one in the QR code', async () => {
+    const trust = new FakeTrust().serve(LAN, OTHER_CA);
+    const { session, device } = setup(server(), newDevice(), trust);
+    await expect(
+      session.findServer({ servers: [ELSEWHERE, LAN], caSha256: LAN_CA.sha256 }),
+    ).rejects.toThrow(ServerMismatchError);
+    expect(trust.pinned).toBeUndefined();
+    expect(device.keys.created).toBe(0);
+  });
+
+  it('says the server did not answer when no address does, trying each once', async () => {
+    const trust = new FakeTrust();
+    const { session } = setup(server(), newDevice(), trust);
+    const failure = session.findServer({
+      servers: [LAN, `${ELSEWHERE}/`, ELSEWHERE],
+      caSha256: LAN_CA.sha256,
+    });
+    await expect(failure).rejects.toThrow(ServerUnreachableError);
+    await expect(failure).rejects.toMatchObject({ servers: [LAN, ELSEWHERE] });
+    expect(trust.fetched).toEqual([LAN, ELSEWHERE]);
+  });
+
+  it('tries only secure addresses for a server whose CA the QR code names', async () => {
+    const trust = new FakeTrust().serve(LAN, LAN_CA);
+    const { session } = setup(server(), newDevice(), trust);
+    await expect(
+      session.findServer({ servers: ['http://192.168.1.20:3000'], caSha256: LAN_CA.sha256 }),
+    ).rejects.toThrow(InvalidServerAddressError);
+    await expect(
+      session.findServer({
+        servers: ['http://192.168.1.20:3000', LAN],
+        caSha256: LAN_CA.sha256,
+      }),
+    ).resolves.toMatchObject({ serverUrl: LAN, verified: true });
+  });
+
+  it('shows the CA of a typed address for a person to compare and pairs only once they have', async () => {
+    const trust = new FakeTrust().serve(LAN, LAN_CA);
+    const fake = server();
+    const { session, device } = setup(fake, newDevice(), trust);
+    await session.start();
+
+    await expect(session.findServer({ servers: ['192.168.1.20:8443'] })).resolves.toEqual({
+      serverUrl: LAN,
+      authority: LAN_CA,
+      verified: false,
+    });
+    await expect(session.pair('192.168.1.20:8443', 'ABCD-EFGH')).rejects.toThrow(
+      UnverifiedServerError,
+    );
+    expect(fake.calls).toHaveLength(0);
+    expect(device.keys.created).toBe(0);
+
+    // The person compared the fingerprint with the one the POS shows.
+    await session.pair('192.168.1.20:8443', 'ABCD-EFGH', LAN_CA);
+    expect(trust.pinned).toEqual({ certificate: LAN_CA.certificate, serverUrl: LAN });
+    expect(session.getSnapshot().phase).toBe('paired');
+  });
+
+  it('does not pair when the device pinned another CA than the one checked', async () => {
+    const trust = new FakeTrust().serve(LAN, LAN_CA);
+    trust.pinAnswer = OTHER_CA.sha256;
+    const fake = server();
+    const { session, device } = setup(fake, newDevice(), trust);
+    await session.start();
+    await expect(session.pair(LAN, 'ABCD-EFGH', LAN_CA)).rejects.toThrow(ServerMismatchError);
+    expect(trust).toMatchObject({ pinned: undefined, clears: 1 });
+    expect(fake.calls).toHaveLength(0);
+    expect(device.keys.created).toBe(0);
+  });
+
+  it('forgets the pinned CA when the server has unpaired the device', async () => {
+    const trust = new FakeTrust().serve(LAN, LAN_CA);
+    const first = setup(server(), newDevice(), trust);
+    await first.session.start();
+    await first.session.pair(LAN, 'ABCD-EFGH', LAN_CA);
+    first.session.stop();
+    expect(trust.pinned?.serverUrl).toBe(LAN);
+
+    const again = setup(unpairingServer(), first.device, trust);
+    await again.session.start();
+    await expect.poll(() => trust.clears).toBe(1);
+    expect(trust.pinned).toBeUndefined();
+    expect(again.session.getSnapshot().notice).toBe('revoked');
+  });
+});
+
+describe('[AUTH-007] finding a development server without TLS', () => {
+  it('asks every address at once and takes the first that answers', async () => {
+    const fake = server();
+    const somewhere: typeof fetch = (input, init) =>
+      (input instanceof Request ? input.url : input.toString()).startsWith('http://10.0.2.2')
+        ? Promise.reject(new TypeError('Network request failed'))
+        : fake.fetch(input, init);
+    const trust = new FakeTrust();
+    const { session } = setup({ fetch: somewhere }, newDevice(), trust);
+    await expect(
+      session.findServer({ servers: ['http://10.0.2.2:3000', 'http://192.168.1.20:3000'] }),
+    ).resolves.toEqual({
+      serverUrl: 'http://192.168.1.20:3000',
+      authority: undefined,
+      verified: false,
+    });
+    expect(fake.callsTo('GET', '/api/v1/health')).toHaveLength(1);
+    expect(trust.fetched).toEqual([]);
+  });
+
+  it('takes a single address as it is and gives up on addresses that do not answer in time', async () => {
+    const silent: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('Timed out', 'AbortError'));
+        });
+      });
+    await expect(
+      findServer({ servers: ['http://10.0.2.2:3000'] }, { fetch: silent }),
+    ).resolves.toMatchObject({ serverUrl: 'http://10.0.2.2:3000' });
+    await expect(
+      findServer(
+        { servers: ['http://10.0.2.2:3000', 'http://192.168.1.20:3000'] },
+        { fetch: silent, timeoutMs: 10 },
+      ),
+    ).rejects.toThrow(ServerUnreachableError);
+    await expect(findServer({ servers: [] })).rejects.toThrow(InvalidServerAddressError);
+  });
+
+  it('pairs without pinning over plain HTTP, even with the trust module', async () => {
+    const trust = new FakeTrust();
+    const { session } = setup(server(), newDevice(), trust);
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    expect(trust.pinned).toBeUndefined();
+    expect(session.getSnapshot().phase).toBe('paired');
   });
 });
 
