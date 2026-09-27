@@ -25,3 +25,4 @@ export * from './menu-import.js';
 export * from './notifications.js';
 export * from './pager.js';
 export * from './recommendations.js';
+export * from './order-feed.js';

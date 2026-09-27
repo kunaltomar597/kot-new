@@ -32,6 +32,11 @@ export interface TableTileProps {
   selected?: boolean;
   disabled?: boolean;
   onSelect?: () => void;
+  /**
+   * Whether selecting the tile selects the table (a toggle, the POS floor), or only goes somewhere
+   * else, such as the dashboard's orders for the table (false: no pressed state).
+   */
+  toggle?: boolean;
   className?: string;
 }
 
@@ -50,6 +55,7 @@ export function TableTile({
   selected = false,
   disabled = false,
   onSelect,
+  toggle = true,
   className,
 }: TableTileProps) {
   const style = TABLE_STATE_STYLES[state];
@@ -66,7 +72,7 @@ export function TableTile({
       aria-label={spoken.join(', ')}
       data-tone={style.tone}
       data-state={state}
-      aria-pressed={onSelect === undefined ? undefined : selected}
+      aria-pressed={onSelect === undefined || !toggle ? undefined : selected}
       disabled={disabled}
       onClick={onSelect}
       className={cx('rp-table-tile', className)}

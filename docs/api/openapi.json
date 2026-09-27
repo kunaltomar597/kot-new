@@ -4299,6 +4299,42 @@
         "x-requirements": ["MENU-013", "MENU-012", "MGR-005", "AUD-001"]
       }
     },
+    "/api/v1/order-feed": {
+      "get": {
+        "operationId": "getOrderFeed",
+        "summary": "The live order feed: every order with something waiting, cooking or at the pass",
+        "description": "For the manager dashboard (MGR-001, MGR-003): orders with an item waiting for approval, sent, being prepared or ready, oldest first, each with its items, stations, states and times. Dine-in orders leave with their table; takeaway orders with their business date. The dashboard filters by station, waiter, source and table, and marks late items with `@rp/domain` `itemDelay` from `settings` and `serverTime`.",
+        "tags": ["orders"],
+        "responses": {
+          "200": {
+            "description": "The live orders.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderFeedResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["MGR-001", "MGR-003"]
+      }
+    },
     "/api/v1/order-items/{orderItemId}": {
       "patch": {
         "operationId": "modifyOrderItem",
@@ -11940,6 +11976,130 @@
           "audit",
           "invoices"
         ],
+        "additionalProperties": false
+      },
+      "OrderFeedEntry": {
+        "type": "object",
+        "properties": {
+          "orderId": { "$ref": "#/components/schemas/Id" },
+          "orderNumber": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "orderType": { "$ref": "#/components/schemas/OrderType" },
+          "source": { "$ref": "#/components/schemas/OrderSource" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "tableLabel": { "type": ["string", "null"] },
+          "takeawayToken": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "waiterId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "waiterName": { "type": ["string", "null"] },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrderFeedItem" } }
+        },
+        "required": [
+          "orderId",
+          "orderNumber",
+          "orderType",
+          "source",
+          "tableId",
+          "tableLabel",
+          "takeawayToken",
+          "waiterId",
+          "waiterName",
+          "createdAt",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "OrderFeedItem": {
+        "type": "object",
+        "properties": {
+          "orderItemId": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "variantName": { "type": ["string", "null"] },
+          "quantity": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "comboName": { "type": ["string", "null"] },
+          "stationId": { "$ref": "#/components/schemas/Id" },
+          "stationName": { "type": "string" },
+          "state": { "$ref": "#/components/schemas/OrderItemState" },
+          "prepTimeMinutes": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "sentAt": { "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }] },
+          "preparingAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "readyAt": { "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }] }
+        },
+        "required": [
+          "orderItemId",
+          "name",
+          "variantName",
+          "quantity",
+          "comboName",
+          "stationId",
+          "stationName",
+          "state",
+          "prepTimeMinutes",
+          "sentAt",
+          "preparingAt",
+          "readyAt"
+        ],
+        "additionalProperties": false
+      },
+      "OrderFeedResponse": {
+        "type": "object",
+        "properties": {
+          "orders": { "type": "array", "items": { "$ref": "#/components/schemas/OrderFeedEntry" } },
+          "stations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"],
+              "additionalProperties": false
+            }
+          },
+          "waiters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"],
+              "additionalProperties": false
+            }
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "ageRedMinutes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "readyNotCollectedMinutes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["ageRedMinutes", "readyNotCollectedMinutes"],
+            "additionalProperties": false
+          },
+          "serverTime": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["orders", "stations", "waiters", "settings", "serverTime"],
         "additionalProperties": false
       },
       "OrderItemEndRequest": {
