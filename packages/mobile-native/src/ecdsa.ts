@@ -2,7 +2,10 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 
 /** Decodes standard base64 (padding optional); throws on anything else. */
 export function fromBase64(text: string): Uint8Array {
-  const clean = text.replace(/=+$/, '');
+  // At most two padding characters, stripped with a loop: a regex like /=+$/ is slow on long runs.
+  let end = text.length;
+  while (end > 0 && text.length - end < 2 && text[end - 1] === '=') end -= 1;
+  const clean = text.slice(0, end);
   if (!/^[A-Za-z0-9+/]*$/.test(clean) || clean.length % 4 === 1) {
     throw new TypeError('Not base64');
   }

@@ -154,5 +154,7 @@ describe('DER to raw ECDSA signatures', () => {
     expect([...fromBase64('AQ')]).toEqual([1]);
     expect(() => fromBase64('A')).toThrow(TypeError);
     expect(() => fromBase64('A*B=')).toThrow(TypeError);
+    expect(() => fromBase64('AQ===')).toThrow(TypeError);
+    expect(() => fromBase64(`A${'='.repeat(100_000)}`)).toThrow(TypeError);
   });
 });
