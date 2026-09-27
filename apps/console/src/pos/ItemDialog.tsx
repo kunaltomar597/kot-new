@@ -18,8 +18,8 @@ import {
 } from '@rp/ui-web';
 import { useId, useState } from 'react';
 import { useT } from '../app/i18n.js';
-import type { NewCartLine } from './cart.js';
-import { comboOf, comboSlots, selectable } from './menu-view.js';
+import type { NewCartLine } from '@rp/ordering';
+import { comboOf, comboSlots, selectable } from '@rp/ordering';
 
 export function ruleOf(group: ModifierGroupDef, t: Translator): string {
   if (group.minSelections === 0) return t('pos.item.ruleOptional', { max: group.maxSelections });

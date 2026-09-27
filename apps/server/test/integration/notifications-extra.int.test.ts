@@ -188,6 +188,29 @@ describe('[NTF-003] device, printer and disk alerts', () => {
     );
   });
 
+  it('[PGR-013] [TAB-015] uses the pager level for pagers and the tablet level for tablets', async () => {
+    const device = (type: 'PAGER' | 'TABLE_TABLET') =>
+      prisma.device.create({
+        data: { restaurantId: kit.restaurantId, type, name: `${type} at 18 %` },
+      });
+    const pager = await device('PAGER');
+    const tablet = await device('TABLE_TABLET');
+    await produce(
+      app,
+      [pager, tablet].map(({ id, type }) =>
+        domainEvent('DeviceStatusChanged', kit.restaurantId, {
+          deviceId: id,
+          deviceType: type,
+          online: true,
+          batteryPercent: 18,
+        }),
+      ),
+    );
+    // 18 % is low for a tablet (20 %) but not yet for a pager (15 %).
+    await openAlert({ dedupeKey: `device:${tablet.id}:low` });
+    expect(await prisma.alert.count({ where: { dedupeKey: `device:${pager.id}:low` } })).toBe(0);
+  });
+
   it('alerts the managers and cashier while a printer is offline', async () => {
     const printerId = randomUUID();
     const printer = (online: boolean) =>

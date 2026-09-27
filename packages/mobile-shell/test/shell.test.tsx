@@ -9,6 +9,7 @@ import {
   messageOf,
   PairingScreen,
   useLive,
+  useNow,
 } from '../src/index.js';
 import { ADDRESS, fakeServer, newSession, renderShell, translator } from './harness.js';
 import { itemReadyFrame, STAFF } from '@rp/mobile-core/testing';
@@ -196,5 +197,28 @@ describe('messages', () => {
   it('formats pairing codes as people type them', () => {
     expect(formatPairingCode('ab')).toBe('AB');
     expect(formatPairingCode('abcd-efgh-ij')).toBe('ABCD-EFGH');
+  });
+});
+
+describe('useNow', () => {
+  function Clock() {
+    return <Text testID="now">{String(useNow(1_000))}</Text>;
+  }
+
+  it('ticks at the interval and stops when unmounted', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-27T10:00:00.000Z'));
+    const view = await renderShell(newSession().session, <Clock />);
+    const start = Date.parse('2026-09-27T10:00:00.000Z');
+    expect(screen.getByTestId('now')).toHaveTextContent(String(start));
+    await act(async () => {
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('now')).toHaveTextContent(String(start + 1_000));
+    const clear = jest.spyOn(globalThis, 'clearInterval');
+    await view.unmount();
+    expect(clear).toHaveBeenCalled();
+    jest.useRealTimers();
   });
 });

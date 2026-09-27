@@ -1,4 +1,10 @@
-import type { FloorResponse, TableOverviewEntry, TableOverviewResponse } from '@rp/contracts';
+import type {
+  FloorResponse,
+  TableOverviewEntry,
+  TableOverviewResponse,
+  WaiterAssignmentView,
+} from '@rp/contracts';
+import { tablesOf, type WaiterAssignment } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 
 /** One section of the POS floor, in the manager's display order, active tables only. */
@@ -74,4 +80,43 @@ export function tileAlert(table: TableOverviewEntry, t: Translator): string | un
 /** Events after which the overview is read again (tables, orders, bills, service requests). */
 export function affectsFloor(eventType: string): boolean {
   return /^(Table|Order|Bill|ServiceRequest|ItemStatusChanged$|MenuPublished$)/.test(eventType);
+}
+
+/**
+ * "My tables" (WTR-002): the tables a waiter looks after today, from the manager's assignments
+ * (their sections, and tables given to them directly, which leave the section's other waiters,
+ * TBL-002), plus any open table they are the responsible waiter of wherever it is.
+ */
+export function myTableIds(
+  staffId: string,
+  overview: TableOverviewResponse,
+  assignments: readonly WaiterAssignmentView[],
+): Set<string> {
+  const sectionOf = new Map(overview.tables.map((table) => [table.tableId, table.sectionId]));
+  const flat: WaiterAssignment[] = assignments.flatMap((assignment) => [
+    ...assignment.sectionIds.map((sectionId) => ({
+      staffId: assignment.staffId,
+      sectionId,
+      tableId: null,
+    })),
+    ...assignment.tableIds.map((tableId) => ({
+      staffId: assignment.staffId,
+      sectionId: sectionOf.get(tableId) ?? '',
+      tableId,
+    })),
+  ]);
+  const floorTables = overview.tables.map((table) => ({
+    id: table.tableId,
+    sectionId: table.sectionId,
+  }));
+  const mine = new Set(tablesOf(staffId, floorTables, flat));
+  for (const table of overview.tables) {
+    if (table.session?.waiterId === staffId) mine.add(table.tableId);
+  }
+  return mine;
+}
+
+/** Where guests can move to (TBL-005): the free tables, in the overview's order. */
+export function freeTables(overview: TableOverviewResponse): TableOverviewEntry[] {
+  return overview.tables.filter((table) => table.state === 'FREE');
 }

@@ -1,5 +1,6 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type { DomainEvent } from '@rp/contracts';
+import { isLowBattery } from '@rp/domain';
 import type { TransactionClient } from '../database/prisma.service.js';
 import { EventBus } from '../events/event-bus.js';
 import { NotificationsService } from './notifications.service.js';
@@ -135,9 +136,12 @@ export class NotificationTriggers implements OnModuleInit {
   ): Promise<void> {
     if (!['PAGER', 'TABLE_TABLET', 'KDS'].includes(change.deviceType)) return;
     const settings = await this.notifications.settingsOf(restaurantId);
-    const low =
-      change.batteryPercent !== undefined &&
-      change.batteryPercent <= settings.get('notifications.lowBatteryPercent');
+    // PGR-013 sets the pager's level; TAB-015 the tablets' (kitchen screens share it).
+    const threshold =
+      change.deviceType === 'PAGER'
+        ? settings.get('pager.lowBatteryPercent')
+        : settings.get('devices.lowBatteryAlertPercent');
+    const low = isLowBattery(change.batteryPercent ?? null, threshold);
     const offlineKey = `device:${change.deviceId}:offline`;
     const lowKey = `device:${change.deviceId}:low`;
     if (change.online) await this.notifications.clear(tx, { restaurantId, dedupeKey: offlineKey });

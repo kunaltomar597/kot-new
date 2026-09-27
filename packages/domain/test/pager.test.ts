@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isLowBattery,
   pagerIsOffline,
   pagerLines,
   pagerMayPublish,
   pagerMaySubscribe,
   pagerTopic,
+  pagerWarning,
   vibrationFor,
 } from '../src/index.js';
 
@@ -49,5 +51,15 @@ describe('[PGR-007] offline after three missed heartbeats', () => {
     expect(pagerIsOffline(ago(90), now, 30)).toBe(false);
     expect(pagerIsOffline(ago(91), now, 30)).toBe(true);
     expect(pagerIsOffline(null, now, 30)).toBe(true);
+  });
+});
+
+describe('[WTR-014] [PGR-013] what the wearer is warned about', () => {
+  it('warns about a pager that is not connected first, then about a low battery', () => {
+    expect(pagerWarning({ online: false, batteryPercent: 10 }, 15)).toBe('OFFLINE');
+    expect(pagerWarning({ online: true, batteryPercent: 15 }, 15)).toBe('LOW_BATTERY');
+    expect(pagerWarning({ online: true, batteryPercent: 16 }, 15)).toBeUndefined();
+    expect(pagerWarning({ online: true, batteryPercent: null }, 15)).toBeUndefined();
+    expect(isLowBattery(null, 15)).toBe(false);
   });
 });

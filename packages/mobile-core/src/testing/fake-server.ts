@@ -19,7 +19,10 @@ export class FakeServer {
   readonly calls: RecordedCall[] = [];
   private readonly handlers = new Map<string, Handler[]>();
 
-  /** Answers `method path` with `handler`; several handlers answer successive calls in turn. */
+  /**
+   * Answers `method path` with `handler`; several handlers answer successive calls in turn. A path
+   * segment starting with `:` matches any one segment, e.g. `/api/v1/tables/:tableId/open`.
+   */
   on(method: string, path: string, ...handlers: Handler[]): this {
     this.handlers.set(`${method} ${path}`, handlers);
     return this;
@@ -27,6 +30,24 @@ export class FakeServer {
 
   callsTo(method: string, path: string): RecordedCall[] {
     return this.calls.filter((call) => call.method === method && call.path === path);
+  }
+
+  private handlersFor(method: string, pathname: string): Handler[] | undefined {
+    const exact = this.handlers.get(`${method} ${pathname}`);
+    if (exact !== undefined) return exact;
+    const segments = pathname.split('/');
+    for (const [key, handlers] of this.handlers) {
+      const [keyMethod, pattern = ''] = key.split(' ');
+      const parts = pattern.split('/');
+      if (
+        keyMethod === method &&
+        parts.length === segments.length &&
+        parts.every((part, index) => part.startsWith(':') || part === segments[index])
+      ) {
+        return handlers;
+      }
+    }
+    return undefined;
   }
 
   readonly fetch: typeof fetch = async (input, init) => {
@@ -45,7 +66,7 @@ export class FakeServer {
       body: typeof raw === 'string' ? (JSON.parse(raw) as unknown) : undefined,
     };
     this.calls.push(call);
-    const queue = this.handlers.get(`${call.method} ${url.pathname}`);
+    const queue = this.handlersFor(call.method, url.pathname);
     const handler = queue?.length === 1 ? queue[0] : queue?.shift();
     if (handler === undefined) {
       return new Response(JSON.stringify({ code: 'NOT_FOUND', message: 'No such route' }), {

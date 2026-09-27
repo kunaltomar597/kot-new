@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import {
   type LoginResponse,
+  MyPagerResponse,
   PagerAlertMessage,
   PagerCredentialResponse,
   PagerListResponse,
@@ -283,6 +284,30 @@ describe('[PGR-007] [PGR-013] heartbeats', () => {
     expect((await prisma.device.findUniqueOrThrow({ where: { id: pagerA.deviceId } })).online).toBe(
       false,
     );
+  });
+});
+
+describe('[WTR-014] the wearer’s own pager', () => {
+  it('shows the waiter their pager and the warning level, and tells them when its state changes', async () => {
+    const response = await server().get('/api/v1/pagers/mine').set(as(waiter));
+    expect(response.status).toBe(200);
+    // The pager's own level (PGR-013 ⚙), not the tablets' (TAB-015).
+    expect(MyPagerResponse.parse(response.body)).toMatchObject({
+      lowBatteryPercent: 15,
+      pager: { deviceId: pagerA.deviceId, staffId: kit.staff.WAITER, batteryPercent: 12 },
+    });
+    // Coming online and going offline reached the wearer as well as the managers.
+    const changes = await prisma.outboxEvent.findMany({
+      where: { eventType: 'DeviceStatusChanged', aggregateId: pagerA.deviceId },
+    });
+    expect(changes.length).toBeGreaterThanOrEqual(2);
+    for (const change of changes) expect(change.audience).toEqual({ staffIds: [kit.staff.WAITER] });
+    // Someone who wears no pager gets none, not somebody else's.
+    const managers = MyPagerResponse.parse(
+      (await server().get('/api/v1/pagers/mine').set(as(manager))).body,
+    );
+    expect(managers.pager).toBeNull();
+    expect((await server().get('/api/v1/pagers/mine')).status).toBe(401);
   });
 });
 

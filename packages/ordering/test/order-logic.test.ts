@@ -7,19 +7,19 @@ import {
   removeLine,
   requestLines,
   updateLine,
-} from '../src/pos/cart.js';
+} from '../src/cart.js';
 import {
   comboOf,
   comboSlots,
   displayPrice,
   needsOptions,
-  posCategories,
-  posItems,
+  channelItems,
+  menuCategories,
   selectable,
   visibleItems,
-} from '../src/pos/menu-view.js';
-import { displayState } from '../src/pos/order-state.js';
-import { IDS, MENU, sentOrder } from './menu-fixture.js';
+} from '../src/menu-view.js';
+import { displayState } from '../src/order-state.js';
+import { IDS, MENU, sentOrder } from '../src/testing/index.js';
 
 let next = 0;
 const newId = () => `line-${String(++next)}`;
@@ -87,14 +87,14 @@ describe('[ORD-001] [ORD-014] the cart', () => {
 
 describe('[MENU-012] the POS menu', () => {
   it('shows POS items in category order and searches names, codes and synonyms', () => {
-    const items = posItems(MENU);
+    const items = channelItems(MENU, 'POS');
     expect(items.map((item) => item.name)).toEqual([
       'Paneer Tikka',
       'Dal Makhani',
       'Veg Thali Combo',
       'Gulab Jamun',
     ]);
-    expect(posCategories(MENU, items).map((category) => category.name)).toEqual([
+    expect(menuCategories(MENU, items).map((category) => category.name)).toEqual([
       'Starters',
       'Main Course',
     ]);
@@ -112,7 +112,7 @@ describe('[MENU-012] the POS menu', () => {
   });
 
   it('knows which items need choices, their groups, combo slots and card price', () => {
-    const [tikka, dal, thali] = posItems(MENU);
+    const [tikka, dal, thali] = channelItems(MENU, 'POS');
     if (tikka === undefined || dal === undefined || thali === undefined) throw new Error('menu');
     expect(needsOptions(MENU, tikka)).toBe(true);
     expect(needsOptions(MENU, dal)).toBe(false);

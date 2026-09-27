@@ -23,6 +23,9 @@ export const GLYPHS = {
   radioOff: '○',
   boxOn: '☑',
   boxOff: '☐',
+  seated: '●',
+  bell: '◆',
+  receipt: '▤',
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

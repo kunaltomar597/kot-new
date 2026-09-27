@@ -94,3 +94,21 @@ export function pagerIsOffline(
   if (lastSeenAt === null) return true;
   return now.getTime() - lastSeenAt.getTime() > 3 * heartbeatSeconds * 1000;
 }
+
+/** PGR-013: at or below the level ⚙ the battery counts as low. */
+export function isLowBattery(batteryPercent: number | null, lowBatteryPercent: number): boolean {
+  return batteryPercent !== null && batteryPercent <= lowBatteryPercent;
+}
+
+/**
+ * What the waiter app warns its wearer about (WTR-014): a pager that is not connected, else a low
+ * battery. Not connected comes first: alerts then reach only the phone (NTF-007).
+ */
+export function pagerWarning(
+  pager: { readonly online: boolean; readonly batteryPercent: number | null },
+  lowBatteryPercent: number,
+): 'OFFLINE' | 'LOW_BATTERY' | undefined {
+  if (!pager.online) return 'OFFLINE';
+  if (isLowBattery(pager.batteryPercent, lowBatteryPercent)) return 'LOW_BATTERY';
+  return undefined;
+}

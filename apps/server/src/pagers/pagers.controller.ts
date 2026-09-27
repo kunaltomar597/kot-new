@@ -2,13 +2,14 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/
 import {
   AssignPagerRequest,
   CreatePagerRequest,
+  type MyPagerResponse,
   type PagerCredentialResponse,
   type PagerListResponse,
   PagerParams,
   type PagerView,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
-import { RequireCapability } from '../auth/decorators.js';
+import { RequireCapability, RequireSession } from '../auth/decorators.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { PagersService } from './pagers.service.js';
@@ -20,7 +21,7 @@ function principalOf(request: AuthenticatedRequest): Principal {
 
 const params = new ZodValidationPipe(PagerParams);
 
-/** Pager administration (P2-04, PGR-012). */
+/** Pager administration (P2-04, PGR-012), and each wearer's own pager (WTR-014). */
 @Controller('pagers')
 @RequireCapability('DEVICE_PAIR')
 export class PagersController {
@@ -29,6 +30,13 @@ export class PagersController {
   @Get()
   list(@Req() request: AuthenticatedRequest): Promise<PagerListResponse> {
     return this.pagers.list(principalOf(request).restaurantId);
+  }
+
+  /** WTR-014: anyone signed in reads their own pager. */
+  @Get('mine')
+  @RequireSession()
+  mine(@Req() request: AuthenticatedRequest): Promise<MyPagerResponse> {
+    return this.pagers.mine(principalOf(request));
   }
 
   @Post()

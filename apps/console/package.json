@@ -20,6 +20,7 @@
     "@rp/design-tokens": "workspace:*",
     "@rp/domain": "workspace:*",
     "@rp/i18n": "workspace:*",
+    "@rp/ordering": "workspace:*",
     "@rp/ui-web": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

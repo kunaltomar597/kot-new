@@ -14,7 +14,8 @@ What exists:
 - `packages/domain`: money, tax, discounts, bill, business date, financial year, invoice numbers,
   state machines, permissions, menu selection, KOT split, GSTIN validation, waiter assignment,
   bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export, menu
-  import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a). 173 tests.
+  import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a), including the
+  low-battery check (P2-02a). 174 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -23,8 +24,8 @@ What exists:
   (P1-02); the menu (P1-03); photos (P1-04); menu import (P1-05); orders and item changes (P1-06);
   stations, printers and the print queue (P1-07); the KDS (P1-09a); bills and invoices (P1-10);
   shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down
-  (P1-13); alerts (P2-03a); nudges and breaks (P2-03b); pagers and their MQTT channels (P2-04a).
-  478 tests.
+  (P1-13); alerts (P2-03a); nudges and breaks (P2-03b); pagers and their MQTT channels (P2-04a);
+  the signed-in person's own pager (P2-02a). 478 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (61 tables after the later migrations), least-privilege roles,
@@ -49,22 +50,27 @@ What exists:
   drill-down (P1-13); the Phase 1 exit scenario (P1-14); the notification engine core with
   acknowledgement, repeats and escalation (P2-03a); nudges, breaks, device, printer and disk
   alerts (P2-03b); the pager MQTT broker with per-pager credentials, ACL, alert delivery, acks and
-  heartbeats (P2-04a). 644 tests (4 skipped without a real install).
+  heartbeats (P2-04a); the waiter's own pager and low-battery levels per device type (P2-02a).
+  646 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
   account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
-  for the React Native apps (P2-01a). 8 tests.
+  for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c).
+  26 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
-  pickers) (P2-01b). 23 tests.
+  pickers) (P2-01b), table tiles and a segmented control (P2-02a). 26 tests.
 - `packages/mobile-native` (the Keystore device key as a local Expo module, secure and plain
   stores) and `packages/mobile-shell` (pairing and login screens, connection banner, live data)
-  (P2-01c). `packages/mobile-core` gained `DeviceSession` and the `testing` entry point.
+  (P2-01c), with `useNow` for clocks on screen (P2-02a).
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
-  (P2-01c).
+  (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
+  and the waiter's own pager (P2-02a).
+- `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
+  "my tables", cart lines, the menu tree), moved out of the console (P2-02a). 13 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -88,8 +94,8 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P2-01d LAN TLS pinning and QR pairing on Android (P2-01c done).
-- P2-02 Waiter app: tables and order taking (P2-01c done; runs against development servers
-  until P2-01d).
+- P2-02b Waiter app: order taking (P2-02a done; runs against development servers until P2-01d).
+- P2-06 Waiter alerts, service-request inbox, nudge, Notify manager (P2-02a done).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -159,7 +165,8 @@ Recommended next WPs (dependencies met):
 - [x] P2-01b React Native component library
 - [x] P2-01c Expo apps, builds and smoke flows
 - [ ] P2-01d LAN TLS pinning and QR pairing on Android
-- [ ] P2-02 Waiter app: tables and order taking
+- [x] P2-02a Waiter tables and pager status
+- [ ] P2-02b Waiter app: order taking
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
 - [x] P2-04a Pager broker, credentials, delivery and heartbeats
@@ -468,6 +475,25 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-09-27 (P2-02a):
+
+119. Low battery has a level per device type: `pager.lowBatteryPercent` (15 %, PGR-013) for pagers,
+     and `devices.lowBatteryAlertPercent` (20 %, TAB-015) for table tablets and kitchen screens.
+     This replaces the single `notifications.lowBatteryPercent` of decision 103, which contradicted
+     PGR-013's 15 %. The pager's own warning, the manager's alert and the waiter app all use the
+     pager's level.
+120. "My tables" are the sections and tables in the waiter's assignment for today plus every open
+     table they are the responsible waiter of, so a table opened for them in another section still
+     shows. Waiters start on "My tables"; managers and the owner start on all tables.
+121. The waiter app reads the waiter's pager again on every `DeviceStatusChanged` for it and once a
+     minute, because the pager announces only changes of state, not every battery level.
+122. Opening a table from the phone asks only for guests (2 by default); the server applies the
+     day's assignment for the responsible waiter, as on the POS (decision 70). "Move table" is
+     shown only when the person may move that table (`TABLE_MOVE_MERGE`: a waiter their own open
+     tables, managers any); the server still decides.
+123. `GET /api/v1/pagers/mine` gives the signed-in person their own active pager (or none) and the
+     pager low-battery level, so the app needs no device-management permission to show it.
+
 Decided 2026-09-27 (P2-01c):
 
 114. The device key on Android is an ECDSA P-256 (ES256) Keystore key made by our own Expo module,
@@ -527,8 +553,9 @@ Decided 2026-09-26 (P2-03b):
      own; while set, their alerts go to the managers at once. Break reporting comes with staff
      reports (P4).
 103. Device alerts cover pagers, table tablets and kitchen screens: one alert for "offline" and one
-     for "low battery" (at or below `notifications.lowBatteryPercent`, default 20 %), each raised
-     once per state and cleared when the device is back online with enough battery.
+     for "low battery", each raised once per state and cleared when the device is back online with
+     enough battery. The low-battery level is per device type since decision 119 (it was one
+     shared `notifications.lowBatteryPercent`, default 20 %).
 104. The disk check runs hourly on the server PC and alerts every restaurant on it when the data
      drive is at or above `notifications.diskAlertPercent` (default 80 %), until space is freed.
 
@@ -672,6 +699,7 @@ Security-sensitive PRs for the P8-03 human review:
 - #43 P1-05: spreadsheet parsing of untrusted files and the ZIP size guard.
 - #48 P2-04a: pager credentials (peppered Argon2id), MQTT ACL and TLS.
 - #49 P2-01a: secure credential persistence on the mobile apps.
+- #52 P2-01c: the Android Keystore device key, pairing and sign-in on the phones.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -679,6 +707,36 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-02a Waiter tables and pager status
+
+Merged #52 (P2-01c) once both debug APK builds were green. P2-02 was split into P2-02a (this) and
+P2-02b (order taking).
+
+Built: `packages/ordering` (the console's ordering helpers moved out so the phones share them, plus
+`myTableIds` and `freeTables`); the waiter app's `TablesScreen`, `TableSheet` (open, move, request
+bill) and `PagerCard`; `TableTile` and `SegmentedControl` in `@rp/ui-native`; `useNow` in
+`@rp/mobile-shell`; `GET /api/v1/pagers/mine`; and low-battery levels per device type, which fixed
+decision 103's single 20 % level contradicting PGR-013's 15 % for pagers. The Maestro flow now
+opens a table and asks for its bill.
+
+Tests: waiter app 14 (was 4), ordering 13, ui-native 26 (was 23),
+mobile-shell 10 (was 9), domain 174, contracts 478, server 646 (new
+pager and per-type battery integration tests).
+
+Gotchas:
+
+- The fake server in `@rp/mobile-core/testing` matches `:param` path segments, so a test can
+  register `POST /api/v1/tables/:tableId/open` once; exact paths still win.
+- Build event frames with `eventFrame(sequence, type, payload)`; the payload must satisfy the
+  event's contract, or the client drops the frame without a word.
+- Jest fake timers must be installed before the screen renders, or an interval created at mount
+  (the pager card's minute refresh, `useNow`) runs on real time and never fires in the test.
+- Two settings hold the pager heartbeat: `pagers.heartbeatSeconds` (restaurant scope, used by the
+  broker) and `pager.heartbeatSeconds` (vendor scope, unused). Left for P2-05, where the firmware
+  reads its heartbeat period, to settle on one.
+
+Decisions: 119 to 123.
 
 ### 2026-09-27: P2-01c Expo apps, builds and smoke flows
 

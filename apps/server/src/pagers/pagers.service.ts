@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import type {
   CreatePagerRequest,
+  MyPagerResponse,
   PagerCredentialResponse,
   PagerListResponse,
   PagerView,
@@ -15,6 +16,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import type { Device } from '../generated/prisma/client.js';
 import { AppError } from '../errors/app-error.js';
 import { CredentialHasher } from '../auth/credential-hasher.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { PagerBroker } from './pager-broker.js';
 
 function view(device: Device): PagerView {
@@ -43,6 +45,7 @@ export class PagersService {
     private readonly audit: AuditService,
     private readonly broker: PagerBroker,
     private readonly hasher: CredentialHasher,
+    private readonly settings: SettingsService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -52,6 +55,25 @@ export class PagersService {
       orderBy: { name: 'asc' },
     });
     return { pagers: pagers.map(view) };
+  }
+
+  /** WTR-014: the pager the person wears (a person wears at most one, PGR-012), if any. */
+  async mine(principal: Principal): Promise<MyPagerResponse> {
+    const [pager, settings] = await Promise.all([
+      this.prisma.device.findFirst({
+        where: {
+          restaurantId: principal.restaurantId,
+          type: 'PAGER',
+          status: 'ACTIVE',
+          staffId: principal.staffId,
+        },
+      }),
+      this.settings.snapshot(principal.restaurantId),
+    ]);
+    return {
+      pager: pager === null ? null : view(pager),
+      lowBatteryPercent: settings.get('pager.lowBatteryPercent'),
+    };
   }
 
   async create(

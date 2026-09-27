@@ -8,7 +8,7 @@ import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
 import { useOpenBill } from '../billing/use-open-bill.js';
-import { floorSections, tileAlert, tileDetails } from './floor-view.js';
+import { floorSections, tileAlert, tileDetails } from '@rp/ordering';
 import { MoveTableDialog } from './MoveTableDialog.js';
 import { OpenTableDialog } from './OpenTableDialog.js';
 import { useFloor } from './use-floor.js';

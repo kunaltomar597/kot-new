@@ -67,7 +67,7 @@ apps/
   server/          NestJS local server (Windows service): REST, Socket.io, MQTT, engines   [skeleton done]
   console/         React web console: POS, manager dashboard and KDS modes                [P0-14+]
   desktop/         Electron shell and installer config                                    [P0-16]
-  waiter-app/      React Native (Expo) waiter app                                         [P2-01c, P2]
+  waiter-app/      React Native (Expo) waiter app                                         [P2-01c, P2-02a, P2]
   table-tablet/    React Native (Expo) kiosk table tablet                                  [P2-01c, P3]
   qr-menu/         Next.js public QR menu                                                  [P5]
   control-plane/   Vendor Control Plane (NestJS API + React web)                          [P0-17, P7]
@@ -80,10 +80,12 @@ packages/
   mobile-core/     Shared mobile logic: secure credentials, outbox, menu cache             [P2-01a done]
   mobile-native/   Android Keystore device key module and device stores                    [P2-01c done]
   mobile-shell/    Pairing, login and live-data screens shared by the apps                 [P2-01c done]
+  ordering/        Cart, menu and floor helpers shared by the POS and the phones           [P2-02a done]
   design-tokens/   Colours, typography, spacing shared by web and native                   [P0-13]
   licensing/       Licence verification shared by server and apps                          [P7-01]
   i18n/            UI string catalogues (English only in v1)                               [P0-14]
   config/          Shared tool presets                                                     [grows]
+  test-postgres/   Throwaway PostgreSQL cluster for integration tests                      [done]
 firmware/pager/    ESP-IDF project for the ESP32-S3 wrist pager                            [P0-H1, P2-05]
 infra/             supabase/ (relay), installer/ (Windows), ci/ (pipelines, signing)
 docs/              brd/, build/, adr/, runbooks/, api/, owner/

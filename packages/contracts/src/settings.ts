@@ -263,8 +263,9 @@ export const SETTINGS = [
     defaultValue: 20,
     scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
-    description: 'Battery level at which a tablet or phone raises a low-battery alert.',
-    requirements: ['TAB-015'],
+    description:
+      'Battery level at or below which a table tablet or kitchen screen raises a low-battery alert.',
+    requirements: ['TAB-015', 'NTF-003'],
     unit: 'percent',
   }),
 
@@ -425,16 +426,6 @@ export const SETTINGS = [
     requirements: ['NTF-008'],
   }),
   setting({
-    key: 'notifications.lowBatteryPercent',
-    schema: int(5, 50),
-    defaultValue: 20,
-    scope: 'RESTAURANT',
-    capability: 'OPERATIONS_CONFIGURE',
-    description: 'A pager or tablet at or below this battery level raises a low-battery alert.',
-    requirements: ['NTF-003', 'PGR-002'],
-    unit: 'percent',
-  }),
-  setting({
     key: 'notifications.diskAlertPercent',
     schema: int(50, 99),
     defaultValue: 80,
@@ -546,8 +537,9 @@ export const SETTINGS = [
     defaultValue: 15,
     scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
-    description: 'Battery level at which a pager alerts its wearer and the manager.',
-    requirements: ['PGR-013'],
+    description:
+      'Battery level at or below which a pager alerts its wearer and the manager, and the waiter app warns.',
+    requirements: ['PGR-013', 'WTR-014', 'NTF-003'],
     unit: 'percent',
   }),
   setting({

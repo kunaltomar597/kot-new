@@ -83,3 +83,13 @@ export type PagerView = z.infer<typeof PagerView>;
 
 export const PagerListResponse = z.object({ pagers: z.array(PagerView) });
 export type PagerListResponse = z.infer<typeof PagerListResponse>;
+
+/**
+ * WTR-014: the signed-in person's own pager, or null when they wear none, with the low-battery
+ * level (PGR-013 ⚙ `pager.lowBatteryPercent`) at or below which the app warns them.
+ */
+export const MyPagerResponse = z.object({
+  pager: PagerView.nullable(),
+  lowBatteryPercent: z.int().min(0).max(100),
+});
+export type MyPagerResponse = z.infer<typeof MyPagerResponse>;

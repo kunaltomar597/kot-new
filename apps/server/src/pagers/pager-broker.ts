@@ -15,6 +15,7 @@ import {
   PagerHeartbeat,
 } from '@rp/contracts';
 import {
+  isLowBattery,
   type NotificationEvent,
   pagerIsOffline,
   pagerLines,
@@ -244,7 +245,13 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
   async checkOffline(now: Date = this.clock.now()): Promise<number> {
     const online = await this.prisma.device.findMany({
       where: { type: 'PAGER', online: true },
-      select: { id: true, restaurantId: true, lastSeenAt: true, batteryPercent: true },
+      select: {
+        id: true,
+        restaurantId: true,
+        staffId: true,
+        lastSeenAt: true,
+        batteryPercent: true,
+      },
     });
     let changed = 0;
     for (const pager of online) {
@@ -252,7 +259,10 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
       if (!pagerIsOffline(pager.lastSeenAt, now, settings.get('pagers.heartbeatSeconds'))) continue;
       await this.prisma.transaction(async (tx) => {
         await tx.device.update({ where: { id: pager.id }, data: { online: false } });
-        await this.statusEvent(tx, pager.restaurantId, pager.id, false, pager.batteryPercent);
+        await this.statusEvent(tx, pager.restaurantId, pager.id, pager.staffId, {
+          online: false,
+          batteryPercent: pager.batteryPercent,
+        });
       });
       this.connected.delete(pager.id);
       changed += 1;
@@ -324,7 +334,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
   private async heartbeat(pager: ConnectedPager, beat: PagerHeartbeat): Promise<void> {
     const now = this.clock.now();
     const settings = await this.notifications.settingsOf(pager.restaurantId);
-    const threshold = settings.get('notifications.lowBatteryPercent');
+    const threshold = settings.get('pager.lowBatteryPercent');
     await this.prisma.transaction(async (tx) => {
       const before = await tx.device.findUniqueOrThrow({
         where: { id: pager.deviceId },
@@ -340,21 +350,25 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
           firmwareVersion: beat.firmware,
         },
       });
-      const wasLow = before.batteryPercent !== null && before.batteryPercent <= threshold;
-      const isLow = beat.battery <= threshold;
+      const wasLow = isLowBattery(before.batteryPercent, threshold);
+      const isLow = isLowBattery(beat.battery, threshold);
       // Only a change of state is news (Appendix C: once per state change).
       if (!before.online || wasLow !== isLow) {
-        await this.statusEvent(tx, pager.restaurantId, pager.deviceId, true, beat.battery);
+        await this.statusEvent(tx, pager.restaurantId, pager.deviceId, pager.staffId, {
+          online: true,
+          batteryPercent: beat.battery,
+        });
       }
     });
   }
 
+  /** Managers see every pager's status; the wearer hears about their own (WTR-014). */
   private async statusEvent(
     tx: TransactionClient,
     restaurantId: string,
     deviceId: string,
-    online: boolean,
-    batteryPercent: number | null,
+    wearerId: string | null,
+    { online, batteryPercent }: { online: boolean; batteryPercent: number | null },
   ): Promise<void> {
     const now = this.clock.now();
     await appendEvent(
@@ -373,7 +387,10 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
           ...(batteryPercent !== null && { batteryPercent }),
         },
       },
-      { aggregate: { type: 'device', id: deviceId } },
+      {
+        aggregate: { type: 'device', id: deviceId },
+        ...(wearerId !== null && { audience: { staffIds: [wearerId] } }),
+      },
     );
   }
 

@@ -187,26 +187,31 @@ export function fakeLocalServer(
     });
 }
 
-/** A valid `event` frame (an item became ready) for tests of live updates. */
-export function itemReadyFrame(sequence: number) {
-  const id = '0199a0e0-0000-7000-8000-0000000000f1';
+/** A valid `event` frame for tests of live updates; its payload must match the event's contract. */
+export function eventFrame(sequence: number, type: string, payload: Record<string, unknown>) {
   return {
     sequence,
     event: {
-      eventId: id,
-      type: 'ItemStatusChanged',
+      eventId: `0199a0e0-0000-7000-8000-${String(sequence).padStart(12, '0')}`,
+      type,
       version: 1,
       occurredAt: '2026-09-26T08:40:00.000Z',
       restaurantId: RESTAURANT_ID,
       businessDate: '2026-09-26',
-      payload: {
-        orderId: id,
-        orderItemId: id,
-        from: 'SENT',
-        to: 'READY',
-        actorId: id,
-        deviceId: id,
-      },
+      payload,
     },
   };
+}
+
+/** A valid `event` frame (an item became ready) for tests of live updates. */
+export function itemReadyFrame(sequence: number) {
+  const id = '0199a0e0-0000-7000-8000-0000000000f1';
+  return eventFrame(sequence, 'ItemStatusChanged', {
+    orderId: id,
+    orderItemId: id,
+    from: 'SENT',
+    to: 'READY',
+    actorId: id,
+    deviceId: id,
+  });
 }

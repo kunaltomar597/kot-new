@@ -4,14 +4,23 @@ React Native + Expo SDK 57 (development builds, not Expo Go), Android only. A pa
 staff PIN login (WTR-001). Built by P2-01 (foundation, done), P2-02, P2-06, P3-03 (approvals
 inbox) and P3-05 (upsell).
 
-What it does today (P2-01c): pairs with the local server (address and manager's code; the device
-key is created in the Android Keystore), lists the staff who may use a waiter phone (waiters,
-managers, the owner), signs one in with their PIN and shows every table with its live state.
+What it does today (P2-01c, P2-02a): pairs with the local server (address and manager's code; the
+device key is created in the Android Keystore), lists the staff who may use a waiter phone
+(waiters, managers, the owner) and signs one in with their PIN. Home is "My tables" (the waiter's
+sections and tables for today, and any table they are responsible for) or all tables, grouped by
+section with state, guests, time seated, waiter and anything waiting; the waiter's pager with its
+connection and battery, and a warning when it is offline or low (WTR-014). Tapping a table opens
+it with its guests (TBL-003), moves it to a free table (TBL-005, own tables only for waiters) or
+asks for the bill (WTR-008). Order taking arrives with P2-02b.
 
 Where things are:
 
 - `src/App.tsx`: pairing → login → home, from the device session's state.
-- `src/WaiterHome.tsx`: the live tables (P2-02 turns it into "My tables" with order taking).
+- `src/TablesScreen.tsx`: "My tables" and all tables, read again after table, order, bill and
+  service-request events (`@rp/ordering` `myTableIds`, `floorSections`).
+- `src/TableSheet.tsx`: open, move and request the bill for one table.
+- `src/PagerCard.tsx`: the waiter's own pager (`GET /api/v1/pagers/mine`), read again on
+  `DeviceStatusChanged` and every minute for the battery level.
 - `src/Root.tsx`: wires `@rp/mobile-core`'s `DeviceSession` to the Keystore key and the secure
   and plain stores from `@rp/mobile-native`.
 - Shared screens (pairing, PIN login, connection banner, `useLive`) are in `@rp/mobile-shell`.
@@ -19,7 +28,7 @@ Where things are:
   its own package (`in.rp.waiter.dev`, `.preview`, `in.rp.waiter`). Only development builds
   allow cleartext HTTP, for a development server without TLS.
 - `eas.json`: EAS Build profiles (APKs) and EAS Update channels.
-- `.maestro/`: the smoke flow.
+- `.maestro/`: the smoke flow (pair, sign in, open a free table, ask for its bill).
 
 ## Commands
 
@@ -41,9 +50,10 @@ as an artifact.
    waiter phone in the console (Manage → Devices).
 2. Install the debug APK from CI (or `pnpm --filter @rp/waiter-app android`) on an emulator and
    start Metro: `pnpm --filter @rp/waiter-app start`.
-3. `maestro test -e PAIRING_CODE=ABCD-EFGH apps/waiter-app/.maestro`. The flow assumes the
-   emulator reaches the PC as `10.0.2.2` (server on 3000, Metro on 8081); override `SERVER`,
-   `METRO`, `STAFF_NAME` and `PIN` with `-e` for a real phone.
+3. `maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE=T1 apps/waiter-app/.maestro`, where `TABLE`
+   is a free table (the flow opens it and asks for its bill). The flow assumes the emulator reaches
+   the PC as `10.0.2.2` (server on 3000, Metro on 8081); override `SERVER`, `METRO`, `STAFF_NAME`
+   and `PIN` with `-e` for a real phone.
 
 ## Signed builds and updates (Business Owner, OWNER_CHECKLIST items 7 and 8)
 

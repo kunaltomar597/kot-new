@@ -1,7 +1,7 @@
 import type { FloorResponse, TableOverviewResponse } from '@rp/contracts';
 import { useConsole } from '../app/console-context.js';
 import { type LiveData, useLive } from '../app/use-live.js';
-import { affectsFloor } from './floor-view.js';
+import { affectsFloor } from '@rp/ordering';
 
 export type FloorData = LiveData<{
   readonly floor: FloorResponse;
