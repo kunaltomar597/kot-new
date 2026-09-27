@@ -28,7 +28,7 @@ What exists:
   the signed-in person's own pager (P2-02a); each KOT's station and print status on orders and
   `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c);
   the pairing QR code with the server's addresses and CA fingerprint (P2-01d); a waiter phone's
-  own alerts (P2-06a). 485 tests.
+  own alerts (P2-06a). 486 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (61 tables after the later migrations), least-privilege roles,
@@ -861,6 +861,9 @@ Security-sensitive PRs for the P8-03 human review:
   phones), and own-table cancel checks.
 - #57 P2-01d: the phones' trust manager pinning the LAN CA, the untrusted CA download before
   pairing, the server addresses in the pairing QR code, and the camera permission.
+- #58 P2-06a: the waiter phone's holder set at sign-in and cleared at logout, the device-only
+  routes that list and acknowledge the holder's alerts without a PIN, the alerts-only socket room
+  and the gateway sweep order.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -886,9 +889,11 @@ acknowledges. `@rp/ordering` `describeAlert` and `alertAge` word them; `@rp/mobi
 `AlertBanner` shows them on every `Screen` with a list sheet. The waiter app follows alerts, and
 its Maestro flow acknowledges the food-ready alert.
 
-Tests: domain 176 (was 174), server 665 (was 654: `phone-alerts.int.test.ts`, the phone's
-acknowledgement stopping the pager's repeats, the alert rooms, the renewed phone connection),
-ordering 34 (was 27), mobile-core 58 (was 47), mobile-shell 34 (was 27), waiter app 40 (was 38).
+Tests: domain 176 (was 174), contracts 486 (was 485: the new schema snapshot; `AlertView` and
+`AlertListResponse` snapshots updated), server 665 (was 654: `phone-alerts.int.test.ts`, the
+phone's acknowledgement stopping the pager's repeats, the alert rooms, the renewed phone
+connection), ordering 34 (was 27), mobile-core 58 (was 47), mobile-shell 34 (was 27), waiter app
+40 (was 38).
 
 Gotchas:
 
