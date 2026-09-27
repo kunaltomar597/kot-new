@@ -57,9 +57,6 @@ interface Table {
   session: TableOverviewEntry['session'];
 }
 
-/** A request from a table as the server keeps it: its table is wherever its session is now. */
-type StoredRequest = Omit<ServiceRequestView, 'tableId' | 'tableLabel'>;
-
 function session(n: number, waiterId: string, covers: number): TableOverviewEntry['session'] {
   return {
     id: id(n),
@@ -70,28 +67,6 @@ function session(n: number, waiterId: string, covers: number): TableOverviewEntr
     amountSoFar: 64_000,
     pendingApprovals: 0,
     readyItems: 0,
-  };
-}
-
-/** A request raised on a table's tablet some minutes ago, not answered yet. */
-export function request(
-  n: number,
-  type: ServiceRequestView['type'],
-  tableSessionId: string,
-  minutesAgo: number,
-): StoredRequest {
-  return {
-    id: id(n),
-    type,
-    state: 'ACTIVE',
-    source: 'TABLE_TABLET',
-    tableSessionId,
-    createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
-    escalatedAt: null,
-    acknowledgedAt: null,
-    acknowledgedById: null,
-    acknowledgedByName: null,
-    closedAt: null,
   };
 }
 
@@ -141,8 +116,9 @@ export class Restaurant {
   holder: DeviceAlertsResponse['holder'] = { staffId: RAVI, displayName: 'Ravi' };
   alerts: AlertView[] = [];
 
-  /** T2 asked for water four minutes ago (TAB-004); requests by age, oldest first. */
-  serviceRequests: StoredRequest[] = [request(9601, 'WATER', T2_SESSION, 4)];
+  /** Requests from the tables, oldest first, as the server keeps them (closed ones too). */
+  serviceRequests: ServiceRequestView[] = [];
+  private nextRequest = 9600;
 
   /** The menu the server hands out; tests change it as the kitchen runs out. */
   menu: MenuSnapshot = MENU;
@@ -157,6 +133,48 @@ export class Restaurant {
   /** Manager approvals issued and not used yet (single use, AUTH-011). */
   private readonly approvals = new Set<string>();
   private nextOrder = 20;
+
+  constructor() {
+    // T2 asked for water four minutes ago, on its tablet (TAB-004).
+    this.ask('T2', 'WATER', 4);
+  }
+
+  /** A diner at the table asks, `minutesAgo` minutes ago; `now` is how it stands since. */
+  ask(
+    label: string,
+    type: ServiceRequestView['type'],
+    minutesAgo: number,
+    now: Partial<ServiceRequestView> = {},
+  ): ServiceRequestView {
+    const table = this.table(label);
+    if (table.session === null) throw new Error(`${label} is not open`);
+    this.nextRequest += 1;
+    const asked: ServiceRequestView = {
+      id: id(this.nextRequest),
+      type,
+      state: 'ACTIVE',
+      source: 'TABLE_TABLET',
+      tableId: table.id,
+      tableLabel: table.label,
+      tableSessionId: table.session.id,
+      createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+      escalatedAt: null,
+      acknowledgedAt: null,
+      acknowledgedById: null,
+      acknowledgedByName: null,
+      closedAt: null,
+      ...now,
+    };
+    this.serviceRequests.push(asked);
+    return asked;
+  }
+
+  /** Changes a request as another device or the server did meanwhile. */
+  update(requestId: string, changes: Partial<ServiceRequestView>): void {
+    this.serviceRequests = this.serviceRequests.map((asked) =>
+      asked.id === requestId ? { ...asked, ...changes } : asked,
+    );
+  }
 
   table(label: string): Table {
     const found = this.tables.find((table) => table.label === label);
@@ -183,53 +201,46 @@ export class Restaurant {
   }
 
   /** A table session's requests still open, as the server counts them. */
-  openRequests(sessionId: string): StoredRequest[] {
+  openRequests(sessionId: string): ServiceRequestView[] {
     return this.serviceRequests.filter(
-      (open) => open.tableSessionId === sessionId && open.closedAt === null,
+      (asked) => asked.tableSessionId === sessionId && asked.closedAt === null,
     );
   }
 
   /** The open requests as the waiter's inbox reads them, each at its session's table now. */
   requestViews(): ServiceRequestView[] {
-    return this.serviceRequests.flatMap((stored) => {
-      const table = this.tables.find(
-        (candidate) => candidate.session?.id === stored.tableSessionId,
-      );
-      if (table === undefined || stored.closedAt !== null) return [];
-      return [{ ...stored, tableId: table.id, tableLabel: table.label }];
+    return this.serviceRequests.flatMap((asked) => {
+      const table = this.tables.find((candidate) => candidate.session?.id === asked.tableSessionId);
+      if (table === undefined || asked.closedAt !== null) return [];
+      return [{ ...asked, tableId: table.id, tableLabel: table.label }];
     });
   }
 
-  /** Acknowledge or resolve, as the server's request machine allows (WTR-005). */
+  /**
+   * Acknowledge or resolve as the server does (WTR-005): the first acknowledgement stands,
+   * resolving an unanswered request acknowledges it on the way, and a closed one stays closed.
+   */
   private requestStep(call: RecordedCall, step: 'acknowledge' | 'resolve'): FakeResponse {
-    const stored = this.serviceRequests.find((candidate) => call.path.includes(candidate.id));
-    const view = this.requestViews().find((open) => open.id === stored?.id);
-    if (stored === undefined || view === undefined) {
+    const asked = this.serviceRequests.find((candidate) => call.path.includes(candidate.id));
+    if (asked === undefined) {
       return {
         status: 404,
-        body: { code: 'SERVICE_REQUEST_NOT_FOUND', message: 'This request has been dealt with.' },
+        body: { code: 'SERVICE_REQUEST_NOT_FOUND', message: 'There is no such service request.' },
       };
     }
     const at = new Date().toISOString();
-    if (step === 'acknowledge' && stored.state === 'ACKNOWLEDGED') {
-      return {
-        status: 409,
-        body: { code: 'INVALID_TRANSITION', message: 'Someone is on the way already.' },
-      };
-    }
-    // Resolving an unanswered request acknowledges it on the way, as on the server.
-    const next: StoredRequest = {
-      ...stored,
-      ...(stored.acknowledgedAt === null && {
-        state: 'ACKNOWLEDGED',
-        acknowledgedAt: at,
-        acknowledgedById: RAVI,
-        acknowledgedByName: 'Ravi',
-      }),
-      ...(step === 'resolve' && { state: 'RESOLVED', closedAt: at }),
-    };
-    this.serviceRequests = this.serviceRequests.map((open) => (open === stored ? next : open));
-    return { status: 200, body: { ...view, ...next } };
+    const open = asked.closedAt === null;
+    this.update(asked.id, {
+      ...(open &&
+        asked.acknowledgedAt === null && {
+          state: 'ACKNOWLEDGED',
+          acknowledgedAt: at,
+          acknowledgedById: RAVI,
+          acknowledgedByName: 'Ravi',
+        }),
+      ...(open && step === 'resolve' && { state: 'RESOLVED', closedAt: at }),
+    });
+    return { status: 200, body: this.serviceRequests.find((now) => now.id === asked.id) };
   }
 
   /** Dishes waiting at the pass for a table session, as the server counts them. */

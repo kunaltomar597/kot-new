@@ -1,36 +1,33 @@
 import { eventFrame } from '@rp/mobile-core/testing';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { KIRAN, request, Restaurant, signedInApp, T2_SESSION } from './restaurant';
+import { KIRAN, Restaurant, signedInApp, T2_SESSION } from './restaurant';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 
 const inbox = () => screen.findByTestId('service-requests');
+/** T2's water, asked for four minutes before each test. */
 const T2_WATER = '0199a0e0-0000-7000-8000-000000009601';
 
-/** The open session of a table in the fake restaurant. */
-function sessionOf(restaurant: Restaurant, label: string): string {
-  const session = restaurant.table(label).session;
-  if (session === null) throw new Error(`${label} is not open`);
-  return session.id;
-}
+const gone = () =>
+  waitFor(() => {
+    expect(screen.queryByTestId('service-requests')).toBeNull();
+  });
+
+const byKiran = () => ({
+  state: 'ACKNOWLEDGED' as const,
+  acknowledgedAt: new Date().toISOString(),
+  acknowledgedById: KIRAN,
+  acknowledgedByName: 'Kiran',
+});
 
 describe('[WTR-005] the service request inbox', () => {
   it('lists the requests at the waiter’s tables with table and age, then every table’s', async () => {
     const restaurant = new Restaurant();
-    restaurant.serviceRequests.push(
-      {
-        ...request(9602, 'WAITER', sessionOf(restaurant, 'T5'), 3),
-        state: 'ESCALATED',
-        escalatedAt: new Date(Date.now() - 60_000).toISOString(),
-      },
-      {
-        ...request(9603, 'BILL', sessionOf(restaurant, 'T3'), 2),
-        state: 'ACKNOWLEDGED',
-        acknowledgedAt: new Date().toISOString(),
-        acknowledgedById: KIRAN,
-        acknowledgedByName: 'Kiran',
-      },
-    );
+    restaurant.ask('T5', 'WAITER', 3, {
+      state: 'ESCALATED',
+      escalatedAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+    restaurant.ask('T3', 'BILL', 2, byKiran());
     await signedInApp(restaurant);
 
     const mine = await inbox();
@@ -56,7 +53,6 @@ describe('[WTR-005] the service request inbox', () => {
     await fireEvent.press(screen.getByRole('tab', { name: 'All tables' }));
     const all = await inbox();
     expect(within(all).getByRole('header', { name: '3 requests from tables' })).toBeOnTheScreen();
-    expect(within(all).getByText('Table T5 · Waiter called')).toBeOnTheScreen();
     expect(within(all).getByText('3 min ago · Managers were alerted too')).toBeOnTheScreen();
     // Oldest first.
     const [first, second, third] = within(all).getAllByText(/^Table T/);
@@ -76,9 +72,7 @@ describe('[WTR-005] the service request inbox', () => {
     );
 
     await fireEvent.press(screen.getByTestId(`request-${T2_WATER}-resolve`));
-    await waitFor(() => {
-      expect(screen.queryByTestId('service-requests')).toBeNull();
-    });
+    await gone();
     expect(server.callsTo('POST', `/api/v1/service-requests/${T2_WATER}/resolve`)).toHaveLength(1);
   });
 
@@ -86,10 +80,11 @@ describe('[WTR-005] the service request inbox', () => {
     const { restaurant } = await signedInApp();
     await inbox();
     await fireEvent.press(screen.getByTestId(`request-${T2_WATER}-resolve`));
-    await waitFor(() => {
-      expect(screen.queryByTestId('service-requests')).toBeNull();
+    await gone();
+    expect(restaurant.serviceRequests[0]).toMatchObject({
+      state: 'RESOLVED',
+      acknowledgedByName: 'Ravi',
     });
-    expect(restaurant.serviceRequests[0]).toMatchObject({ state: 'RESOLVED' });
     expect(restaurant.openRequests(T2_SESSION)).toEqual([]);
   });
 
@@ -97,15 +92,14 @@ describe('[WTR-005] the service request inbox', () => {
     const restaurant = new Restaurant();
     const { sockets } = await signedInApp(restaurant);
     await inbox();
-    const t3 = sessionOf(restaurant, 'T3');
-    restaurant.serviceRequests.push(request(9604, 'BILL', t3, 0));
+    const bill = restaurant.ask('T3', 'BILL', 0);
     await act(async () => {
       sockets.sync(0);
       sockets.last.fire(
         'event',
         eventFrame(1, 'ServiceRequestRaised', {
-          serviceRequestId: '0199a0e0-0000-7000-8000-000000009604',
-          tableId: restaurant.table('T3').id,
+          serviceRequestId: bill.id,
+          tableId: bill.tableId,
           type: 'BILL',
         }),
       );
@@ -116,35 +110,42 @@ describe('[WTR-005] the service request inbox', () => {
     expect(screen.getByRole('header', { name: '2 requests from tables' })).toBeOnTheScreen();
   });
 
-  it('says why an action failed, and shows the request as it is now', async () => {
+  it('shows who got there first, and what is left when another device dealt with it', async () => {
     const restaurant = new Restaurant();
     await signedInApp(restaurant);
     await inbox();
-    // Kiran got there first, from his phone.
-    restaurant.serviceRequests = restaurant.serviceRequests.map((open) => ({
-      ...open,
-      state: 'ACKNOWLEDGED',
-      acknowledgedAt: new Date().toISOString(),
-      acknowledgedById: KIRAN,
-      acknowledgedByName: 'Kiran',
-    }));
+    // Kiran acknowledged on his phone meanwhile: his stands.
+    restaurant.update(T2_WATER, byKiran());
     await fireEvent.press(screen.getByTestId(`request-${T2_WATER}-acknowledge`));
-    expect(
-      await screen.findByText('Not acknowledged: Someone is on the way already.'),
-    ).toBeOnTheScreen();
     expect(await screen.findByText('4 min ago · Kiran is on the way')).toBeOnTheScreen();
 
-    // Resolved elsewhere meanwhile.
-    restaurant.serviceRequests = [];
+    // The diner pressed Cancel on the tablet meanwhile.
+    restaurant.update(T2_WATER, { state: 'CANCELLED', closedAt: new Date().toISOString() });
     await fireEvent.press(screen.getByTestId(`request-${T2_WATER}-resolve`));
-    await waitFor(() => {
-      expect(screen.queryByTestId('service-requests')).toBeNull();
-    });
+    await gone();
+    expect(restaurant.serviceRequests[0]).toMatchObject({ state: 'CANCELLED' });
+  });
+
+  it('says why an action failed, and keeps the request', async () => {
+    const restaurant = new Restaurant();
+    const server = restaurant
+      .server()
+      .on('POST', '/api/v1/service-requests/:requestId/acknowledge', () => ({
+        status: 500,
+        body: { code: 'INTERNAL', message: 'The server had a problem.' },
+      }));
+    await signedInApp(restaurant, server);
+    await inbox();
+    await fireEvent.press(screen.getByTestId(`request-${T2_WATER}-acknowledge`));
+    expect(
+      await screen.findByText('Not acknowledged: The server had a problem.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByTestId(`request-${T2_WATER}-acknowledge`)).toBeOnTheScreen();
   });
 
   it('shows a table’s own requests on its screen', async () => {
     const restaurant = new Restaurant();
-    restaurant.serviceRequests.push(request(9605, 'WAITER', sessionOf(restaurant, 'T3'), 1));
+    restaurant.ask('T3', 'WAITER', 1);
     await signedInApp(restaurant);
     await fireEvent.press(await screen.findByRole('button', { name: /^T2, Occupied/ }));
     expect(await screen.findByRole('header', { name: 'Table T2' })).toBeOnTheScreen();
@@ -153,9 +154,7 @@ describe('[WTR-005] the service request inbox', () => {
     expect(within(own).getByText('Table T2 · Water requested')).toBeOnTheScreen();
     expect(within(own).queryByText(/Table T3/)).toBeNull();
     await fireEvent.press(within(own).getByTestId(`request-${T2_WATER}-resolve`));
-    await waitFor(() => {
-      expect(screen.queryByTestId('service-requests')).toBeNull();
-    });
+    await gone();
   });
 
   it('says when the requests cannot be read, with a retry', async () => {
