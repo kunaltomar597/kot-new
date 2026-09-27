@@ -3,7 +3,8 @@ import type { INestApplication } from '@nestjs/common';
 import { REALTIME_CONNECT_ERRORS, type DomainEvent } from '@rp/contracts';
 import { businessDateOf } from '@rp/domain';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { SessionService } from '../../src/auth/session.service.js';
 import { APP_CONFIG, type AppConfig } from '../../src/config/app-config.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { EventBus } from '../../src/events/event-bus.js';
@@ -487,6 +488,31 @@ describe('[AUTH-008] [AUTH-005] live connections end when their credentials do',
     // The phone no longer alerts the waiter (P2-06a): it reconnects without their alert room.
     expect(await deviceOnly.waitForDisconnect(5_000)).toBe('io server disconnect');
     expect(deviceOnly.endings).toEqual([{ reason: 'DEVICE_CHANGED' }]);
+  });
+
+  it('[WTR-006] says the person signed out when the sign-out lands between its reads', async () => {
+    const phone = await addDevice(app, kit, 'WAITER_PHONE');
+    const waiter = await signIn(app, kit, 'WAITER', phone);
+    const client = await connect(auth(phone, waiter.accessToken));
+    const sessions = app.get(SessionService);
+    const read = sessions.liveSessions.bind(sessions);
+    // The next check reads the sessions just before the sign-out commits, the devices just after:
+    // the phone's holder is gone while the session still looked live.
+    const spy = vi.spyOn(sessions, 'liveSessions').mockImplementationOnce(async (...args) => {
+      const live = await read(...args);
+      await request(httpServer(app))
+        .post('/api/v1/auth/logout')
+        .set(authHeaders(phone, waiter.accessToken))
+        .expect(204);
+      return live;
+    });
+    try {
+      await app.get(RealtimeGateway).sweep();
+      expect(await client.waitForDisconnect(5_000)).toBe('io server disconnect');
+      expect(client.endings).toEqual([{ reason: 'SESSION_ENDED' }]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('ends the connection when the person’s role changes', async () => {
