@@ -1,6 +1,7 @@
-# Smoke flow (P2-01c, WTR-001): pair with the local server, sign a waiter in, see the live tables.
+# Smoke flow (P2-01c, P2-02a; WTR-001, WTR-002, TBL-003, WTR-008): pair with the local server, sign
+# a waiter in, see the live tables, open a free table and ask for its bill. TABLE must be free.
 # Run against a development build with Metro running (see apps/waiter-app/README.md):
-#   maestro test -e PAIRING_CODE=ABCD-EFGH apps/waiter-app/.maestro
+#   maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE=T1 apps/waiter-app/.maestro
 appId: ${APP_ID}
 env:
   APP_ID: in.rp.waiter.dev
@@ -8,6 +9,7 @@ env:
   SERVER: http://10.0.2.2:3000
   STAFF_NAME: Ravi
   PIN: '4444'
+  TABLE: T1
 ---
 - launchApp:
     clearState: true
@@ -32,5 +34,14 @@ env:
 - tapOn: ${PIN.charAt(3)}
 - assertVisible: Tables
 - assertVisible: Signed in as ${STAFF_NAME}
+- tapOn: All tables
+- tapOn: ${TABLE}, Free.*
+- tapOn: One more
+- tapOn:
+    id: open-table
+- assertVisible: ${TABLE} is open
+- tapOn: ${TABLE}, Occupied.*
+- tapOn: Request bill
+- assertVisible: The cashier has been asked for the bill for ${TABLE}.
 - tapOn: Sign out
 - assertVisible: Tap your name

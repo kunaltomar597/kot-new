@@ -1,13 +1,16 @@
 import type { Combo, MenuItem, MenuSnapshot } from '@rp/contracts';
+
+/** Where an item is sold: POS, waiter app, table tablet or QR menu. */
+export type SalesChannel = MenuItem['channels'][number];
 import type { ModifierGroupDef, SelectableItemDef } from '@rp/domain';
 
-/** Items the POS may sell (channel POS, not archived), in category and display order. */
-export function posItems(menu: MenuSnapshot): MenuItem[] {
+/** Items a channel may sell (not archived), in category and display order. */
+export function channelItems(menu: MenuSnapshot, channel: SalesChannel): MenuItem[] {
   const categoryOrder = new Map(
     menu.categories.map((category) => [category.id, category.displayOrder]),
   );
   return menu.items
-    .filter((item) => !item.archived && item.channels.includes('POS'))
+    .filter((item) => !item.archived && item.channels.includes(channel))
     .sort(
       (a, b) =>
         (categoryOrder.get(a.categoryId) ?? 0) - (categoryOrder.get(b.categoryId) ?? 0) ||
@@ -16,7 +19,7 @@ export function posItems(menu: MenuSnapshot): MenuItem[] {
 }
 
 /** Categories that have something to sell, in display order. */
-export function posCategories(menu: MenuSnapshot, items: readonly MenuItem[]) {
+export function menuCategories(menu: MenuSnapshot, items: readonly MenuItem[]) {
   const used = new Set(items.map((item) => item.categoryId));
   return menu.categories
     .filter((category) => used.has(category.id))

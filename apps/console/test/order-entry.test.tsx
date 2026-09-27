@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { RESTAURANT_ID } from './fakes.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
-import { IDS, MENU, sentOrder } from './menu-fixture.js';
+import { IDS, MENU, sentOrder } from '@rp/ordering/testing';
 
 const TABLE_PATH = `/pos/table/${IDS.session}?label=T1`;
 

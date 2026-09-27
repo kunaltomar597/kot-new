@@ -26,18 +26,18 @@ import {
   removeLine,
   requestLines,
   updateLine,
-} from './cart.js';
+} from '@rp/ordering';
 import { useOpenBill } from '../billing/use-open-bill.js';
 import { ItemDialog } from './ItemDialog.js';
-import { displayState } from './order-state.js';
+import { displayState } from '@rp/ordering';
 import {
   comboOf,
   displayPrice,
   needsOptions,
-  posCategories,
-  posItems,
+  channelItems,
+  menuCategories,
   visibleItems,
-} from './menu-view.js';
+} from '@rp/ordering';
 
 /** Who the order is for: a seated table session, or a takeaway customer (TBL-008). */
 export type OrderTarget =
@@ -231,8 +231,8 @@ function MenuBrowser({
   onChoose: (item: MenuItem, menu: MenuSnapshot) => void;
 }) {
   const t = useT();
-  const items = posItems(menu);
-  const categories = posCategories(menu, items);
+  const items = channelItems(menu, 'POS');
+  const categories = menuCategories(menu, items);
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState<string | undefined>(categories[0]?.id);
   const shown = visibleItems(items, query, categoryId);

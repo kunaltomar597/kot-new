@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 import {
   affectsFloor,
   floorSections,
+  freeTables,
   minutesSince,
+  myTableIds,
   seatedFor,
   tileAlert,
   tileDetails,
-} from '../src/pos/floor-view.js';
+} from '../src/floor-view.js';
 
 const t = createTranslator();
 const NOW = Date.parse('2026-09-26T10:00:00.000Z');
@@ -123,5 +125,48 @@ describe('[TBL-007] floor view', () => {
     for (const type of ['PrinterStatusChanged', 'SettingsChanged', 'DeviceRevoked']) {
       expect(affectsFloor(type), type).toBe(false);
     }
+  });
+});
+
+describe('[WTR-002] [TBL-002] my tables', () => {
+  const ravi = id(501);
+  const asha = id(502);
+  const hall = id(100);
+  const terrace = id(101);
+  const session = (waiterId: string) => ({
+    id: id(900),
+    openedAt: '2026-09-26T09:30:00.000Z',
+    covers: 2,
+    waiterId,
+    waiterName: waiterId === ravi ? 'Ravi' : 'Asha',
+    amountSoFar: 0,
+    pendingApprovals: 0,
+  });
+  const overview = {
+    tables: [
+      live(1),
+      live(2),
+      live(3),
+      live(4, { sectionId: terrace }),
+      live(5, { sectionId: terrace, state: 'OCCUPIED', session: session(ravi) }),
+    ],
+  };
+
+  it('takes the waiter’s sections, minus tables given to someone else, plus tables given to them', () => {
+    const assignments = [
+      { staffId: ravi, staffName: 'Ravi', sectionIds: [hall], tableIds: [] },
+      { staffId: asha, staffName: 'Asha', sectionIds: [], tableIds: [id(2), id(4)] },
+    ];
+    expect([...myTableIds(ravi, overview, assignments)].sort()).toEqual([id(1), id(3), id(5)]);
+    expect([...myTableIds(asha, overview, assignments)].sort()).toEqual([id(2), id(4)]);
+  });
+
+  it('includes an open table the waiter is responsible for, even with no assignments', () => {
+    expect([...myTableIds(ravi, overview, [])]).toEqual([id(5)]);
+    expect(myTableIds(asha, overview, []).size).toBe(0);
+  });
+
+  it('offers only free tables to move to', () => {
+    expect(freeTables(overview).map((table) => table.label)).toEqual(['T1', 'T2', 'T3', 'T4']);
   });
 });

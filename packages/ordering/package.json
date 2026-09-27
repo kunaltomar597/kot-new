@@ -1,0 +1,33 @@
+{
+  "name": "@rp/ordering",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ordering and floor helpers shared by the POS console and the waiter app: the cart, menu views for a sales channel, order item display state and the table overview (NFR-M01).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@rp/contracts": "workspace:*",
+    "@rp/domain": "workspace:*",
+    "@rp/i18n": "workspace:*"
+  }
+}

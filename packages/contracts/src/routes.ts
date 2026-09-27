@@ -58,6 +58,7 @@ import { MenuImportReport, MenuImportRequest, MenuTemplateResponse } from './men
 import {
   AssignPagerRequest,
   CreatePagerRequest,
+  MyPagerResponse,
   PagerCredentialResponse,
   PagerListResponse,
   PagerParams,
@@ -1791,6 +1792,25 @@ export const ROUTES = [
     capability: 'DEVICE_PAIR',
     responses: {
       200: { description: 'Pagers.', schema: PagerListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getMyPager',
+    method: 'GET',
+    path: '/api/v1/pagers/mine',
+    summary: "The signed-in person's own pager with battery and connection",
+    description:
+      'WTR-014: the waiter app shows it and warns when the pager is offline or its battery is at ' +
+      'or below `lowBatteryPercent`. Read again on `DeviceStatusChanged`, which reaches the wearer.',
+    tags: ['pagers'],
+    requirements: ['WTR-014', 'PGR-007', 'PGR-013'],
+    capability: 'SESSION',
+    responses: {
+      200: {
+        description: 'The pager, or null when the person wears none.',
+        schema: MyPagerResponse,
+      },
       ...standardErrors,
     },
   },

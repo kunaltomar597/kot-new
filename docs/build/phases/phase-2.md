@@ -97,6 +97,57 @@ PIN on the device; out-of-stock shown live; own pager battery/connection status.
 Acceptance: Maestro flows for open → order → send → served; offline draft resent on reconnect
 without duplicates (idempotency test against the server).
 
+P2-02 is split in two.
+
+### P2-02a Waiter tables and pager status (done)
+
+As built:
+
+- `packages/ordering` (`@rp/ordering`): the POS ordering helpers that the console and the phones
+  share (floor sections, tile details and alerts, which events touch the floor, cart lines and
+  the menu tree), moved out of the console. `myTableIds` gives the waiter's tables for today: the
+  sections and tables in the current waiter assignments plus any open table they are responsible
+  for. `freeTables` lists the tables a session may move to.
+- `apps/waiter-app`:
+  - `TablesScreen` is the home (WTR-002): "My tables" or all tables, grouped by section, each a
+    tile with state, guests, time seated, waiter, pending approvals and waiting requests, live
+    from table, order, bill and service-request events. Waiters start on "My tables", everyone
+    else on all tables.
+  - `TableSheet`: a free table opens with a guest count (TBL-003). An open table can move to a
+    free one (TBL-005), shown only when `TABLE_MOVE_MERGE` allows it (waiters their own tables,
+    managers any), and can ask for the bill while occupied (WTR-008). The server's answer is
+    shown when another device got there first.
+  - `PagerCard` (WTR-014): the waiter's own pager, connected or not, with its battery, warning
+    below the pager's low-battery level. It reads again on `DeviceStatusChanged` and every minute,
+    because battery levels are not announced.
+- Server: `GET /api/v1/pagers/mine` returns the signed-in person's active pager and
+  `pager.lowBatteryPercent`. Low battery now uses a level per device type: `pager.lowBatteryPercent`
+  (15 %, PGR-013) for pagers and `devices.lowBatteryAlertPercent` (20 %, TAB-015) for tablets and
+  kitchen screens; `notifications.lowBatteryPercent` is gone. `isLowBattery` and `pagerWarning`
+  are in `@rp/domain`. `DeviceStatusChanged` for a pager also reaches its wearer.
+- `@rp/ui-native`: `TableTile` and `SegmentedControl`. `@rp/mobile-shell`: `useNow`.
+  `@rp/mobile-core/testing`: `eventFrame`, and the fake server matches `:param` path segments.
+- The Maestro flow `pair-login-tables.yaml` now opens a table and asks for its bill.
+
+### P2-02b Order taking
+
+Depends on: P2-02a, P1-06.
+Deliverables:
+
+- Order taking from a table: categories, search, item details, the shared selection popup (sizes,
+  add-ons, combos), quantity and instructions, reusing `@rp/ordering`'s cart and menu helpers and
+  the cached menu.
+- Send KOT through the outbox with one idempotency key per submission, and per-KOT delivery
+  confirmation (WTR-003, WTR-012); a draft made offline is sent on reconnect without duplicates.
+- Live item status on the table, and marking items picked up and served (WTR-007).
+- Cancellations and voids with a manager PIN on the device (WTR-009, ORD-011), using the
+  server's override.
+- Out-of-stock items shown live and blocked (WTR-010).
+- Reorder plus send in at most 5 taps (NFR-U03).
+
+Acceptance: a Maestro flow open → order → send → served; the idempotency test against the server
+(an offline draft resent on reconnect creates one order, one set of KOTs and one stock deduction).
+
 ## P2-03 Notification and escalation engine
 
 Goal: events become alerts to the right people and channels, with acknowledgement and escalation.
@@ -154,7 +205,7 @@ As built:
 
 ### P2-03b Nudges, breaks, device, printer and system alerts (done)
 
-As built: `POST /api/v1/alerts/nudge` (`STAFF_MANAGE`; one alert per person, presets in `notifications.nudgePresets`), `POST /api/v1/staff/me/break` (`staff.on_break_since`, migration `20260928020000_staff_break`; `recipientContext` fills `onBreak`), triggers for `DeviceStatusChanged` (pager, tablet, KDS: offline and low battery at `notifications.lowBatteryPercent`, one alert per state) and `PrinterStatusChanged` (until back online), and `SystemAlerts.checkDisk` hourly (`notifications.diskAlertPercent`). Backup and licence alerts use the same engine when P7 adds them; the UI parts are P2-06 and P4.
+As built: `POST /api/v1/alerts/nudge` (`STAFF_MANAGE`; one alert per person, presets in `notifications.nudgePresets`), `POST /api/v1/staff/me/break` (`staff.on_break_since`, migration `20260928020000_staff_break`; `recipientContext` fills `onBreak`), triggers for `DeviceStatusChanged` (pager, tablet, KDS: offline, and low battery at `pager.lowBatteryPercent` for pagers or `devices.lowBatteryAlertPercent` for tablets and kitchen screens, one alert per state; one shared level until P2-02a) and `PrinterStatusChanged` (until back online), and `SystemAlerts.checkDisk` hourly (`notifications.diskAlertPercent`). Backup and licence alerts use the same engine when P7 adds them; the UI parts are P2-06 and P4.
 
 Original scope:
 
