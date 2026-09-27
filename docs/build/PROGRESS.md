@@ -64,7 +64,7 @@ What exists:
   inactivity sign-out, with its own alert routes and room (P2-06a); service requests from the
   table tablet with anti-spam and a rate limit, their alerts kept in step, the waiter's inbox,
   requests ended when the table closes, and a bill asker who is not alerted (P2-06d).
-  SERVER_TESTS tests (4 skipped without a real install).
+  679 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -997,7 +997,7 @@ controllers); `NotificationsService.acknowledgeInTx` for acknowledging an alert 
 transaction; the bill trigger's asker rule; open requests counted on the table overview; the
 waiter app's `ServiceRequests` card on the tables and table screens.
 
-Tests: domain 181 (was 178), contracts 494 (was 486), server SERVER_TESTS (was 665),
+Tests: domain 181 (was 178), contracts 494 (was 486), server 679 (was 665),
 waiter app 52 (was 44).
 
 Gotchas:
