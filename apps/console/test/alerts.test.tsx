@@ -48,7 +48,11 @@ describe('[MGR-008] the alert centre on the manager dashboard', () => {
       kitchenFlag,
       escalatedFood,
     ]);
-    const { container } = await renderConsole({ fake, path: '/manage', signedIn: 'MANAGER' });
+    const { container } = await renderConsole({
+      fake,
+      path: '/manage/alerts',
+      signedIn: 'MANAGER',
+    });
 
     const mine = await group(
       t('alerts.centre.groupHeading', { group: t('alerts.centre.groups.mine'), count: 2 }),
@@ -91,7 +95,7 @@ describe('[MGR-008] the alert centre on the manager dashboard', () => {
         body: { ...kitchenFlag, status: 'ACKNOWLEDGED', acknowledgedAt: kitchenFlag.createdAt },
       }),
     );
-    const { user } = await renderConsole({ fake, path: '/manage', signedIn: 'MANAGER' });
+    const { user } = await renderConsole({ fake, path: '/manage/alerts', signedIn: 'MANAGER' });
 
     await user.click(await acknowledgeOf('Table 4 · Food waiting at the pass'));
     await waitFor(() => {
@@ -112,7 +116,7 @@ describe('[MGR-008] the alert centre on the manager dashboard', () => {
         body: { code: 'ALERT_NOT_FOUND', message: 'There is no such alert for you.' },
       }),
     );
-    const { user } = await renderConsole({ fake, path: '/manage', signedIn: 'MANAGER' });
+    const { user } = await renderConsole({ fake, path: '/manage/alerts', signedIn: 'MANAGER' });
 
     await user.click(await acknowledgeOf('Table 4 · Food waiting at the pass'));
     expect(
@@ -127,7 +131,7 @@ describe('[MGR-008] the alert centre on the manager dashboard', () => {
   it('says when there is nothing open', async () => {
     await renderConsole({
       fake: signsInAs(server(), 'MANAGER'),
-      path: '/manage',
+      path: '/manage/alerts',
       signedIn: 'MANAGER',
     });
     expect(await screen.findByText(t('alerts.centre.none'))).toBeInTheDocument();
@@ -141,7 +145,7 @@ describe('[MGR-008] the alert centre on the manager dashboard', () => {
       () => ({ status: 503, body: { code: 'UNAVAILABLE', message: 'The server is starting.' } }),
       () => ({ status: 200, body: { alerts: [kitchenFlag] } }),
     );
-    const { user } = await renderConsole({ fake, path: '/manage', signedIn: 'MANAGER' });
+    const { user } = await renderConsole({ fake, path: '/manage/alerts', signedIn: 'MANAGER' });
     expect(await screen.findByText(t('alerts.centre.loadFailed'))).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: t('states.retry') }));
     expect(await screen.findByText('Table 4 · Food waiting at the pass')).toBeInTheDocument();

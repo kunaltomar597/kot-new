@@ -324,9 +324,17 @@ export const en = {
         '{count, plural, =0 {No orders in progress} one {# order in progress} other {# orders in progress}}',
       inKitchen:
         '{count, plural, =0 {Nothing in the kitchen} one {# dish in the kitchen} other {# dishes in the kitchen}}',
+      awaiting:
+        '{count, plural, one {# dish waiting for approval} other {# dishes waiting for approval}}',
+      ready:
+        '{count, plural, =0 {Nothing waiting at the pass} one {# dish ready at the pass} other {# dishes ready at the pass}}',
       delayed:
         '{count, plural, =0 {Nothing delayed} one {# dish delayed} other {# dishes delayed}}',
       alerts: '{count, plural, =0 {No open alerts} one {# open alert} other {# open alerts}}',
+      seeOrders: 'See orders',
+      seeDelayed: 'See delayed dishes',
+      seeAlerts: 'See alerts',
+      floor: 'Floor',
       noTables: 'No tables yet. They are added in the floor settings.',
       tableHint: 'Select a table to see its orders.',
     },

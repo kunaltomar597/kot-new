@@ -33,6 +33,15 @@ const fakeKeyPair = () =>
     },
   });
 
+/** An order feed with nothing in progress (dashboard tests replace it). */
+export const EMPTY_FEED = {
+  orders: [],
+  stations: [],
+  waiters: [],
+  settings: { ageRedMinutes: 20, readyNotCollectedMinutes: 3 },
+  serverTime: '2026-09-26T10:00:00.000Z',
+};
+
 /** A kitchen screen with nothing to cook (KDS tests replace it). */
 export const EMPTY_KDS = {
   station: null,
@@ -78,6 +87,9 @@ export function server(type: 'POS' | 'KDS' = 'POS'): FakeServer {
       body: { staff: Object.values(STAFF) },
     }))
     .on('GET', '/api/v1/kds/tickets', () => ({ status: 200, body: EMPTY_KDS }))
+    .on('GET', '/api/v1/floor', () => ({ status: 200, body: { sections: [] } }))
+    .on('GET', '/api/v1/tables/overview', () => ({ status: 200, body: { tables: [] } }))
+    .on('GET', '/api/v1/order-feed', () => ({ status: 200, body: EMPTY_FEED }))
     .on('GET', '/api/v1/alerts', () => ({ status: 200, body: { alerts: [] } }))
     .on('POST', '/api/v1/auth/logout', () => ({ status: 204 }))
     .on('GET', '/api/v1/auth/session', () => ({ status: 200, body: {} }));

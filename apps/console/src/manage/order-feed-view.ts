@@ -50,7 +50,10 @@ function isSource(value: string | null): value is OrderSource {
  * The filter the address asks for. A station or waiter the feed does not offer (a station
  * archived, a waiter gone home) is dropped rather than applied unseen.
  */
-export function filterFromSearch(search: URLSearchParams, feed: OrderFeedResponse): OrderFeedFilter {
+export function filterFromSearch(
+  search: URLSearchParams,
+  feed: OrderFeedResponse,
+): OrderFeedFilter {
   const station = search.get(FILTER_PARAMS.station);
   const waiter = search.get(FILTER_PARAMS.waiter);
   const source = search.get(FILTER_PARAMS.source);
@@ -59,7 +62,9 @@ export function filterFromSearch(search: URLSearchParams, feed: OrderFeedRespons
     stationId: feed.stations.some((option) => option.id === station)
       ? (station ?? undefined)
       : undefined,
-    waiterId: feed.waiters.some((option) => option.id === waiter) ? (waiter ?? undefined) : undefined,
+    waiterId: feed.waiters.some((option) => option.id === waiter)
+      ? (waiter ?? undefined)
+      : undefined,
     source: isSource(source) ? source : undefined,
     tableId: table === null || table === '' ? undefined : table,
     delayedOnly: search.get(FILTER_PARAMS.delayed) === '1',

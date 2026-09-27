@@ -101,9 +101,7 @@ export function OrderFeedScreen() {
       </p>
       {shown.length === 0 ? (
         <EmptyState
-          title={
-            isFiltered(filter) ? t('dashboard.orders.noneMatch') : t('dashboard.orders.none')
-          }
+          title={isFiltered(filter) ? t('dashboard.orders.noneMatch') : t('dashboard.orders.none')}
           action={
             isFiltered(filter) ? (
               <Button variant="secondary" onClick={clear}>
@@ -140,7 +138,11 @@ function FeedFilters({
 }) {
   const t = useT();
   return (
-    <div role="group" aria-label={t('dashboard.orders.filters')} className="dashboard-feed__filters">
+    <div
+      role="group"
+      aria-label={t('dashboard.orders.filters')}
+      className="dashboard-feed__filters"
+    >
       <Select
         label={t('dashboard.orders.station')}
         value={filter.stationId ?? ''}

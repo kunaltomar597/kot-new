@@ -43,7 +43,7 @@ function withPresets(fake: FakeServer, presets: unknown): FakeServer {
 }
 
 async function openNudge(fake: FakeServer) {
-  const rendered = await renderConsole({ fake, path: '/manage', signedIn: 'MANAGER' });
+  const rendered = await renderConsole({ fake, path: '/manage/alerts', signedIn: 'MANAGER' });
   await rendered.user.click(await screen.findByRole('button', { name: t('alerts.nudge.open') }));
   const dialog = await screen.findByRole('dialog', { name: t('alerts.nudge.title') });
   return { ...rendered, dialog };

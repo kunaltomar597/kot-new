@@ -1,11 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { expect, type Page, test } from '@playwright/test';
 import { createTranslator } from '@rp/i18n';
+import pg from 'pg';
 import { type RunningServer, startServer } from './server.js';
 
 /**
  * P0-14b acceptance: a real browser pairs with the real server, people sign in with their PIN and
  * land in their mode, and the offline banner shows while the server is down (NFR-P11). Later work
- * packages add their flows: the POS floor, orders, the kitchen display, billing and alerts.
+ * packages add their flows: the POS floor, orders, the kitchen display, the manager dashboard on a
+ * desktop and a phone, billing and alerts.
  */
 
 const t = createTranslator();
@@ -21,6 +25,66 @@ const PEOPLE = [
 
 function escape(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * axe-core's browser build, to check pages against WCAG 2.2 AA (NFR-U05). It is evaluated through
+ * the browser's debugging protocol: the server's Content Security Policy rightly refuses inline
+ * scripts, so a script tag would not run.
+ */
+const AXE_SOURCE = readFileSync(
+  createRequire(import.meta.url).resolve('axe-core/axe.min.js'),
+  'utf8',
+);
+
+interface AxeViolation {
+  readonly id: string;
+  readonly help: string;
+  readonly nodes: readonly { readonly target: readonly string[] }[];
+}
+
+/** No WCAG 2.2 A or AA violations on the page as it stands, colour contrast included. */
+async function expectAccessible(page: Page): Promise<void> {
+  await page.evaluate(AXE_SOURCE);
+  const violations = await page.evaluate(async () => {
+    const { axe } = window as unknown as {
+      axe: {
+        run: (
+          context: Document,
+          options: { runOnly: { type: 'tag'; values: string[] } },
+        ) => Promise<{ violations: AxeViolation[] }>;
+      };
+    };
+    const results = await axe.run(document, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
+    });
+    return results.violations.map(
+      (violation) =>
+        `${violation.id}: ${violation.help} (${violation.nodes.map((node) => node.target.join(' ')).join(', ')})`,
+    );
+  });
+  expect(violations).toEqual([]);
+}
+
+/** How far the page is wider than the window: 0 when nothing scrolls sideways (MGR-011). */
+function sidewaysOverflow(page: Page): Promise<number> {
+  return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+}
+
+/** Moves an item's "sent to the kitchen" time back, as if the kitchen had it that long. */
+async function sentMinutesAgo(item: string, minutes: number): Promise<void> {
+  const client = new pg.Client({ connectionString: process.env.RP_E2E_DATABASE_URL });
+  await client.connect();
+  try {
+    const { rowCount } = await client.query(
+      `UPDATE order_items SET sent_at = now() - make_interval(mins => $2)
+       WHERE name = $1 AND state = 'SENT'`,
+      [item, minutes],
+    );
+    expect(rowCount).toBe(1);
+  } finally {
+    await client.end();
+  }
 }
 
 test.describe.serial('the web console', () => {
@@ -218,6 +282,76 @@ test.describe.serial('the web console', () => {
     await expect(tickets).toHaveCount(before);
   });
 
+  test('[MGR-001] [MGR-002] [MGR-003] [MGR-011] [NFR-U05] the manager dashboard on a desktop and a phone', async () => {
+    // The takeaway's naan has been in the kitchen for half an hour (kds.ageRedMinutes is 20).
+    await sentMinutesAgo('Butter Naan', 30);
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    const link = (section: 'overview' | 'orders' | 'alerts') =>
+      nav.getByRole('link', { name: t(`dashboard.section.${section}`) });
+    await expect(link('overview')).toHaveAttribute('aria-current', 'page');
+    const glance = page.getByRole('region', { name: t('dashboard.overview.glance') });
+    await expect(
+      glance.getByText(t('dashboard.overview.occupied', { occupied: 1, total: 10 })),
+    ).toBeVisible();
+    await expect(glance.getByText(t('dashboard.overview.guests', { count: 2 }))).toBeVisible();
+    await expect(glance.getByText(t('dashboard.overview.orders', { count: 2 }))).toBeVisible();
+    await expect(glance.getByText(t('dashboard.overview.delayed', { count: 1 }))).toBeVisible();
+    const terrace = page
+      .getByRole('region', { name: t('dashboard.overview.floor') })
+      .getByRole('region', { name: 'Terrace' });
+    await expect(terrace.getByRole('button', { name: /^8, Free/ })).toBeDisabled();
+    await expectAccessible(page);
+
+    // The occupied table opens its orders.
+    await terrace.getByRole('button', { name: /^7, Occupied/ }).click();
+    await expect(page).toHaveURL(/\/manage\/orders\?table=[^&]+&label=7$/);
+    await expect(link('orders')).toHaveAttribute('aria-current', 'page');
+    const feed = page.getByRole('region', { name: t('dashboard.orders.title') });
+    await expect(page.getByText(t('dashboard.orders.table', { table: '7' }))).toBeVisible();
+    const table7 = feed.getByRole('article', { name: /^Table 7 · Order \d+$/ });
+    const token = feed.getByRole('article', { name: /^Token \d+ · Order \d+$/ });
+    await expect(table7).toBeVisible();
+    await expect(table7.getByText(t('pos.itemState.READY')).first()).toBeVisible();
+    await expect(table7.getByText(/^1 × Chicken Tikka \(Full\)$/)).toBeVisible();
+    await expect(token).toHaveCount(0);
+    await page.getByRole('button', { name: t('dashboard.orders.allTables') }).click();
+    await expect(token).toBeVisible();
+
+    // Filters: a station with nothing cooking, then late dishes only.
+    const filters = page.getByRole('group', { name: t('dashboard.orders.filters') });
+    await filters.getByLabel(t('dashboard.orders.station')).selectOption({ label: 'Bar' });
+    await expect(page.getByText(t('dashboard.orders.noneMatch'))).toBeVisible();
+    await filters.getByLabel(t('dashboard.orders.station')).selectOption({ label: 'Kitchen' });
+    await filters.getByLabel(t('dashboard.orders.source')).selectOption({ label: 'POS' });
+    await expect(table7).toBeVisible();
+    await filters.getByRole('checkbox', { name: t('dashboard.orders.delayedOnly') }).check();
+    await expect(table7).toHaveCount(0);
+    await expect(token.getByText(t('dashboard.orders.delayed'))).toBeVisible();
+    await expect(token.getByText(/^Late: 3\d min in the kitchen, expected 20$/)).toBeVisible();
+    await expect(page).toHaveURL(/delayed=1/);
+    await expectAccessible(page);
+
+    // A 360 px phone: the same pages, nothing wider than the screen.
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(token).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await expectAccessible(page);
+    await link('overview').click();
+    await expect(glance.getByText(t('dashboard.overview.orders', { count: 2 }))).toBeVisible();
+    await expect(terrace.getByRole('button', { name: /^7, Occupied/ })).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await expectAccessible(page);
+    await link('alerts').click();
+    await expect(page.getByRole('heading', { level: 2, name: t('alerts.title') })).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+  });
+
   test('[ORD-010] the POS sees the kitchen’s progress', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
@@ -323,6 +457,10 @@ test.describe.serial('the web console', () => {
     await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
     await page.keyboard.type('2222');
     await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.alerts') })
+      .click();
     await expect(page.getByRole('heading', { level: 2, name: t('alerts.title') })).toBeVisible();
 
     await page.getByRole('button', { name: t('alerts.nudge.open') }).click();
