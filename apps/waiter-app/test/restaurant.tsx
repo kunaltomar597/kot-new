@@ -2,7 +2,9 @@ import type {
   FloorResponse,
   MenuSnapshot,
   MyPagerResponse,
+  OrderItemStatusRequest,
   OrderView,
+  OverrideRequest,
   PagerView,
   SubmitOrderRequest,
   SubmitOrderResponse,
@@ -10,11 +12,13 @@ import type {
   TableSessionView,
   WaiterAssignmentsResponse,
 } from '@rp/contracts';
+import { canTransition, type OrderItemState, orderItemMachine, transition } from '@rp/domain';
 import { createTranslator } from '@rp/i18n';
 import { DeviceSession, MemoryStore } from '@rp/mobile-core';
 import {
   FakeKeys,
   fakeLocalServer,
+  type FakeResponse,
   type FakeServer,
   type RecordedCall,
   SocketFactory,
@@ -59,6 +63,7 @@ function session(n: number, waiterId: string, covers: number): TableOverviewEntr
     waiterName: waiterId === RAVI ? 'Ravi' : 'Kiran',
     amountSoFar: 64_000,
     pendingApprovals: 0,
+    readyItems: 0,
   };
 }
 
@@ -115,6 +120,10 @@ export class Restaurant {
   readonly answers = new Map<string, SubmitOrderResponse>();
   /** No answer reaches the phone: `down` fails before the server, `loseAnswers` after it. */
   network: 'up' | 'down' | 'loseAnswers' = 'up';
+  /** Reasons given for cancels and voids, by order item. */
+  readonly reasons = new Map<string, string>();
+  /** Manager approvals issued and not used yet (single use, AUTH-011). */
+  private readonly approvals = new Set<string>();
   private nextOrder = 20;
 
   table(label: string): Table {
@@ -131,9 +140,118 @@ export class Restaurant {
         sectionId: table.sectionId,
         capacity: 4,
         state: table.state,
-        session: table.session,
+        session:
+          table.session === null
+            ? null
+            : { ...table.session, readyItems: this.readyAt(table.session.id) },
         activeServiceRequests: table.requests,
       })),
+    };
+  }
+
+  /** Dishes waiting at the pass for a table session, as the server counts them. */
+  private readyAt(sessionId: string): number {
+    return (this.orders.get(sessionId) ?? [])
+      .flatMap((order) => order.items)
+      .filter((item) => item.state === 'READY' && item.parentOrderItemId === null).length;
+  }
+
+  /** The order holding an item, as it is now. */
+  orderOf(orderItemId: string): OrderView | undefined {
+    return this.allOrders().find((order) => order.items.some((item) => item.id === orderItemId));
+  }
+
+  /** The item as it is now. */
+  item(orderItemId: string): OrderView['items'][number] | undefined {
+    return this.orderOf(orderItemId)?.items.find((item) => item.id === orderItemId);
+  }
+
+  /** Moves an item, as the kitchen does from its screen or the server after a step. */
+  setState(orderItemId: string, state: OrderItemState): void {
+    for (const [sessionId, orders] of this.orders) {
+      this.orders.set(
+        sessionId,
+        orders.map((order) => ({
+          ...order,
+          items: order.items.map((item) => (item.id === orderItemId ? { ...item, state } : item)),
+        })),
+      );
+    }
+  }
+
+  private itemStep(call: RecordedCall): FakeResponse {
+    const orderItemId = call.path.split('/')[4] ?? '';
+    const item = this.item(orderItemId);
+    if (item === undefined)
+      return { status: 404, body: { code: 'ORDER_ITEM_NOT_FOUND', message: 'No such item.' } };
+    const { event } = call.body as OrderItemStatusRequest;
+    if (!canTransition(orderItemMachine, item.state, event)) {
+      return {
+        status: 409,
+        body: { code: 'INVALID_TRANSITION', message: `${item.name} has moved on already.` },
+      };
+    }
+    this.setState(orderItemId, transition(orderItemMachine, item.state, event).to);
+    return { status: 200, body: this.orderOf(orderItemId) };
+  }
+
+  /** Cancel before the kitchen starts; void after, with a manager's approval for a waiter. */
+  private endItem(call: RecordedCall, ending: 'CANCEL' | 'VOID'): FakeResponse {
+    const orderItemId = call.path.split('/')[4] ?? '';
+    const item = this.item(orderItemId);
+    if (item === undefined)
+      return { status: 404, body: { code: 'ORDER_ITEM_NOT_FOUND', message: 'No such item.' } };
+    if (ending === 'CANCEL' && item.state !== 'SENT') {
+      return {
+        status: 409,
+        body: {
+          code: 'INVALID_TRANSITION',
+          message: 'The kitchen has started this item. Void it instead.',
+        },
+      };
+    }
+    if (ending === 'VOID') {
+      if (item.state === 'SENT') {
+        return {
+          status: 409,
+          body: {
+            code: 'ITEM_NOT_STARTED',
+            message: 'The kitchen has not started this item. Cancel it instead.',
+          },
+        };
+      }
+      const token = call.headers['x-override-token'];
+      if (token === undefined || !this.approvals.delete(token)) {
+        return {
+          status: 403,
+          body: {
+            code: 'OVERRIDE_REQUIRED',
+            message: 'A manager must approve this. Ask a manager to enter their PIN.',
+            details: { capability: 'ITEM_VOID_AFTER_PREP' },
+          },
+        };
+      }
+    }
+    this.reasons.set(orderItemId, (call.body as { reason: string }).reason);
+    this.setState(orderItemId, ending === 'CANCEL' ? 'CANCELLED' : 'VOIDED');
+    return { status: 200, body: this.orderOf(orderItemId) };
+  }
+
+  /** Meera approves with PIN 2222. */
+  private approve(call: RecordedCall): FakeResponse {
+    const request = call.body as OverrideRequest;
+    if (request.approverStaffId !== STAFF.MANAGER.staffId || request.pin !== '2222') {
+      return { status: 401, body: { code: 'PIN_INVALID', message: 'Wrong PIN. Try again.' } };
+    }
+    const token = `approval-${String(this.approvals.size + 1)}`;
+    this.approvals.add(token);
+    return {
+      status: 200,
+      body: {
+        overrideToken: token,
+        expiresAt: '2026-09-26T09:00:00.000Z',
+        approver: { id: STAFF.MANAGER.staffId, displayName: 'Meera', role: 'MANAGER' },
+      },
     };
   }
 
@@ -291,6 +409,10 @@ export class Restaurant {
         if (this.network === 'loseAnswers') throw new TypeError('Network request failed');
         return { status: 200, body: answer };
       })
+      .on('POST', '/api/v1/order-items/:orderItemId/status', (call) => this.itemStep(call))
+      .on('POST', '/api/v1/order-items/:orderItemId/cancel', (call) => this.endItem(call, 'CANCEL'))
+      .on('POST', '/api/v1/order-items/:orderItemId/void', (call) => this.endItem(call, 'VOID'))
+      .on('POST', '/api/v1/auth/override', (call) => this.approve(call))
       .on('GET', '/api/v1/table-sessions/:sessionId/orders', (call: RecordedCall) => {
         const sessionId = call.path.split('/')[4] ?? '';
         return { status: 200, body: { orders: this.orders.get(sessionId) ?? [] } };

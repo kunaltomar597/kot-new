@@ -2,7 +2,7 @@
   "name": "@rp/mobile-shell",
   "version": "0.1.0",
   "private": true,
-  "description": "Screens and hooks shared by the waiter app and table tablet: pairing, staff login, the connection banner, live data, and the menu and unsent orders kept on the device (P2-01c, P2-02b).",
+  "description": "Screens and hooks shared by the waiter app and table tablet: pairing, staff login, the connection banner, live data, the menu and unsent orders kept on the device, and a manager's approval on the device (P2-01c, P2-02b, P2-02c).",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -25,6 +25,7 @@
     "@rp/api-client": "workspace:*",
     "@rp/contracts": "workspace:*",
     "@rp/design-tokens": "workspace:*",
+    "@rp/domain": "workspace:*",
     "@rp/i18n": "workspace:*",
     "@rp/mobile-core": "workspace:*",
     "@rp/ui-native": "workspace:*"

@@ -39,6 +39,32 @@ const STEP_CAPABILITY: Readonly<Record<OrderItemStatusRequest['event'], Capabili
 /** States in which a station still has the item on its screen or rail. */
 const AT_STATION: ReadonlySet<OrderItemState> = new Set(['SENT', 'PREPARING', 'READY']);
 
+/** How far along the kitchen and the floor an item is; ended items have no place. */
+const PROGRESS: Partial<Record<OrderItemState, number>> = {
+  SENT: 0,
+  PREPARING: 1,
+  READY: 2,
+  PICKED_UP: 3,
+  SERVED: 4,
+};
+const PROGRESS_STATES = ['SENT', 'PREPARING', 'READY', 'PICKED_UP', 'SERVED'] as const;
+
+/** The step that brings an item to each state (ADR-0006 shortcuts included). */
+const STEP_TO: Readonly<
+  Record<Exclude<(typeof PROGRESS_STATES)[number], 'SENT'>, OrderItemStatusRequest['event']>
+> = {
+  PREPARING: 'START_PREPARING',
+  READY: 'MARK_READY',
+  PICKED_UP: 'PICK_UP',
+  SERVED: 'SERVE',
+};
+
+/** An item ended by a cancel or a void, and how (a voided combo cancels its unstarted parts). */
+interface Ended {
+  readonly target: OrderItem;
+  readonly event: 'CANCEL' | 'VOID';
+}
+
 type ItemWithOrder = OrderItem & {
   order: {
     id: string;
@@ -84,6 +110,10 @@ export class OrderItemsService {
   /**
    * A kitchen or floor step. A kitchen screen in station mode acts with the kitchen's grants and
    * only on its own station's items; its steps are attributed to the device (AUTH-005).
+   *
+   * A combo line and its parts move together both ways: a step on the line moves every part that
+   * can take it, and a step on a part (the kitchen works on parts) brings the line along, so the
+   * floor can serve, cancel or void the combo as one line (ORD-011).
    */
   async setStatus(
     principal: Actor,
@@ -92,21 +122,28 @@ export class OrderItemsService {
   ): Promise<OrderView> {
     if (grantFor(principal.role, STEP_CAPABILITY[event]) !== 'ALLOW') throw authErrors.forbidden();
     const orderId = await this.prisma.transaction(async (tx) => {
+      // The combo line is locked before its part, in the order cancel and void lock them.
+      const found = await tx.orderItem.findFirst({
+        where: { id: orderItemId, restaurantId: principal.restaurantId },
+        select: { parentOrderItemId: true },
+      });
+      const parentId = found?.parentOrderItemId ?? null;
+      if (parentId !== null) await this.lockRow(tx, parentId);
       const item = await this.lock(tx, principal.restaurantId, orderItemId);
       const station = principal.stationId ?? null;
       if (station !== null && item.stationId !== station) {
         throw authErrors.forbidden();
       }
       const now = new Date();
-      for (const target of [item, ...item.components]) {
-        // Parts follow their combo where they can; the line itself must be able to move.
-        if (target !== item && target.state !== item.state) continue;
-        const to = transition(orderItemMachine, target.state, event).to;
-        await tx.orderItem.update({
-          where: { id: target.id },
-          data: { state: to, ...stepTimes(event, target, now) },
-        });
-        await this.changed(tx, principal, item.order, target, to, event);
+      await this.step(tx, principal, item.order, item, event, now);
+      // Parts follow their combo where they can; the line itself must be able to move.
+      for (const part of item.components) {
+        if (canTransition(orderItemMachine, part.state, event)) {
+          await this.step(tx, principal, item.order, part, event, now);
+        }
+      }
+      if (item.parentOrderItemId !== null) {
+        await this.follow(tx, principal, item.order, item.parentOrderItemId, now);
       }
       return item.orderId;
     });
@@ -123,12 +160,9 @@ export class OrderItemsService {
       const item = await this.lock(tx, principal.restaurantId, orderItemId);
       this.assertLine(item);
       if (ownOnly) this.assertOwn(principal, item);
-      const ended = await this.end(tx, principal, item, 'CANCEL', 'CANCELLED', reason);
+      const ended = await this.end(tx, principal, item, 'CANCEL', reason);
       // Nothing was cooked: counted stock goes back (MENU-006).
-      for (const target of ended) {
-        if (target.parentOrderItemId === null && item.components.length > 0) continue;
-        await this.menu.restoreStock(tx, principal.restaurantId, target.itemId, target.quantity);
-      }
+      await this.restoreUncooked(tx, principal, item, ended);
       await this.audit.record(tx, {
         action: 'ORDER_ITEM_CANCELLED',
         entityType: 'order_item',
@@ -161,7 +195,9 @@ export class OrderItemsService {
           'The kitchen has not started this item. Cancel it instead.',
         );
       }
-      await this.end(tx, principal, item, 'VOID', 'VOIDED', reason);
+      const ended = await this.end(tx, principal, item, 'VOID', reason);
+      // Parts of a voided combo the kitchen had not started were not cooked either.
+      await this.restoreUncooked(tx, principal, item, ended);
       await this.audit.record(tx, {
         action: 'ORDER_ITEM_VOIDED',
         entityType: 'order_item',
@@ -260,28 +296,33 @@ export class OrderItemsService {
 
   /**
    * Ends a line and its parts (cancel or void), and hands each station still holding one of them
-   * a CANCELLED slip (ORD-012). Returns what ended.
+   * a CANCELLED slip (ORD-012). A voided combo's parts the kitchen has not started are cancelled
+   * with it, so none is left on a kitchen screen. Returns what ended, and how.
    */
   private async end(
     tx: TransactionClient,
     principal: Principal,
     item: ItemWithOrder,
     event: 'CANCEL' | 'VOID',
-    to: 'CANCELLED' | 'VOIDED',
     reason: string,
-  ): Promise<OrderItem[]> {
+  ): Promise<Ended[]> {
     transition(orderItemMachine, item.state, event);
-    const targets = [item, ...item.components].filter(
-      (target) => target === item || canTransition(orderItemMachine, target.state, event),
-    );
+    const ended: Ended[] = [{ target: item, event }];
+    for (const part of item.components) {
+      if (canTransition(orderItemMachine, part.state, event)) ended.push({ target: part, event });
+      else if (event === 'VOID' && canTransition(orderItemMachine, part.state, 'CANCEL')) {
+        ended.push({ target: part, event: 'CANCEL' });
+      }
+    }
     const now = new Date();
     const slips: { stationId: string; orderItemId: string; quantity: number }[] = [];
-    for (const target of targets) {
+    for (const { target, event: how } of ended) {
+      const to = transition(orderItemMachine, target.state, how).to;
       await tx.orderItem.update({
         where: { id: target.id },
         data: { state: to, endedAt: now, endReason: reason },
       });
-      await this.changed(tx, principal, item.order, target, to, event, reason);
+      await this.changed(tx, principal, item.order, target, to, how, reason);
       const cooking = item.components.length === 0 || target !== item;
       if (cooking && AT_STATION.has(target.state)) {
         slips.push({
@@ -292,7 +333,73 @@ export class OrderItemsService {
       }
     }
     if (slips.length > 0) await this.slip(tx, principal, item.orderId, 'CANCELLED', slips);
-    return targets;
+    return ended;
+  }
+
+  /**
+   * Counted stock goes back for what ended before the kitchen started it (MENU-006): a cancelled
+   * dish, or the parts of a combo (the combo line itself holds no stock).
+   */
+  private async restoreUncooked(
+    tx: TransactionClient,
+    principal: Principal,
+    item: ItemWithOrder,
+    ended: readonly Ended[],
+  ): Promise<void> {
+    for (const { target, event } of ended) {
+      if (event !== 'CANCEL') continue;
+      if (target === item && item.components.length > 0) continue;
+      await this.menu.restoreStock(tx, principal.restaurantId, target.itemId, target.quantity);
+    }
+  }
+
+  /** Moves one item by a kitchen or floor step, with its times and events. */
+  private async step(
+    tx: TransactionClient,
+    principal: Actor,
+    order: ItemWithOrder['order'],
+    target: OrderItem,
+    event: OrderItemEvent,
+    now: Date,
+  ): Promise<OrderItem> {
+    const to = transition(orderItemMachine, target.state, event).to;
+    const moved = await tx.orderItem.update({
+      where: { id: target.id },
+      data: { state: to, ...stepTimes(event, target, now) },
+    });
+    await this.changed(tx, principal, order, target, to, event);
+    return moved;
+  }
+
+  /**
+   * Brings a combo line to where its parts are: in preparation once the kitchen starts any part,
+   * then as far along as its least advanced part (ready when every part is ready, and so on).
+   * It only moves forward, and never out of an ended or awaiting-approval state.
+   */
+  private async follow(
+    tx: TransactionClient,
+    principal: Actor,
+    order: ItemWithOrder['order'],
+    parentId: string,
+    now: Date,
+  ): Promise<void> {
+    const parent = await tx.orderItem.findUniqueOrThrow({
+      where: { id: parentId },
+      include: { components: true },
+    });
+    const places = parent.components
+      .map((part) => PROGRESS[part.state])
+      .filter((place) => place !== undefined);
+    if (PROGRESS[parent.state] === undefined || places.length === 0) return;
+    const started = Math.max(...places) > 0 ? 1 : 0;
+    const target = PROGRESS_STATES[Math.max(Math.min(...places), started)] ?? 'SENT';
+    let line: OrderItem = parent;
+    while (target !== 'SENT' && (PROGRESS[line.state] ?? 0) < (PROGRESS[target] ?? 0)) {
+      // Picked up and served come after ready: a line not yet ready becomes ready first.
+      const direct = STEP_TO[target];
+      const event = canTransition(orderItemMachine, line.state, direct) ? direct : 'MARK_READY';
+      line = await this.step(tx, principal, order, line, event, now);
+    }
   }
 
   /** A MODIFIED or CANCELLED ticket per station, numbered with the day's KOTs (ORD-008). */
@@ -409,13 +516,17 @@ export class OrderItemsService {
     });
   }
 
+  private async lockRow(tx: TransactionClient, orderItemId: string): Promise<void> {
+    await tx.$queryRaw`SELECT 1 AS locked FROM order_items WHERE id = ${orderItemId}::uuid FOR UPDATE`;
+  }
+
   /** Locks the item row and loads it with its order and combo parts. */
   private async lock(
     tx: TransactionClient,
     restaurantId: string,
     orderItemId: string,
   ): Promise<ItemWithOrder> {
-    await tx.$queryRaw`SELECT 1 AS locked FROM order_items WHERE id = ${orderItemId}::uuid FOR UPDATE`;
+    await this.lockRow(tx, orderItemId);
     const item = await tx.orderItem.findFirst({
       where: { id: orderItemId, restaurantId },
       include: {

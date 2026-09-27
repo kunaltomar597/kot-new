@@ -1,11 +1,32 @@
 import type { MenuSnapshot, OrderView } from '@rp/contracts';
 import { fontSize, fontWeight, radius, spacing } from '@rp/design-tokens';
+import type { Role } from '@rp/domain';
 import { type LiveData, messageOf, Note, useT } from '@rp/mobile-shell';
-import { displayState, kotDelivery, kotDeliveryText, unavailableReason } from '@rp/ordering';
+import {
+  displayState,
+  kotDelivery,
+  kotDeliveryText,
+  lineActions,
+  servableLines,
+  unavailableReason,
+} from '@rp/ordering';
 import { Button, Glyph, StatusChip, toneColors, useTheme, weight } from '@rp/ui-native';
 import { StyleSheet, Text, View } from 'react-native';
+import type { Ending } from './EndItemSheet';
 
 type SentLine = OrderView['items'][number];
+
+/** What the person may do with the sent items, and what to do when they do it. */
+export interface SentActions {
+  readonly role: Role;
+  /** Whether the person is this table's waiter (own-table grants). */
+  readonly ownTable: boolean;
+  /** Lines with a step in flight. */
+  readonly busy: ReadonlySet<string>;
+  readonly onStep: (line: SentLine, event: 'PICK_UP' | 'SERVE') => void;
+  readonly onServeAll: (lines: readonly SentLine[]) => void;
+  readonly onEnd: (line: SentLine, ending: Ending) => void;
+}
 
 /** Why a sent line cannot be ordered again from the phone now, or undefined when it can. */
 function againBlocked(
@@ -36,18 +57,22 @@ function lineDetails(line: SentLine, order: OrderView): string {
 }
 
 /**
- * What was sent for this table (WTR-007, WTR-012): each order with its kitchen tickets and
- * whether each one reached the kitchen (on the kitchen screen, printed, printing, or held by a
- * printer problem), and each item's live state with "Again" to order it once more (NFR-U03).
+ * What was sent for this table (WTR-007, WTR-009, WTR-012): each order with its kitchen tickets
+ * and whether each one reached the kitchen (on the kitchen screen, printed, printing, or held by
+ * a printer problem), and each item's live state with what can be done with it now: mark it
+ * picked up or served, cancel it before the kitchen starts, void it after, or order it again
+ * (NFR-U03). Ready dishes can be marked served together.
  */
 export function SentOrders({
   data,
   menu,
+  actions,
   onAgain,
   onRetry,
 }: {
   data: LiveData<readonly OrderView[]>;
   menu: MenuSnapshot | null | undefined;
+  actions: SentActions;
   onAgain: (order: OrderView, line: SentLine) => void;
   onRetry: () => void;
 }) {
@@ -77,10 +102,23 @@ export function SentOrders({
       </View>
     );
   }
+  const servable = servableLines(data.value, actions.role, actions.ownTable);
   return (
     <View style={styles.section}>
       {heading}
       {data.value.length === 0 ? <Note>{t('pos.sent.none')}</Note> : null}
+      {servable.length > 1 ? (
+        <Button
+          fullWidth
+          testID="serve-all"
+          disabled={servable.some((line) => actions.busy.has(line.id))}
+          onPress={() => {
+            actions.onServeAll(servable);
+          }}
+        >
+          {t('mobile.item.serveAll', { count: servable.length })}
+        </Button>
+      ) : null}
       {data.value.map((order) => (
         <View
           key={order.id}
@@ -131,18 +169,49 @@ export function SentOrders({
                     : blocked === 'OFF_MENU'
                       ? t('pos.cart.offMenu')
                       : undefined;
+              const can = lineActions(line, actions.role, actions.ownTable);
+              const busy = actions.busy.has(line.id);
               return (
-                <View key={line.id} testID={`sent-line-${line.id}`} style={styles.line}>
-                  <View style={styles.lineText}>
-                    <Text style={[styles.lineName, { color: colors.text }]}>
-                      {`${String(line.quantity)} × ${line.name}`}
-                    </Text>
-                    {details === '' ? null : (
-                      <Text style={{ color: colors.textMuted }}>{details}</Text>
-                    )}
+                <View
+                  key={line.id}
+                  testID={`sent-line-${line.id}`}
+                  style={[styles.line, { borderTopColor: colors.border }]}
+                >
+                  <View style={styles.lineHead}>
+                    <View style={styles.lineText}>
+                      <Text style={[styles.lineName, { color: colors.text }]}>
+                        {`${String(line.quantity)} × ${line.name}`}
+                      </Text>
+                      {details === '' ? null : (
+                        <Text style={{ color: colors.textMuted }}>{details}</Text>
+                      )}
+                    </View>
                     <StatusChip state={state} label={t(`pos.itemState.${state}`)} />
                   </View>
-                  <View style={styles.again}>
+                  <View style={styles.lineActions}>
+                    {can.serve ? (
+                      <Button
+                        loading={busy}
+                        accessibilityLabel={t('mobile.item.serveOf', { name: line.name })}
+                        onPress={() => {
+                          actions.onStep(line, 'SERVE');
+                        }}
+                      >
+                        {t('mobile.item.serve')}
+                      </Button>
+                    ) : null}
+                    {can.pickUp ? (
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        accessibilityLabel={t('mobile.item.pickUpOf', { name: line.name })}
+                        onPress={() => {
+                          actions.onStep(line, 'PICK_UP');
+                        }}
+                      >
+                        {t('mobile.item.pickUp')}
+                      </Button>
+                    ) : null}
                     <Button
                       variant="secondary"
                       disabled={blocked !== undefined}
@@ -153,10 +222,34 @@ export function SentOrders({
                     >
                       {t('mobile.order.again')}
                     </Button>
-                    {reason === undefined ? null : (
-                      <Text style={[styles.reason, { color: colors.dangerText }]}>{reason}</Text>
+                    {can.cancel ? (
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        accessibilityLabel={t('mobile.item.cancelOf', { name: line.name })}
+                        onPress={() => {
+                          actions.onEnd(line, 'CANCEL');
+                        }}
+                      >
+                        {t('mobile.item.cancel')}
+                      </Button>
+                    ) : null}
+                    {can.void === null ? null : (
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        accessibilityLabel={t('mobile.item.voidOf', { name: line.name })}
+                        onPress={() => {
+                          actions.onEnd(line, 'VOID');
+                        }}
+                      >
+                        {t('mobile.item.void')}
+                      </Button>
                     )}
                   </View>
+                  {reason === undefined ? null : (
+                    <Text style={[styles.reason, { color: colors.dangerText }]}>{reason}</Text>
+                  )}
                 </View>
               );
             })}
@@ -180,9 +273,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   kotText: { flex: 1, fontSize: fontSize.sm, fontWeight: weight(fontWeight.semibold) },
-  line: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  line: { gap: spacing[2], borderTopWidth: 1, paddingTop: spacing[2] },
+  lineHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   lineText: { flex: 1, gap: spacing[1] },
   lineName: { fontSize: fontSize.md },
-  again: { alignItems: 'flex-end', gap: spacing[1] },
+  lineActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   reason: { fontSize: fontSize.sm },
 });

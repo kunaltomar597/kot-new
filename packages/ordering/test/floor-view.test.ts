@@ -88,7 +88,7 @@ describe('[TBL-007] floor view', () => {
     expect(seatedFor(at(65), NOW, t)).toBe('1 h 05 min');
   });
 
-  it('lists guests, time and waiter, and what waits for staff', () => {
+  it('[WTR-007] lists guests, time and waiter, and what waits for staff', () => {
     const session = {
       id: id(200),
       openedAt: new Date(NOW - 10 * 60_000).toISOString(),
@@ -97,6 +97,7 @@ describe('[TBL-007] floor view', () => {
       waiterName: 'Ravi',
       amountSoFar: 0,
       pendingApprovals: 0,
+      readyItems: 0,
     };
     expect(tileDetails(live(1), NOW, t)).toEqual([]);
     expect(tileDetails(live(1, { session }), NOW, t)).toEqual(['1 guest', '10 min', 'Ravi']);
@@ -108,6 +109,10 @@ describe('[TBL-007] floor view', () => {
         t,
       ),
     ).toBe('1 to approve');
+    expect(
+      tileAlert(live(1, { session: { ...session, readyItems: 2 }, activeServiceRequests: 1 }), t),
+    ).toBe('2 dishes ready');
+    expect(tileAlert(live(1, { session: { ...session, readyItems: 1 } }), t)).toBe('1 dish ready');
   });
 
   it('refreshes on table, order, bill and service events only', () => {
@@ -141,6 +146,7 @@ describe('[WTR-002] [TBL-002] my tables', () => {
     waiterName: waiterId === ravi ? 'Ravi' : 'Asha',
     amountSoFar: 0,
     pendingApprovals: 0,
+    readyItems: 0,
   });
   const overview = {
     tables: [

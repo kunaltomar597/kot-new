@@ -4,7 +4,7 @@ React Native + Expo SDK 57 (development builds, not Expo Go), Android only. A pa
 staff PIN login (WTR-001). Built by P2-01 (foundation, done), P2-02, P2-06, P3-03 (approvals
 inbox) and P3-05 (upsell).
 
-What it does today (P2-01c, P2-02a, P2-02b): pairs with the local server (address and manager's
+What it does today (P2-01c, P2-02a to P2-02c): pairs with the local server (address and manager's
 code; the device key is created in the Android Keystore), lists the staff who may use a waiter
 phone (waiters, managers, the owner) and signs one in with their PIN. Home is "My tables" (the
 waiter's sections and tables for today, and any table they are responsible for) or all tables,
@@ -21,7 +21,13 @@ Request bill (WTR-008). Send KOT keeps the order on the phone first and sends it
 idempotency key; without an answer it stays, shown on its table and on home, and goes again with
 the same key when the phone reconnects, while the waiter who took it is signed in (WTR-012,
 ORD-013). Sold-out dishes are marked live in the menu and the new items, and block sending until
-they are removed (WTR-010). Serving, cancellations and voids come with P2-02c.
+they are removed (WTR-010).
+
+Each sent item shows its live state with what can be done now (WTR-007, WTR-009, ORD-011): mark
+it picked up or served (all ready dishes at once too), cancel it with a reason while the kitchen
+has not started it (waiters on their own tables), or void it with a reason after, which a manager
+approves by entering their PIN on the phone (AUTH-011). Home shows how many dishes are ready at
+the pass for each table.
 
 Where things are:
 
@@ -33,9 +39,10 @@ Where things are:
   service-request events (`@rp/ordering` `myTableIds`, `floorSections`); `src/OpenTableSheet.tsx`
   opens a free table.
 - `src/TableScreen.tsx`: one table session: new items (`src/CartList.tsx`), the menu
-  (`src/MenuBrowser.tsx`, `src/ItemSheet.tsx`), sent orders (`src/SentOrders.tsx`), unsent
-  orders (`src/UnsentOrders.tsx`), moving (`src/MoveSheet.tsx`) and the bill request. Orders go
-  through the device session's `OrderOutbox` (`@rp/mobile-core`).
+  (`src/MenuBrowser.tsx`, `src/ItemSheet.tsx`), sent orders with serving, cancel and void
+  (`src/SentOrders.tsx`, `src/EndItemSheet.tsx`, `@rp/mobile-shell` `useOverride` for the
+  manager's PIN), unsent orders (`src/UnsentOrders.tsx`), moving (`src/MoveSheet.tsx`) and the
+  bill request. Orders go through the device session's `OrderOutbox` (`@rp/mobile-core`).
 - `src/PagerCard.tsx`: the waiter's own pager (`GET /api/v1/pagers/mine`), read again on
   `DeviceStatusChanged` and every minute for the battery level.
 - `src/Root.tsx`: wires `@rp/mobile-core`'s `DeviceSession` to the Keystore key and the secure
@@ -48,7 +55,7 @@ Where things are:
   allow cleartext HTTP, for a development server without TLS.
 - `eas.json`: EAS Build profiles (APKs) and EAS Update channels.
 - `.maestro/`: the smoke flow (pair, sign in, open a free table, order a dish and send the KOT,
-  ask for the bill).
+  serve it once the kitchen marks it ready, ask for the bill).
 
 ## Commands
 
@@ -72,7 +79,9 @@ as an artifact.
    start Metro: `pnpm --filter @rp/waiter-app start`.
 3. `maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE=T1 -e "DISH=Dal Makhani" apps/waiter-app/.maestro`,
    where `TABLE` is a free table and `DISH` a dish without options on the waiter-app menu (the
-   flow opens the table, sends that dish to the kitchen and asks for the bill). The flow assumes
+   flow opens the table, sends that dish to the kitchen, serves it and asks for the bill). When
+   the flow waits for the dish, mark it Ready on the kitchen screen (the console in Kitchen mode)
+   within 5 minutes. The flow assumes
    the emulator reaches the PC as `10.0.2.2` (server on 3000, Metro on 8081); override `SERVER`,
    `METRO`, `STAFF_NAME` and `PIN` with `-e` for a real phone.
 

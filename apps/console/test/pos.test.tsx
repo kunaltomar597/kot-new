@@ -71,6 +71,7 @@ function entry(
             waiterName: 'Ravi',
             amountSoFar: 56_000,
             pendingApprovals: 0,
+            readyItems: 0,
             ...session,
           },
     activeServiceRequests: 0,

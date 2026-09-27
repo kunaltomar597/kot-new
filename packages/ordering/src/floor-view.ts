@@ -67,10 +67,15 @@ export function tileDetails(table: TableOverviewEntry, now: number, t: Translato
   ];
 }
 
-/** What is waiting for staff at a table: approvals first, then service requests. */
+/**
+ * What is waiting for staff at a table: approvals first, then food ready at the pass (WTR-007),
+ * then service requests.
+ */
 export function tileAlert(table: TableOverviewEntry, t: Translator): string | undefined {
   const approvals = table.session?.pendingApprovals ?? 0;
   if (approvals > 0) return t('pos.toApprove', { count: approvals });
+  const ready = table.session?.readyItems ?? 0;
+  if (ready > 0) return t('pos.readyToServe', { count: ready });
   if (table.activeServiceRequests > 0) {
     return t('pos.requests', { count: table.activeServiceRequests });
   }

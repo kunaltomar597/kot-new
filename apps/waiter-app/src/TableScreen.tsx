@@ -6,11 +6,13 @@ import type { OrderDraft } from '@rp/mobile-core';
 import {
   messageOf,
   Note,
+  OverrideCancelled,
   Screen,
   useDeviceSession,
   useLive,
   useMenu,
   useNow,
+  useOverride,
   useSessionState,
   useT,
   useUnsentOrders,
@@ -22,6 +24,7 @@ import {
   type CartLine,
   cartTotal,
   freeTables,
+  lineActions,
   type LineProblem,
   lineProblems,
   markRejected,
@@ -35,6 +38,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BackHandler, StyleSheet, Text, View } from 'react-native';
 import { CartList } from './CartList';
 import { useCart } from './carts';
+import { EndItemSheet, type Ending } from './EndItemSheet';
 import { ItemSheet } from './ItemSheet';
 import { MenuBrowser } from './MenuBrowser';
 import { mayMove, MoveSheet } from './MoveSheet';
@@ -42,6 +46,7 @@ import { SentOrders } from './SentOrders';
 import { UnsentOrders } from './UnsentOrders';
 
 type TableView = 'order' | 'menu';
+type SentLine = OrderView['items'][number];
 
 /** Seated times move on every half minute. */
 const CLOCK_MS = 30_000;
@@ -51,10 +56,11 @@ const affectsOrders = (eventType: string) =>
   /^(Order|Kot|ItemStatusChanged$|TableMoved$|BillSettled$)/.test(eventType);
 
 /**
- * One table in the waiter app (WTR-003, WTR-007, WTR-008, WTR-012): its new items and the menu to
- * add them from, what was already sent with each ticket's delivery and "Again", its orders not yet
- * sent, and moving it or asking for the bill. Opened by the table session, so a moved table stays
- * open here under its new name.
+ * One table in the waiter app (WTR-003, WTR-007 to WTR-009, WTR-012): its new items and the menu
+ * to add them from, what was already sent with each ticket's delivery and each item's state, to
+ * mark picked up or served, cancel, void (with a manager's PIN on this phone) or order again, its
+ * orders not yet sent, and moving it or asking for the bill. Opened by the table session, so a
+ * moved table stays open here under its new name.
  */
 export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
   const session = useDeviceSession();
@@ -70,6 +76,9 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   const [moving, setMoving] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const [asking, setAsking] = useState(false);
+  const [busyLines, setBusyLines] = useState<ReadonlySet<string>>(new Set());
+  const [ending, setEnding] = useState<{ line: SentLine; ending: Ending } | undefined>();
+  const { withOverride, sheet: approval } = useOverride();
   const tables = useLive(() => session.api.getTableOverview(), affectsFloor);
   const orders = useLive(
     async () => (await session.api.listSessionOrders({ params: { sessionId } })).orders,
@@ -204,6 +213,106 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
     );
   };
 
+  const working = (ids: readonly string[], busy: boolean) => {
+    setBusyLines((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (busy) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const settled = () => {
+    orders.reload();
+    tables.reload();
+  };
+
+  /** Picked up from the pass or served at the table (WTR-007, KDS-007). */
+  const step = (line: SentLine, event: 'PICK_UP' | 'SERVE') => {
+    setNotice(undefined);
+    working([line.id], true);
+    session.api.setOrderItemStatus({ params: { orderItemId: line.id }, body: { event } }).then(
+      () => {
+        working([line.id], false);
+        settled();
+      },
+      (failure: unknown) => {
+        working([line.id], false);
+        setNotice(messageOf(failure, t));
+        settled();
+      },
+    );
+  };
+
+  /** Several dishes carried to the table at once, one after another; stops at a refusal. */
+  const serveAll = async (lines: readonly SentLine[]) => {
+    setNotice(undefined);
+    const ids = lines.map((line) => line.id);
+    working(ids, true);
+    let served = 0;
+    try {
+      for (const line of lines) {
+        await session.api.setOrderItemStatus({
+          params: { orderItemId: line.id },
+          body: { event: 'SERVE' },
+        });
+        served += 1;
+      }
+      toast.show({ title: t('mobile.item.servedAll', { count: served }), tone: 'success' });
+    } catch (failure) {
+      setNotice(messageOf(failure, t));
+    } finally {
+      working(ids, false);
+      settled();
+    }
+  };
+
+  /**
+   * Cancels a dish the kitchen has not started, or voids one it has (ORD-011). A waiter's void
+   * goes through a manager's PIN on this phone when the server asks for it (WTR-009, AUTH-011).
+   */
+  const end = (line: SentLine, kind: Ending, reason: string) => {
+    setEnding(undefined);
+    setNotice(undefined);
+    working([line.id], true);
+    const params = { orderItemId: line.id };
+    const done =
+      kind === 'CANCEL'
+        ? session.api.cancelOrderItem({ params, body: { reason } })
+        : withOverride(
+            (overrideToken) =>
+              session.api.voidOrderItem({
+                params,
+                body: { reason },
+                ...(overrideToken !== undefined && { overrideToken }),
+              }),
+            { entityType: 'order_item', entityId: line.id },
+          );
+    done.then(
+      () => {
+        working([line.id], false);
+        toast.show({
+          title: t(kind === 'CANCEL' ? 'mobile.item.cancelled' : 'mobile.item.voided', {
+            name: line.name,
+          }),
+          tone: 'success',
+        });
+        settled();
+      },
+      (failure: unknown) => {
+        working([line.id], false);
+        setNotice(
+          failure instanceof OverrideCancelled
+            ? t('mobile.item.notApproved', { name: line.name })
+            : messageOf(failure, t),
+        );
+        settled();
+      },
+    );
+  };
+
   const requestBill = () => {
     if (table === undefined) return;
     setAsking(true);
@@ -227,6 +336,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   const count = cart.reduce((total, line) => total + line.quantity, 0);
   const blocked = problems.size > 0;
   const alert = table === undefined ? undefined : tileAlert(table, t);
+  const ownTable = table?.session?.waiterId === person.id;
 
   return (
     <Screen
@@ -347,7 +457,24 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
                   }}
                 />
               )}
-              <SentOrders data={orders.data} menu={menu} onAgain={again} onRetry={orders.reload} />
+              <SentOrders
+                data={orders.data}
+                menu={menu}
+                actions={{
+                  role: person.role,
+                  ownTable,
+                  busy: busyLines,
+                  onStep: step,
+                  onServeAll: (lines) => {
+                    void serveAll(lines);
+                  },
+                  onEnd: (line, kind) => {
+                    setEnding({ line, ending: kind });
+                  },
+                }}
+                onAgain={again}
+                onRetry={orders.reload}
+              />
             </>
           )}
         </>
@@ -380,6 +507,20 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
           }}
         />
       ) : null}
+      {ending === undefined ? null : (
+        <EndItemSheet
+          line={ending.line}
+          ending={ending.ending}
+          managerNeeded={lineActions(ending.line, person.role, ownTable).void === 'OVERRIDE'}
+          onClose={() => {
+            setEnding(undefined);
+          }}
+          onConfirm={(reason) => {
+            end(ending.line, ending.ending, reason);
+          }}
+        />
+      )}
+      {approval}
     </Screen>
   );
 }

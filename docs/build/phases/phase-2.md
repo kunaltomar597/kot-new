@@ -174,13 +174,40 @@ As built:
 - Tests: `apps/server/test/integration/order-outbox.int.test.ts` runs the phone's outbox against
   the real server; the Maestro flow now finds a dish, sends the KOT and sees it reach the kitchen.
 
-### P2-02c Serving, cancellations and voids
+### P2-02c Serving, cancellations and voids (done)
 
 Depends on: P2-02b.
 Deliverables: live item status per table with marking items picked up and served (WTR-007,
 KDS-007); cancelling an item before preparation with a reason, and voiding it after with a
 manager's PIN entered on the phone (WTR-009, ORD-011, AUTH-011), through the server's override.
 Acceptance: the Maestro flow runs open → order → send → served.
+
+As built:
+
+- Server: a combo line now follows its parts. The kitchen works on the parts, so a step on a part
+  brings the line along: in preparation once any part starts, then as far as its least advanced
+  part (ready when every part is ready), forward only. A step on the line still moves every part
+  that can take it. The line is locked before its part, in the order cancel and void lock them.
+  Voiding a started combo cancels the parts the kitchen had not started and returns their counted
+  stock, so no part is left on a kitchen screen. The table overview counts `readyItems` per
+  session (top-level lines ready at the pass; a combo once all its parts are).
+- `@rp/ordering`: `item-actions.ts` with `lineActions` (pick up, serve, cancel on the person's own
+  tables, void outright or with a manager's PIN, from the item state machine and the permission
+  grants; combo parts have none) and `servableLines`. `tileAlert` shows "N dishes ready" after
+  pending approvals. `displayState` shows a combo in preparation while a part is being cooked.
+- `@rp/mobile-shell`: `useOverride`, the phone's twin of the console's: the action is tried as the
+  signed-in person, and on `OVERRIDE_REQUIRED` a sheet lists the managers and owner on the device
+  (never the person asking), takes the approver's PIN and retries with the single-use approval.
+- `apps/waiter-app`: `SentOrders` shows, per line, Mark served, Mark picked up, Again, Cancel and
+  Void as the line's state and the person's grants allow, and "Mark all N ready dishes served"
+  when more than one is ready. `EndItemSheet` takes the reason, with a few common reasons a tap
+  away. A void by a waiter goes through `useOverride` with the order item as the approval's
+  subject; the reason sheet closes before the approval opens. Refusals show the server's words and
+  the table reads again.
+- Tests: `order-items.int.test.ts` (combo follows its parts, is served as one line, and a started
+  combo's void cancels its unstarted part and returns its stock), `serving.test.tsx` in the waiter
+  app (7), `override.test.tsx` in the shell (4), ordering line actions and ready tiles. The Maestro
+  flow waits for the dish to be marked Ready on the kitchen screen, then marks it served.
 
 ## P2-03 Notification and escalation engine
 
