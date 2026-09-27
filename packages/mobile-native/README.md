@@ -10,5 +10,8 @@ The Android pieces shared by the waiter app and the table tablet (P2-01c):
   server verifies raw `r‖s` (as WebCrypto gives), so `derToRawEcdsa` converts.
 - `secureStore()`: `expo-secure-store` (values encrypted with a Keystore key) for credentials.
 - `plainStore()`: AsyncStorage for the outbox, the menu cache and the server address.
+- `installRandomValues()`: gives Hermes the `crypto.getRandomValues` that `@rp/api-client` builds
+  correlation ids and idempotency keys from (ORD-013), from `expo-crypto` (Android
+  `SecureRandom`). Each app calls it before creating the device session (P2-02b).
 
 Tests run with Vitest and fake native modules; the Kotlin module is compiled by the Android CI job.

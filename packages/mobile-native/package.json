@@ -30,11 +30,13 @@
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "^57.0.0",
+    "expo-crypto": "^57.0.0",
     "expo-secure-store": "^57.0.0"
   },
   "devDependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "57.0.25",
+    "expo-crypto": "~57.0.3",
     "expo-secure-store": "~57.0.4",
     "react": "19.2.3",
     "react-native": "0.86.3"

@@ -8829,6 +8829,7 @@
           { "$ref": "#/components/schemas/OrderRejected" },
           { "$ref": "#/components/schemas/KotCreated" },
           { "$ref": "#/components/schemas/KotBumped" },
+          { "$ref": "#/components/schemas/KotPrintStatusChanged" },
           { "$ref": "#/components/schemas/ItemStatusChanged" },
           { "$ref": "#/components/schemas/ServiceRequestRaised" },
           { "$ref": "#/components/schemas/ServiceRequestAcknowledged" },
@@ -9841,6 +9842,52 @@
         "type": "object",
         "properties": { "id": { "$ref": "#/components/schemas/Id" } },
         "required": ["id"],
+        "additionalProperties": false
+      },
+      "KotPrintStatus": {
+        "type": "string",
+        "enum": ["NOT_REQUIRED", "PENDING", "PRINTED", "FAILED"]
+      },
+      "KotPrintStatusChanged": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "KotPrintStatusChanged" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "kotId": { "$ref": "#/components/schemas/Id" },
+              "kotNumber": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "orderId": { "$ref": "#/components/schemas/Id" },
+              "stationId": { "$ref": "#/components/schemas/Id" },
+              "printStatus": { "type": "string", "enum": ["PENDING", "PRINTED", "FAILED"] }
+            },
+            "required": ["kotId", "kotNumber", "orderId", "stationId", "printStatus"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
+        ],
         "additionalProperties": false
       },
       "KotReprintRequest": {
@@ -11186,12 +11233,16 @@
                   "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
                 },
                 "name": { "type": "string" },
+                "variantId": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+                },
                 "variantName": { "type": ["string", "null"] },
                 "modifiers": {
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
+                      "optionId": { "$ref": "#/components/schemas/Id" },
                       "name": { "type": "string" },
                       "priceDelta": {
                         "type": "integer",
@@ -11199,7 +11250,7 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["name", "priceDelta"],
+                    "required": ["optionId", "name", "priceDelta"],
                     "additionalProperties": false
                   }
                 },
@@ -11219,6 +11270,7 @@
                 "itemId",
                 "parentOrderItemId",
                 "name",
+                "variantId",
                 "variantName",
                 "modifiers",
                 "quantity",
@@ -11243,9 +11295,11 @@
                   "maximum": 9007199254740991
                 },
                 "stationId": { "$ref": "#/components/schemas/Id" },
-                "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] }
+                "stationName": { "type": "string" },
+                "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] },
+                "printStatus": { "$ref": "#/components/schemas/KotPrintStatus" }
               },
-              "required": ["id", "kotNumber", "stationId", "kind"],
+              "required": ["id", "kotNumber", "stationId", "stationName", "kind", "printStatus"],
               "additionalProperties": false
             }
           }

@@ -11,6 +11,7 @@ export * from './components/SegmentedControl.js';
 export * from './components/Sheet.js';
 export * from './components/StatusChip.js';
 export * from './components/TableTile.js';
+export * from './components/TextField.js';
 export * from './components/Toast.js';
 export * from './glyphs.js';
 export * from './strings.js';

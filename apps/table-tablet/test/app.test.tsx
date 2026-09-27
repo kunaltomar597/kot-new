@@ -1,6 +1,6 @@
 import type { MenuSnapshot } from '@rp/contracts';
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession, MemoryStore, MenuCache } from '@rp/mobile-core';
+import { DeviceSession, MemoryStore } from '@rp/mobile-core';
 import { FakeKeys, fakeLocalServer, RESTAURANT_ID, SocketFactory } from '@rp/mobile-core/testing';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { App } from '../src/App';
@@ -105,7 +105,6 @@ function setup() {
     session,
     sockets,
     server,
-    menuCache: new MenuCache(plainStore),
     publish: () => {
       version = 2;
     },
@@ -114,9 +113,9 @@ function setup() {
 
 describe('[MENU-013] [MENU-006] table tablet smoke flow', () => {
   it('pairs to its table and shows the live menu with no staff login', async () => {
-    const { session, sockets, menuCache, publish } = setup();
+    const { session, sockets, publish } = setup();
     await session.start();
-    await render(<App session={session} menu={menuCache} translator={translator} />);
+    await render(<App session={session} translator={translator} />);
 
     await fireEvent.changeText(screen.getByLabelText('Server address'), 'http://pos.test:3000');
     await fireEvent.changeText(screen.getByLabelText('Pairing code'), 'ABCDEFGH');
@@ -154,11 +153,11 @@ describe('[MENU-013] [MENU-006] table tablet smoke flow', () => {
   });
 
   it('shows the cached menu straight away after a restart, before the server answers', async () => {
-    const { session, menuCache } = setup();
+    const { session } = setup();
     await session.start();
     await session.pair('http://pos.test:3000', 'ABCD-EFGH');
-    await menuCache.refresh(() => Promise.resolve(menu(2)));
-    await render(<App session={session} menu={menuCache} translator={translator} />);
+    await session.menu.refresh(() => Promise.resolve(menu(2)));
+    await render(<App session={session} translator={translator} />);
     expect(await screen.findByText('3 dishes on the menu today')).toBeOnTheScreen();
   });
 

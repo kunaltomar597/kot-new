@@ -136,7 +136,7 @@ describe('[BILL-010] [AUTH-011] correcting a printed bill', () => {
     await user.type(within(dialog).getByLabelText(t('billing.voidReason')), 'Wrong table');
     await user.click(within(dialog).getByRole('button', { name: t('billing.confirm') }));
     const approval = await screen.findByRole('dialog', { name: t('override.title') });
-    await user.click(within(approval).getByRole('button', { name: 'Meera' }));
+    await user.click(await within(approval).findByRole('button', { name: 'Meera' }));
     await user.keyboard('2222');
     expect(
       await screen.findByText(t('billing.voidedToast', { number: 'INV/26-27/000012' })),
@@ -180,7 +180,7 @@ describe('[BILL-010] [AUTH-011] correcting a printed bill', () => {
     await user.type(within(dialog).getByLabelText(t('billing.editReason')), 'Guest added a Lassi');
     await user.click(within(dialog).getByRole('button', { name: t('billing.confirm') }));
     const approval = await screen.findByRole('dialog', { name: t('override.title') });
-    await user.click(within(approval).getByRole('button', { name: 'Meera' }));
+    await user.click(await within(approval).findByRole('button', { name: 'Meera' }));
     await user.keyboard('2222');
     expect(
       await screen.findByText(t('billing.editing', { number: 'INV/26-27/000012' })),

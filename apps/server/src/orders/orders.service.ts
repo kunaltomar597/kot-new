@@ -99,7 +99,7 @@ function comboOnNow(combo: MenuSnapshot['combos'][number], now: Date, timeZone: 
  */
 const ORDER_VIEW_INCLUDE = {
   items: { orderBy: { id: 'asc' }, include: { modifiers: { orderBy: { id: 'asc' } } } },
-  kots: { orderBy: { kotNumber: 'asc' } },
+  kots: { orderBy: { kotNumber: 'asc' }, include: { station: { select: { name: true } } } },
 } as const satisfies Prisma.OrderInclude;
 
 function orderView(
@@ -123,8 +123,13 @@ function orderView(
       itemId: item.itemId,
       parentOrderItemId: item.parentOrderItemId,
       name: item.name,
+      variantId: item.variantId,
       variantName: item.variantName,
-      modifiers: item.modifiers.map(({ name, priceDelta }) => ({ name, priceDelta })),
+      modifiers: item.modifiers.map(({ modifierOptionId, name, priceDelta }) => ({
+        optionId: modifierOptionId,
+        name,
+        priceDelta,
+      })),
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       lineTotal: item.lineTotal,
@@ -132,11 +137,13 @@ function orderView(
       state: item.state,
       instructions: item.instructions,
     })),
-    kots: order.kots.map(({ id, kotNumber, stationId, kind }) => ({
+    kots: order.kots.map(({ id, kotNumber, stationId, station, kind, printStatus }) => ({
       id,
       kotNumber,
       stationId,
+      stationName: station.name,
       kind,
+      printStatus,
     })),
   };
 }

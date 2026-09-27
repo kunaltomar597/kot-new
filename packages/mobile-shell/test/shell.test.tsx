@@ -8,11 +8,15 @@ import {
   LoginScreen,
   messageOf,
   PairingScreen,
+  Screen,
   useLive,
+  useMenu,
   useNow,
+  useUnsentOrders,
 } from '../src/index.js';
 import { ADDRESS, fakeServer, newSession, renderShell, translator } from './harness.js';
 import { itemReadyFrame, STAFF } from '@rp/mobile-core/testing';
+import { IDS, MENU } from '@rp/ordering/testing';
 
 async function pressDigits(pin: string) {
   for (const digit of pin) {
@@ -174,6 +178,72 @@ describe('[NFR-A01] connection banner and live data', () => {
     expect(screen.queryByTestId('connection-banner')).toBeNull();
     expect(load).toHaveBeenCalledTimes(3);
     jest.useRealTimers();
+  });
+});
+
+describe('[MENU-013] [WTR-012] the menu and unsent orders on the device', () => {
+  function Probe() {
+    const menu = useMenu();
+    const unsent = useUnsentOrders();
+    const shown =
+      menu === undefined ? 'reading' : menu === null ? 'none' : `v${String(menu.version)}`;
+    return <Text testID="probe">{`${shown} ${String(unsent.length)}`}</Text>;
+  }
+
+  it('shows what the device keeps at once, then every change', async () => {
+    const server = fakeServer().on('GET', '/api/v1/menu', () => ({ status: 200, body: MENU }));
+    const { session } = newSession(server);
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    await session.signIn(STAFF.WAITER.staffId, '4444');
+    await renderShell(session, <Probe />);
+    expect(await screen.findByText('none 0')).toBeOnTheScreen();
+
+    await act(async () => {
+      await session.menu.refresh(() => session.api.getMenu());
+    });
+    expect(screen.getByText('v1 0')).toBeOnTheScreen();
+
+    // The server has no order route here: the order is refused and kept for the waiter to see.
+    const key = '0199a0e0-0000-7000-8000-000000005001';
+    await act(async () => {
+      await session.orders.submit({
+        staffId: STAFF.WAITER.staffId,
+        tableLabel: 'T2',
+        request: {
+          idempotencyKey: key,
+          source: 'WAITER_APP',
+          orderType: 'DINE_IN',
+          tableSessionId: '0199a0e0-0000-7000-8000-000000005002',
+          lines: [
+            {
+              clientLineId: '0199a0e0-0000-7000-8000-000000005003',
+              itemId: IDS.dal,
+              quantity: 1,
+              modifiers: [],
+            },
+          ],
+        },
+        lines: [],
+      });
+    });
+    expect(screen.getByText('v1 1')).toBeOnTheScreen();
+    await act(async () => {
+      await session.orders.dismiss(key);
+      await session.menu.clear();
+    });
+    expect(screen.getByText('none 0')).toBeOnTheScreen();
+  });
+
+  it('keeps a footer under the scrolling content', async () => {
+    await renderShell(
+      newSession().session,
+      <Screen title="Table T2" footer={<Text>Send KOT</Text>}>
+        <Text>New items</Text>
+      </Screen>,
+    );
+    expect(screen.getByRole('header', { name: 'Table T2' })).toBeOnTheScreen();
+    expect(screen.getByText('Send KOT')).toBeOnTheScreen();
   });
 });
 

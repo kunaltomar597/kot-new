@@ -10,8 +10,17 @@ const STORAGE_KEY = 'rp.menu.v1';
  */
 export class MenuCache {
   private current: MenuSnapshot | null | undefined;
+  private readonly listeners = new Set<(menu: MenuSnapshot | null) => void>();
 
   constructor(private readonly store: KeyValueStore) {}
+
+  /** Called with the menu whenever it changes: fetched, availability applied or cleared. */
+  subscribe(listener: (menu: MenuSnapshot | null) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
 
   async get(): Promise<MenuSnapshot | null> {
     if (this.current !== undefined) return this.current;
@@ -62,10 +71,16 @@ export class MenuCache {
   async clear(): Promise<void> {
     this.current = null;
     await this.store.removeItem(STORAGE_KEY);
+    this.notify(null);
   }
 
   private async put(menu: MenuSnapshot): Promise<void> {
     this.current = menu;
     await this.store.setItem(STORAGE_KEY, JSON.stringify(menu));
+    this.notify(menu);
+  }
+
+  private notify(menu: MenuSnapshot | null): void {
+    for (const listener of this.listeners) listener(menu);
   }
 }

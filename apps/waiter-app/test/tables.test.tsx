@@ -1,7 +1,8 @@
 import { eventFrame } from '@rp/mobile-core/testing';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { BackHandler } from 'react-native';
 import { PAGER_REFRESH_MS } from '../src/PagerCard';
-import { mayMove } from '../src/TableSheet';
+import { mayMove } from '../src/MoveSheet';
 import { KIRAN, PAGER_ID, RAVI, Restaurant, signedInApp } from './restaurant';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
@@ -52,7 +53,7 @@ describe('[WTR-002] my tables', () => {
 });
 
 describe('[TBL-003] opening a table', () => {
-  it('opens a free table with the guests chosen, then shows it occupied', async () => {
+  it('opens a free table with the guests chosen, then lands on it to take the order', async () => {
     const { server, restaurant } = await signedInApp();
     await fireEvent.press(await tile('T1, Free'));
     expect(screen.getByRole('header', { name: 'Open T1' })).toBeOnTheScreen();
@@ -62,6 +63,10 @@ describe('[TBL-003] opening a table', () => {
     expect(server.callsTo('POST', `/api/v1/tables/${restaurant.table('T1').id}/open`)).toEqual([
       expect.objectContaining({ body: { covers: 3 } }),
     ]);
+    expect(await screen.findByRole('header', { name: 'Table T1' })).toBeOnTheScreen();
+    expect(await screen.findByText(/^Occupied · 3 guests/)).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Back to tables' }));
     expect(await tile(/^T1, Occupied, 3 guests/)).toBeOnTheScreen();
   });
 
@@ -80,10 +85,11 @@ describe('[TBL-003] opening a table', () => {
 });
 
 describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
-  it('moves the waiter’s table to a free one', async () => {
+  it('moves the waiter’s table to a free one and stays on it', async () => {
     const { server, restaurant } = await signedInApp();
     await fireEvent.press(await tile(/^T2, Occupied/));
-    await fireEvent.press(screen.getByRole('button', { name: 'Move table' }));
+    expect(await screen.findByRole('header', { name: 'Table T2' })).toBeOnTheScreen();
+    await fireEvent.press(await screen.findByRole('button', { name: 'Move table' }));
     expect(screen.getByRole('header', { name: 'Move T2 to' })).toBeOnTheScreen();
     const sheet = screen.getByTestId(`move-to-${restaurant.table('T4').id}`);
     expect(within(sheet).getByText('T4')).toBeOnTheScreen();
@@ -94,6 +100,9 @@ describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
       '/api/v1/table-sessions/0199a0e0-0000-7000-8000-000000009002/move',
     );
     expect(call?.body).toEqual({ toTableId: restaurant.table('T4').id });
+    // The same guests, now at T4.
+    expect(await screen.findByRole('header', { name: 'Table T4' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Back to tables' }));
     expect(await tile('T2, Free')).toBeOnTheScreen();
   });
 
@@ -104,16 +113,17 @@ describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
     }
     await signedInApp(restaurant);
     await fireEvent.press(await tile(/^T2, Occupied/));
-    await fireEvent.press(screen.getByRole('button', { name: 'Move table' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Move table' }));
     expect(screen.getByText('There is no free table to move to.')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.queryByRole('header', { name: 'Move T2 to' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Request bill' })).toBeOnTheScreen();
   });
 
   it('asks for the bill once, and not again while it is asked for', async () => {
     const { server } = await signedInApp();
     await fireEvent.press(await tile(/^T2, Occupied/));
-    await fireEvent.press(screen.getByRole('button', { name: 'Request bill' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Request bill' }));
     expect(
       await screen.findByText('The cashier has been asked for the bill for T2.'),
     ).toBeOnTheScreen();
@@ -123,11 +133,11 @@ describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
         '/api/v1/table-sessions/0199a0e0-0000-7000-8000-000000009002/request-bill',
       ),
     ).toHaveLength(1);
-    await fireEvent.press(await tile(/^T2, Bill asked/));
+    expect(await screen.findByText(/^Bill asked · 3 guests/)).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Request bill' })).toBeNull();
   });
 
-  it('offers Move only on the waiter’s own tables; managers move any', () => {
+  it('offers Move only on the waiter’s own tables; managers move any', async () => {
     const restaurant = new Restaurant();
     const entry = (label: string) => {
       const table = restaurant.overview().tables.find((candidate) => candidate.label === label);
@@ -138,6 +148,35 @@ describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
     expect(mayMove(entry('T5'), { id: RAVI, role: 'WAITER' })).toBe(false);
     expect(mayMove(entry('T5'), { id: RAVI, role: 'MANAGER' })).toBe(true);
     expect(mayMove(entry('T5'), { id: RAVI, role: 'KITCHEN' })).toBe(false);
+
+    await signedInApp(restaurant);
+    await fireEvent.press(await screen.findByRole('tab', { name: 'All tables' }));
+    await fireEvent.press(await tile(/^T5, Occupied/));
+    expect(await screen.findByRole('header', { name: 'Table T5' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Move table' })).toBeNull();
+  });
+
+  it('shows why a bill request was refused, and goes back with the phone’s back button', async () => {
+    const restaurant = new Restaurant();
+    const server = restaurant
+      .server()
+      .on('POST', '/api/v1/table-sessions/:sessionId/request-bill', () => ({
+        status: 409,
+        body: { code: 'NOTHING_TO_BILL', message: 'Nothing to bill yet.' },
+      }));
+    const back = jest.spyOn(BackHandler, 'addEventListener');
+    await signedInApp(restaurant, server);
+    await fireEvent.press(await tile(/^T2, Occupied/));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Request bill' }));
+    expect(await screen.findByText('Nothing to bill yet.')).toBeOnTheScreen();
+
+    const handler = back.mock.calls.at(-1)?.[1];
+    await act(async () => {
+      expect(handler?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(true);
+      await Promise.resolve();
+    });
+    expect(await tile(/^T2, Occupied/)).toBeOnTheScreen();
+    back.mockRestore();
   });
 });
 

@@ -86,6 +86,20 @@ export const KotBumped = event(
   'KotBumped',
   z.object({ kotId: Id, stationId: Id, bumped: z.boolean() }),
 );
+/**
+ * A printing station's ticket was printed, or its printer failed and it waits in the queue
+ * (KDS-008), so the waiter sees whether each KOT reached the kitchen (WTR-012).
+ */
+export const KotPrintStatusChanged = event(
+  'KotPrintStatusChanged',
+  z.object({
+    kotId: Id,
+    kotNumber: z.int().positive(),
+    orderId: Id,
+    stationId: Id,
+    printStatus: z.enum(['PENDING', 'PRINTED', 'FAILED']),
+  }),
+);
 
 export const ItemStatusChanged = event(
   'ItemStatusChanged',
@@ -235,6 +249,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   OrderRejected,
   KotCreated,
   KotBumped,
+  KotPrintStatusChanged,
   ItemStatusChanged,
   ServiceRequestRaised,
   ServiceRequestAcknowledged,

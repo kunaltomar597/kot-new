@@ -8,9 +8,12 @@ import {
 import type { PrintQueueResponse, TestPrintResponse } from '@rp/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
-import { PrismaService } from '../database/prisma.service.js';
+import { isoDateOf } from '../common/business-dates.js';
+import { newId } from '../common/ids.js';
+import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { EventBus } from '../events/event-bus.js';
+import { appendEvent } from '../events/outbox.js';
 import type { Printer } from '../generated/prisma/client.js';
 import { paperWidthOf, renderNotice } from './escpos.js';
 import { KotTicketsService } from './kot-tickets.service.js';
@@ -179,10 +182,12 @@ export class PrintQueueService implements OnApplicationBootstrap, OnModuleDestro
     await this.updateHealth(printer.id, error);
     await this.prisma.transaction(async (tx) => {
       if (error === null && kot.printStatus !== 'PRINTED' && kot.printStatus !== 'NOT_REQUIRED') {
-        await tx.kot.update({
+        const printed = await tx.kot.update({
           where: { id: kot.id },
           data: { printStatus: 'PRINTED', printedAt: new Date() },
+          select: PRINT_STATUS_SELECT,
         });
+        await printStatusEvent(tx, printed);
       }
       await this.audit.record(tx, {
         action: 'KOT_REPRINTED',
@@ -352,9 +357,66 @@ export class PrintQueueService implements OnApplicationBootstrap, OnModuleDestro
       ? { printStatus: 'PRINTED' as const, printedAt: new Date(), printAttempts: { increment: 1 } }
       : { printStatus: 'FAILED' as const, printAttempts: { increment: 1 } };
     if (job.type === 'KOT') {
-      await this.prisma.kot.update({ where: { id: job.id }, data });
+      await this.prisma.transaction(async (tx) => {
+        const before = await tx.kot.findUniqueOrThrow({
+          where: { id: job.id },
+          select: { printStatus: true },
+        });
+        const after = await tx.kot.update({
+          where: { id: job.id },
+          data,
+          select: PRINT_STATUS_SELECT,
+        });
+        // A ticket failing again on a printer that is still down is not news.
+        if (after.printStatus !== before.printStatus) await printStatusEvent(tx, after);
+      });
     } else {
       await this.prisma.printNotice.update({ where: { id: job.id }, data });
     }
   }
+}
+
+const PRINT_STATUS_SELECT = {
+  id: true,
+  restaurantId: true,
+  businessDate: true,
+  kotNumber: true,
+  orderId: true,
+  stationId: true,
+  printStatus: true,
+} as const;
+
+/** Floor screens show whether each ticket reached its station (WTR-012). */
+async function printStatusEvent(
+  tx: TransactionClient,
+  kot: {
+    id: string;
+    restaurantId: string;
+    businessDate: Date;
+    kotNumber: number;
+    orderId: string;
+    stationId: string;
+    printStatus: 'NOT_REQUIRED' | 'PENDING' | 'PRINTED' | 'FAILED';
+  },
+): Promise<void> {
+  if (kot.printStatus === 'NOT_REQUIRED') return;
+  await appendEvent(
+    tx,
+    {
+      eventId: newId(),
+      type: 'KotPrintStatusChanged',
+      version: 1,
+      occurredAt: new Date().toISOString(),
+      restaurantId: kot.restaurantId,
+      businessDate: isoDateOf(kot.businessDate),
+      payload: {
+        kotId: kot.id,
+        kotNumber: kot.kotNumber,
+        orderId: kot.orderId,
+        stationId: kot.stationId,
+        printStatus: kot.printStatus,
+      },
+    },
+    { aggregate: { type: 'kot', id: kot.id } },
+  );
 }

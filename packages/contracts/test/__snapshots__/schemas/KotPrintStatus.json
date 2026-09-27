@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["NOT_REQUIRED", "PENDING", "PRINTED", "FAILED"] },
+  "output": { "type": "string", "enum": ["NOT_REQUIRED", "PENDING", "PRINTED", "FAILED"] }
+}

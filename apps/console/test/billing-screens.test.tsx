@@ -84,7 +84,7 @@ describe('[BILL-001] [BILL-005] [AUTH-011] the bill', () => {
     await user.click(within(dialog).getByRole('button', { name: t('billing.discount.apply') }));
 
     const approval = await screen.findByRole('dialog', { name: t('override.title') });
-    await user.click(within(approval).getByRole('button', { name: 'Meera' }));
+    await user.click(await within(approval).findByRole('button', { name: 'Meera' }));
     await user.keyboard('2222');
     await waitFor(() => {
       expect(fake.callsTo('POST', `/api/v1/bills/${B.bill}/discounts`)).toHaveLength(2);

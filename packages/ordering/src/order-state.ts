@@ -1,5 +1,6 @@
-import type { OrderView } from '@rp/contracts';
+import type { MenuSnapshot, OrderView } from '@rp/contracts';
 import type { OrderItemState } from '@rp/domain';
+import type { Translator } from '@rp/i18n';
 
 type Item = OrderView['items'][number];
 
@@ -26,4 +27,38 @@ export function displayState(item: Item, items: readonly Item[]): OrderItemState
   return parts.reduce((least, part) =>
     (PROGRESS[part.state] ?? 0) < (PROGRESS[least.state] ?? 0) ? part : least,
   ).state;
+}
+
+type Kot = OrderView['kots'][number];
+
+/** Whether a kitchen ticket reached the kitchen (WTR-012), for the waiter who sent it. */
+export interface KotDelivery {
+  /** The ticket is on the station's kitchen screen. */
+  readonly onScreen: boolean;
+  /** Its printing, when the station prints tickets; null when it does not. */
+  readonly print: 'PENDING' | 'PRINTED' | 'FAILED' | null;
+  /** The kitchen has it: on a screen or on paper. */
+  readonly reached: boolean;
+}
+
+/**
+ * Where a ticket is: on the kitchen screen, printed, still printing, or held by a printer problem.
+ * A station that shows tickets on a screen and also prints them has the ticket on its screen
+ * whatever the printer does; a station missing from the menu counts as print-only.
+ */
+export function kotDelivery(kot: Kot, stations: MenuSnapshot['stations']): KotDelivery {
+  const mode = stations.find((station) => station.id === kot.stationId)?.mode;
+  const print = kot.printStatus === 'NOT_REQUIRED' ? null : kot.printStatus;
+  const onScreen = print === null || mode === 'SCREEN' || mode === 'BOTH';
+  return { onScreen, print, reached: onScreen || print === 'PRINTED' };
+}
+
+/** "On the kitchen screen · Printed", "Printing", "Not printed: printer problem". */
+export function kotDeliveryText(delivery: KotDelivery, t: Translator): string {
+  const parts: string[] = [];
+  if (delivery.onScreen) parts.push(t('pos.kot.onScreen'));
+  if (delivery.print === 'PENDING') parts.push(t('pos.kot.printing'));
+  if (delivery.print === 'PRINTED') parts.push(t('pos.kot.printed'));
+  if (delivery.print === 'FAILED') parts.push(t('pos.kot.failed'));
+  return parts.join(' · ');
 }

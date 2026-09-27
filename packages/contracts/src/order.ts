@@ -84,6 +84,14 @@ export const SubmitOrderResponse = z.discriminatedUnion('status', [
 ]);
 export type SubmitOrderResponse = z.infer<typeof SubmitOrderResponse>;
 
+/**
+ * Whether a ticket reached its station's printer (KDS-008, WTR-012): NOT_REQUIRED for a station
+ * that only has a screen, PENDING until printed, FAILED while its printer is down (it stays queued
+ * and prints on recovery or on another printer).
+ */
+export const KotPrintStatus = z.enum(['NOT_REQUIRED', 'PENDING', 'PRINTED', 'FAILED']);
+export type KotPrintStatus = z.infer<typeof KotPrintStatus>;
+
 /** Kitchen ticket as shown on the KDS and printed (ORD-008, KDS-003). */
 export const Kot = z.object({
   id: Id,
@@ -135,8 +143,10 @@ export const OrderView = z.object({
       /** Set on the parts of a combo; the combo line carries the price. */
       parentOrderItemId: Id.nullable(),
       name: z.string(),
+      /** The variant and options chosen, so the same item can be ordered again (NFR-U03). */
+      variantId: Id.nullable(),
       variantName: z.string().nullable(),
-      modifiers: z.array(z.object({ name: z.string(), priceDelta: z.int() })),
+      modifiers: z.array(z.object({ optionId: Id, name: z.string(), priceDelta: z.int() })),
       quantity: z.int().positive(),
       unitPrice: z.int().nonnegative(),
       lineTotal: z.int().nonnegative(),
@@ -150,7 +160,9 @@ export const OrderView = z.object({
       id: Id,
       kotNumber: z.int().positive(),
       stationId: Id,
+      stationName: z.string(),
       kind: z.enum(['NEW', 'MODIFIED', 'CANCELLED']),
+      printStatus: KotPrintStatus,
     }),
   ),
 });

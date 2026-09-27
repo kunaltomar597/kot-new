@@ -1,4 +1,6 @@
 export * from './cart.js';
 export * from './floor-view.js';
+export * from './item-choice.js';
 export * from './menu-view.js';
 export * from './order-state.js';
+export * from './reorder.js';
