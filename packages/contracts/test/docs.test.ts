@@ -41,9 +41,10 @@ const route = (overrides: Partial<RouteDefinition>): RouteDefinition => ({
 });
 
 describe('[INT-002] [NFR-M06] generated contract documents', () => {
-  // Formats both documents twice with Prettier, including its parsers' cold start: under a second
-  // alone, but CI runs every package's tests at once (6.9 s seen), so it gets more than the 5 s default.
-  it('renders deterministically', { timeout: 30_000 }, async () => {
+  // Formats both documents twice with Prettier, including its parsers' cold start: under two
+  // seconds alone, but CI runs every package's tests at once and has taken 33 s, so it gets two
+  // minutes, as the React Native suites do.
+  it('renders deterministically', { timeout: 120_000 }, async () => {
     const first = await renderDocs(options);
     const second = await renderDocs(options);
     expect(second).toEqual(first);
