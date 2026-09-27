@@ -1,0 +1,141 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "recommendations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "itemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+            "reason": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "RULE" },
+                    "ruleId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "label": { "type": ["string", "null"] },
+                    "becauseOf": { "type": "string" }
+                  },
+                  "required": ["kind", "ruleId", "label", "becauseOf"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "LEARNED" },
+                    "becauseOf": { "type": "string" }
+                  },
+                  "required": ["kind", "becauseOf"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "BEST_SELLER" },
+                    "daypart": {
+                      "anyOf": [
+                        { "type": "string", "enum": ["BREAKFAST", "LUNCH", "EVENING", "DINNER"] },
+                        { "type": "null" }
+                      ]
+                    }
+                  },
+                  "required": ["kind", "daypart"]
+                }
+              ]
+            }
+          },
+          "required": ["itemId", "layer", "reason"]
+        }
+      },
+      "daypart": {
+        "anyOf": [
+          { "type": "string", "enum": ["BREAKFAST", "LUNCH", "EVENING", "DINNER"] },
+          { "type": "null" }
+        ]
+      },
+      "menuVersion": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["recommendations", "daypart", "menuVersion"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "recommendations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "itemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+            "reason": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "RULE" },
+                    "ruleId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "label": { "type": ["string", "null"] },
+                    "becauseOf": { "type": "string" }
+                  },
+                  "required": ["kind", "ruleId", "label", "becauseOf"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "LEARNED" },
+                    "becauseOf": { "type": "string" }
+                  },
+                  "required": ["kind", "becauseOf"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "BEST_SELLER" },
+                    "daypart": {
+                      "anyOf": [
+                        { "type": "string", "enum": ["BREAKFAST", "LUNCH", "EVENING", "DINNER"] },
+                        { "type": "null" }
+                      ]
+                    }
+                  },
+                  "required": ["kind", "daypart"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": ["itemId", "layer", "reason"],
+          "additionalProperties": false
+        }
+      },
+      "daypart": {
+        "anyOf": [
+          { "type": "string", "enum": ["BREAKFAST", "LUNCH", "EVENING", "DINNER"] },
+          { "type": "null" }
+        ]
+      },
+      "menuVersion": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["recommendations", "daypart", "menuVersion"],
+    "additionalProperties": false
+  }
+}

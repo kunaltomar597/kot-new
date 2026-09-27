@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["IMPRESSION", "TAP", "ADD_TO_CART", "ORDERED"] },
+  "output": { "type": "string", "enum": ["IMPRESSION", "TAP", "ADD_TO_CART", "ORDERED"] }
+}

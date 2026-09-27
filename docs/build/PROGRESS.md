@@ -16,8 +16,9 @@ What exists:
   bill splitting, payments and shift cash, the Z-report, report aggregation, CSV export, menu
   import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a), including the
   low-battery check (P2-02a), what reaches a pager and the waiter app (P2-06a), what asks for
-  a person at the POS or dashboard (P2-06c), and service requests' alerts, Resolve and the asker
-  who is not alerted (P2-06d). 181 tests.
+  a person at the POS or dashboard (P2-06c), service requests' alerts, Resolve and the asker
+  who is not alerted (P2-06d), and recommendations: rules, best sellers by daypart, filters,
+  course order and reasons (P3-04). 198 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -30,11 +31,12 @@ What exists:
   the signed-in person's own pager (P2-02a); each KOT's station and print status on orders and
   `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c);
   the pairing QR code with the server's addresses and CA fingerprint (P2-01d); a waiter phone's
-  own alerts (P2-06a); service requests, their routes and `ServiceRequestEscalated` (P2-06d).
-  494 tests.
+  own alerts (P2-06a); service requests, their routes and `ServiceRequestEscalated` (P2-06d);
+  suggestions, their tracking, the rules and the suggestion an order line came from (P3-04).
+  518 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
-  harness; core data model (62 tables after the later migrations), least-privilege roles,
+  harness; core data model (64 tables after the later migrations), least-privilege roles,
   audit/invoice protection triggers,
   gap-free numbering and a development seed (P0-08); audit hash chain (P0-09); authentication,
   sessions, permission guard and manager override (P0-10); device pairing and device tokens
@@ -63,8 +65,10 @@ What exists:
   (P2-01d); a waiter phone that alerts the person who last signed in on it, also after an
   inactivity sign-out, with its own alert routes and room (P2-06a); service requests from the
   table tablet with anti-spam and a rate limit, their alerts kept in step, the waiter's inbox,
-  requests ended when the table closes, and a bill asker who is not alerted (P2-06d).
-  679 tests (4 skipped without a real install).
+  requests ended when the table closes, and a bill asker who is not alerted (P2-06d); the
+  recommendation engine for the tablet and the phones, with best sellers by daypart, the rules
+  API, and impressions, taps, adds and orders tracked (P3-04).
+  700 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -107,8 +111,8 @@ What exists:
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
-  line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a).
-  34 tests.
+  line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a); the
+  reason shown with a suggestion and the suggestion a cart line came from (P3-04). 38 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -133,7 +137,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-04 Recommendation engine v1 (P1-06 done).
 - P4-01 Dashboard shell and live views (P0-14, P1-02 and P1-06 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
@@ -225,7 +228,7 @@ Recommended next WPs (dependencies met):
 - [ ] P3-01 Table tablet app: kiosk, pairing, lifecycle, health
 - [ ] P3-02 Service requests on the tablet (server side in P2-06d)
 - [ ] P3-03 Customer ordering and waiter approval
-- [ ] P3-04 Recommendation engine v1
+- [x] P3-04 Recommendation engine v1
 - [ ] P3-05 Recommendation UI and feedback
 - [ ] P3-06 Phase 3 exit test (S6)
 
@@ -519,6 +522,42 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-27 (P3-04):
+
+179. A lower layer fills the places a higher one leaves: REC-004's "used when nothing has been
+     ordered yet or no rule applies" is read as best sellers filling what the rules (and later the
+     learned pairs) leave, so a table sees up to `limit` suggestions (default 6, at most 20).
+180. Course awareness (REC-005): a category's course is its own name, else its parent's, in
+     `reco.courseSequence` (case ignored). In every layer the course after the furthest one ordered
+     comes first, then later courses and dishes outside the sequence, then courses already served;
+     before anything is ordered the first course is next.
+181. Best sellers (REC-004) are quantities over the last `reco.bestSellerDays` business dates,
+     today included, counted in the daypart's hours by when each line was ordered (local time);
+     outside every daypart window the whole day counts. Only lines that reached the kitchen count
+     (sent to served), and a combo counts, not its parts. Each ranking is cached for ten minutes
+     and refreshed in the background (not a BRD ⚙ value, so a constant).
+182. A rule's dates are business dates (a rule until 31 December still applies at 01:00 on
+     1 January, like that night's orders) and its hours local time; a combo keeps the calendar
+     dates the order engine checks. A combo outside its dates or hours is never suggested.
+183. Suggestions are for a table session, or for a takeaway cart without one (the POS). "In the
+     order" means the session's lines sent or waiting for approval, combo parts included, plus the
+     cart the client names. Veg only is the table's filter as the client sets it (TAB-005).
+184. ORDERED is counted from the order itself: an order line may carry the suggestion it was
+     added from (`recommendation`, layer and rule), kept on the order item, and the recommendations
+     module records one ORDERED event per such line when the order is submitted, customer orders
+     included. The report reads each line's final state, so a rejected or voided line is not
+     revenue. Clients send IMPRESSION, TAP and ADD_TO_CART in batches of at most 50; events for a
+     session closed since still count; unknown items or rules are refused (422).
+185. A rule names active items or categories (422 otherwise), checked on every change. Pausing
+     (`active: false`) keeps it; archiving is final for the editor (create it again to bring it
+     back). Its targets are not foreign keys: an item archived later only stops being suggested.
+186. Staff read suggestions and record events with ORDER_CREATE, like the order screens; the
+     tablet only for its own open table (AUTH-009); rules need OPERATIONS_CONFIGURE, which the
+     permissions matrix gives recommendations.
+187. `MenuPublishService` keeps the parsed snapshot of each restaurant's latest version (a version
+     never changes), so the order engine and recommendations read the menu with one small query
+     plus the live availability.
 
 Decided 2026-09-27 (P2-06d):
 
@@ -983,6 +1022,38 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P3-04 Recommendation engine v1
+
+Merged #61 (P2-06d) once green.
+
+Built: `@rp/domain` `recommend` with its layers, filters, course order and reasons, `daypartAt`,
+`courseIndexes`, `ruleIsOn`, `timeOfDayOf` and `inTimeWindow`; the `recommendation_rules` and
+`recommendation_events` tables and the suggestion columns on `order_items`; contracts for the
+suggestions, tracking and rules, and `OrderLineRequest.recommendation`; the server's
+`recommendations` module (`RecommendationsService`, `BestSellers`, `RecommendationRulesService`,
+the `RecommendationOrders` consumer and three controllers); `comboOnNow` moved to the menu helpers
+for the order engine and recommendations; the parsed menu kept per version; `@rp/ordering`
+`describeRecommendation`, `reco.reason.*` strings and `CartLine.recommendation`.
+
+Tests: domain 198 (was 181), contracts 518 (was 494), server 700 (was 679), ordering 38 (was 34),
+i18n unchanged. The speed test answers in about 30 ms at the 95th percentile in the cloud
+container (budget 200 ms).
+
+Gotchas:
+
+- Best sellers are cached for ten minutes per restaurant, business date, days and hours: a test
+  that adds orders and expects them ranked at once calls `BestSellers.invalidate()`, or, like
+  `recommendations.int.test.ts`, sets the clock years ahead and writes the history directly.
+- The order engine refuses a reused idempotency key with a different body: a replay test sends
+  the same `clientLineId`s.
+- Query arrays arrive as a string when given once: contracts use `z.union([Id, z.array(Id)])` and
+  normalise; flags accept `'true'`/`'false'` and booleans (the api-client sends the parsed value).
+
+Deferred: the suggestion rows on the tablet and the phones (P3-05); boost, pin and block (REC-009,
+P4-03); the report (RPT-012, P4-05); learned pairs (P6-02); the QR relay snapshot (P5).
+
+Decisions: 179 to 187.
 
 ### 2026-09-27: P2-06d Service requests and the waiter's inbox (P2-06 done)
 

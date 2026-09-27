@@ -1,4 +1,4 @@
-import type { OrderLineRequest } from '@rp/contracts';
+import type { OrderLineRequest, RecommendationSource } from '@rp/contracts';
 import { multiply, sum, type ItemSelection } from '@rp/domain';
 
 /** One line waiting to be sent (ORD-001). Prices are estimates; the server prices the order. */
@@ -16,6 +16,8 @@ export interface CartLine {
   readonly unitPrice: number;
   /** Why the server refused this line last time (ORD-017), until it is changed. */
   readonly error?: string;
+  /** The suggestion it was added from, sent with the line so it counts as ordered (REC-008). */
+  readonly recommendation?: RecommendationSource;
 }
 
 export type NewCartLine = Omit<CartLine, 'clientLineId' | 'error'>;
@@ -31,7 +33,10 @@ function sameChoice(a: NewCartLine, b: CartLine): boolean {
   );
 }
 
-/** Adds a line, or raises the quantity of an identical one (same item, options and note). */
+/**
+ * Adds a line, or raises the quantity of an identical one (same item, options and note). A line
+ * that came from a suggestion keeps it; one added by hand takes the suggestion added to it.
+ */
 export function addLine(
   lines: readonly CartLine[],
   line: NewCartLine,
@@ -45,6 +50,7 @@ export function addLine(
           ...existing,
           quantity: Math.min(MAX_QUANTITY, existing.quantity + line.quantity),
           error: undefined,
+          recommendation: existing.recommendation ?? line.recommendation,
         }
       : existing,
   );
@@ -93,5 +99,6 @@ export function requestLines(lines: readonly CartLine[]): OrderLineRequest[] {
     })),
     ...(line.comboChoices !== undefined && { comboChoices: [...line.comboChoices] }),
     ...(line.instructions.trim() !== '' && { instructions: line.instructions.trim() }),
+    ...(line.recommendation !== undefined && { recommendation: { ...line.recommendation } }),
   }));
 }

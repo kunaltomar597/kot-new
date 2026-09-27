@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Id, IdempotencyKey, OrderItemState, OrderSource, OrderType, Timestamp } from './common.js';
+import { RecommendationSource } from './recommendations.js';
 
 /** Default maximum length of per-item instructions (ORD-015 ⚙); the server applies the configured value. */
 export const DEFAULT_INSTRUCTION_MAX_LENGTH = 140;
@@ -25,6 +26,8 @@ export const OrderLineRequest = z.strictObject({
   /** Chosen items for combo choice slots, in component order. */
   comboChoices: z.array(Id).max(20).optional(),
   instructions: Instructions.optional(),
+  /** The suggestion the line was added from, counted as ORDERED for its layer (REC-008). */
+  recommendation: RecommendationSource.optional(),
 });
 export type OrderLineRequest = z.infer<typeof OrderLineRequest>;
 

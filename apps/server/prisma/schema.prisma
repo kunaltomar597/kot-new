@@ -1020,48 +1020,51 @@ model Order {
 }
 
 model OrderItem {
-  id                String              @id @default(uuid(7)) @db.Uuid
-  restaurantId      String              @map("restaurant_id") @db.Uuid
-  orderId           String              @map("order_id") @db.Uuid
-  order             Order               @relation(fields: [orderId], references: [id])
-  businessDate      DateTime            @map("business_date") @db.Date
-  itemId            String              @map("item_id") @db.Uuid
-  item              Item                @relation(fields: [itemId], references: [id])
-  variantId         String?             @map("variant_id") @db.Uuid
-  variant           Variant?            @relation(fields: [variantId], references: [id])
+  id                   String               @id @default(uuid(7)) @db.Uuid
+  restaurantId         String               @map("restaurant_id") @db.Uuid
+  orderId              String               @map("order_id") @db.Uuid
+  order                Order                @relation(fields: [orderId], references: [id])
+  businessDate         DateTime             @map("business_date") @db.Date
+  itemId               String               @map("item_id") @db.Uuid
+  item                 Item                 @relation(fields: [itemId], references: [id])
+  variantId            String?              @map("variant_id") @db.Uuid
+  variant              Variant?             @relation(fields: [variantId], references: [id])
   /// Combo component lines point at the combo's own order item.
-  parentOrderItemId String?             @map("parent_order_item_id") @db.Uuid
-  parent            OrderItem?          @relation("ComboLines", fields: [parentOrderItemId], references: [id])
-  components        OrderItem[]         @relation("ComboLines")
+  parentOrderItemId    String?              @map("parent_order_item_id") @db.Uuid
+  parent               OrderItem?           @relation("ComboLines", fields: [parentOrderItemId], references: [id])
+  components           OrderItem[]          @relation("ComboLines")
   /// Names and prices as they were when ordered; menu edits never change past orders.
-  name              String
-  variantName       String?             @map("variant_name")
-  quantity          Int
-  unitPrice         Int                 @map("unit_price")
-  lineTotal         Int                 @map("line_total")
-  taxGroupId        String              @map("tax_group_id") @db.Uuid
+  name                 String
+  variantName          String?              @map("variant_name")
+  quantity             Int
+  unitPrice            Int                  @map("unit_price")
+  lineTotal            Int                  @map("line_total")
+  taxGroupId           String               @map("tax_group_id") @db.Uuid
   /// Tax rates at the time of ordering ({code, rateBp}[]).
-  taxRates          Json                @map("tax_rates")
-  stationId         String              @map("station_id") @db.Uuid
-  state             OrderItemState
-  instructions      String?
-  createdById       String?             @map("created_by_id") @db.Uuid
-  approvedById      String?             @map("approved_by_id") @db.Uuid
-  sentAt            DateTime?           @map("sent_at") @db.Timestamptz(3)
-  preparingAt       DateTime?           @map("preparing_at") @db.Timestamptz(3)
-  readyAt           DateTime?           @map("ready_at") @db.Timestamptz(3)
-  pickedUpAt        DateTime?           @map("picked_up_at") @db.Timestamptz(3)
-  servedAt          DateTime?           @map("served_at") @db.Timestamptz(3)
-  endedAt           DateTime?           @map("ended_at") @db.Timestamptz(3)
+  taxRates             Json                 @map("tax_rates")
+  stationId            String               @map("station_id") @db.Uuid
+  state                OrderItemState
+  instructions         String?
+  createdById          String?              @map("created_by_id") @db.Uuid
+  approvedById         String?              @map("approved_by_id") @db.Uuid
+  sentAt               DateTime?            @map("sent_at") @db.Timestamptz(3)
+  preparingAt          DateTime?            @map("preparing_at") @db.Timestamptz(3)
+  readyAt              DateTime?            @map("ready_at") @db.Timestamptz(3)
+  pickedUpAt           DateTime?            @map("picked_up_at") @db.Timestamptz(3)
+  servedAt             DateTime?            @map("served_at") @db.Timestamptz(3)
+  endedAt              DateTime?            @map("ended_at") @db.Timestamptz(3)
   /// Reason for reject, cancel or void (ORD-011).
-  endReason         String?             @map("end_reason")
-  modifiers         OrderItemModifier[]
-  kotLines          KotLine[]
-  events            OrderEvent[]
-  discounts         Discount[]
-  invoiceLines      InvoiceLine[]
-  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  endReason            String?              @map("end_reason")
+  /// The suggestion the line was ordered from (REC-008); null for most lines.
+  recommendationLayer  RecommendationLayer? @map("recommendation_layer")
+  recommendationRuleId String?              @map("recommendation_rule_id") @db.Uuid
+  modifiers            OrderItemModifier[]
+  kotLines             KotLine[]
+  events               OrderEvent[]
+  discounts            Discount[]
+  invoiceLines         InvoiceLine[]
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([orderId])
   @@index([restaurantId, businessDate, state])
@@ -1250,6 +1253,78 @@ model ServiceRequest {
   @@index([restaurantId, state])
   @@index([tableSessionId, state])
   @@map("service_requests")
+}
+
+/// @rp/domain RECOMMENDATION_LAYERS.
+enum RecommendationLayer {
+  RULE
+  LEARNED
+  BEST_SELLER
+}
+
+/// @rp/contracts RECOMMENDATION_EVENT_KINDS.
+enum RecommendationEventKind {
+  IMPRESSION
+  TAP
+  ADD_TO_CART
+  ORDERED
+}
+
+/// A manual recommendation rule (REC-002, P3-04): "if the order contains X, suggest Y". Each side
+/// is an item or a category with its sub-categories, exactly one of the two (a check constraint).
+/// Archived, never deleted, so what it suggested stays in the reports (REC-008).
+model RecommendationRule {
+  id                String         @id @default(uuid(7)) @db.Uuid
+  restaurantId      String         @map("restaurant_id") @db.Uuid
+  whenItemId        String?        @map("when_item_id") @db.Uuid
+  whenCategoryId    String?        @map("when_category_id") @db.Uuid
+  suggestItemId     String?        @map("suggest_item_id") @db.Uuid
+  suggestCategoryId String?        @map("suggest_category_id") @db.Uuid
+  /// Higher first.
+  priority          Int
+  channels          SalesChannel[]
+  /// Daily window, local 'HH:MM'; an end before the start runs past midnight.
+  windowStart       String?        @map("window_start")
+  windowEnd         String?        @map("window_end")
+  /// Business dates, both included.
+  activeFrom        DateTime?      @map("active_from") @db.Date
+  activeUntil       DateTime?      @map("active_until") @db.Date
+  /// The restaurant's own words shown with the suggestion.
+  label             String?
+  /// Paused rules are kept for later.
+  active            Boolean        @default(true)
+  archivedAt        DateTime?      @map("archived_at") @db.Timestamptz(3)
+  createdById       String?        @map("created_by_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, archivedAt])
+  @@map("recommendation_rules")
+}
+
+/// What was done with a suggestion (REC-008): shown, opened or put in the cart (from the apps), or
+/// ordered (from an order line that carries it). Table-level only (REC-007): the table session and
+/// the device or staff member, never a diner. Feeds the recommendation report (RPT-012).
+model RecommendationEvent {
+  id             String                  @id @default(uuid(7)) @db.Uuid
+  restaurantId   String                  @map("restaurant_id") @db.Uuid
+  businessDate   DateTime                @map("business_date") @db.Date
+  kind           RecommendationEventKind
+  layer          RecommendationLayer
+  itemId         String                  @map("item_id") @db.Uuid
+  ruleId         String?                 @map("rule_id") @db.Uuid
+  /// Where the suggestion showed, or where its line was ordered.
+  channel        SalesChannel
+  tableSessionId String?                 @map("table_session_id") @db.Uuid
+  /// The order line an ORDERED event counts; its quantity and value are read from it.
+  orderItemId    String?                 @unique @map("order_item_id") @db.Uuid
+  deviceId       String?                 @map("device_id") @db.Uuid
+  staffId        String?                 @map("staff_id") @db.Uuid
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, businessDate, kind])
+  @@map("recommendation_events")
 }
 
 /// A note printed at a station that is not a kitchen ticket, e.g. "Moved from T4 to T7" when a

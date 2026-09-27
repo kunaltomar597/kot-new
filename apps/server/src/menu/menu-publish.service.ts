@@ -28,6 +28,9 @@ import { SettingsService } from '../settings/settings.service.js';
  */
 @Injectable()
 export class MenuPublishService {
+  /** The latest published version of each restaurant, parsed. */
+  private readonly parsed = new Map<string, { id: string; snapshot: MenuSnapshot }>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -272,16 +275,30 @@ export class MenuPublishService {
     return { version, publishedAt: publishedAt.toISOString(), checksum, published: true };
   }
 
-  /** The published menu with current availability and stock overlaid (MENU-006, MENU-013). */
+  /**
+   * The published menu with current availability and stock overlaid (MENU-006, MENU-013). A
+   * version never changes once published, so its parsed snapshot is kept until the next one: the
+   * order engine and recommendations read the menu on every call (NFR-P01, REC-011).
+   */
   async current(restaurantId: string): Promise<MenuSnapshot> {
     const latest = await this.prisma.menuVersion.findFirst({
       where: { restaurantId },
       orderBy: { version: 'desc' },
+      select: { id: true },
     });
     if (latest === null) {
       throw new AppError(404, 'MENU_NOT_PUBLISHED', 'No menu has been published yet.');
     }
-    const snapshot = MenuSnapshot.parse(latest.snapshot);
+    let parsed = this.parsed.get(restaurantId);
+    if (parsed?.id !== latest.id) {
+      const row = await this.prisma.menuVersion.findUniqueOrThrow({
+        where: { id: latest.id },
+        select: { snapshot: true },
+      });
+      parsed = { id: latest.id, snapshot: MenuSnapshot.parse(row.snapshot) };
+      this.parsed.set(restaurantId, parsed);
+    }
+    const { snapshot } = parsed;
     const live = await this.prisma.item.findMany({
       where: { id: { in: snapshot.items.map((item) => item.id) } },
       select: { id: true, available: true, trackStock: true, stockLevel: true },

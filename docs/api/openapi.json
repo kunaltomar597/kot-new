@@ -23,6 +23,7 @@
     { "name": "payments" },
     { "name": "photos" },
     { "name": "printing" },
+    { "name": "recommendations" },
     { "name": "reports" },
     { "name": "restaurant" },
     { "name": "service-requests" },
@@ -1662,6 +1663,154 @@
         },
         "x-capability": "DEVICE",
         "x-requirements": ["WTR-006", "NTF-004"]
+      }
+    },
+    "/api/v1/devices/current/recommendations": {
+      "get": {
+        "operationId": "getTableRecommendations",
+        "summary": "Suggestions for this table tablet's table",
+        "description": "TAB-011, AUTH-009: as `getRecommendations` for the session open at the tablet's own table, on the tablet channel. Only table tablets.",
+        "tags": ["recommendations"],
+        "parameters": [
+          {
+            "name": "cart",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "default": 6, "type": "integer", "minimum": 1, "maximum": 20 }
+          },
+          {
+            "name": "vegOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "boolean" }, { "type": "string", "enum": ["true", "false"] }]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggestions, best first.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet bound to a table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No menu published yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table is not open.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": [
+          "TAB-011",
+          "REC-001",
+          "REC-005",
+          "REC-006",
+          "REC-007",
+          "REC-011",
+          "AUTH-009"
+        ]
+      }
+    },
+    "/api/v1/devices/current/recommendations/events": {
+      "post": {
+        "operationId": "recordTableRecommendationEvents",
+        "summary": "Count this table tablet's suggestions shown, opened and put in the cart",
+        "description": "REC-008, AUTH-009: for the session open at the tablet's own table.",
+        "tags": ["recommendations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RecordTableRecommendationEventsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Recorded." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet bound to a table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table is not open.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "An item or rule does not exist here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["REC-008", "TAB-011", "AUTH-009"]
       }
     },
     "/api/v1/devices/current/service-requests": {
@@ -5293,6 +5442,391 @@
         },
         "x-capability": "OPERATIONS_CONFIGURE",
         "x-requirements": ["KDS-008", "ONB-004"]
+      }
+    },
+    "/api/v1/recommendation-rules": {
+      "get": {
+        "operationId": "listRecommendationRules",
+        "summary": "The recommendation rules, highest priority first",
+        "description": "REC-002: every rule not archived, paused ones included. The editor is P4-03.",
+        "tags": ["recommendations"],
+        "responses": {
+          "200": {
+            "description": "The rules.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationRuleListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-002"]
+      },
+      "post": {
+        "operationId": "createRecommendationRule",
+        "summary": "Add a rule: if the order contains X, suggest Y",
+        "description": "REC-002: X and Y are active items or categories (a category includes its sub-categories). Audited.",
+        "tags": ["recommendations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RecommendationRuleRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new rule.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationRuleView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "An item or category it names is not active here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-002", "AUD-001"]
+      }
+    },
+    "/api/v1/recommendation-rules/{ruleId}": {
+      "put": {
+        "operationId": "updateRecommendationRule",
+        "summary": "Change or pause a rule",
+        "description": "REC-002: audited with before and after. An archived rule cannot be changed.",
+        "tags": ["recommendations"],
+        "parameters": [
+          {
+            "name": "ruleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RecommendationRuleRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The rule as it is now.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationRuleView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such rule, or it is archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "An item or category it names is not active here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-002", "AUD-001"]
+      }
+    },
+    "/api/v1/recommendation-rules/{ruleId}/archive": {
+      "post": {
+        "operationId": "archiveRecommendationRule",
+        "summary": "Remove a rule for good",
+        "description": "REC-002: rules are archived, never deleted, so what they suggested stays in the reports (REC-008). Audited with the reason. Archiving an archived rule changes nothing.",
+        "tags": ["recommendations"],
+        "parameters": [
+          {
+            "name": "ruleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ArchiveRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Archived.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationRuleView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such rule.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-002", "AUD-001"]
+      }
+    },
+    "/api/v1/recommendations": {
+      "get": {
+        "operationId": "getRecommendations",
+        "summary": "Suggestions for a table's order, each with its reason",
+        "description": "REC-001 to REC-006: the rules the order triggers (by priority), then learned pairings, then best sellers of the time of day, without what cannot be served on the channel now, what is in the order already unless repeatable, and anything not veg for a veg-only table; the next course first. `cart` names the items not yet sent; the sent ones are read from the table session. Without a table session, from the cart alone. Table-level only (REC-007).",
+        "tags": ["recommendations"],
+        "parameters": [
+          {
+            "name": "cart",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["POS", "WAITER_APP", "TABLE_TABLET", "QR"] }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "default": 6, "type": "integer", "minimum": 1, "maximum": 20 }
+          },
+          {
+            "name": "tableSessionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "vegOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "boolean" }, { "type": "string", "enum": ["true", "false"] }]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggestions, best first.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such table session, or no menu published yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table session is closed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": [
+          "REC-001",
+          "REC-002",
+          "REC-004",
+          "REC-005",
+          "REC-006",
+          "REC-007",
+          "REC-011",
+          "WTR-011"
+        ]
+      }
+    },
+    "/api/v1/recommendations/events": {
+      "post": {
+        "operationId": "recordRecommendationEvents",
+        "summary": "Count suggestions shown, opened and put in the cart",
+        "description": "REC-008: up to 50 events per call, for a table session open or just closed (events sent in batches may arrive after the bill). An order line sent with its `recommendation` is counted as ORDERED by the server; clients never send ORDERED.",
+        "tags": ["recommendations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RecordRecommendationEventsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Recorded." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such table session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "An item or rule does not exist here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["REC-008"]
       }
     },
     "/api/v1/reports/exports": {
@@ -9006,6 +9540,7 @@
         "required": ["businessDate", "closedAt", "closedById", "carriedForward", "report"],
         "additionalProperties": false
       },
+      "Daypart": { "type": "string", "enum": ["BREAKFAST", "LUNCH", "EVENING", "DINNER"] },
       "Denominations": {
         "type": "object",
         "propertyNames": { "type": "string", "pattern": "^\\d{1,4}(\\.\\d{1,2})?$" },
@@ -11478,7 +12013,8 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/Id" }
           },
-          "instructions": { "type": "string", "maxLength": 500 }
+          "instructions": { "type": "string", "maxLength": 500 },
+          "recommendation": { "$ref": "#/components/schemas/RecommendationSource" }
         },
         "required": ["clientLineId", "itemId", "quantity", "modifiers"],
         "additionalProperties": false
@@ -11517,7 +12053,8 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/Id" }
           },
-          "instructions": { "type": "string", "maxLength": 500 }
+          "instructions": { "type": "string", "maxLength": 500 },
+          "recommendation": { "$ref": "#/components/schemas/RecommendationSource" }
         },
         "required": ["clientLineId", "itemId", "quantity"],
         "additionalProperties": false
@@ -12390,6 +12927,251 @@
         "required": ["streamId", "head", "replayed", "fullRefresh"],
         "additionalProperties": false
       },
+      "RecommendationEventInput": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["IMPRESSION", "TAP", "ADD_TO_CART"] },
+          "itemId": { "$ref": "#/components/schemas/Id" },
+          "layer": { "$ref": "#/components/schemas/RecommendationLayer" },
+          "ruleId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["kind", "itemId", "layer", "ruleId"],
+        "additionalProperties": false
+      },
+      "RecommendationEventKind": {
+        "type": "string",
+        "enum": ["IMPRESSION", "TAP", "ADD_TO_CART", "ORDERED"]
+      },
+      "RecommendationLayer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+      "RecommendationReason": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "RULE" },
+              "ruleId": { "$ref": "#/components/schemas/Id" },
+              "label": { "type": ["string", "null"] },
+              "becauseOf": { "type": "string" }
+            },
+            "required": ["kind", "ruleId", "label", "becauseOf"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "LEARNED" },
+              "becauseOf": { "type": "string" }
+            },
+            "required": ["kind", "becauseOf"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "BEST_SELLER" },
+              "daypart": {
+                "anyOf": [{ "$ref": "#/components/schemas/Daypart" }, { "type": "null" }]
+              }
+            },
+            "required": ["kind", "daypart"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "RecommendationRuleListResponse": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecommendationRuleView" }
+          }
+        },
+        "required": ["rules"],
+        "additionalProperties": false
+      },
+      "RecommendationRuleParams": {
+        "type": "object",
+        "properties": { "ruleId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["ruleId"],
+        "additionalProperties": false
+      },
+      "RecommendationRuleRequest": {
+        "type": "object",
+        "properties": {
+          "when": { "$ref": "#/components/schemas/RecommendationTarget" },
+          "suggest": { "$ref": "#/components/schemas/RecommendationTarget" },
+          "priority": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "channels": {
+            "minItems": 1,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SalesChannel" }
+          },
+          "timeWindow": {
+            "anyOf": [{ "$ref": "#/components/schemas/TimeWindow" }, { "type": "null" }]
+          },
+          "activeFrom": {
+            "anyOf": [{ "$ref": "#/components/schemas/IsoDate" }, { "type": "null" }]
+          },
+          "activeUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/IsoDate" }, { "type": "null" }]
+          },
+          "label": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 60 }, { "type": "null" }]
+          },
+          "active": { "type": "boolean" }
+        },
+        "required": [
+          "when",
+          "suggest",
+          "priority",
+          "channels",
+          "timeWindow",
+          "activeFrom",
+          "activeUntil",
+          "label",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "RecommendationRuleView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "when": { "$ref": "#/components/schemas/RecommendationTarget" },
+          "suggest": { "$ref": "#/components/schemas/RecommendationTarget" },
+          "priority": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "channels": { "type": "array", "items": { "$ref": "#/components/schemas/SalesChannel" } },
+          "timeWindow": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": { "start": { "type": "string" }, "end": { "type": "string" } },
+                "required": ["start", "end"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "activeFrom": {
+            "anyOf": [{ "$ref": "#/components/schemas/IsoDate" }, { "type": "null" }]
+          },
+          "activeUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/IsoDate" }, { "type": "null" }]
+          },
+          "label": { "type": ["string", "null"] },
+          "active": { "type": "boolean" },
+          "archivedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": [
+          "id",
+          "when",
+          "suggest",
+          "priority",
+          "channels",
+          "timeWindow",
+          "activeFrom",
+          "activeUntil",
+          "label",
+          "active",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "RecommendationSource": {
+        "type": "object",
+        "properties": {
+          "layer": { "$ref": "#/components/schemas/RecommendationLayer" },
+          "ruleId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["layer", "ruleId"],
+        "additionalProperties": false
+      },
+      "RecommendationTarget": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "ITEM" },
+              "itemId": { "$ref": "#/components/schemas/Id" }
+            },
+            "required": ["kind", "itemId"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "CATEGORY" },
+              "categoryId": { "$ref": "#/components/schemas/Id" }
+            },
+            "required": ["kind", "categoryId"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "RecommendationView": {
+        "type": "object",
+        "properties": {
+          "itemId": { "$ref": "#/components/schemas/Id" },
+          "layer": { "$ref": "#/components/schemas/RecommendationLayer" },
+          "reason": { "$ref": "#/components/schemas/RecommendationReason" }
+        },
+        "required": ["itemId", "layer", "reason"],
+        "additionalProperties": false
+      },
+      "RecommendationsQuery": {
+        "type": "object",
+        "properties": {
+          "tableSessionId": { "$ref": "#/components/schemas/Id" },
+          "channel": { "$ref": "#/components/schemas/SalesChannel" },
+          "cart": {},
+          "vegOnly": { "default": false, "anyOf": [{ "type": "boolean" }, {}] },
+          "limit": { "default": 6, "type": "integer", "minimum": 1, "maximum": 20 }
+        },
+        "required": ["channel", "cart", "vegOnly", "limit"],
+        "additionalProperties": false
+      },
+      "RecommendationsQueryInput": {
+        "type": "object",
+        "properties": {
+          "tableSessionId": { "$ref": "#/components/schemas/Id" },
+          "channel": { "$ref": "#/components/schemas/SalesChannel" },
+          "cart": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/Id" },
+              { "maxItems": 100, "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
+            ]
+          },
+          "vegOnly": {
+            "anyOf": [{ "type": "boolean" }, { "type": "string", "enum": ["true", "false"] }]
+          },
+          "limit": { "default": 6, "type": "integer", "minimum": 1, "maximum": 20 }
+        },
+        "required": ["channel"],
+        "additionalProperties": false
+      },
+      "RecommendationsResponse": {
+        "type": "object",
+        "properties": {
+          "recommendations": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecommendationView" }
+          },
+          "daypart": { "anyOf": [{ "$ref": "#/components/schemas/Daypart" }, { "type": "null" }] },
+          "menuVersion": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["recommendations", "daypart", "menuVersion"],
+        "additionalProperties": false
+      },
       "RecordPaymentsRequest": {
         "type": "object",
         "properties": {
@@ -12414,6 +13196,34 @@
           }
         },
         "required": ["idempotencyKey", "payments"],
+        "additionalProperties": false
+      },
+      "RecordRecommendationEventsRequest": {
+        "type": "object",
+        "properties": {
+          "tableSessionId": { "$ref": "#/components/schemas/Id" },
+          "channel": { "$ref": "#/components/schemas/SalesChannel" },
+          "events": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecommendationEventInput" }
+          }
+        },
+        "required": ["channel", "events"],
+        "additionalProperties": false
+      },
+      "RecordTableRecommendationEventsRequest": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecommendationEventInput" }
+          }
+        },
+        "required": ["events"],
         "additionalProperties": false
       },
       "RefreshRequest": {
@@ -13625,6 +14435,32 @@
         "type": "object",
         "properties": { "tableId": { "$ref": "#/components/schemas/Id" } },
         "required": ["tableId"],
+        "additionalProperties": false
+      },
+      "TableRecommendationsQuery": {
+        "type": "object",
+        "properties": {
+          "cart": {},
+          "vegOnly": { "default": false, "anyOf": [{ "type": "boolean" }, {}] },
+          "limit": { "default": 6, "type": "integer", "minimum": 1, "maximum": 20 }
+        },
+        "required": ["cart", "vegOnly", "limit"],
+        "additionalProperties": false
+      },
+      "TableRecommendationsQueryInput": {
+        "type": "object",
+        "properties": {
+          "cart": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/Id" },
+              { "maxItems": 100, "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
+            ]
+          },
+          "vegOnly": {
+            "anyOf": [{ "type": "boolean" }, { "type": "string", "enum": ["true", "false"] }]
+          },
+          "limit": { "default": 6, "type": "integer", "minimum": 1, "maximum": 20 }
+        },
         "additionalProperties": false
       },
       "TableRequest": {

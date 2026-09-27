@@ -652,6 +652,20 @@ export const en = {
       'This screen lost the restaurant server. Tickets will come back when it reconnects; keep cooking from the printed tickets.',
     reconnecting: 'Reconnecting…',
   },
+  reco: {
+    /** Why a dish is suggested (REC-006), on the tablet's and the phones' suggestion rows. */
+    reason: {
+      rule: 'Goes well with {dish}',
+      learned: 'Often ordered with {dish}',
+      bestSeller: 'Bestseller',
+      bestSellerAt: {
+        BREAKFAST: 'Bestseller at breakfast',
+        LUNCH: 'Bestseller at lunch',
+        EVENING: 'Bestseller this evening',
+        DINNER: 'Bestseller at dinner',
+      },
+    },
+  },
   states: {
     loading: 'Loading…',
     empty: 'Nothing here yet.',

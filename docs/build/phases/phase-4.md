@@ -37,6 +37,11 @@ rules editor with boost/pin/block, stations and printers with test print, discou
 charge, timers and thresholds. Tax and invoice settings Owner-only with step-up.
 Acceptance: every catalogue setting is editable or visibly read-only; changes audited.
 
+The rules editor uses the P3-04 API (`listRecommendationRules`, `createRecommendationRule`,
+`updateRecommendationRule` with `active` to pause, `archiveRecommendationRule` with a reason), all
+audited. Boost, pin and block (REC-009) are new: they fit `@rp/domain` `recommend` as a filter
+(block) and as items placed first (pin) or ranked higher (boost) before the rules layer.
+
 ## P4-04 Alert centre and system screen
 
 Requirements: MGR-008, MGR-010, NFR-I03, DATA-006 (display), LIC-008 (display), UPD-004 ("Install now").
@@ -59,6 +64,12 @@ downs, dashboard charts with Recharts and table views. Query design meets ≤ 5 
 design capacity (indexes, pre-aggregated daily tables if needed).
 Acceptance: fixture data with known answers for every report; performance test on a generated
 12-month dataset at §7.2 capacity.
+
+Recommendation performance (P3-04 data): `recommendation_events` holds IMPRESSION, TAP and
+ADD_TO_CART from the apps and ORDERED from the order lines sent with a suggestion (unique
+`order_item_id`), per layer, item, rule, channel and business date. Attach rate and revenue join
+ORDERED to `order_items` for quantity, `line_total` and the final state (a rejected, cancelled or
+voided line is not revenue).
 
 ## P4-06 Report exports
 
