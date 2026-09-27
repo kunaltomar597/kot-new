@@ -43,6 +43,7 @@ import { ItemSheet } from './ItemSheet';
 import { MenuBrowser } from './MenuBrowser';
 import { mayMove, MoveSheet } from './MoveSheet';
 import { SentOrders } from './SentOrders';
+import { ServiceRequests } from './ServiceRequests';
 import { UnsentOrders } from './UnsentOrders';
 
 type TableView = 'order' | 'menu';
@@ -56,11 +57,11 @@ const affectsOrders = (eventType: string) =>
   /^(Order|Kot|ItemStatusChanged$|TableMoved$|BillSettled$)/.test(eventType);
 
 /**
- * One table in the waiter app (WTR-003, WTR-007 to WTR-009, WTR-012): its new items and the menu
- * to add them from, what was already sent with each ticket's delivery and each item's state, to
- * mark picked up or served, cancel, void (with a manager's PIN on this phone) or order again, its
- * orders not yet sent, and moving it or asking for the bill. Opened by the table session, so a
- * moved table stays open here under its new name.
+ * One table in the waiter app (WTR-003, WTR-005, WTR-007 to WTR-009, WTR-012): its new items and
+ * the menu to add them from, what was already sent with each ticket's delivery and each item's
+ * state, to mark picked up or served, cancel, void (with a manager's PIN on this phone) or order
+ * again, its orders not yet sent, its open requests, and moving it or asking for the bill. Opened
+ * by the table session, so a moved table stays open here under its new name.
  */
 export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
   const session = useDeviceSession();
@@ -409,6 +410,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
         </>
       )}
       {notice === undefined ? null : <Note tone="danger">{notice}</Note>}
+      <ServiceRequests show={(request) => request.tableSessionId === sessionId} />
       <UnsentOrders entries={drafts} personId={person.id} onChange={putBack} />
       {closed ? null : (
         <>

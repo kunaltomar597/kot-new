@@ -8,6 +8,7 @@ import type {
   OrderView,
   OverrideRequest,
   PagerView,
+  ServiceRequestView,
   SubmitOrderRequest,
   SubmitOrderResponse,
   TableOverviewEntry,
@@ -54,8 +55,10 @@ interface Table {
   readonly sectionId: string;
   state: TableOverviewEntry['state'];
   session: TableOverviewEntry['session'];
-  requests: number;
 }
+
+/** A request from a table as the server keeps it: its table is wherever its session is now. */
+type StoredRequest = Omit<ServiceRequestView, 'tableId' | 'tableLabel'>;
 
 function session(n: number, waiterId: string, covers: number): TableOverviewEntry['session'] {
   return {
@@ -70,16 +73,37 @@ function session(n: number, waiterId: string, covers: number): TableOverviewEntr
   };
 }
 
+/** A request raised on a table's tablet some minutes ago, not answered yet. */
+export function request(
+  n: number,
+  type: ServiceRequestView['type'],
+  tableSessionId: string,
+  minutesAgo: number,
+): StoredRequest {
+  return {
+    id: id(n),
+    type,
+    state: 'ACTIVE',
+    source: 'TABLE_TABLET',
+    tableSessionId,
+    createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+    escalatedAt: null,
+    acknowledgedAt: null,
+    acknowledgedById: null,
+    acknowledgedByName: null,
+    closedAt: null,
+  };
+}
+
 export class Restaurant {
   readonly tables: Table[] = [
-    { id: id(1), label: 'T1', sectionId: HALL, state: 'FREE', session: null, requests: 0 },
+    { id: id(1), label: 'T1', sectionId: HALL, state: 'FREE', session: null },
     {
       id: id(2),
       label: 'T2',
       sectionId: HALL,
       state: 'OCCUPIED',
       session: session(9002, RAVI, 3),
-      requests: 1,
     },
     {
       id: id(3),
@@ -87,16 +111,14 @@ export class Restaurant {
       sectionId: HALL,
       state: 'BILL_REQUESTED',
       session: session(9003, RAVI, 2),
-      requests: 0,
     },
-    { id: id(4), label: 'T4', sectionId: TERRACE, state: 'FREE', session: null, requests: 0 },
+    { id: id(4), label: 'T4', sectionId: TERRACE, state: 'FREE', session: null },
     {
       id: id(5),
       label: 'T5',
       sectionId: TERRACE,
       state: 'OCCUPIED',
       session: session(9005, KIRAN, 4),
-      requests: 0,
     },
   ];
   pager: PagerView | null = {
@@ -118,6 +140,9 @@ export class Restaurant {
   /** Ravi signed in on the phone, so it alerts him (P2-06a); his open alerts, oldest first. */
   holder: DeviceAlertsResponse['holder'] = { staffId: RAVI, displayName: 'Ravi' };
   alerts: AlertView[] = [];
+
+  /** T2 asked for water four minutes ago (TAB-004); requests by age, oldest first. */
+  serviceRequests: StoredRequest[] = [request(9601, 'WATER', T2_SESSION, 4)];
 
   /** The menu the server hands out; tests change it as the kitchen runs out. */
   menu: MenuSnapshot = MENU;
@@ -151,9 +176,60 @@ export class Restaurant {
           table.session === null
             ? null
             : { ...table.session, readyItems: this.readyAt(table.session.id) },
-        activeServiceRequests: table.requests,
+        activeServiceRequests:
+          table.session === null ? 0 : this.openRequests(table.session.id).length,
       })),
     };
+  }
+
+  /** A table session's requests still open, as the server counts them. */
+  openRequests(sessionId: string): StoredRequest[] {
+    return this.serviceRequests.filter(
+      (open) => open.tableSessionId === sessionId && open.closedAt === null,
+    );
+  }
+
+  /** The open requests as the waiter's inbox reads them, each at its session's table now. */
+  requestViews(): ServiceRequestView[] {
+    return this.serviceRequests.flatMap((stored) => {
+      const table = this.tables.find(
+        (candidate) => candidate.session?.id === stored.tableSessionId,
+      );
+      if (table === undefined || stored.closedAt !== null) return [];
+      return [{ ...stored, tableId: table.id, tableLabel: table.label }];
+    });
+  }
+
+  /** Acknowledge or resolve, as the server's request machine allows (WTR-005). */
+  private requestStep(call: RecordedCall, step: 'acknowledge' | 'resolve'): FakeResponse {
+    const stored = this.serviceRequests.find((candidate) => call.path.includes(candidate.id));
+    const view = this.requestViews().find((open) => open.id === stored?.id);
+    if (stored === undefined || view === undefined) {
+      return {
+        status: 404,
+        body: { code: 'SERVICE_REQUEST_NOT_FOUND', message: 'This request has been dealt with.' },
+      };
+    }
+    const at = new Date().toISOString();
+    if (step === 'acknowledge' && stored.state === 'ACKNOWLEDGED') {
+      return {
+        status: 409,
+        body: { code: 'INVALID_TRANSITION', message: 'Someone is on the way already.' },
+      };
+    }
+    // Resolving an unanswered request acknowledges it on the way, as on the server.
+    const next: StoredRequest = {
+      ...stored,
+      ...(stored.acknowledgedAt === null && {
+        state: 'ACKNOWLEDGED',
+        acknowledgedAt: at,
+        acknowledgedById: RAVI,
+        acknowledgedByName: 'Ravi',
+      }),
+      ...(step === 'resolve' && { state: 'RESOLVED', closedAt: at }),
+    };
+    this.serviceRequests = this.serviceRequests.map((open) => (open === stored ? next : open));
+    return { status: 200, body: { ...view, ...next } };
   }
 
   /** Dishes waiting at the pass for a table session, as the server counts them. */
@@ -436,6 +512,16 @@ export class Restaurant {
         this.alerts = this.alerts.filter((open) => open !== alert);
         return { status: 200, body: { ...alert, status: 'ACKNOWLEDGED', acknowledgedById: RAVI } };
       })
+      .on('GET', '/api/v1/service-requests', () => ({
+        status: 200,
+        body: { requests: this.requestViews() },
+      }))
+      .on('POST', '/api/v1/service-requests/:requestId/acknowledge', (call) =>
+        this.requestStep(call, 'acknowledge'),
+      )
+      .on('POST', '/api/v1/service-requests/:requestId/resolve', (call) =>
+        this.requestStep(call, 'resolve'),
+      )
       .on('GET', '/api/v1/pagers/mine', () => ({
         status: 200,
         body: { pager: this.pager, lowBatteryPercent: 15 } satisfies MyPagerResponse,
@@ -463,10 +549,8 @@ export class Restaurant {
         if (from === undefined || to === undefined) return { status: 404, body: {} };
         to.state = from.state;
         to.session = from.session;
-        to.requests = from.requests;
         from.state = 'FREE';
         from.session = null;
-        from.requests = 0;
         return { status: 200, body: this.sessionView(to) };
       })
       .on('POST', '/api/v1/table-sessions/:sessionId/request-bill', (call) => {

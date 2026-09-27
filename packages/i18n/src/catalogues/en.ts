@@ -193,6 +193,16 @@ export const en = {
       lowWarning: 'Your pager battery is low. Charge it soon.',
       unavailable: 'Your pager status could not be read.',
     },
+    /** The waiter's inbox of requests from the tables (P2-06d, WTR-005). */
+    requests: {
+      title: '{count, plural, one {# request from a table} other {# requests from tables}}',
+      onTheWay: '{name} is on the way',
+      onTheWaySomeone: 'Someone is on the way',
+      resolve: 'Resolve',
+      resolveOf: 'Resolve {title}',
+      resolveFailed: 'Not resolved: {message}',
+      unavailable: 'The requests from tables could not be read.',
+    },
     order: {
       views: 'Order or menu',
       orderTab: '{count, plural, =0 {Order} other {Order (#)}}',
