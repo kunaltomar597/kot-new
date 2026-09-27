@@ -336,6 +336,7 @@ describe('[TBL-007] table overview', () => {
       waiterName: 'Test waiter',
       amountSoFar: 50_000,
       pendingApprovals: 0,
+      readyItems: 0,
     });
     expect(overview.find((table) => table.label === 'T4')?.session).toBeNull();
   });

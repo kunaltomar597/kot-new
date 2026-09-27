@@ -6,6 +6,7 @@ import {
   OrderView,
   OverrideResponse,
   SubmitOrderResponse,
+  TableOverviewResponse,
   TableSessionView,
 } from '@rp/contracts';
 import request from 'supertest';
@@ -165,6 +166,58 @@ describe('[ORD-010] item status', () => {
       'READY',
     ]);
   });
+
+  it('[WTR-007] brings a combo line along as the kitchen works on its parts, so the floor serves it as one', async () => {
+    const placed = await order([{ itemId: id('Thali') }]);
+    const thali = placed.items.find((item) => item.name === 'Thali')?.id ?? '';
+    const dal = placed.items.find((item) => item.name === 'Dal')?.id ?? '';
+    const roti = placed.items.find((item) => item.name === 'Roti')?.id ?? '';
+    const states = async () =>
+      Object.fromEntries(
+        (await prisma.orderItem.findMany({ where: { orderId: placed.id } })).map((item) => [
+          item.name,
+          item.state,
+        ]),
+      );
+    const ready = async () => {
+      const response = await server().get('/api/v1/tables/overview').set(as(waiter));
+      return TableOverviewResponse.parse(response.body).tables.find(
+        (table) => table.session?.id === session.id,
+      )?.session?.readyItems;
+    };
+
+    expect((await step(kitchen, dal, 'START_PREPARING')).status).toBe(200);
+    // One part started: the combo is in preparation, so it can no longer be cancelled.
+    expect(await states()).toEqual({ Thali: 'PREPARING', Dal: 'PREPARING', Roti: 'SENT' });
+    const cancel = await server()
+      .post(`/api/v1/order-items/${thali}/cancel`)
+      .set(as(waiter))
+      .send({ reason: 'Guest left' });
+    expect([cancel.status, codeOf(cancel)]).toEqual([409, 'INVALID_TRANSITION']);
+
+    await step(kitchen, dal, 'MARK_READY');
+    expect((await states()).Thali).toBe('PREPARING');
+    const before = (await ready()) ?? 0;
+    await step(kitchen, roti, 'MARK_READY');
+    // Every part is ready: so is the combo, counted once on the table.
+    expect((await states()).Thali).toBe('READY');
+    expect(await ready()).toBe(before + 1);
+
+    const served = await step(waiter, thali, 'SERVE');
+    expect(served.status, JSON.stringify(served.body)).toBe(200);
+    expect(await states()).toEqual({ Thali: 'SERVED', Dal: 'SERVED', Roti: 'SERVED' });
+    expect(await ready()).toBe(before);
+    const line = await prisma.orderItem.findUniqueOrThrow({ where: { id: thali } });
+    expect([line.preparingAt, line.readyAt, line.servedAt].every((at) => at !== null)).toBe(true);
+    expect(
+      (
+        await prisma.orderEvent.findMany({
+          where: { orderItemId: thali },
+          orderBy: { createdAt: 'asc' },
+        })
+      ).map((event) => event.toState),
+    ).toEqual(['PREPARING', 'READY', 'SERVED']);
+  });
 });
 
 describe('[ORD-011] [ORD-012] cancel, void and modify', () => {
@@ -314,6 +367,30 @@ describe('[ORD-011] [ORD-012] cancel, void and modify', () => {
       'CANCELLED',
     ]);
     // The Dal part's portion goes back to stock; one CANCELLED slip lists both parts.
+    expect(await stock()).toBe(before + 1);
+    const slip = await prisma.kot.findFirstOrThrow({
+      where: { orderId: placed.id, kind: 'CANCELLED' },
+      include: { lines: true },
+    });
+    expect(slip.lines).toHaveLength(2);
+  });
+
+  it('voids a started combo whole: parts the kitchen had not started are cancelled with it', async () => {
+    const placed = await order([{ itemId: id('Thali') }]);
+    const thali = placed.items.find((item) => item.name === 'Thali')?.id ?? '';
+    const roti = placed.items.find((item) => item.name === 'Roti')?.id ?? '';
+    await step(kitchen, roti, 'START_PREPARING');
+    const before = await stock();
+
+    const voided = await server()
+      .post(`/api/v1/order-items/${thali}/void`)
+      .set(as(manager))
+      .send({ reason: 'Guest left' });
+    expect(voided.status, JSON.stringify(voided.body)).toBe(200);
+    expect(
+      Object.fromEntries(OrderView.parse(voided.body).items.map((item) => [item.name, item.state])),
+    ).toEqual({ Thali: 'VOIDED', Roti: 'VOIDED', Dal: 'CANCELLED' });
+    // The uncooked Dal goes back to stock; the station gets one slip for both parts.
     expect(await stock()).toBe(before + 1);
     const slip = await prisma.kot.findFirstOrThrow({
       where: { orderId: placed.id, kind: 'CANCELLED' },

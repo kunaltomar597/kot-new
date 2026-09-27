@@ -26,7 +26,8 @@ What exists:
   shifts and payments (P1-11a); day-end (P1-11b); reports, exports and the order drill-down
   (P1-13); alerts (P2-03a); nudges and breaks (P2-03b); pagers and their MQTT channels (P2-04a);
   the signed-in person's own pager (P2-02a); each KOT's station and print status on orders and
-  `KotPrintStatusChanged` (P2-02b). 480 tests.
+  `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c).
+  480 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (61 tables after the later migrations), least-privilege roles,
@@ -53,7 +54,8 @@ What exists:
   alerts (P2-03b); the pager MQTT broker with per-pager credentials, ACL, alert delivery, acks and
   heartbeats (P2-04a); the waiter's own pager and low-battery levels per device type (P2-02a);
   KOT print status announced to the floor, and the phones' order outbox tested against the server
-  (P2-02b). 651 tests (4 skipped without a real install).
+  (P2-02b); a combo line that follows its parts, voided combos that cancel their unstarted parts,
+  and dishes ready per table (P2-02c). 653 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -69,15 +71,19 @@ What exists:
 - `packages/mobile-native` (the Keystore device key as a local Expo module, secure and plain
   stores) and `packages/mobile-shell` (pairing and login screens, connection banner, live data)
   (P2-01c), with `useNow` for clocks on screen (P2-02a); `useMenu`, `useUnsentOrders`, and the
-  `crypto.getRandomValues` that Hermes lacks, from `expo-crypto` (P2-02b).
+  `crypto.getRandomValues` that Hermes lacks, from `expo-crypto` (P2-02b); `useOverride`, a
+  manager's approval with their PIN on the phone (P2-02c). Shell 16 tests.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
   and the waiter's own pager (P2-02a); each table has its screen with the menu, the new items,
-  Send KOT through the offline outbox, each KOT's delivery and "Again" (P2-02b).
+  Send KOT through the offline outbox, each KOT's delivery and "Again" (P2-02b); each sent dish
+  can be marked picked up or served (all ready dishes in one tap), cancelled before the kitchen
+  starts it, or voided after with a manager's PIN on the phone (P2-02c). Waiter app 38 tests.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
-  "Again", live checks of cart lines and KOT delivery (P2-02b). 22 tests.
+  "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
+  line and dishes ready on the tiles (P2-02c). 27 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -101,7 +107,6 @@ What exists:
 Recommended next WPs (dependencies met):
 
 - P2-01d LAN TLS pinning and QR pairing on Android (P2-01c done).
-- P2-02c Waiter app: serving, cancellations and voids (P2-02b done).
 - P2-06 Waiter alerts, service-request inbox, nudge, Notify manager (P2-02a done).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -174,7 +179,7 @@ Recommended next WPs (dependencies met):
 - [ ] P2-01d LAN TLS pinning and QR pairing on Android
 - [x] P2-02a Waiter tables and pager status
 - [x] P2-02b Waiter app: order taking
-- [ ] P2-02c Waiter app: serving, cancellations and voids
+- [x] P2-02c Waiter app: serving, cancellations and voids
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
 - [x] P2-04a Pager broker, credentials, delivery and heartbeats
@@ -483,6 +488,34 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-09-27 (P2-02c):
+
+133. A combo line follows its parts on the server: it is in preparation once the kitchen starts any
+     part, then as far along as its least advanced part (ready when every part is ready), and it
+     only moves forward. The kitchen works on the parts; the floor serves, cancels and voids the
+     combo as one line. Before this, a combo whose parts were bumped stayed SENT, so it could never
+     be served and could be cancelled after it was cooked.
+134. Voiding a started combo cancels its parts the kitchen has not started, returns their counted
+     stock, and gives their station a CANCELLED slip, so no part is left cooking for a dish that
+     was taken back. Parts already started are voided with the line.
+135. A table tile shows "N dishes ready" (top-level lines ready at the pass, a combo once all its
+     parts are) after pending approvals and before service requests, on the phones and on the POS
+     floor alike (they share `tileAlert`). It comes from `readyItems` on the table overview.
+136. On the phone, a sent dish offers Mark picked up (ready) and Mark served (ready or picked up);
+     with more than one ready dish, "Mark all N ready dishes served" serves them one after
+     another and stops at the first refusal, which is shown. A refused step shows the server's
+     words and reads the table again.
+137. Cancel is offered to a waiter only on the tables they are responsible for, as the server
+     allows (`ITEM_CANCEL_BEFORE_PREP` OWN); managers and the owner may cancel on any table. Void
+     is offered once the kitchen has started a dish; for waiters it needs a manager's approval.
+138. Every cancel and void needs a reason of at least 3 characters for the audit log; three common
+     cancel reasons and four common void reasons are a tap away, and any reason can be typed.
+139. A waiter's void is approved on the phone itself: a sheet lists the managers and the owner who
+     can sign in on it (never the person asking), the approver enters their PIN, and the void goes
+     again with the single-use approval bound to that order item (AUTH-011). The reason sheet
+     closes before the approval opens, so two sheets never stack. Closing the approval voids
+     nothing and says so.
+
 Decided 2026-09-27 (P2-02b):
 
 124. Tapping an open table on the phone opens its table screen (new items, menu, what was sent,
@@ -746,6 +779,8 @@ Security-sensitive PRs for the P8-03 human review:
 - #52 P2-01c: the Android Keystore device key, pairing and sign-in on the phones.
 - #55 P2-02b: the phones' secure random source (`expo-crypto`) for idempotency keys and
   correlation ids, and the offline order outbox.
+- #56 P2-02c: a manager's PIN entered on a waiter's phone for voids (the override flow on the
+  phones), and own-table cancel checks.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -753,6 +788,38 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-02c Waiter app: serving, cancellations and voids (P2-02 done)
+
+Merged #55 (P2-02b) once green (the console approval tests now wait for the manager list).
+
+Built: per-line Mark picked up, Mark served, Cancel and Void on the waiter app's sent orders, with
+"Mark all N ready dishes served"; `EndItemSheet` for the reason; `useOverride` in
+`@rp/mobile-shell` for a manager's PIN on the phone; `lineActions` and `servableLines` in
+`@rp/ordering`, and "N dishes ready" on table tiles from the overview's new `readyItems`. Found and
+fixed on the server: a combo line never moved when the kitchen bumped its parts, so the floor could
+not serve it and could still cancel it after it was cooked; the line now follows its parts
+(decision 133), and voiding a started combo cancels its unstarted parts (decision 134). The Maestro
+flow now waits for the dish to be marked Ready on the kitchen screen and marks it served.
+
+Tests: waiter app 38 (was 31), mobile-shell 16 (was 12), ordering 27 (was 22), server 653 (was
+651: a combo follows its parts and is served as one; a started combo's void), contracts 480
+(snapshots updated for `readyItems`).
+
+Gotchas:
+
+- A step on a combo part locks the combo line before the part, the order cancel and void lock
+  them in; locking the part first could deadlock against a void of the combo.
+- `follow()` on the server reaches picked up or served through ready (`MARK_READY` first) when the
+  direct step is not allowed from the line's state; it never moves a line backwards or out of an
+  ended or awaiting-approval state.
+- The Maestro flow needs a person (or a second device) to mark the dish Ready on the kitchen
+  screen within 5 minutes; it waits with `extendedWaitUntil`.
+- CI runs `test:coverage` with thresholds, not plain `test`; a new screen needs its tests to keep
+  the waiter app above them.
+- The approval sheet and the reason sheet are both modals: open one only after the other closed.
+
+Decisions: 133 to 139.
 
 ### 2026-09-27: P2-02b Waiter app: order taking
 

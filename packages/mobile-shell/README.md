@@ -10,5 +10,9 @@ Screens and hooks shared by the waiter app and the table tablet (P2-01c), on top
 - `useLive`: data read again after the events that change it and after a reconnect.
 - `useMenu` and `useUnsentOrders`: the menu and the unsent orders the device keeps, at once and
   live (MENU-013, WTR-012, P2-02b).
+- `useOverride`: a manager's approval on the device (AUTH-011, WTR-009, P2-02c). An action is
+  tried as the signed-in person; when the server answers `OVERRIDE_REQUIRED`, a manager or the
+  owner picks their name and enters their PIN in a sheet, and the action goes again with the
+  single-use approval. The twin of the console's `useOverride`.
 
 Tested with Jest and React Native Testing Library against `@rp/mobile-core/testing`'s fake server.

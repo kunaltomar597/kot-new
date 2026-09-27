@@ -16,17 +16,20 @@ const PROGRESS: Partial<Record<OrderItemState, number>> = {
 
 /**
  * The state to show for a line (ORD-010). The kitchen moves a combo's parts, which are what its
- * tickets list, so a combo line shows its least advanced part that is still going; a line
- * without parts shows its own state.
+ * tickets list, so a combo line shows how far its parts that are still going have got, as the
+ * server moves the line: in preparation once any part is started, then at its least advanced part
+ * (ready when every part is ready). A line without parts shows its own state.
  */
 export function displayState(item: Item, items: readonly Item[]): OrderItemState {
   const parts = items.filter(
     (part) => part.parentOrderItemId === item.id && PROGRESS[part.state] !== undefined,
   );
   if (parts.length === 0 || PROGRESS[item.state] === undefined) return item.state;
-  return parts.reduce((least, part) =>
-    (PROGRESS[part.state] ?? 0) < (PROGRESS[least.state] ?? 0) ? part : least,
+  const least = parts.reduce((first, part) =>
+    (PROGRESS[part.state] ?? 0) < (PROGRESS[first.state] ?? 0) ? part : first,
   ).state;
+  const started = parts.some((part) => (PROGRESS[part.state] ?? 0) > (PROGRESS.SENT ?? 0));
+  return started && (PROGRESS[least] ?? 0) < (PROGRESS.PREPARING ?? 0) ? 'PREPARING' : least;
 }
 
 type Kot = OrderView['kots'][number];

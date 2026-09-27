@@ -604,6 +604,9 @@ importers:
       '@rp/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens
+      '@rp/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@rp/i18n':
         specifier: workspace:*
         version: link:../i18n

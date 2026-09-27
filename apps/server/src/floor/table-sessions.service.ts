@@ -71,11 +71,17 @@ export class TableSessionsService {
       this.staffNames(sessions.map((session) => session.waiterId).filter((id) => id !== null)),
       this.prisma.orderItem.findMany({
         where: { order: { tableSessionId: { in: sessionIds } } },
-        select: { state: true, lineTotal: true, order: { select: { tableSessionId: true } } },
+        select: {
+          state: true,
+          lineTotal: true,
+          parentOrderItemId: true,
+          order: { select: { tableSessionId: true } },
+        },
       }),
     ]);
     const amounts = new Map<string, number>();
     const pending = new Map<string, number>();
+    const ready = new Map<string, number>();
     for (const item of items) {
       const sessionId = item.order.tableSessionId;
       if (sessionId === null) continue;
@@ -83,6 +89,9 @@ export class TableSessionsService {
         amounts.set(sessionId, (amounts.get(sessionId) ?? 0) + item.lineTotal);
       if (item.state === 'PENDING_APPROVAL')
         pending.set(sessionId, (pending.get(sessionId) ?? 0) + 1);
+      // Lines, not combo parts: a combo line is ready once all its parts are.
+      if (item.state === 'READY' && item.parentOrderItemId === null)
+        ready.set(sessionId, (ready.get(sessionId) ?? 0) + 1);
     }
     return tables.map((table) => {
       const session = table.sessions[0];
@@ -103,6 +112,7 @@ export class TableSessionsService {
                 waiterName: names.get(session.waiterId ?? '') ?? '',
                 amountSoFar: amounts.get(session.id) ?? 0,
                 pendingApprovals: pending.get(session.id) ?? 0,
+                readyItems: ready.get(session.id) ?? 0,
               },
         activeServiceRequests: 0,
       };

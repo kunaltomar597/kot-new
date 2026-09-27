@@ -71,6 +71,8 @@ export const TableOverviewEntry = z.object({
       amountSoFar: Paise,
       /** Items from the tablet or QR waiting for staff approval. */
       pendingApprovals: z.int().nonnegative(),
+      /** Dishes ready at the pass for this table; a combo counts once all its parts are (WTR-007). */
+      readyItems: z.int().nonnegative(),
     })
     .nullable(),
   /** Water, waiter and bill requests not yet resolved (service requests arrive in P2/P3). */
