@@ -13,6 +13,7 @@ module.exports = {
     '^@rp/([a-z0-9-]+)/testing$': '<rootDir>/../../packages/$1/dist/testing/index.js',
   },
   transformIgnorePatterns: ['node_modules/(?!(\\.pnpm|(@react-native|react-native|@rp)/))'],
-  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/Root.tsx'],
+  // Root and session wire the native modules; the Android build and Maestro cover them.
+  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/Root.tsx', '!src/session.ts'],
   coverageThreshold: { global: { lines: 80, functions: 80, statements: 80, branches: 70 } },
 };

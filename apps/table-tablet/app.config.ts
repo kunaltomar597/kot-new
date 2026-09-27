@@ -57,12 +57,18 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
         monochromeImage: './assets/android-icon-monochrome.png',
       },
       // The app needs the network, and the camera only to scan the pairing QR code; no location,
-      // contacts, microphone or media (SEC-002 least privilege).
+      // contacts, microphone or media (SEC-002 least privilege). The waiter phone's background
+      // alerts (P2-06b) come with @rp/mobile-native; a table tablet alerts nobody, so it has no
+      // notifications, foreground service or vibration.
       blockedPermissions: [
         'android.permission.RECORD_AUDIO',
         'android.permission.SYSTEM_ALERT_WINDOW',
         'android.permission.READ_EXTERNAL_STORAGE',
         'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.POST_NOTIFICATIONS',
+        'android.permission.FOREGROUND_SERVICE',
+        'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
+        'android.permission.VIBRATE',
       ],
     },
     updates:

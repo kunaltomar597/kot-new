@@ -68,7 +68,8 @@ What exists:
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
   the server from the pairing QR code and pinning its CA before the code is sent (P2-01d); the
-  waiter phone's alert centre (P2-06a). 58 tests.
+  waiter phone's alert centre (P2-06a), which tells the Android notifier whom to listen for on its
+  first read and sends Acknowledge pressed on a notification (P2-06b). 61 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
@@ -80,7 +81,9 @@ What exists:
   manager's approval with their PIN on the phone (P2-02c); the LAN CA pinned in every React
   Native HTTP and WebSocket client (an Expo module installed at app start), the QR code scanner
   and the fingerprint check for a typed address (P2-01d); the alert banner and list on every
-  screen (P2-06a). Shell 34 tests, mobile-native 22.
+  screen (P2-06a); the waiter phone's background alerts: a `specialUse` foreground service
+  running a keep-alive JavaScript task, a notification per alert with Acknowledge, the ring and
+  vibration in the foreground, and `POST_NOTIFICATIONS` (P2-06b). Shell 34 tests, mobile-native 29.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
@@ -90,8 +93,10 @@ What exists:
   starts it, or voided after with a manager's PIN on the phone (P2-02c). Both apps pair by
   scanning the manager's QR code and then trust only the restaurant's CA over TLS, so preview
   and production builds can pair with a real server (P2-01d). The phone shows its holder's
-  alerts over every screen, acknowledged in one tap, also after an inactivity sign-out (P2-06a).
-  Waiter app 40 tests.
+  alerts over every screen, acknowledged in one tap, also after an inactivity sign-out (P2-06a),
+  and rings for them with the screen off or the app closed, with notifications acknowledged from
+  the lock screen; it asks for notifications at sign-in and says when they are off; the table
+  tablet blocks those permissions (P2-06b). Waiter app 44 tests.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
@@ -119,8 +124,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-06b Background alerts on Android (P2-06a done), then P2-06c (POS alert centre and nudge)
-  and P2-06d (service requests and the waiter's inbox).
+- P2-06c POS alert centre and manager nudge (P2-06a done), then P2-06d (service requests and
+  the waiter's inbox).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -199,7 +204,7 @@ Recommended next WPs (dependencies met):
 - [ ] P2-04b Pager firmware OTA distribution
 - [ ] P2-05 Pager firmware [H]
 - [x] P2-06a Alerts in the waiter app
-- [ ] P2-06b Background alerts on Android
+- [x] P2-06b Background alerts on Android
 - [ ] P2-06c POS alert centre and manager nudge
 - [ ] P2-06d Service requests and the waiter's inbox
 - [ ] P2-07 Phase 2 exit test on the lab rig [H]
@@ -503,6 +508,48 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-27 (P2-06b):
+
+157. The waiter phone's alert service is a `specialUse` foreground service with a
+     `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` explaining it (a `dataSync` service is stopped after 6
+     hours; no other type fits). It runs while the phone has a holder, and holds a partial wake
+     lock all that time (through `HeadlessJsTaskService`): alerts in the pocket (WTR-005) are worth
+     the battery; the pager stays the main alert device and the runbook says to charge phones
+     between shifts.
+158. The keep-alive JavaScript task never finishes by itself; the service finishes it when it
+     stops, and a task that ends does not stop the service (only `stop` does), so a stop and a
+     start close together cannot leave the service without its task.
+159. `START_STICKY`: when Android stops the process, the service comes back with the words it saved
+     and its task starts JavaScript and the device session without a screen. If Android refuses
+     that restart in the background (Android 12 and later may), the service ends and the phone
+     alerts only while the app is open until it is next opened. The first read of alerts always
+     tells the notifier whom to listen for, so a service restarted for someone who has signed out
+     since stops.
+160. With the app on screen an alert only rings and vibrates (the banner shows it), as the spec
+     says. With notifications off, an alert in the background still rings and vibrates, as the
+     ringer mode allows: a work phone's alerts should be hard to miss; the person's ringer mode
+     and Do Not Disturb are respected.
+161. Acknowledge on a notification takes it off at once. If the acknowledgement fails (offline, the
+     server busy), the alert, still open, is announced again, which rings. One pressed while
+     JavaScript is not listening waits in the app's private preferences and is sent after the
+     first read of alerts.
+162. `POST_NOTIFICATIONS` is asked for each time someone signs in (Android shows its question at
+     most twice, then answers by itself), and checked again when the app comes back on screen;
+     while notifications are off, home says alerts ring only while the app is open, with a button
+     to the app's notification settings.
+163. The waiter app's device session is a module singleton, created on first use and never
+     stopped: the screen and the keep-alive task share it, and closing the app from the recents
+     list (which takes the screen down) keeps it connected. The table tablet keeps its screen-owned
+     session.
+164. The alert notification is `CATEGORY_REMINDER`, public on the lock screen (it names a table and
+     dishes, no personal data), with the default notification sound and three long buzzes. Channel
+     ids carry a version (`rp.alerts.v1`) so a later change of sound or importance can use a new
+     channel. A tap opens the app where it was.
+165. The table tablet blocks `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`,
+     `FOREGROUND_SERVICE_SPECIAL_USE` and `VIBRATE`; the service and receiver are still declared by
+     the shared library but never started there. The Android CI job checks both APKs' permissions
+     and the service's type.
 
 Decided 2026-09-27 (P2-06a):
 
@@ -864,6 +911,9 @@ Security-sensitive PRs for the P8-03 human review:
 - #58 P2-06a: the waiter phone's holder set at sign-in and cleared at logout, the device-only
   routes that list and acknowledge the holder's alerts without a PIN, the alerts-only socket room
   and the gateway sweep order.
+- #59 P2-06b: the waiter phone's foreground service and wake lock, the non-exported receiver that
+  acknowledges from a notification (and keeps presses in private preferences), alert text on the
+  lock screen, and the new Android permissions (blocked on the table tablet).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -871,6 +921,40 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-06b Background alerts on Android
+
+Merged #58 (P2-06a) once green.
+
+Built: `@rp/mobile-native` `RpAlertService` (a `specialUse` foreground service extending
+`HeadlessJsTaskService`) keeps the waiter phone listening while it has a holder, running the
+keep-alive task `RpAlertKeepAlive` so React Native keeps JavaScript timers going with no screen,
+under a partial wake lock; `AlertNotifications` posts a notification per alert (alerts channel,
+lock screen, Acknowledge), posted again on each repeat, and only rings and vibrates in the
+foreground; `RpAlertActionReceiver` sends Acknowledge to JavaScript; `RpAlertsModule` and
+`AndroidAlertNotifier` connect them to `AlertCenter`, which now tells the notifier whom to listen
+for on the first read and sends presses made before it. The waiter app's device session is a
+module singleton that outlives the screen, `index.ts` registers the keep-alive task, sign-in asks
+for notifications and home says when they are off. The table tablet blocks the permissions; the
+Android CI job checks both APKs. Maestro `background-alert.yaml` acknowledges from the shade;
+`docs/runbooks/waiter-phone.md` covers setting phones up.
+
+Tests: mobile-core 61 (was 58), mobile-native 29 (was 22), waiter app 44 (was 40).
+
+Gotchas:
+
+- The Kotlin compiles only in the Android CI job (the container cannot reach Google Maven); the
+  service, the notifications and the receiver run only on a phone or emulator, through the Maestro
+  flow and the manual check in the waiter app's README.
+- `HeadlessJsTaskService.startTask` must run on the main thread and takes a static,
+  non-counted wake lock that `onDestroy` releases. Its default `onHeadlessJsTaskFinish` stops the
+  service when the last task ends; `RpAlertService` overrides that.
+- Stopping a service started with `startForegroundService` before it called `startForeground`
+  crashes the app, so `stop` is an intent to the service, which handles the start first.
+- `AppState.addEventListener` is a Jest mock in the React Native preset; the tests call its
+  listeners themselves.
+
+Decisions: 157 to 165.
 
 ### 2026-09-27: P2-06a Alerts in the waiter app
 

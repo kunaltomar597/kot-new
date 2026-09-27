@@ -576,6 +576,9 @@ importers:
       '@rp/api-client':
         specifier: workspace:*
         version: link:../api-client
+      '@rp/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@rp/mobile-core':
         specifier: workspace:*
         version: link:../mobile-core

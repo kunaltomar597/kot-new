@@ -4,8 +4,8 @@ React Native + Expo SDK 57 (development builds, not Expo Go), Android only. A pa
 staff PIN login (WTR-001). Built by P2-01 (foundation, done), P2-02, P2-06, P3-03 (approvals
 inbox) and P3-05 (upsell).
 
-What it does today (P2-01c, P2-01d, P2-02a to P2-02c, P2-06a): pairs with the local server by scanning the
-manager's QR code, or with the address and code typed (the device key is created in the Android
+What it does today (P2-01c, P2-01d, P2-02a to P2-02c, P2-06a, P2-06b): pairs with the local
+server by scanning the manager's QR code, or with the address and code typed (the device key is created in the Android
 Keystore, and over TLS only the restaurant's CA is trusted from then on), lists the staff who may
 use a waiter phone (waiters, managers, the owner) and signs one in with their PIN. Home is "My
 tables" (the waiter's sections and tables for today, and any table they are responsible for) or all
@@ -35,8 +35,15 @@ ready, a new order to approve, a bill asked for, a manager's message and anythin
 manager. The newest open alert shows over every screen with Acknowledge, and a tap lists them all;
 acknowledging on the phone stops the pager too (NTF-004). An inactivity sign-out keeps the alerts
 coming, shown on the sign-in screen; signing out on the phone, or signing in on another phone,
-ends them. With the app in the background or the screen locked, Android notifications come in
-P2-06b.
+ends them.
+
+They are hard to miss outside the app too (P2-06b, WTR-005). While someone holds the phone, a
+foreground service keeps it listening with the screen off or the app closed from the recents list
+(its quiet notification says "Alerts for Ravi"), and each alert is a notification that rings,
+vibrates and shows on the lock screen, with Acknowledge; a repeat rings again. With the app on
+screen the banner shows the alert and the phone rings and vibrates. Android 13 and later ask for
+notifications when someone signs in; while they are off, home says alerts ring only while the app
+is open, with a button to the settings.
 
 Where things are:
 
@@ -54,9 +61,16 @@ Where things are:
   bill request. Orders go through the device session's `OrderOutbox` (`@rp/mobile-core`).
 - `src/PagerCard.tsx`: the waiter's own pager (`GET /api/v1/pagers/mine`), read again on
   `DeviceStatusChanged` and every minute for the battery level.
-- `src/Root.tsx`: wires `@rp/mobile-core`'s `DeviceSession` to the Keystore key, the secure
-  and plain stores and the LAN CA pinning (`AndroidServerTrust`) from `@rp/mobile-native`, and
-  follows the holder's alerts (`followAlerts`).
+- `src/session.ts`: the phone's one `DeviceSession` (`@rp/mobile-core`), wired to the Keystore
+  key, the secure and plain stores and the LAN CA pinning (`AndroidServerTrust`) from
+  `@rp/mobile-native`, following the holder's alerts (`followAlerts`) with `AndroidAlertNotifier`
+  for the notifications. Created on first use and never stopped: it outlives the screen, which
+  Android takes down when the app is closed from the recents list.
+- `src/Root.tsx`: the screen, on that session. `index.ts` registers it and the alert service's
+  keep-alive task (`registerAlertKeepAlive`), which starts the session when Android restarts the
+  service in a new process.
+- `src/notifications.tsx`: the notifications' words (`describeAlert`, as the banner), asking for
+  them at sign-in and the "notifications are off" note on home.
 - The alert banner and list are `@rp/mobile-shell` `AlertBanner`, on every screen.
 - Shared screens and hooks (pairing, PIN login, connection banner, `useLive`, `useMenu`,
   `useUnsentOrders`) are in `@rp/mobile-shell`; cart, menu and reorder rules shared with the POS
@@ -64,12 +78,16 @@ Where things are:
 - `app.config.ts`: native config per `APP_ENV` (`development`, `preview`, `production`), each
   its own package (`in.rp.waiter.dev`, `.preview`, `in.rp.waiter`). Only development builds
   allow cleartext HTTP, for a development server without TLS; preview and production builds pair
-  over TLS with the pinned CA. The camera (for the pairing QR code) is the only permission beyond
-  the network; the microphone is blocked.
+  over TLS with the pinned CA. Beyond the network, the camera (for the pairing QR code) and what
+  the background alerts need (notifications, a foreground service, vibration, a wake lock, from
+  `@rp/mobile-native`); the microphone is blocked.
 - `eas.json`: EAS Build profiles (APKs) and EAS Update channels.
-- `.maestro/`: the smoke flow (pair, sign in, open a free table, order a dish and send the KOT,
-  acknowledge the alert and serve it once the kitchen marks it ready, ask for the bill). It types the development server's
-  `http://` address, as an emulator cannot scan the QR code.
+- `.maestro/`: the smoke flow `pair-login-tables.yaml` (pair, sign in, open a free table, order a
+  dish and send the KOT, acknowledge the alert and serve it once the kitchen marks it ready, ask
+  for the bill), then `background-alert.yaml` (the same with the app in the background, acknowledged
+  from the notification shade; signing out ends the listening), in the order `config.yaml` sets.
+  The smoke flow types the development server's `http://` address, as an emulator cannot scan the
+  QR code.
 
 ## Commands
 
@@ -91,13 +109,18 @@ as an artifact.
    waiter phone in the console (Manage → Devices).
 2. Install the debug APK from CI (or `pnpm --filter @rp/waiter-app android`) on an emulator and
    start Metro: `pnpm --filter @rp/waiter-app start`.
-3. `maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE=T1 -e "DISH=Dal Makhani" apps/waiter-app/.maestro`,
-   where `TABLE` is a free table and `DISH` a dish without options on the waiter-app menu (the
-   flow opens the table, sends that dish to the kitchen, serves it and asks for the bill). When
-   the flow waits for the dish, mark it Ready on the kitchen screen (the console in Kitchen mode)
-   within 5 minutes. The flow assumes
-   the emulator reaches the PC as `10.0.2.2` (server on 3000, Metro on 8081); override `SERVER`,
-   `METRO`, `STAFF_NAME` and `PIN` with `-e` for a real phone.
+3. `maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE=T1 -e TABLE2=T2 -e "DISH=Dal Makhani" apps/waiter-app/.maestro`,
+   where `TABLE` and `TABLE2` are free tables and `DISH` a dish without options on the waiter-app
+   menu (each flow opens its table, sends that dish to the kitchen, serves it and asks for the
+   bill). Each time a flow waits for the dish, mark it Ready on the kitchen screen (the console in
+   Kitchen mode) within 5 minutes. Keep the emulator's screen on for the background flow
+   (`adb shell svc power stayon true`). The flows assume the emulator reaches the PC as
+   `10.0.2.2` (server on 3000, Metro on 8081); override `SERVER`, `METRO`, `STAFF_NAME` and `PIN`
+   with `-e` for a real phone.
+4. By hand, once per release on a real phone (Maestro cannot swipe an app out of the recents list):
+   sign in, close the app from the recents list, lock the phone and have the kitchen mark a dish
+   Ready. The phone rings with the notification on the lock screen. See
+   `docs/runbooks/waiter-phone.md` for setting phones up.
 
 ## Signed builds and updates (Business Owner, OWNER_CHECKLIST items 7 and 8)
 

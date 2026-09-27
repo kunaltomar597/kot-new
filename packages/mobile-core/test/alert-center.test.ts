@@ -162,6 +162,20 @@ describe('[WTR-006] [NTF-006] the alerts of the person the phone alerts', () => 
     expect(notifier.announced.at(-1)).toEqual(hers);
   });
 
+  it('[WTR-005] stops a notifier left listening when the first read finds nobody holds the phone', async () => {
+    // Android restarted the alert service after the app was stopped; the waiter has signed out since.
+    const fake = serverListing({ holder: null, alerts: [] });
+    const { session, sockets, notifier } = await phone(fake);
+    sockets.sync();
+    await expect.poll(() => session.alerts.getSnapshot().status).toBe('ready');
+    await expect.poll(() => notifier.stops).toBe(1);
+    expect(notifier.starts).toBe(0);
+
+    // Later reads that find nobody do not stop it again.
+    await session.alerts.refresh();
+    expect(notifier.stops).toBe(1);
+  });
+
   it('follows nothing on a device that does not ask to (the table tablet)', async () => {
     const fake = serverListing(held(ready));
     const { session, sockets } = await phone(fake, { followAlerts: false });
@@ -256,6 +270,41 @@ describe('[NTF-004] [WTR-006] acknowledging on the phone', () => {
     expect(session.alerts.getSnapshot().alerts).toEqual([bill]);
     await expect(session.alerts.acknowledge(bill.id)).rejects.toThrow('Busy.');
     expect(session.alerts.getSnapshot().alerts).toEqual([bill]);
+  });
+
+  it('[WTR-005] sends what was pressed while the app was starting once it has read the alerts', async () => {
+    const fake = serverListing(held(ready, bill)).on(
+      'POST',
+      `${ALERTS}/:alertId/acknowledge`,
+      () => ({ status: 200, body: { ...bill, status: 'ACKNOWLEDGED' } }),
+    );
+    const { session, sockets, notifier } = await phone(fake);
+    // Android delivers an Acknowledge pressed on a notification before the app has read anything.
+    notifier.pressAcknowledge(bill.id);
+    await settled();
+    expect(fake.callsTo('POST', `${ALERTS}/${bill.id}/acknowledge`)).toHaveLength(0);
+
+    sockets.sync();
+    await expect.poll(() => session.alerts.getSnapshot().alerts).toEqual([ready]);
+    expect(fake.callsTo('POST', `${ALERTS}/${bill.id}/acknowledge`)).toHaveLength(1);
+  });
+
+  it('[WTR-005] brings a notification back when acknowledging it failed', async () => {
+    const fake = serverListing(held(ready)).on('POST', `${ALERTS}/:alertId/acknowledge`, () => ({
+      status: 503,
+      body: { code: 'UNAVAILABLE', message: 'Busy.' },
+    }));
+    const { session, sockets, notifier, errors } = await phone(fake);
+    sockets.sync();
+    await expect.poll(() => notifier.announced).toEqual([ready]);
+
+    notifier.pressAcknowledge(ready.id);
+    // Still open: announced again (the notification went when it was pressed), and reported.
+    await expect.poll(() => notifier.announced).toEqual([ready, ready]);
+    expect(session.alerts.getSnapshot().alerts).toEqual([ready]);
+    expect(errors.some((error) => error instanceof ApiRequestError && error.status === 503)).toBe(
+      true,
+    );
   });
 
   it('forgets the alerts when the phone is unpaired', async () => {

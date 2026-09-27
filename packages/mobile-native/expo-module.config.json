@@ -1,6 +1,10 @@
 {
   "platforms": ["android"],
   "android": {
-    "modules": ["com.rp.mobilenative.RpDeviceKeyModule", "com.rp.mobilenative.RpLanTrustModule"]
+    "modules": [
+      "com.rp.mobilenative.RpDeviceKeyModule",
+      "com.rp.mobilenative.RpLanTrustModule",
+      "com.rp.mobilenative.RpAlertsModule"
+    ]
   }
 }

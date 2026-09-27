@@ -18,7 +18,9 @@ Where things are:
 - `src/Root.tsx`: wires the device session and `MenuCache` to the Keystore key, the stores and the
   LAN CA pinning.
 - `app.config.ts`, `eas.json`, `.maestro/`: as in `apps/waiter-app` (packages `in.rp.tablet.dev`,
-  `.preview`, `in.rp.tablet`).
+  `.preview`, `in.rp.tablet`). A tablet alerts nobody, so it blocks the notification, foreground
+  service and vibration permissions that `@rp/mobile-native` brings for the waiter phone's
+  background alerts (P2-06b); the Android CI job checks its APK asks for none of them.
 
 Commands, the Maestro run and signed builds work as described in `apps/waiter-app/README.md`,
 with `@rp/table-tablet` and `apps/table-tablet/.maestro` (pass `-e TABLE_NAME="Table T4"`, the

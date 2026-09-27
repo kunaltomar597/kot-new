@@ -1,0 +1,76 @@
+# Background alerts (P2-06b, WTR-005, NTF-004): with the app in the background, the kitchen marking
+# a dish Ready rings the phone with a notification, which is acknowledged from the notification
+# shade; signing out ends the phone's listening. Runs after pair-login-tables on the phone it
+# paired (config.yaml sets the order). TABLE2 must be free; DISH as there. While the flow waits
+# (up to 5 minutes) with the shade open, a person marks the dish Ready on the kitchen screen: keep
+# the emulator's screen on (adb shell svc power stayon true). Maestro's launchApp allows the
+# notifications that Android 13 and later ask for at sign-in.
+appId: ${APP_ID}
+env:
+  APP_ID: in.rp.waiter.dev
+  METRO: http://10.0.2.2:8081
+  STAFF_NAME: Ravi
+  PIN: '4444'
+  TABLE2: T2
+  DISH: Dal Makhani
+---
+- launchApp
+- openLink: exp+rp-waiter://expo-development-client/?url=${METRO}
+- extendedWaitUntil:
+    visible: Tap your name
+    timeout: 60000
+- tapOn: ${STAFF_NAME}
+- tapOn: ${PIN.charAt(0)}
+- tapOn: ${PIN.charAt(1)}
+- tapOn: ${PIN.charAt(2)}
+- tapOn: ${PIN.charAt(3)}
+- assertVisible: Signed in as ${STAFF_NAME}
+- assertNotVisible:
+    id: notifications-off
+- tapOn: All tables
+- tapOn: ${TABLE2}, Free.*
+- tapOn:
+    id: open-table
+- assertVisible: ${TABLE2} is open
+- tapOn: Add from the menu
+- tapOn:
+    id: menu-search
+- inputText: ${DISH}
+- hideKeyboard
+- tapOn: ${DISH},.*
+- tapOn:
+    id: send-kot
+- assertVisible: Order .* sent to the kitchen
+# To the background: the phone keeps listening, and its notification says for whom.
+- pressKey: Home
+- swipe:
+    start: 50%, 1%
+    end: 50%, 75%
+- assertVisible: Alerts for ${STAFF_NAME}
+# The kitchen marks the dish Ready: the phone rings with a notification for it.
+- extendedWaitUntil:
+    visible: Table ${TABLE2} · Food ready
+    timeout: 300000
+- tapOn: (?i)acknowledge
+- assertNotVisible: Table ${TABLE2} · Food ready
+- pressKey: Back
+# Back in the app, on the table it was left on: the alert is gone there too (and on the pager).
+- launchApp:
+    stopApp: false
+- assertVisible: Table ${TABLE2}
+- assertNotVisible:
+    id: alert-banner
+- tapOn: Mark ${DISH} served
+- assertVisible: Served
+- tapOn: Request bill
+- assertVisible: The cashier has been asked for the bill for ${TABLE2}.
+- tapOn: Back to tables
+- tapOn: Sign out
+- assertVisible: Tap your name
+# Nobody holds the phone now: it stops listening, and its notification goes.
+- pressKey: Home
+- swipe:
+    start: 50%, 1%
+    end: 50%, 75%
+- assertNotVisible: Alerts for ${STAFF_NAME}
+- pressKey: Back

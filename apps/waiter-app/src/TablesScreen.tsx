@@ -14,6 +14,7 @@ import { affectsFloor, floorSections, myTableIds, tileAlert, tileDetails } from 
 import { Button, SegmentedControl, TableTile, useTheme, useToast, weight } from '@rp/ui-native';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { NotificationsOff } from './notifications';
 import { OpenTableSheet } from './OpenTableSheet';
 import { PagerCard } from './PagerCard';
 import { UnsentHome } from './UnsentOrders';
@@ -83,6 +84,7 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
       }
     >
       <Note>{t('mobile.signedInAs', { name: person.displayName })}</Note>
+      <NotificationsOff />
       <UnsentHome onOpen={onOpenTable} />
       <PagerCard />
       <SegmentedControl

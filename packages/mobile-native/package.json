@@ -2,7 +2,7 @@
   "name": "@rp/mobile-native",
   "version": "0.1.0",
   "private": true,
-  "description": "Android pieces shared by the waiter app and table tablet: the Keystore device key (a local Expo module), the secure store and AsyncStorage adapters (P2-01c, AUTH-007, SEC-010).",
+  "description": "Android pieces shared by the waiter app and table tablet: the Keystore device key and the LAN CA pinning (local Expo modules), the secure store and AsyncStorage adapters (P2-01c, P2-01d, AUTH-007, SEC-010), and the waiter phone's background alerts: a foreground service, notifications with Acknowledge (P2-06b, WTR-005).",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@rp/api-client": "workspace:*",
+    "@rp/contracts": "workspace:*",
     "@rp/mobile-core": "workspace:*"
   },
   "peerDependencies": {
