@@ -8114,6 +8114,7 @@
         "type": "array",
         "items": { "$ref": "#/components/schemas/OpeningHours" }
       },
+      "CaFingerprint": { "type": "string", "pattern": "^([0-9A-F]{2}:){31}[0-9A-F]{2}$" },
       "Capability": {
         "type": "string",
         "enum": [
@@ -11518,10 +11519,32 @@
         "properties": {
           "code": { "$ref": "#/components/schemas/PairingCode" },
           "expiresAt": { "$ref": "#/components/schemas/Timestamp" },
-          "caSha256": { "type": ["string", "null"] },
+          "caSha256": {
+            "anyOf": [{ "$ref": "#/components/schemas/CaFingerprint" }, { "type": "null" }]
+          },
+          "serverUrls": {
+            "maxItems": 8,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ServerUrl" }
+          },
           "qrPayload": { "type": "string" }
         },
-        "required": ["code", "expiresAt", "caSha256", "qrPayload"],
+        "required": ["code", "expiresAt", "caSha256", "serverUrls", "qrPayload"],
+        "additionalProperties": false
+      },
+      "PairingQrPayload": {
+        "type": "object",
+        "properties": {
+          "v": { "type": "number", "const": 1 },
+          "code": { "$ref": "#/components/schemas/PairingCode" },
+          "ca": { "$ref": "#/components/schemas/CaFingerprint" },
+          "urls": {
+            "maxItems": 8,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ServerUrl" }
+          }
+        },
+        "required": ["v", "code"],
         "additionalProperties": false
       },
       "Paise": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -12316,6 +12339,7 @@
         "required": ["id", "name", "displayOrder", "archivedAt", "tables", "updatedAt"],
         "additionalProperties": false
       },
+      "ServerUrl": { "type": "string", "maxLength": 200, "format": "uri" },
       "ServiceChargeRequest": {
         "type": "object",
         "properties": {
@@ -13375,7 +13399,7 @@
             "format": "starts_with",
             "pattern": "^-----BEGIN CERTIFICATE-----.*"
           },
-          "sha256": { "type": "string", "pattern": "^([0-9A-F]{2}:){31}[0-9A-F]{2}$" },
+          "sha256": { "$ref": "#/components/schemas/CaFingerprint" },
           "expiresAt": { "$ref": "#/components/schemas/Timestamp" }
         },
         "required": ["certificate", "sha256", "expiresAt"],

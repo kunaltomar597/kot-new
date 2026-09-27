@@ -129,9 +129,16 @@ function pair(code: string, key: DeviceKeys, proofKey: DeviceKeys = key) {
 describe('[AUTH-007] pairing', () => {
   it('pairs a device with a manager code and its key; the device can then sign in', async () => {
     const code = await createCode({ type: 'WAITER_PHONE', name: 'Ravi phone' });
-    // No TLS in this test app, so no CA fingerprint to pin (see tls.int.test.ts).
+    // No TLS in this test app, so no CA fingerprint to pin (see tls.int.test.ts); the addresses
+    // are this machine's, over plain HTTP.
     expect(code.caSha256).toBeNull();
-    expect(JSON.parse(code.qrPayload)).toEqual({ v: 1, code: code.code });
+    for (const address of code.serverUrls) expect(address).toMatch(/^http:\/\/[^/]+:\d+$/);
+    expect(code.serverUrls).not.toContainEqual(expect.stringContaining('127.0.0.1'));
+    expect(JSON.parse(code.qrPayload)).toEqual({
+      v: 1,
+      code: code.code,
+      ...(code.serverUrls.length > 0 && { urls: code.serverUrls }),
+    });
     const key = keys('ES256');
     const response = await pair(code.code, key);
     expect(response.status).toBe(201);

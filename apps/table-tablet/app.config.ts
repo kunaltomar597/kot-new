@@ -56,7 +56,8 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
         backgroundImage: './assets/android-icon-background.png',
         monochromeImage: './assets/android-icon-monochrome.png',
       },
-      // The app needs the network only; no location, contacts or media (SEC-002 least privilege).
+      // The app needs the network, and the camera only to scan the pairing QR code; no location,
+      // contacts, microphone or media (SEC-002 least privilege).
       blockedPermissions: [
         'android.permission.RECORD_AUDIO',
         'android.permission.SYSTEM_ALERT_WINDOW',
@@ -92,6 +93,8 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
         },
       ],
       'expo-secure-store',
+      // Scanning the pairing QR code (P2-01d): the camera without the microphone.
+      ['expo-camera', { recordAudioAndroid: false }],
     ],
   };
 };

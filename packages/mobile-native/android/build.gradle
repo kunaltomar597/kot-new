@@ -13,3 +13,10 @@ android {
     versionName "0.1.0"
   }
 }
+
+dependencies {
+  // LanTrust hooks React Native's OkHttp clients (fetch, XHR, WebSocket, images); the versions
+  // come from React Native.
+  implementation 'com.facebook.react:react-android'
+  implementation 'com.squareup.okhttp3:okhttp:4.9.2'
+}

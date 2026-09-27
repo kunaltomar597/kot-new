@@ -45,10 +45,21 @@ network):
 
 ## Our apps: nothing to install
 
-Waiter phones and table tablets get the fingerprint from the pairing QR code
-(`{"v":1,"code":"…","ca":"<fingerprint>"}`), fetch the CA from `GET /api/v1/tls/ca`, check that it
-matches and from then on trust only that CA (pinning, SEC-010). Pagers are flashed with the CA
-(P2-05). The POS on the server PC pins it itself (P0-16).
+Waiter phones and table tablets scan the pairing QR code
+(`{"v":1,"code":"…","ca":"<fingerprint>","urls":["https://192.168.1.10:8080"]}`), try the server
+addresses in it, fetch the CA from `GET /api/v1/tls/ca`, check that it matches the fingerprint and
+from then on trust only that CA for the server (pinning, SEC-010). Nothing is typed.
+
+If a phone cannot scan (a broken camera), type the server address and the code on the phone. It
+then shows the server's fingerprint: compare it with the one the server PC shows (above) and tap
+"They match, pair" only if every character is the same.
+
+A phone trusts the CA it paired with and no other. If the server ever gets a new CA (its TLS
+folder or secret store was lost), phones cannot connect: on each, clear the app's storage
+(Android Settings → Apps → RP Waiter or RP Table → Storage → Clear storage), pair it again with a
+new code and unpair its old entry in Manage → Devices.
+
+Pagers are flashed with the CA (P2-05). The POS on the server PC pins it itself (P0-16).
 
 ## Browsers: install the CA once per device
 
@@ -118,6 +129,9 @@ from a manager as usual.
 - `NET::ERR_CERT_COMMON_NAME_INVALID`: the address typed is not in the certificate. Use the server's
   LAN address or its computer name. After the server's address changed, wait a minute and reload.
   A new name needs `RP_TLS_HOSTNAMES` and a restart of the server.
+- A waiter phone or table tablet says "The server's certificate does not match the pairing code":
+  it reached something that is not this server with this CA. Do not pair; check that the phone is
+  on the restaurant Wi-Fi and tell support if it persists.
 - `NET::ERR_CERT_DATE_INVALID`: a clock is wrong. Fix the device's date and time; if the server
   PC's clock was wrong, correct it and wait a minute.
 - Fingerprints differ: do not trust the certificate. Remove it and tell support; someone may be

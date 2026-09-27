@@ -73,6 +73,28 @@ export function localServerNames(
   return { dnsNames: [...dnsNames], ipAddresses: [...ipAddresses].sort() };
 }
 
+/** At most this many addresses go in a pairing QR code (`PairingQrPayload`). */
+const MAX_PAIRING_URLS = 8;
+
+/**
+ * The base URLs devices can reach this server at, for pairing without typing (AUTH-007): each LAN
+ * address, then each configured host name. Loopback and the computer's own names are left out: a
+ * phone cannot reach `127.0.0.1`, and `.local` names do not resolve on every phone.
+ */
+export function lanServerUrls(
+  names: ServerNames,
+  options: { readonly tls: boolean; readonly port: number; readonly hostnames: readonly string[] },
+): string[] {
+  const hosts = new Set([
+    ...names.ipAddresses.filter((address) => address !== '127.0.0.1'),
+    ...options.hostnames.map((name) => name.toLowerCase()),
+  ]);
+  const scheme = options.tls ? 'https' : 'http';
+  return [...hosts]
+    .slice(0, MAX_PAIRING_URLS)
+    .map((host) => `${scheme}://${host}:${String(options.port)}`);
+}
+
 function keyedCertificate(json: string): KeyedCertificate {
   const value: unknown = JSON.parse(json);
   if (

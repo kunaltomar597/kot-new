@@ -51,6 +51,29 @@ export const en = {
     insecureContext:
       'This browser can only be paired over a secure connection. Open the console on the restaurant PC, or use the secure address.',
     revoked: 'This device was unpaired by a manager. Pair it again to continue.',
+    scanIntro:
+      'Ask a manager to pair a device in Manage → Devices. Scan the QR code they show, or type the server address and code.',
+    scan: 'Scan QR code',
+    scanTitle: 'Scan the pairing QR code',
+    scanHint: 'Point the camera at the QR code a manager shows in Manage → Devices.',
+    switchCamera: 'Switch camera',
+    typeInstead: 'Type the code instead',
+    cameraStarting: 'Starting the camera…',
+    allowCamera: 'Allow the camera',
+    cameraDenied:
+      'The camera is not allowed. Allow it in the device’s settings, or type the address and code.',
+    notPairingCode: 'That is not a pairing QR code. Scan the code shown in Manage → Devices.',
+    enterServer: 'Code scanned. Enter the server address shown with it, then pair.',
+    checkTitle: 'Check the server’s certificate',
+    checkBody:
+      'The server at {server} has this certificate fingerprint. Compare it with the fingerprint shown on the server PC and pair only if every character is the same.',
+    checkConfirm: 'They match, pair',
+    checkCancel: 'Cancel',
+    unreachable:
+      'The server did not answer. Check the address and that this device is on the restaurant Wi-Fi.',
+    mismatch:
+      'The server’s certificate does not match the pairing code. Do not pair this device; tell a manager.',
+    unverified: 'Check the server’s certificate before pairing.',
   },
   mobile: {
     serverLabel: 'Server address',

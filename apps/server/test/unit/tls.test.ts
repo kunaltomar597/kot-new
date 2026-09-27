@@ -13,7 +13,7 @@ import {
   namesOf,
   needsRenewal,
 } from '../../src/tls/certificates.js';
-import { localServerNames, TlsStore } from '../../src/tls/tls-store.js';
+import { lanServerUrls, localServerNames, TlsStore } from '../../src/tls/tls-store.js';
 
 const DAY = 86_400_000;
 const NOW = new Date('2026-09-26T10:00:00.000Z');
@@ -98,6 +98,28 @@ describe('[SEC-001] the installation CA and server certificate (ADR-0011)', () =
       ipAddresses: ['127.0.0.1', '192.168.1.10'],
     });
     expect(localServerNames([], {}, 'not a valid_name').dnsNames).toEqual(['localhost']);
+  });
+
+  it('[AUTH-007] tells devices where to reach the server: LAN addresses, then configured names', () => {
+    const names = {
+      dnsNames: ['localhost', 'desktop-pos1', 'desktop-pos1.local', 'pos.local'],
+      ipAddresses: ['10.0.0.5', '127.0.0.1', '192.168.1.10'],
+    };
+    expect(lanServerUrls(names, { tls: true, port: 8443, hostnames: ['POS.local'] })).toEqual([
+      'https://10.0.0.5:8443',
+      'https://192.168.1.10:8443',
+      'https://pos.local:8443',
+    ]);
+    expect(lanServerUrls(names, { tls: false, port: 3000, hostnames: [] })).toEqual([
+      'http://10.0.0.5:3000',
+      'http://192.168.1.10:3000',
+    ]);
+    // A PC with many virtual adapters: the QR code stays small.
+    const many = {
+      dnsNames: [],
+      ipAddresses: Array.from({ length: 12 }, (_, index) => `10.0.${String(index)}.1`),
+    };
+    expect(lanServerUrls(many, { tls: true, port: 8443, hostnames: [] })).toHaveLength(8);
   });
 });
 

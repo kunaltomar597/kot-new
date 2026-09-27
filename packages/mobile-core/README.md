@@ -9,8 +9,16 @@ here with Vitest:
   the secure store on every change (AUTH-007, SEC-010).
 - `PersistentOutbox`: unsent submissions kept with their idempotency key until the server has them;
   refused ones stay until a person dismisses them (WTR-012, ORD-013).
+- `findServer` and `ServerTrust` (P2-01d, ADR-0011, SEC-010): the addresses from the pairing QR
+  code (or the one typed) are tried at once and the first server to answer wins. Over TLS its CA
+  is downloaded through `ServerTrust` (the Android module) and must match the QR code's
+  fingerprint, so a stranger on another address cannot stand in for the server; a typed address
+  comes back unverified, for a person to compare the fingerprint first. When the QR code names a
+  CA, plain-HTTP addresses are not tried.
 - `DeviceSession`: pairing with a Keystore key, PIN sign-in and out, the live connection with a
-  stored resume point, and forgetting the device when the server unpairs it (P2-01c). It owns the
+  stored resume point, and forgetting the device when the server unpairs it (P2-01c). Over TLS,
+  `pair` pins the server's CA before the code is sent and refuses a CA nobody checked; unpairing
+  forgets the pin (P2-01d). It owns the
   device's menu cache and order outbox: the menu is fetched on reconnect and when a newer one is
   published, availability changes apply live, and unsent orders go when the connection is back
   (P2-02b).
@@ -23,4 +31,5 @@ here with Vitest:
   in `apps/server/test/integration/order-outbox.int.test.ts`.
 
 `@rp/mobile-core/testing` holds the test doubles (a fake local server behind `fetch`, a fake
-Socket.io client, a fake Keystore) used by this package, `@rp/mobile-shell` and the apps.
+Socket.io client, a fake Keystore, a fake trust module with sample CAs) used by this package,
+`@rp/mobile-shell` and the apps.

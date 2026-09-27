@@ -1,4 +1,5 @@
 import { Server as HttpsServer } from 'node:https';
+import { Server as NetServer } from 'node:net';
 import { join } from 'node:path';
 import {
   Inject,
@@ -11,7 +12,13 @@ import { HttpAdapterHost } from '@nestjs/core';
 import type { TlsCaResponse } from '@rp/contracts';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
-import { localServerNames, serverTlsOptions, type TlsMaterial, TlsStore } from './tls-store.js';
+import {
+  lanServerUrls,
+  localServerNames,
+  serverTlsOptions,
+  type TlsMaterial,
+  TlsStore,
+} from './tls-store.js';
 
 /**
  * How often the server certificate is checked. Devices are configured with the server's address
@@ -92,6 +99,20 @@ export class TlsService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.material?.caFingerprint ?? null;
   }
 
+  /**
+   * Where devices reach this server on the LAN, for pairing codes and their QR code: the addresses
+   * the server certificate covers (with TLS) or the PC's current addresses (without), on the port
+   * the server listens on.
+   */
+  lanUrls(): string[] {
+    const names = this.material?.names ?? localServerNames(this.config.tlsHostnames);
+    return lanServerUrls(names, {
+      tls: this.enabled,
+      port: this.listeningPort(),
+      hostnames: this.config.tlsHostnames,
+    });
+  }
+
   /** The CA to pin or install; undefined without TLS. */
   ca(): TlsCaResponse | undefined {
     const material = this.material;
@@ -101,6 +122,14 @@ export class TlsService implements OnApplicationBootstrap, OnModuleDestroy {
       sha256: material.caFingerprint,
       expiresAt: material.caExpiresAt.toISOString(),
     };
+  }
+
+  /** The port the HTTP(S) server listens on (tests listen on any free port), else `PORT`. */
+  private listeningPort(): number {
+    const adapter = this.adapterHost.httpAdapter as typeof this.adapterHost.httpAdapter | undefined;
+    const server: unknown = adapter?.getHttpServer();
+    const address = server instanceof NetServer ? server.address() : null;
+    return typeof address === 'object' && address !== null ? address.port : this.config.port;
   }
 
   /**

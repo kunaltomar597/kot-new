@@ -4,7 +4,13 @@ Screens and hooks shared by the waiter app and the table tablet (P2-01c), on top
 `@rp/mobile-core`'s `DeviceSession`:
 
 - `ShellProvider`: the device session, the i18n catalogue (NFR-L02) and the `@rp/ui-native` theme.
-- `PairingScreen`: server address and pairing code (AUTH-007).
+- `PairingScreen` (AUTH-007, P2-01d): scanning the manager's QR code (`QrScanner`, `expo-camera`,
+  loaded only when a person taps Scan) gives the code, the server's addresses and its CA
+  fingerprint, so the device finds the server and pins its CA without anything typed. A QR code
+  without addresses fills in the code and asks for the address, still checked against its
+  fingerprint. With a typed address over TLS, the screen shows the server's certificate
+  fingerprint (`formatFingerprint`) for a person to compare with the server PC's before pairing.
+  `expo-camera` is a peer dependency: each app installs it.
 - `LoginScreen`: staff tiles, optionally limited to some roles, and the PIN pad (AUTH-001).
 - `ConnectionBanner`, `Screen` (with a footer that stays put, e.g. Send KOT), `Note`.
 - `useLive`: data read again after the events that change it and after a reconnect.

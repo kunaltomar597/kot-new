@@ -1,6 +1,7 @@
 import type { DeviceKey } from '@rp/api-client';
 import type { DeviceSummary, LoginResponse, StaffTile } from '@rp/contracts';
 import type { DeviceKeyStore } from '../device-session.js';
+import type { ServerAuthority, ServerTrust } from '../server-trust.js';
 import { FakeServer } from './fake-server.js';
 
 type Role = LoginResponse['staff']['role'];
@@ -144,6 +145,66 @@ export class FakeKeys implements DeviceKeyStore {
 
   remove(): Promise<void> {
     this.key = undefined;
+    return Promise.resolve();
+  }
+}
+
+function sampleFingerprint(first: number): string {
+  return Array.from({ length: 32 }, (_, index) =>
+    ((first + index) % 256).toString(16).toUpperCase().padStart(2, '0'),
+  ).join(':');
+}
+
+/** The restaurant's LAN CA as its server hands it out (ADR-0011); the PEM is only a sample. */
+export const LAN_CA: ServerAuthority = {
+  certificate: '-----BEGIN CERTIFICATE-----\nTEFOIENB\n-----END CERTIFICATE-----\n',
+  sha256: sampleFingerprint(0x3a),
+};
+
+/** Somebody else's CA: a stranger on the network standing in for the server. */
+export const OTHER_CA: ServerAuthority = {
+  certificate: '-----BEGIN CERTIFICATE-----\nT1RIRVIgQ0E=\n-----END CERTIFICATE-----\n',
+  sha256: sampleFingerprint(0x7f),
+};
+
+/**
+ * The Android trust module's stand-in (ADR-0011): the servers that hand out a CA before pairing and
+ * what the device pinned. `pin` answers the certificate's sample fingerprint, or `pinAnswer`.
+ */
+export class FakeTrust implements ServerTrust {
+  /** Addresses whose CA was asked for, in order. */
+  readonly fetched: string[] = [];
+  pinned: { readonly certificate: string; readonly serverUrl: string } | undefined;
+  clears = 0;
+  /** What `pin` answers instead of the certificate's fingerprint: a device that disagrees. */
+  pinAnswer: string | undefined;
+  private readonly servers = new Map<string, ServerAuthority>();
+
+  /** A server at `serverUrl` hands out `authority`; nothing answers at any other address. */
+  serve(serverUrl: string, authority: ServerAuthority = LAN_CA): this {
+    this.servers.set(serverUrl, authority);
+    return this;
+  }
+
+  fetchAuthority(serverUrl: string): Promise<ServerAuthority> {
+    this.fetched.push(serverUrl);
+    const authority = this.servers.get(serverUrl);
+    return authority === undefined
+      ? Promise.reject(new Error(`Nothing answered at ${serverUrl}`))
+      : Promise.resolve(authority);
+  }
+
+  pin(certificate: string, serverUrl: string): Promise<string> {
+    this.pinned = { certificate, serverUrl };
+    const known = [LAN_CA, OTHER_CA, ...this.servers.values()].find(
+      (authority) => authority.certificate === certificate,
+    );
+    return Promise.resolve(this.pinAnswer ?? known?.sha256 ?? 'not a certificate');
+  }
+
+  clear(): Promise<void> {
+    this.clears += 1;
+    this.pinned = undefined;
     return Promise.resolve();
   }
 }

@@ -71,7 +71,7 @@ Tested with React Native Testing Library.
 - `.github/workflows/android.yml`: Metro bundle, `expo prebuild` and `gradlew assembleDebug` for
   both apps, APKs kept as artifacts.
 
-### P2-01d LAN TLS pinning and QR pairing on Android
+### P2-01d LAN TLS pinning and QR pairing on Android (done)
 
 What ADR-0011 asks of the apps, left out of P2-01c:
 
@@ -82,6 +82,30 @@ What ADR-0011 asks of the apps, left out of P2-01c:
 - Scanning the pairing QR code (`expo-camera`); the QR payload has no server address yet, so the
   address stays a typed field unless the payload gains one (decision to record).
 - Preview and production builds, which refuse cleartext, can then pair with a real server.
+
+As built:
+
+- Server and contracts: the pairing code response gains `serverUrls`, the addresses devices reach
+  the server at (its non-loopback IPv4 addresses, then `RP_TLS_HOSTNAMES`, with the scheme and the
+  port it listens on, at most 8), and the QR payload carries them as `urls`, so a scanned code
+  needs nothing typed. `v` stays 1: the fields are optional. `parsePairingQr`, `PairingQrPayload`,
+  `ServerUrl` and `CaFingerprint` are in `@rp/contracts`.
+- `@rp/mobile-native`: `LanTrust.kt` holds the pinned CA and one trust manager for every React
+  Native HTTP path: Expo's `fetch` and images (the `OkHttpClientProvider` factory), XHR and
+  WebSocket (the custom client builders). `RpLanTrustPackage` installs it as the application
+  starts. The pin applies to the paired server's host; other hosts keep the phone's trust store.
+  `RpLanTrustModule` downloads the CA without trusting the connection (no credentials, no
+  redirects), pins it, and forgets it; `AndroidServerTrust` is its JavaScript side.
+- `@rp/mobile-core`: `findServer` tries every address at once and takes the first to answer; over
+  TLS its CA must match the QR code's fingerprint, else it is refused (a stranger on another
+  address is passed over). `DeviceSession.pair` pins the CA before the code is sent and refuses an
+  unchecked CA; unpairing forgets the pin.
+- `@rp/mobile-shell`: `PairingScreen` scans the QR code (`QrScanner`, loaded only when a person
+  taps Scan). A typed address over TLS shows the server's fingerprint for a person to compare
+  before pairing. Both apps pass `AndroidServerTrust` and ask for the camera (not the microphone).
+- Not testable here: the Kotlin is compiled by the Android CI job; pairing a real phone over TLS is
+  a manual check on hardware (runbook `docs/runbooks/lan-tls.md`). The Maestro flows keep typing
+  a development server's `http://` address, since an emulator cannot scan.
 
 ## P2-02 Waiter app: tables and order taking
 

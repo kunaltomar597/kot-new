@@ -22,7 +22,9 @@ Depends on: P4-01, P1-03, P0-11.
 Deliverables: staff add/edit/deactivate (never delete), roles, set/reset PINs, section assignment per
 shift, pager assignment; full menu editor (items, photos, variants, modifiers, combos, availability,
 stock, synonyms, tags); device list with type, binding, status, battery, versions, last seen; pair,
-unpair, rename; "Locate" (S).
+unpair, rename; "Locate" (S). The pair dialog shows the QR code (`qrPayload`), the code, the server
+addresses (`serverUrls`) and the CA fingerprint (`caSha256`), which phones typing an address
+compare (P2-01d).
 Acceptance: Playwright flows for each area; permission denials for non-managers.
 
 ## P4-03 Configuration screens
