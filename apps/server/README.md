@@ -445,6 +445,29 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - A bill asked for on a phone or at the POS carries `requestedBy`: the trigger does not alert the
   asker (`askedById`); one from the tablet is the service request's alert.
 
+## Recommendations (P3-04)
+
+- `src/recommendations/recommendations.service.ts` serves suggestions to the waiter app and the
+  POS (`GET /api/v1/recommendations`, ORDER_CREATE, a table session or a takeaway cart) and the
+  table tablet (`GET /api/v1/devices/current/recommendations`, its own open table). It loads the
+  published menu with live availability (a combo outside its hours counts as unavailable), the
+  active rules, the table's sent and pending lines plus the cart, and calls `@rp/domain`
+  `recommend` at the restaurant's local time (`RECOMMENDATION_CLOCK`, replaced in tests).
+- `best-sellers.ts` ranks quantities over `reco.bestSellerDays` business dates in the daypart's
+  hours (`reco.dayparts`), counting top-level lines that reached the kitchen; each ranking is
+  cached for ten minutes and refreshed in the background. Tests that add orders and need them
+  counted at once call `BestSellers.invalidate()`.
+- `recommendation-rules.service.ts`: the rules API (`/api/v1/recommendation-rules`,
+  OPERATIONS_CONFIGURE), audited; rules are archived, never deleted.
+- Tracking: `POST .../recommendations/events` records IMPRESSION, TAP and ADD_TO_CART (at most 50
+  a call); `recommendation-orders.ts` is the durable consumer that records ORDERED for each order
+  line sent with its `recommendation`, once per line.
+- `MenuPublishService.current` keeps the parsed snapshot of the latest version, so reading the
+  menu costs one small query plus the live availability.
+- See `test/integration/recommendations.int.test.ts` and
+  `test/integration/recommendations-performance.int.test.ts` (1,000 items, 200 rules, 27,000 order
+  lines: p95 within 200 ms, REC-011).
+
 ## Pagers (P2-04a)
 
 - `src/pagers/pager-broker.ts` embeds the MQTT broker (Aedes) on `RP_MQTT_PORT` (8883), over TLS

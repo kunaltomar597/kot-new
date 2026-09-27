@@ -27,6 +27,11 @@ sellers.
 Acceptance: unit tests on synthetic baskets with known associations; job runtime acceptable at
 design capacity; no suggestions below the activation volume.
 
+P3-04 left the place for this: `recommend` takes `learned` pairs (`fromItemId`, `toItemId`,
+`score`) as its second layer, after the rules and before the best sellers, with the same filters;
+`RecommendationsService` passes none yet. Its reason is `{ kind: 'LEARNED', becauseOf }`, shown as
+"Often ordered with …".
+
 ## P6-03 Voice search
 
 Requirements: TAB-007 (S), ONB-011 (offline speech pack checklist), risk R-09.
