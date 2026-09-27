@@ -744,6 +744,8 @@ Security-sensitive PRs for the P8-03 human review:
 - #48 P2-04a: pager credentials (peppered Argon2id), MQTT ACL and TLS.
 - #49 P2-01a: secure credential persistence on the mobile apps.
 - #52 P2-01c: the Android Keystore device key, pairing and sign-in on the phones.
+- #55 P2-02b: the phones' secure random source (`expo-crypto`) for idempotency keys and
+  correlation ids, and the offline order outbox.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
