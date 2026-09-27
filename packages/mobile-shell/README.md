@@ -13,6 +13,12 @@ Screens and hooks shared by the waiter app and the table tablet (P2-01c), on top
   `expo-camera` is a peer dependency: each app installs it.
 - `LoginScreen`: staff tiles, optionally limited to some roles, and the PIN pad (AUTH-001).
 - `ConnectionBanner`, `Screen` (with a footer that stays put, e.g. Send KOT), `Note`.
+- `AlertBanner`, on every `Screen` (P2-06a, WTR-006): the newest open alert of the person the
+  phone alerts ("Table 5 · Food ready", with `@rp/ordering` `describeAlert`), how many more, and
+  Acknowledge in one tap (NFR-U03); a tap on it lists every open alert with its age, reminders and
+  escalation. It shows on the sign-in screen too, naming whose alerts they are, since the phone
+  goes on alerting after an inactivity sign-out. `useAlerts` gives the same state to any screen.
+  Nothing shows on a device that follows no alerts (the table tablet).
 - `useLive`: data read again after the events that change it and after a reconnect.
 - `useMenu` and `useUnsentOrders`: the menu and the unsent orders the device keeps, at once and
   live (MENU-013, WTR-012, P2-02b).

@@ -1571,6 +1571,98 @@
         "x-requirements": ["AUTH-007", "AUTH-009"]
       }
     },
+    "/api/v1/devices/current/alerts": {
+      "get": {
+        "operationId": "listDeviceAlerts",
+        "summary": "This waiter phone's alerts: those of the person it alerts",
+        "description": "WTR-006, NTF-006: the open alerts of the phone's holder, the person who last signed in on it, that go to their pager or app, oldest first. The holder stays after an inactivity sign-out, so the phone keeps alerting like a pager; signing out on the phone, signing in on another phone or unpairing ends it. Only waiter phones.",
+        "tags": ["notifications"],
+        "responses": {
+          "200": {
+            "description": "The holder and their open alerts.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeviceAlertsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a waiter phone.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["WTR-006", "NTF-006", "AUTH-005"]
+      }
+    },
+    "/api/v1/devices/current/alerts/{alertId}/acknowledge": {
+      "post": {
+        "operationId": "acknowledgeDeviceAlert",
+        "summary": "Acknowledge one of the phone's alerts, as its holder",
+        "description": "WTR-006, NTF-004: like the button on the pager, the phone acknowledges its holder's alert in their name, signed in or not, which stops its repeats and escalation everywhere. Acknowledging again returns the alert as it is.",
+        "tags": ["notifications"],
+        "parameters": [
+          {
+            "name": "alertId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The alert.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AlertView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a waiter phone.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such alert for the phone's holder.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["WTR-006", "NTF-004"]
+      }
+    },
     "/api/v1/devices/pair": {
       "post": {
         "operationId": "pairDevice",
@@ -7674,6 +7766,7 @@
           "type": { "$ref": "#/components/schemas/NotificationEventType" },
           "status": { "type": "string", "enum": ["OPEN", "ACKNOWLEDGED", "CLEARED"] },
           "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "tableLabel": { "type": ["string", "null"] },
           "tableSessionId": {
             "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
           },
@@ -7684,6 +7777,7 @@
             "propertyNames": { "type": "string" },
             "additionalProperties": {}
           },
+          "raisedByName": { "type": ["string", "null"] },
           "recipientIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } },
           "channels": { "type": "array", "items": { "type": "string" } },
           "repeatCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -7707,10 +7801,12 @@
           "type",
           "status",
           "tableId",
+          "tableLabel",
           "tableSessionId",
           "orderId",
           "pagerText",
           "payload",
+          "raisedByName",
           "recipientIds",
           "channels",
           "repeatCount",
@@ -8614,6 +8710,28 @@
         "type": "object",
         "propertyNames": { "type": "string", "pattern": "^\\d{1,4}(\\.\\d{1,2})?$" },
         "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 100000 }
+      },
+      "DeviceAlertsResponse": {
+        "type": "object",
+        "properties": {
+          "holder": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "staffId": { "$ref": "#/components/schemas/Id" },
+                  "displayName": { "type": "string" }
+                },
+                "required": ["staffId", "displayName"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "alerts": { "type": "array", "items": { "$ref": "#/components/schemas/AlertView" } }
+        },
+        "required": ["holder", "alerts"],
+        "additionalProperties": false
       },
       "DeviceChallengeRequest": {
         "type": "object",

@@ -1,10 +1,10 @@
-# Smoke flow (P2-01c, P2-02a to P2-02c; WTR-001 to WTR-003, WTR-007, TBL-003, WTR-008, WTR-012):
-# pair with the local server, sign a waiter in, see the live tables, open a free table, find a dish,
-# send the KOT and see it reach the kitchen, serve it once the kitchen has it ready, then ask for
-# the bill. TABLE must be free; DISH must be a dish without options on the waiter-app menu. While
-# the flow waits for the dish to be ready (up to 5 minutes), a person marks it Ready on the kitchen
-# screen (the console in Kitchen mode). Run against a development build with Metro running (see
-# apps/waiter-app/README.md):
+# Smoke flow (P2-01c, P2-02a to P2-02c, P2-06a; WTR-001 to WTR-003, WTR-006 to WTR-008, TBL-003,
+# WTR-012): pair with the local server, sign a waiter in, see the live tables, open a free table,
+# find a dish, send the KOT and see it reach the kitchen, acknowledge the alert when the kitchen has
+# it ready and serve it, then ask for the bill. TABLE must be free; DISH must be a dish without
+# options on the waiter-app menu. While the flow waits for the dish to be ready (up to 5 minutes),
+# a person marks it Ready on the kitchen screen (the console in Kitchen mode). Run against a
+# development build with Metro running (see apps/waiter-app/README.md):
 #   maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE=T1 -e "DISH=Dal Makhani" apps/waiter-app/.maestro
 appId: ${APP_ID}
 env:
@@ -61,6 +61,12 @@ env:
 - extendedWaitUntil:
     visible: Mark ${DISH} served
     timeout: 300000
+# The waiter's alert for it (P2-06a, WTR-006): acknowledged here, the pager stops too (NTF-004).
+- assertVisible: .*Table ${TABLE} · Food ready.*
+- tapOn:
+    id: alert-banner-acknowledge
+- assertNotVisible:
+    id: alert-banner
 - tapOn: Mark ${DISH} served
 - assertVisible: Served
 - tapOn: Request bill

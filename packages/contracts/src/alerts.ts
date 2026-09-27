@@ -28,11 +28,15 @@ export const AlertView = z.object({
   type: NotificationEventType,
   status: z.enum(['OPEN', 'ACKNOWLEDGED', 'CLEARED']),
   tableId: Id.nullable(),
+  /** The table's label, e.g. "5", for the screens. */
+  tableLabel: z.string().nullable(),
   tableSessionId: Id.nullable(),
   orderId: Id.nullable(),
   pagerText: z.string().nullable(),
   /** Details for the screen, e.g. the items waiting. */
   payload: z.record(z.string(), z.unknown()),
+  /** Who raised it, e.g. the manager who nudged; null when the system raised it. */
+  raisedByName: z.string().nullable(),
   recipientIds: z.array(Id),
   channels: z.array(z.string()),
   repeatCount: z.int().nonnegative(),
@@ -48,6 +52,18 @@ export type AlertView = z.infer<typeof AlertView>;
 /** Open alerts for the signed-in person; managers and the Owner see every open alert. */
 export const AlertListResponse = z.object({ alerts: z.array(AlertView) });
 export type AlertListResponse = z.infer<typeof AlertListResponse>;
+
+/**
+ * A waiter phone's alerts (P2-06a, WTR-006): those of its holder, the person who last signed in
+ * on it, on the pager and app channels. The phone keeps its holder after an inactivity sign-out,
+ * so it goes on alerting like a pager (AUTH-005 still asks for the PIN for anything else).
+ */
+export const DeviceAlertsResponse = z.object({
+  /** Null when nobody holds the phone: nobody signed in on it yet, or they signed out. */
+  holder: z.object({ staffId: Id, displayName: z.string() }).nullable(),
+  alerts: z.array(AlertView),
+});
+export type DeviceAlertsResponse = z.infer<typeof DeviceAlertsResponse>;
 
 export const AlertParams = z.strictObject({ alertId: Id });
 export type AlertParams = z.infer<typeof AlertParams>;

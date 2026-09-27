@@ -8,6 +8,7 @@ import type {
   TypedApi,
 } from '@rp/api-client';
 import type { DeviceSummary, DomainEvent, LoginResponse, StaffTile } from '@rp/contracts';
+import { AlertCenter, type AlertNotifier } from './alert-center.js';
 import { createMobileClient, CREDENTIALS_KEY, loadCredentials } from './client.js';
 import { MenuCache } from './menu-cache.js';
 import { OrderOutbox } from './order-outbox.js';
@@ -55,6 +56,13 @@ export interface DeviceSessionOptions {
    * Without it (tests, development tools) nothing is pinned.
    */
   readonly trust?: ServerTrust;
+  /**
+   * Follow the alerts of the person the phone alerts (P2-06a, WTR-006): the waiter app. Other
+   * apps leave it off and never read alerts.
+   */
+  readonly followAlerts?: boolean;
+  /** Where followed alerts go besides the screen: Android notifications (P2-06b). */
+  readonly alertNotifier?: AlertNotifier;
   readonly appVersion?: string;
   readonly fetch?: typeof fetch;
   /** Socket.io's `io`; tests pass a fake. */
@@ -80,15 +88,18 @@ const INITIAL: DeviceSessionSnapshot = {
  * The phone's or tablet's link to the local server, outside React so it can be tested on its own
  * (AUTH-005, AUTH-007, AUTH-008): pairing with a Keystore key, signing staff in and out, the live
  * connection with resume, and what happens when the server ends the session or unpairs the device.
- * It also keeps the menu on the device current (MENU-013, MENU-006) and sends unsent orders when
- * the connection comes back (WTR-012). Screens read `getSnapshot()` through
- * `useSyncExternalStore` and call the actions.
+ * It also keeps the menu on the device current (MENU-013, MENU-006), sends unsent orders when
+ * the connection comes back (WTR-012) and, on a waiter phone, follows the alerts of the person it
+ * alerts (P2-06a). Screens read `getSnapshot()` through `useSyncExternalStore` and call the
+ * actions.
  */
 export class DeviceSession {
   /** The published menu on the device, fetched again on reconnect and when a new one is out. */
   readonly menu: MenuCache;
   /** Orders on their way to the kitchen; sent again on every reconnect. */
   readonly orders: OrderOutbox;
+  /** The alerts of the person the phone alerts, when `followAlerts` is on (P2-06a). */
+  readonly alerts: AlertCenter;
   private snapshot: DeviceSessionSnapshot = INITIAL;
   private readonly listeners = new Set<() => void>();
   private readonly eventListeners = new Set<(event: DomainEvent) => void>();
@@ -103,6 +114,11 @@ export class DeviceSession {
       store: options.plainStore,
       api: () => this.api,
       staffId: () => this.snapshot.person?.id ?? null,
+    });
+    this.alerts = new AlertCenter({
+      api: () => this.api,
+      ...(options.alertNotifier !== undefined && { notifier: options.alertNotifier }),
+      ...(options.onError !== undefined && { onError: options.onError }),
     });
   }
 
@@ -187,8 +203,9 @@ export class DeviceSession {
     const device = await client.api.getCurrentDevice();
     await this.options.plainStore.setItem(SERVER_KEY, serverUrl);
     await this.options.plainStore.removeItem(RESUME_KEY);
-    // Another restaurant's menu is no use here.
+    // Another restaurant's menu and alerts are no use here.
     await this.menu.clear();
+    this.alerts.reset();
     this.update({
       phase: 'paired',
       serverUrl,
@@ -212,6 +229,10 @@ export class DeviceSession {
     this.connect(undefined);
   }
 
+  /**
+   * Signs the person out on the server. On a waiter phone this also ends its alerts for them
+   * (P2-06a); a sign-out for inactivity is the server's and keeps them, so never call this for it.
+   */
   async signOut(notice?: SessionNotice): Promise<void> {
     await this.requireClient().signOut();
     this.update({ person: undefined, session: undefined, notice });
@@ -307,6 +328,7 @@ export class DeviceSession {
       connection: 'stopped',
       notice: 'revoked',
     });
+    this.alerts.reset();
     try {
       await this.options.keys.remove();
       await this.options.plainStore.removeItem(RESUME_KEY);
@@ -339,6 +361,7 @@ export class DeviceSession {
       ...(this.options.connect !== undefined && { connect: this.options.connect }),
       onEvent: (event) => {
         this.keepMenuCurrent(event);
+        if (this.options.followAlerts === true) this.alerts.handleEvent(event);
         for (const listener of this.eventListeners) listener(event);
       },
       onStatus: (status) => {
@@ -348,6 +371,8 @@ export class DeviceSession {
         if (cameOnline) {
           this.refreshMenu({ force: true });
           this.orders.flush().catch((error: unknown) => this.options.onError?.(error));
+          // Alerts missed while away are read again (NTF-006); so is a change of holder.
+          if (this.options.followAlerts === true) void this.alerts.refresh();
         }
       },
       onResumePoint: (point) => {

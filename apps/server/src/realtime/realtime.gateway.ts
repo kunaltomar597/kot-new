@@ -369,10 +369,15 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     return { streamId, head, replayed, fullRefresh: false };
   }
 
-  /** Whether the person has a live connection now, e.g. the waiter app (NTF-007). */
+  /**
+   * Whether the person has a live connection now (NTF-007): signed in somewhere, e.g. the waiter
+   * app, or the waiter phone that alerts them is connected, signed in or not (P2-06a).
+   */
   isStaffConnected(restaurantId: string, staffId: string): boolean {
-    const room = this.namespace?.adapter.rooms.get(rooms.staff(restaurantId, staffId));
-    return room !== undefined && room.size > 0;
+    const joined = this.namespace?.adapter.rooms;
+    return [rooms.staff(restaurantId, staffId), rooms.alerts(restaurantId, staffId)].some(
+      (name) => (joined?.get(name)?.size ?? 0) > 0,
+    );
   }
 
   /** Live listener: each published event goes to its rooms (ORD-010). */
@@ -437,14 +442,16 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         const row = deviceById.get(device.deviceId);
         if (row?.status !== 'ACTIVE') {
           this.end(socket, 'DEVICE_REVOKED');
+        } else if (principal !== undefined && live.get(principal.sessionId) !== principal.role) {
+          // Before a binding change: signing out on a waiter phone also ends its alerts (P2-06a),
+          // and the app must hear that the person is signed out.
+          this.end(socket, 'SESSION_ENDED');
         } else if (
           row.tableId !== device.tableId ||
           row.stationId !== device.stationId ||
           row.staffId !== device.staffId
         ) {
           this.end(socket, 'DEVICE_CHANGED');
-        } else if (principal !== undefined && live.get(principal.sessionId) !== principal.role) {
-          this.end(socket, 'SESSION_ENDED');
         }
       }
     } catch (error) {

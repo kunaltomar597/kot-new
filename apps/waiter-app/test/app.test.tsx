@@ -1,8 +1,14 @@
 import { DeviceSession, MemoryStore } from '@rp/mobile-core';
-import { FakeKeys, itemReadyFrame, SocketFactory } from '@rp/mobile-core/testing';
+import {
+  alertRaisedFrame,
+  alertView,
+  FakeKeys,
+  itemReadyFrame,
+  SocketFactory,
+} from '@rp/mobile-core/testing';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { App } from '../src/App';
-import { Restaurant, signedInApp, translator } from './restaurant';
+import { Restaurant, signedInApp, T2_SESSION, translator } from './restaurant';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 
@@ -16,6 +22,7 @@ function setup() {
     keys: new FakeKeys(),
     fetch: server.fetch,
     connect: sockets.connect,
+    followAlerts: true,
   });
   return { restaurant, server, session, sockets };
 }
@@ -79,5 +86,73 @@ describe('[WTR-001] waiter app smoke flow', () => {
     expect(await screen.findByText('The server had a problem.')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText(translator('mobile.tables.empty'))).toBeOnTheScreen();
+  });
+});
+
+describe('[WTR-006] the waiter’s alerts on the phone', () => {
+  const ready = alertView({
+    createdAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+    tableLabel: 'T2',
+    tableSessionId: T2_SESSION,
+    pagerText: 'T2 READY',
+    payload: { items: ['Paneer Tikka'] },
+  });
+
+  it('shows them over the tables and rings a new one in at once', async () => {
+    const restaurant = new Restaurant();
+    const { sockets, server } = await signedInApp(restaurant);
+    await act(async () => {
+      sockets.sync();
+      await Promise.resolve();
+    });
+    expect(await screen.findByRole('button', { name: /^T2, Occupied/ })).toBeOnTheScreen();
+    expect(screen.queryByTestId('alert-banner')).toBeNull();
+
+    restaurant.alerts.push(ready);
+    await act(async () => {
+      sockets.last.fire('event', alertRaisedFrame(1, ready));
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(/Table T2 · Food ready/)).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Acknowledge Table T2 · Food ready' }),
+    );
+    expect(
+      server.callsTo('POST', `/api/v1/devices/current/alerts/${ready.id}/acknowledge`),
+    ).toHaveLength(1);
+    expect(screen.queryByTestId('alert-banner')).toBeNull();
+  });
+
+  it('[AUTH-005] keeps them on the sign-in screen after an inactivity sign-out', async () => {
+    const restaurant = new Restaurant();
+    restaurant.alerts.push(ready);
+    const { session, sockets, server } = await signedInApp(restaurant);
+    await act(async () => {
+      sockets.sync();
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(/Table T2 · Food ready/)).toBeOnTheScreen();
+
+    // The server signs Ravi out for inactivity; the phone still alerts him, like his pager.
+    server.on('GET', '/api/v1/auth/session', () => ({
+      status: 401,
+      body: { code: 'SESSION_EXPIRED', message: 'Signed out after inactivity.' },
+    }));
+    await act(async () => {
+      await session.keepAlive();
+    });
+    expect(await screen.findByText('Tap your name')).toBeOnTheScreen();
+    await act(async () => {
+      sockets.sync();
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Paneer Tikka · 4 min ago · For Ravi')).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Acknowledge Table T2 · Food ready' }),
+    );
+    expect(
+      server.callsTo('POST', `/api/v1/devices/current/alerts/${ready.id}/acknowledge`),
+    ).toHaveLength(1);
+    expect(screen.queryByTestId('alert-banner')).toBeNull();
   });
 });

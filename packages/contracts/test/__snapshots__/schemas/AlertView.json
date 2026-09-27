@@ -36,6 +36,7 @@
           { "type": "null" }
         ]
       },
+      "tableLabel": { "type": ["string", "null"] },
       "tableSessionId": {
         "anyOf": [
           {
@@ -62,6 +63,7 @@
         "propertyNames": { "type": "string" },
         "additionalProperties": {}
       },
+      "raisedByName": { "type": ["string", "null"] },
       "recipientIds": {
         "type": "array",
         "items": {
@@ -131,10 +133,12 @@
       "type",
       "status",
       "tableId",
+      "tableLabel",
       "tableSessionId",
       "orderId",
       "pagerText",
       "payload",
+      "raisedByName",
       "recipientIds",
       "channels",
       "repeatCount",
@@ -183,6 +187,7 @@
           { "type": "null" }
         ]
       },
+      "tableLabel": { "type": ["string", "null"] },
       "tableSessionId": {
         "anyOf": [
           {
@@ -209,6 +214,7 @@
         "propertyNames": { "type": "string" },
         "additionalProperties": {}
       },
+      "raisedByName": { "type": ["string", "null"] },
       "recipientIds": {
         "type": "array",
         "items": {
@@ -278,10 +284,12 @@
       "type",
       "status",
       "tableId",
+      "tableLabel",
       "tableSessionId",
       "orderId",
       "pagerText",
       "payload",
+      "raisedByName",
       "recipientIds",
       "channels",
       "repeatCount",

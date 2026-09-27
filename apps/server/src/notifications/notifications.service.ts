@@ -9,6 +9,7 @@ import type {
   AlertListResponse,
   AlertView,
   BreakView,
+  DeviceAlertsResponse,
   DomainEvent,
   NotificationEventType,
   NudgeRequest,
@@ -22,8 +23,10 @@ import {
   type NotificationRule,
   type NotificationTiming,
   pagerTextFor,
+  reachesPagerAndApp,
   resolveRecipients,
 } from '@rp/domain';
+import type { AuthenticatedDevice } from '../auth/device.js';
 import type { Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
@@ -62,16 +65,25 @@ export interface RaiseAlert {
 
 const MANAGER_ROLES = new Set(['OWNER', 'MANAGER']);
 
+const alertNotFound = () => new AppError(404, 'ALERT_NOT_FOUND', 'There is no such alert for you.');
+
 function iso(value: Date | null): string | null {
   return value === null ? null : value.toISOString();
 }
 
-export function toAlertView(alert: Alert): AlertView {
+/** What the screens show next to an alert: its table's label and who raised it. */
+export interface AlertLabels {
+  readonly tableLabel: string | null;
+  readonly raisedByName: string | null;
+}
+
+export function toAlertView(alert: Alert, labels: AlertLabels): AlertView {
   return {
     id: alert.id,
     type: alert.type as NotificationEventType,
     status: alert.status,
     tableId: alert.tableId,
+    tableLabel: labels.tableLabel,
     tableSessionId: alert.tableSessionId,
     orderId: alert.orderId,
     pagerText: alert.pagerText,
@@ -79,6 +91,7 @@ export function toAlertView(alert: Alert): AlertView {
       typeof alert.payload === 'object' && alert.payload !== null && !Array.isArray(alert.payload)
         ? alert.payload
         : {},
+    raisedByName: labels.raisedByName,
     recipientIds: alert.recipientIds,
     channels: alert.channels,
     repeatCount: alert.repeatCount,
@@ -89,6 +102,37 @@ export function toAlertView(alert: Alert): AlertView {
     acknowledgedById: alert.acknowledgedById,
     clearedAt: iso(alert.clearedAt),
   };
+}
+
+/** The alerts as the screens show them, with table labels and names read in two queries. */
+async function alertViews(
+  db: Pick<TransactionClient, 'diningTable' | 'staff'>,
+  alerts: readonly Alert[],
+): Promise<AlertView[]> {
+  const tableIds = [...new Set(alerts.flatMap((alert) => alert.tableId ?? []))];
+  const staffIds = [...new Set(alerts.flatMap((alert) => alert.raisedById ?? []))];
+  const tables =
+    tableIds.length === 0
+      ? []
+      : await db.diningTable.findMany({
+          where: { id: { in: tableIds } },
+          select: { id: true, label: true },
+        });
+  const people =
+    staffIds.length === 0
+      ? []
+      : await db.staff.findMany({
+          where: { id: { in: staffIds } },
+          select: { id: true, displayName: true },
+        });
+  const labels = new Map(tables.map((table) => [table.id, table.label]));
+  const names = new Map(people.map((person) => [person.id, person.displayName]));
+  return alerts.map((alert) =>
+    toAlertView(alert, {
+      tableLabel: alert.tableId === null ? null : (labels.get(alert.tableId) ?? null),
+      raisedByName: alert.raisedById === null ? null : (names.get(alert.raisedById) ?? null),
+    }),
+  );
 }
 
 /**
@@ -262,7 +306,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       },
       orderBy: { createdAt: 'asc' },
     });
-    return { alerts: alerts.map(toAlertView) };
+    return { alerts: await alertViews(this.prisma, alerts) };
   }
 
   /**
@@ -318,44 +362,111 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** NTF-004: acknowledged by a recipient, a manager or the Owner, on any device. */
-  async acknowledge(
+  acknowledge(
     principal: Pick<Principal, 'restaurantId' | 'staffId' | 'role'>,
     alertId: string,
   ): Promise<AlertView> {
+    return this.acknowledgeAs(
+      principal.restaurantId,
+      principal.staffId,
+      alertId,
+      (row) => MANAGER_ROLES.has(principal.role) || row.recipientIds.includes(principal.staffId),
+    );
+  }
+
+  /**
+   * A waiter phone's alerts (WTR-006): those of its holder, the person who last signed in on it,
+   * that go to their pager and app. The phone keeps its holder after an inactivity sign-out, so it
+   * goes on alerting like a pager; it lists nothing when nobody holds it.
+   */
+  async deviceAlerts(device: AuthenticatedDevice): Promise<DeviceAlertsResponse> {
+    const holder = await this.holderOf(device);
+    if (holder === null) return { holder: null, alerts: [] };
+    const alerts = await this.prisma.alert.findMany({
+      where: {
+        restaurantId: device.restaurantId,
+        status: 'OPEN',
+        recipientIds: { has: holder.id },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    return {
+      holder: { staffId: holder.id, displayName: holder.displayName },
+      alerts: await alertViews(
+        this.prisma,
+        alerts.filter((alert) => reachesPagerAndApp(alert, holder.id)),
+      ),
+    };
+  }
+
+  /**
+   * The phone acknowledges one of its holder's alerts in their name, like the button on their
+   * pager (WTR-006, NTF-004): only an alert the phone shows, whoever is signed in on it.
+   */
+  async acknowledgeForDevice(device: AuthenticatedDevice, alertId: string): Promise<AlertView> {
+    const holder = await this.holderOf(device);
+    if (holder === null) throw alertNotFound();
+    return this.acknowledgeAs(device.restaurantId, holder.id, alertId, (row) =>
+      reachesPagerAndApp(row, holder.id),
+    );
+  }
+
+  /** The person a waiter phone alerts, if they still work here. */
+  private async holderOf(
+    device: AuthenticatedDevice,
+  ): Promise<{ id: string; displayName: string } | null> {
+    if (device.type !== 'WAITER_PHONE') {
+      throw new AppError(403, 'FORBIDDEN', 'Only a waiter phone has alerts of its own.');
+    }
+    if (device.staffId === null) return null;
+    return this.prisma.staff.findFirst({
+      where: {
+        id: device.staffId,
+        restaurantId: device.restaurantId,
+        active: true,
+        archivedAt: null,
+      },
+      select: { id: true, displayName: true },
+    });
+  }
+
+  private acknowledgeAs(
+    restaurantId: string,
+    staffId: string,
+    alertId: string,
+    allowed: (row: Alert) => boolean,
+  ): Promise<AlertView> {
     return this.prisma.transaction(async (tx) => {
       const [alert] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM alerts WHERE id = ${alertId}::uuid AND restaurant_id = ${principal.restaurantId}::uuid
+        SELECT id FROM alerts WHERE id = ${alertId}::uuid AND restaurant_id = ${restaurantId}::uuid
         FOR UPDATE`;
       const row =
         alert === undefined ? null : await tx.alert.findUnique({ where: { id: alert.id } });
-      if (
-        row === null ||
-        (!MANAGER_ROLES.has(principal.role) && !row.recipientIds.includes(principal.staffId))
-      ) {
-        throw new AppError(404, 'ALERT_NOT_FOUND', 'There is no such alert for you.');
-      }
-      if (row.status !== 'OPEN') return toAlertView(row);
+      if (row === null || !allowed(row)) throw alertNotFound();
+      if (row.status !== 'OPEN') return this.viewOf(tx, row);
       const now = this.clock.now();
       const acknowledged = await tx.alert.update({
         where: { id: row.id },
         data: {
           status: 'ACKNOWLEDGED',
           acknowledgedAt: now,
-          acknowledgedById: principal.staffId,
+          acknowledgedById: staffId,
           escalateAt: null,
           nextRepeatAt: null,
         },
       });
       await this.emit(tx, acknowledged, now, {
         type: 'AlertAcknowledged',
-        payload: {
-          alertId: row.id,
-          acknowledgedBy: principal.staffId,
-          recipients: row.recipientIds,
-        },
+        payload: { alertId: row.id, acknowledgedBy: staffId, recipients: row.recipientIds },
       });
-      return toAlertView(acknowledged);
+      return this.viewOf(tx, acknowledged);
     });
+  }
+
+  private async viewOf(tx: TransactionClient, alert: Alert): Promise<AlertView> {
+    const [view] = await alertViews(tx, [alert]);
+    if (view === undefined) throw new Error('An alert has no view');
+    return view;
   }
 
   /**

@@ -13,7 +13,7 @@ export interface AuthenticatedDevice {
   readonly tableId: string | null;
   /** The station a kitchen screen shows (KDS-002). */
   readonly stationId: string | null;
-  /** The person a pager belongs to. */
+  /** The person a pager belongs to, or a waiter phone alerts (P2-06a). */
   readonly staffId: string | null;
 }
 

@@ -190,6 +190,27 @@ export function pagerTextFor(
   return shown.slice(0, PAGER_TEXT_MAX);
 }
 
+/** What decides where an alert shows: the people it went to and its channels. */
+export interface AlertDelivery {
+  readonly recipientIds: readonly string[];
+  readonly channels: readonly string[];
+  readonly escalatedTo: readonly string[];
+}
+
+/**
+ * Whether an alert goes to the person's pager and waiter app (P2-06a). Both show the same alerts
+ * (WTR-006): those the person receives whose rule names the pager or the app, and any alert
+ * escalated to them, which reaches a manager's pager and app whatever its channels (NTF-005).
+ */
+export function reachesPagerAndApp(alert: AlertDelivery, staffId: string): boolean {
+  if (!alert.recipientIds.includes(staffId)) return false;
+  return (
+    alert.channels.includes('PAGER') ||
+    alert.channels.includes('WAITER_APP') ||
+    alert.escalatedTo.includes(staffId)
+  );
+}
+
 /** The restaurant's people as they are right now, for resolving a rule. */
 export interface RecipientContext {
   readonly responsibleWaiterId: string | null;

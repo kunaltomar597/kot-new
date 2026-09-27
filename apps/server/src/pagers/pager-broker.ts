@@ -22,6 +22,7 @@ import {
   pagerMayPublish,
   pagerMaySubscribe,
   pagerTopic,
+  reachesPagerAndApp,
   vibrationFor,
 } from '@rp/domain';
 import { Aedes, type AuthenticateError, type Client } from 'aedes';
@@ -405,15 +406,20 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
     const recipients = new Set(event.payload.recipients);
-    const targets = [...this.connected.values()].filter(
+    const wearers = [...this.connected.values()].filter(
       (pager) =>
         pager.restaurantId === event.restaurantId &&
         pager.staffId !== null &&
         recipients.has(pager.staffId),
     );
-    if (targets.length === 0) return;
+    if (wearers.length === 0) return;
     const alert = await this.prisma.alert.findUnique({ where: { id: event.payload.alertId } });
     if (alert === null) return;
+    // The pager shows what the waiter app shows (WTR-006): the rule's pager and app alerts.
+    const targets = wearers.filter(
+      (pager) => pager.staffId !== null && reachesPagerAndApp(alert, pager.staffId),
+    );
+    if (targets.length === 0) return;
     const settings = await this.notifications.settingsOf(event.restaurantId);
     const message: PagerAlertMessage = {
       alertId: alert.id,
@@ -447,7 +453,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
         staffId,
         role: 'WAITER',
       })
-    ).alerts;
+    ).alerts.filter((alert) => reachesPagerAndApp(alert, staffId));
     const settings = await this.notifications.settingsOf(pager.restaurantId);
     for (const alert of open) {
       await this.publish(pager, {

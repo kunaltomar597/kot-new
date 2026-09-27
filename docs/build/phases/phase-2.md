@@ -387,6 +387,100 @@ nudge UI in POS/dashboard; KDS "Notify manager" wired to the engine; basic alert
 Acceptance: Maestro test for background alert; integration test that acknowledging on the app stops
 the pager repeats.
 
+The KDS "Notify manager" already goes through the engine (P2-03a). The rest is split in four:
+
+### P2-06a Alerts in the waiter app (done)
+
+Requirements: WTR-006, NTF-004, NTF-005, NTF-006, NTF-007, NFR-U03, AUTH-005.
+
+- A waiter phone alerts its holder: the person who last signed in on it (`devices.staff_id`, as a
+  pager's wearer). The holder stays after an inactivity sign-out, so the phone goes on alerting like
+  a pager while it sits in a pocket; the PIN is still needed for anything else (AUTH-005). Signing
+  out on the phone, signing in on another phone or unpairing ends it.
+- Device-authenticated `GET /api/v1/devices/current/alerts` and
+  `POST /api/v1/devices/current/alerts/:alertId/acknowledge`: the holder's open alerts, acknowledged
+  as the holder, like the pager's button. The phone's live connection joins its holder's alert room,
+  and a phone holding a person counts as their app being connected (NTF-007).
+- One rule for the pager and the app (`reachesPagerAndApp` in `@rp/domain`): the person is a
+  recipient and the rule names the pager or the app, or the alert was escalated to them (NTF-005).
+  The pager broker uses it too.
+- `AlertView` gains `tableLabel` and `raisedByName` for the screens.
+- `@rp/mobile-core` `AlertCenter`: the holder's open alerts, read at start, on every reconnect
+  (NTF-006) and after alert events; each alert and each repeat announced once; acknowledging. An
+  `AlertNotifier` hook for the Android side (P2-06b).
+- `@rp/ordering` `describeAlert` (shared with the POS alert centre, P2-06c); `@rp/mobile-shell`
+  `useAlerts`, the alert banner on every screen (the newest alert, how many more, Acknowledge in one
+  tap, NFR-U03) and the list of open alerts with their age.
+- Acceptance: integration test that acknowledging on the app stops the pager repeats and tells the
+  pager; a phone signed out for inactivity still lists and acknowledges its holder's alerts;
+  core and shell tests.
+
+As built:
+
+- Server: `session.service.ts` makes the person signing in on a waiter phone its holder and takes
+  them off any other phone; `auth.service.ts` `logout` on the phone clears it. An inactivity expiry
+  leaves it. `DeviceAlertsController` serves the two device routes (403 for other device types);
+  `NotificationsService.acknowledgeAs` is shared by the person's and the device's acknowledgement,
+  under a row lock. Contracts: `DeviceAlertsResponse`, `listDeviceAlerts`,
+  `acknowledgeDeviceAlert`; `AlertView.tableLabel` and `raisedByName`.
+- Rooms: `rooms.alerts(restaurant, staff)`, joined by a waiter phone's own connection, hears only
+  `AlertRaised`, `AlertAcknowledged` and `AlertCleared`, and counts for presence. The gateway sweep
+  ends a phone's connection with `DEVICE_CHANGED` when its holder changes (after `SESSION_ENDED`,
+  now checked first).
+- `reachesPagerAndApp` also stopped a manager's pager buzzing for alerts meant for the POS and
+  dashboard only (a printer or the disk).
+- `@rp/mobile-core` `AlertCenter` is `DeviceSession.alerts`, on when `followAlerts` is set (the
+  waiter app). A repeat event updates the alert and rings at once; reads coalesce (one on its way,
+  one after); a failed first read shows as `error`, later failures keep the list.
+- `@rp/mobile-shell` `AlertBanner` sits in `Screen` under the connection banner, so it shows on
+  the sign-in screen too, with "For Ravi" when the holder is not the person signed in.
+- Tests: `phone-alerts.int.test.ts` and a pager test where the phone's acknowledgement stops the
+  repeats and reaches the pager; `alert-center.test.ts`; `alerts.test.tsx` in the shell; two
+  waiter-app tests (a new alert, and acknowledging on the sign-in screen after an inactivity
+  sign-out). The Maestro smoke flow acknowledges the food-ready alert.
+
+### P2-06b Background alerts on Android
+
+Requirements: WTR-005 (banner, sound and vibration in the background or locked), WTR-006.
+
+- A foreground service while the phone holds a person, so the connection stays up with the screen
+  off: a headless JS task keeps React Native's timers running and the service holds a partial wake
+  lock. Android 14's `specialUse` service type (a `dataSync` service stops after 6 hours).
+- A high-importance notification channel with sound and vibration; one notification per open alert
+  with an Acknowledge action, shown on the lock screen, alerting again on each repeat. In the
+  foreground the banner shows and the phone rings and vibrates without a notification.
+- `POST_NOTIFICATIONS` asked for at sign-in (Android 13+); the table tablet blocks these permissions.
+- The device session outlives the screen: closing the app from the recents list keeps alerts coming.
+- Acceptance: Maestro flow with the app in the background (a person marks a dish ready on the
+  kitchen screen; the flow acknowledges from the notification shade); the Debug APK builds.
+
+### P2-06c POS alert centre and manager nudge
+
+Requirements: MGR-008, NTF-008, NTF-004, KDS-006.
+
+- The alert centre in the console (POS and manager modes): open alerts, escalations, kitchen flags,
+  device and system alerts, each with Acknowledge, live.
+- Manager nudge: pick one or more waiters, then a preset (`notifications.nudgePresets`) or up to 40
+  characters.
+- Acceptance: component tests and a Playwright flow (nudge a waiter, acknowledge an alert).
+
+### P2-06d Service requests and the waiter's inbox
+
+Requirements: WTR-005, TAB-004 (server side), NTF-003, NTF-004, NTF-005, BILL-015, TBL-007,
+SEC-009.
+
+- Moved forward from P3-02, which keeps the tablet's buttons: the server `service-requests` module
+  (raise with anti-spam, acknowledge, cancel or resolve per `serviceRequestMachine`, events
+  `ServiceRequestRaised`/`Acknowledged`/`Cancelled`, the WATER/WAITER/BILL_REQUEST alerts with
+  repeats and escalation, Bill also for the cashier and `BILL_REQUESTED`), and
+  `activeServiceRequests` on the table overview.
+- The waiter app's inbox (WTR-005): Water, Waiter and Bill requests with table and age;
+  Acknowledge and Resolve.
+- A bill asked for on the waiter app does not alert the waiter who asked (today the P2-03 trigger
+  alerts the responsible waiter whoever asked); the cashier still gets it.
+- Acceptance: integration tests (raise, repeat every R, escalate after N, acknowledge, resolve,
+  duplicate refused) and waiter-app tests.
+
 ## P2-07 Phase 2 exit test: latency and escalation on the lab rig
 
 Goal: prove NFR-P03, NTF-005, NTF-006 and S5, S14 on real devices.
