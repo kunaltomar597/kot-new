@@ -5,6 +5,9 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['test/**/*.test.{ts,tsx}'],
     setupFiles: ['test/setup.ts'],
+    // Component tests click through jsdom, query by role and run axe; under coverage on a busy CI
+    // runner (every package's tests at once) one took just over the 5 s default.
+    testTimeout: 20_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
