@@ -110,6 +110,25 @@ export function addDays(date: IsoDate, days: number): IsoDate {
   return formatIsoDate(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate());
 }
 
+/** The wall-clock time of `instant` in `timeZone`, as 'HH:MM'. */
+export function timeOfDayOf(instant: Date, timeZone: string = DEFAULT_TIME_ZONE): string {
+  const local = toLocalDateTime(instant, timeZone);
+  return `${String(local.hour).padStart(2, '0')}:${String(local.minute).padStart(2, '0')}`;
+}
+
+/**
+ * Whether the 'HH:MM' `time` falls in a daily window, start included and end excluded. A window
+ * that ends before it starts runs past midnight (a combo's hours, MENU-005; a recommendation
+ * rule's, REC-002; dinner, REC-004).
+ */
+export function inTimeWindow(
+  time: string,
+  window: { readonly start: string; readonly end: string },
+): boolean {
+  const { start, end } = window;
+  return start <= end ? time >= start && time < end : time >= start || time < end;
+}
+
 /** The calendar date of `instant` in `timeZone`. */
 export function calendarDateOf(instant: Date, timeZone: string = DEFAULT_TIME_ZONE): IsoDate {
   const local = toLocalDateTime(instant, timeZone);
