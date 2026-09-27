@@ -29,7 +29,7 @@ use EAS secrets; never commit keystores.
 Acceptance: both apps build as development APKs in CI (EAS or local Gradle), pair with a local
 server, log in, and show live data.
 
-P2-01 is split in three.
+P2-01 is split in four.
 
 ### P2-01a Mobile core (done)
 
@@ -52,15 +52,36 @@ P2-01 is split in three.
 popup and combo picker using `@rp/domain` menu-selection, with the same tokens as `ui-web`.
 Tested with React Native Testing Library.
 
-### P2-01c Expo apps, builds and smoke flows
+### P2-01c Expo apps, builds and smoke flows (done)
 
-`apps/waiter-app` and `apps/table-tablet` as Expo development builds:
+`apps/waiter-app` and `apps/table-tablet` as Expo SDK 57 development builds. As built:
 
-- the Keystore key through `expo-secure-store` and a native signer;
-- AsyncStorage for the outbox and menu;
-- EAS Build and Update profiles (the keystore comes from EAS secrets, never committed);
-- Maestro flows;
-- a CI job that builds debug APKs with Gradle.
+- `packages/mobile-native`: the device key as a local Expo module (`RpDeviceKeyModule.kt`, ECDSA
+  P-256 in the Android Keystore, StrongBox when present) with DER → raw signature conversion;
+  `expo-secure-store` and AsyncStorage as `KeyValueStore`s.
+- `@rp/mobile-core` `DeviceSession`: pairing, PIN sign-in, live connection with a stored resume
+  point, forgetting a revoked device; `@rp/mobile-core/testing` holds the shared test doubles.
+- `packages/mobile-shell`: pairing and login screens, connection banner, `useLive`.
+- Waiter app: pair → PIN login (waiters, managers, owner) → live tables. Tablet: pair → idle
+  screen with the restaurant, its table and the live menu count, no staff login.
+- `app.config.ts` per `APP_ENV` (separate packages for development, preview, production;
+  cleartext only in development), EAS Build and Update profiles, code-signed updates once the
+  owner commits the public certificate; keystore and keys stay in EAS.
+- Maestro smoke flows in each app's `.maestro/` (run against a development build; see READMEs).
+- `.github/workflows/android.yml`: Metro bundle, `expo prebuild` and `gradlew assembleDebug` for
+  both apps, APKs kept as artifacts.
+
+### P2-01d LAN TLS pinning and QR pairing on Android
+
+What ADR-0011 asks of the apps, left out of P2-01c:
+
+- An OkHttp client factory (Expo module, registered at app start) whose trust manager trusts only
+  the installation's CA pinned at pairing, for REST and the Socket.io WebSocket.
+- Pairing over TLS: download `GET /api/v1/tls/ca` without trust, check its SHA-256 against the
+  `caSha256` from the pairing code, then pin it.
+- Scanning the pairing QR code (`expo-camera`); the QR payload has no server address yet, so the
+  address stays a typed field unless the payload gains one (decision to record).
+- Preview and production builds, which refuse cleartext, can then pair with a real server.
 
 ## P2-02 Waiter app: tables and order taking
 

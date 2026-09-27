@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-09-26.
+Last updated: 2026-09-27.
 
 What exists:
 
@@ -59,6 +59,12 @@ What exists:
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b). 23 tests.
+- `packages/mobile-native` (the Keystore device key as a local Expo module, secure and plain
+  stores) and `packages/mobile-shell` (pairing and login screens, connection banner, live data)
+  (P2-01c). `packages/mobile-core` gained `DeviceSession` and the `testing` entry point.
+- `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
+  (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
+  (P2-01c).
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -81,7 +87,9 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-01c Expo apps, builds and smoke flows (P2-01a and P2-01b done).
+- P2-01d LAN TLS pinning and QR pairing on Android (P2-01c done).
+- P2-02 Waiter app: tables and order taking (P2-01c done; runs against development servers
+  until P2-01d).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -149,7 +157,8 @@ Recommended next WPs (dependencies met):
 
 - [x] P2-01a Mobile core (credentials, outbox, menu cache)
 - [x] P2-01b React Native component library
-- [ ] P2-01c Expo apps, builds and smoke flows
+- [x] P2-01c Expo apps, builds and smoke flows
+- [ ] P2-01d LAN TLS pinning and QR pairing on Android
 - [ ] P2-02 Waiter app: tables and order taking
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
@@ -459,6 +468,23 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-09-27 (P2-01c):
+
+114. The device key on Android is an ECDSA P-256 (ES256) Keystore key made by our own Expo module,
+     not a key stored in `expo-secure-store`: the private key can never be read out (SEC-006).
+     StrongBox is used when the phone has it, otherwise the TEE.
+115. A phone pairs with a typed server address (`host:port`, https assumed; `http://` kept for
+     development) because the pairing QR payload carries no address. Adding the address to the QR
+     payload is left to P2-01d.
+116. Pairing, sign-in and the live connection are one `DeviceSession` in `@rp/mobile-core`, shared
+     by both apps; the screens are shared in `@rp/mobile-shell`. The tablet has no staff login and
+     only reads what a device token may (device, restaurant, menu).
+117. The waiter phone offers waiters, managers and the owner on its login screen; cashiers and
+     kitchen staff sign in on the POS and KDS.
+118. The apps and native-facing packages are aligned on Expo SDK 57's React Native 0.86.3 and
+     React 19.2.3 (`@rp/ui-native` moved from 0.87.1), so Metro bundles exactly one copy of each.
+     Development builds allow cleartext HTTP; preview and production do not (they wait on P2-01d).
+
 Decided 2026-09-26 (P2-01b):
 
 112. `@rp/ui-native` mirrors the `@rp/ui-web` props and takes the same `UiStrings` shape (the
@@ -653,6 +679,33 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P2-01c Expo apps, builds and smoke flows
+
+Took over from the previous session: merged main into #50 (P2-01b), merged it once green.
+
+Built `packages/mobile-native` (Keystore device key module in Kotlin, DER → raw ECDSA, secure and
+plain stores), `DeviceSession` and `@rp/mobile-core/testing`, `packages/mobile-shell`, and the two
+Expo apps with EAS profiles, Maestro flows and `.github/workflows/android.yml`. Split out P2-01d
+(TLS pinning with a custom OkHttp client, QR pairing).
+
+Tests: mobile-native 18, mobile-core 26 (was 8), mobile-shell 9, waiter app 4, tablet 3. Both apps
+bundle with Metro (`bundle:check`); the Gradle build runs only in CI (the container cannot reach
+dl.google.com for the Android SDK).
+
+Gotchas:
+
+- Metro does not map `./x.js` to `x.tsx` inside an app: app sources use extensionless imports
+  (`moduleResolution: bundler`); packages keep NodeNext `.js` imports and are consumed from `dist/`.
+- Keep every React Native package on the Expo SDK's exact `react` and `react-native` versions, or
+  Metro bundles two copies. Checked by the source map: no package appears twice.
+- React Native's globals type `process.env` loosely: `app.config.ts` casts it once.
+- Event frames in tests must satisfy the contracts, or the client drops them silently: use
+  `itemReadyFrame` from `@rp/mobile-core/testing`.
+- The Kotlin module has only been compiled by CI, not run on a phone: the first real pairing is part
+  of the P2-07 lab run.
+
+Decisions: 114 to 118.
 
 ### 2026-09-26: P2-01b React Native component library
 

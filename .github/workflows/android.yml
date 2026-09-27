@@ -1,0 +1,81 @@
+name: Android
+
+# Builds debug APKs of the waiter app and the table tablet with Gradle (P2-01c), so native
+# configuration (Expo modules, the Keystore device key module, autolinking in the monorepo) is
+# checked on every change that could affect it. Signed release APKs are built by EAS Build with
+# the owner's keystore held as an EAS secret, never here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/waiter-app/**'
+      - 'apps/table-tablet/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android.yml'
+  pull_request:
+    paths:
+      - 'apps/waiter-app/**'
+      - 'apps/table-tablet/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  debug-apk:
+    name: Debug APK (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [waiter-app, table-tablet]
+    env:
+      APP_ENV: development
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm turbo run build --filter=@rp/${{ matrix.app }}^...
+
+      - name: Bundle the JavaScript with Metro
+        run: pnpm --filter @rp/${{ matrix.app }} bundle:check
+
+      - name: Generate the Android project
+        run: pnpm --filter @rp/${{ matrix.app }} prebuild
+
+      - name: Assemble the debug APK
+        working-directory: apps/${{ matrix.app }}/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Keep the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-debug-apk
+          path: apps/${{ matrix.app }}/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14

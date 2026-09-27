@@ -52,6 +52,22 @@ export const en = {
       'This browser can only be paired over a secure connection. Open the console on the restaurant PC, or use the secure address.',
     revoked: 'This device was unpaired by a manager. Pair it again to continue.',
   },
+  mobile: {
+    serverLabel: 'Server address',
+    serverHint: 'Shown on the POS in Manage → Devices, for example 192.168.1.20:8443.',
+    invalidServer: 'Enter the server address shown on the POS, for example 192.168.1.20:8443.',
+    staffTitle: 'Tap your name',
+    signedInAs: 'Signed in as {name}',
+    tables: {
+      title: 'Tables',
+      empty: 'No tables yet. A manager adds them in Manage → Floor.',
+    },
+    tablet: {
+      welcome: 'Welcome to {restaurant}',
+      dishes: '{count, plural, one {# dish} other {# dishes}} on the menu today',
+      menuWaiting: 'The menu appears when this tablet reaches the restaurant server.',
+    },
+  },
   login: {
     title: 'Who is signing in?',
     noStaff: 'No staff are set up yet. The owner adds staff in Manage → Staff.',

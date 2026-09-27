@@ -18,6 +18,7 @@ export {
   ApiUnavailableError,
   errorFromResponse,
 } from './errors.js';
+export { toBase64 } from './base64.js';
 export { newCorrelationId, newIdempotencyKey, uuidV4 } from './ids.js';
 export {
   type ConnectionStatus,
