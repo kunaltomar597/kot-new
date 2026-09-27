@@ -437,6 +437,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         select: { id: true, status: true, tableId: true, stationId: true, staffId: true },
       });
       const deviceById = new Map(devices.map((device) => [device.id, device]));
+      const recheck: { socket: RealtimeSocket; principal: Principal }[] = [];
       for (const socket of sockets) {
         const { device, principal } = socket.data;
         const row = deviceById.get(device.deviceId);
@@ -451,7 +452,26 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
           row.stationId !== device.stationId ||
           row.staffId !== device.staffId
         ) {
-          this.end(socket, 'DEVICE_CHANGED');
+          if (principal === undefined) this.end(socket, 'DEVICE_CHANGED');
+          else recheck.push({ socket, principal });
+        }
+      }
+      if (recheck.length > 0) {
+        // A sign-out on a waiter phone ends the session and clears the phone's holder in one
+        // transaction (P2-06a). Committed between the two reads above, it shows as a binding
+        // change with a live session: read those sessions again, after the devices, so the app
+        // still hears that the person signed out.
+        const again = await this.sessions.liveSessions(
+          recheck.map(({ socket, principal }) => ({
+            sessionId: principal.sessionId,
+            device: socket.data.device,
+          })),
+        );
+        for (const { socket, principal } of recheck) {
+          this.end(
+            socket,
+            again.get(principal.sessionId) === principal.role ? 'DEVICE_CHANGED' : 'SESSION_ENDED',
+          );
         }
       }
     } catch (error) {
