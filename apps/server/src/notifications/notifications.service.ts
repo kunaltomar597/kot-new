@@ -251,7 +251,9 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     return open.length;
   }
 
-  async list(principal: Principal): Promise<AlertListResponse> {
+  async list(
+    principal: Pick<Principal, 'restaurantId' | 'staffId' | 'role'>,
+  ): Promise<AlertListResponse> {
     const alerts = await this.prisma.alert.findMany({
       where: {
         restaurantId: principal.restaurantId,
@@ -316,7 +318,10 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** NTF-004: acknowledged by a recipient, a manager or the Owner, on any device. */
-  async acknowledge(principal: Principal, alertId: string): Promise<AlertView> {
+  async acknowledge(
+    principal: Pick<Principal, 'restaurantId' | 'staffId' | 'role'>,
+    alertId: string,
+  ): Promise<AlertView> {
     return this.prisma.transaction(async (tx) => {
       const [alert] = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM alerts WHERE id = ${alertId}::uuid AND restaurant_id = ${principal.restaurantId}::uuid

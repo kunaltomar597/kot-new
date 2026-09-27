@@ -55,6 +55,14 @@ import {
   NotifyManagerResponse,
 } from './kds.js';
 import { MenuImportReport, MenuImportRequest, MenuTemplateResponse } from './menu-import.js';
+import {
+  AssignPagerRequest,
+  CreatePagerRequest,
+  PagerCredentialResponse,
+  PagerListResponse,
+  PagerParams,
+  PagerView,
+} from './pagers.js';
 import { PhotoRenditionParams, PhotoView, UploadPhotoRequest } from './photos.js';
 import { CloseDayRequest, DayEndParams, DayEndPreview, DayEndView } from './day-end.js';
 import {
@@ -1771,6 +1779,73 @@ export const ROUTES = [
     responses: {
       200: { description: 'The break state.', schema: BreakView },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'listPagers',
+    method: 'GET',
+    path: '/api/v1/pagers',
+    summary: "The restaurant's pagers with wearer, battery, signal and connection",
+    tags: ['pagers'],
+    requirements: ['PGR-007', 'PGR-012'],
+    capability: 'DEVICE_PAIR',
+    responses: {
+      200: { description: 'Pagers.', schema: PagerListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'createPager',
+    method: 'POST',
+    path: '/api/v1/pagers',
+    summary: 'Register a pager by its serial and get the credential to write into it',
+    description:
+      'PGR-012, SEC-012: a unique MQTT credential per pager, shown only in this answer (stored ' +
+      'hashed). The pager may read only its own alerts topic and write only its own ack and ' +
+      'heartbeat topics. Audited.',
+    tags: ['pagers'],
+    requirements: ['PGR-005', 'PGR-012', 'SEC-012', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { body: CreatePagerRequest },
+    responses: {
+      201: { description: 'The pager and its credential.', schema: PagerCredentialResponse },
+      ...standardErrors,
+      409: { description: 'A pager with this serial is already registered.', schema: ApiError },
+      422: { description: 'The wearer is not active staff here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'rotatePagerCredential',
+    method: 'POST',
+    path: '/api/v1/pagers/:deviceId/credential',
+    summary: 'Issue a new credential for a pager; the old one stops working at once',
+    tags: ['pagers'],
+    requirements: ['SEC-012', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { params: PagerParams },
+    responses: {
+      200: { description: 'The new credential.', schema: PagerCredentialResponse },
+      ...standardErrors,
+      404: { description: 'No such pager.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'assignPager',
+    method: 'PUT',
+    path: '/api/v1/pagers/:deviceId/wearer',
+    summary: 'Give a pager to a waiter or manager, or take it back',
+    description:
+      "PGR-012, PGR-014: effective at once; the pager's open alerts are sent again for the new " +
+      'wearer. A person wears one pager: giving them this one takes any other from them. Audited.',
+    tags: ['pagers'],
+    requirements: ['PGR-012', 'PGR-014', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { params: PagerParams, body: AssignPagerRequest },
+    responses: {
+      200: { description: 'The pager.', schema: PagerView },
+      ...standardErrors,
+      404: { description: 'No such pager.', schema: ApiError },
+      422: { description: 'The wearer is not active staff here.', schema: ApiError },
     },
   },
   {

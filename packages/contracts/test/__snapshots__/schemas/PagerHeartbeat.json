@@ -1,0 +1,22 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "battery": { "type": "integer", "minimum": 0, "maximum": 100 },
+      "rssi": { "type": "integer", "minimum": -127, "maximum": 0 },
+      "firmware": { "type": "string", "minLength": 1, "maxLength": 32 }
+    },
+    "required": ["battery", "rssi", "firmware"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "battery": { "type": "integer", "minimum": 0, "maximum": 100 },
+      "rssi": { "type": "integer", "minimum": -127, "maximum": 0 },
+      "firmware": { "type": "string", "minLength": 1, "maxLength": 32 }
+    },
+    "required": ["battery", "rssi", "firmware"],
+    "additionalProperties": false
+  }
+}

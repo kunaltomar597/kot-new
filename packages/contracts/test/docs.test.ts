@@ -157,9 +157,20 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
     });
     const doc = buildAsyncApi({
       ...options,
+      // Only what the event needs; the full package also documents the pager topics.
+      namespace: { Id: contracts.Id },
       events: z.discriminatedUnion('type', [Inline]),
     }) as unknown as Doc;
     expect(Object.keys(doc.components.schemas)).toEqual(['Id', 'SomethingHappened']);
+  });
+
+  it('[PGR-005] documents the pager topics and their messages', () => {
+    expect(Object.keys(asyncapi.channels)).toEqual(
+      expect.arrayContaining(['pagerAlerts', 'pagerAck', 'pagerHeartbeat']),
+    );
+    expect(Object.keys(asyncapi.components.schemas)).toEqual(
+      expect.arrayContaining(['PagerAlertMessage', 'PagerAckMessage', 'PagerHeartbeat']),
+    );
   });
 
   it('rejects events without literal type and version', () => {

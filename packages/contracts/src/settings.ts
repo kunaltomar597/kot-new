@@ -445,6 +445,29 @@ export const SETTINGS = [
     unit: 'percent',
   }),
   setting({
+    key: 'pagers.heartbeatSeconds',
+    schema: int(10, 120),
+    defaultValue: 30,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'How often a pager reports in; three missed heartbeats and it counts as offline.',
+    requirements: ['PGR-007'],
+    unit: 'seconds',
+  }),
+  setting({
+    key: 'pagers.vibration',
+    schema: z.partialRecord(
+      NotificationEventType,
+      z.enum(['ONE_LONG', 'TWO_SHORT', 'THREE', 'ONE_SHORT']),
+    ),
+    defaultValue: {},
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Changes to the pager vibration per alert type (ready: one long; requests: two short; manager: three).',
+    requirements: ['PGR-006'],
+  }),
+  setting({
     key: 'kds.ageAmberMinutes',
     schema: int(1, 120),
     defaultValue: 10,

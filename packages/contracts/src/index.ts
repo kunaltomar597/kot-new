@@ -15,6 +15,7 @@ export * from './restaurant.js';
 export * from './billing.js';
 export * from './day-end.js';
 export * from './events.js';
+export * from './pagers.js';
 export * from './payments.js';
 export * from './photos.js';
 export * from './reports.js';
