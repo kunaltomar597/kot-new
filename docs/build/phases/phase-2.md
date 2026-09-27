@@ -46,7 +46,7 @@ P2-01 is split in three.
 - `MenuCache`: works offline, refreshes on a newer version or on reconnect, and applies
   availability changes.
 
-### P2-01b React Native component library
+### P2-01b React Native component library (done)
 
 `packages/ui-native`: PinPad, Button, Sheet, Toast, StatusChip, menu item card, variant/modifier
 popup and combo picker using `@rp/domain` menu-selection, with the same tokens as `ui-web`.

@@ -56,6 +56,9 @@ What exists:
   account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a). 8 tests.
+- `packages/ui-native`: the React Native component library with the same props and tokens as
+  `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
+  pickers) (P2-01b). 23 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -78,7 +81,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-01b React Native component library (P2-01a done).
+- P2-01c Expo apps, builds and smoke flows (P2-01a and P2-01b done).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -145,7 +148,7 @@ Recommended next WPs (dependencies met):
 ### Phase 2: Waiter app, notifications, pagers
 
 - [x] P2-01a Mobile core (credentials, outbox, menu cache)
-- [ ] P2-01b React Native component library
+- [x] P2-01b React Native component library
 - [ ] P2-01c Expo apps, builds and smoke flows
 - [ ] P2-02 Waiter app: tables and order taking
 - [x] P2-03a Notification engine core
@@ -456,6 +459,24 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-09-26 (P2-01b):
+
+112. `@rp/ui-native` mirrors the `@rp/ui-web` props and takes the same `UiStrings` shape (the
+     `ui.*` catalogue keys, minus the number pad and toast region). Symbols are drawn with text
+     glyphs next to words, so the apps need no icon font; a vector icon set can replace them later
+     without changing any props.
+113. The native library is tested with Jest and React Native Testing Library, not Vitest, because
+     React Native ships Flow sources; Jest maps the workspace packages to their `dist/` builds.
+
+Decided 2026-09-26 (P2-01a):
+
+110. Unsent submissions are sent oldest first and a flush stops at the first network failure, so a
+     later order never overtakes an earlier one. A refused submission stays on the device with its
+     reason until corrected or dismissed; nothing is dropped silently (WTR-012).
+111. Device credentials live only in the secure store (Android Keystore through
+     `expo-secure-store`), written back on every token rotation and cleared when the device is
+     revoked (AUTH-007, SEC-010).
+
 Decided 2026-09-26 (P2-04a):
 
 105. A pager signs in to MQTT with its device id and its own secret. The secret is issued when a
@@ -632,6 +653,25 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-26: P2-01b React Native component library
+
+Built `packages/ui-native`, matching `@rp/ui-web` props and tokens: Button, Money, StatusChip,
+PinPad, Sheet, ToastProvider/useToast, MenuItemCard, QuantityStepper, ChoiceGroup, ItemOptions and
+ComboChoices, plus `ThemeProvider` (theme and restaurant accent) and `UiStringsProvider`.
+
+Tests: 23 (Jest + React Native Testing Library), 100 % lines, 94 % branches.
+
+Gotchas:
+
+- React Native 0.87 has no Jest preset inside `react-native`; it is `@react-native/jest-preset`.
+- RNTL 14's `render` and `fireEvent` are async: always `await` them.
+- The preset's resolver ignores `exports`, so `jest.config.cjs` maps `@rp/design-tokens` and
+  `@rp/domain` to their `dist/` builds (build them first).
+- A `View` needs `accessible` to be found by role; elements hidden from accessibility need
+  `includeHiddenElements: true` in queries.
+
+Decisions: 112 and 113.
 
 ### 2026-09-26: docs review of PROGRESS.md and the server README
 
