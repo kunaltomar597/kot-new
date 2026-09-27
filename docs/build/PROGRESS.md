@@ -17,8 +17,9 @@ What exists:
   import planning (P1-05), notification rules (P2-03a) and pager rules (P2-04a), including the
   low-battery check (P2-02a), what reaches a pager and the waiter app (P2-06a), what asks for
   a person at the POS or dashboard (P2-06c), service requests' alerts, Resolve and the asker
-  who is not alerted (P2-06d), and recommendations: rules, best sellers by daypart, filters,
-  course order and reasons (P3-04). 198 tests.
+  who is not alerted (P2-06d), recommendations: rules, best sellers by daypart, filters,
+  course order and reasons (P3-04), and the live order feed's late dishes, filters and summary
+  (P4-01). 208 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -32,8 +33,8 @@ What exists:
   `KotPrintStatusChanged` (P2-02b); dishes ready at the pass per table on the overview (P2-02c);
   the pairing QR code with the server's addresses and CA fingerprint (P2-01d); a waiter phone's
   own alerts (P2-06a); service requests, their routes and `ServiceRequestEscalated` (P2-06d);
-  suggestions, their tracking, the rules and the suggestion an order line came from (P3-04).
-  518 tests.
+  suggestions, their tracking, the rules and the suggestion an order line came from (P3-04);
+  the manager dashboard's live order feed (P4-01). 524 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -67,8 +68,9 @@ What exists:
   table tablet with anti-spam and a rate limit, their alerts kept in step, the waiter's inbox,
   requests ended when the table closes, and a bill asker who is not alerted (P2-06d); the
   recommendation engine for the tablet and the phones, with best sellers by daypart, the rules
-  API, and impressions, taps, adds and orders tracked (P3-04).
-  700 tests (4 skipped without a real install).
+  API, and impressions, taps, adds and orders tracked (P3-04); the dashboard's live order feed
+  (P4-01).
+  707 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -123,7 +125,9 @@ What exists:
   discounts with manager approval, payments and shifts on the POS (P1-12a); split bills, void,
   edit after print and the day-end screen (P1-12b); the alert centre on the POS and the
   dashboard, live, with Acknowledge, a count of what asks for the person and toasts, and the
-  manager's nudge to waiters (P2-06c). 105 tests, and 11 Playwright steps.
+  manager's nudge to waiters (P2-06c); the manager dashboard's navigation, overview with the
+  live floor and the live order feed with its filters, from a 360 px phone to a desktop
+  (P4-01). 124 tests, and 12 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -137,7 +141,10 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-01 Dashboard shell and live views (P0-14, P1-02 and P1-06 done).
+- P4-02 Staff, device and menu management UI (P4-01, P1-03 and P0-11 done).
+- P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
+- P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
+- P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
@@ -234,7 +241,7 @@ Recommended next WPs (dependencies met):
 
 ### Phase 4: Manager dashboard and reports
 
-- [ ] P4-01 Dashboard shell and live views
+- [x] P4-01 Dashboard shell and live views
 - [ ] P4-02 Staff, device and menu management UI
 - [ ] P4-03 Configuration screens
 - [ ] P4-04 Alert centre and system screen
@@ -522,6 +529,35 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-27 (P4-01):
+
+188. The live order feed (MGR-003) holds every order with a dish waiting for approval, sent,
+     being prepared or ready; picked-up and served dishes stay on their order but need nothing
+     more. A dine-in order leaves the feed when its table closes, a takeaway at the end of its
+     business date; the newest 300 are kept. Closed and older orders are for the reports (P4-05).
+189. "Delayed" uses the kitchen's own thresholds, so the dashboard and the kitchen display agree
+     and no new setting is needed: a dish in the kitchen is late at its published prep time since
+     it was sent (when the menu gives one above 0), else at `kds.ageRedMinutes` (KDS-004); a
+     ready dish is late at the pass after `kds.readyNotCollectedMinutes` (KDS-006). Ages use the
+     server's clock, moved on between reads; seated times on the floor use the screen's clock,
+     like the POS.
+190. The feed counts dishes as lines, not quantities ("3 × Butter Naan" is one dish), and leaves
+     combo lines out: the kitchen cooks the parts, which say "Part of Veg Thali Combo".
+191. An order's waiter is its table's waiter, else whoever took it (a takeaway's cashier), so the
+     waiter filter covers takeaways too. The stations offered are the unarchived ones; the waiters
+     are those serving now (open tables and live orders).
+192. The dashboard and its feed are for the Owner and Managers (MGR-001), through the existing
+     OPERATIONS_CONFIGURE capability; no new capability.
+193. The dashboard has three pages for now: Overview (at a glance, and the POS's floor read-only),
+     Orders and Alerts; P4-02 to P4-07 add theirs. On the floor an occupied table opens its orders
+     and a free table is disabled: tables are opened on the POS. The feed's filters live in the
+     page's address, so a filtered view survives a reload and can be linked; a station or waiter
+     no longer offered is dropped rather than applied unseen.
+194. The browser test checks every dashboard page with axe-core's WCAG 2.2 A and AA rules,
+     colour contrast included, at desktop size and at 360 px, where nothing may scroll sideways.
+     axe is evaluated through the browser's debugging protocol because the server's Content
+     Security Policy (rightly) refuses inline scripts.
 
 Decided 2026-09-27 (P3-04):
 
@@ -1022,6 +1058,36 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-27: P4-01 Dashboard shell and live views
+
+Merged #62 (P3-04) once green, with two CI fixes merged first: #63 (a waiter phone's socket said
+DEVICE_CHANGED instead of SESSION_ENDED when the sign-out landed between the realtime sweep's two
+reads; the sweep now reads the sessions again before choosing) and #64 (the UI library's tests
+get 20 s, like the console's, after one took 5.1 s on a busy runner).
+
+Built: `@rp/domain` `order-feed.ts` (live states, `itemDelay`, `filterOrderFeed`,
+`summarizeOrderFeed`); contracts `OrderFeedResponse` and the `getOrderFeed` route; the server's
+`OrderFeedService` and `MenuPublishService.published`; the console's dashboard (`src/manage/`:
+navigation, overview with the live floor, the order feed with filters in the address) with its
+styles; `TableTile` `toggle`; `dashboard.*` strings.
+
+Tests: domain 208 (was 198), contracts 524 (was 518), server 707 (was 700), console 124
+(was 105), ui-web 100, and 12 Playwright steps (was 11), including the dashboard on a desktop and
+a 360 px phone with axe.
+
+Gotchas:
+
+- The console's Content Security Policy blocks `page.addScriptTag`: evaluate a library's source
+  with `page.evaluate(source)` instead.
+- Screen tests build the floor's seated times from the real clock (`Date.now()`), but the order
+  feed's times from its `serverTime`: mixing them makes "30 min" read as a day.
+- `/manage` now opens the overview: tests of the alert centre go to `/manage/alerts`.
+
+Deferred: management, configuration, the alert centre's additions and system screen, reports,
+exports and the audit viewer (P4-02 to P4-07).
+
+Decisions: 188 to 194.
 
 ### 2026-09-27: P3-04 Recommendation engine v1
 

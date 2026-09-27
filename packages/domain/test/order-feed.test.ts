@@ -42,9 +42,11 @@ describe('[MGR-003] which items are late', () => {
       allowedMinutes: 12,
     });
     // Waiting to be started counts the same as cooking: the clock runs from when it was sent.
-    expect(itemDelay({ ...tikka, state: 'PREPARING', sentAt: ago(15) }, NOW, thresholds)).toEqual(
-      { kind: 'KITCHEN', minutes: 15, allowedMinutes: 12 },
-    );
+    expect(itemDelay({ ...tikka, state: 'PREPARING', sentAt: ago(15) }, NOW, thresholds)).toEqual({
+      kind: 'KITCHEN',
+      minutes: 15,
+      allowedMinutes: 12,
+    });
   });
 
   it('uses the kitchen display’s red age for a dish with no prep time', () => {
@@ -70,7 +72,13 @@ describe('[MGR-003] which items are late', () => {
   });
 
   it('never marks what is out of the kitchen’s hands, or not sent yet', () => {
-    for (const state of ['PENDING_APPROVAL', 'PICKED_UP', 'SERVED', 'CANCELLED', 'VOIDED'] as const) {
+    for (const state of [
+      'PENDING_APPROVAL',
+      'PICKED_UP',
+      'SERVED',
+      'CANCELLED',
+      'VOIDED',
+    ] as const) {
       expect(itemDelay(item({ state, sentAt: ago(90), readyAt: ago(60) }), NOW, thresholds)).toBe(
         null,
       );
@@ -121,9 +129,7 @@ describe('[MGR-003] the live order feed and its filters', () => {
   });
 
   it('filters by source, waiter and table, keeping the feed’s order', () => {
-    expect(ids(filterOrderFeed(feed, { source: 'TABLE_TABLET' }, NOW, thresholds))).toEqual([
-      't2',
-    ]);
+    expect(ids(filterOrderFeed(feed, { source: 'TABLE_TABLET' }, NOW, thresholds))).toEqual(['t2']);
     expect(ids(filterOrderFeed(feed, { waiterId: 'ravi' }, NOW, thresholds))).toEqual([
       't1',
       'takeaway',
@@ -148,9 +154,9 @@ describe('[MGR-003] the live order feed and its filters', () => {
 
   it('shows only the late orders when asked, per station', () => {
     expect(ids(filterOrderFeed(feed, { delayedOnly: true }, NOW, thresholds))).toEqual(['t1']);
-    expect(
-      filterOrderFeed(feed, { delayedOnly: true, stationId: 'bar' }, NOW, thresholds),
-    ).toEqual([]);
+    expect(filterOrderFeed(feed, { delayedOnly: true, stationId: 'bar' }, NOW, thresholds)).toEqual(
+      [],
+    );
     const later = NOW + 3 * 60_000;
     expect(
       ids(filterOrderFeed(feed, { delayedOnly: true, stationId: 'bar' }, later, thresholds)),
