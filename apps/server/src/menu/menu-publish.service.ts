@@ -281,24 +281,10 @@ export class MenuPublishService {
    * order engine and recommendations read the menu on every call (NFR-P01, REC-011).
    */
   async current(restaurantId: string): Promise<MenuSnapshot> {
-    const latest = await this.prisma.menuVersion.findFirst({
-      where: { restaurantId },
-      orderBy: { version: 'desc' },
-      select: { id: true },
-    });
-    if (latest === null) {
+    const snapshot = await this.published(restaurantId);
+    if (snapshot === null) {
       throw new AppError(404, 'MENU_NOT_PUBLISHED', 'No menu has been published yet.');
     }
-    let parsed = this.parsed.get(restaurantId);
-    if (parsed?.id !== latest.id) {
-      const row = await this.prisma.menuVersion.findUniqueOrThrow({
-        where: { id: latest.id },
-        select: { snapshot: true },
-      });
-      parsed = { id: latest.id, snapshot: MenuSnapshot.parse(row.snapshot) };
-      this.parsed.set(restaurantId, parsed);
-    }
-    const { snapshot } = parsed;
     const live = await this.prisma.item.findMany({
       where: { id: { in: snapshot.items.map((item) => item.id) } },
       select: { id: true, available: true, trackStock: true, stockLevel: true },
@@ -316,6 +302,29 @@ export class MenuPublishService {
         };
       }),
     };
+  }
+
+  /**
+   * The latest published menu exactly as published, without live availability, or null before the
+   * first publish. For readers that need its fixed content only, such as prep times (P4-01).
+   */
+  async published(restaurantId: string): Promise<MenuSnapshot | null> {
+    const latest = await this.prisma.menuVersion.findFirst({
+      where: { restaurantId },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    });
+    if (latest === null) return null;
+    let parsed = this.parsed.get(restaurantId);
+    if (parsed?.id !== latest.id) {
+      const row = await this.prisma.menuVersion.findUniqueOrThrow({
+        where: { id: latest.id },
+        select: { snapshot: true },
+      });
+      parsed = { id: latest.id, snapshot: MenuSnapshot.parse(row.snapshot) };
+      this.parsed.set(restaurantId, parsed);
+    }
+    return parsed.snapshot;
   }
 
   /** Locks an active item row and reads its availability (the order engine checks stock with it). */

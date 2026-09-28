@@ -37,6 +37,23 @@ describe('[TBL-007] [NFR-U05] TableTile', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('can be a plain button that goes somewhere, without a pressed state', async () => {
+    const onSelect = vi.fn();
+    const { user } = renderUi(
+      <TableTile
+        label="T2"
+        state="OCCUPIED"
+        stateLabel="Occupied"
+        toggle={false}
+        onSelect={onSelect}
+      />,
+    );
+    const tile = screen.getByRole('button', { name: 'T2, Occupied' });
+    expect(tile).not.toHaveAttribute('aria-pressed');
+    await user.click(tile);
+    expect(onSelect).toHaveBeenCalledOnce();
+  });
+
   it('shows a free table without amount, and can be disabled', () => {
     renderUi(<TableTile label="T1" state="FREE" stateLabel="Free" disabled />);
     const tile = screen.getByRole('button', { name: 'T1, Free' });

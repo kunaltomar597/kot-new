@@ -65,6 +65,7 @@ import {
   PagerParams,
   PagerView,
 } from './pagers.js';
+import { OrderFeedResponse } from './order-feed.js';
 import { PhotoRenditionParams, PhotoView, UploadPhotoRequest } from './photos.js';
 import { CloseDayRequest, DayEndParams, DayEndPreview, DayEndView } from './day-end.js';
 import {
@@ -336,6 +337,25 @@ export const ROUTES = [
       200: { description: 'The order.', schema: OrderView },
       ...standardErrors,
       404: { description: 'No such order.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getOrderFeed',
+    method: 'GET',
+    path: '/api/v1/order-feed',
+    summary: 'The live order feed: every order with something waiting, cooking or at the pass',
+    description:
+      'For the manager dashboard (MGR-001, MGR-003): orders with an item waiting for approval, ' +
+      'sent, being prepared or ready, oldest first, each with its items, stations, states and ' +
+      'times. Dine-in orders leave with their table; takeaway orders with their business date. ' +
+      'The dashboard filters by station, waiter, source and table, and marks late items with ' +
+      '`@rp/domain` `itemDelay` from `settings` and `serverTime`.',
+    tags: ['orders'],
+    requirements: ['MGR-001', 'MGR-003'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The live orders.', schema: OrderFeedResponse },
+      ...standardErrors,
     },
   },
   {

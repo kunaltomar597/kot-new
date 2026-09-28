@@ -110,7 +110,6 @@ export const en = {
         system: 'Devices and system',
       },
       groupHeading: '{group} ({count})',
-      dashboardLater: 'The rest of the dashboard arrives in a later update.',
     },
     /** A manager's message to waiters' pagers and phones (P2-06c, NTF-008). */
     nudge: {
@@ -307,6 +306,72 @@ export const en = {
     kds: 'Kitchen display',
     manage: 'Manage',
     notAllowed: 'Your role cannot open {mode}.',
+  },
+  /** The manager dashboard (P4-01, MGR-001 to MGR-003, MGR-011). */
+  dashboard: {
+    navigation: 'Dashboard',
+    section: {
+      overview: 'Overview',
+      orders: 'Orders',
+      alerts: 'Alerts',
+    },
+    overview: {
+      glance: 'At a glance',
+      tables: 'Tables',
+      occupied: '{occupied} of {total} tables occupied',
+      guests: '{count, plural, one {# guest seated} other {# guests seated}}',
+      orders:
+        '{count, plural, =0 {No orders in progress} one {# order in progress} other {# orders in progress}}',
+      inKitchen:
+        '{count, plural, =0 {Nothing in the kitchen} one {# dish in the kitchen} other {# dishes in the kitchen}}',
+      awaiting:
+        '{count, plural, one {# dish waiting for approval} other {# dishes waiting for approval}}',
+      ready:
+        '{count, plural, =0 {Nothing waiting at the pass} one {# dish ready at the pass} other {# dishes ready at the pass}}',
+      delayed:
+        '{count, plural, =0 {Nothing delayed} one {# dish delayed} other {# dishes delayed}}',
+      alerts: '{count, plural, =0 {No open alerts} one {# open alert} other {# open alerts}}',
+      seeOrders: 'See orders',
+      seeDelayed: 'See delayed dishes',
+      seeAlerts: 'See alerts',
+      floor: 'Floor',
+      noTables: 'No tables yet. They are added in the floor settings.',
+      tableHint: 'Select a table to see its orders.',
+    },
+    orders: {
+      title: 'Orders in progress',
+      summary:
+        '{orders, plural, one {# order} other {# orders}} · {ready, plural, one {# dish ready} other {# dishes ready}} · {delayed} delayed',
+      filters: 'Filters',
+      station: 'Station',
+      allStations: 'All stations',
+      waiter: 'Waiter',
+      allWaiters: 'All waiters',
+      source: 'Source',
+      allSources: 'All sources',
+      delayedOnly: 'Delayed only',
+      table: 'Showing table {table}',
+      allTables: 'All tables',
+      clear: 'Clear filters',
+      none: 'Nothing in the kitchen right now. New orders show here as they come in.',
+      noneMatch: 'No orders in progress match these filters.',
+      order: 'Order {number}',
+      atTable: 'Table {table}',
+      token: 'Token {token}',
+      takeaway: 'Takeaway',
+      waiterName: 'Waiter: {name}',
+      placed: '{minutes, plural, =0 {Placed just now} other {Placed # min ago}}',
+      line: '{quantity} × {name}',
+      inCombo: 'Part of {combo}',
+      sinceSent: '{minutes} min since sent',
+      readyFor: 'Ready for {minutes} min',
+      late: {
+        KITCHEN: 'Late: {minutes} min in the kitchen, expected {allowed}',
+        PASS: 'Waiting at the pass for {minutes} min',
+      },
+      delayed: 'Delayed',
+      loadFailed: 'The orders could not be loaded.',
+    },
   },
   pos: {
     tables: 'Tables',

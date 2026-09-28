@@ -636,25 +636,6 @@ body {
   margin-inline-start: var(--rp-space-2);
 }
 
-.manage-home {
-  display: flex;
-  flex-direction: column;
-  gap: var(--rp-space-4);
-  max-width: 56rem;
-}
-
-.manage-home__heading {
-  margin: 0;
-  font-size: var(--rp-font-size-xl);
-  font-weight: var(--rp-font-weight-semibold);
-}
-
-.manage-home__later {
-  margin: 0;
-  color: var(--rp-color-text-muted);
-  font-size: var(--rp-font-size-sm);
-}
-
 .alert-centre {
   display: flex;
   flex-direction: column;
@@ -750,4 +731,276 @@ body {
   margin-bottom: var(--rp-space-2);
   padding: 0;
   font-weight: var(--rp-font-weight-semibold);
+}
+
+/*
+ * The manager dashboard (P4-01, MGR-001, MGR-011): its pages beside the navigation on a wide
+ * screen, under it on a phone. Nothing is wider than a 360 px screen, so the page never scrolls
+ * sideways; late dishes carry an icon and words as well as colour (NFR-U05).
+ */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-5);
+  min-width: 0;
+}
+
+.dashboard__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+}
+
+.dashboard__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--rp-touch-min);
+  padding: 0 var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface);
+  color: var(--rp-color-text);
+  font-weight: var(--rp-font-weight-medium);
+  text-decoration: none;
+}
+
+.dashboard__link:hover {
+  border-color: var(--rp-color-border-strong);
+}
+
+.dashboard__link[aria-current='page'] {
+  border-color: var(--rp-color-primary);
+  background: var(--rp-color-primary);
+  color: var(--rp-color-on-primary);
+}
+
+.dashboard__link:focus-visible,
+.glance-card__link:focus-visible {
+  outline: 3px solid var(--rp-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.dashboard__content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--rp-space-6);
+  min-width: 0;
+}
+
+@media (min-width: 60rem) {
+  .dashboard {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .dashboard__nav {
+    position: sticky;
+    top: var(--rp-space-4);
+    flex: 0 0 12rem;
+    flex-direction: column;
+  }
+}
+
+.dashboard-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-4);
+  min-width: 0;
+}
+
+.dashboard-section__heading {
+  margin: 0;
+  font-size: var(--rp-font-size-xl);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.dashboard-section__hint {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
+.dashboard-glance {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.glance-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  padding: var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+}
+
+.glance-card__title {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.glance-card__value {
+  margin: 0;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.glance-card__line {
+  display: flex;
+  align-items: center;
+  gap: var(--rp-space-1);
+  margin: 0;
+}
+
+.glance-card__line[data-delayed] {
+  color: var(--rp-color-danger-text);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.glance-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--rp-space-4);
+  margin: 0;
+}
+
+.glance-card__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--rp-touch-min);
+  color: var(--rp-color-primary);
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.dashboard-feed__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  align-items: end;
+  gap: var(--rp-space-3);
+}
+
+.dashboard-feed__table {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+  margin: 0;
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.dashboard-feed__summary {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
+.dashboard-feed__orders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feed-order {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  height: 100%;
+  padding: var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+  box-sizing: border-box;
+}
+
+.feed-order[data-delayed] {
+  border-color: var(--rp-color-danger);
+  border-inline-start-width: 4px;
+}
+
+.feed-order__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-2);
+}
+
+.feed-order__title {
+  margin: 0;
+  font-size: var(--rp-font-size-md);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.feed-order__meta {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.feed-order__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feed-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-1) var(--rp-space-3);
+  padding-block-start: var(--rp-space-2);
+  border-block-start: 1px solid var(--rp-color-border);
+}
+
+.feed-line__name {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-weight: var(--rp-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.feed-line__where {
+  flex: 1 1 8rem;
+  min-width: 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.feed-line__time {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: var(--rp-space-1);
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.feed-line[data-delayed] .feed-line__time {
+  color: var(--rp-color-danger-text);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+/* A phone's width is for content, not margins (MGR-011). */
+@media (max-width: 40rem) {
+  .console-main {
+    padding: var(--rp-space-4);
+  }
+
+  .console-header {
+    padding: var(--rp-space-3) var(--rp-space-4);
+  }
 }

@@ -5,6 +5,7 @@ import {
   OrderItemParams,
   OrderItemStatusRequest,
   type OrderListResponse,
+  type OrderFeedResponse,
   OrderParams,
   type OrderView,
   SubmitOrderRequest,
@@ -16,6 +17,7 @@ import { RequireCapability, RequireSession } from '../auth/decorators.js';
 import { actorOf, type AuthenticatedRequest, type Principal } from '../auth/principal.js';
 import { AppError } from '../errors/app-error.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { OrderFeedService } from './order-feed.service.js';
 import { OrderItemsService } from './order-items.service.js';
 import { OrdersService } from './orders.service.js';
 
@@ -144,5 +146,17 @@ export class OrderItemsController {
     @Body(new ZodValidationPipe(ModifyOrderItemRequest)) body: ModifyOrderItemRequest,
   ): Promise<OrderView> {
     return this.items.modify(principalOf(request), params.orderItemId, body);
+  }
+}
+
+/** The manager dashboard's live order feed (P4-01, MGR-003): managers and owners (MGR-001). */
+@Controller('order-feed')
+export class OrderFeedController {
+  constructor(private readonly feed: OrderFeedService) {}
+
+  @Get()
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  get(@Req() request: AuthenticatedRequest): Promise<OrderFeedResponse> {
+    return this.feed.feed(principalOf(request).restaurantId);
   }
 }

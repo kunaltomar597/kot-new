@@ -5,8 +5,8 @@ role-based modes:
 
 - POS (`/pos`): tables, order entry, billing, shifts, day-end (Phase 1);
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
-- Manager dashboard (`/manage`): the alert centre (P2-06c); live views, management,
-  configuration, reports (Phase 4).
+- Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c);
+  management, configuration, reports (Phase 4).
 
 Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
 `@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
@@ -55,6 +55,20 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   toast. Managers nudge waiters from there (`NudgeDialog`): waiters from the staff tiles, the
   quick messages from `notifications.nudgePresets`, or up to 40 characters of their own. The
   kitchen display has no alerts button.
+- Manager dashboard (`/manage`, P4-01, MGR-001 to MGR-003, MGR-011): `src/manage/ManageHome.tsx`
+  has three pages, Overview (`/manage`), Orders (`/manage/orders`) and Alerts (`/manage/alerts`,
+  the alert centre), with the navigation beside them from 60rem and above them on a phone.
+  `Overview.tsx` shows the restaurant at a glance (tables occupied and guests, orders, dishes
+  waiting for approval, in the kitchen, ready and late, open alerts, with links to the orders, the
+  late dishes and the alerts) and the live floor from the POS's overview; an occupied table opens
+  its orders, a free one is disabled. `OrderFeedScreen.tsx` lists every order in progress oldest
+  first, each dish with its station, combo, state and time, filtered by station, waiter, source,
+  table and "Delayed only". The filters live in the address (`?station=&waiter=&source=&table=
+&label=&delayed=1`, `order-feed-view.ts`), so a filtered view survives a reload and the
+  overview can link to a table; a station or waiter the feed no longer offers is dropped. Late
+  dishes (`itemDelay` in `@rp/domain`, on the server's clock moved on between reads) and their
+  orders carry a badge, an icon and words, not colour alone (NFR-U05). Both pages read again after
+  order, kitchen, table, menu and settings events and after a reconnect.
 - `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
   screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
 
@@ -71,6 +85,9 @@ pnpm --filter @rp/console e2e          Playwright against the built server and c
 
 The e2e tests (`e2e/`) start PostgreSQL, seed it, run `apps/server/dist/main.js` with the built
 console, pair a real Chromium, sign each role in and stop and restart the server to check the
-offline banner; then they walk through the floor, orders, the kitchen display, billing and a
-manager's nudge acknowledged in the alert centre. In cloud sessions they use the preinstalled Chromium (`/opt/pw-browsers`); CI
-installs Playwright's own.
+offline banner; then they walk through the floor, orders, the kitchen display, the manager
+dashboard on a desktop and a 360 px phone (no sideways scrolling, and axe-core's WCAG 2.2 A and
+AA rules, colour contrast included, on each page), billing and a manager's nudge acknowledged in
+the alert centre. axe runs through the browser's debugging protocol, since the server's Content
+Security Policy refuses inline scripts. In cloud sessions they use the preinstalled Chromium
+(`/opt/pw-browsers`); CI installs Playwright's own.

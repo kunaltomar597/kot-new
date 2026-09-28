@@ -7,13 +7,45 @@ browsers (phone, laptop) for Manager and Owner roles only.
 
 ---
 
-## P4-01 Dashboard shell and live views
+## P4-01 Dashboard shell and live views (done)
 
 Requirements: MGR-001, MGR-002, MGR-003, MGR-011, NFR-U05 (WCAG 2.2 AA).
 Depends on: P0-14, P1-02, P1-06.
 Deliverables: responsive layout (360 px phone to desktop), navigation, live table overview, live order
 feed with kitchen status filterable by station, waiter and source, delayed items highlighted.
 Acceptance: Playwright on phone and desktop viewports; axe accessibility checks pass.
+
+As built:
+
+- `@rp/domain` `order-feed.ts`: `LIVE_ITEM_STATES` (waiting for approval, sent, preparing, ready),
+  `itemDelay` (in the kitchen at least the dish's prep time since it was sent, or
+  `kds.ageRedMinutes` when it has none; at the pass for `kds.readyNotCollectedMinutes`),
+  `minutesSince`, `filterOrderFeed` (a station keeps only its dishes; an order stays while a kept
+  dish is live; "Delayed only" keeps orders with a late kept dish; waiter, source and table) and
+  `summarizeOrderFeed` (orders, and dishes awaiting approval, in the kitchen, ready and late:
+  lines, not quantities).
+- Contracts `order-feed.ts`: `OrderFeedResponse` (orders with their dishes, the stations and
+  waiters to filter by, the two settings and the server's clock); route `getOrderFeed`
+  (`GET /api/v1/order-feed`, OPERATIONS_CONFIGURE: Owner and Manager).
+- Server `OrderFeedService`: orders with a live dish, a dine-in one while its table is open and a
+  takeaway on its business date, the newest 300, oldest first; rejected, cancelled and voided
+  dishes and combo lines left out (parts name their combo); prep times from the published menu;
+  the waiter is the table's, or for a takeaway whoever took it.
+- Console `src/manage/`: `ManageHome` (Overview, Orders, Alerts; the navigation beside the page
+  from 60rem, above it on a phone; unknown addresses go to the overview), `Overview` (at a glance:
+  tables and guests, orders, dishes waiting for approval, in the kitchen, ready and late, open
+  alerts, with links; the live floor, where an occupied table opens its orders and a free one is
+  disabled), `OrderFeedScreen` (filters kept in the address, a table named by its label, summary,
+  a card per order with a "Delayed" badge and icon, each dish with station, combo, state chip and
+  time in words). `@rp/ui-web` `TableTile` gained `toggle={false}` for tiles that open a page
+  (no `aria-pressed`). On screens up to 40rem the console's margins shrink.
+- Tests: domain (10), contracts (3), `order-feed.int.test.ts` (6: contents and order, following
+  the kitchen, delays and filters with the domain rules, prep times only from the published menu,
+  tables and business dates, 403 for waiter, cashier and kitchen, 401 without a person), console
+  (`dashboard.test.tsx` 13 with axe, `order-feed-view.test.ts` 6) and a Playwright step on a
+  desktop and a 360 px phone: glance, floor, a table's orders, station, source and "Delayed only"
+  filters with a dish backdated in the database, no sideways scrolling, and axe-core's WCAG 2.2 A
+  and AA rules with colour contrast in the real browser on every page.
 
 ## P4-02 Staff, device and menu management UI
 
@@ -48,7 +80,9 @@ Requirements: MGR-008, MGR-010, NFR-I03, DATA-006 (display), LIC-008 (display), 
 Depends on: P4-01; data sources arrive in P7 but the screens show placeholders until then.
 Deliverables: alert centre (escalations, kitchen flags, device and system alerts, acknowledge);
 system screen (storage usage, backup status, licence status and reminders, update status with
-"Install now", "Send diagnostics to support").
+"Install now", "Send diagnostics to support"). The alert centre itself exists (P2-06c) and is the
+dashboard's Alerts page (`/manage/alerts`, P4-01); this WP adds what the spec lists beyond it and
+the system screen as a fourth page.
 Acceptance: Playwright tests with seeded alerts.
 
 ## P4-05 Full report suite

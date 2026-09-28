@@ -9,6 +9,7 @@ export * from './menu.js';
 export * from './menu-admin.js';
 export * from './menu-import.js';
 export * from './order.js';
+export * from './order-feed.js';
 export * from './printing.js';
 export * from './realtime.js';
 export * from './restaurant.js';

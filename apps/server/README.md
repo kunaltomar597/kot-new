@@ -339,6 +339,15 @@ recommendations, sync, licensing, backup, updates and diagnostics.
   session's orders and today's open takeaway orders with their item states, for the POS.
 - `src/orders/order-items.service.ts` (P1-06b): status steps, cancel, void (override token) and
   modify. Kitchen-relevant changes always produce a CANCELLED or MODIFIED ticket (ORD-012).
+- `src/orders/order-feed.service.ts` (P4-01): `GET /api/v1/order-feed`, the manager dashboard's
+  live order feed (MGR-003, Owner and Manager only). Every order with a dish waiting for approval,
+  in the kitchen or at the pass: a dine-in order while its table is open, a takeaway on its
+  business date; the newest 300, oldest first. Each dish carries its station, state, times and
+  the published menu's prep time; combo lines are left out and their parts name the combo. The
+  answer also carries the stations and waiters to filter by, the `kds.ageRedMinutes` and
+  `kds.readyNotCollectedMinutes` settings and the server's clock, so the dashboard marks late
+  dishes with `@rp/domain` `itemDelay`. `MenuPublishService.published` reads the published
+  snapshot (null before the first publish), which `current` now uses.
 
 ## Printing (P1-07)
 
