@@ -13,6 +13,7 @@ import {
   PagerAckMessage,
   type PagerAlertMessage,
   PagerHeartbeat,
+  type PagerLocateMessage,
 } from '@rp/contracts';
 import {
   isLowBattery,
@@ -22,6 +23,7 @@ import {
   pagerMayPublish,
   pagerMaySubscribe,
   pagerTopic,
+  type PagerTopicKind,
   reachesPagerAndApp,
   vibrationFor,
 } from '@rp/domain';
@@ -66,7 +68,9 @@ function refused(): AuthenticateError {
  * - it may subscribe only to its own alerts topic and publish only its own ack and heartbeat;
  * - alerts reach the wearer's pager at QoS 1, and a reconnecting pager is sent every open alert of
  *   its wearer again (it de-duplicates by alert id and repeat number);
- * - heartbeats keep battery, signal and firmware; three missed heartbeats mark it offline.
+ * - heartbeats keep battery, signal and firmware; three missed heartbeats mark it offline;
+ * - an unpaired pager is disconnected at once and nothing it sends counts (AUTH-008);
+ * - a manager looking for a pager makes it vibrate through its locate topic (MGR-006).
  */
 @Injectable()
 export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
@@ -218,6 +222,11 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
       : null;
   }
 
+  /** MGR-006: whether the pager is connected to the broker now (it can be located). */
+  isDeviceConnected(deviceId: string): boolean {
+    return this.connected.has(deviceId);
+  }
+
   /** NTF-007: whether the person's pager is connected now. */
   isStaffConnected(restaurantId: string, staffId: string): boolean {
     for (const pager of this.connected.values()) {
@@ -245,7 +254,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
   /** PGR-007: marks pagers offline after three missed heartbeats. */
   async checkOffline(now: Date = this.clock.now()): Promise<number> {
     const online = await this.prisma.device.findMany({
-      where: { type: 'PAGER', online: true },
+      where: { type: 'PAGER', online: true, status: 'ACTIVE' },
       select: {
         id: true,
         restaurantId: true,
@@ -314,6 +323,8 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     if (topic === pagerTopic(pager.restaurantId, deviceId, 'ack')) {
       const ack = PagerAckMessage.safeParse(body);
       if (!ack.success || pager.staffId === null) return;
+      // Unpaired between the ack and its handling: the wearer's alerts are no longer its to end.
+      if (!(await this.stillPaired(deviceId))) return;
       const staff = await this.prisma.staff.findUnique({
         where: { id: pager.staffId },
         select: { role: { select: { baseRole: true } } },
@@ -336,11 +347,13 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     const now = this.clock.now();
     const settings = await this.notifications.settingsOf(pager.restaurantId);
     const threshold = settings.get('pager.lowBatteryPercent');
-    await this.prisma.transaction(async (tx) => {
+    const paired = await this.prisma.transaction(async (tx) => {
       const before = await tx.device.findUniqueOrThrow({
         where: { id: pager.deviceId },
-        select: { online: true, batteryPercent: true },
+        select: { online: true, batteryPercent: true, status: true },
       });
+      // AUTH-008: an unpaired pager is dropped, however soon after it beats.
+      if (before.status !== 'ACTIVE') return false;
       await tx.device.update({
         where: { id: pager.deviceId },
         data: {
@@ -360,7 +373,19 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
           batteryPercent: beat.battery,
         });
       }
+      return true;
     });
+    if (!paired) this.disconnect(pager.deviceId);
+  }
+
+  private async stillPaired(deviceId: string): Promise<boolean> {
+    const device = await this.prisma.device.findUnique({
+      where: { id: deviceId },
+      select: { status: true },
+    });
+    if (device?.status === 'ACTIVE') return true;
+    this.disconnect(deviceId);
+    return false;
   }
 
   /** Managers see every pager's status; the wearer hears about their own (WTR-014). */
@@ -395,9 +420,22 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     );
   }
 
-  /** Alert events → the recipients' pagers. */
+  /** Alert events → the recipients' pagers; unpairing and locating → the pager concerned. */
   private async deliver({ event }: PublishedEvent): Promise<void> {
     if (this.broker === undefined) return;
+    if (event.type === 'DeviceRevoked') {
+      // AUTH-008: its connection closes at once, not at its next reconnect.
+      if (event.payload.deviceType === 'PAGER') this.disconnect(event.payload.deviceId);
+      return;
+    }
+    if (event.type === 'DeviceLocateRequested') {
+      const pager = this.connected.get(event.payload.deviceId);
+      if (pager === undefined || pager.restaurantId !== event.restaurantId) return;
+      const message: PagerLocateMessage = { sentAt: this.clock.now().toISOString() };
+      // QoS 0: a pager that is not connected now has nothing to catch up on.
+      await this.publish(pager, 'locate', message, 0);
+      return;
+    }
     if (
       event.type !== 'AlertRaised' &&
       event.type !== 'AlertAcknowledged' &&
@@ -439,7 +477,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
       ),
       sentAt: this.clock.now().toISOString(),
     };
-    for (const pager of targets) await this.publish(pager, message);
+    for (const pager of targets) await this.publish(pager, 'alerts', message, 1);
   }
 
   /** PGR-008: after (re)connecting, the wearer's open alerts are sent again. */
@@ -456,32 +494,42 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     ).alerts.filter((alert) => reachesPagerAndApp(alert, staffId));
     const settings = await this.notifications.settingsOf(pager.restaurantId);
     for (const alert of open) {
-      await this.publish(pager, {
-        alertId: alert.id,
-        seq: alert.repeatCount,
-        state: 'ALERT',
-        type: alert.type,
-        lines: pagerLines(alert.pagerText ?? ''),
-        vibration: vibrationFor(
-          alert.type,
-          alert.escalatedAt !== null,
-          settings.get('pagers.vibration'),
-        ),
-        sentAt: this.clock.now().toISOString(),
-      });
+      await this.publish(
+        pager,
+        'alerts',
+        {
+          alertId: alert.id,
+          seq: alert.repeatCount,
+          state: 'ALERT',
+          type: alert.type,
+          lines: pagerLines(alert.pagerText ?? ''),
+          vibration: vibrationFor(
+            alert.type,
+            alert.escalatedAt !== null,
+            settings.get('pagers.vibration'),
+          ),
+          sentAt: this.clock.now().toISOString(),
+        },
+        1,
+      );
     }
   }
 
-  private publish(pager: ConnectedPager, message: PagerAlertMessage): Promise<void> {
+  private publish(
+    pager: ConnectedPager,
+    kind: Extract<PagerTopicKind, 'alerts' | 'locate'>,
+    message: PagerAlertMessage | PagerLocateMessage,
+    qos: 0 | 1,
+  ): Promise<void> {
     const broker = this.broker;
     if (broker === undefined) return Promise.resolve();
     return new Promise((resolve, reject) => {
       broker.publish(
         {
           cmd: 'publish',
-          topic: pagerTopic(pager.restaurantId, pager.deviceId, 'alerts'),
+          topic: pagerTopic(pager.restaurantId, pager.deviceId, kind),
           payload: Buffer.from(JSON.stringify(message)),
-          qos: 1,
+          qos,
           retain: false,
           dup: false,
         },

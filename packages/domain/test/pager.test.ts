@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isLowBattery,
+  lowBatteryLevelFor,
   pagerIsOffline,
   pagerLines,
   pagerMayPublish,
@@ -42,6 +43,14 @@ describe('[PGR-005] [SEC-012] topics', () => {
     expect(pagerMayPublish(pagerTopic(r, a, 'alerts'), r, a)).toBe(false);
     expect(pagerMayPublish(pagerTopic(r, b, 'ack'), r, a)).toBe(false);
   });
+
+  it('[MGR-006] lets a pager hear a manager looking for it, and only for itself', () => {
+    expect(pagerTopic(r, a, 'locate')).toBe('rp/r1/pagers/pager-a/locate');
+    expect(pagerMaySubscribe(pagerTopic(r, a, 'locate'), r, a)).toBe(true);
+    expect(pagerMaySubscribe(pagerTopic(r, b, 'locate'), r, a)).toBe(false);
+    expect(pagerMaySubscribe('rp/r1/pagers/+/locate', r, a)).toBe(false);
+    expect(pagerMayPublish(pagerTopic(r, a, 'locate'), r, a)).toBe(false);
+  });
 });
 
 describe('[PGR-007] offline after three missed heartbeats', () => {
@@ -61,5 +70,12 @@ describe('[WTR-014] [PGR-013] what the wearer is warned about', () => {
     expect(pagerWarning({ online: true, batteryPercent: 16 }, 15)).toBeUndefined();
     expect(pagerWarning({ online: true, batteryPercent: null }, 15)).toBeUndefined();
     expect(isLowBattery(null, 15)).toBe(false);
+  });
+
+  it('[TAB-015] [MGR-006] uses the pagers’ own low level for pagers and the shared one for others', () => {
+    const levels = { pager: 15, other: 20 };
+    expect(lowBatteryLevelFor('PAGER', levels)).toBe(15);
+    expect(lowBatteryLevelFor('TABLE_TABLET', levels)).toBe(20);
+    expect(lowBatteryLevelFor('KDS', levels)).toBe(20);
   });
 });

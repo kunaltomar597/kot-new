@@ -356,7 +356,9 @@ describe('[AUTH-008] unpairing', () => {
     const session = await prisma.session.findUniqueOrThrow({ where: { id: waiter.session.id } });
     expect(session.revokeReason).toBe('DEVICE_REVOKED');
 
-    const event = await prisma.outboxEvent.findFirstOrThrow({ where: { aggregateId: phone } });
+    const event = await prisma.outboxEvent.findFirstOrThrow({
+      where: { aggregateId: phone, eventType: 'DeviceRevoked' },
+    });
     expect(DeviceRevoked.parse(event.payload).payload).toEqual({
       deviceId: phone,
       deviceType: 'WAITER_PHONE',
@@ -371,7 +373,11 @@ describe('[AUTH-008] unpairing', () => {
       .set(asManager())
       .send({ reason: 'Phone lost' });
     expect(again.status).toBe(200);
-    expect(await prisma.outboxEvent.count({ where: { aggregateId: phone } })).toBe(1);
+    // Unpairing again changes nothing: one DeviceRevoked, one announcement to device lists.
+    expect(await prisma.outboxEvent.count({ where: { aggregateId: phone } })).toBe(2);
+    expect(
+      await prisma.outboxEvent.count({ where: { aggregateId: phone, eventType: 'DeviceRevoked' } }),
+    ).toBe(1);
   });
 
   it('refuses to unpair the device the manager is using', async () => {

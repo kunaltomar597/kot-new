@@ -63,11 +63,12 @@ export function vibrationFor(
   return overrides[event] ?? DEFAULT_VIBRATION[event];
 }
 
-export type PagerTopicKind = 'alerts' | 'ack' | 'heartbeat';
+export type PagerTopicKind = 'alerts' | 'locate' | 'ack' | 'heartbeat';
 
 /**
- * Topics: `rp/<restaurant>/pagers/<device>/alerts` (server → pager, QoS 1),
- * `.../ack` and `.../heartbeat` (pager → server). Nothing else is allowed (PGR-005, SEC-012).
+ * Topics: `rp/<restaurant>/pagers/<device>/alerts` (server → pager, QoS 1), `.../locate` (server →
+ * pager, a manager looking for it, P4-02c), `.../ack` and `.../heartbeat` (pager → server). Nothing
+ * else is allowed (PGR-005, SEC-012).
  */
 export function pagerTopic(restaurantId: string, deviceId: string, kind: PagerTopicKind): string {
   return `rp/${restaurantId}/pagers/${deviceId}/${kind}`;
@@ -82,7 +83,10 @@ export function pagerMayPublish(topic: string, restaurantId: string, deviceId: s
 }
 
 export function pagerMaySubscribe(topic: string, restaurantId: string, deviceId: string): boolean {
-  return topic === pagerTopic(restaurantId, deviceId, 'alerts');
+  return (
+    topic === pagerTopic(restaurantId, deviceId, 'alerts') ||
+    topic === pagerTopic(restaurantId, deviceId, 'locate')
+  );
 }
 
 /** PGR-007: offline after 3 missed heartbeats. */
@@ -98,6 +102,17 @@ export function pagerIsOffline(
 /** PGR-013: at or below the level ⚙ the battery counts as low. */
 export function isLowBattery(batteryPercent: number | null, lowBatteryPercent: number): boolean {
   return batteryPercent !== null && batteryPercent <= lowBatteryPercent;
+}
+
+/**
+ * The low-battery level ⚙ of a device type: pagers have their own (`pager.lowBatteryPercent`,
+ * PGR-013); tablets and every other device share `devices.lowBatteryAlertPercent` (TAB-015).
+ */
+export function lowBatteryLevelFor(
+  deviceType: string,
+  levels: { readonly pager: number; readonly other: number },
+): number {
+  return deviceType === 'PAGER' ? levels.pager : levels.other;
 }
 
 /**

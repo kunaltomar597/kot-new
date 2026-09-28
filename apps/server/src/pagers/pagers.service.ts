@@ -216,6 +216,7 @@ export class PagersService {
       mqttUsername: device.id,
       mqttPassword: secret,
       alertsTopic: pagerTopic(device.restaurantId, device.id, 'alerts'),
+      locateTopic: pagerTopic(device.restaurantId, device.id, 'locate'),
       ackTopic: pagerTopic(device.restaurantId, device.id, 'ack'),
       heartbeatTopic: pagerTopic(device.restaurantId, device.id, 'heartbeat'),
       mqttPort: this.broker.port() ?? (this.config.mqttPort || 8883),

@@ -76,7 +76,9 @@ export function roomsForConnection(identity: ConnectionIdentity): string[] {
  * OWN or OVERRIDE), so the socket never shows a role what its REST calls could not. Station-scoped
  * kitchen work reaches kitchen screens through their station rooms instead.
  */
-const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE' | 'MANAGERS'>> = {
+const VISIBLE_WITH: Readonly<
+  Record<DomainEvent['type'], Capability | 'EVERYONE' | 'MANAGERS' | 'THE_DEVICE'>
+> = {
   MenuPublished: 'EVERYONE',
   ItemAvailabilityChanged: 'EVERYONE',
   TableOpened: 'ORDER_CREATE',
@@ -107,6 +109,8 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   AlertCleared: 'MANAGERS',
   DeviceStatusChanged: 'DEVICE_PAIR',
   DeviceRevoked: 'DEVICE_PAIR',
+  // Only the device a manager is looking for (MGR-006 "Locate").
+  DeviceLocateRequested: 'THE_DEVICE',
   // The POS and managers are alerted when a printer stops or starts again (KDS-008, NTF-003).
   PrinterStatusChanged: 'BILL_PRINT_AND_PAYMENT',
   // Only the changed keys: every screen may hear it and reads what it may see again.
@@ -176,7 +180,7 @@ export function roomsForEvent(
     targets.add(rooms.all(rid));
   } else if (visibility === 'MANAGERS') {
     for (const role of OVERRIDE_APPROVER_ROLES) targets.add(rooms.role(rid, role));
-  } else {
+  } else if (visibility !== 'THE_DEVICE') {
     for (const role of rolesWith(visibility, matrix)) targets.add(rooms.role(rid, role));
   }
   const own = named(event);
@@ -200,7 +204,17 @@ export function roomsForEvent(
   ) {
     for (const staffId of event.payload.recipients) targets.add(rooms.alerts(rid, staffId));
   }
+  if (event.type === 'DeviceLocateRequested')
+    targets.add(rooms.device(rid, event.payload.deviceId));
   return [...targets];
+}
+
+/**
+ * Events that only mean something the moment they happen (MGR-006 "Locate"): a device that
+ * connects later is not sent them again, so it does not beep for a manager who has gone.
+ */
+export function isLiveOnly(event: DomainEvent): boolean {
+  return event.type === 'DeviceLocateRequested';
 }
 
 /** True when a connection in `joined` receives `targets` (replay uses the live routing). */

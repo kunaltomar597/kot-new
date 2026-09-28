@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   Req,
@@ -22,6 +23,7 @@ import {
   type PairedDevice,
   type PairingCodeResponse,
   RevokeDeviceRequest,
+  UpdateDeviceRequest,
 } from '@rp/contracts';
 import type { Request } from 'express';
 import { authErrors } from '../auth/auth-errors.js';
@@ -112,6 +114,26 @@ export class DevicesController {
   @RequireCapability('DEVICE_PAIR')
   list(@Req() request: AuthenticatedRequest): Promise<DeviceListResponse> {
     return this.devices.list(principalOf(request));
+  }
+
+  @Patch(':deviceId')
+  @RequireCapability('DEVICE_PAIR')
+  rename(
+    @Req() request: AuthenticatedRequest,
+    @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
+    @Body(new ZodValidationPipe(UpdateDeviceRequest)) body: UpdateDeviceRequest,
+  ): Promise<DeviceSummary> {
+    return this.devices.rename(principalOf(request), deviceId, body.name);
+  }
+
+  @Post(':deviceId/locate')
+  @HttpCode(204)
+  @RequireCapability('DEVICE_PAIR')
+  locate(
+    @Req() request: AuthenticatedRequest,
+    @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
+  ): Promise<void> {
+    return this.devices.locate(principalOf(request), deviceId);
   }
 
   @Post(':deviceId/revoke')

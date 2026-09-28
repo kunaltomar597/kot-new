@@ -1402,7 +1402,8 @@
     "/api/v1/devices": {
       "get": {
         "operationId": "listDevices",
-        "summary": "Paired and revoked devices of the restaurant",
+        "summary": "Paired and revoked devices of the restaurant, with their state now",
+        "description": "Each device with its binding, whether it is connected now, its battery against the low level of its type, and its app and firmware versions (MGR-006). Keys are never listed.",
         "tags": ["devices"],
         "responses": {
           "200": {
@@ -1433,13 +1434,135 @@
           }
         },
         "x-capability": "DEVICE_PAIR",
-        "x-requirements": ["AUTH-007", "AUTH-008"]
+        "x-requirements": ["AUTH-007", "AUTH-008", "MGR-006", "TAB-015"]
+      }
+    },
+    "/api/v1/devices/{deviceId}": {
+      "patch": {
+        "operationId": "renameDevice",
+        "summary": "Rename a device",
+        "description": "Audited. The device and every device list hear of it (`RestaurantChanged`).",
+        "tags": ["devices"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateDeviceRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Renamed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DeviceSummary" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such device.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The device is unpaired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["MGR-006", "AUD-001"]
+      }
+    },
+    "/api/v1/devices/{deviceId}/locate": {
+      "post": {
+        "operationId": "locateDevice",
+        "summary": "Make a device show itself: a screen sounds, a tablet beeps, a pager vibrates",
+        "description": "Only while the device is connected: the request is refused otherwise, and a device that connects later does not hear it (`DeviceLocateRequested`, MGR-006).",
+        "tags": ["devices"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "204": { "description": "The device was asked to show itself." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such device.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The device is unpaired or not connected.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["MGR-006"]
       }
     },
     "/api/v1/devices/{deviceId}/revoke": {
       "post": {
         "operationId": "revokeDevice",
         "summary": "Unpair a device: its tokens and sessions stop working at once",
+        "description": "Its live connections close within 5 seconds, a pager is disconnected from the broker, and its device alerts are cleared. Audited with the reason.",
         "tags": ["devices"],
         "parameters": [
           {
@@ -1486,14 +1609,14 @@
           }
         },
         "x-capability": "DEVICE_PAIR",
-        "x-requirements": ["AUTH-008"]
+        "x-requirements": ["AUTH-008", "MGR-006"]
       }
     },
     "/api/v1/devices/{deviceId}/table": {
       "put": {
         "operationId": "bindTabletTable",
         "summary": "Move a table tablet to another table",
-        "description": "Needs a manager (AUTH-009); the tablet then serves only the new table.",
+        "description": "Needs a manager (AUTH-009); the tablet then serves only the new table, and its live connection restarts in the new table’s rooms. Audited.",
         "tags": ["devices"],
         "parameters": [
           {
@@ -1540,7 +1663,7 @@
           }
         },
         "x-capability": "DEVICE_PAIR",
-        "x-requirements": ["AUTH-009"]
+        "x-requirements": ["AUTH-009", "TAB-002"]
       }
     },
     "/api/v1/devices/challenge": {
@@ -10037,9 +10160,51 @@
       "DeviceListResponse": {
         "type": "object",
         "properties": {
-          "devices": { "type": "array", "items": { "$ref": "#/components/schemas/DeviceSummary" } }
+          "devices": { "type": "array", "items": { "$ref": "#/components/schemas/DeviceView" } }
         },
         "required": ["devices"],
+        "additionalProperties": false
+      },
+      "DeviceLocateRequested": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "DeviceLocateRequested" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "deviceId": { "$ref": "#/components/schemas/Id" },
+              "deviceType": { "$ref": "#/components/schemas/DeviceType" },
+              "name": { "type": "string", "maxLength": 60 }
+            },
+            "required": ["deviceId", "deviceType", "name"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceParams": {
+        "type": "object",
+        "properties": { "deviceId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["deviceId"],
         "additionalProperties": false
       },
       "DeviceRevoked": {
@@ -10171,6 +10336,50 @@
         "type": "string",
         "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
       },
+      "DeviceView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/DeviceStatus" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "pairedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastSeenAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "appVersion": { "type": ["string", "null"] },
+          "online": { "type": "boolean" },
+          "batteryPercent": {
+            "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+          },
+          "batteryLow": { "type": "boolean" },
+          "firmwareVersion": { "type": ["string", "null"] },
+          "serial": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "status",
+          "tableId",
+          "stationId",
+          "staffId",
+          "pairedAt",
+          "lastSeenAt",
+          "appVersion",
+          "online",
+          "batteryPercent",
+          "batteryLow",
+          "firmwareVersion",
+          "serial"
+        ],
+        "additionalProperties": false
+      },
       "DiscountRequest": {
         "type": "object",
         "properties": {
@@ -10248,6 +10457,7 @@
           { "$ref": "#/components/schemas/AlertCleared" },
           { "$ref": "#/components/schemas/DeviceStatusChanged" },
           { "$ref": "#/components/schemas/DeviceRevoked" },
+          { "$ref": "#/components/schemas/DeviceLocateRequested" },
           { "$ref": "#/components/schemas/PrinterStatusChanged" },
           { "$ref": "#/components/schemas/SettingsChanged" },
           { "$ref": "#/components/schemas/RestaurantChanged" }
@@ -12958,6 +13168,7 @@
           "mqttUsername": { "type": "string" },
           "mqttPassword": { "type": "string" },
           "alertsTopic": { "type": "string" },
+          "locateTopic": { "type": "string" },
           "ackTopic": { "type": "string" },
           "heartbeatTopic": { "type": "string" },
           "mqttPort": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
@@ -12967,6 +13178,7 @@
           "mqttUsername",
           "mqttPassword",
           "alertsTopic",
+          "locateTopic",
           "ackTopic",
           "heartbeatTopic",
           "mqttPort"
@@ -12990,6 +13202,12 @@
           "lowBatteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
         },
         "required": ["pagers", "lowBatteryPercent"],
+        "additionalProperties": false
+      },
+      "PagerLocateMessage": {
+        "type": "object",
+        "properties": { "sentAt": { "$ref": "#/components/schemas/Timestamp" } },
+        "required": ["sentAt"],
         "additionalProperties": false
       },
       "PagerParams": {
@@ -15463,6 +15681,12 @@
         "type": "object",
         "properties": { "staffId": { "$ref": "#/components/schemas/Id" } },
         "required": ["staffId"],
+        "additionalProperties": false
+      },
+      "UpdateDeviceRequest": {
+        "type": "object",
+        "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 60 } },
+        "required": ["name"],
         "additionalProperties": false
       },
       "UpdateRestaurantLegalRequest": {

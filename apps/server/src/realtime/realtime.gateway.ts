@@ -31,7 +31,7 @@ import { SessionService } from '../auth/session.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
 import { EventBus, type PublishedEvent } from '../events/event-bus.js';
-import { reaches, rooms, roomsForConnection, roomsForEvent } from './rooms.js';
+import { isLiveOnly, reaches, rooms, roomsForConnection, roomsForEvent } from './rooms.js';
 
 export const REALTIME_OPTIONS = Symbol('REALTIME_OPTIONS');
 
@@ -358,7 +358,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         limit: REPLAY_BATCH,
       });
       for (const { sequence, event, audience } of events) {
-        if (!reaches(roomsForEvent(event, audience), joined)) continue;
+        if (isLiveOnly(event) || !reaches(roomsForEvent(event, audience), joined)) continue;
         socket.emit(REALTIME_MESSAGES.event, { sequence, event });
         replayed += 1;
       }
@@ -378,6 +378,11 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     return [rooms.staff(restaurantId, staffId), rooms.alerts(restaurantId, staffId)].some(
       (name) => (joined?.get(name)?.size ?? 0) > 0,
     );
+  }
+
+  /** Whether the device has a live connection now (MGR-006: shown as connected, can be located). */
+  isDeviceConnected(restaurantId: string, deviceId: string): boolean {
+    return (this.namespace?.adapter.rooms.get(rooms.device(restaurantId, deviceId))?.size ?? 0) > 0;
   }
 
   /** Live listener: each published event goes to its rooms (ORD-010). */

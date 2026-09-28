@@ -218,6 +218,16 @@ export const DeviceRevoked = event(
 );
 
 /**
+ * A manager asked a device to show itself (MGR-006 "Locate", P4-02c): a screen shows its name and
+ * sounds, a table tablet beeps (P3-01), a pager vibrates (P2-05, over MQTT). Only that device hears
+ * it, and only while it is connected: it is never replayed to a device that reconnects later.
+ */
+export const DeviceLocateRequested = event(
+  'DeviceLocateRequested',
+  z.object({ deviceId: Id, deviceType: DeviceType, name: z.string().max(60) }),
+);
+
+/**
  * Settings changed (P1-01a, MGR-007, UPD-010). Only the keys: every screen may hear it, and each
  * reads the values it is allowed to see again.
  */
@@ -232,7 +242,8 @@ export const SettingsChanged = event(
  * assignments, stations, printers, its staff (P4-02a: someone added, changed, deactivated or
  * reactivated, so login tiles and staff lists change) or its devices (P4-02b: a pager registered,
  * given to someone or taken back, or its credential replaced, so pager lists and the wearer's own
- * pager change). Screens and bill templates read that part again.
+ * pager change; P4-02c: a device paired, renamed, moved to another table or unpaired, so device
+ * lists and the device's own name change). Screens and bill templates read that part again.
  */
 export const RestaurantChanged = event(
   'RestaurantChanged',
@@ -280,6 +291,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   AlertCleared,
   DeviceStatusChanged,
   DeviceRevoked,
+  DeviceLocateRequested,
   PrinterStatusChanged,
   SettingsChanged,
   RestaurantChanged,

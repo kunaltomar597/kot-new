@@ -159,8 +159,36 @@ export const DeviceSummary = z.object({
 });
 export type DeviceSummary = z.infer<typeof DeviceSummary>;
 
-export const DeviceListResponse = z.object({ devices: z.array(DeviceSummary) });
+/** What a manager sees of a device (MGR-006, P4-02c): its summary and its state now. */
+export const DeviceView = DeviceSummary.extend({
+  /**
+   * Connected now: an app or screen with a live connection to the server, or a pager whose
+   * heartbeats arrive (PGR-007).
+   */
+  online: z.boolean(),
+  /** The battery level the device last reported (pagers; table tablets from P3-01), if any. */
+  batteryPercent: z.int().min(0).max(100).nullable(),
+  /**
+   * Below the low level of its type: `pager.lowBatteryPercent` for pagers (PGR-013),
+   * `devices.lowBatteryAlertPercent` for the others (TAB-015). False while nothing is reported.
+   */
+  batteryLow: z.boolean(),
+  /** A pager's firmware, from its heartbeats. */
+  firmwareVersion: z.string().nullable(),
+  /** The serial on a pager's label. */
+  serial: z.string().nullable(),
+});
+export type DeviceView = z.infer<typeof DeviceView>;
+
+export const DeviceListResponse = z.object({ devices: z.array(DeviceView) });
 export type DeviceListResponse = z.infer<typeof DeviceListResponse>;
+
+export const DeviceParams = z.strictObject({ deviceId: Id });
+export type DeviceParams = z.infer<typeof DeviceParams>;
+
+/** MGR-006: a manager renames a device, e.g. after moving it. */
+export const UpdateDeviceRequest = z.strictObject({ name: z.string().trim().min(1).max(60) });
+export type UpdateDeviceRequest = z.infer<typeof UpdateDeviceRequest>;
 
 export const RevokeDeviceRequest = z.strictObject({ reason: z.string().trim().min(3).max(200) });
 export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;

@@ -26,6 +26,15 @@ const PAGER_CHANNELS = [
       'again only for a higher seq; ACKNOWLEDGED or CLEARED removes it.',
   },
   {
+    id: 'pagerLocate',
+    address: 'rp/{restaurantId}/pagers/{deviceId}/locate',
+    action: 'send',
+    schema: 'PagerLocateMessage',
+    description:
+      'Server → pager, QoS 0. A manager is looking for the pager (MGR-006 "Locate"): vibrate and ' +
+      'light up for a few seconds. Only the pager itself may subscribe; nothing is queued.',
+  },
+  {
     id: 'pagerAck',
     address: 'rp/{restaurantId}/pagers/{deviceId}/ack',
     action: 'receive',

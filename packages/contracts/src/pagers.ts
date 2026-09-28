@@ -5,7 +5,8 @@ import { Id, Timestamp } from './common.js';
 /**
  * Wrist pagers over MQTT (P2-04, PGR-005 to PGR-008, PGR-012, SEC-012): the messages on the
  * broker and the manager's pager administration. Topics: `rp/<restaurant>/pagers/<device>/alerts`
- * (server → pager, QoS 1), `.../ack` and `.../heartbeat` (pager → server).
+ * (server → pager, QoS 1), `.../locate` (server → pager, QoS 0, P4-02c), `.../ack` and
+ * `.../heartbeat` (pager → server).
  */
 
 export const VibrationPattern = z.enum(['ONE_LONG', 'TWO_SHORT', 'THREE', 'ONE_SHORT']);
@@ -25,6 +26,13 @@ export const PagerAlertMessage = z.object({
   sentAt: Timestamp,
 });
 export type PagerAlertMessage = z.infer<typeof PagerAlertMessage>;
+
+/**
+ * Server → pager (QoS 0): a manager is looking for it (MGR-006 "Locate"). The pager vibrates and
+ * lights up for a few seconds; nothing is queued, so a pager that is not connected misses it.
+ */
+export const PagerLocateMessage = z.object({ sentAt: Timestamp });
+export type PagerLocateMessage = z.infer<typeof PagerLocateMessage>;
 
 /** Pager → server: the wearer pressed the button on this alert (NTF-004). */
 export const PagerAckMessage = z.strictObject({ alertId: Id });
@@ -55,6 +63,8 @@ export const PagerCredentialResponse = z.object({
   mqttUsername: z.string(),
   mqttPassword: z.string(),
   alertsTopic: z.string(),
+  /** Subscribed to beside the alerts: a manager is looking for the pager (P4-02c). */
+  locateTopic: z.string(),
   ackTopic: z.string(),
   heartbeatTopic: z.string(),
   mqttPort: z.int().positive(),
