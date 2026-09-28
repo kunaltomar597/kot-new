@@ -61,9 +61,10 @@
             "lastSeenAt"
           ]
         }
-      }
+      },
+      "lowBatteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
     },
-    "required": ["pagers"]
+    "required": ["pagers", "lowBatteryPercent"]
   },
   "output": {
     "type": "object",
@@ -128,9 +129,10 @@
           ],
           "additionalProperties": false
         }
-      }
+      },
+      "lowBatteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
     },
-    "required": ["pagers"],
+    "required": ["pagers", "lowBatteryPercent"],
     "additionalProperties": false
   }
 }

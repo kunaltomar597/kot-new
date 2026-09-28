@@ -1721,7 +1721,8 @@
                       "WAITER_ASSIGNMENTS",
                       "STATIONS",
                       "PRINTERS",
-                      "STAFF"
+                      "STAFF",
+                      "DEVICES"
                     ]
                   }
                 },
@@ -3523,7 +3524,8 @@
                       "WAITER_ASSIGNMENTS",
                       "STATIONS",
                       "PRINTERS",
-                      "STAFF"
+                      "STAFF",
+                      "DEVICES"
                     ]
                   }
                 },

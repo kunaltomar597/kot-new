@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { responsibleWaiters, tablesOf, type WaiterAssignment } from '../src/index.js';
+import {
+  reapplyAssignments,
+  responsibleWaiters,
+  tablesOf,
+  tablesWithoutWaiter,
+  toWaiterAssignments,
+  type WaiterAssignment,
+} from '../src/index.js';
 
 const hall = 'hall';
 const terrace = 'terrace';
@@ -45,5 +52,47 @@ describe('[TBL-002] responsible waiter', () => {
       { staffId: 'ravi', sectionId: hall, tableId: 'T1' },
     ];
     expect(responsibleWaiters(tables[0]!, twice)).toEqual(['ravi']);
+  });
+});
+
+describe('[TBL-002] planning the day', () => {
+  const plan = [
+    { staffId: 'asha', sectionIds: [hall], tableIds: [] },
+    { staffId: 'ravi', sectionIds: [], tableIds: ['T3', 'T9'] },
+  ];
+
+  it('turns each person’s sections and tables into assignments, skipping unknown tables', () => {
+    expect(toWaiterAssignments(plan, tables)).toEqual([
+      { staffId: 'asha', sectionId: hall, tableId: null },
+      { staffId: 'ravi', sectionId: hall, tableId: 'T3' },
+    ]);
+  });
+
+  it('finds the tables nobody looks after', () => {
+    const assignments = toWaiterAssignments(plan, tables);
+    expect(tablesWithoutWaiter(tables, assignments)).toEqual(['T7']);
+    expect(tablesWithoutWaiter(tables, [])).toEqual(['T1', 'T2', 'T3', 'T7']);
+  });
+
+  it('gives an earlier day’s plan again without people or places no longer in use', () => {
+    const earlier = [
+      { staffId: 'asha', sectionIds: [hall, 'rooftop'], tableIds: [] },
+      { staffId: 'priya', sectionIds: [terrace], tableIds: [] },
+      { staffId: 'ravi', sectionIds: ['rooftop'], tableIds: ['R1'] },
+      { staffId: 'meena', sectionIds: [terrace], tableIds: ['T3', 'T3'] },
+    ];
+    const scope = {
+      // Priya was deactivated; the rooftop and its tables were archived.
+      staffIds: new Set(['asha', 'ravi', 'meena']),
+      sectionIds: new Set([hall, terrace]),
+      tableIds: new Set(['T1', 'T2', 'T3', 'T7']),
+    };
+    expect(reapplyAssignments(earlier, scope)).toEqual({
+      assignments: [
+        { staffId: 'asha', sectionIds: [hall], tableIds: [] },
+        { staffId: 'meena', sectionIds: [terrace], tableIds: ['T3'] },
+      ],
+      leftOut: ['priya', 'ravi'],
+    });
   });
 });

@@ -229,6 +229,24 @@ describe('[WTR-014] the waiter’s pager', () => {
     expect(screen.getByTestId('pager-card')).toHaveProp('accessibilityRole', 'alert');
   });
 
+  it('[PGR-012] shows a pager given by the manager at once', async () => {
+    const restaurant = new Restaurant();
+    const given = restaurant.pager;
+    restaurant.pager = null;
+    const { sockets } = await signedInApp(restaurant);
+    expect(await screen.findByText('No pager is given to you.')).toBeOnTheScreen();
+    restaurant.pager = given;
+    await act(async () => {
+      sockets.sync(0);
+      sockets.last.fire('event', eventFrame(1, 'RestaurantChanged', { part: 'DEVICES' }));
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('pager-card')).toHaveProp(
+      'accessibilityLabel',
+      'My pager: Pager 3, Connected, Battery 80%',
+    );
+  });
+
   it('says when no pager is given, or when its status cannot be read', async () => {
     const restaurant = new Restaurant();
     restaurant.pager = null;

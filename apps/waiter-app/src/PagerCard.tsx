@@ -8,7 +8,9 @@ import { StyleSheet, Text, View } from 'react-native';
 /** Battery levels are not announced (only a change to low or offline is), so read them again. */
 export const PAGER_REFRESH_MS = 60_000;
 
-const affectsPager = (eventType: string) => eventType === 'DeviceStatusChanged';
+/** Its state changed, or it was given to someone or taken back (`RestaurantChanged`, P4-02b). */
+const affectsPager = (eventType: string) =>
+  eventType === 'DeviceStatusChanged' || eventType === 'RestaurantChanged';
 
 /**
  * The waiter's own pager (WTR-014): its connection and battery, with a warning when it is not

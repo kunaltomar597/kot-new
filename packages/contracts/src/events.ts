@@ -229,9 +229,10 @@ export const SettingsChanged = event(
 /**
  * Part of the restaurant's setup changed (P1-01b, P1-02a): its profile, its invoice particulars,
  * its tax groups, its invoice series, the floor (sections and tables), the day's waiter
- * assignments, stations, printers or its staff (P4-02a: someone added, changed, deactivated or
- * reactivated, so login tiles and staff lists change). Screens and bill templates read that part
- * again.
+ * assignments, stations, printers, its staff (P4-02a: someone added, changed, deactivated or
+ * reactivated, so login tiles and staff lists change) or its devices (P4-02b: a pager registered,
+ * given to someone or taken back, or its credential replaced, so pager lists and the wearer's own
+ * pager change). Screens and bill templates read that part again.
  */
 export const RestaurantChanged = event(
   'RestaurantChanged',
@@ -246,6 +247,7 @@ export const RestaurantChanged = event(
       'STATIONS',
       'PRINTERS',
       'STAFF',
+      'DEVICES',
     ]),
   }),
 );

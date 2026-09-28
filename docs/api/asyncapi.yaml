@@ -1680,6 +1680,7 @@ components:
                 - STATIONS
                 - PRINTERS
                 - STAFF
+                - DEVICES
           required:
             - part
           additionalProperties: false
