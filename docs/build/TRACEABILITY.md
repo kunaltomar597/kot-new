@@ -37,7 +37,7 @@ Must: 175 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 - MENU-012 (M): apps/console/e2e/console.e2e.ts, apps/console/test/order-entry.test.tsx, apps/server/test/integration/menu-publish.int.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ordering/test/order-logic.test.ts, packages/ordering/test/reorder.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/ordering.test.tsx
 - MENU-013 (M): apps/server/test/integration/menu-publish.int.test.ts, apps/table-tablet/test/app.test.tsx, packages/contracts/test/contracts.test.ts, packages/mobile-core/test/mobile-core.test.ts, packages/mobile-core/test/order-outbox.test.ts, packages/mobile-shell/test/shell.test.tsx
 - TBL-001 (M): apps/server/test/integration/floor.int.test.ts, packages/contracts/test/floor.test.ts
-- TBL-002 (M): apps/server/test/integration/floor.int.test.ts, packages/contracts/test/floor.test.ts, packages/domain/test/floor.test.ts, packages/ordering/test/floor-view.test.ts
+- TBL-002 (M): apps/console/e2e/console.e2e.ts, apps/console/test/sections-view.test.ts, apps/console/test/sections.test.tsx, apps/server/test/integration/floor.int.test.ts, packages/contracts/test/floor.test.ts, packages/domain/test/floor.test.ts, packages/ordering/test/floor-view.test.ts
 - TBL-003 (M): apps/console/e2e/console.e2e.ts, apps/console/test/pos.test.tsx, apps/server/test/integration/table-sessions.int.test.ts, apps/waiter-app/test/tables.test.tsx, packages/contracts/test/table-sessions.test.ts
 - TBL-004 (M): apps/server/test/integration/orders.int.test.ts, apps/server/test/integration/payments.int.test.ts, apps/server/test/integration/table-sessions.int.test.ts, packages/contracts/test/table-sessions.test.ts, packages/domain/test/state-machines.test.ts
 - TBL-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/pos.test.tsx, apps/server/test/integration/kds.int.test.ts, apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/table-sessions.int.test.ts, apps/server/test/unit/escpos.test.ts, apps/waiter-app/test/tables.test.tsx
@@ -49,7 +49,7 @@ Must: 175 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 - ORD-005 (M): apps/server/test/unit/notification-triggers.test.ts
 - ORD-007 (M): apps/server/test/integration/printing.int.test.ts, apps/server/test/unit/escpos.test.ts, packages/domain/test/menu-and-kot.test.ts
 - ORD-008 (M): apps/server/test/integration/schema.int.test.ts
-- ORD-010 (M): apps/console/e2e/console.e2e.ts, apps/console/test/dashboard.test.tsx, apps/console/test/staff.test.tsx, apps/server/test/integration/order-items.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/order-items.test.ts, packages/ordering/test/order-logic.test.ts
+- ORD-010 (M): apps/console/e2e/console.e2e.ts, apps/console/test/dashboard.test.tsx, apps/console/test/sections.test.tsx, apps/console/test/staff.test.tsx, apps/server/test/integration/order-items.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/order-items.test.ts, packages/ordering/test/order-logic.test.ts
 - ORD-011 (M): apps/server/test/integration/order-items.int.test.ts, apps/server/test/unit/escpos.test.ts, apps/waiter-app/test/serving.test.tsx, packages/contracts/test/order-items.test.ts, packages/domain/test/state-machines.test.ts, packages/ordering/test/order-logic.test.ts
 - ORD-012 (M): apps/server/test/integration/order-items.int.test.ts, packages/contracts/test/order-items.test.ts
 - ORD-013 (M): apps/server/test/integration/order-outbox.int.test.ts, apps/server/test/integration/orders.int.test.ts, apps/waiter-app/test/orders.test.tsx, packages/api-client/test/client.test.ts, packages/contracts/test/contracts.test.ts, packages/mobile-core/test/mobile-core.test.ts, packages/mobile-core/test/order-outbox.test.ts, packages/mobile-native/test/random.test.ts
@@ -119,13 +119,13 @@ Must: 175 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 - PGR-006 (M): apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts
 - PGR-007 (M): apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts
 - PGR-008 (M): apps/server/test/integration/pagers.int.test.ts
-- PGR-012 (M): apps/server/test/integration/pagers.int.test.ts
-- PGR-013 (M): apps/server/test/integration/notifications-extra.int.test.ts, apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts, packages/ordering/test/alert-text.test.ts
-- PGR-014 (M): apps/server/test/integration/pagers.int.test.ts
+- PGR-012 (M): apps/console/e2e/console.e2e.ts, apps/console/test/pagers-view.test.ts, apps/console/test/pagers.test.tsx, apps/server/test/integration/pagers.int.test.ts, apps/waiter-app/test/tables.test.tsx
+- PGR-013 (M): apps/console/test/pagers-view.test.ts, apps/console/test/pagers.test.tsx, apps/server/test/integration/notifications-extra.int.test.ts, apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts, packages/ordering/test/alert-text.test.ts
+- PGR-014 (M): apps/console/test/pagers-view.test.ts, apps/console/test/pagers.test.tsx, apps/server/test/integration/pagers.int.test.ts
 - MGR-001 (M): apps/console/e2e/console.e2e.ts, apps/console/test/console.test.tsx, apps/console/test/dashboard.test.tsx, apps/console/test/modes.test.ts, apps/server/test/integration/console-static.int.test.ts, apps/server/test/integration/order-feed.int.test.ts, packages/contracts/test/order-feed.test.ts
 - MGR-002 (M): apps/console/e2e/console.e2e.ts, apps/console/test/dashboard.test.tsx
 - MGR-003 (M): apps/console/e2e/console.e2e.ts, apps/console/test/dashboard.test.tsx, apps/console/test/order-feed-view.test.ts, apps/server/test/integration/order-feed.int.test.ts, packages/contracts/test/order-feed.test.ts, packages/domain/test/order-feed.test.ts
-- MGR-004 (M): apps/console/e2e/console.e2e.ts, apps/console/test/staff-view.test.ts, apps/console/test/staff.test.tsx, apps/server/test/integration/staff.int.test.ts, packages/contracts/test/staff.test.ts, packages/domain/test/staff.test.ts
+- MGR-004 (M): apps/console/e2e/console.e2e.ts, apps/console/test/sections.test.tsx, apps/console/test/staff-view.test.ts, apps/console/test/staff.test.tsx, apps/server/test/integration/staff.int.test.ts, packages/contracts/test/staff.test.ts, packages/domain/test/staff.test.ts
 - MGR-007 (M): apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/settings.test.ts
 - MGR-008 (M): apps/console/e2e/console.e2e.ts, apps/console/test/alert-view.test.ts, apps/console/test/alerts.test.tsx, packages/domain/test/notifications.test.ts
 - MGR-011 (M): apps/console/e2e/console.e2e.ts, apps/console/test/dashboard.test.tsx
@@ -178,7 +178,7 @@ Must: 175 / 287 covered. Should: 2 / 24. Could: 0 / 7.
 - SEC-007 (M): apps/server/test/integration/schema.int.test.ts
 - SEC-009 (M): apps/control-plane/test/integration/enrolment.int.test.ts, apps/control-plane/test/unit/rate-limiter.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/service-requests.int.test.ts, apps/server/test/unit/auth-primitives.test.ts
 - SEC-010 (M): apps/server/test/integration/tls.int.test.ts, packages/contracts/test/devices.test.ts, packages/mobile-core/test/device-session.test.ts, packages/mobile-core/test/mobile-core.test.ts, packages/mobile-native/test/keystore.test.ts, packages/mobile-native/test/lan-trust.test.ts, packages/mobile-native/test/stores.test.ts, packages/mobile-shell/test/pairing.test.tsx
-- SEC-012 (M): apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts
+- SEC-012 (M): apps/console/test/pagers.test.tsx, apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts
 - SEC-015 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/unit/correlation-and-validation.test.ts
 - NFR-P02 (M): apps/server/test/integration/print-queue.int.test.ts
 - NFR-P03 (M): apps/server/test/integration/pagers.int.test.ts

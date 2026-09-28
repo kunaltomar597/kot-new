@@ -94,7 +94,7 @@ As built:
   computes the authenticator code from the key on screen and adds the manager with a recovery
   code (the enrolment code's 30 s step cannot be used twice).
 
-### P4-02b Sections and pagers
+### P4-02b Sections and pagers (done)
 
 Requirements: MGR-004 (section assignment per shift, pager assignment), PGR-012, TBL-002.
 Deliverables: on the Staff page, today's sections for each waiter (sections and single tables,
@@ -102,6 +102,24 @@ Deliverables: on the Staff page, today's sections for each waiter (sections and 
 (the credential shown once), give it to a person or take it back (re-assignment at shift start in
 ≤ 30 s), issue a new credential.
 Acceptance: Playwright flow assigning sections and a pager.
+
+As built:
+
+- `@rp/domain` `floor.ts`: `toWaiterAssignments` (a day's plan as single assignments, now also
+  behind "My tables"), `tablesWithoutWaiter` and `reapplyAssignments` (an earlier plan without
+  people who are deactivated or no longer take orders, and without archived sections and tables).
+- Contracts and server: pager registration, re-assignment and new credentials are announced as
+  `RestaurantChanged` `DEVICES`; the pager list carries `lowBatteryPercent`. The waiter app's
+  pager card follows the event, so a pager given at shift start shows on the phone at once.
+- Console: the Staff area has three pages (`StaffArea.tsx`): People, Today's sections
+  (`SectionsScreen.tsx`: per person, with the tables nobody looks after and "Same as <day>") and
+  Pagers (`PagersScreen.tsx`, `PagerDialogs.tsx`: state in words, register with the next free
+  name suggested, give, take back, new credential, the credential shown once). Each sections
+  save re-reads the day's set and changes one person, so two managers do not overwrite each
+  other's changes.
+- Playwright: the manager gives Ravi the hall and Sunita the terrace and table 1 (every table
+  covered), registers Pager 1 for Ravi, sees its credential once and hands the pager to Sunita,
+  well within 30 s; both pages pass axe and fit a 360 px phone.
 
 ### P4-02c Devices
 

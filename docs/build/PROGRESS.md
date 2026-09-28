@@ -19,8 +19,9 @@ What exists:
   a person at the POS or dashboard (P2-06c), service requests' alerts, Resolve and the asker
   who is not alerted (P2-06d), recommendations: rules, best sellers by daypart, filters,
   course order and reasons (P3-04), the live order feed's late dishes, filters and summary
-  (P4-01), and who may add, change, unlock or deactivate whom, with the roles each person may give
-  (P4-02a). 221 tests.
+  (P4-01), who may add, change, unlock or deactivate whom, with the roles each person may give
+  (P4-02a), and planning the day's sections: the assignments a plan gives, the tables without a
+  waiter and an earlier day's sections given again (P4-02b). 224 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -36,7 +37,8 @@ What exists:
   own alerts (P2-06a); service requests, their routes and `ServiceRequestEscalated` (P2-06d);
   suggestions, their tracking, the rules and the suggestion an order line came from (P3-04);
   the manager dashboard's live order feed (P4-01); staff records, PINs, deactivation and the
-  Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a). 539 tests.
+  Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a); `RestaurantChanged`
+  for devices and the low-battery level with the pager list (P4-02b). 539 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -73,7 +75,8 @@ What exists:
   API, and impressions, taps, adds and orders tracked (P3-04); the dashboard's live order feed
   (P4-01); staff management with audit: add, change, new PIN, unlock, deactivate (sessions,
   pager, phone and sections taken back at once) and reactivate, managers kept to the Owner with a
-  fresh second factor (P4-02a).
+  fresh second factor (P4-02a); pager changes announced to every screen and the low-battery level
+  with the pager list (P4-02b).
   717 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
@@ -112,13 +115,14 @@ What exists:
   and rings for them with the screen off or the app closed, with notifications acknowledged from
   the lock screen; it asks for notifications at sign-in and says when they are off; the table
   tablet blocks those permissions (P2-06b). The tables screen lists the open requests from the
-  tables shown, and each table's screen its own, with Acknowledge and Resolve (P2-06d). Waiter
-  app 52 tests.
+  tables shown, and each table's screen its own, with Acknowledge and Resolve (P2-06d). A pager
+  the manager gives shows on the waiter's phone at once (P4-02b). Waiter app 53 tests.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
   line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a); the
-  reason shown with a suggestion and the suggestion a cart line came from (P3-04). 38 tests.
+  reason shown with a suggestion and the suggestion a cart line came from (P3-04); "my tables"
+  from the domain's planning helper (P4-02b). 38 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -134,7 +138,10 @@ What exists:
   (P4-01); the Staff page (add, edit, PIN, unlock, deactivate, reactivate) and the Owner's
   Security page (password, authenticator with a QR code, recovery codes), with the Owner's
   second factor asked for when an action needs it, and sign-in tiles that follow staff changes
-  (P4-02a). 143 tests, and 15 Playwright steps.
+  (P4-02a); the Staff area's Today's sections page (sections and single tables per person, the
+  tables nobody looks after, the last day's sections given again) and Pagers page (register,
+  give, take back, a new credential, connection and battery) (P4-02b). 169 tests, and 16
+  Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -149,8 +156,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02b Sections and pagers (P4-02a done), then P4-02c Devices, P4-02d Menu editor and P4-02e
-  Custom roles (P4-02 is split in five, see phase-4.md).
+- P4-02c Devices (P4-02a and P4-02b done), then P4-02d Menu editor and P4-02e Custom roles
+  (P4-02 is split in five, see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -252,7 +259,7 @@ Recommended next WPs (dependencies met):
 
 - [x] P4-01 Dashboard shell and live views
 - [x] P4-02a Staff and the Owner's sign-in security
-- [ ] P4-02b Sections and pagers
+- [x] P4-02b Sections and pagers
 - [ ] P4-02c Devices
 - [ ] P4-02d Menu editor
 - [ ] P4-02e Custom roles (S)
@@ -542,6 +549,33 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-28 (P4-02b):
+
+205. Today's sections and the pagers are pages of the Staff area (People, Today's sections,
+     Pagers). Everyone active who takes orders can be given tables, waiters listed first; the
+     server's rule (ORDER_CREATE) decides.
+206. The day's assignments stay one set replaced by each save (the P1-02a API). The console
+     re-reads the set just before each save and changes only the person being edited, leaving out
+     archived sections and tables and people who no longer take orders, so a screen that is a
+     little behind neither undoes another manager's change nor fails on an archived section.
+207. "Same as <day>" gives the most recent earlier day's set again without deactivated people,
+     people who no longer take orders and archived places, and says who was left out. When today
+     already has a set it asks first, since the whole day is replaced.
+208. The page lists the tables nobody looks after yet (a whole section or single tables). It is a
+     hint, not a rule: a table without a waiter still works, and its alerts go to the managers at
+     once, as before.
+209. Anyone active can wear a pager, managers included (PGR-014). Giving someone a pager takes back
+     any other they wear (the server's rule since P2-04a); taking one back asks first.
+210. A pager's credential shows once as text (pager ID, password, port) in a dialog only "I have
+     entered it" closes; a new credential disconnects the pager, so it asks first. How the
+     credential gets into the pager (USB or Bluetooth set-up) is decided with the firmware
+     (P2-05).
+211. The serial is typed, or scanned with a USB or Bluetooth barcode scanner, which types like a
+     keyboard. Scanning the pager's QR code with a camera stays with P2-04b.
+212. Pager changes are announced as `RestaurantChanged` `DEVICES` (device pairing in P4-02c will use
+     the same part). The Pagers page and the waiter's own pager card follow it; batteries are read
+     again every minute, since only a change to low or offline is announced.
 
 Decided 2026-09-28 (P4-02a):
 
@@ -1104,6 +1138,50 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-28: P4-02b Sections and pagers
+
+Merged #66 (P4-02a) once green.
+
+Built: `@rp/domain` `floor.ts` planning helpers (`toWaiterAssignments`, `tablesWithoutWaiter`,
+and `reapplyAssignments` for "same as last time", which drops archived places, people who no
+longer take orders and duplicates); `@rp/ordering` "my tables" builds on `toWaiterAssignments`.
+Contracts: `RestaurantChanged` part `DEVICES`, and `PagerListResponse` carries the restaurant's
+`lowBatteryPercent`. The server announces a registered pager, a new credential and a new wearer as
+`RestaurantChanged` `DEVICES`. The waiter app's pager card follows it, so a pager the manager gives
+shows at once. In the console: the Staff area with its pages (`StaffArea.tsx`: People, Today's
+sections, Pagers); `SectionsScreen.tsx` with `sections-view.ts` (each person's sections and single
+tables for the day, the tables nobody looks after, "Same as <day>"); `PagersScreen.tsx` with
+`PagerDialogs.tsx` and `pagers-view.ts` (register by serial with a suggested name, give, take
+back, a new credential shown once, connected state, battery against the low level, read again
+every minute).
+
+Also folded in three `apps/server/README.md` fixes found by the documentation review: the "still
+to come" line, the missing P2-03b section and the missing `src/observability` mention.
+
+Tests: domain 224 (was 221), contracts 539 (snapshots updated), server 717 (the pager integration
+tests check the announcements), console 169 (was 143), waiter app 53 (was 52), and 16 Playwright
+steps (was 15): a manager gives Ravi the Main Hall and Sunita the Terrace with table 1, sees every
+table covered, registers a pager for Ravi, reads its credential once and gives it to Sunita within
+30 s, on a 360 px screen, with no axe violations.
+
+Gotchas:
+
+- `pnpm --filter @rp/contracts test -- -u` does not update the snapshots; run
+  `pnpm exec vitest run -u test/snapshot.test.ts` inside `packages/contracts`.
+- `PUT /waiter-assignments` replaces the whole day's set, so the page reads the set again just
+  before saving and changes only the person being edited.
+- Archiving a section or table leaves it in today's set, but the server refuses a save that names
+  it, so every request the console sends drops archived places.
+- After editing the i18n catalogue, rebuild `@rp/i18n` before typechecking the console, or the new
+  keys are not `MessageKey`s.
+- `pagerWarning` says nothing about the battery of a pager that is not connected; `pagers-view.ts`
+  asks it as if connected, so a low battery shows either way.
+
+Deferred: scanning a pager's QR code with a camera (P2-04b) and how a new credential reaches the
+pager (P2-05).
+
+Decisions: 205 to 212.
 
 ### 2026-09-28: P4-02a Staff and the Owner's sign-in security
 
