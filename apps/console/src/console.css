@@ -994,6 +994,139 @@ body {
   font-weight: var(--rp-font-weight-semibold);
 }
 
+/* Staff (P4-02a, MGR-004): one row per person, the actions wrapping under them on a phone. */
+.staff-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-3);
+}
+
+.staff-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staff-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rp-space-3);
+  padding: var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+}
+
+.staff-row[data-inactive] {
+  background: var(--rp-color-surface-sunken);
+}
+
+.staff-row__who {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+  min-width: 0;
+}
+
+.staff-row__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+  margin: 0;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.staff-row__role,
+.staff-row__contact {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.staff-row__states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+  margin: 0;
+}
+
+.staff-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+}
+
+.staff-form__role {
+  margin: 0;
+  font-weight: var(--rp-font-weight-medium);
+}
+
+/* The Owner's sign-in security (P4-02a, AUTH-006). */
+.security-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: var(--rp-space-3);
+}
+
+.security-cards__wide {
+  grid-column: 1 / -1;
+}
+
+.security-card .rp-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--rp-space-3);
+}
+
+.security-card__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+  margin: 0;
+}
+
+.security-enrol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--rp-space-3);
+  margin-bottom: var(--rp-space-4);
+}
+
+.security-enrol__manual {
+  margin: 0;
+  text-align: center;
+}
+
+.security-enrol__key,
+.security-codes__code {
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-lg);
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+
+.security-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--rp-space-2) var(--rp-space-4);
+  margin: 0;
+  padding-left: var(--rp-space-6);
+}
+
 /* A phone's width is for content, not margins (MGR-011). */
 @media (max-width: 40rem) {
   .console-main {

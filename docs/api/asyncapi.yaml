@@ -1679,6 +1679,7 @@ components:
                 - WAITER_ASSIGNMENTS
                 - STATIONS
                 - PRINTERS
+                - STAFF
           required:
             - part
           additionalProperties: false

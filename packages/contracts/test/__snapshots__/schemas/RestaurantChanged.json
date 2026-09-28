@@ -38,7 +38,8 @@
               "FLOOR",
               "WAITER_ASSIGNMENTS",
               "STATIONS",
-              "PRINTERS"
+              "PRINTERS",
+              "STAFF"
             ]
           }
         },
@@ -94,7 +95,8 @@
               "FLOOR",
               "WAITER_ASSIGNMENTS",
               "STATIONS",
-              "PRINTERS"
+              "PRINTERS",
+              "STAFF"
             ]
           }
         },

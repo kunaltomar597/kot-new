@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "@rp/design-tokens": "workspace:*",
-    "@rp/domain": "workspace:*"
+    "@rp/domain": "workspace:*",
+    "uqr": "0.1.3"
   },
   "peerDependencies": {
     "react": "^19.0.0",

@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-09-27.
+Last updated: 2026-09-28.
 
 What exists:
 
@@ -18,8 +18,9 @@ What exists:
   low-battery check (P2-02a), what reaches a pager and the waiter app (P2-06a), what asks for
   a person at the POS or dashboard (P2-06c), service requests' alerts, Resolve and the asker
   who is not alerted (P2-06d), recommendations: rules, best sellers by daypart, filters,
-  course order and reasons (P3-04), and the live order feed's late dishes, filters and summary
-  (P4-01). 208 tests.
+  course order and reasons (P3-04), the live order feed's late dishes, filters and summary
+  (P4-01), and who may add, change, unlock or deactivate whom, with the roles each person may give
+  (P4-02a). 221 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -34,7 +35,8 @@ What exists:
   the pairing QR code with the server's addresses and CA fingerprint (P2-01d); a waiter phone's
   own alerts (P2-06a); service requests, their routes and `ServiceRequestEscalated` (P2-06d);
   suggestions, their tracking, the rules and the suggestion an order line came from (P3-04);
-  the manager dashboard's live order feed (P4-01). 524 tests.
+  the manager dashboard's live order feed (P4-01); staff records, PINs, deactivation and the
+  Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a). 539 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -69,8 +71,10 @@ What exists:
   requests ended when the table closes, and a bill asker who is not alerted (P2-06d); the
   recommendation engine for the tablet and the phones, with best sellers by daypart, the rules
   API, and impressions, taps, adds and orders tracked (P3-04); the dashboard's live order feed
-  (P4-01).
-  707 tests (4 skipped without a real install).
+  (P4-01); staff management with audit: add, change, new PIN, unlock, deactivate (sessions,
+  pager, phone and sections taken back at once) and reactivate, managers kept to the Owner with a
+  fresh second factor (P4-02a).
+  717 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -127,13 +131,17 @@ What exists:
   dashboard, live, with Acknowledge, a count of what asks for the person and toasts, and the
   manager's nudge to waiters (P2-06c); the manager dashboard's navigation, overview with the
   live floor and the live order feed with its filters, from a 360 px phone to a desktop
-  (P4-01). 124 tests, and 12 Playwright steps.
+  (P4-01); the Staff page (add, edit, PIN, unlock, deactivate, reactivate) and the Owner's
+  Security page (password, authenticator with a QR code, recovery codes), with the Owner's
+  second factor asked for when an action needs it, and sign-in tiles that follow staff changes
+  (P4-02a). 143 tests, and 15 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
 - `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
   React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
-  Storybook 10 workbench (P0-13, ADR-0009).
+  Storybook 10 workbench (P0-13, ADR-0009); QR codes drawn in the browser (P4-02a, ADR-0014).
+  ui-web 102 tests.
 - CI security baseline: secret scan, dependency audit, licence policy, SBOM, CodeQL, Dependabot,
   generated OpenAPI/AsyncAPI docs (P0-06, ADR-0010).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
@@ -141,7 +149,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02 Staff, device and menu management UI (P4-01, P1-03 and P0-11 done).
+- P4-02b Sections and pagers (P4-02a done), then P4-02c Devices, P4-02d Menu editor and P4-02e
+  Custom roles (P4-02 is split in five, see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -242,7 +251,11 @@ Recommended next WPs (dependencies met):
 ### Phase 4: Manager dashboard and reports
 
 - [x] P4-01 Dashboard shell and live views
-- [ ] P4-02 Staff, device and menu management UI
+- [x] P4-02a Staff and the Owner's sign-in security
+- [ ] P4-02b Sections and pagers
+- [ ] P4-02c Devices
+- [ ] P4-02d Menu editor
+- [ ] P4-02e Custom roles (S)
 - [ ] P4-03 Configuration screens
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
@@ -529,6 +542,39 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-28 (P4-02a):
+
+195. The roles given on the Staff page are Manager, Cashier, Waiter and Kitchen. The restaurant's
+     one Owner is set up at installation (ONB-004) and is never added, given another role,
+     deactivated or reactivated there.
+196. "Creating or removing managers" (AUTH-006) covers adding a manager, making someone a manager
+     or no longer one, and deactivating or reactivating one: the Owner only, with a fresh second
+     factor. A manager's other details, PIN and lock are changed by the Owner or by that manager;
+     the Owner's record only by the Owner; nobody deactivates themselves or changes their own
+     role. The same rules now decide who unlocks whom: a manager no longer unlocks the Owner's or
+     another manager's login, since the lock on the Owner's password guards Owner-only actions
+     from guessing.
+197. A PIN has exactly `auth.pinLength` digits and need not be unique (sign-in picks the person
+     first). A new PIN ends the person's other sessions and lifts a lock.
+198. Deactivating someone ends their sessions (their screens are back on sign-in within seconds),
+     frees their pager and waiter phone, takes them off today's and later section assignments and
+     ends a break. Their open tables stay theirs, and alerts for them fall back as for anyone
+     unreachable. Reactivating restores sign-in only; sections and devices are given again.
+199. Moving someone to Kitchen (the one role without ORDER_CREATE) takes them off sections.
+200. The audit never holds a PIN or contact details: it records that a phone or e-mail was given,
+     and which fields changed.
+201. The built-in roles are created in the database with the first person given each, with English
+     names (data, not code). Staff photos wait for a later package; P4-02b re-applies "same as last
+     time" without deactivated people.
+202. The Owner still signs in with a PIN on shared screens; the password and authenticator protect
+     Owner-only actions. Setting either up the first time needs nothing more, changing either
+     needs the second factor. The recovery codes show once, in a dialog only "I have saved them"
+     closes.
+203. QR codes are drawn in the browser with `uqr` (ADR-0014), so the authenticator secret never
+     leaves the screen that shows it.
+204. The sign-in tiles follow `RestaurantChanged`, so a person added anywhere can sign in at once and
+     a deactivated one disappears without a reload.
 
 Decided 2026-09-27 (P4-01):
 
@@ -1058,6 +1104,46 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-09-28: P4-02a Staff and the Owner's sign-in security
+
+Merged #65 (P4-01) once green, after one more fix on its branch: React Router wraps address
+changes in a transition, so an order-feed filter picked straight after another acted on the old
+address and dropped the first. The console's router now runs without transitions
+(`useTransitions={false}`); the browser test picks the filters on a CPU slowed 30 times.
+
+Split P4-02 into five (a staff, b sections and pagers, c devices, d menu editor, e custom roles).
+
+Built: `@rp/domain` `staff.ts` (`decideStaffChange` with add, edit, role, PIN, unlock,
+deactivate and reactivate; `rolesOffered`; `isValidPin`); contracts `staff.ts`, the staff routes
+and `RestaurantChanged` part `STAFF`; the server's `StaffModule` (list, add, change, PIN,
+deactivate, reactivate, all audited; deactivation ends sessions, takes back the pager, the waiter
+phone and the day's sections) and `GET /api/v1/auth/owner/security`; unlocking now follows the staff
+rules. In the console: `src/manage/staff/` (Staff page, person and PIN dialogs, `staff-view.ts`),
+`src/owner/` (Security page, `useSecondFactor` with its dialog), live sign-in tiles, and
+`@rp/ui-web` `QrCode` (uqr, ADR-0014).
+
+Tests: domain 221 (was 208), contracts 539 (was 524), server 717 (was 707), console 143 (was 124),
+ui-web 102 (was 100), and 15 Playwright steps (was 12): a manager adds a waiter who signs in on a
+second tab and is signed out there within 5 s of being deactivated; the Owner sets a password,
+adds the authenticator from its key and adds a manager with a recovery code; a cashier is kept
+out of the Staff page.
+
+Gotchas:
+
+- A second tab in the same browser context shares the device key (IndexedDB) but not the session
+  (sessionStorage): that is how the e2e signs in two people on one paired browser.
+  `browser.newPage()` cannot open more tabs; create a `BrowserContext` and open pages from it.
+- axe measures colours mid-animation: `expectAccessible` waits for a dialog's fade-in to finish.
+- An authenticator code is used up once accepted (enrolment consumes its step), so a step-up
+  straight after enrolment needs the next code or a recovery code; the e2e uses a recovery code.
+- A manager could unlock the Owner's login through `/auth/unlock`: unlocking is now a staff change
+  (`UNLOCK`) and follows the same rules as a new PIN.
+
+Deferred: staff photos (a later package), sections and pagers
+(P4-02b), devices (P4-02c), the menu editor (P4-02d) and custom roles (P4-02e).
+
+Decisions: 195 to 204.
 
 ### 2026-09-27: P4-01 Dashboard shell and live views
 

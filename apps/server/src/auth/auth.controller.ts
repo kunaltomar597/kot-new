@@ -6,6 +6,7 @@ import {
   type OverrideResponse,
   OwnerLoginRequest,
   OwnerPasswordRequest,
+  type OwnerSecurityResponse,
   PinLoginRequest,
   RefreshRequest,
   type StaffTilesResponse,
@@ -136,6 +137,12 @@ export class AuthController {
     @Body(new ZodValidationPipe(TotpConfirmRequest)) body: TotpConfirmRequest,
   ): Promise<TotpConfirmResponse> {
     return this.auth.confirmTotp(principalOf(request), body.code);
+  }
+
+  @Get('owner/security')
+  @RequireSession()
+  ownerSecurity(@Req() request: AuthenticatedRequest): Promise<OwnerSecurityResponse> {
+    return this.auth.ownerSecurity(principalOf(request));
   }
 
   @Post('owner/password')

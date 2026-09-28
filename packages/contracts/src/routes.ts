@@ -37,6 +37,7 @@ import {
   OverrideResponse,
   OwnerLoginRequest,
   OwnerPasswordRequest,
+  OwnerSecurityResponse,
   PinLoginRequest,
   RefreshRequest,
   StaffTilesResponse,
@@ -208,6 +209,15 @@ import {
   UpdateSettingRequest,
 } from './settings.js';
 import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
+import {
+  CreateStaffRequest,
+  DeactivateStaffRequest,
+  SetStaffPinRequest,
+  StaffListResponse,
+  StaffParams,
+  StaffView,
+  UpdateStaffRequest,
+} from './staff.js';
 
 /**
  * REST route registry (INT-002). Each entry ties an endpoint to the contract schemas it accepts
@@ -658,6 +668,9 @@ export const ROUTES = [
     method: 'POST',
     path: '/api/v1/auth/unlock',
     summary: "Unlock a staff member's PIN login after repeated failures",
+    description:
+      'A manager unlocks their own login and their team’s; the Owner’s and other managers’ ' +
+      'only the Owner (P4-02a).',
     tags: ['auth'],
     requirements: ['AUTH-003', 'AUTH-013'],
     capability: 'STAFF_MANAGE',
@@ -703,6 +716,138 @@ export const ROUTES = [
     capability: 'SESSION',
     request: { body: OwnerPasswordRequest },
     responses: { 204: { description: 'Password saved.' }, ...standardErrors },
+  },
+  {
+    operationId: 'getOwnerSecurity',
+    method: 'GET',
+    path: '/api/v1/auth/owner/security',
+    summary: "What of the Owner's password, authenticator and recovery codes is set up",
+    description:
+      'Owner only. Never returns a secret: the console shows what is still to set up and whether ' +
+      'the last password + second factor confirmation still holds (AUTH-006).',
+    tags: ['auth'],
+    requirements: ['AUTH-006'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'What is set up.', schema: OwnerSecurityResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'listStaff',
+    method: 'GET',
+    path: '/api/v1/staff',
+    summary: 'Everyone who works here, active or not, with their role and PIN status',
+    description:
+      'MGR-004: never the PIN itself, only whether one is set and whether the sign-in is locked ' +
+      '(AUTH-003); with the PIN length a new PIN must have (AUTH-001).',
+    tags: ['staff'],
+    requirements: ['MGR-004', 'AUTH-001', 'AUTH-003'],
+    capability: 'STAFF_MANAGE',
+    responses: {
+      200: { description: 'Staff.', schema: StaffListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'createStaff',
+    method: 'POST',
+    path: '/api/v1/staff',
+    summary: 'Add a person with a role and a PIN',
+    description:
+      'MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner ' +
+      'with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN ' +
+      'has exactly `auth.pinLength` digits, is hashed with the pepper and never stored or logged ' +
+      '(AUTH-002). Audited.',
+    tags: ['staff'],
+    requirements: ['MGR-004', 'AUTH-001', 'AUTH-002', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { body: CreateStaffRequest },
+    responses: {
+      201: { description: 'The new person.', schema: StaffView },
+      ...standardErrors,
+      422: { description: 'The PIN does not have the configured length.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateStaff',
+    method: 'PATCH',
+    path: '/api/v1/staff/:staffId',
+    summary: "Change a person's name, role, phone or e-mail",
+    description:
+      "MGR-004. A new role applies to the person's next request (AUTH-010). Making someone a " +
+      "manager or no longer one needs the Owner's second factor (AUTH-006); a manager's details " +
+      'are changed by the Owner or themselves; nobody changes their own role. Audited with ' +
+      'before and after.',
+    tags: ['staff'],
+    requirements: ['MGR-004', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: StaffParams, body: UpdateStaffRequest },
+    responses: {
+      200: { description: 'The person as they are now.', schema: StaffView },
+      ...standardErrors,
+      404: { description: 'No such person.', schema: ApiError },
+      422: { description: 'The change is not allowed on this record.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'deactivateStaff',
+    method: 'POST',
+    path: '/api/v1/staff/:staffId/deactivate',
+    summary: 'Deactivate a person: signed out everywhere, kept in the records',
+    description:
+      'MGR-004, AUTH-008: never deleted. Their sessions end and live connections close within 5 ' +
+      "s; their pager and waiter phone are taken back and they leave today's sections. " +
+      "Deactivating a manager needs the Owner's second factor (AUTH-006). Audited with the reason.",
+    tags: ['staff'],
+    requirements: ['MGR-004', 'AUTH-006', 'AUTH-008', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: StaffParams, body: DeactivateStaffRequest },
+    responses: {
+      200: { description: 'The person, inactive.', schema: StaffView },
+      ...standardErrors,
+      404: { description: 'No such person.', schema: ApiError },
+      409: { description: 'They are already inactive.', schema: ApiError },
+      422: { description: 'The Owner, or the person asking.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'reactivateStaff',
+    method: 'POST',
+    path: '/api/v1/staff/:staffId/reactivate',
+    summary: 'Let a deactivated person sign in again',
+    description:
+      "MGR-004. Reactivating a manager needs the Owner's second factor (AUTH-006). Audited.",
+    tags: ['staff'],
+    requirements: ['MGR-004', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: StaffParams },
+    responses: {
+      200: { description: 'The person, active.', schema: StaffView },
+      ...standardErrors,
+      404: { description: 'No such person.', schema: ApiError },
+      409: { description: 'They are already active.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'setStaffPin',
+    method: 'PUT',
+    path: '/api/v1/staff/:staffId/pin',
+    summary: "Set or reset a person's PIN",
+    description:
+      'MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, hashed with the pepper, never ' +
+      "stored, logged or shown. Clears a lockout (AUTH-003). A manager's PIN is set by the Owner " +
+      "or themselves, the Owner's only by the Owner. Audited without the PIN.",
+    tags: ['staff'],
+    requirements: ['MGR-004', 'AUTH-001', 'AUTH-002', 'AUTH-003', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: StaffParams, body: SetStaffPinRequest },
+    responses: {
+      204: { description: 'PIN set.' },
+      ...standardErrors,
+      404: { description: 'No such person.', schema: ApiError },
+      422: { description: 'The PIN does not have the configured length.', schema: ApiError },
+    },
   },
   {
     operationId: 'createPairingCode',

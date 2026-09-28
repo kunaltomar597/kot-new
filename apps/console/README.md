@@ -5,8 +5,9 @@ role-based modes:
 
 - POS (`/pos`): tables, order entry, billing, shifts, day-end (Phase 1);
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
-- Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c);
-  management, configuration, reports (Phase 4).
+- Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c),
+  staff and the Owner's sign-in security (P4-02a); more management, configuration and reports
+  (Phase 4).
 
 Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
 `@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
@@ -69,6 +70,26 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   dishes (`itemDelay` in `@rp/domain`, on the server's clock moved on between reads) and their
   orders carry a badge, an icon and words, not colour alone (NFR-U05). Both pages read again after
   order, kitchen, table, menu and settings events and after a reconnect.
+- Staff (`/manage/staff`, P4-02a, MGR-004, for managers and the Owner): `src/manage/staff/`.
+  `StaffScreen.tsx` lists everyone, active first, with role, contact, "No PIN yet", "Locked until"
+  and "Deactivated" as words, and only the actions the signed-in person may take
+  (`staff-view.ts` `staffActions`, from `@rp/domain` `decideStaffChange`; the server checks
+  again): add, edit, set or change the PIN (typed twice), unlock, deactivate with a reason, and
+  reactivate. The add and edit form is checked with the contract schemas before it is sent and
+  sends only what changed. The list follows `RestaurantChanged` from any screen.
+- The Owner's second factor (`src/owner/second-factor.tsx`, AUTH-006): `useSecondFactor` tries an
+  action and, when the server answers SECOND_FACTOR_REQUIRED, asks for the Owner password and an
+  authenticator code (or a recovery code, typed like a pairing code), confirms them with
+  `stepUp` and sends the action again. Cancelling leaves the action untaken and the form as it
+  was; with no password or authenticator yet it sends the Owner to Security instead.
+- Security (`/manage/security`, the Owner only): `src/owner/OwnerSecurityScreen.tsx` sets the
+  first password and authenticator without more ado and changes them behind the second factor.
+  The authenticator is added from a QR code (`QrCode`, ADR-0014) or its key in groups of four,
+  confirmed with a code, then the ten recovery codes show once, in a dialog only "I have saved
+  them" closes. It shows how many recovery codes are left and until when the last confirmation
+  holds.
+- The sign-in tiles follow `RestaurantChanged` too, so a person added on another screen can sign
+  in at once and a deactivated one disappears.
 - `src/app/console-controller.ts` holds the state and actions outside React (tested on its own);
   screens read it with `useSyncExternalStore`. All text comes from `@rp/i18n` (NFR-L02).
 
@@ -87,7 +108,12 @@ The e2e tests (`e2e/`) start PostgreSQL, seed it, run `apps/server/dist/main.js`
 console, pair a real Chromium, sign each role in and stop and restart the server to check the
 offline banner; then they walk through the floor, orders, the kitchen display, the manager
 dashboard on a desktop and a 360 px phone (no sideways scrolling, and axe-core's WCAG 2.2 A and
-AA rules, colour contrast included, on each page), billing and a manager's nudge acknowledged in
-the alert centre. axe runs through the browser's debugging protocol, since the server's Content
-Security Policy refuses inline scripts. In cloud sessions they use the preinstalled Chromium
+AA rules, colour contrast included, on each page), billing, a manager's nudge acknowledged in
+the alert centre, a manager adding a waiter who signs in on a second tab and is signed out there
+within 5 s of being deactivated, the Owner setting up password and authenticator (the test
+computes the authenticator's code from the key shown) and adding a manager with a recovery code,
+and a cashier refused the Staff page. The tabs share one browser context, so they share the
+device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
+since the server's Content Security Policy refuses inline scripts, after entrance animations end
+(a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium
 (`/opt/pw-browsers`); CI installs Playwright's own.

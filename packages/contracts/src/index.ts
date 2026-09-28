@@ -26,3 +26,4 @@ export * from './service-requests.js';
 export * from './settings.js';
 export * from './table-sessions.js';
 export * from './system.js';
+export * from './staff.js';

@@ -1,0 +1,7 @@
+/* A QR code keeps its white quiet zone in every theme and shrinks to fit a narrow screen. */
+.rp-qr {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--rp-radius-sm);
+}

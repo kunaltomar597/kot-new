@@ -12,7 +12,8 @@ variant/modifier/combo selection components (MENU-012).
 - Overlays: `Dialog`, `Sheet`, `ConfirmDialog` (NFR-U04), `ToastProvider` + `useToast`
 - Navigation: `Tabs`
 - Display: `Badge`, `StatusChip` (order item states, `ORDER_ITEM_STATE_STYLES`), `Money` (paise via
-  `formatRupees`), `Card`, `Table`
+  `formatRupees`), `Card`, `Table`, `QrCode` (drawn offline with `uqr`, ADR-0014: the Owner's
+  authenticator, device pairing)
 - States (NFR-U04): `EmptyState`, `LoadingState`, `ErrorState`, `ConnectionBanner`
 - Setup: `ThemeRoot` (theme + accent), `UiStringsProvider`
 
