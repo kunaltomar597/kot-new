@@ -29,7 +29,13 @@ const root = document.getElementById('root');
 if (root === null) throw new Error('The page has no #root element');
 createRoot(root).render(
   <StrictMode>
-    <BrowserRouter>
+    {/*
+      No transitions: a moved address (a filter kept in it) shows at once, so a checkbox does not
+      spring back until the transition commits, and a second filter picked straight after the first
+      is added to it rather than to the address before it. Nothing in the console suspends, so a
+      transition has nothing to wait for.
+    */}
+    <BrowserRouter useTransitions={false}>
       <ThemeRoot className="console-root">
         <App controller={controller} translator={translator} />
       </ThemeRoot>

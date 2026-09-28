@@ -135,7 +135,7 @@ export async function renderConsole(
   }
   const user = userEvent.setup();
   const view = render(
-    <MemoryRouter initialEntries={[options.path ?? '/']}>
+    <MemoryRouter initialEntries={[options.path ?? '/']} useTransitions={false}>
       <App controller={controller} translator={t} />
     </MemoryRouter>,
   );

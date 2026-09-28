@@ -322,7 +322,11 @@ test.describe.serial('the web console', () => {
     await page.getByRole('button', { name: t('dashboard.orders.allTables') }).click();
     await expect(token).toBeVisible();
 
-    // Filters: a station with nothing cooking, then late dishes only.
+    // Filters: a station with nothing cooking, then late dishes only. The browser runs 30 times
+    // slower here, so a filter picked straight after another comes before the first has shown: it
+    // must still add to it, and the checkbox must stay ticked.
+    const cpu = await page.context().newCDPSession(page);
+    await cpu.send('Emulation.setCPUThrottlingRate', { rate: 30 });
     const filters = page.getByRole('group', { name: t('dashboard.orders.filters') });
     await filters.getByLabel(t('dashboard.orders.station')).selectOption({ label: 'Bar' });
     await expect(page.getByText(t('dashboard.orders.noneMatch'))).toBeVisible();
@@ -334,6 +338,8 @@ test.describe.serial('the web console', () => {
     await expect(token.getByText(t('dashboard.orders.delayed'))).toBeVisible();
     await expect(token.getByText(/^Late: 3\d min in the kitchen, expected 20$/)).toBeVisible();
     await expect(page).toHaveURL(/delayed=1/);
+    await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    await cpu.detach();
     await expectAccessible(page);
 
     // A 360 px phone: the same pages, nothing wider than the screen.
