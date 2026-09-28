@@ -10,6 +10,7 @@ import {
   Icon,
   LoadingState,
   Money,
+  QrCode,
   StatusChip,
   TableTile,
   Table,
@@ -208,6 +209,18 @@ export const ConnectionBanners: Story = {
         status="offline"
         message="Can't reach the restaurant server. New orders will not reach the kitchen."
         action={<Button variant="secondary">Retry now</Button>}
+      />
+    </div>
+  ),
+};
+
+export const QrCodes: Story = {
+  render: () => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+      <QrCode value="ABCD-EFGH" label="Pairing code ABCD-EFGH" size={128} />
+      <QrCode
+        value="otpauth://totp/Spice%20Route:Asha?secret=JBSWY3DPEHPK3PXP&issuer=Spice%20Route"
+        label="Authenticator set-up code"
       />
     </div>
   ),

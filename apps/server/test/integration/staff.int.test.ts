@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import {
   ApiError,
+  CurrentSessionResponse,
   LoginResponse,
   OwnerSecurityResponse,
   StaffListResponse,
@@ -234,7 +235,7 @@ describe('[MGR-004] changing people', () => {
       email: 'meena@example.in',
     });
     const now = await server().get('/api/v1/auth/session').set(as(session));
-    expect(now.body.staff.role).toBe('CASHIER');
+    expect(CurrentSessionResponse.parse(now.body).staff.role).toBe('CASHIER');
     const entry = await prisma.auditLog.findFirstOrThrow({
       where: { action: 'STAFF_UPDATED', entityId: meena.id },
     });
@@ -446,6 +447,27 @@ describe('[AUTH-006] creating or removing managers', () => {
       .send({ pin: '2222' });
     expect(response.status).toBe(403);
     expect(codeOf(response)).toBe('OWNER_ONLY');
+  });
+
+  it('[AUTH-003] keeps the Owner’s and other managers’ locked logins to the Owner', async () => {
+    const unlock = (session: LoginResponse, staffId: string) =>
+      server().post('/api/v1/auth/unlock').set(as(session)).send({ staffId });
+    const ownerLock = await unlock(manager, kit.staff.OWNER);
+    expect(ownerLock.status).toBe(403);
+    expect(codeOf(ownerLock)).toBe('OWNER_ONLY');
+
+    await stepUp();
+    const added = await create(owner, { displayName: 'Meera', role: 'MANAGER', pin: '8765' });
+    expect(added.status).toBe(201);
+    const meera = StaffView.parse(added.body);
+    const otherManager = await unlock(manager, meera.id);
+    expect(otherManager.status).toBe(403);
+    expect(codeOf(otherManager)).toBe('OWNER_ONLY');
+
+    // Unlocking gives nobody a role, so the Owner needs no second factor for it.
+    await forgetStepUp();
+    await unlock(owner, meera.id).expect(204);
+    await unlock(manager, kit.staff.MANAGER).expect(204);
   });
 
   it('tells the Owner what of their sign-in security is set up, and nobody else', async () => {

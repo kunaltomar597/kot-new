@@ -65,9 +65,7 @@ export const UpdateStaffRequest = z
     phone: PhoneNumber.nullable().optional(),
     email: Email.nullable().optional(),
   })
-  .refine((body) => Object.values(body).some((value) => value !== undefined), {
-    message: 'Change at least one thing',
-  });
+  .refine((body) => Object.keys(body).length > 0, { message: 'Change at least one thing' });
 export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
 
 /** Deactivation says why; it signs the person out everywhere (AUTH-008). */

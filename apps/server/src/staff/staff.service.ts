@@ -12,20 +12,18 @@ import {
   isValidPin,
   type Role,
   type StaffChange,
-  type StaffRefusal,
   type StaffTarget,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
-import { authErrors } from '../auth/auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from '../auth/auth-settings.js';
 import { CredentialHasher } from '../auth/credential-hasher.js';
 import type { Principal } from '../auth/principal.js';
 import { hasFreshStepUp } from '../auth/step-up.js';
 import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
-import { AppError } from '../errors/app-error.js';
 import { PagerBroker } from '../pagers/pager-broker.js';
 import { announceSetupChange, lockSetup } from '../restaurant/setup-changes.js';
+import { staffErrors } from './staff-errors.js';
 
 const STAFF_INCLUDE = {
   role: { select: { baseRole: true } },
@@ -72,40 +70,6 @@ function view(person: StaffRow, now: Date): StaffView {
     updatedAt: person.updatedAt.toISOString(),
   };
 }
-
-const staffErrors = {
-  notFound: () => new AppError(404, 'STAFF_NOT_FOUND', 'There is no such person.'),
-  pinLength: (length: number) =>
-    new AppError(422, 'PIN_LENGTH', `The PIN must have exactly ${String(length)} digits.`, {
-      pinLength: length,
-    }),
-  refused: (reason: StaffRefusal): AppError => {
-    switch (reason) {
-      case 'DENIED':
-        return authErrors.forbidden();
-      case 'OWNER_ONLY':
-        return authErrors.ownerOnly();
-      case 'SECOND_FACTOR_REQUIRED':
-        return authErrors.secondFactorRequired();
-      case 'OWNER_RECORD':
-        return new AppError(
-          422,
-          'OWNER_RECORD',
-          'The Owner always stays active and keeps the Owner role.',
-        );
-      case 'OWN_RECORD':
-        return new AppError(
-          422,
-          'OWN_RECORD',
-          'You cannot deactivate yourself or change your own role. Ask the Owner.',
-        );
-      case 'ALREADY_ACTIVE':
-        return new AppError(409, 'STAFF_ALREADY_ACTIVE', 'This person is already active.');
-      case 'ALREADY_INACTIVE':
-        return new AppError(409, 'STAFF_ALREADY_INACTIVE', 'This person is already deactivated.');
-    }
-  },
-};
 
 /**
  * Staff administration (P4-02a, MGR-004): adding people, their roles and PINs, deactivating and

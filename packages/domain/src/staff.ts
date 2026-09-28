@@ -24,6 +24,8 @@ export type StaffChange =
   | { readonly kind: 'EDIT' }
   | { readonly kind: 'CHANGE_ROLE'; readonly role: AssignableRole }
   | { readonly kind: 'SET_PIN' }
+  /** Opens a login locked after wrong attempts (AUTH-003). */
+  | { readonly kind: 'UNLOCK' }
   | { readonly kind: 'DEACTIVATE' }
   | { readonly kind: 'REACTIVATE' };
 
@@ -83,6 +85,7 @@ function changesManagers(change: StaffChange, target: StaffTarget | null): boole
       return target?.role === 'MANAGER';
     case 'EDIT':
     case 'SET_PIN':
+    case 'UNLOCK':
       return false;
   }
 }
@@ -90,8 +93,8 @@ function changesManagers(change: StaffChange, target: StaffTarget | null): boole
 /**
  * May `actor` make `change` to `target` (null when creating)? Managers look after cashiers,
  * waiters and kitchen staff. Anything that creates or removes a manager needs the Owner with a
- * fresh second factor (AUTH-006); a manager's other details and PIN are changed by the Owner or by
- * that manager, and the Owner's own record only by the Owner. Permission comes before state, so a
+ * fresh second factor (AUTH-006); a manager's other details, PIN and lock are changed by the Owner
+ * or by that manager, and the Owner's own record only by the Owner. Permission comes before state, so a
  * refused person learns nothing about the record.
  */
 export function decideStaffChange(

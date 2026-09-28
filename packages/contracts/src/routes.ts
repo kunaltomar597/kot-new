@@ -668,6 +668,9 @@ export const ROUTES = [
     method: 'POST',
     path: '/api/v1/auth/unlock',
     summary: "Unlock a staff member's PIN login after repeated failures",
+    description:
+      'A manager unlocks their own login and their team’s; the Owner’s and other managers’ ' +
+      'only the Owner (P4-02a).',
     tags: ['auth'],
     requirements: ['AUTH-003', 'AUTH-013'],
     capability: 'STAFF_MANAGE',

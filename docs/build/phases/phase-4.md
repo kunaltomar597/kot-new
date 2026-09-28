@@ -54,7 +54,7 @@ Depends on: P4-01, P1-03, P0-11.
 Too big for one pull request, so it is built in five parts, each with its own Playwright flow and
 permission denials for non-managers.
 
-### P4-02a Staff and the Owner's sign-in security
+### P4-02a Staff and the Owner's sign-in security (done)
 
 Requirements: MGR-004 (people, roles, PINs), AUTH-001, AUTH-003, AUTH-006, AUTH-008, AUD-001.
 Deliverables: staff routes (list, add, edit, deactivate, reactivate, set PIN; never delete) with
@@ -72,6 +72,27 @@ change is audited.
 Acceptance: server tests for every rule; Playwright flow: a manager adds a waiter with a PIN, the
 waiter signs in, the manager deactivates them and they are signed out; the Owner adds a manager
 with the second factor; a cashier cannot open the Staff page or call the routes.
+
+As built:
+
+- `@rp/domain` `staff.ts`: `decideStaffChange` for CREATE, EDIT, CHANGE_ROLE, SET_PIN, UNLOCK,
+  DEACTIVATE and REACTIVATE, refusing with DENIED, OWNER_RECORD, OWN_RECORD, OWNER_ONLY,
+  SECOND_FACTOR_REQUIRED, ALREADY_ACTIVE or ALREADY_INACTIVE; `rolesOffered`, `isValidPin`.
+  Permission is checked before state, so a refused person learns nothing about the record.
+- Contracts: `listStaff`, `createStaff`, `updateStaff`, `deactivateStaff`, `reactivateStaff`,
+  `setStaffPin` (`StaffView` never carries a secret: `hasPin`, `lockedUntil`), `getOwnerSecurity`;
+  `RestaurantChanged` gains `STAFF`.
+- Server: `StaffModule` (see `apps/server/README.md`). `unlockStaff` now applies the staff rules:
+  a manager no longer unlocks the Owner's or another manager's login (the Owner's password lock
+  guards Owner-only actions from guessing).
+- Console: `/manage/staff` and, for the Owner, `/manage/security`; `useSecondFactor` retries an
+  action after the Owner confirms password and authenticator or recovery code; the authenticator
+  is added from a `QrCode` (`@rp/ui-web`, `uqr`, ADR-0014) or its key; recovery codes show once.
+  The sign-in tiles follow `RestaurantChanged`.
+- Playwright: the waiter signs in on a second tab of the same browser (one device) and is back on
+  the sign-in screen, told they were signed out, within 5 s of the deactivation; the Owner's test
+  computes the authenticator code from the key on screen and adds the manager with a recovery
+  code (the enrolment code's 30 s step cannot be used twice).
 
 ### P4-02b Sections and pagers
 

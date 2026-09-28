@@ -698,6 +698,7 @@
       "post": {
         "operationId": "unlockStaff",
         "summary": "Unlock a staff member's PIN login after repeated failures",
+        "description": "A manager unlocks their own login and their team’s; the Owner’s and other managers’ only the Owner (P4-02a).",
         "tags": ["auth"],
         "requestBody": {
           "required": true,

@@ -1,47 +1,29 @@
 import type { StaffTile } from '@rp/contracts';
 import { Button, EmptyState, ErrorState, LoadingState, PinPad } from '@rp/ui-web';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useConsole, useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
-
-type Tiles =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'failed'; readonly message: string }
-  | { readonly kind: 'ready'; readonly staff: readonly StaffTile[] };
+import { useLive } from '../app/use-live.js';
 
 /**
  * The shared-terminal login (AUTH-001, AUTH-004): pick yourself from the tiles, then enter your
- * PIN on the pad, by touch or keyboard.
+ * PIN on the pad, by touch or keyboard. The tiles follow staff changes made anywhere (P4-02a): a
+ * person added on another screen can sign in here at once, and a deactivated one disappears.
  */
 export function LoginScreen() {
   const t = useT();
   const controller = useConsole();
   const { notice } = useConsoleState();
   const navigate = useNavigate();
-  const [tiles, setTiles] = useState<Tiles>({ kind: 'loading' });
+  const { data: tiles, reload } = useLive(
+    () => controller.staffTiles(),
+    (type) => type === 'RestaurantChanged',
+  );
   const [selected, setSelected] = useState<StaffTile | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const fetchTiles = useCallback(async (): Promise<Tiles> => {
-    try {
-      return { kind: 'ready', staff: await controller.staffTiles() };
-    } catch (caught) {
-      return { kind: 'failed', message: messageOf(caught, t) };
-    }
-  }, [controller, t]);
-
-  useEffect(() => {
-    let current = true;
-    void fetchTiles().then((result) => {
-      if (current) setTiles(result);
-    });
-    return () => {
-      current = false;
-    };
-  }, [fetchTiles]);
 
   async function signIn(person: StaffTile, pin: string): Promise<void> {
     setBusy(true);
@@ -100,24 +82,21 @@ export function LoginScreen() {
             {noticeText}
           </p>
         )}
-        {tiles.kind === 'loading' ? <LoadingState title={t('states.loading')} /> : null}
-        {tiles.kind === 'failed' ? (
+        {tiles.status === 'loading' ? <LoadingState title={t('states.loading')} /> : null}
+        {tiles.status === 'error' ? (
           <ErrorState
             title={t('states.error')}
-            description={tiles.message}
-            onRetry={() => {
-              setTiles({ kind: 'loading' });
-              void fetchTiles().then(setTiles);
-            }}
+            description={messageOf(tiles.error, t)}
+            onRetry={reload}
             retryLabel={t('states.retry')}
           />
         ) : null}
-        {tiles.kind === 'ready' && tiles.staff.length === 0 ? (
+        {tiles.status === 'ready' && tiles.value.length === 0 ? (
           <EmptyState title={t('states.empty')} description={t('login.noStaff')} />
         ) : null}
-        {tiles.kind === 'ready' && tiles.staff.length > 0 ? (
+        {tiles.status === 'ready' && tiles.value.length > 0 ? (
           <ul className="console-tiles">
-            {tiles.staff.map((person) => (
+            {tiles.value.map((person) => (
               <li key={person.staffId}>
                 <button
                   type="button"

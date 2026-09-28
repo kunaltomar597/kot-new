@@ -86,6 +86,17 @@ describe('[MGR-004] staff management rules', () => {
     expect(decide(owner, otherManager, { kind: 'SET_PIN' })).toBe('ALLOWED');
   });
 
+  it('[AUTH-003] lets a manager open a locked login, but not the Owner’s or another manager’s', () => {
+    expect(decide(manager, waiter, { kind: 'UNLOCK' })).toBe('ALLOWED');
+    expect(decide(manager, managerSelf, { kind: 'UNLOCK' })).toBe('ALLOWED');
+    // The lock on the Owner's password guards Owner-only actions from guessing.
+    expect(decide(manager, ownerRecord, { kind: 'UNLOCK' })).toBe('OWNER_ONLY');
+    expect(decide(manager, otherManager, { kind: 'UNLOCK' })).toBe('OWNER_ONLY');
+    // No second factor needed: unlocking gives nobody a new role.
+    expect(decide(owner, otherManager, { kind: 'UNLOCK' })).toBe('ALLOWED');
+    expect(decide(owner, ownerRecord, { kind: 'UNLOCK' })).toBe('ALLOWED');
+  });
+
   it('says when there is nothing to deactivate or reactivate', () => {
     expect(decide(manager, person('ravi', 'WAITER', false), { kind: 'DEACTIVATE' })).toBe(
       'ALREADY_INACTIVE',

@@ -141,8 +141,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02a Staff and the Owner's sign-in security (P4-01, P1-03 and P0-11 done), then P4-02b to
-  P4-02e (P4-02 is split in five, see phase-4.md).
+- P4-02b Sections and pagers (P4-02a done), then P4-02c Devices, P4-02d Menu editor and P4-02e
+  Custom roles (P4-02 is split in five, see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -243,7 +243,7 @@ Recommended next WPs (dependencies met):
 ### Phase 4: Manager dashboard and reports
 
 - [x] P4-01 Dashboard shell and live views
-- [ ] P4-02a Staff and the Owner's sign-in security
+- [x] P4-02a Staff and the Owner's sign-in security
 - [ ] P4-02b Sections and pagers
 - [ ] P4-02c Devices
 - [ ] P4-02d Menu editor
@@ -534,6 +534,39 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-09-28 (P4-02a):
+
+195. The roles given on the Staff page are Manager, Cashier, Waiter and Kitchen. The restaurant's
+     one Owner is set up at installation (ONB-004) and is never added, given another role,
+     deactivated or reactivated there.
+196. "Creating or removing managers" (AUTH-006) covers adding a manager, making someone a manager
+     or no longer one, and deactivating or reactivating one: the Owner only, with a fresh second
+     factor. A manager's other details, PIN and lock are changed by the Owner or by that manager;
+     the Owner's record only by the Owner; nobody deactivates themselves or changes their own
+     role. The same rules now decide who unlocks whom: a manager no longer unlocks the Owner's or
+     another manager's login, since the lock on the Owner's password guards Owner-only actions
+     from guessing.
+197. A PIN has exactly `auth.pinLength` digits and need not be unique (sign-in picks the person
+     first). A new PIN ends the person's other sessions and lifts a lock.
+198. Deactivating someone ends their sessions (their screens are back on sign-in within seconds),
+     frees their pager and waiter phone, takes them off today's and later section assignments and
+     ends a break. Their open tables stay theirs, and alerts for them fall back as for anyone
+     unreachable. Reactivating restores sign-in only; sections and devices are given again.
+199. Moving someone to Kitchen (the one role without ORDER_CREATE) takes them off sections.
+200. The audit never holds a PIN or contact details: it records that a phone or e-mail was given,
+     and which fields changed.
+201. The built-in roles are created in the database with the first person given each, with English
+     names (data, not code). Staff photos wait for a later package; P4-02b re-applies "same as last
+     time" without deactivated people.
+202. The Owner still signs in with a PIN on shared screens; the password and authenticator protect
+     Owner-only actions. Setting either up the first time needs nothing more, changing either
+     needs the second factor. The recovery codes show once, in a dialog only "I have saved them"
+     closes.
+203. QR codes are drawn in the browser with `uqr` (ADR-0014), so the authenticator secret never
+     leaves the screen that shows it.
+204. The sign-in tiles follow `RestaurantChanged`, so a person added anywhere can sign in at once and
+     a deactivated one disappears without a reload.
 
 Decided 2026-09-27 (P4-01):
 

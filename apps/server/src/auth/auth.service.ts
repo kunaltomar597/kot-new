@@ -15,11 +15,12 @@ import type {
   TotpConfirmResponse,
   TotpEnrollmentResponse,
 } from '@rp/contracts';
-import { canApproveOverride, grantFor, type Role } from '@rp/domain';
+import { canApproveOverride, decideStaffChange, grantFor, type Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
 import type { CredentialKind } from '../generated/prisma/enums.js';
+import { staffErrors } from '../staff/staff-errors.js';
 import { authErrors } from './auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
 import { hasFreshStepUp } from './step-up.js';
@@ -262,9 +263,17 @@ export class AuthService {
     await this.prisma.transaction(async (tx) => {
       const staff = await tx.staff.findFirst({
         where: { id: staffId, restaurantId: principal.restaurantId },
-        select: { id: true },
+        select: { id: true, active: true, role: { select: { baseRole: true } } },
       });
       if (staff === null) throw authErrors.forbidden();
+      // A manager opens their own and their team's logins; the Owner's and other managers' locks
+      // (the Owner's password guards Owner-only actions) only the Owner opens (P4-02a).
+      const decision = decideStaffChange(
+        { staffId: principal.staffId, role: principal.role, secondFactorFresh: false },
+        { staffId: staff.id, role: staff.role.baseRole, active: staff.active },
+        { kind: 'UNLOCK' },
+      );
+      if (!decision.allowed) throw staffErrors.refused(decision.reason);
       const before = await tx.credential.findMany({
         where: { staffId },
         select: { kind: true, lockedUntil: true, failedAttempts: true },

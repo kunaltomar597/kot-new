@@ -1,6 +1,7 @@
+import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createTranslator } from '@rp/i18n';
 import pg from 'pg';
 import { type RunningServer, startServer } from './server.js';
@@ -45,6 +46,20 @@ interface AxeViolation {
 
 /** No WCAG 2.2 A or AA violations on the page as it stands, colour contrast included. */
 async function expectAccessible(page: Page): Promise<void> {
+  // Let entrance animations (a dialog fading in) end, so colours are measured as people see them.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) =>
+          animation.finished.then(
+            () => undefined,
+            () => undefined,
+          ),
+        ),
+    ),
+  );
   await page.evaluate(AXE_SOURCE);
   const violations = await page.evaluate(async () => {
     const { axe } = window as unknown as {
@@ -87,17 +102,44 @@ async function sentMinutesAgo(item: string, minutes: number): Promise<void> {
   }
 }
 
+/**
+ * The code an authenticator app shows now for a base32 key (RFC 6238: HMAC-SHA1, 30 s steps,
+ * 6 digits), as the Owner's phone would.
+ */
+function authenticatorCode(key: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  const bytes: number[] = [];
+  for (const char of key.replace(/\s/g, '')) {
+    value = (value << 5) | alphabet.indexOf(char);
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
+  const digest = createHmac('sha1', Buffer.from(bytes)).update(counter).digest();
+  const offset = (digest.at(-1) ?? 0) & 0x0f;
+  return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
 test.describe.serial('the web console', () => {
   let server: RunningServer;
+  // One browser profile: the device key it keeps is shared by every tab, like a POS terminal's.
+  let context: BrowserContext;
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     server = await startServer();
-    page = await browser.newPage();
+    context = await browser.newContext();
+    page = await context.newPage();
   });
 
   test.afterAll(async () => {
-    await page.close();
+    await context.close();
     await server.stop();
   });
 
@@ -483,5 +525,141 @@ test.describe.serial('the web console', () => {
     await expect(acknowledge).toBeVisible();
     await acknowledge.click();
     await expect(acknowledge).toHaveCount(0);
+  });
+  test('[MGR-004] [AUTH-001] [AUTH-008] a manager adds a waiter who signs in, then deactivates them and they are signed out', async () => {
+    // A second screen on this device, waiting on the sign-in screen.
+    const other = await context.newPage();
+    await other.goto(server.url);
+    await expect(other.getByRole('heading', { name: t('login.title') })).toBeVisible();
+    const sunilTile = other.getByRole('button', { name: /^Sunil/ });
+    await expect(sunilTile).toHaveCount(0);
+
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.staff') })
+      .click();
+    await expect(page.getByRole('heading', { level: 2, name: t('staff.title') })).toBeVisible();
+
+    await page.getByRole('button', { name: t('staff.add') }).click();
+    const add = page.getByRole('dialog', { name: t('staff.form.addTitle') });
+    await add.getByLabel(t('staff.form.name'), { exact: false }).first().fill('Sunil');
+    await expect(add.getByLabel(t('staff.form.role'))).toHaveValue('WAITER');
+    await add.getByLabel(/^PIN( \*)?$/).fill('7777');
+    await add.getByLabel(/^PIN again( \*)?$/).fill('7777');
+    await expectAccessible(page);
+    await add.getByRole('button', { name: t('staff.form.add') }).click();
+    await expect(page.getByText(t('staff.added', { name: 'Sunil' }))).toBeVisible();
+    const sunil = page.getByRole('group', { name: t('staff.actionsFor', { name: 'Sunil' }) });
+    await expect(sunil).toBeVisible();
+    await expectAccessible(page);
+
+    // The new waiter shows on the other screen without a reload, and signs in with the new PIN.
+    await sunilTile.click();
+    await other.keyboard.type('7777');
+    await expect(other).toHaveURL(/\/pos$/);
+
+    // A 360 px phone: the Staff page fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(sunil).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await sunil.getByRole('button', { name: t('staff.deactivate') }).click();
+    const deactivate = page.getByRole('dialog', {
+      name: t('staff.deactivateDialog.title', { name: 'Sunil' }),
+    });
+    await deactivate.getByLabel(t('staff.deactivateDialog.reason')).fill('Trial shift over');
+    await deactivate.getByRole('button', { name: t('staff.deactivateDialog.confirm') }).click();
+    await expect(page.getByText(t('staff.deactivated', { name: 'Sunil' }))).toBeVisible();
+    const deactivated = Date.now();
+
+    // Signed out on the other screen within seconds (AUTH-008), and off its sign-in tiles.
+    await expect(other.getByRole('heading', { name: t('login.title') })).toBeVisible({
+      timeout: 5_000,
+    });
+    expect(Date.now() - deactivated).toBeLessThan(5_000);
+    await expect(other.getByText(t('login.signedOut'))).toBeVisible();
+    await expect(sunilTile).toHaveCount(0);
+    await expect(sunil.getByRole('button', { name: t('staff.reactivate') })).toBeVisible();
+    await other.close();
+  });
+
+  test('[AUTH-006] the Owner sets up password and authenticator, then adds a manager with the second factor', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
+    await page.keyboard.type('1111');
+    await expect(page).toHaveURL(/\/manage$/);
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.security') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('ownerSecurity.title') }),
+    ).toBeVisible();
+    await expectAccessible(page);
+
+    const password = 'rooftop tandoor since 1998';
+    await page.getByRole('button', { name: t('ownerSecurity.password.setAction') }).click();
+    const setPassword = page.getByRole('dialog', { name: t('ownerSecurity.password.setAction') });
+    await setPassword.getByLabel(/^New password( \*)?$/).fill(password);
+    await setPassword.getByLabel(/^New password again( \*)?$/).fill(password);
+    await setPassword.getByRole('button', { name: t('ownerSecurity.password.save') }).click();
+    await expect(page.getByText(t('ownerSecurity.password.saved'))).toBeVisible();
+
+    await page.getByRole('button', { name: t('ownerSecurity.authenticator.add') }).click();
+    const enrol = page.getByRole('dialog', { name: t('ownerSecurity.authenticator.add') });
+    await expect(
+      enrol.getByRole('img', { name: t('ownerSecurity.authenticator.qrLabel') }),
+    ).toBeVisible();
+    await expectAccessible(page);
+    // The phone reads the key (typed here, as "Can't scan it?" offers) and shows the code.
+    const key = await enrol.locator('code').innerText();
+    await enrol
+      .getByLabel(t('ownerSecurity.authenticator.code'), { exact: false })
+      .fill(authenticatorCode(key));
+    await enrol.getByRole('button', { name: t('ownerSecurity.authenticator.confirm') }).click();
+    const codes = page.getByRole('dialog', { name: t('ownerSecurity.recovery.saveTitle') });
+    const recovery = codes
+      .getByRole('list', { name: t('ownerSecurity.recovery.codes') })
+      .getByRole('listitem');
+    await expect(recovery).toHaveCount(10);
+    const firstCode = await recovery.first().innerText();
+    await codes.getByRole('button', { name: t('ownerSecurity.recovery.saved') }).click();
+    await expect(page.getByText(t('ownerSecurity.recovery.left', { count: 10 }))).toBeVisible();
+
+    // Adding a manager asks for the password and a second factor: this time a recovery code.
+    await nav.getByRole('link', { name: t('dashboard.section.staff') }).click();
+    await page.getByRole('button', { name: t('staff.add') }).click();
+    const add = page.getByRole('dialog', { name: t('staff.form.addTitle') });
+    await add.getByLabel(t('staff.form.name'), { exact: false }).first().fill('Farah');
+    await add.getByLabel(t('staff.form.role')).selectOption({ label: t('roles.MANAGER') });
+    await add.getByLabel(/^PIN( \*)?$/).fill('8888');
+    await add.getByLabel(/^PIN again( \*)?$/).fill('8888');
+    await add.getByRole('button', { name: t('staff.form.add') }).click();
+    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
+    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(password);
+    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
+    await confirm.getByLabel(t('secondFactor.recoveryCode'), { exact: false }).fill(firstCode);
+    await expectAccessible(page);
+    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
+    await expect(page.getByText(t('staff.added', { name: 'Farah' }))).toBeVisible();
+    await expect(
+      page.getByRole('group', { name: t('staff.actionsFor', { name: 'Farah' }) }),
+    ).toBeVisible();
+
+    await nav.getByRole('link', { name: t('dashboard.section.security') }).click();
+    await expect(page.getByText(t('ownerSecurity.recovery.left', { count: 9 }))).toBeVisible();
+  });
+
+  test('[SEC-003] a cashier cannot open the Staff page', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
+    await page.keyboard.type('3333');
+    await expect(page).toHaveURL(/\/pos$/);
+    await page.goto(`${server.url}/manage/staff`);
+    await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: t('staff.title') })).toHaveCount(0);
   });
 });

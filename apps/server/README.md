@@ -477,6 +477,26 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `test/integration/recommendations-performance.int.test.ts` (1,000 items, 200 rules, 27,000 order
   lines: p95 within 200 ms, REC-011).
 
+## Staff (P4-02a)
+
+- `src/staff/staff.service.ts` serves `/api/v1/staff` (STAFF_MANAGE): list (active first, never a
+  secret: `hasPin` and `lockedUntil` only), add with a PIN, edit name, role and contact, set a
+  PIN, deactivate with a reason and reactivate; never delete (AUD-004). Who may change whom is
+  `@rp/domain` `decideStaffChange`: anything that creates or removes a manager needs the Owner with
+  a fresh second factor (AUTH-006), a manager's other details only the Owner or that manager, the
+  Owner's record only the Owner, and nobody deactivates themselves or changes their own role.
+  `POST /api/v1/auth/unlock` applies the same rules.
+- A PIN has exactly `auth.pinLength` digits (PIN_LENGTH otherwise), is hashed with the pepper and
+  is never logged or audited; setting one ends the person's other sessions and lifts a lock.
+- Deactivating revokes the person's sessions (the realtime sweep closes their sockets within
+  seconds, AUTH-008), frees their pager (the broker is told) and waiter phone, removes today's and
+  later section assignments and ends a break. Moving someone to Kitchen takes them off sections.
+- Every change is audited (STAFF_CREATED, STAFF_UPDATED, STAFF_PIN_SET, STAFF_DEACTIVATED,
+  STAFF_REACTIVATED; contact values and PINs never, only what changed) and announced as
+  `RestaurantChanged` `STAFF`, which the staff list and the sign-in tiles follow.
+- `GET /api/v1/auth/owner/security` tells the Owner what of password, authenticator and recovery
+  codes is set up, never a secret. See `test/integration/staff.int.test.ts`.
+
 ## Pagers (P2-04a)
 
 - `src/pagers/pager-broker.ts` embeds the MQTT broker (Aedes) on `RP_MQTT_PORT` (8883), over TLS

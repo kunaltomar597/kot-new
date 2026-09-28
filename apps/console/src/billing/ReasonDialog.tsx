@@ -1,18 +1,26 @@
 import { Button, Dialog, TextField } from '@rp/ui-web';
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { useT } from '../app/i18n.js';
 
 /** Asks why before an audited change (a reason is mandatory, AUD-001). */
 export function ReasonDialog({
   title,
+  description,
   label,
+  confirmLabel,
+  tone = 'primary',
   onConfirm,
   onClose,
   busy = false,
   error,
 }: {
   title: string;
+  /** What will happen, when the title does not say it all. */
+  description?: ReactNode;
   label: string;
+  confirmLabel?: string;
+  /** `danger` when the change takes something away (deactivating a person). */
+  tone?: 'primary' | 'danger';
   onConfirm: (reason: string) => void;
   onClose: () => void;
   busy?: boolean;
@@ -27,9 +35,16 @@ export function ReasonDialog({
       onClose={onClose}
       dismissible={!busy}
       title={title}
+      description={description}
       footer={
-        <Button type="submit" form={formId} loading={busy} disabled={reason.trim().length < 3}>
-          {t('billing.confirm')}
+        <Button
+          type="submit"
+          form={formId}
+          variant={tone}
+          loading={busy}
+          disabled={reason.trim().length < 3}
+        >
+          {confirmLabel ?? t('billing.confirm')}
         </Button>
       }
     >
