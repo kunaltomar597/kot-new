@@ -9,6 +9,12 @@ export interface KitchenSounds {
   change(volumePercent: number): void;
 }
 
+/** "Here I am" when a manager looks for this device (MGR-006 "Locate"): three rising notes. */
+export interface LocateSound {
+  unlock(): void;
+  locate(volumePercent: number): void;
+}
+
 type Note = readonly [frequencyHz: number, startSeconds: number, lengthSeconds: number];
 
 const CHIME: readonly Note[] = [
@@ -19,10 +25,15 @@ const BUZZ: readonly Note[] = [
   [330, 0, 0.22],
   [330, 0.3, 0.22],
 ];
+const HERE: readonly Note[] = [
+  [660, 0, 0.16],
+  [880, 0.2, 0.16],
+  [1175, 0.4, 0.32],
+];
 
 export function webAudioSounds(
   create: () => AudioContext = () => new AudioContext(),
-): KitchenSounds {
+): KitchenSounds & LocateSound {
   let context: AudioContext | undefined;
   const play = (notes: readonly Note[], volumePercent: number, wave: OscillatorType) => {
     if (context === undefined || volumePercent <= 0) return;
@@ -53,6 +64,9 @@ export function webAudioSounds(
     },
     change(volumePercent) {
       play(BUZZ, volumePercent, 'square');
+    },
+    locate(volumePercent) {
+      play(HERE, volumePercent, 'triangle');
     },
   };
 }

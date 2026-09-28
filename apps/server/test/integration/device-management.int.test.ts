@@ -117,8 +117,16 @@ describe('[MGR-006] [TAB-015] the device list', () => {
     expect((await listed(kds)).online).toBe(false);
     const screen = await connect(kds);
     expect((await listed(kds)).online).toBe(true);
+    // Last seen as it connected (at most once a minute), and again as it left (MGR-006).
+    const connectedAt = (await listed(kds)).lastSeenAt ?? '';
+    expect(connectedAt).not.toBe('');
     screen.close();
     await until(async () => !(await listed(kds)).online, 5_000, 'the screen to show as gone');
+    await until(
+      async () => ((await listed(kds)).lastSeenAt ?? '') > connectedAt,
+      5_000,
+      'last seen as it left',
+    );
 
     // Pagers report through heartbeats (the broker keeps `online`); 15 % is low for a pager…
     const pager = await addDevice(app, kit, 'PAGER');

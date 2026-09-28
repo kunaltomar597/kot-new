@@ -293,6 +293,9 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     socket.on(REALTIME_MESSAGES.resync, (request: unknown, ack: unknown) => {
       void this.resync(socket, request, ack);
     });
+    socket.on('disconnect', () => {
+      this.seen(socket.data.device);
+    });
     try {
       await this.bus.withPublishLock(async () => {
         const sync = await this.replay(socket, socket.data.resume);
@@ -305,6 +308,23 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
       // Transport-level close: the client reconnects and tries again.
       socket.conn.close();
     }
+  }
+
+  /**
+   * When an app or screen was last connected (MGR-006 "last seen"): the handshake and its requests
+   * record it (`DeviceTokenAuthenticator`), and this records when it left, so a screen that was
+   * connected all day is not shown as last seen in the morning. While connected, the device list
+   * says so instead.
+   */
+  private seen(device: AuthenticatedDevice): void {
+    this.prisma.device
+      .updateMany({
+        where: { id: device.deviceId, status: 'ACTIVE' },
+        data: { lastSeenAt: new Date() },
+      })
+      .catch((error: unknown) => {
+        this.logger.warn({ err: error }, 'Could not record when a device was last seen');
+      });
   }
 
   private async resync(socket: RealtimeSocket, request: unknown, ack: unknown): Promise<void> {
