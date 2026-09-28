@@ -47,17 +47,65 @@ As built:
   filters with a dish backdated in the database, no sideways scrolling, and axe-core's WCAG 2.2 A
   and AA rules with colour contrast in the real browser on every page.
 
-## P4-02 Staff, device and menu management UI
+## P4-02 Staff, device and menu management UI (split)
 
 Requirements: MGR-004, MGR-005, MGR-006, AUTH-012 (S: custom roles), PGR-012, TAB-002.
 Depends on: P4-01, P1-03, P0-11.
-Deliverables: staff add/edit/deactivate (never delete), roles, set/reset PINs, section assignment per
-shift, pager assignment; full menu editor (items, photos, variants, modifiers, combos, availability,
-stock, synonyms, tags); device list with type, binding, status, battery, versions, last seen; pair,
-unpair, rename; "Locate" (S). The pair dialog shows the QR code (`qrPayload`), the code, the server
-addresses (`serverUrls`) and the CA fingerprint (`caSha256`), which phones typing an address
-compare (P2-01d).
-Acceptance: Playwright flows for each area; permission denials for non-managers.
+Too big for one pull request, so it is built in five parts, each with its own Playwright flow and
+permission denials for non-managers.
+
+### P4-02a Staff and the Owner's sign-in security
+
+Requirements: MGR-004 (people, roles, PINs), AUTH-001, AUTH-003, AUTH-006, AUTH-008, AUD-001.
+Deliverables: staff routes (list, add, edit, deactivate, reactivate, set PIN; never delete) with
+the rules in `@rp/domain` `staff.ts`: the roles given are Manager, Cashier, Waiter and Kitchen (the
+one Owner is set up at installation); creating a manager, making someone a manager or no longer
+one, and deactivating or reactivating a manager need the Owner with a fresh second factor
+(AUTH-006); only the Owner changes a manager's details or PIN, and only the Owner their own record;
+nobody deactivates themselves or changes their own role; a PIN has exactly `auth.pinLength` digits
+and need not be unique (AUTH-001). Deactivating ends the person's sessions and live connections
+(AUTH-008), takes back their pager and waiter phone and takes them off today's sections. Console:
+the dashboard's Staff page (list, add, edit, set PIN, unlock, deactivate, reactivate), the Owner's
+second-factor dialog (password and authenticator or recovery code, then the action is repeated)
+and the Owner's sign-in security (password, authenticator with QR code, recovery codes). Every
+change is audited.
+Acceptance: server tests for every rule; Playwright flow: a manager adds a waiter with a PIN, the
+waiter signs in, the manager deactivates them and they are signed out; the Owner adds a manager
+with the second factor; a cashier cannot open the Staff page or call the routes.
+
+### P4-02b Sections and pagers
+
+Requirements: MGR-004 (section assignment per shift, pager assignment), PGR-012, TBL-002.
+Deliverables: on the Staff page, today's sections for each waiter (sections and single tables,
+"same as last time") over `updateWaiterAssignments`, and the pagers: register one by its serial
+(the credential shown once), give it to a person or take it back (re-assignment at shift start in
+≤ 30 s), issue a new credential.
+Acceptance: Playwright flow assigning sections and a pager.
+
+### P4-02c Devices
+
+Requirements: MGR-006, TAB-002, AUTH-008, AUTH-009.
+Deliverables: device list with type, binding (table, station, person), status, battery, app and
+firmware version and last seen; pair, unpair (tokens revoked and connections closed within 5 s),
+rename; binding a tablet to its table; "Locate" (S): a tablet beeps, a pager vibrates. The pair
+dialog shows the QR code (`qrPayload`), the code, the server addresses (`serverUrls`) and the CA
+fingerprint (`caSha256`), which phones typing an address compare (P2-01d).
+Acceptance: Playwright pair, rename and unpair flow.
+
+### P4-02d Menu editor
+
+Requirements: MGR-005, MENU-001 to MENU-011 (the manager's side).
+Deliverables: full menu editor over the menu admin API: categories, items (photos, descriptions,
+variants, modifiers, combos, tags, synonyms), availability and stock counts, draft and publish.
+Acceptance: Playwright flow creating an item with a variant, a modifier and a photo, publishing it
+and seeing it on the POS.
+
+### P4-02e Custom roles (S)
+
+Requirements: AUTH-012 (S).
+Deliverables: the Owner combines permissions into a named role on top of a base role; the
+permission guard applies it; the staff editor offers it.
+Acceptance: guard tests with a custom role; Playwright flow.
 
 ## P4-03 Configuration screens
 

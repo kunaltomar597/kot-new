@@ -112,7 +112,8 @@ Exit: tablet order flow end to end with no data left over between sessions.
 Exit: all Must reports verified against test data.
 
 - P4-01 Dashboard shell and live views
-- P4-02 Staff, device and menu management UI
+- P4-02 Staff, device and menu management UI (in five parts: P4-02a staff and Owner security,
+  P4-02b sections and pagers, P4-02c devices, P4-02d menu editor, P4-02e custom roles)
 - P4-03 Configuration screens
 - P4-04 Alert centre and system screen
 - P4-05 Full report suite

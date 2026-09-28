@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "pin": { "type": "string", "pattern": "^\\d{4,8}$" } },
+    "required": ["pin"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "pin": { "type": "string", "pattern": "^\\d{4,8}$" } },
+    "required": ["pin"],
+    "additionalProperties": false
+  }
+}

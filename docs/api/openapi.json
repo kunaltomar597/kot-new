@@ -28,6 +28,7 @@
     { "name": "restaurant" },
     { "name": "service-requests" },
     { "name": "settings" },
+    { "name": "staff" },
     { "name": "system" },
     { "name": "tables" }
   ],
@@ -356,6 +357,44 @@
         },
         "responses": {
           "204": { "description": "Password saved." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["AUTH-006"]
+      }
+    },
+    "/api/v1/auth/owner/security": {
+      "get": {
+        "operationId": "getOwnerSecurity",
+        "summary": "What of the Owner's password, authenticator and recovery codes is set up",
+        "description": "Owner only. Never returns a secret: the console shows what is still to set up and whether the last password + second factor confirmation still holds (AUTH-006).",
+        "tags": ["auth"],
+        "responses": {
+          "200": {
+            "description": "What is set up.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OwnerSecurityResponse" }
+              }
+            }
+          },
           "400": {
             "description": "The request does not match the contract.",
             "content": {
@@ -7155,6 +7194,349 @@
         "x-requirements": ["BILL-013"]
       }
     },
+    "/api/v1/staff": {
+      "get": {
+        "operationId": "listStaff",
+        "summary": "Everyone who works here, active or not, with their role and PIN status",
+        "description": "MGR-004: never the PIN itself, only whether one is set and whether the sign-in is locked (AUTH-003); with the PIN length a new PIN must have (AUTH-001).",
+        "tags": ["staff"],
+        "responses": {
+          "200": {
+            "description": "Staff.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StaffListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["MGR-004", "AUTH-001", "AUTH-003"]
+      },
+      "post": {
+        "operationId": "createStaff",
+        "summary": "Add a person with a role and a PIN",
+        "description": "MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN has exactly `auth.pinLength` digits, is hashed with the pepper and never stored or logged (AUTH-002). Audited.",
+        "tags": ["staff"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CreateStaffRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new person.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StaffView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The PIN does not have the configured length.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["MGR-004", "AUTH-001", "AUTH-002", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/staff/{staffId}": {
+      "patch": {
+        "operationId": "updateStaff",
+        "summary": "Change a person's name, role, phone or e-mail",
+        "description": "MGR-004. A new role applies to the person's next request (AUTH-010). Making someone a manager or no longer one needs the Owner's second factor (AUTH-006); a manager's details are changed by the Owner or themselves; nobody changes their own role. Audited with before and after.",
+        "tags": ["staff"],
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateStaffRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The person as they are now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StaffView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such person.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The change is not allowed on this record.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["MGR-004", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/staff/{staffId}/deactivate": {
+      "post": {
+        "operationId": "deactivateStaff",
+        "summary": "Deactivate a person: signed out everywhere, kept in the records",
+        "description": "MGR-004, AUTH-008: never deleted. Their sessions end and live connections close within 5 s; their pager and waiter phone are taken back and they leave today's sections. Deactivating a manager needs the Owner's second factor (AUTH-006). Audited with the reason.",
+        "tags": ["staff"],
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeactivateStaffRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The person, inactive.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StaffView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such person.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "They are already inactive.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The Owner, or the person asking.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["MGR-004", "AUTH-006", "AUTH-008", "AUD-001"]
+      }
+    },
+    "/api/v1/staff/{staffId}/pin": {
+      "put": {
+        "operationId": "setStaffPin",
+        "summary": "Set or reset a person's PIN",
+        "description": "MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, hashed with the pepper, never stored, logged or shown. Clears a lockout (AUTH-003). A manager's PIN is set by the Owner or themselves, the Owner's only by the Owner. Audited without the PIN.",
+        "tags": ["staff"],
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SetStaffPinRequest" } }
+          }
+        },
+        "responses": {
+          "204": { "description": "PIN set." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such person.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The PIN does not have the configured length.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["MGR-004", "AUTH-001", "AUTH-002", "AUTH-003", "AUD-001"]
+      }
+    },
+    "/api/v1/staff/{staffId}/reactivate": {
+      "post": {
+        "operationId": "reactivateStaff",
+        "summary": "Let a deactivated person sign in again",
+        "description": "MGR-004. Reactivating a manager needs the Owner's second factor (AUTH-006). Audited.",
+        "tags": ["staff"],
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person, active.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/StaffView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such person.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "They are already active.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["MGR-004", "AUTH-006", "AUD-001"]
+      }
+    },
     "/api/v1/staff/me/break": {
       "post": {
         "operationId": "setMyBreak",
@@ -8726,6 +9108,7 @@
         "required": ["waiterId"],
         "additionalProperties": false
       },
+      "AssignableRole": { "type": "string", "enum": ["MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
       "AuditChainBreak": {
         "type": "string",
         "enum": ["HASH_MISMATCH", "PREV_HASH_MISMATCH", "SEQUENCE_GAP"]
@@ -9461,6 +9844,30 @@
         "required": ["type", "name"],
         "additionalProperties": false
       },
+      "CreateStaffRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "role": { "$ref": "#/components/schemas/AssignableRole" },
+          "pin": { "$ref": "#/components/schemas/Pin" },
+          "phone": {
+            "anyOf": [{ "$ref": "#/components/schemas/PhoneNumber" }, { "type": "null" }]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["displayName", "role", "pin"],
+        "additionalProperties": false
+      },
       "CurrentSessionResponse": {
         "type": "object",
         "properties": {
@@ -9577,6 +9984,12 @@
         "additionalProperties": false
       },
       "Daypart": { "type": "string", "enum": ["BREAKFAST", "LUNCH", "EVENING", "DINNER"] },
+      "DeactivateStaffRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "Denominations": {
         "type": "object",
         "propertyNames": { "type": "string", "pattern": "^\\d{1,4}(\\.\\d{1,2})?$" },
@@ -12490,6 +12903,24 @@
         "required": ["newPassword"],
         "additionalProperties": false
       },
+      "OwnerSecurityResponse": {
+        "type": "object",
+        "properties": {
+          "hasPassword": { "type": "boolean" },
+          "hasAuthenticator": { "type": "boolean" },
+          "recoveryCodesLeft": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "secondFactorValidUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "hasPassword",
+          "hasAuthenticator",
+          "recoveryCodesLeft",
+          "secondFactorValidUntil"
+        ],
+        "additionalProperties": false
+      },
       "PagerAckMessage": {
         "type": "object",
         "properties": { "alertId": { "$ref": "#/components/schemas/Id" } },
@@ -13494,7 +13925,8 @@
                   "FLOOR",
                   "WAITER_ASSIGNMENTS",
                   "STATIONS",
-                  "PRINTERS"
+                  "PRINTERS",
+                  "STAFF"
                 ]
               }
             },
@@ -13949,6 +14381,12 @@
         ],
         "additionalProperties": false
       },
+      "SetStaffPinRequest": {
+        "type": "object",
+        "properties": { "pin": { "$ref": "#/components/schemas/Pin" } },
+        "required": ["pin"],
+        "additionalProperties": false
+      },
       "SettingKeyParams": {
         "type": "object",
         "properties": {
@@ -14264,6 +14702,26 @@
           "additionalProperties": false
         }
       },
+      "StaffListResponse": {
+        "type": "object",
+        "properties": {
+          "staff": { "type": "array", "items": { "$ref": "#/components/schemas/StaffView" } },
+          "pinLength": {
+            "anyOf": [
+              { "type": "number", "const": 4 },
+              { "type": "number", "const": 6 }
+            ]
+          }
+        },
+        "required": ["staff", "pinLength"],
+        "additionalProperties": false
+      },
+      "StaffParams": {
+        "type": "object",
+        "properties": { "staffId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["staffId"],
+        "additionalProperties": false
+      },
       "StaffTile": {
         "type": "object",
         "properties": {
@@ -14281,6 +14739,38 @@
           "staff": { "type": "array", "items": { "$ref": "#/components/schemas/StaffTile" } }
         },
         "required": ["staff"],
+        "additionalProperties": false
+      },
+      "StaffView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "displayName": { "type": "string" },
+          "role": { "$ref": "#/components/schemas/Role" },
+          "active": { "type": "boolean" },
+          "phone": { "type": ["string", "null"] },
+          "email": { "type": ["string", "null"] },
+          "photoId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "hasPin": { "type": "boolean" },
+          "lockedUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "role",
+          "active",
+          "phone",
+          "email",
+          "photoId",
+          "hasPin",
+          "lockedUntil",
+          "createdAt",
+          "updatedAt"
+        ],
         "additionalProperties": false
       },
       "Station": {
@@ -15007,6 +15497,28 @@
           "reason": { "type": "string", "minLength": 1, "maxLength": 200 }
         },
         "required": ["value"],
+        "additionalProperties": false
+      },
+      "UpdateStaffRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "role": { "$ref": "#/components/schemas/AssignableRole" },
+          "phone": {
+            "anyOf": [{ "$ref": "#/components/schemas/PhoneNumber" }, { "type": "null" }]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
         "additionalProperties": false
       },
       "UpdateWaiterAssignmentsRequest": {

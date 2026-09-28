@@ -141,3 +141,18 @@ export const OwnerPasswordRequest = z.strictObject({
   newPassword: OwnerPassword,
 });
 export type OwnerPasswordRequest = z.infer<typeof OwnerPasswordRequest>;
+
+/**
+ * What of the Owner's sign-in security is set up (AUTH-006), never the secrets: the console shows
+ * "Set password" or "Change password", and whether the authenticator still has to be added.
+ */
+export const OwnerSecurityResponse = z.object({
+  hasPassword: z.boolean(),
+  /** An authenticator app is set up and was confirmed with a code. */
+  hasAuthenticator: z.boolean(),
+  /** One-time recovery codes not yet used. */
+  recoveryCodesLeft: z.int().nonnegative(),
+  /** Until when the last password + second factor confirmation holds, if it still does. */
+  secondFactorValidUntil: Timestamp.nullable(),
+});
+export type OwnerSecurityResponse = z.infer<typeof OwnerSecurityResponse>;

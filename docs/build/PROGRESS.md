@@ -141,7 +141,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02 Staff, device and menu management UI (P4-01, P1-03 and P0-11 done).
+- P4-02a Staff and the Owner's sign-in security (P4-01, P1-03 and P0-11 done), then P4-02b to
+  P4-02e (P4-02 is split in five, see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -242,7 +243,11 @@ Recommended next WPs (dependencies met):
 ### Phase 4: Manager dashboard and reports
 
 - [x] P4-01 Dashboard shell and live views
-- [ ] P4-02 Staff, device and menu management UI
+- [ ] P4-02a Staff and the Owner's sign-in security
+- [ ] P4-02b Sections and pagers
+- [ ] P4-02c Devices
+- [ ] P4-02d Menu editor
+- [ ] P4-02e Custom roles (S)
 - [ ] P4-03 Configuration screens
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite

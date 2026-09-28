@@ -6,6 +6,7 @@ import type {
   OverrideResponse,
   OwnerLoginRequest,
   OwnerPasswordRequest,
+  OwnerSecurityResponse,
   PinLoginRequest,
   SecondFactor,
   StaffTilesResponse,
@@ -533,6 +534,33 @@ export class AuthService {
         restaurantId: principal.restaurantId,
       });
     });
+  }
+
+  /**
+   * What of the Owner's sign-in security is set up (AUTH-006), never the secrets: the console
+   * offers what is missing, and knows whether the last step-up still holds.
+   */
+  async ownerSecurity(principal: Principal): Promise<OwnerSecurityResponse> {
+    if (principal.role !== 'OWNER') throw authErrors.ownerOnly();
+    const [settings, credentials, recoveryCodesLeft] = await Promise.all([
+      this.settings.get(principal.restaurantId),
+      this.prisma.credential.findMany({
+        where: { staffId: principal.staffId, kind: { in: ['PASSWORD', 'TOTP'] } },
+        select: { kind: true, confirmedAt: true, secretHash: true },
+      }),
+      this.prisma.recoveryCode.count({ where: { staffId: principal.staffId, usedAt: null } }),
+    ]);
+    const totp = credentials.find((credential) => credential.kind === 'TOTP');
+    const confirmedAt = this.hasFreshStepUp(principal, settings) ? principal.secondFactorAt : null;
+    return {
+      hasPassword: credentials.some((credential) => credential.kind === 'PASSWORD'),
+      hasAuthenticator: totp !== undefined && totp.confirmedAt !== null && totp.secretHash !== '',
+      recoveryCodesLeft,
+      secondFactorValidUntil:
+        confirmedAt === null
+          ? null
+          : new Date(confirmedAt.getTime() + settings.stepUpMinutes * 60_000).toISOString(),
+    };
   }
 
   /** The Owner confirmed password + second factor recently enough (AUTH-006). */

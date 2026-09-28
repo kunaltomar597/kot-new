@@ -1,0 +1,46 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "role": { "type": "string", "enum": ["MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+      "phone": {
+        "anyOf": [{ "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" }, { "type": "null" }]
+      },
+      "email": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "role": { "type": "string", "enum": ["MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+      "phone": {
+        "anyOf": [{ "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" }, { "type": "null" }]
+      },
+      "email": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "additionalProperties": false
+  }
+}
