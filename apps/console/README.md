@@ -6,8 +6,8 @@ role-based modes:
 - POS (`/pos`): tables, order entry, billing, shifts, day-end (Phase 1);
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
 - Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c),
-  staff and the Owner's sign-in security (P4-02a); more management, configuration and reports
-  (Phase 4).
+  staff and the Owner's sign-in security (P4-02a), today's sections and pagers (P4-02b); more
+  management, configuration and reports (Phase 4).
 
 Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
 `@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
@@ -76,7 +76,23 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   (`staff-view.ts` `staffActions`, from `@rp/domain` `decideStaffChange`; the server checks
   again): add, edit, set or change the PIN (typed twice), unlock, deactivate with a reason, and
   reactivate. The add and edit form is checked with the contract schemas before it is sent and
-  sends only what changed. The list follows `RestaurantChanged` from any screen.
+  sends only what changed. The list follows `RestaurantChanged` from any screen. `StaffArea.tsx`
+  puts People, Today's sections and Pagers (for those who may pair devices) under one row of
+  links.
+- Today's sections (`/manage/staff/sections`, P4-02b, TBL-002): `SectionsScreen.tsx` lists the
+  people who take orders, waiters first, with their sections, their own tables and how many
+  tables that makes, and names the tables nobody looks after yet. A dialog per person ticks whole
+  sections and single tables; each save re-reads the day's set, changes that one person and sends
+  it without archived places or people who no longer take orders (`sections-view.ts`). "Same as
+  <day>" gives the last day's set again (asking first when today already has one) and says who
+  was left out.
+- Pagers (`/manage/staff/pagers`, P4-02b, PGR-012 to PGR-014): `PagersScreen.tsx` lists each
+  pager with Connected or Not connected, its battery against the restaurant's low level, who
+  wears it and when it was last seen. Register a pager by its serial (a barcode scanner types into
+  the field; the next free "Pager N" is suggested), give it to anyone active or take it back, and
+  issue a new credential after a warning. The credential shows once, in a dialog only "I have
+  entered it" closes. The list follows `RestaurantChanged` and `DeviceStatusChanged`, and reads
+  batteries again every minute.
 - The Owner's second factor (`src/owner/second-factor.tsx`, AUTH-006): `useSecondFactor` tries an
   action and, when the server answers SECOND_FACTOR_REQUIRED, asks for the Owner password and an
   authenticator code (or a recovery code, typed like a pairing code), confirms them with
@@ -112,7 +128,9 @@ AA rules, colour contrast included, on each page), billing, a manager's nudge ac
 the alert centre, a manager adding a waiter who signs in on a second tab and is signed out there
 within 5 s of being deactivated, the Owner setting up password and authenticator (the test
 computes the authenticator's code from the key shown) and adding a manager with a recovery code,
-and a cashier refused the Staff page. The tabs share one browser context, so they share the
+a manager giving waiters their sections and a pager at shift start (registered, its credential
+shown once, then handed to another waiter well within 30 s), and a cashier refused the Staff
+page. The tabs share one browser context, so they share the
 device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
 since the server's Content Security Policy refuses inline scripts, after entrance animations end
 (a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium

@@ -6,15 +6,15 @@ import { useT } from '../app/i18n.js';
 import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
-import { StaffScreen } from './staff/StaffScreen.js';
+import { StaffArea } from './staff/StaffArea.js';
 
 /**
  * The manager dashboard (P4-01, MGR-001): the overview, the live order feed and the alert centre,
- * one at a time under `/manage`, then the setup pages: Staff for people who manage staff (P4-02a,
- * MGR-004) and the Owner's own sign-in security (AUTH-006). The navigation sits beside them on a
- * wide screen and above them on a phone (MGR-011); the page shown is marked for screen readers,
- * not by colour alone. Pages a role cannot use are neither linked nor opened; the server refuses
- * their calls anyway.
+ * one at a time under `/manage`, then the setup pages: Staff for people who manage staff (people,
+ * today's sections and pagers; P4-02a, P4-02b, MGR-004) and the Owner's own sign-in security
+ * (AUTH-006). The navigation sits beside them on a wide screen and above them on a phone
+ * (MGR-011); the page shown is marked for screen readers, not by colour alone. Pages a role cannot
+ * use are neither linked nor opened; the server refuses their calls anyway.
  */
 export function ManageHome() {
   const t = useT();
@@ -49,7 +49,7 @@ export function ManageHome() {
           <Route index element={<Overview />} />
           <Route path="orders" element={<OrderFeedScreen />} />
           <Route path="alerts" element={<AlertsSection />} />
-          {managesStaff ? <Route path="staff" element={<StaffScreen />} /> : null}
+          {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {isOwner ? <Route path="security" element={<OwnerSecurityScreen />} /> : null}
           <Route path="*" element={<Navigate to="/manage" replace />} />
         </Routes>

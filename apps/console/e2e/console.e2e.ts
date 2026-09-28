@@ -653,6 +653,103 @@ test.describe.serial('the web console', () => {
     await expect(page.getByText(t('ownerSecurity.recovery.left', { count: 9 }))).toBeVisible();
   });
 
+  test('[TBL-002] [PGR-012] [MGR-004] a manager gives waiters their sections and a pager at shift start', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.staff') })
+      .click();
+    const pages = page.getByRole('navigation', { name: t('staff.pages.label') });
+    await pages.getByRole('link', { name: t('staff.pages.sections') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('sections.title') })).toBeVisible();
+    await expect(
+      page.getByText(t('sections.uncoveredSection', { section: 'Main Hall' })),
+    ).toBeVisible();
+
+    // Ravi takes the hall; Sunita the terrace and table 1, which leaves Ravi's hall for her.
+    const change = (name: string) =>
+      page.getByRole('button', { name: t('sections.changeFor', { name }) });
+    const tablesOf = (name: string) =>
+      page.getByRole('dialog', { name: t('sections.dialog.title', { name }) });
+    await change('Ravi').click();
+    await tablesOf('Ravi')
+      .getByRole('checkbox', { name: /^Main Hall/ })
+      .check();
+    await tablesOf('Ravi')
+      .getByRole('button', { name: t('sections.dialog.save') })
+      .click();
+    await expect(page.getByText(t('sections.saved', { name: 'Ravi' }))).toBeVisible();
+
+    await change('Sunita').click();
+    await tablesOf('Sunita')
+      .getByRole('checkbox', { name: /^Terrace/ })
+      .check();
+    await tablesOf('Sunita')
+      .getByRole('group', { name: t('sections.dialog.tables', { section: 'Main Hall' }) })
+      .getByRole('checkbox', { name: '1', exact: true })
+      .check();
+    await expectAccessible(page);
+    await tablesOf('Sunita')
+      .getByRole('button', { name: t('sections.dialog.save') })
+      .click();
+    await expect(page.getByText(t('sections.saved', { name: 'Sunita' }))).toBeVisible();
+    await expect(page.getByText(t('sections.allCovered'))).toBeVisible();
+    const row = (name: string) =>
+      page.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 3, name }) });
+    await expect(row('Ravi').getByText(t('sections.tableCount', { count: 5 }))).toBeVisible();
+    await expect(row('Sunita').getByText(t('sections.tablesLine', { tables: '1' }))).toBeVisible();
+    await expect(row('Sunita').getByText(t('sections.tableCount', { count: 5 }))).toBeVisible();
+    await expectAccessible(page);
+
+    // The pagers: register one for Ravi, then hand it to Sunita at shift start.
+    await pages.getByRole('link', { name: t('staff.pages.pagers') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('pagers.title') })).toBeVisible();
+    await expect(page.getByText(t('pagers.none'))).toBeVisible();
+    await page.getByRole('button', { name: t('pagers.register') }).click();
+    const register = page.getByRole('dialog', { name: t('pagers.form.title') });
+    await expect(register.getByLabel(/^Name( \*)?$/)).toHaveValue('Pager 1');
+    await register.getByLabel(/^Serial( \*)?$/).fill('WP-0101');
+    await register.getByLabel(t('pagers.form.wearer')).selectOption({ label: 'Ravi' });
+    await expectAccessible(page);
+    await register.getByRole('button', { name: t('pagers.form.register') }).click();
+    const shown = page.getByRole('dialog', {
+      name: t('pagers.credentialDialog.title', { pager: 'Pager 1' }),
+    });
+    await expect(shown.locator('code')).toHaveCount(3);
+    expect((await shown.locator('code').nth(1).innerText()).length).toBeGreaterThanOrEqual(24);
+    await expectAccessible(page);
+    await shown.getByRole('button', { name: t('pagers.credentialDialog.done') }).click();
+    const pager = row('Pager 1');
+    await expect(pager.getByText(t('pagers.wornBy', { name: 'Ravi' }))).toBeVisible();
+    await expect(pager.getByText(t('pagers.notConnected'))).toBeVisible();
+
+    // Re-assignment at shift start takes seconds, not the 30 s allowed (PGR-012).
+    const started = Date.now();
+    await pager.getByRole('button', { name: t('pagers.giveOther') }).click();
+    const give = page.getByRole('dialog', {
+      name: t('pagers.giveDialog.title', { pager: 'Pager 1' }),
+    });
+    await give.getByLabel(t('pagers.giveDialog.person'), { exact: false }).selectOption({
+      label: 'Sunita',
+    });
+    await give.getByRole('button', { name: t('pagers.giveDialog.confirm') }).click();
+    await expect(
+      page.getByText(t('pagers.given', { pager: 'Pager 1', name: 'Sunita' })),
+    ).toBeVisible();
+    await expect(pager.getByText(t('pagers.wornBy', { name: 'Sunita' }))).toBeVisible();
+    expect(Date.now() - started).toBeLessThan(30_000);
+
+    // A 360 px phone: the Pagers page fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(pager).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await expectAccessible(page);
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
