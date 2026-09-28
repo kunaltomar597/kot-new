@@ -81,7 +81,14 @@ export const PagerView = z.object({
 });
 export type PagerView = z.infer<typeof PagerView>;
 
-export const PagerListResponse = z.object({ pagers: z.array(PagerView) });
+/**
+ * The restaurant's pagers by name, with the low-battery level (PGR-013 ⚙ `pager.lowBatteryPercent`)
+ * at or below which a pager is shown as low.
+ */
+export const PagerListResponse = z.object({
+  pagers: z.array(PagerView),
+  lowBatteryPercent: z.int().min(0).max(100),
+});
 export type PagerListResponse = z.infer<typeof PagerListResponse>;
 
 /**

@@ -1,0 +1,6 @@
+# Findings gitleaks reports that are proven false positives (SEC-002, SEC-013), one fingerprint
+# per line with a comment saying why. Never list a real credential here: rotate it instead.
+
+# P4-02b: a made-up pager password in a console test fixture (commit cf9052e), never used as a
+# credential anywhere. The fixture now uses a value that does not look like a secret.
+cf9052ef3815894024990a2ebcdb43ce1ed74768:apps/console/test/sections-fixture.ts:generic-api-key:141

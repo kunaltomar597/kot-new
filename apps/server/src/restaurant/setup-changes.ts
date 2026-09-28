@@ -13,7 +13,8 @@ export type SetupPart =
   | 'WAITER_ASSIGNMENTS'
   | 'STATIONS'
   | 'PRINTERS'
-  | 'STAFF';
+  | 'STAFF'
+  | 'DEVICES';
 
 /**
  * Serialises changes to the restaurant's setup for the rest of the transaction, so checks such as

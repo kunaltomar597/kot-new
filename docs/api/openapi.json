@@ -12986,9 +12986,10 @@
       "PagerListResponse": {
         "type": "object",
         "properties": {
-          "pagers": { "type": "array", "items": { "$ref": "#/components/schemas/PagerView" } }
+          "pagers": { "type": "array", "items": { "$ref": "#/components/schemas/PagerView" } },
+          "lowBatteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
         },
-        "required": ["pagers"],
+        "required": ["pagers", "lowBatteryPercent"],
         "additionalProperties": false
       },
       "PagerParams": {
@@ -13927,7 +13928,8 @@
                   "WAITER_ASSIGNMENTS",
                   "STATIONS",
                   "PRINTERS",
-                  "STAFF"
+                  "STAFF",
+                  "DEVICES"
                 ]
               }
             },

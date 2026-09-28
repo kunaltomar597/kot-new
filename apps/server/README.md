@@ -16,6 +16,9 @@ of truth for the restaurant.
 - `src/errors`: `mapError` turns domain errors, `AppError`, Zod validation errors, HTTP exceptions
   and unexpected errors into the `ApiError` contract; `ApiExceptionFilter` applies it globally.
   Unexpected errors never leak internals and go to the `ErrorReporter` (NFR-O02; real reporter in P7-08).
+- `src/observability/error-reporter.ts`: the `ErrorReporter` interface and `ObservabilityModule`.
+  Today it provides `NoopErrorReporter`, which sends nothing; the reporter to the vendor's
+  error-monitoring service, which must scrub personal data and secrets, arrives in P7-08.
 - `src/validation/zod-validation.pipe.ts`: validate bodies against `@rp/contracts` schemas.
 - `src/database`: `PrismaService` (pool, `transaction()`, `ping()`); schema in `prisma/schema.prisma`,
   SQL migrations in `prisma/migrations`, Prisma 7 config in `prisma.config.ts`.
@@ -111,8 +114,8 @@ of truth for the restaurant.
 - Development PINs from `db:seed`: Owner 1111, Manager 2222, Cashier 3333, waiters 4444 and 5555,
   kitchen 6666 (development only).
 
-Each area is one Nest module registered in `src/app.module.ts`. Still to come:
-recommendations, sync, licensing, backup, updates and diagnostics.
+Each area is one Nest module registered in `src/app.module.ts`. Still to come: sync, licensing,
+backup, updates and diagnostics.
 
 ## Devices (P0-11)
 
@@ -284,7 +287,10 @@ recommendations, sync, licensing, backup, updates and diagnostics.
   row lock, so it cannot race a table being opened.
 - `src/floor/waiter-assignments.service.ts`: the business day's assignments (TBL-002), stored as
   `shift_assignments` rows (a whole section, or one table with `table_id`). `assignmentsFor()`
-  returns them for `@rp/domain` `responsibleWaiters`.
+  returns them for `@rp/domain` `responsibleWaiters`. Each PUT replaces the day's set; the
+  console's Today's sections page (P4-02b) builds it from the set as the server has it, leaving
+  out archived places and people who no longer take orders, as `@rp/domain` `reapplyAssignments`
+  does for "same as last time".
 - `src/floor/table-sessions.service.ts` (P1-02b): open, request bill, close without bill, move
   and hand over tables, and the TBL-007 overview. Every change locks the table rows it touches,
   follows `tableMachine`, and writes the audit entry and the table events in one transaction.
@@ -420,6 +426,21 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `PRESENCE` says who is reachable: the gateway's live connections (a waiter phone holding a
   person counts as their app, P2-06a) and the connected pagers.
 
+## Nudges, breaks and system alerts (P2-03b)
+
+- `POST /api/v1/alerts/nudge` (STAFF_MANAGE, NTF-008): a manager nudges the people they pick with
+  a preset (`notifications.nudgePresets`) or up to 40 characters; one `MANAGER_NUDGE` alert each.
+- `POST /api/v1/staff/me/break` (NTF-009): the signed-in person goes on or comes off break
+  (`staff.on_break_since`). `recipientContext` fills `onBreak`, so their alerts go to the managers
+  until they are back.
+- `notification-triggers.ts` also raises device alerts from `DeviceStatusChanged` (a pager, table
+  tablet or kitchen screen offline, or low on battery at `pager.lowBatteryPercent` for pagers and
+  `devices.lowBatteryAlertPercent` for the others; one alert per change of state) and printer
+  alerts from `PrinterStatusChanged`, open until the printer is back.
+- `system-alerts.ts` (`SystemAlerts.checkDisk`) checks the data drive every hour and raises
+  `DISK_OR_BACKUP` at `notifications.diskAlertPercent` until space is freed. Backup and licence
+  alerts will use the same engine (P7).
+
 ## Alerts on the waiter phone (P2-06a)
 
 - A waiter phone alerts its holder, `devices.staff_id`: the person who last signed in on it
@@ -506,7 +527,9 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - Alert events reach the recipients' pagers at QoS 1 (only the alerts `reachesPagerAndApp` lets
   through), and a pager that connects is sent its wearer's open alerts again. Heartbeats feed
   battery, signal and offline detection.
-- `src/pagers/pagers.service.ts` registers pagers, replaces credentials and assigns wearers.
+- `src/pagers/pagers.service.ts` registers pagers, replaces credentials and assigns wearers. Each
+  change is audited and announced as `RestaurantChanged` `DEVICES` (P4-02b), which the console's
+  Pagers page and the wearer's own pager card follow; the list carries `pager.lowBatteryPercent`.
 - Tests start the broker with `config: { mqtt: 'on', mqttPort: 0 }`. See
   `test/integration/pagers.int.test.ts`.
 

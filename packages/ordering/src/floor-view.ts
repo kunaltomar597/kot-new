@@ -4,7 +4,7 @@ import type {
   TableOverviewResponse,
   WaiterAssignmentView,
 } from '@rp/contracts';
-import { tablesOf, type WaiterAssignment } from '@rp/domain';
+import { tablesOf, toWaiterAssignments } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 
 /** One section of the POS floor, in the manager's display order, active tables only. */
@@ -97,23 +97,11 @@ export function myTableIds(
   overview: TableOverviewResponse,
   assignments: readonly WaiterAssignmentView[],
 ): Set<string> {
-  const sectionOf = new Map(overview.tables.map((table) => [table.tableId, table.sectionId]));
-  const flat: WaiterAssignment[] = assignments.flatMap((assignment) => [
-    ...assignment.sectionIds.map((sectionId) => ({
-      staffId: assignment.staffId,
-      sectionId,
-      tableId: null,
-    })),
-    ...assignment.tableIds.map((tableId) => ({
-      staffId: assignment.staffId,
-      sectionId: sectionOf.get(tableId) ?? '',
-      tableId,
-    })),
-  ]);
   const floorTables = overview.tables.map((table) => ({
     id: table.tableId,
     sectionId: table.sectionId,
   }));
+  const flat = toWaiterAssignments(assignments, floorTables);
   const mine = new Set(tablesOf(staffId, floorTables, flat));
   for (const table of overview.tables) {
     if (table.session?.waiterId === staffId) mine.add(table.tableId);

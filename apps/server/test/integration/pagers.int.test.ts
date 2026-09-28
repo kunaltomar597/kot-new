@@ -82,6 +82,17 @@ afterAll(async () => {
 const as = (login: LoginResponse) => authHeaders(kit.deviceId, login.accessToken);
 const server = () => request(httpServer(app));
 
+/** `RestaurantChanged` `DEVICES` announced for this pager (P4-02b). */
+function changesAnnounced(deviceId: string): Promise<number> {
+  return prisma.outboxEvent.count({
+    where: {
+      eventType: 'RestaurantChanged',
+      aggregateId: deviceId,
+      payload: { path: ['payload', 'part'], equals: 'DEVICES' },
+    },
+  });
+}
+
 async function register(serial: string, staffId: string | null): Promise<PagerCredentialResponse> {
   const response = await server()
     .post('/api/v1/pagers')
@@ -161,6 +172,11 @@ describe('[PGR-012] [SEC-012] registering and assigning pagers', () => {
       (await server().get('/api/v1/pagers').set(as(manager))).body,
     );
     expect(list.pagers.map((pager) => pager.serial).sort()).toEqual(['WP-0001', 'WP-0002']);
+    // PGR-013 ⚙: the level at which the list shows a pager as low.
+    expect(list.lowBatteryPercent).toBe(15);
+    // Every screen hears that the pagers changed (P4-02b); the refused ones changed nothing.
+    expect(await changesAnnounced(pagerA.deviceId)).toBe(1);
+    expect(await changesAnnounced(pagerB.deviceId)).toBe(1);
   });
 
   it('refuses a wrong password and another pager’s topics', async () => {
@@ -421,13 +437,23 @@ describe('[PGR-012] [PGR-014] re-assignment', () => {
         where: { action: 'PAGER_ASSIGNED', entityId: pagerA.deviceId },
       }),
     ).toBeGreaterThanOrEqual(2);
+    // Announced, so the wearers' own pager cards change at once (P4-02b). Giving a pager to the
+    // person who already wears it changes nothing.
+    const announced = await changesAnnounced(pagerA.deviceId);
+    await server()
+      .put(`/api/v1/pagers/${pagerA.deviceId}/wearer`)
+      .set(as(manager))
+      .send({ staffId: kit.staff.MANAGER });
+    expect(await changesAnnounced(pagerA.deviceId)).toBe(announced);
   });
 
   it('replaces a credential, after which the old one no longer signs in', async () => {
+    const announced = await changesAnnounced(pagerB.deviceId);
     const rotated = PagerCredentialResponse.parse(
       (await server().post(`/api/v1/pagers/${pagerB.deviceId}/credential`).set(as(manager))).body,
     );
     await expect(connect(pagerB)).rejects.toThrow();
     await connect(rotated);
+    expect(await changesAnnounced(pagerB.deviceId)).toBe(announced + 1);
   });
 });

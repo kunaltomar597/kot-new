@@ -16,6 +16,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import type { Device } from '../generated/prisma/client.js';
 import { AppError } from '../errors/app-error.js';
 import { CredentialHasher } from '../auth/credential-hasher.js';
+import { announceSetupChange } from '../restaurant/setup-changes.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { PagerBroker } from './pager-broker.js';
 
@@ -35,8 +36,10 @@ function view(device: Device): PagerView {
 
 /**
  * Pager administration for managers (P2-04, PGR-012, PGR-014, SEC-012): register a pager from its
- * serial with a unique credential (shown once, stored as a peppered Argon2id hash), replace the credential, and give
- * the pager to a person or take it back, effective at once.
+ * serial with a unique credential (shown once, stored as a peppered Argon2id hash), replace the
+ * credential, and give the pager to a person or take it back, effective at once. Every change is
+ * announced as `RestaurantChanged` `DEVICES` (P4-02b), so pager lists and the wearer's own pager
+ * follow it.
  */
 @Injectable()
 export class PagersService {
@@ -50,11 +53,17 @@ export class PagersService {
   ) {}
 
   async list(restaurantId: string): Promise<PagerListResponse> {
-    const pagers = await this.prisma.device.findMany({
-      where: { restaurantId, type: 'PAGER', status: 'ACTIVE' },
-      orderBy: { name: 'asc' },
-    });
-    return { pagers: pagers.map(view) };
+    const [pagers, settings] = await Promise.all([
+      this.prisma.device.findMany({
+        where: { restaurantId, type: 'PAGER', status: 'ACTIVE' },
+        orderBy: { name: 'asc' },
+      }),
+      this.settings.snapshot(restaurantId),
+    ]);
+    return {
+      pagers: pagers.map(view),
+      lowBatteryPercent: settings.get('pager.lowBatteryPercent'),
+    };
   }
 
   /** WTR-014: the pager the person wears (a person wears at most one, PGR-012), if any. */
@@ -115,6 +124,7 @@ export class PagersService {
         name: request.name,
         staffId: request.staffId,
       });
+      await this.announce(tx, principal, created.id);
       return created;
     });
     return this.credential(device, secret);
@@ -130,6 +140,7 @@ export class PagersService {
         data: { mqttSecretHash: secretHash },
       });
       await this.record(tx, principal, 'PAGER_CREDENTIAL_REPLACED', deviceId, null, null);
+      await this.announce(tx, principal, deviceId);
       return updated;
     });
     this.broker.disconnect(deviceId);
@@ -150,6 +161,7 @@ export class PagersService {
         { staffId: existing.staffId },
         { staffId },
       );
+      await this.announce(tx, principal, deviceId);
       return updated;
     });
     await this.broker.reassigned(deviceId, staffId);
@@ -208,6 +220,13 @@ export class PagersService {
       heartbeatTopic: pagerTopic(device.restaurantId, device.id, 'heartbeat'),
       mqttPort: this.broker.port() ?? (this.config.mqttPort || 8883),
     };
+  }
+
+  private announce(tx: TransactionClient, principal: Principal, deviceId: string): Promise<void> {
+    return announceSetupChange(tx, principal.restaurantId, 'DEVICES', {
+      type: 'device',
+      id: deviceId,
+    });
   }
 
   private async record(
