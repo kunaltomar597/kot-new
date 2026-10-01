@@ -7,6 +7,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { SECRET_STORE, type SecretStore } from '../../src/auth/secret-store.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import { LearnedAssociations } from '../../src/recommendations/learned-associations.service.js';
 import { saveRelayCredential } from '../../src/relay/relay-credential.js';
 import {
   concernsRelay,
@@ -305,6 +306,27 @@ describe('[QR-008] [QR-003] keeping the relay in step', () => {
       'LUNCH',
     ]);
     expect(snapshot?.businessDayCutoff).toBe('04:00');
+  });
+
+  it('[QR-004] sends the pairings learned from the restaurant’s orders (P6-02)', async () => {
+    await prisma.learnedAssociation.create({
+      data: {
+        restaurantId: kit.restaurantId,
+        fromItemId: ids['Dal Makhani'] ?? '',
+        toItemId: ids['Staff Meal'] ?? '',
+        pairCount: 40,
+        supportBp: 900,
+        confidenceBp: 6_000,
+        liftPercent: 180,
+        score: 10_800,
+      },
+    });
+    app.get(LearnedAssociations).invalidate();
+    await sync.sync();
+    await giveT1ACode();
+    expect((await relayMenu()).document?.recommendations?.learned).toEqual([
+      { fromItemId: ids['Dal Makhani'], toItemId: ids['Staff Meal'], score: 10_800 },
+    ]);
   });
 
   it('knows which changes the QR page shows', () => {

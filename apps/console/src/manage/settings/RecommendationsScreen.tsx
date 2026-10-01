@@ -1,5 +1,10 @@
 import type { MenuSnapshot, RecommendationRuleView, RecommendationTarget } from '@rp/contracts';
-import { formatDisplayDate, ITEM_PREFERENCES, type ItemPreference } from '@rp/domain';
+import {
+  displayDateTime,
+  formatDisplayDate,
+  ITEM_PREFERENCES,
+  type ItemPreference,
+} from '@rp/domain';
 import {
   Badge,
   Button,
@@ -270,6 +275,7 @@ export function RecommendationsScreen() {
             void savePreferences(next);
           }}
         />
+        <LearnedPairings editable={editable} />
       </>
     );
   }
@@ -334,6 +340,113 @@ export function RecommendationsScreen() {
           onCancel={close}
         />
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * What the nightly job learned from the restaurant's orders (P6-02, REC-003): when it last ran,
+ * whether there are enough orders yet, and the strongest pairings in plain words.
+ */
+function LearnedPairings({ editable }: { editable: boolean }) {
+  const t = useT();
+  const controller = useConsole();
+  const toast = useToast();
+  const { data, reload } = useLive(
+    () => controller.api.getLearnedRecommendations(),
+    () => false,
+  );
+  const [busy, setBusy] = useState(false);
+
+  const learnNow = async () => {
+    setBusy(true);
+    try {
+      await controller.api.learnRecommendationsNow();
+      toast.show({ title: t('recoPage.learned.ran'), tone: 'success' });
+      reload();
+    } catch (failure) {
+      toast.show({ title: messageOf(failure, t), tone: 'danger' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  let body: ReactNode;
+  if (data.status === 'loading') {
+    body = <LoadingState title={t('states.loading')} />;
+  } else if (data.status === 'error') {
+    body = (
+      <ErrorState
+        title={t('recoPage.loadFailed')}
+        description={messageOf(data.error, t)}
+        onRetry={reload}
+        retryLabel={t('states.retry')}
+      />
+    );
+  } else {
+    const { lastRun, minOrders, associations } = data.value;
+    const at = lastRun === null ? undefined : displayDateTime(new Date(lastRun.at));
+    const summary =
+      lastRun === null || at === undefined
+        ? t('recoPage.learned.never', { minOrders })
+        : lastRun.active
+          ? t('recoPage.learned.active', {
+              ...at,
+              orders: lastRun.orders,
+              from: formatDisplayDate(lastRun.windowFrom),
+              to: formatDisplayDate(lastRun.windowTo),
+              count: lastRun.associations,
+            })
+          : t('recoPage.learned.waiting', { ...at, orders: lastRun.orders, minOrders });
+    body = (
+      <>
+        <p className="dashboard-section__hint">{summary}</p>
+        {lastRun?.active === true && associations.length === 0 ? (
+          <EmptyState title={t('recoPage.learned.empty')} />
+        ) : null}
+        {associations.length > 0 ? (
+          <ul className="staff-list" aria-labelledby="reco-learned">
+            {associations.map((entry) => (
+              <li key={`${entry.fromItemId}-${entry.toItemId}`} className="staff-row">
+                <div className="staff-row__who">
+                  <h4 className="staff-row__name">
+                    {t('recoPage.learned.pair', { from: entry.fromName, to: entry.toName })}
+                  </h4>
+                  <p className="staff-row__states">
+                    {t('recoPage.learned.strength', {
+                      confidence: Math.round(entry.confidenceBp / 100),
+                      lift: (entry.liftPercent / 100).toFixed(1),
+                    })}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <section className="device-group" aria-labelledby="reco-learned">
+      <div className="staff-header">
+        <h3 id="reco-learned" className="device-group__heading">
+          {t('recoPage.learned.title')}
+        </h3>
+        {editable ? (
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => {
+              void learnNow();
+            }}
+          >
+            {t('recoPage.learned.run')}
+          </Button>
+        ) : null}
+      </div>
+      <p className="dashboard-section__hint">{t('recoPage.learned.hint')}</p>
+      {body}
     </section>
   );
 }

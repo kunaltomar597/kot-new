@@ -9,6 +9,7 @@ import { newId } from '../../src/common/ids.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import type { FoodType, SalesChannel } from '../../src/generated/prisma/enums.js';
 import { RECOMMENDATION_CLOCK } from '../../src/recommendations/clock.js';
+import { LearnedAssociations } from '../../src/recommendations/learned-associations.service.js';
 import {
   addDevice,
   authHeaders,
@@ -22,7 +23,8 @@ import { createTestDatabase, type TestDatabase } from '../helpers/test-database.
 /**
  * REC-011, NFR-P09: recommendations within 200 ms at the 95th percentile, at the size the BRD
  * designs for: a menu of 1,000 items, 200 rules, and 30 days of a busy restaurant's orders
- * (27,000 order lines) to rank the best sellers from. Measured through HTTP, as a phone asks.
+ * (27,000 order lines) to rank the best sellers from and to learn pairings from (P6-02). Measured
+ * through HTTP, as a phone asks.
  */
 
 const ITEMS = 1_000;
@@ -40,6 +42,7 @@ let kit: AuthKit;
 let waiter: LoginResponse;
 let tabletId: string;
 let session: TableSessionView;
+let learnedMs = Number.POSITIVE_INFINITY;
 const itemIds: string[] = [];
 
 /** 13:00 in Mumbai: lunch. */
@@ -179,6 +182,12 @@ beforeAll(async () => {
     await prisma.orderItem.createMany({ data: lines });
   }
 
+  // P6-02: what these orders teach, learned as the nightly job does, so the engine has all three
+  // layers to work through (REC-003).
+  const learning = await app.get(LearnedAssociations).learn(restaurantId);
+  expect(learning.lastRun?.active).toBe(true);
+  learnedMs = learning.lastRun?.durationMs ?? Number.POSITIVE_INFINITY;
+
   const hall = await prisma.section.create({ data: { restaurantId, name: 'Hall' } });
   const table = await prisma.diningTable.create({
     data: { restaurantId, sectionId: hall.id, label: 'T1' },
@@ -251,4 +260,8 @@ describe('[REC-011] [NFR-P09] recommendations at 1,000 items', () => {
     );
     expect(took, `p95 ${took.toFixed(1)} ms`).toBeLessThanOrEqual(P95_BUDGET_MS);
   }, 60_000);
+
+  it('[REC-003] learns 30 busy days in seconds on this PC', () => {
+    expect(learnedMs, `learning took ${String(learnedMs)} ms`).toBeLessThan(30_000);
+  });
 });

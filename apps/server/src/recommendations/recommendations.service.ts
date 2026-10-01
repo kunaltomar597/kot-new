@@ -16,6 +16,7 @@ import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { BestSellers } from './best-sellers.js';
 import { RECOMMENDATION_CLOCK, type RecommendationClock } from './clock.js';
+import { LearnedAssociations } from './learned-associations.service.js';
 import { RecommendationRulesService } from './recommendation-rules.service.js';
 
 const errors = {
@@ -63,8 +64,8 @@ interface Tracked {
 
 /**
  * Serves recommendations (P3-04, REC-001, REC-011): loads what `@rp/domain` `recommend` needs (the
- * published menu with live availability, the active rules, the best sellers of the time of day,
- * the table's order and cart) and returns its suggestions with their reasons. Table-level only
+ * published menu with live availability, the active rules, the learned pairings (P6-02), the best
+ * sellers of the time of day, the table's order and cart) and returns its suggestions with their reasons. Table-level only
  * (REC-007): nothing about a person is read. Also records what was done with them (REC-008).
  */
 @Injectable()
@@ -75,6 +76,7 @@ export class RecommendationsService {
     private readonly settings: SettingsService,
     private readonly rules: RecommendationRulesService,
     private readonly bestSellers: BestSellers,
+    private readonly learned: LearnedAssociations,
     @Inject(RECOMMENDATION_CLOCK) private readonly clock: RecommendationClock,
   ) {}
 
@@ -194,7 +196,7 @@ export class RecommendationsService {
   private async suggest(ask: Ask): Promise<RecommendationsResponse> {
     const now = this.clock.now();
     const { restaurantId } = ask;
-    const [menu, settings, restaurant, businessDate, ordered, rules] = await Promise.all([
+    const [menu, settings, restaurant, businessDate, ordered, rules, learned] = await Promise.all([
       this.menu.current(restaurantId),
       this.settings.snapshot(restaurantId),
       this.prisma.restaurant.findUniqueOrThrow({
@@ -204,6 +206,7 @@ export class RecommendationsService {
       currentBusinessDate(this.prisma, restaurantId, now),
       ask.tableSessionId === null ? [] : this.orderedAt(ask.tableSessionId),
       this.rules.active(restaurantId),
+      this.learned.pairs(restaurantId),
     ]);
     const { timeZone } = restaurant;
     const time = timeOfDayOf(now, timeZone);
@@ -235,6 +238,7 @@ export class RecommendationsService {
       items,
       categories: menu.categories,
       rules,
+      learned,
       bestSellers,
       daypart,
       channel: ask.channel,

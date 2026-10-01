@@ -6792,6 +6792,82 @@
         "x-requirements": ["REC-008"]
       }
     },
+    "/api/v1/recommendations/learned": {
+      "get": {
+        "operationId": "getLearnedRecommendations",
+        "summary": "What the restaurant’s orders taught the engine",
+        "description": "REC-003: the last run of the nightly learning job (the window, how many orders and visits, whether there were enough) and its 50 strongest \"frequently ordered together\" rules.",
+        "tags": ["recommendations"],
+        "responses": {
+          "200": {
+            "description": "The last run and its findings.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LearnedRecommendationsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-003"]
+      }
+    },
+    "/api/v1/recommendations/learned/run": {
+      "post": {
+        "operationId": "learnRecommendationsNow",
+        "summary": "Learn again now",
+        "description": "REC-003: runs the nightly learning job at once, for after a big menu change; the answer is what it found.",
+        "tags": ["recommendations"],
+        "responses": {
+          "200": {
+            "description": "The run and its findings.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LearnedRecommendationsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-003"]
+      }
+    },
     "/api/v1/reports/cancellations": {
       "get": {
         "operationId": "getCancellationReport",
@@ -14162,6 +14238,72 @@
           "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
         },
         "required": ["reason"],
+        "additionalProperties": false
+      },
+      "LearnedAssociationView": {
+        "type": "object",
+        "properties": {
+          "fromItemId": { "$ref": "#/components/schemas/Id" },
+          "fromName": { "type": "string" },
+          "toItemId": { "$ref": "#/components/schemas/Id" },
+          "toName": { "type": "string" },
+          "pairCount": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "supportBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+          "confidenceBp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+          "liftPercent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "fromItemId",
+          "fromName",
+          "toItemId",
+          "toName",
+          "pairCount",
+          "supportBp",
+          "confidenceBp",
+          "liftPercent"
+        ],
+        "additionalProperties": false
+      },
+      "LearnedRecommendationsResponse": {
+        "type": "object",
+        "properties": {
+          "lastRun": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": { "$ref": "#/components/schemas/Timestamp" },
+                  "windowFrom": { "$ref": "#/components/schemas/IsoDate" },
+                  "windowTo": { "$ref": "#/components/schemas/IsoDate" },
+                  "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "baskets": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "associations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "active": { "type": "boolean" },
+                  "durationMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": [
+                  "at",
+                  "windowFrom",
+                  "windowTo",
+                  "orders",
+                  "baskets",
+                  "associations",
+                  "active",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "minOrders": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "associations": {
+            "maxItems": 50,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LearnedAssociationView" }
+          }
+        },
+        "required": ["lastRun", "minOrders", "associations"],
         "additionalProperties": false
       },
       "LicenseState": {

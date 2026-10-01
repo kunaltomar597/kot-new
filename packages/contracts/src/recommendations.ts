@@ -209,3 +209,42 @@ export type RecommendationRuleListResponse = z.infer<typeof RecommendationRuleLi
 
 export const RecommendationRuleParams = z.strictObject({ ruleId: Id });
 export type RecommendationRuleParams = z.infer<typeof RecommendationRuleParams>;
+
+// ---------------------------------------------------------------- learned pairings (P6-02)
+
+/** One "frequently ordered together" rule (REC-003), for the manager to see. */
+export const LearnedAssociationView = z.object({
+  fromItemId: Id,
+  fromName: z.string(),
+  toItemId: Id,
+  toName: z.string(),
+  /** Visits (or takeaway orders) that had both. */
+  pairCount: z.int().positive(),
+  supportBp: z.int().min(0).max(10_000),
+  confidenceBp: z.int().min(0).max(10_000),
+  liftPercent: z.int().nonnegative(),
+});
+export type LearnedAssociationView = z.infer<typeof LearnedAssociationView>;
+
+/** What the learning job last did, and its strongest findings (REC-003). */
+export const LearnedRecommendationsResponse = z.object({
+  lastRun: z
+    .object({
+      at: Timestamp,
+      /** Business dates read, both included. */
+      windowFrom: IsoDate,
+      windowTo: IsoDate,
+      orders: z.int().nonnegative(),
+      baskets: z.int().nonnegative(),
+      associations: z.int().nonnegative(),
+      /** Enough orders to learn from (`reco.minOrders`). */
+      active: z.boolean(),
+      durationMs: z.int().nonnegative(),
+    })
+    .nullable(),
+  /** `reco.minOrders`. */
+  minOrders: z.int().positive(),
+  /** The strongest, at most 50. */
+  associations: z.array(LearnedAssociationView).max(50),
+});
+export type LearnedRecommendationsResponse = z.infer<typeof LearnedRecommendationsResponse>;

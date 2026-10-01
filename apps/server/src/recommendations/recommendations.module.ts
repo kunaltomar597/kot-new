@@ -5,10 +5,16 @@ import { MenuModule } from '../menu/menu.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { BestSellers } from './best-sellers.js';
 import { RECOMMENDATION_CLOCK, SYSTEM_RECOMMENDATION_CLOCK } from './clock.js';
+import {
+  DEFAULT_LEARNING_OPTIONS,
+  LEARNING_OPTIONS,
+  LearnedAssociations,
+} from './learned-associations.service.js';
 import { RecommendationOrders } from './recommendation-orders.js';
 import { RecommendationRulesService } from './recommendation-rules.service.js';
 import {
   BestSellersController,
+  LearnedRecommendationsController,
   RecommendationRulesController,
   RecommendationsController,
   TabletRecommendationsController,
@@ -18,7 +24,7 @@ import { RecommendationsService } from './recommendations.service.js';
 /**
  * The recommendation engine v1 (P3-04, REC-001 to REC-008, REC-011): suggestions for the waiter
  * app, the POS and the table tablet from the restaurant's rules and best sellers, the rules API,
- * and tracking. The tablet's and the phones' suggestion rows are P3-05; learned pairings P6-02.
+ * and tracking, and the pairings learned each night from its orders (P6-02, REC-003).
  */
 @Module({
   imports: [AuthModule, EventsModule, MenuModule, SettingsModule],
@@ -26,6 +32,7 @@ import { RecommendationsService } from './recommendations.service.js';
     RecommendationsController,
     TabletRecommendationsController,
     RecommendationRulesController,
+    LearnedRecommendationsController,
     BestSellersController,
   ],
   providers: [
@@ -33,8 +40,10 @@ import { RecommendationsService } from './recommendations.service.js';
     RecommendationRulesService,
     RecommendationOrders,
     BestSellers,
+    LearnedAssociations,
     { provide: RECOMMENDATION_CLOCK, useValue: SYSTEM_RECOMMENDATION_CLOCK },
+    { provide: LEARNING_OPTIONS, useValue: DEFAULT_LEARNING_OPTIONS },
   ],
-  exports: [RecommendationsService, BestSellers, RecommendationRulesService],
+  exports: [RecommendationsService, BestSellers, RecommendationRulesService, LearnedAssociations],
 })
 export class RecommendationsModule {}

@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@
 import {
   type BestSellersResponse,
   ArchiveRequest,
+  type LearnedRecommendationsResponse,
   type RecommendationRuleListResponse,
   RecommendationRuleParams,
   RecommendationRuleRequest,
@@ -17,6 +18,7 @@ import { RequireCapability, RequireDevice } from '../auth/decorators.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { LearnedAssociations } from './learned-associations.service.js';
 import { RecommendationRulesService } from './recommendation-rules.service.js';
 import { RecommendationsService } from './recommendations.service.js';
 
@@ -116,6 +118,24 @@ export class RecommendationRulesController {
     @Body(new ZodValidationPipe(ArchiveRequest)) body: ArchiveRequest,
   ): Promise<RecommendationRuleView> {
     return this.rules.archive(principalOf(request), ruleId, body.reason);
+  }
+}
+
+/** What the restaurant's orders taught the engine, and learning again now (P6-02, REC-003). */
+@Controller('recommendations/learned')
+@RequireCapability('OPERATIONS_CONFIGURE')
+export class LearnedRecommendationsController {
+  constructor(private readonly learned: LearnedAssociations) {}
+
+  @Get()
+  status(@Req() request: AuthenticatedRequest): Promise<LearnedRecommendationsResponse> {
+    return this.learned.status(principalOf(request).restaurantId);
+  }
+
+  @Post('run')
+  @HttpCode(200)
+  run(@Req() request: AuthenticatedRequest): Promise<LearnedRecommendationsResponse> {
+    return this.learned.learn(principalOf(request).restaurantId);
   }
 }
 
