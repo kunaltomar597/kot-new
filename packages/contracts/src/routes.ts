@@ -216,7 +216,13 @@ import {
   RoleRequest,
   RoleView,
 } from './roles.js';
-import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
+import {
+  ApproveUpdateRequest,
+  HealthResponse,
+  SystemStatusResponse,
+  TlsCaResponse,
+  VersionResponse,
+} from './system.js';
 import {
   CreateStaffRequest,
   DeactivateStaffRequest,
@@ -462,6 +468,40 @@ export const ROUTES = [
     responses: {
       200: { description: 'Server and database are up.', schema: HealthResponse },
       503: { description: 'The database is down.', schema: HealthResponse },
+    },
+  },
+  {
+    operationId: 'getSystemStatus',
+    method: 'GET',
+    path: '/api/v1/system',
+    summary: 'The System page: versions, services, storage, devices, update, backup and licence',
+    description:
+      'MGR-010, NFR-I03, DATA-006: what support asks for first. The backup and licence parts are ' +
+      'null until P7-05 and P7-01.',
+    tags: ['system'],
+    requirements: ['MGR-010', 'NFR-I03', 'DATA-006', 'UPD-004'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The status.', schema: SystemStatusResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'approveUpdateInstall',
+    method: 'POST',
+    path: '/api/v1/system/update/approve',
+    summary: '"Install now" for the update on offer',
+    description:
+      'UPD-004: the update installs at once instead of in the maintenance window (the updater, ' +
+      'P7-04, still waits for open tables unless it is security-critical). Audited.',
+    tags: ['system'],
+    requirements: ['UPD-004', 'AUD-001'],
+    capability: 'UPDATE_INSTALL_NOW',
+    request: { body: ApproveUpdateRequest },
+    responses: {
+      200: { description: 'The status with the approval.', schema: SystemStatusResponse },
+      ...standardErrors,
+      409: { description: 'That version is not on offer.', schema: ApiError },
     },
   },
   {

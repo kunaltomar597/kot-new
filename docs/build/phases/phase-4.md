@@ -222,6 +222,11 @@ dashboard's Alerts page (`/manage/alerts`, P4-01); this WP adds what the spec li
 the system screen as a fourth page.
 Acceptance: Playwright tests with seeded alerts.
 
+As built: the System page (`/manage/system`) over `GET /api/v1/system`, with "Install now"
+(`POST /api/v1/system/update/approve`) stored in `system_meta` for P7-04; backups, the licence and
+"Send diagnostics" show placeholders until P7-05, P7-01 and P7-08. The e2e run seeds a disk alert
+and an offered update.
+
 ## P4-05 Full report suite
 
 Requirements: RPT-003, RPT-004, RPT-007 to RPT-016, RPT-018, AUD-006 (data), REC-008 (data).

@@ -8094,6 +8094,96 @@
         "x-requirements": ["KDS-002", "KDS-008", "ONB-004", "AUD-001"]
       }
     },
+    "/api/v1/system": {
+      "get": {
+        "operationId": "getSystemStatus",
+        "summary": "The System page: versions, services, storage, devices, update, backup and licence",
+        "description": "MGR-010, NFR-I03, DATA-006: what support asks for first. The backup and licence parts are null until P7-05 and P7-01.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The status.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SystemStatusResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["MGR-010", "NFR-I03", "DATA-006", "UPD-004"]
+      }
+    },
+    "/api/v1/system/update/approve": {
+      "post": {
+        "operationId": "approveUpdateInstall",
+        "summary": "\"Install now\" for the update on offer",
+        "description": "UPD-004: the update installs at once instead of in the maintenance window (the updater, P7-04, still waits for open tables unless it is security-critical). Audited.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ApproveUpdateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The status with the approval.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SystemStatusResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "That version is not on offer.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "UPDATE_INSTALL_NOW",
+        "x-requirements": ["UPD-004", "AUD-001"]
+      }
+    },
     "/api/v1/table-sessions/{sessionId}/close-without-bill": {
       "post": {
         "operationId": "closeTableWithoutBill",
@@ -9370,6 +9460,15 @@
           "correlationId": { "type": "string" }
         },
         "required": ["code", "message"],
+        "additionalProperties": false
+      },
+      "ApproveUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["version"],
         "additionalProperties": false
       },
       "ArchiveRequest": {
@@ -15263,6 +15362,11 @@
         "required": ["secondFactorValidUntil"],
         "additionalProperties": false
       },
+      "StorageCategory": {
+        "type": "string",
+        "enum": ["TRANSACTIONS", "AUDIT", "PHOTOS", "LOGS", "BACKUPS"]
+      },
+      "StorageLevel": { "type": "string", "enum": ["OK", "WARNING", "CRITICAL", "UNKNOWN"] },
       "SubmitOrderRequest": {
         "type": "object",
         "properties": {
@@ -15335,6 +15439,223 @@
             "additionalProperties": false
           }
         ]
+      },
+      "SystemStatusResponse": {
+        "type": "object",
+        "properties": {
+          "checkedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+              },
+              "required": ["name", "version"],
+              "additionalProperties": false
+            }
+          },
+          "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "database": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string", "enum": ["up", "down"] },
+              "latencyMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["status", "latencyMs"],
+            "additionalProperties": false
+          },
+          "controlPlane": {
+            "type": "object",
+            "properties": {
+              "configured": { "type": "boolean" },
+              "enrolled": { "type": "boolean" },
+              "lastContactAt": {
+                "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+              },
+              "lastError": { "type": ["string", "null"] }
+            },
+            "required": ["configured", "enrolled", "lastContactAt", "lastError"],
+            "additionalProperties": false
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "totalBytes": {
+                "anyOf": [
+                  { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "freeBytes": {
+                "anyOf": [
+                  { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "usedPercent": {
+                "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+              },
+              "level": { "$ref": "#/components/schemas/StorageLevel" },
+              "warnPercent": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "criticalPercent": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": { "$ref": "#/components/schemas/StorageCategory" },
+                    "bytes": {
+                      "anyOf": [
+                        { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        { "type": "null" }
+                      ]
+                    }
+                  },
+                  "required": ["category", "bytes"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "totalBytes",
+              "freeBytes",
+              "usedPercent",
+              "level",
+              "warnPercent",
+              "criticalPercent",
+              "categories"
+            ],
+            "additionalProperties": false
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "$ref": "#/components/schemas/DeviceType" },
+                "paired": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "connected": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["type", "paired", "connected"],
+              "additionalProperties": false
+            }
+          },
+          "update": {
+            "type": "object",
+            "properties": {
+              "offered": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": { "type": "string" },
+                      "channel": { "type": "string" },
+                      "notes": { "type": ["string", "null"] },
+                      "publishedAt": { "$ref": "#/components/schemas/Timestamp" },
+                      "sizeBytes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["version", "channel", "notes", "publishedAt", "sizeBytes"],
+                    "additionalProperties": false
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "installApproval": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": { "type": "string" },
+                      "approvedAt": { "$ref": "#/components/schemas/Timestamp" },
+                      "approvedBy": { "type": ["string", "null"] }
+                    },
+                    "required": ["version", "approvedAt", "approvedBy"],
+                    "additionalProperties": false
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "maintenanceWindow": {
+                "type": "object",
+                "properties": { "start": { "type": "string" }, "end": { "type": "string" } },
+                "required": ["start", "end"],
+                "additionalProperties": false
+              },
+              "openTables": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["offered", "installApproval", "maintenanceWindow", "openTables"],
+            "additionalProperties": false
+          },
+          "backup": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "lastSuccessAt": {
+                    "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                  },
+                  "lastError": { "type": ["string", "null"] }
+                },
+                "required": ["lastSuccessAt", "lastError"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "state": { "type": "string" },
+                  "validUntil": {
+                    "anyOf": [{ "$ref": "#/components/schemas/IsoDate" }, { "type": "null" }]
+                  },
+                  "daysLeft": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["state", "validUntil", "daysLeft"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "checkedAt",
+          "versions",
+          "uptimeSeconds",
+          "database",
+          "controlPlane",
+          "storage",
+          "devices",
+          "update",
+          "backup",
+          "licence"
+        ],
+        "additionalProperties": false
       },
       "TableClosed": {
         "type": "object",

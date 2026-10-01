@@ -30,6 +30,7 @@ import { RestaurantModule } from './restaurant/restaurant.module.js';
 import { ServiceRequestsModule } from './service-requests/service-requests.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StaffModule } from './staff/staff.module.js';
+import { SystemModule } from './system/system.module.js';
 import { TlsModule } from './tls/tls.module.js';
 
 /**
@@ -70,6 +71,7 @@ export class AppModule {
         RealtimeModule,
         TlsModule,
         CloudModule,
+        SystemModule,
         HealthModule,
       ],
       providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],
