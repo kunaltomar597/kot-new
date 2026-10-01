@@ -193,8 +193,9 @@ Built in five parts, each its own pull request:
 - P4-03a Settings page (done): every catalogue setting by area, the editor chosen from its schema,
   labels and hints in i18n (`settingLabels`, `settingHints`), defaults shown, a reason kept with
   each change, vendor settings read-only, Owner-only ones behind the second factor.
-- P4-03b Notification rules: the Appendix C table per event (recipients, channels, pager text,
-  escalate, repeat) over the `notifications.rules` setting, and the nudge presets.
+- P4-03b Notification rules (done): the Appendix C table per event (recipients, channels, pager
+  text, escalate, repeat) over the `notifications.rules` setting, storing only differences; the
+  nudge presets are a list on the Settings page.
 - P4-03c Recommendation rules with boost, pin and block (REC-002, REC-009).
 - P4-03d Stations and printers with test print (KDS-008, ONB-004 step 6).
 - P4-03e The Owner's restaurant profile, tax groups and invoice series (ONB-004 steps 1 to 3,

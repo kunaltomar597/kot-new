@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  channelChoices,
+  checkRule,
   DEFAULT_NOTIFICATION_RULES,
   dueActions,
   effectiveRule,
@@ -10,7 +12,9 @@ import {
   reachesConsole,
   reachesPagerAndApp,
   type RecipientContext,
+  recipientChoices,
   resolveRecipients,
+  ruleOverride,
 } from '../src/index.js';
 
 const context = (overrides: Partial<RecipientContext> = {}): RecipientContext => ({
@@ -206,5 +210,66 @@ describe('[MGR-008] [NTF-005] what asks for a person at the POS and the dashboar
     expect(reachesConsole(alert(['PAGER', 'WAITER_APP']), 'vikram')).toBe(false);
     expect(reachesConsole(alert(['PAGER', 'WAITER_APP'], ['vikram']), 'vikram')).toBe(true);
     expect(reachesConsole(alert(['PAGER', 'WAITER_APP'], ['vikram']), 'neha')).toBe(false);
+  });
+});
+
+describe('[NTF-002] a manager’s rules', () => {
+  it('offers the usual people and channels, and the special ones only where they belong', () => {
+    expect(recipientChoices('ITEM_READY')).toEqual([
+      'RESPONSIBLE_WAITER',
+      'SECTION_WAITERS',
+      'ALL_WAITERS',
+      'MANAGERS_ON_DUTY',
+      'CASHIER',
+      'OWNER',
+    ]);
+    expect(recipientChoices('ORDER_CHANGED')).toContain('STATION');
+    expect(recipientChoices('MANAGER_NUDGE')).toContain('SELECTED');
+    expect(channelChoices('ITEM_READY')).toEqual([
+      'PAGER',
+      'WAITER_APP',
+      'POS',
+      'DASHBOARD',
+      'TABLET',
+    ]);
+    expect(channelChoices('ORDER_CHANGED')).toContain('PRINTED_SLIP');
+    expect(channelChoices('WATER_REQUEST')).not.toContain('KDS');
+  });
+
+  it('stores only what differs from Appendix C', () => {
+    const factory = DEFAULT_NOTIFICATION_RULES.WATER_REQUEST;
+    expect(ruleOverride('WATER_REQUEST', factory)).toBeUndefined();
+    // The same people in another order is no change.
+    expect(
+      ruleOverride('BILL_REQUEST', {
+        ...DEFAULT_NOTIFICATION_RULES.BILL_REQUEST,
+        recipients: ['CASHIER', 'RESPONSIBLE_WAITER'],
+      }),
+    ).toBeUndefined();
+    expect(
+      ruleOverride('WATER_REQUEST', {
+        ...factory,
+        recipients: ['SECTION_WAITERS'],
+        escalate: false,
+      }),
+    ).toEqual({ recipients: ['SECTION_WAITERS'], escalate: false });
+    const changed = effectiveRule('WATER_REQUEST', {
+      WATER_REQUEST: { recipients: ['SECTION_WAITERS'], escalate: false },
+    });
+    expect(changed).toMatchObject({ recipients: ['SECTION_WAITERS'], channels: factory.channels });
+  });
+
+  it('needs someone, somewhere, and a pager line for the pager', () => {
+    const factory = DEFAULT_NOTIFICATION_RULES.ITEM_READY;
+    expect(checkRule(factory)).toEqual([]);
+    expect(checkRule({ ...factory, recipients: [], channels: [] })).toEqual([
+      'RECIPIENTS_REQUIRED',
+      'CHANNELS_REQUIRED',
+    ]);
+    expect(checkRule({ ...factory, pagerText: ' ' })).toEqual(['PAGER_TEXT_REQUIRED']);
+    expect(checkRule({ ...factory, pagerText: '{table} FOOD IS READY AT THE PASS' })).toEqual([
+      'PAGER_TEXT_TOO_LONG',
+    ]);
+    expect(checkRule({ ...factory, channels: ['WAITER_APP'], pagerText: null })).toEqual([]);
   });
 });

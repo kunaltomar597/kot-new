@@ -14,6 +14,7 @@ import {
   useToast,
 } from '@rp/ui-web';
 import { type ReactNode, useCallback, useId, useState } from 'react';
+import { Link } from 'react-router';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
@@ -139,10 +140,8 @@ function describe(
             .map(([key, chosen]) => `${eventLabel(key, t)}: ${choiceLabel(chosen, t)}`)
             .join(' · ');
     }
-    case 'RULES': {
-      const count = Object.keys(value ?? {}).length;
-      return count === 0 ? t('settingsPage.none') : t('settingsPage.unit.plain', { value: count });
-    }
+    case 'RULES':
+      return t('settingsPage.rulesChanged', { count: Object.keys(value ?? {}).length });
   }
 }
 
@@ -275,7 +274,13 @@ export function SettingsScreen() {
                         <p className="staff-row__contact">{t('settingsPage.notYours')}</p>
                       ) : null}
                     </div>
-                    {setting.editable && editor !== undefined && editor.kind !== 'RULES' ? (
+                    {editor?.kind === 'RULES' ? (
+                      <div className="staff-row__actions">
+                        <Link to="/manage/settings/notifications" className="staff-pages__link">
+                          {t('settingsPage.openRules')}
+                        </Link>
+                      </div>
+                    ) : setting.editable && editor !== undefined ? (
                       <div
                         className="staff-row__actions"
                         role="group"
