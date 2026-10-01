@@ -61,6 +61,15 @@ are built. The tablet's routes are `GET` and `POST /api/v1/devices/current/servi
 `tablet.serviceRequestsPerMinute` raises a minute), and the tablet hears the request events in its
 table's room. P3-02 builds the tablet's buttons on them and the Maestro test.
 
+As built (P3-02):
+
+- `apps/table-tablet/src/ServiceButtons.tsx` on the open table's screen, with `service-view.ts`.
+- Water, Waiter and Bill light up with "Requested, waiter notified" and the minutes since, then
+  "… is on the way" once acknowledged.
+- Cancel clears the only open request, or asks which of several.
+- The repeats, escalation and anti-spam are the server's (P2-06d, tested there).
+- Maestro: `service-requests.yaml`, with a person acknowledging on the waiter app.
+
 ## P3-03 Customer ordering and waiter approval workflow
 
 Goal: diners order from the tablet; the waiter approves before the kitchen sees it.

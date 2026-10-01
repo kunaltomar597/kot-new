@@ -42,19 +42,23 @@ restaurant server running on this Mac.
 10. **Table session**: run `maestro test apps/table-tablet/.maestro/session-lifecycle.yaml`, or do
     it by hand: open the table at the POS with 2 guests → the tablet says "Table … · 2 guests";
     close it (Close without bill) → the idle screen is back.
-11. **Staff exit**: tap the top-left corner five times quickly → choose Vikram → PIN `2222`. The
+11. **Calling the waiter** (P3-02): with the table open, press Water: it says "Requested, waiter
+    notified" and the waiter's app and pager ring. Acknowledge on the waiter app: the tablet says
+    "… is on the way". Press Cancel: it clears. Press Water and Bill, then Cancel: it asks which.
+    (`maestro test apps/table-tablet/.maestro/service-requests.yaml` does the tablet's part.)
+12. **Staff exit**: tap the top-left corner five times quickly → choose Vikram → PIN `2222`. The
     tablet says "Kiosk paused"; Home now works. Press "Lock the tablet again" (or wait 10
     minutes): it is locked again. A wrong PIN is refused, and the audit trail shows both.
-12. **Battery alert**: `adb shell dumpsys battery unplug`, then `adb shell dumpsys battery set level
+13. **Battery alert**: `adb shell dumpsys battery unplug`, then `adb shell dumpsys battery set level
 15`. Within a few minutes the dashboard alerts the managers ("Device needs attention") and
     the Devices page shows "Battery 15%". `adb shell dumpsys battery set ac 1` (charging) clears
     it; finish with `adb shell dumpsys battery reset`.
-13. **Offline alert**: turn the tablet's Wi-Fi off for 3 minutes: the dashboard alerts the
+14. **Offline alert**: turn the tablet's Wi-Fi off for 3 minutes: the dashboard alerts the
     managers that it is offline. Turn Wi-Fi on: the alert clears and the tablet carries on.
     Then Dashboard → Devices → the tablet → Locate: it flashes its name and sounds for 15 s.
-14. **Restart**: hold the power button and restart. Note whether the app comes back by itself
+15. **Restart**: hold the power button and restart. Note whether the app comes back by itself
     (MDM's kiosk launcher does this in production; with only `dpm` it may not).
-15. **To undo**, factory reset the tablet (a device owner can only be removed that way).
+16. **To undo**, factory reset the tablet (a device owner can only be removed that way).
 
 ## Results template
 
@@ -69,6 +73,8 @@ Screen stays on while plugged in:     yes / no
 Accent colour and logo shown:         yes / no
 Promotions rotate:                    yes / no
 Opens on table open, idle on close:   yes / no
+Water lights, "on the way", Cancel:   yes / no
+Cancel asks which of two:             yes / no
 Staff exit with PIN, locks again:     yes / no
 Wrong PIN refused:                    yes / no
 Battery alert at 15 %, cleared on charge: yes / no, after about ... minutes

@@ -1,4 +1,4 @@
-import type { MenuSnapshot, TabletTableView } from '@rp/contracts';
+import type { MenuSnapshot, ServiceRequestView, TabletTableView } from '@rp/contracts';
 import { createTranslator } from '@rp/i18n';
 import {
   type DeviceHealthReading,
@@ -20,6 +20,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { App } from '../src/App';
 import { accentColorsOf, STAFF_TAPS } from '../src/branding';
 import { locateRequest } from '../src/LocateOverlay';
+import { cancelPlan, requestButtonState } from '../src/service-view';
 import { orderableCount, type TabletDevice } from '../src/TabletHome';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
@@ -419,5 +420,168 @@ describe('[MGR-006] locate', () => {
     expect(locateRequest(event, DEVICE_ID, now)).toEqual({ seconds: 15 });
     expect(locateRequest(event, '0199a0e0-0000-7000-8000-000000000092', now)).toBeUndefined();
     expect(locateRequest(event, DEVICE_ID, now + 120_000)).toBeUndefined();
+  });
+});
+
+describe('[TAB-004] [BILL-015] calling the waiter from the table', () => {
+  const REQUEST_IDS = {
+    WATER: '0199a0e0-0000-7000-8000-0000000072a1',
+    WAITER: '0199a0e0-0000-7000-8000-0000000072a2',
+    BILL: '0199a0e0-0000-7000-8000-0000000072a3',
+  } as const;
+
+  function request(
+    type: keyof typeof REQUEST_IDS,
+    overrides: Partial<ServiceRequestView> = {},
+  ): ServiceRequestView {
+    return {
+      id: REQUEST_IDS[type],
+      type,
+      state: 'ACTIVE',
+      source: 'TABLE_TABLET',
+      tableId: TABLE_ID,
+      tableLabel: 'T4',
+      tableSessionId: SESSION_ID,
+      createdAt: new Date().toISOString(),
+      escalatedAt: null,
+      acknowledgedAt: null,
+      acknowledgedById: null,
+      acknowledgedByName: null,
+      closedAt: null,
+      ...overrides,
+    };
+  }
+
+  async function atTable(open: ServiceRequestView[] = []) {
+    const context = setup(true);
+    let requests = open;
+    context.server
+      .on('GET', '/api/v1/devices/current/service-requests', () => ({
+        status: 200,
+        body: { tableSessionId: SESSION_ID, requests },
+      }))
+      .on('POST', '/api/v1/devices/current/service-requests', (call) => {
+        const { type } = call.body as { type: keyof typeof REQUEST_IDS };
+        if (requests.some((existing) => existing.type === type)) {
+          return {
+            status: 409,
+            body: {
+              code: 'SERVICE_REQUEST_OPEN',
+              message: 'Already asked; the waiter is coming.',
+              correlationId: 'c',
+            },
+          };
+        }
+        const raised = request(type);
+        requests = [...requests, raised];
+        return { status: 201, body: raised };
+      })
+      .on('POST', '/api/v1/devices/current/service-requests/:requestId/cancel', (call) => {
+        const id = call.path.split('/').at(-2);
+        const found = requests.find((existing) => existing.id === id);
+        requests = requests.filter((existing) => existing.id !== id);
+        return {
+          status: 200,
+          body: {
+            ...(found ?? request('WATER')),
+            state: 'CANCELLED',
+            closedAt: new Date().toISOString(),
+          },
+        };
+      });
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await render(<App session={context.session} translator={translator} device={context.device} />);
+    await online(context.sockets);
+    expect(await screen.findByTestId('service-buttons')).toBeOnTheScreen();
+    return {
+      ...context,
+      acknowledge: (type: keyof typeof REQUEST_IDS, name: string) => {
+        requests = requests.map((existing) =>
+          existing.type === type
+            ? { ...existing, state: 'ACKNOWLEDGED', acknowledgedByName: name }
+            : existing,
+        );
+      },
+    };
+  }
+
+  it('lights a button until the waiter comes, then Cancel clears it', async () => {
+    const { server, sockets, acknowledge } = await atTable();
+    await fireEvent.press(screen.getByTestId('request-WATER'));
+    expect(await screen.findByText('Requested, waiter notified · just now')).toBeOnTheScreen();
+    expect(server.callsTo('POST', '/api/v1/devices/current/service-requests')[0]?.body).toEqual({
+      type: 'WATER',
+    });
+    acknowledge('WATER', 'Ravi');
+    await act(async () => {
+      sockets.last.fire(
+        'event',
+        frame(3, 'ServiceRequestAcknowledged', {
+          serviceRequestId: REQUEST_IDS.WATER,
+          tableId: TABLE_ID,
+          tableSessionId: SESSION_ID,
+          type: 'WATER',
+          acknowledgedBy: STAFF.WAITER.staffId,
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByText('Ravi is on the way')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('request-cancel'));
+    await waitForIdle();
+    expect(
+      server.callsTo(
+        'POST',
+        `/api/v1/devices/current/service-requests/${REQUEST_IDS.WATER}/cancel`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  async function waitForIdle() {
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('request-WATER')).toBeOnTheScreen();
+    expect(screen.queryByTestId('request-WATER-state')).toBeNull();
+  }
+
+  it('asks which request to cancel when several are open', async () => {
+    const { server } = await atTable([request('WATER'), request('BILL')]);
+    expect(await screen.findByTestId('request-BILL-state')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('request-cancel'));
+    expect(
+      await screen.findByText(translator('mobile.tablet.requests.chooseCancel')),
+    ).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('cancel-BILL'));
+    expect(
+      server.callsTo('POST', `/api/v1/devices/current/service-requests/${REQUEST_IDS.BILL}/cancel`),
+    ).toHaveLength(1);
+    expect(
+      server.callsTo(
+        'POST',
+        `/api/v1/devices/current/service-requests/${REQUEST_IDS.WATER}/cancel`,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('works out each button and what Cancel does', () => {
+    const now = Date.parse('2026-09-26T09:00:00.000Z');
+    const water = request('WATER', { createdAt: '2026-09-26T08:57:10.000Z' });
+    expect(requestButtonState('WATER', [water], now)).toEqual({ kind: 'requested', minutes: 2 });
+    expect(requestButtonState('BILL', [water], now)).toEqual({ kind: 'idle' });
+    expect(
+      requestButtonState(
+        'WATER',
+        [{ ...water, state: 'ACKNOWLEDGED', acknowledgedByName: null }],
+        now,
+      ),
+    ).toEqual({ kind: 'onTheWay', name: null });
+    expect(requestButtonState('WATER', [{ ...water, state: 'RESOLVED' }], now)).toEqual({
+      kind: 'idle',
+    });
+    expect(cancelPlan([]).kind).toBe('none');
+    expect(cancelPlan([water]).kind).toBe('one');
+    expect(cancelPlan([water, request('WAITER')]).kind).toBe('choose');
   });
 });

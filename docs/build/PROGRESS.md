@@ -172,7 +172,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-02 Service requests on the tablet (the server side is built).
+- P3-03 Customer ordering from the tablet and the waiter's approval.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -261,7 +261,7 @@ Recommended next WPs (dependencies met):
 - [x] P3-01a Tablet server side: own table, health, offline, kiosk exit, accent colour
 - [x] P3-01b Table tablet app: kiosk, idle and session screens, wipe, health, staff exit
 - [x] P3-01c Locate a tablet from the dashboard (MGR-006, Should)
-- [ ] P3-02 Service requests on the tablet (server side in P2-06d)
+- [x] P3-02 Service requests on the tablet (server side in P2-06d)
 - [ ] P3-03 Customer ordering and waiter approval
 - [x] P3-04 Recommendation engine v1
 - [ ] P3-05 Recommendation UI and feedback
@@ -569,6 +569,16 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-02):
+
+297. The open table's screen has four large buttons in a 2×2 grid: Water, Waiter, Bill and Cancel.
+     - A request button stays lit, with "Requested, waiter notified · n min ago" (updated every
+       30 s) and then "… is on the way" with the waiter's name once acknowledged.
+     - It cannot be pressed again while open; the server refuses a duplicate anyway.
+     - Cancel is greyed out with nothing open, clears the only open request at once, and lists the
+       open ones to choose from when there are several ("Keep them" closes the list).
+     - A refused request shows the server's reason, e.g. too many requests this minute.
 
 Decided 2026-10-02 (P3-01c):
 
@@ -1539,6 +1549,20 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-02 Service requests on the tablet
+
+Built:
+
+- The tablet: `ServiceButtons` with `service-view.ts` (`requestButtonState`, `cancelPlan`,
+  `openRequests`) on `OpenTableScreen`; `@rp/domain` is now a dependency of the tablet app.
+- Maestro: `service-requests.yaml` (in `config.yaml` after the session flow).
+- Manual task 12 now covers calling the waiter.
+
+Tests: tablet 3 (lit until acknowledged, then Cancel clears it; choosing between two; the button
+and Cancel rules). The server side's repeats, escalation and anti-spam were tested in P2-06d.
+
+Decision: 297.
 
 ### 2026-10-02: P3-01c Locate a tablet (P3-01 done)
 
