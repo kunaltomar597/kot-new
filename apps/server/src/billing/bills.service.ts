@@ -382,6 +382,7 @@ export class BillsService {
     };
     const items: BillableItem[] = billable.map((item) => ({
       id: item.id,
+      itemId: item.itemId,
       name: item.name,
       variantName: item.variantName,
       modifiers: item.modifiers.map(({ name, quantity }) => ({ name, quantity })),

@@ -273,6 +273,29 @@ describe('[RPT-002] item and category sales', () => {
   });
 });
 
+describe('[RPT-002] [RPT-018] what each invoice line keeps', () => {
+  it('keeps its dish and a share of the tax that adds up to the invoice, split parts too', async () => {
+    const issued = await prisma.invoice.findMany({
+      where: { restaurantId: kit.restaurantId },
+      include: { lines: true },
+    });
+    expect(issued.length).toBeGreaterThan(3);
+    for (const invoice of issued) {
+      const current = invoice.lines.filter((line) => line.version === invoice.version);
+      expect(
+        current.reduce((sum, line) => sum + (line.taxShare ?? 0), 0),
+        invoice.invoiceNumber,
+      ).toBe(invoice.taxTotal);
+      for (const line of current) {
+        const orderItem = await prisma.orderItem.findUniqueOrThrow({
+          where: { id: line.orderItemId ?? '' },
+        });
+        expect(line.itemId).toBe(orderItem.itemId);
+      }
+    }
+  });
+});
+
 describe('[RPT-005] payments and shifts', () => {
   it('adds up payments per mode', async () => {
     const payments = PaymentModesResponse.parse((await report('payments')).body);
@@ -345,6 +368,29 @@ describe('[RPT-006] GST reports for the CA', () => {
     expect(voided).toMatchObject({ voidReason: 'Wrong item', grandTotal: 8_400 });
     expect(register.invoices[5]?.replacesInvoiceNumber).toBe(invoices.voided?.invoiceNumber);
     expect(register.invoices[0]).toMatchObject({ taxableValue: 58_000, taxTotal: 3_160 });
+    expect(register).toMatchObject({ total: 6, voided: 1, offset: 0, nextOffset: null });
+  });
+
+  it('[RPT-018] pages a long register, in the same order', async () => {
+    const page = (offset: number) =>
+      server()
+        .get('/api/v1/reports/invoice-register')
+        .query({ from: invoiceDay, to: invoiceDay, offset, limit: 4 })
+        .set(as(manager));
+    const first = InvoiceRegisterResponse.parse((await page(0)).body);
+    expect(first).toMatchObject({ total: 6, offset: 0, nextOffset: 4 });
+    expect(first.invoices).toHaveLength(4);
+    const second = InvoiceRegisterResponse.parse((await page(4)).body);
+    expect(second).toMatchObject({ total: 6, offset: 4, nextOffset: null });
+    expect(second.invoices.map((invoice) => invoice.invoiceNumber)).toEqual([
+      invoices.voided?.invoiceNumber,
+      invoices.reissued?.invoiceNumber,
+    ]);
+    const tooMany = await server()
+      .get('/api/v1/reports/invoice-register')
+      .query({ from: invoiceDay, to: invoiceDay, limit: 5_000 })
+      .set(as(manager));
+    expect(tooMany.status).toBe(400);
   });
 });
 

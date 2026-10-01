@@ -24,6 +24,18 @@ export default defineConfig({
       },
       {
         extends: true,
+        // Reports over a generated year at design capacity (P4-05c, RPT-018); skipped without
+        // RP_PERF=1 because the year takes minutes to generate.
+        test: {
+          name: 'performance',
+          include: ['test/performance/**/*.perf.test.ts'],
+          globalSetup: ['test/setup/global-setup.ts'],
+          testTimeout: 120_000,
+          hookTimeout: 3_600_000,
+        },
+      },
+      {
+        extends: true,
         // The Phase 1 exit scenario against a real install (P1-14); skipped without RP_SCENARIO_URL.
         test: {
           name: 'scenario',

@@ -143,10 +143,32 @@ export const GstSummaryResponse = z.object({
 });
 export type GstSummaryResponse = z.infer<typeof GstSummaryResponse>;
 
-/** RPT-006: every invoice number in sequence, cancelled ones included. */
+/** The most invoices one page of the register carries (P4-05c: a year is 700,000 or more). */
+export const REGISTER_PAGE_MAX = 1_000;
+
+/** RPT-006: a range of invoice dates, a page at a time. */
+export const InvoiceRegisterQuery = z
+  .strictObject({
+    from: IsoDate,
+    to: IsoDate,
+    /** Invoices to skip, in register order. */
+    offset: z.coerce.number().int().min(0).default(0),
+    limit: z.coerce.number().int().min(1).max(REGISTER_PAGE_MAX).default(500),
+  })
+  .refine(withinRange, rangeMessages.order)
+  .refine(withinMaxDays, rangeMessages.length);
+export type InvoiceRegisterQuery = z.infer<typeof InvoiceRegisterQuery>;
+
+/** RPT-006: every invoice number in sequence, cancelled ones included, a page at a time. */
 export const InvoiceRegisterResponse = z.object({
   from: IsoDate,
   to: IsoDate,
+  /** Invoices in the whole range, and where the next page starts (null after the last). */
+  total: z.int().min(0),
+  /** Of them, voided. */
+  voided: z.int().min(0),
+  offset: z.int().min(0),
+  nextOffset: z.int().min(0).nullable(),
   invoices: z.array(
     z.object({
       invoiceId: Id,

@@ -117,6 +117,7 @@ import {
   CancellationReportResponse,
   DiscountReportResponse,
   GstSummaryResponse,
+  InvoiceRegisterQuery,
   InvoiceRegisterResponse,
   ItemSalesResponse,
   KitchenReportResponse,
@@ -3267,7 +3268,7 @@ export const ROUTES = [
     tags: ['reports'],
     requirements: ['RPT-006'],
     capability: 'REPORTS_VIEW_EXPORT',
-    request: { query: ReportRangeQuery },
+    request: { query: InvoiceRegisterQuery },
     responses: {
       200: { description: 'The report.', schema: InvoiceRegisterResponse },
       ...standardErrors,

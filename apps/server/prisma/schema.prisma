@@ -1528,6 +1528,10 @@ model InvoiceLine {
   taxableValue Int        @map("taxable_value")
   taxGroupId   String?    @map("tax_group_id") @db.Uuid
   sacCode      String?    @map("sac_code")
+  /// The dish (P4-05c), for item-wise reports without joining the order lines.
+  itemId       String?    @map("item_id") @db.Uuid
+  /// This line's share of its tax group's tax on the invoice, as issued (P4-05c, RPT-002).
+  taxShare     Int?       @map("tax_share")
   /// The invoice version this line belongs to. An edited invoice (BILL-010) gets new lines under
   /// its next version; earlier lines stay for the audit trail, since lines are never deleted.
   version      Int        @default(1)
@@ -1639,6 +1643,7 @@ model Payment {
 
   @@index([invoiceId])
   @@index([restaurantId, businessDate])
+  @@index([shiftId])
   @@map("payments")
 }
 

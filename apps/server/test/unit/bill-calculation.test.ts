@@ -7,6 +7,7 @@ import {
 
 const item = (overrides: Partial<BillableItem>): BillableItem => ({
   id: 'a',
+  itemId: 'dish-a',
   name: 'Paneer Tikka',
   variantName: null,
   modifiers: [],
