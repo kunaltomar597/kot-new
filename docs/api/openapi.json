@@ -6093,8 +6093,8 @@
     "/api/v1/reports/exports": {
       "post": {
         "operationId": "exportReport",
-        "summary": "Export a report as CSV, stamped and audited",
-        "description": "The file starts with the restaurant, the report, its filters, who generated it and when (RPT-017); every export is audited as REPORT_EXPORTED. Cashiers may export their own shift report only. Amounts are plain rupees with two decimals.",
+        "summary": "Export a report as CSV, Excel or PDF, stamped and audited",
+        "description": "The file starts with the restaurant, the report, its filters, who generated it and when (RPT-017); every export is audited as REPORT_EXPORTED. Cashiers may export their own shift report only. CSV amounts are plain rupees with two decimals; Excel amounts are numbers in rupees; PDF shows ₹ with Indian grouping. Excel takes at most 200,000 rows and PDF 5,000.",
         "tags": ["reports"],
         "requestBody": {
           "required": true,
@@ -6127,6 +6127,12 @@
           },
           "403": {
             "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "Too many rows for this format: use CSV.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -11430,6 +11436,7 @@
           { "$ref": "#/components/schemas/RestaurantChanged" }
         ]
       },
+      "ExportFormat": { "type": "string", "enum": ["CSV", "XLSX", "PDF"] },
       "ExternalId": { "type": "string", "minLength": 1, "maxLength": 128 },
       "FloorArchiveRequest": {
         "type": "object",
@@ -15303,7 +15310,7 @@
           "report": { "$ref": "#/components/schemas/ReportKind" },
           "from": { "$ref": "#/components/schemas/IsoDate" },
           "to": { "$ref": "#/components/schemas/IsoDate" },
-          "format": { "default": "CSV", "type": "string", "const": "CSV" }
+          "format": { "default": "CSV", "$ref": "#/components/schemas/ExportFormat" }
         },
         "required": ["report", "from", "to", "format"],
         "additionalProperties": false
@@ -15314,7 +15321,7 @@
           "report": { "$ref": "#/components/schemas/ReportKind" },
           "from": { "$ref": "#/components/schemas/IsoDate" },
           "to": { "$ref": "#/components/schemas/IsoDate" },
-          "format": { "default": "CSV", "type": "string", "const": "CSV" }
+          "format": { "default": "CSV", "$ref": "#/components/schemas/ExportFormat" }
         },
         "required": ["report", "from", "to"],
         "additionalProperties": false
@@ -15323,16 +15330,39 @@
         "type": "object",
         "properties": {
           "filename": { "type": "string" },
-          "contentType": { "type": "string", "const": "text/csv; charset=utf-8" },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "text/csv; charset=utf-8",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/pdf"
+            ]
+          },
+          "encoding": { "type": "string", "enum": ["utf-8", "base64"] },
           "content": { "type": "string" },
           "generatedAt": { "$ref": "#/components/schemas/Timestamp" }
         },
-        "required": ["filename", "contentType", "content", "generatedAt"],
+        "required": ["filename", "contentType", "encoding", "content", "generatedAt"],
         "additionalProperties": false
       },
       "ReportKind": {
         "type": "string",
-        "enum": ["SALES", "ITEMS", "PAYMENTS", "SHIFTS", "GST", "INVOICE_REGISTER"]
+        "enum": [
+          "SALES",
+          "ITEMS",
+          "PAYMENTS",
+          "SHIFTS",
+          "GST",
+          "INVOICE_REGISTER",
+          "SOURCES",
+          "STAFF",
+          "DISCOUNTS",
+          "CANCELLATIONS",
+          "REPRINTS",
+          "KITCHEN",
+          "TABLES",
+          "RECOMMENDATIONS"
+        ]
       },
       "ReportRangeQuery": {
         "type": "object",

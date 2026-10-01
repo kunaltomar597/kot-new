@@ -3390,11 +3390,12 @@ export const ROUTES = [
     operationId: 'exportReport',
     method: 'POST',
     path: '/api/v1/reports/exports',
-    summary: 'Export a report as CSV, stamped and audited',
+    summary: 'Export a report as CSV, Excel or PDF, stamped and audited',
     description:
       'The file starts with the restaurant, the report, its filters, who generated it and when ' +
       '(RPT-017); every export is audited as REPORT_EXPORTED. Cashiers may export their own shift ' +
-      'report only. Amounts are plain rupees with two decimals.',
+      'report only. CSV amounts are plain rupees with two decimals; Excel amounts are numbers in ' +
+      'rupees; PDF shows ₹ with Indian grouping. Excel takes at most 200,000 rows and PDF 5,000.',
     tags: ['reports'],
     requirements: ['RPT-017', 'AUD-001'],
     capability: 'REPORTS_VIEW_EXPORT',
@@ -3402,6 +3403,7 @@ export const ROUTES = [
     responses: {
       200: { description: 'The exported file.', schema: ReportExportResponse },
       ...standardErrors,
+      422: { description: 'Too many rows for this format: use CSV.', schema: ApiError },
     },
   },
   {

@@ -9,6 +9,7 @@ import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { percent, type ReportRange, rupees } from './report-view.js';
 import {
+  ExportButtons,
   moneyColumn,
   nameOf,
   numberColumn,
@@ -39,7 +40,11 @@ function Discounts({ range }: { range: ReportRange }) {
   return (
     <ReportBody data={data} reload={reload}>
       {(report) => (
-        <ReportSection id="report-discounts" title={t('reportsPage.report.discounts')}>
+        <ReportSection
+          id="report-discounts"
+          title={t('reportsPage.report.discounts')}
+          action={<ExportButtons report="DISCOUNTS" range={range} />}
+        >
           <StatTiles
             stats={[
               { label: t('reportsPage.discounts.count'), value: String(report.totals.count) },
@@ -105,7 +110,11 @@ function Cancellations({ range }: { range: ReportRange }) {
   return (
     <ReportBody data={data} reload={reload}>
       {(report) => (
-        <ReportSection id="report-cancellations" title={t('reportsPage.report.cancellations')}>
+        <ReportSection
+          id="report-cancellations"
+          title={t('reportsPage.report.cancellations')}
+          action={<ExportButtons report="CANCELLATIONS" range={range} />}
+        >
           <StatTiles
             stats={[
               {
@@ -196,7 +205,11 @@ function Reprints({ range }: { range: ReportRange }) {
   return (
     <ReportBody data={data} reload={reload}>
       {(report) => (
-        <ReportSection id="report-reprints" title={t('reportsPage.report.reprints')}>
+        <ReportSection
+          id="report-reprints"
+          title={t('reportsPage.report.reprints')}
+          action={<ExportButtons report="REPRINTS" range={range} />}
+        >
           <StatTiles
             stats={[
               { label: t('reportsPage.reprints.kot'), value: String(report.totals.kotReprints) },

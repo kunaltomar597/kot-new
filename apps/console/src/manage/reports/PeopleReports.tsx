@@ -6,7 +6,7 @@ import { useT } from '../../app/i18n.js';
 import { axisRupees, duration, type ReportRange, rupees } from './report-view.js';
 import {
   BarChartFigure,
-  ExportButton,
+  ExportButtons,
   moneyColumn,
   numberColumn,
   ReportBody,
@@ -27,7 +27,11 @@ function StaffWork({ range }: { range: ReportRange }) {
   return (
     <ReportBody data={data} reload={reload}>
       {(report) => (
-        <ReportSection id="report-staff" title={t('reportsPage.report.staff')}>
+        <ReportSection
+          id="report-staff"
+          title={t('reportsPage.report.staff')}
+          action={<ExportButtons report="STAFF" range={range} />}
+        >
           {report.staff.length === 0 ? null : (
             <BarChartFigure
               title={t('reportsPage.staff.chart')}
@@ -92,7 +96,7 @@ function Shifts({ range }: { range: ReportRange }) {
         <ReportSection
           id="report-shifts"
           title={t('reportsPage.report.shifts')}
-          action={<ExportButton report="SHIFTS" range={range} />}
+          action={<ExportButtons report="SHIFTS" range={range} />}
         >
           <p className="settings-row__value">
             {t('reportsPage.shifts.variance', { amount: signed(report.totalVariance) })}

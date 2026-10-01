@@ -1533,6 +1533,18 @@ body {
   text-underline-offset: 4px;
 }
 
+.report-exports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+}
+
+.report-exports__label {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
 .report-body {
   display: flex;
   flex-direction: column;

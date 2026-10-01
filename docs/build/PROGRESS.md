@@ -154,8 +154,8 @@ What exists:
   update on offer with "Install now", and placeholders for backups, the licence and diagnostics
   (P4-04); the Reports area: one range for every report (presets or dates, kept in the address),
   each report as headline figures, a bar chart where one helps and tables, CSV export, and
-  drill-down from a row to everything about its order (P4-05d, Recharts). 282 tests, and 22
-  Playwright steps.
+  drill-down from a row to everything about its order (P4-05d, Recharts); export of every report
+  as CSV, Excel or PDF (P4-06). 283 tests, and 22 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -170,7 +170,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-06 Report exports (CSV, Excel and PDF for every report).
 - P4-07 Audit viewer, chain verification and the suspicious-activity report.
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
@@ -284,7 +283,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-05b Report data II: kitchen, tables, recommendations
 - [x] P4-05c Twelve months at design capacity (RPT-018)
 - [x] P4-05d Reports area in the console with charts and drill-down
-- [ ] P4-06 Report exports
+- [x] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
 
 ### Phase 5: QR menu and cloud relay
@@ -567,6 +566,25 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-06):
+
+273. Every report exports as CSV, Excel (.xlsx, ExcelJS) or PDF (A4, pdfmake), all from one
+     document model in `@rp/domain` (`report-document.ts`: the stamp and tables whose columns are
+     text, money in paise, number, percent in basis points or date), so the three formats show
+     the same figures. CSV is unchanged for the six reports it already exported.
+274. Excel: one sheet per table, the stamp on top and the header frozen; amounts are numbers in
+     rupees with two decimals and percentages are numbers, so the CA can sum them; text stays text
+     (never run as a formula). PDF: ₹ with Indian grouping, DD-MM-YYYY dates, landscape when a
+     table has more than six columns, page numbers; Roboto as shipped with pdfmake (it has ₹), and
+     no network or disk access beyond those fonts.
+275. Excel takes at most 200,000 rows and PDF 5,000 (`EXPORT_TOO_LARGE` says to use CSV or a shorter
+     period); CSV has no limit. Files come back in the JSON answer, CSV as text and the others as
+     base64. A year's invoice register as CSV (about 90 MB) is the largest file; a streamed
+     download is left for P8 hardening if the pilot needs it (this replaces the note in 267).
+276. The server declares the pdfmake types it uses (`src/types/pdfmake.d.ts`): `@types/pdfmake`
+     brings the browser's DOM types into the server build, which broke the TLS code's typing.
+     `@fast-csv` (via ExcelJS) is pinned to the workspace's `@types/node` for the same reason.
 
 Decided 2026-10-01 (P4-05d):
 
@@ -1392,6 +1410,29 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-06 Report exports
+
+Built: `@rp/domain` `report-document.ts` (`columns`, `documentToCsv`, `csvValue`, `displayValue`,
+`reportRowCount`); contracts: every report in `ReportKind`, `ExportFormat` (CSV, XLSX, PDF),
+`EXPORT_ROW_LIMITS`, `EXPORT_CONTENT_TYPES` and the answer's `encoding`; the server's
+`ReportDocumentsService` (the 14 reports as typed tables), `report-files.ts` (Excel and PDF, the
+row limits) and the export service rebuilt on them; the console's `ExportButtons` (CSV, Excel,
+PDF) on every report.
+
+Tests: domain `report-document.test.ts` 2; server `report-files.test.ts` 3 (sheets, stamp,
+numbers and formats in Excel, a formula kept as text, PDF pages and landscape, limits) and 3 in
+`report-suite.int.test.ts` (each of the 14 reports as CSV, Excel and PDF files audited with their
+format, an unknown format and a waiter refused); the console export test also saves a PDF.
+
+Gotchas:
+
+- A type package with `/// <reference lib="dom" />` changes the server's global types (here
+  `Crypto`, so an overloaded `@peculiar/x509` call resolved differently): declare the few types
+  needed instead.
+- ExcelJS types `load` with an older `Buffer` than Node's; cast through its parameter type.
+
+Decisions: 273 to 276.
 
 ### 2026-10-01: P4-05d Reports area (P4-05 done)
 

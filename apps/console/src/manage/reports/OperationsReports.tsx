@@ -9,6 +9,7 @@ import { useT } from '../../app/i18n.js';
 import { axisRupees, duration, percent, type ReportRange, rupees } from './report-view.js';
 import {
   BarChartFigure,
+  ExportButtons,
   moneyColumn,
   numberColumn,
   ReportBody,
@@ -36,7 +37,11 @@ function Kitchen({ range }: { range: ReportRange }) {
   return (
     <ReportBody data={data} reload={reload}>
       {(report) => (
-        <ReportSection id="report-kitchen" title={t('reportsPage.report.kitchen')}>
+        <ReportSection
+          id="report-kitchen"
+          title={t('reportsPage.report.kitchen')}
+          action={<ExportButtons report="KITCHEN" range={range} />}
+        >
           <StatTiles
             stats={[
               {
@@ -116,7 +121,11 @@ function Tables({ range }: { range: ReportRange }) {
   return (
     <ReportBody data={data} reload={reload}>
       {(report) => (
-        <ReportSection id="report-tables" title={t('reportsPage.report.tables')}>
+        <ReportSection
+          id="report-tables"
+          title={t('reportsPage.report.tables')}
+          action={<ExportButtons report="TABLES" range={range} />}
+        >
           <StatTiles
             stats={[
               { label: t('reportsPage.tables.covers'), value: String(report.totals.covers) },
@@ -173,7 +182,11 @@ function Suggestions({ range }: { range: ReportRange }) {
   return (
     <ReportBody data={data} reload={reload}>
       {(report) => (
-        <ReportSection id="report-suggestions" title={t('reportsPage.report.suggestions')}>
+        <ReportSection
+          id="report-suggestions"
+          title={t('reportsPage.report.suggestions')}
+          action={<ExportButtons report="RECOMMENDATIONS" range={range} />}
+        >
           <StatTiles
             stats={[
               { label: t('reportsPage.suggestions.revenue'), value: rupees(report.totals.revenue) },

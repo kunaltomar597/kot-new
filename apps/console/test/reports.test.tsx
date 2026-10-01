@@ -54,6 +54,7 @@ function reportsServer(): FakeServer {
       body: {
         filename: `sales_${TODAY}_${TODAY}.csv`,
         contentType: 'text/csv; charset=utf-8',
+        encoding: 'utf-8',
         content: 'Restaurant,Spice Route\n',
         generatedAt: '2026-10-01T10:00:00.000Z',
       },
@@ -152,7 +153,7 @@ describe('[RPT-016] the Reports area', () => {
   });
 
   it('[RPT-017] exports a report as CSV', async () => {
-    const createObjectURL = vi.fn(() => 'blob:report');
+    const createObjectURL = vi.fn((_file: Blob) => 'blob:report');
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
     const fake = reportsServer();
     const { user } = await renderConsole({
@@ -160,7 +161,8 @@ describe('[RPT-016] the Reports area', () => {
       path: `/manage/reports/sales?from=${TODAY}&to=${TODAY}`,
       signedIn: 'MANAGER',
     });
-    await user.click(await screen.findByRole('button', { name: t('reportsPage.export') }));
+    const csv = t('reportsPage.exportAs', { format: t('reportsPage.format.CSV') });
+    await user.click(await screen.findByRole('button', { name: csv }));
     expect(
       await screen.findByText(t('reportsPage.exported', { file: `sales_${TODAY}_${TODAY}.csv` })),
     ).toBeVisible();
@@ -171,6 +173,32 @@ describe('[RPT-016] the Reports area', () => {
       format: 'CSV',
     });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+    // A PDF comes as base64 and is saved as bytes.
+    fake.on('POST', '/api/v1/reports/exports', () => ({
+      status: 200,
+      body: {
+        filename: `sales_${TODAY}_${TODAY}.pdf`,
+        contentType: 'application/pdf',
+        encoding: 'base64',
+        content: btoa('%PDF-1.3 test'),
+        generatedAt: '2026-10-01T10:00:00.000Z',
+      },
+    }));
+    await user.click(
+      screen.getByRole('button', {
+        name: t('reportsPage.exportAs', { format: t('reportsPage.format.PDF') }),
+      }),
+    );
+    expect(
+      await screen.findByText(t('reportsPage.exported', { file: `sales_${TODAY}_${TODAY}.pdf` })),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/reports/exports')[1]?.body).toMatchObject({
+      format: 'PDF',
+    });
+    const blob = createObjectURL.mock.calls[1]?.[0];
+    expect(blob?.type).toBe('application/pdf');
+    expect(blob?.size).toBe('%PDF-1.3 test'.length);
   });
 });
 

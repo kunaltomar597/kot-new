@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["CSV", "XLSX", "PDF"] },
+  "output": { "type": "string", "enum": ["CSV", "XLSX", "PDF"] }
+}

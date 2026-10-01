@@ -15,3 +15,7 @@ overrides:
   mysql2@<3.22.0: ^3.22.0
   # GHSA-ggr8-5vv4-36mx, via @prisma/config 7.10.0.
   deepmerge-ts@<8.0.0: ^8.0.0
+  # @fast-csv (via exceljs) lists @types/node 14 as a dependency; its old Node globals clash with
+  # the workspace's in type checking. It needs no types of its own at run time.
+  '@fast-csv/format>@types/node': ^22.20.4
+  '@fast-csv/parse>@types/node': ^22.20.4

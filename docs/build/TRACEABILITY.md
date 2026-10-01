@@ -148,9 +148,9 @@ Must: 192 / 287 covered. Should: 4 / 24. Could: 0 / 7.
 - RPT-012 (M): apps/console/test/reports.test.tsx, apps/server/test/integration/report-suite.int.test.ts
 - RPT-015 (M): apps/console/e2e/console.e2e.ts, apps/console/test/reports.test.tsx, apps/server/test/integration/reports.int.test.ts
 - RPT-016 (M): apps/console/e2e/console.e2e.ts, apps/console/test/report-view.test.ts, apps/console/test/reports.test.tsx
-- RPT-017 (M): apps/console/test/reports.test.tsx, apps/server/test/integration/reports.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/csv.test.ts
+- RPT-017 (M): apps/console/test/reports.test.tsx, apps/server/test/integration/report-suite.int.test.ts, apps/server/test/integration/reports.int.test.ts, apps/server/test/unit/report-files.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/csv.test.ts, packages/domain/test/report-document.test.ts
 - RPT-018 (M): apps/console/test/reports.test.tsx, apps/server/test/integration/reports.int.test.ts, apps/server/test/performance/reports.perf.test.ts
-- AUD-001 (M): apps/console/e2e/console.e2e.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/recommendations.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts, apps/server/test/integration/system.int.test.ts
+- AUD-001 (M): apps/console/e2e/console.e2e.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/recommendations.int.test.ts, apps/server/test/integration/report-suite.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts, apps/server/test/integration/system.int.test.ts
 - AUD-002 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/unit/audit-hash.test.ts
 - AUD-003 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/unit/audit-hash.test.ts, packages/domain/test/canonical-json.test.ts
 - AUD-004 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/integration/schema.int.test.ts
