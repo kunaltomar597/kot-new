@@ -152,7 +152,10 @@ What exists:
   the Owner's invoice particulars, tax groups and invoice series behind the second factor
   (P4-03e); the System page with the services, the data drive by kind of data, devices, the
   update on offer with "Install now", and placeholders for backups, the licence and diagnostics
-  (P4-04). 271 tests, and 21 Playwright steps.
+  (P4-04); the Reports area: one range for every report (presets or dates, kept in the address),
+  each report as headline figures, a bar chart where one helps and tables, CSV export, and
+  drill-down from a row to everything about its order (P4-05d, Recharts). 282 tests, and 22
+  Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -167,7 +170,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-05d the Reports area in the console (the last part of P4-05, see phase-4.md).
+- P4-06 Report exports (CSV, Excel and PDF for every report).
+- P4-07 Audit viewer, chain verification and the suspicious-activity report.
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
@@ -279,7 +283,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-05a Report data I: sources, staff, discounts, cancellations, reprints
 - [x] P4-05b Report data II: kitchen, tables, recommendations
 - [x] P4-05c Twelve months at design capacity (RPT-018)
-- [ ] P4-05d Reports area in the console with charts and drill-down
+- [x] P4-05d Reports area in the console with charts and drill-down
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
 
@@ -563,6 +567,23 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-05d):
+
+269. The Reports area (`/manage/reports`, for REPORTS_VIEW_EXPORT with ALLOW: the Owner, managers
+     and custom roles given it) groups the reports as Sales (sales, dishes, sources, payments),
+     Tax (GST summary, invoice register), People (staff, shifts), Controls (discounts,
+     cancellations and voids, reprints and edits) and Operations (kitchen, tables, suggestions).
+     A cashier's own shift report stays on the POS side for later.
+270. One period scopes every report, in a row above them: Today, Yesterday, Last 7 days, This
+     month, Last month, or two dates (at most 366 days). It lives in the address, so a report can
+     be bookmarked; "today" is the restaurant's business date. While a new period loads, the
+     previous figures stay dimmed instead of flashing.
+271. Charts (Recharts) show one measure each, in the primary colour, with hairline grids, a
+     tooltip per bar and the same figures in a table below; no report needs more than one series.
+     Rupees on chart axes are shortened (₹12k, ₹1.5L); tables show them in full.
+272. A bill-level discount or a reprint of a table's bill opens the table's first order, whose
+     drill-down lists the table's bills (a table bill has no single order).
 
 Decided 2026-10-01 (P4-05c):
 
@@ -1371,6 +1392,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-05d Reports area (P4-05 done)
+
+Built: `apps/console/src/manage/reports/`: `ReportsArea` (range filter, report navigation,
+routes), `report-view.ts` (presets, range checks, rupees, percent, durations, axis labels),
+`use-report.ts` (reads a report for a range and keeps the old figures while a new range loads),
+`ReportParts.tsx` (stat tiles, single-series bar chart, CSV export button, typed table columns,
+order links), the reports in `SalesReports`, `TaxReports` (the register read a page at a time),
+`PeopleReports`, `ControlReports`, `OperationsReports`, and `OrderDrillDownScreen`; i18n
+`reportsPage`; Recharts 3 in the console. The discounts and reprints reports link a table's bill
+to the table's first order.
+
+Tests: console `report-view.test.ts` 3 and `reports.test.tsx` 6 (today's sales, a period kept
+across reports and a refused range, a free dish opening its order, CSV export, register pages,
+kitchen and suggestion figures); one e2e step (22): today's reports, the discount from the billing
+step opened to its order, and the area at 360 px.
+
+Gotchas:
+
+- Under a splat route (`reports/*`) a relative link resolves below the page that is open
+  (`/manage/reports/sales/discounts`), which hit the catch-all redirect, which was relative too:
+  an endless redirect inside React's `act`, a hung test at 100 % CPU. Use absolute paths there.
+- `Recharts` in jsdom: give charts a width (no ResizeObserver there); `<meter>` and charts are
+  checked by attribute, not by ARIA value.
+
+Decisions: 269 to 272.
 
 ### 2026-10-01: P4-05c Twelve months at design capacity (RPT-018)
 

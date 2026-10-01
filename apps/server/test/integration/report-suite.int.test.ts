@@ -497,7 +497,8 @@ describe('[RPT-007] discounts and complimentary items', () => {
     expect(report7.discounts).toEqual([
       expect.objectContaining({
         invoiceId: invoices.t1?.id,
-        orderId: null,
+        // A table's bill opens the table's first order.
+        orderId: id('t1Order'),
         item: null,
         complimentary: false,
         kind: 'PERCENT',
@@ -586,6 +587,7 @@ describe('[RPT-009] reprints and bill edits', () => {
     expect(report9.events[0]).toMatchObject({
       reference: invoices.t1?.invoiceNumber,
       invoiceId: invoices.t1?.id,
+      orderId: id('t1Order'),
       by: { id: kit.staff.CASHIER },
     });
     expect(report9.events[1]).toMatchObject({
