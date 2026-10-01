@@ -14,6 +14,13 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
     uptimeSeconds: 2 * 86_400 + 3 * 3_600 + 120,
     database: { status: 'up', latencyMs: 2 },
     controlPlane: { configured: false, enrolled: false, lastContactAt: null, lastError: null },
+    qrRelay: {
+      configured: true,
+      credential: true,
+      lastContactAt: '2026-10-02T08:00:00.000Z',
+      lastError: null,
+      menuVersion: 3,
+    },
     storage: {
       totalBytes: 256 * GB,
       freeBytes: 97 * GB,

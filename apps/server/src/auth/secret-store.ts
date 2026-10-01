@@ -15,6 +15,8 @@ export const SECRET_NAMES = [
   'tls-key-encryption-key',
   /** Seed of the installation's Ed25519 key for the Vendor Control Plane (P0-17b, ADR-0012). */
   'installation-signing-key',
+  /** Seals the QR relay credential the Control Plane issues, stored in the database (P5-03a). */
+  'relay-credential-key',
 ] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 

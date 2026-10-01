@@ -59,6 +59,25 @@ relay (received, sent to kitchen, item statuses S).
 Acceptance: integration tests with local Supabase: internet cut mid-sync then recovery with no loss or
 duplicates; expired order rejection.
 
+Split in three (2026-10-02). The tests run the real relay (its schema in the test cluster, its
+functions over HTTP, `@rp/relay/testing`) in place of a local Supabase.
+
+- **P5-03a Publishing.**
+  - `RP_RELAY_URL`, and the credential sealed in the database (`relay:credential`);
+  - presence with the QR settings;
+  - the tables, and the QR menu with live availability, versioned and sent when their content
+    changes, with back-off while offline;
+  - the QR relay on the System page.
+- **P5-03b Orders.**
+  - pickup by Realtime with a polling fallback, and the inbox;
+  - prices recomputed into a normal QR order waiting for approval;
+  - tables not open go to their section's waiter, and approving opens the table;
+  - expired orders rejected;
+  - received, sent to the kitchen, rejected and item states reported back.
+- **P5-03c Photos.**
+  - menu photos mirrored to the relay's Storage in their sizes, listed in the QR menu;
+  - removed photos swept after 90 days.
+
 ## P5-04 QR table tokens and table-tent PDFs
 
 Requirements: QR-001, ONB-004 step 10.

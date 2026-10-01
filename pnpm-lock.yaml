@@ -311,6 +311,9 @@ importers:
       '@rp/mobile-core':
         specifier: workspace:*
         version: link:../../packages/mobile-core
+      '@rp/relay':
+        specifier: workspace:*
+        version: link:../../infra/supabase
       '@rp/test-postgres':
         specifier: workspace:*
         version: link:../../packages/test-postgres
@@ -550,13 +553,16 @@ importers:
       '@rp/ordering':
         specifier: workspace:*
         version: link:../../packages/ordering
+      '@rp/test-postgres':
+        specifier: workspace:*
+        version: link:../../packages/test-postgres
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
       zod:
         specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
-      '@rp/test-postgres':
-        specifier: workspace:*
-        version: link:../../packages/test-postgres
       '@types/node':
         specifier: ^22.20.4
         version: 22.20.4
@@ -566,9 +572,6 @@ importers:
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
-      pg:
-        specifier: ^8.23.0
-        version: 8.23.0
 
   packages/api-client:
     dependencies:

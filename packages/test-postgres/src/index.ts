@@ -283,19 +283,21 @@ export async function cloneTemplateDatabase(options: {
 
 /**
  * A fresh database migrated from `migrationsDir` in the same cluster, for a test that needs a
- * second schema (for example the Control Plane next to the local server). Slower than a clone.
+ * second schema (for example the Control Plane or the QR relay next to the local server). Slower
+ * than a clone.
  */
 export async function createMigratedDatabase(options: {
   readonly adminUrl: string;
   readonly runId: string;
   readonly prefix: string;
   readonly migrationsDir: string;
+  readonly preludeFiles?: readonly string[];
 }): Promise<TestDatabase> {
   const { adminUrl, runId, prefix, migrationsDir } = options;
   const name = `${prefix}_test_${runId}_${randomBytes(4).toString('hex')}`;
   await withClient(adminUrl, (client) => client.query(`CREATE DATABASE ${quoteIdentifier(name)}`));
   const url = withDatabase(adminUrl, name);
-  await applyMigrations(url, migrationsDir);
+  await applyMigrations(url, migrationsDir, options.preludeFiles);
   return {
     name,
     url,

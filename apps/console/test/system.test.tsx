@@ -44,6 +44,9 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     expect(services.getByText(t('systemPage.services.databaseUp', { latency: 2 }))).toBeVisible();
     expect(services.getByText(t('systemPage.uptime.days', { days: 2, hours: 3 }))).toBeVisible();
     expect(services.getByText(t('systemPage.services.vendorOff'))).toBeVisible();
+    // P5-03a: whether the QR menu online is in step.
+    expect(services.getByText(t('systemPage.services.qrRelay'))).toBeVisible();
+    expect(services.getByText(/In step, menu version 3/)).toBeVisible();
 
     const storage = await section(t('systemPage.storage.title'));
     expect(

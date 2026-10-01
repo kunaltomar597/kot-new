@@ -18237,6 +18237,25 @@
             "required": ["configured", "enrolled", "lastContactAt", "lastError"],
             "additionalProperties": false
           },
+          "qrRelay": {
+            "type": "object",
+            "properties": {
+              "configured": { "type": "boolean" },
+              "credential": { "type": "boolean" },
+              "lastContactAt": {
+                "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+              },
+              "lastError": { "type": ["string", "null"] },
+              "menuVersion": {
+                "anyOf": [
+                  { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              }
+            },
+            "required": ["configured", "credential", "lastContactAt", "lastError", "menuVersion"],
+            "additionalProperties": false
+          },
           "storage": {
             "type": "object",
             "properties": {
@@ -18407,6 +18426,7 @@
           "uptimeSeconds",
           "database",
           "controlPlane",
+          "qrRelay",
           "storage",
           "devices",
           "update",
