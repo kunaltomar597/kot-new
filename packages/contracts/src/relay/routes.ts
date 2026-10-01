@@ -2,6 +2,7 @@ import { ApiError } from '../common.js';
 import type { RouteDefinition, RouteResponse } from '../routes.js';
 import {
   PublishQrMenuRequest,
+  QrMenuQuery,
   PublishQrMenuResponse,
   QrMenuResponse,
   QrOrderParams,
@@ -58,10 +59,12 @@ export const RELAY_ROUTES = [
     description:
       'The latest menu the restaurant published, with the table label and the pickup timeout. ' +
       '`readOnly` is true when the restaurant has not been heard from for its read-only time ' +
-      '(QR-008); the site then shows the menu with a banner and no ordering.',
+      '(QR-008); the site then shows the menu with a banner and no ordering. With `?known=` the ' +
+      'version the browser has, an unchanged menu comes back as `document: null`.',
     tags: ['qr'],
     requirements: ['QR-001', 'QR-002', 'QR-008', 'QR-014'],
     capability: 'TABLE_TOKEN',
+    request: { query: QrMenuQuery },
     responses: {
       200: { description: 'The menu.', schema: QrMenuResponse },
       ...dinerErrors,

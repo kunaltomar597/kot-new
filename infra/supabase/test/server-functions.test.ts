@@ -259,7 +259,7 @@ describe('[QR-003] publishing the menu', () => {
   it('[QR-014] publishes to its own restaurant only', async () => {
     await publish(20, qrMenuDocument({ restaurantName: 'Server House Special' }));
     const theirs = QrMenuResponse.parse((await diner(qrMenu, 'qr-menu', b.tables[0].token)).body);
-    expect(theirs.document.restaurantName).not.toBe('Server House Special');
+    expect(theirs.document?.restaurantName).not.toBe('Server House Special');
   });
 });
 

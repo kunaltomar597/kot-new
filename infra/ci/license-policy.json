@@ -38,6 +38,15 @@
     },
     "@img/sharp-win32-arm64": {
       "reason": "LGPL-3.0-or-later libvips, the image library behind sharp (P1-04 photo re-encoding, MENU-008, SEC-004). Shipped unmodified as a separate prebuilt shared library that sharp loads at run time, so LGPL obligations are met by keeping it replaceable and offering its source (the installer's third-party notices, P0-16). Only the package for the build platform is installed."
+    },
+    "traverse": {
+      "reason": "Declared 'MIT/X11', which is the MIT licence (its LICENSE file links to it). Reaches the production tree through exceljs (P4-06 report exports, ADR-0013) -> unzipper -> binary, the zip reader exceljs carries; the server only writes .xlsx files."
+    },
+    "chainsaw": {
+      "reason": "Declared 'MIT/X11', which is the MIT licence, by the author of traverse. Reaches the production tree through exceljs (P4-06 report exports, ADR-0013) -> unzipper -> binary, the zip reader exceljs carries; the server only writes .xlsx files."
+    },
+    "buffers": {
+      "reason": "No licence declared in the published package (0.1.1); its author's sibling packages in the same chain are MIT/X11. Reaches the production tree through exceljs (P4-06 report exports, ADR-0013) -> unzipper -> binary, the zip reader exceljs carries; the server only writes .xlsx files. Found 2026-10-02 (P5-05a); confirm the licence or drop the reader before the pilot (PROGRESS decision 368)."
     }
   }
 }

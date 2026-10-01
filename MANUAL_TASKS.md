@@ -27,6 +27,9 @@ code from going live:
 - [ ] Windows code-signing certificate (signed installer and updates).
 - [ ] Supabase organisation, Mumbai region (QR relay), then deploy the relay schema and give the
       edge functions their login: [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).
+- [ ] Host the QR menu site (Next.js, India region) on its domain:
+      [`manual-tasks/21-qr-site.md`](manual-tasks/21-qr-site.md).
+- [ ] Legal review of the QR site's privacy notice and terms (drafts at `/privacy` and `/terms`).
 - [ ] Expo account + Android app-signing keystore (signed APKs, OTA updates).
 - [ ] MDM subscription (kiosk tablets, APK distribution).
 - [ ] Backup storage in India (S3-compatible), error monitoring (Sentry), transactional e-mail.

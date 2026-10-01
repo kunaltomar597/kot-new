@@ -198,9 +198,9 @@ describe('[QR-008] [QR-003] keeping the relay in step', () => {
       10_000,
       'the relay to serve version 2',
     );
-    expect(menu.document.menu.items.find((item) => item.id === ids['Dal Makhani'])?.available).toBe(
-      false,
-    );
+    expect(
+      menu.document?.menu.items.find((item) => item.id === ids['Dal Makhani'])?.available,
+    ).toBe(false);
   });
 
   it('[QR-008] [NFR-A01] catches up after an internet cut, without losing the change', async () => {
@@ -213,10 +213,10 @@ describe('[QR-008] [QR-003] keeping the relay in step', () => {
     expect(offline.lastError).toBe('UNREACHABLE');
     expect((await relayMenu().catch(() => undefined)) ?? null).toBeNull();
     relay.restore();
-    expect((await relayMenu()).document.menu.items[0]?.available).toBe(false);
+    expect((await relayMenu()).document?.menu.items[0]?.available).toBe(false);
     const online = await sync.sync();
     expect(online).toMatchObject({ lastError: null, menuVersion: 3 });
-    expect((await relayMenu()).document.menu.items[0]?.available).toBe(true);
+    expect((await relayMenu()).document?.menu.items[0]?.available).toBe(true);
     // Exactly one new version: nothing duplicated by the retries.
     const versions = await relayRow<{ version: string }>(
       'SELECT version FROM relay.menu_snapshots WHERE tenant_id = $1 ORDER BY version',
@@ -271,7 +271,7 @@ describe('[QR-008] [QR-003] keeping the relay in step', () => {
     const status = await sync.sync();
     expect(status).toMatchObject({ lastError: null, menuVersion: 4 });
     await giveT1ACode();
-    expect((await relayMenu()).document.restaurantName).toBe('Spice Route Bistro');
+    expect((await relayMenu()).document?.restaurantName).toBe('Spice Route Bistro');
   });
 
   it('knows which changes the QR page shows', () => {

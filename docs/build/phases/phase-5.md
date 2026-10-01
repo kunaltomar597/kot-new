@@ -99,6 +99,21 @@ call waiter / request bill (S). Lighthouse CI budget for LCP ≤ 2.5 s on a mid-
 Acceptance: Playwright mobile tests for the order flow and offline read-only mode; Lighthouse budget
 passes.
 
+Split in two (2026-10-02):
+
+- **P5-05a The site.**
+  - `apps/qr-menu` on Next.js 16;
+  - the menu rendered on the server, with search, filters, dishes with options and combos;
+  - the cart with instructions and estimate, sending, and following orders;
+  - the call-a-waiter timeout and the read-only banner;
+  - privacy and terms, no tracking, CSP and no referrer;
+  - Playwright phone tests against a real relay.
+- **P5-05b The rest.**
+  - recommendations from the snapshot (the local server publishes them in the QR menu document);
+  - call waiter / request bill (S, a relay function and pickup by the sync agent);
+  - photos once P5-03c mirrors them;
+  - the Lighthouse CI budget (LCP ≤ 2.5 s on a mid-range phone).
+
 ## P5-06 Phase 5 exit test: QR scenarios
 
 Requirements: S2 (QR part), S11, S13.

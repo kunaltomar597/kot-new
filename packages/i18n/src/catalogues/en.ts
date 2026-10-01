@@ -1714,6 +1714,126 @@ export const en = {
     },
   },
   /** The System page (P4-04, MGR-010, NFR-I03, DATA-006, UPD-004). */
+  qrSite: {
+    title: '{restaurant}: menu',
+    table: 'Table {label}',
+    landing: {
+      title: 'Scan the QR code on your table',
+      body: 'Point your phone’s camera at the code on your table to see the menu and order. No app needed.',
+    },
+    notFound: {
+      title: 'This QR code is not in use',
+      body: 'Please ask a waiter for help.',
+    },
+    notReady: {
+      title: 'The menu is not available yet',
+      body: 'Please ask a waiter for help.',
+    },
+    readOnly:
+      'We can’t reach the restaurant right now, so ordering here is paused. You can still look at the menu. Please call a waiter to order.',
+    search: 'Search dishes',
+    searchHint: 'Try a dish, an ingredient or “spicy”',
+    noMatch: 'No dishes match. Try another word or clear the filters.',
+    filters: {
+      legend: 'Show only',
+      veg: 'Veg',
+      jain: 'Jain',
+      spicy: 'Spicy',
+      bestseller: 'Best sellers',
+    },
+    categories: 'Menu sections',
+    veg: 'Veg',
+    nonVeg: 'Non-veg',
+    egg: 'Contains egg',
+    spice: '{level, plural, one {Mildly spicy} =2 {Spicy} other {Very spicy}}',
+    soldOut: 'Sold out',
+    notAvailable: 'Not available now',
+    add: 'Add',
+    addOf: 'Add {name}',
+    added: '{name} added to your order',
+    choose: 'Choose',
+    chooseOf: 'Choose options for {name}',
+    item: {
+      quantity: 'How many',
+      instructions: 'Anything the kitchen should know? (optional)',
+      addToOrder: 'Add to order · {price}',
+      fewer: 'One fewer',
+      more: 'One more',
+    },
+    cart: {
+      open: 'Your order · {count, plural, one {# item} other {# items}} · {total}',
+      title: 'Your order',
+      empty: 'Nothing here yet. Add dishes from the menu.',
+      remove: 'Remove {name}',
+      quantityOf: 'How many {name}',
+      note: 'A note for the whole order (optional)',
+      name: 'Your name (optional)',
+      subtotal: 'Dishes',
+      tax: 'Estimated taxes',
+      taxIncluded: 'Taxes included in prices',
+      total: 'Estimated total',
+      estimate: 'The restaurant confirms the final bill.',
+      send: 'Send order',
+      sending: 'Sending…',
+      closed: 'Ordering is paused while we can’t reach the restaurant.',
+      rejected: 'Some dishes can’t be ordered right now. Change or remove them and send again.',
+    },
+    errors: {
+      rateLimited:
+        'Too many orders from this table just now. Please wait {seconds, plural, one {# second} other {# seconds}} or call a waiter.',
+      offline: 'We couldn’t reach the restaurant right now. Please call a waiter.',
+      network: 'That didn’t go through. Check your connection and try again.',
+      generic: 'Something went wrong. Please try again or call a waiter.',
+    },
+    orders: {
+      title: 'Your orders here',
+      placed: 'Order sent at {time}',
+      SUBMITTED: 'Sending your order to the restaurant...',
+      RECEIVED: 'Received, waiting for waiter confirmation',
+      SENT_TO_KITCHEN: 'Your order has been sent to the kitchen',
+      EXPIRED: 'We couldn’t reach the restaurant right now. Please call a waiter.',
+      REJECTED: 'The restaurant could not take this order.',
+      reason: 'Reason: {reason}',
+      line: '{quantity} × {name}',
+      itemState: {
+        PENDING_APPROVAL: 'Waiting',
+        SENT: 'Ordered',
+        PREPARING: 'Being prepared',
+        READY: 'Ready',
+        PICKED_UP: 'On its way',
+        SERVED: 'Served',
+        REJECTED: 'Not taken',
+        CANCELLED: 'Cancelled',
+        VOIDED: 'Cancelled',
+      },
+    },
+    footer: {
+      privacy: 'Privacy',
+      terms: 'Terms',
+      noTracking: 'No ads. No tracking. Your order goes only to this restaurant.',
+    },
+    privacy: {
+      title: 'Privacy notice',
+      body1:
+        'This page shows the restaurant’s menu and sends your order to the restaurant. It needs no account and sets no advertising or tracking cookies.',
+      body2:
+        'What we keep: the dishes you order, your optional name and notes, the table and the time. Your browser keeps a random number so we can limit repeated orders; it says nothing about you. Orders are kept on our order relay for 7 days, then deleted; the restaurant keeps its own records as the law requires.',
+      body3:
+        'Who sees it: only this restaurant and its service provider, who runs the menu and the order relay in India on its behalf.',
+      body4:
+        'Questions or requests about your data go to the restaurant; a waiter can tell you how to reach them.',
+    },
+    terms: {
+      title: 'Terms of use',
+      body1:
+        'Use this page to order at the table you are sitting at. Orders are dine-in only, and you pay the restaurant as usual; nothing is paid here.',
+      body2:
+        'Prices and availability come from the restaurant and may change. A waiter confirms each order before it goes to the kitchen, and the restaurant may change or decline an order, for example when a dish has run out.',
+      body3:
+        'Totals shown here are estimates; the restaurant’s bill is final. If the page cannot reach the restaurant, please order with a waiter.',
+    },
+    back: 'Back to the menu',
+  },
   qrCodes: {
     title: 'Table QR codes',
     intro:

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, IdempotencyKey, OrderItemState, Timestamp } from '../common.js';
+import { Id, IdempotencyKey, OrderItemState, PriceMode, Timestamp } from '../common.js';
 import { MenuSnapshot } from '../menu.js';
 import { INSTRUCTION_HARD_MAX_LENGTH, OrderLineRequest, RejectedLine } from '../order.js';
 import { AccentColor } from '../restaurant.js';
@@ -44,6 +44,8 @@ export const QrMenuDocument = z.strictObject({
   timeZone: z.string().min(1).max(60),
   /** ORD-015: the restaurant's limit on a line's instructions. */
   instructionMaxLength: z.int().min(0).max(INSTRUCTION_HARD_MAX_LENGTH),
+  /** Whether menu prices include GST (BILL-004), for the cart's estimate. */
+  priceMode: PriceMode,
   /** QR-011 (S): the page offers Call waiter and Request bill. */
   serviceRequests: z.boolean(),
   menu: MenuSnapshot,
@@ -60,9 +62,14 @@ export const QrMenuResponse = z.object({
   readOnly: z.boolean(),
   /** QR-007: after this long without the restaurant picking it up, an order expires. */
   pickupTimeoutSeconds: z.int().positive(),
-  document: QrMenuDocument,
+  /** The menu; null when the browser already has this version (`?known=`). */
+  document: QrMenuDocument.nullable(),
 });
 export type QrMenuResponse = z.infer<typeof QrMenuResponse>;
+
+/** The menu version the browser already has, so an unchanged menu is not sent again. */
+export const QrMenuQuery = z.strictObject({ known: z.coerce.number().int().positive().optional() });
+export type QrMenuQuery = z.infer<typeof QrMenuQuery>;
 
 /** A diner's order (QR-005, QR-006): dine-in only, no payment, no prices (ORD-014). */
 export const QrSubmitOrderRequest = z.strictObject({

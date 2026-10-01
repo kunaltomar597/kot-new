@@ -18,6 +18,7 @@ export function qrMenuDocument(overrides: Partial<QrMenuDocument> = {}): QrMenuD
     accentColor: '#B4232A',
     timeZone: 'Asia/Kolkata',
     instructionMaxLength: 140,
+    priceMode: 'TAX_EXCLUSIVE',
     serviceRequests: true,
     menu: {
       ...MENU,
