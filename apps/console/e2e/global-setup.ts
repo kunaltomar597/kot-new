@@ -40,6 +40,27 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
             (VALUES ('auth.kitchenIndividualLogins', 'true'::jsonb),
                     ('auth.attemptsPerMinutePerDevice', '100'::jsonb)) AS setting (key, value)`,
     );
+    // A system alert for the alert centre and an update on offer for the System page (P4-04).
+    // The dedupe key is not the server's own `disk`, so its disk check leaves this one alone.
+    await client.query(
+      `INSERT INTO alerts (id, restaurant_id, business_date, type, payload, dedupe_key)
+       SELECT gen_random_uuid(), id, current_date, 'DISK_OR_BACKUP',
+              '{"usedPercent": 91, "freeBytes": 20000000000}'::jsonb, 'e2e:disk'
+       FROM restaurants`,
+    );
+    await client.query(`INSERT INTO system_meta (key, value, updated_at) VALUES ($1, $2, now())`, [
+      'control_plane.offered_update',
+      JSON.stringify({
+        component: 'RESTAURANT_PC',
+        channel: 'STABLE',
+        version: '9.9.0',
+        url: 'https://downloads.example.com/restaurant-pc.exe',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 120_000_000,
+        notes: 'Faster bills.',
+        publishedAt: '2026-09-30T10:00:00.000Z',
+      }),
+    ]);
   } finally {
     await client.end();
   }

@@ -15,6 +15,7 @@ import { SettingsScreen } from './settings/SettingsScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
 import { StaffArea } from './staff/StaffArea.js';
+import { SystemScreen } from './system/SystemScreen.js';
 
 /**
  * The manager dashboard (P4-01, MGR-001): the overview, the live order feed and the alert centre,
@@ -22,7 +23,8 @@ import { StaffArea } from './staff/StaffArea.js';
  * today's sections and pagers; P4-02a, P4-02b, MGR-004), the menu editor (P4-02d, MGR-005), Devices for people
  * who pair them (P4-02c, MGR-006), the restaurant's profile, tax groups and invoice series
  * (P4-03e, ONB-004), the kitchen stations and printers (P4-03d, KDS-008), the
- * settings with their own pages (P4-03a to P4-03c, MGR-007) and the Owner's own sign-in security
+ * settings with their own pages (P4-03a to P4-03c, MGR-007), the System page (P4-04, MGR-010)
+ * and the Owner's own sign-in security
  * (AUTH-006). The navigation sits beside them on a wide screen and above them on a phone
  * (MGR-011); the page shown is marked for screen readers, not by colour alone. Pages a role cannot
  * use are neither linked nor opened; the server refuses their calls anyway.
@@ -94,6 +96,11 @@ export function ManageHome() {
             {t('dashboard.section.settings')}
           </NavLink>
         ) : null}
+        {operates ? (
+          <NavLink to="/manage/system" className="dashboard__link">
+            {t('dashboard.section.system')}
+          </NavLink>
+        ) : null}
         {isOwner ? (
           <NavLink to="/manage/security" className="dashboard__link">
             {t('dashboard.section.security')}
@@ -117,6 +124,7 @@ export function ManageHome() {
           {operates ? <Route path="restaurant" element={<RestaurantScreen />} /> : null}
           {operates ? <Route path="printing" element={<PrintingScreen />} /> : null}
           {operates ? <Route path="settings" element={<SettingsScreen />} /> : null}
+          {operates ? <Route path="system" element={<SystemScreen />} /> : null}
           {operates ? (
             <Route path="settings/notifications" element={<NotificationRulesScreen />} />
           ) : null}

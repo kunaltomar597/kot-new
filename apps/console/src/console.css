@@ -1491,6 +1491,11 @@ body {
   }
 }
 
+.system-meter {
+  width: 100%;
+  height: var(--rp-space-4);
+}
+
 .restaurant-hours {
   display: flex;
   flex-direction: column;

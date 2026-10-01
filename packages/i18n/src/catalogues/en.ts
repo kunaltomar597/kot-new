@@ -319,6 +319,7 @@ export const en = {
       devices: 'Devices',
       printing: 'Kitchen and printers',
       restaurant: 'Restaurant',
+      system: 'System',
       settings: 'Settings',
       security: 'Security',
     },
@@ -1179,6 +1180,95 @@ export const en = {
     },
     saved: 'The rule for “{name}” is saved.',
     resetDone: '“{name}” uses the factory rule again.',
+  },
+  /** The System page (P4-04, MGR-010, NFR-I03, DATA-006, UPD-004). */
+  systemPage: {
+    title: 'System',
+    intro:
+      'How the restaurant’s server is doing: the data drive, the devices, updates, backups and the licence. Support asks for this page first.',
+    loadFailed: 'The system status could not be loaded.',
+    checkedAt: 'Checked at {time}',
+    refresh: 'Check again',
+    services: {
+      title: 'Services',
+      database: 'Database',
+      databaseUp: 'Running ({latency} ms)',
+      databaseDown: 'Not answering',
+      uptime: 'Server running for',
+      vendor: 'Vendor connection',
+      vendorOff: 'Not set up (the restaurant works without it)',
+      vendorNotEnrolled: 'Not activated yet',
+      vendorOk: 'Last contact {date} {time}',
+      vendorNever: 'No contact yet',
+      vendorError: 'Cannot reach the vendor ({code}); the restaurant works without it',
+    },
+    uptime: {
+      minutes: '{minutes} min',
+      hours: '{hours} h {minutes} min',
+      days: '{days, plural, one {# day} other {# days}} {hours} h',
+    },
+    storage: {
+      title: 'Data drive',
+      used: '{percent}% used · {free} free of {total}',
+      unknown: 'The drive’s size could not be read.',
+      level: { OK: 'Fine', WARNING: 'Getting full', CRITICAL: 'Nearly full', UNKNOWN: 'Unknown' },
+      warning:
+        'The drive is over {percent}% full. Ask support to move old backups or photos before it fills.',
+      critical:
+        'The drive is over {percent}% full. Call support today: when it is full, orders cannot be saved.',
+      category: {
+        TRANSACTIONS: 'Orders, bills and menu',
+        AUDIT: 'Audit trail',
+        PHOTOS: 'Menu photos',
+        LOGS: 'Logs',
+        BACKUPS: 'Backups',
+      },
+      notMeasured: 'Not set up',
+    },
+    devices: {
+      title: 'Devices',
+      line: '{connected} of {paired} connected',
+      none: 'No devices paired yet.',
+    },
+    update: {
+      title: 'Updates',
+      upToDate: 'This PC is up to date.',
+      offered: 'Version {version} is ready',
+      details: '{channel} · {size} · published {date}',
+      window: 'It installs between {start} and {end}, when no table is open.',
+      openTables:
+        '{count, plural, one {# table is open} other {# tables are open}}: the update waits until they close.',
+      installNow: 'Install now',
+      approved: '“Install now” pressed by {name} at {date} {time}.',
+      approvedBy: 'someone',
+      confirmTitle: 'Install version {version} now?',
+      confirmDescription:
+        'The server restarts for a minute or two while it installs; screens reconnect by themselves.',
+      done: 'Version {version} will install now.',
+    },
+    backup: {
+      title: 'Backups',
+      notSetUp: 'Backups are not set up on this PC yet.',
+      last: 'Last backup {date} {time}',
+      never: 'No backup yet',
+    },
+    licence: {
+      title: 'Licence',
+      notActive: 'The licence status shows here once the restaurant is activated.',
+    },
+    versions: { title: 'Versions' },
+    diagnostics: {
+      title: 'Support',
+      send: 'Send diagnostics to support',
+      unavailable: 'Sending diagnostics needs the vendor connection, which is not set up yet.',
+    },
+    bytes: {
+      B: '{value} B',
+      KB: '{value} KB',
+      MB: '{value} MB',
+      GB: '{value} GB',
+      TB: '{value} TB',
+    },
   },
   /** The restaurant's profile, invoice particulars, tax groups and series (P4-03e, ONB-004). */
   restaurantPage: {

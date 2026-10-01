@@ -1,0 +1,389 @@
+import type { SystemStatusResponse } from '@rp/contracts';
+import { displayDateTime } from '@rp/domain';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  ErrorState,
+  LoadingState,
+  TextField,
+  useToast,
+} from '@rp/ui-web';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { useConsole, useConsoleState } from '../../app/console-context.js';
+import { useT } from '../../app/i18n.js';
+import { messageOf } from '../../app/messages.js';
+import { grantOf } from '../../app/modes.js';
+import { useLive } from '../../app/use-live.js';
+import { bytesParts, uptimeParts } from './system-view.js';
+
+/** Disk, connections and the vendor link are not announced, so read them again. */
+export const SYSTEM_REFRESH_MS = 30_000;
+
+type Translate = ReturnType<typeof useT>;
+
+const LEVEL_TONE = {
+  OK: 'success',
+  WARNING: 'warning',
+  CRITICAL: 'danger',
+  UNKNOWN: 'neutral',
+} as const;
+
+function bytesText(bytes: number, t: Translate): string {
+  const { value, unit } = bytesParts(bytes);
+  return t(`systemPage.bytes.${unit}`, { value });
+}
+
+function uptimeText(seconds: number, t: Translate): string {
+  const parts = uptimeParts(seconds);
+  return parts.kind === 'days'
+    ? t('systemPage.uptime.days', { days: parts.days, hours: parts.hours })
+    : parts.kind === 'hours'
+      ? t('systemPage.uptime.hours', { hours: parts.hours, minutes: parts.minutes })
+      : t('systemPage.uptime.minutes', { minutes: parts.minutes });
+}
+
+function vendorText(controlPlane: SystemStatusResponse['controlPlane'], t: Translate): string {
+  if (!controlPlane.configured) return t('systemPage.services.vendorOff');
+  if (!controlPlane.enrolled) return t('systemPage.services.vendorNotEnrolled');
+  if (controlPlane.lastError !== null) {
+    return t('systemPage.services.vendorError', { code: controlPlane.lastError });
+  }
+  return controlPlane.lastContactAt === null
+    ? t('systemPage.services.vendorNever')
+    : t('systemPage.services.vendorOk', displayDateTime(new Date(controlPlane.lastContactAt)));
+}
+
+function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) {
+  return (
+    <dl className="restaurant-facts">
+      {facts.map(([term, value]) => (
+        <div key={term} className="restaurant-facts__row">
+          <dt>{term}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * The System page (P4-04, MGR-010, NFR-I03, DATA-006): the services, the data drive by kind of
+ * data with its warning levels, the devices connected, the update on offer with "Install now"
+ * (UPD-004), backups, the licence and the versions. Backups, the licence and sending diagnostics
+ * show what they will once their modules exist (P7-05, P7-01, P7-08). Read again every half minute.
+ */
+export function SystemScreen() {
+  const t = useT();
+  const controller = useConsole();
+  const { person } = useConsoleState();
+  const toast = useToast();
+  const canInstall = person !== undefined && grantOf(person, 'UPDATE_INSTALL_NOW') !== 'DENY';
+  const { data, reload } = useLive(
+    () => controller.api.getSystemStatus(),
+    (type) => type === 'DeviceStatusChanged',
+  );
+  useEffect(() => {
+    const timer = setInterval(reload, SYSTEM_REFRESH_MS);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [reload]);
+  const [confirming, setConfirming] = useState<string | undefined>();
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const close = useCallback(() => {
+    setConfirming(undefined);
+    setReason('');
+    setBusy(false);
+    setError(undefined);
+  }, []);
+
+  const approve = async (version: string) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await controller.api.approveUpdateInstall({
+        body: { version, ...(reason.trim().length >= 3 && { reason: reason.trim() }) },
+      });
+      toast.show({ title: t('systemPage.update.done', { version }), tone: 'success' });
+      close();
+      reload();
+    } catch (failure) {
+      setError(messageOf(failure, t));
+      setBusy(false);
+    }
+  };
+
+  let content: ReactNode;
+  if (data.status === 'loading') {
+    content = <LoadingState title={t('states.loading')} />;
+  } else if (data.status === 'error') {
+    content = (
+      <ErrorState
+        title={t('systemPage.loadFailed')}
+        description={messageOf(data.error, t)}
+        onRetry={reload}
+        retryLabel={t('states.retry')}
+      />
+    );
+  } else {
+    const system = data.value;
+    const { storage, update } = system;
+    const offered = update.offered;
+    content = (
+      <>
+        <section className="device-group" aria-labelledby="system-services">
+          <h3 id="system-services" className="device-group__heading">
+            {t('systemPage.services.title')}
+          </h3>
+          <Facts
+            facts={[
+              [
+                t('systemPage.services.database'),
+                system.database.status === 'up'
+                  ? t('systemPage.services.databaseUp', { latency: system.database.latencyMs })
+                  : t('systemPage.services.databaseDown'),
+              ],
+              [t('systemPage.services.uptime'), uptimeText(system.uptimeSeconds, t)],
+              [t('systemPage.services.vendor'), vendorText(system.controlPlane, t)],
+            ]}
+          />
+        </section>
+
+        <section className="device-group" aria-labelledby="system-storage">
+          <div className="staff-header">
+            <h3 id="system-storage" className="device-group__heading">
+              {t('systemPage.storage.title')}
+            </h3>
+            <Badge tone={LEVEL_TONE[storage.level]}>
+              {t(`systemPage.storage.level.${storage.level}`)}
+            </Badge>
+          </div>
+          {storage.usedPercent === null ||
+          storage.totalBytes === null ||
+          storage.freeBytes === null ? (
+            <p className="dashboard-section__hint">{t('systemPage.storage.unknown')}</p>
+          ) : (
+            <>
+              <p className="settings-row__value">
+                {t('systemPage.storage.used', {
+                  percent: storage.usedPercent,
+                  free: bytesText(storage.freeBytes, t),
+                  total: bytesText(storage.totalBytes, t),
+                })}
+              </p>
+              <meter
+                className="system-meter"
+                aria-label={t('systemPage.storage.title')}
+                min={0}
+                max={100}
+                low={storage.warnPercent}
+                high={storage.criticalPercent}
+                optimum={0}
+                value={storage.usedPercent}
+              />
+            </>
+          )}
+          {storage.level === 'WARNING' || storage.level === 'CRITICAL' ? (
+            <p
+              role="alert"
+              className={`console-notice${storage.level === 'CRITICAL' ? ' console-notice--danger' : ''}`}
+            >
+              {storage.level === 'CRITICAL'
+                ? t('systemPage.storage.critical', { percent: storage.criticalPercent })
+                : t('systemPage.storage.warning', { percent: storage.warnPercent })}
+            </p>
+          ) : null}
+          <Facts
+            facts={storage.categories.map(
+              (entry) =>
+                [
+                  t(`systemPage.storage.category.${entry.category}`),
+                  entry.bytes === null
+                    ? t('systemPage.storage.notMeasured')
+                    : bytesText(entry.bytes, t),
+                ] as const,
+            )}
+          />
+        </section>
+
+        <section className="device-group" aria-labelledby="system-devices">
+          <h3 id="system-devices" className="device-group__heading">
+            {t('systemPage.devices.title')}
+          </h3>
+          {system.devices.length === 0 ? (
+            <p className="dashboard-section__hint">{t('systemPage.devices.none')}</p>
+          ) : (
+            <Facts
+              facts={system.devices.map(
+                (entry) =>
+                  [
+                    t(`devices.type.${entry.type}`),
+                    t('systemPage.devices.line', {
+                      connected: entry.connected,
+                      paired: entry.paired,
+                    }),
+                  ] as const,
+              )}
+            />
+          )}
+        </section>
+
+        <section className="device-group" aria-labelledby="system-update">
+          <h3 id="system-update" className="device-group__heading">
+            {t('systemPage.update.title')}
+          </h3>
+          {offered === null ? (
+            <p className="dashboard-section__hint">{t('systemPage.update.upToDate')}</p>
+          ) : (
+            <>
+              <p className="settings-row__value">
+                {t('systemPage.update.offered', { version: offered.version })}
+              </p>
+              <p className="dashboard-section__hint">
+                {t('systemPage.update.details', {
+                  channel: offered.channel,
+                  size: bytesText(offered.sizeBytes, t),
+                  date: displayDateTime(new Date(offered.publishedAt)).date,
+                })}
+              </p>
+              {offered.notes === null ? null : (
+                <p className="dashboard-section__hint">{offered.notes}</p>
+              )}
+              <p className="dashboard-section__hint">
+                {t('systemPage.update.window', update.maintenanceWindow)}
+              </p>
+              {update.openTables > 0 ? (
+                <p className="console-notice">
+                  {t('systemPage.update.openTables', { count: update.openTables })}
+                </p>
+              ) : null}
+              {update.installApproval === null ? (
+                canInstall ? (
+                  <div className="staff-row__actions">
+                    <Button
+                      onClick={() => {
+                        setConfirming(offered.version);
+                      }}
+                    >
+                      {t('systemPage.update.installNow')}
+                    </Button>
+                  </div>
+                ) : null
+              ) : (
+                <p className="console-notice">
+                  {t('systemPage.update.approved', {
+                    name: update.installApproval.approvedBy ?? t('systemPage.update.approvedBy'),
+                    ...displayDateTime(new Date(update.installApproval.approvedAt)),
+                  })}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="device-group" aria-labelledby="system-backup">
+          <h3 id="system-backup" className="device-group__heading">
+            {t('systemPage.backup.title')}
+          </h3>
+          <p className="dashboard-section__hint">
+            {system.backup === null
+              ? t('systemPage.backup.notSetUp')
+              : system.backup.lastSuccessAt === null
+                ? t('systemPage.backup.never')
+                : t(
+                    'systemPage.backup.last',
+                    displayDateTime(new Date(system.backup.lastSuccessAt)),
+                  )}
+          </p>
+        </section>
+
+        <section className="device-group" aria-labelledby="system-licence">
+          <h3 id="system-licence" className="device-group__heading">
+            {t('systemPage.licence.title')}
+          </h3>
+          <p className="dashboard-section__hint">
+            {system.licence === null ? t('systemPage.licence.notActive') : system.licence.state}
+          </p>
+        </section>
+
+        <section className="device-group" aria-labelledby="system-versions">
+          <h3 id="system-versions" className="device-group__heading">
+            {t('systemPage.versions.title')}
+          </h3>
+          <Facts facts={system.versions.map((entry) => [entry.name, entry.version] as const)} />
+        </section>
+
+        <section className="device-group" aria-labelledby="system-support">
+          <h3 id="system-support" className="device-group__heading">
+            {t('systemPage.diagnostics.title')}
+          </h3>
+          <div className="staff-row__actions">
+            <Button variant="secondary" disabled aria-describedby="system-diagnostics-hint">
+              {t('systemPage.diagnostics.send')}
+            </Button>
+          </div>
+          <p id="system-diagnostics-hint" className="dashboard-section__hint">
+            {t('systemPage.diagnostics.unavailable')}
+          </p>
+        </section>
+      </>
+    );
+  }
+
+  return (
+    <section className="dashboard-section" aria-labelledby="dashboard-system">
+      <div className="staff-header">
+        <h2 id="dashboard-system" className="dashboard-section__heading">
+          {t('systemPage.title')}
+        </h2>
+        <Button variant="ghost" onClick={reload}>
+          {t('systemPage.refresh')}
+        </Button>
+      </div>
+      <p className="dashboard-section__hint">{t('systemPage.intro')}</p>
+      {data.status === 'ready' ? (
+        <p className="dashboard-section__hint">
+          {t('systemPage.checkedAt', {
+            time: displayDateTime(new Date(data.value.checkedAt)).time,
+          })}
+        </p>
+      ) : null}
+      {content}
+      {confirming === undefined ? null : (
+        <ConfirmDialog
+          open
+          tone="primary"
+          title={t('systemPage.update.confirmTitle', { version: confirming })}
+          description={t('systemPage.update.confirmDescription')}
+          confirmLabel={t('systemPage.update.installNow')}
+          cancelLabel={t('restaurantPage.cancel')}
+          busy={busy}
+          onConfirm={() => {
+            void approve(confirming);
+          }}
+          onCancel={close}
+        >
+          <TextField
+            label={t('restaurantPage.reason')}
+            hint={t('restaurantPage.reasonHint')}
+            value={reason}
+            maxLength={200}
+            autoComplete="off"
+            onChange={(event) => {
+              setReason(event.target.value);
+            }}
+          />
+          {error === undefined ? null : (
+            <p role="alert" className="console-notice console-notice--danger">
+              {error}
+            </p>
+          )}
+        </ConfirmDialog>
+      )}
+    </section>
+  );
+}

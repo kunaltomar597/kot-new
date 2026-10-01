@@ -992,6 +992,35 @@ test.describe.serial('the web console', () => {
     ).toBeVisible();
   });
 
+  test('[MGR-008] [MGR-010] [UPD-004] a manager acknowledges a system alert and approves an update', async () => {
+    // Still the manager.
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.alerts') }).click();
+    const acknowledge = page.getByRole('button', {
+      name: t('alerts.acknowledgeOf', { title: t('alerts.type.DISK_OR_BACKUP') }),
+    });
+    await expect(acknowledge).toBeVisible();
+    await acknowledge.click();
+    await expect(acknowledge).toHaveCount(0);
+
+    await nav.getByRole('link', { name: t('dashboard.section.system') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('systemPage.title') }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(t('systemPage.update.offered', { version: '9.9.0' })),
+    ).toBeVisible();
+    await expect(page.getByRole('meter', { name: t('systemPage.storage.title') })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole('button', { name: t('systemPage.update.installNow') }).click();
+    const confirm = page.getByRole('dialog', {
+      name: t('systemPage.update.confirmTitle', { version: '9.9.0' }),
+    });
+    await confirm.getByRole('button', { name: t('systemPage.update.installNow') }).click();
+    await expect(page.getByText(t('systemPage.update.done', { version: '9.9.0' }))).toBeVisible();
+    await expect(page.getByText(/“Install now” pressed by Vikram/)).toBeVisible();
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();

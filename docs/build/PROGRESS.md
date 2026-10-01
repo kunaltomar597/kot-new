@@ -150,7 +150,9 @@ What exists:
   recommendation rules and the pinned, boosted and blocked dishes (P4-03c); the kitchen stations
   and printers with test print and redirect (P4-03d); the Restaurant page with the profile, and
   the Owner's invoice particulars, tax groups and invoice series behind the second factor
-  (P4-03e). 266 tests, and 20 Playwright steps.
+  (P4-03e); the System page with the services, the data drive by kind of data, devices, the
+  update on offer with "Install now", and placeholders for backups, the licence and diagnostics
+  (P4-04). 271 tests, and 21 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -165,7 +167,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
@@ -274,7 +275,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-03c Recommendation rules editor with boost, pin and block
 - [x] P4-03d Stations and printers
 - [x] P4-03e Restaurant profile, tax groups and invoice series (Owner)
-- [ ] P4-04 Alert centre and system screen
+- [x] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
@@ -559,6 +560,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-04):
+
+251. The alert centre of P2-06c already covers MGR-008 (groups for the person, escalations, the
+     kitchen, tables, staff and system, each with Acknowledge), so P4-04 adds the System page
+     (`/manage/system`, OPERATIONS_CONFIGURE) and an e2e step with a seeded system alert.
+252. `GET /api/v1/system` reads everything fresh: versions (installed product, server, Node.js,
+     PostgreSQL), database and uptime, the vendor link from the heartbeat, the data drive with
+     `storage.warnPercent` and `storage.criticalPercent`, devices paired and connected per type, the
+     update on offer, open tables and the maintenance window. Backups and the licence are null
+     until P7-05 and P7-01 fill them; "Send diagnostics" is shown disabled until P7-08.
+253. Storage by kind (DATA-006): the database without the audit trail ("orders, bills and menu"),
+     the audit trail (`audit_log`), and the folders `photos`, `logs` and `backups` under the data
+     directory. No logs folder counts as nothing; no backups folder as "not set up". Sizes use the
+     units Windows shows (1 KB = 1,024 bytes).
+254. "Install now" (UPD-004, UPDATE_INSTALL_NOW: Owner and Manager) records the approval for the
+     version on offer in `system_meta` (`updates.install_approval`), audited as
+     `UPDATE_INSTALL_APPROVED` with the optional reason; an approval for an older version no
+     longer shows once a newer one is offered. The updater (P7-04) acts on it and still waits for
+     open tables unless the update is security-critical.
 
 Decided 2026-10-01 (P4-03e):
 
@@ -1294,6 +1315,25 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-04 System page
+
+Built: contracts `SystemStatusResponse`, `ApproveUpdateRequest` and the routes `getSystemStatus`
+and `approveUpdateInstall`; the server's `SystemModule` (`system.service.ts`, `storage-usage.ts`,
+`system-state.ts`); the console's `SystemScreen` at `/manage/system` with `system-view.ts`
+(sizes, uptime); the e2e setup seeds a disk alert and an offered update, and a new step
+acknowledges the alert and presses "Install now".
+
+Tests: server `system.int.test.ts` 6 and `storage-usage.test.ts` 3; console `system-view.test.ts`
+2 and `system.test.tsx` 3; one e2e step (21).
+
+Gotchas:
+
+- A `<meter>` has no `aria-valuenow` in jsdom; check its `value` attribute.
+- The server's disk check raises and clears the alert with dedupe key `disk`, so seeded alerts use
+  another key.
+
+Decisions: 251 to 254.
 
 ### 2026-10-01: P4-03e Restaurant profile, tax groups and invoice series (P4-03 done)
 

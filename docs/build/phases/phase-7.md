@@ -55,6 +55,9 @@ rollback of app and database; component version matrix and N-1 client compatibil
 Update channels for mobile and APK push via MDM/in-app updater; pager firmware distribution.
 Acceptance: scenario S9 (forced failed health check → rollback) automated on Windows CI; staged
 rollout halt test.
+Builds on: the offered release saved by the heartbeat (`control_plane.offered_update`, P0-17b) and
+a manager's "Install now" saved by the System page (`updates.install_approval` in `system_meta`,
+P4-04); the update agent reads both.
 
 ## P7-05 Backup and restore
 
