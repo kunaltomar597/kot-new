@@ -3,6 +3,7 @@ import { fontSize, fontWeight, spacing } from '@rp/design-tokens';
 import { Note, Screen, useT } from '@rp/mobile-shell';
 import { useTheme, weight } from '@rp/ui-native';
 import { StyleSheet, Text, View } from 'react-native';
+import { ServiceButtons } from './ServiceButtons';
 
 /** Dishes a guest can order from this tablet right now (MENU-006). */
 export function orderableCount(menu: MenuSnapshot): number {
@@ -12,8 +13,8 @@ export function orderableCount(menu: MenuSnapshot): number {
 }
 
 /**
- * While the table's session is open (TAB-003): the guests are welcomed at their table. The
- * service buttons (P3-02) and the menu with ordering (P3-03) arrive here.
+ * While the table's session is open (TAB-003): the guests are welcomed at their table and can call
+ * for water, a waiter or the bill (P3-02, TAB-004). The menu with ordering arrives here (P3-03).
  */
 export function OpenTableScreen({
   restaurant,
@@ -49,6 +50,7 @@ export function OpenTableScreen({
           </Note>
         )}
       </View>
+      <ServiceButtons />
     </Screen>
   );
 }

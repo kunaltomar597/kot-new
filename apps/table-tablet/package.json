@@ -19,6 +19,7 @@
     "@rp/api-client": "workspace:*",
     "@rp/contracts": "workspace:*",
     "@rp/design-tokens": "workspace:*",
+    "@rp/domain": "workspace:*",
     "@rp/i18n": "workspace:*",
     "@rp/mobile-core": "workspace:*",
     "@rp/mobile-native": "workspace:*",

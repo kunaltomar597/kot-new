@@ -5,3 +5,4 @@ executionOrder:
   flowsOrder:
     - pair-idle-menu
     - session-lifecycle
+    - service-requests

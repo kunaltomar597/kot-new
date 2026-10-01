@@ -298,6 +298,25 @@ export const en = {
       unbound: 'This tablet has no table yet.',
       unboundHint: 'A manager chooses its table on the dashboard: Devices, then Move.',
       locating: 'Here I am: {name}',
+      /** The cabin-call buttons (P3-02, TAB-004). */
+      requests: {
+        label: {
+          WATER: 'Water',
+          WAITER: 'Waiter',
+          BILL: 'Bill',
+        },
+        cancel: 'Cancel',
+        requested:
+          'Requested, waiter notified · {minutes, plural, =0 {just now} one {# min ago} other {# min ago}}',
+        onTheWay: 'Waiter is on the way',
+        onTheWayNamed: '{name} is on the way',
+        stateOf: '{request}: {state}',
+        chooseCancel: 'Which request do you want to cancel?',
+        cancelThis: 'Cancel {request}',
+        keep: 'Keep them',
+        cancelled: '{request} cancelled',
+        notSent: 'Not sent: {message}',
+      },
       staff: {
         title: 'Staff: leave the kiosk',
         chooseManager: 'Which manager is letting you out?',

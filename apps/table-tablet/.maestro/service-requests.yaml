@@ -1,0 +1,42 @@
+# The cabin-call buttons (P3-02, TAB-004, BILL-015): Water lights up until the waiter
+# acknowledges, then "on the way", and Cancel clears it; two open requests make Cancel ask which.
+# A person opens the table at the POS and acknowledges on the waiter app while the flow waits
+# (manual task 12). Run on the paired tablet:
+#   maestro test apps/table-tablet/.maestro/service-requests.yaml
+appId: ${APP_ID}
+env:
+  APP_ID: in.rp.tablet.dev
+---
+- launchApp
+# Open this tablet's table at the POS now, if it is not open.
+- extendedWaitUntil:
+    visible:
+      id: service-buttons
+    timeout: 180000
+- tapOn:
+    id: request-WATER
+- assertVisible: Requested, waiter notified.*
+# The waiter's phone (or pager) is alerted. Acknowledge it on the waiter app now.
+- extendedWaitUntil:
+    visible: .*is on the way
+    timeout: 180000
+- tapOn:
+    id: request-cancel
+- extendedWaitUntil:
+    notVisible:
+      id: request-WATER-state
+    timeout: 15000
+# Two at once: Cancel asks which.
+- tapOn:
+    id: request-WATER
+- tapOn:
+    id: request-BILL
+- tapOn:
+    id: request-cancel
+- assertVisible: Which request do you want to cancel?
+- tapOn:
+    id: cancel-WATER
+- assertNotVisible:
+    id: request-WATER-state
+- tapOn:
+    id: request-cancel

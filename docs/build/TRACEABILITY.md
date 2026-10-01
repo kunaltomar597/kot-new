@@ -82,7 +82,7 @@ Must: 197 / 287 covered. Should: 5 / 24. Could: 0 / 7.
 - BILL-011 (M): apps/server/test/integration/billing.int.test.ts, packages/contracts/test/billing-payments.test.ts
 - BILL-013 (M): apps/console/test/billing-corrections.test.tsx, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/day-end.int.test.ts, apps/server/test/integration/payments.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/payments.test.ts, packages/domain/test/z-report.test.ts
 - BILL-014 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-template.test.ts
-- BILL-015 (M): apps/server/test/integration/service-requests.int.test.ts, packages/domain/test/notifications.test.ts, packages/domain/test/state-machines.test.ts
+- BILL-015 (M): apps/server/test/integration/service-requests.int.test.ts, apps/table-tablet/test/app.test.tsx, packages/domain/test/notifications.test.ts, packages/domain/test/state-machines.test.ts
 - BILL-016 (S): apps/console/test/billing-screens.test.tsx, apps/server/test/integration/suspicious-activity.int.test.ts, apps/server/test/unit/escpos.test.ts
 - WTR-001 (M): apps/waiter-app/test/app.test.tsx
 - WTR-002 (M): apps/waiter-app/test/tables.test.tsx, packages/domain/test/floor.test.ts, packages/ordering/test/floor-view.test.ts, packages/ui-native/test/floor.test.tsx
@@ -98,7 +98,7 @@ Must: 197 / 287 covered. Should: 5 / 24. Could: 0 / 7.
 - TAB-001 (M): apps/server/test/integration/tablet.int.test.ts, apps/table-tablet/test/app.test.tsx, packages/mobile-native/test/kiosk.test.ts
 - TAB-002 (M): apps/server/test/integration/tablet.int.test.ts
 - TAB-003 (M): apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/tablet.int.test.ts, apps/table-tablet/test/app.test.tsx, packages/mobile-core/test/tablet.test.ts
-- TAB-004 (M): apps/server/test/integration/service-requests.int.test.ts, packages/domain/test/state-machines.test.ts
+- TAB-004 (M): apps/server/test/integration/service-requests.int.test.ts, apps/table-tablet/test/app.test.tsx, packages/domain/test/state-machines.test.ts
 - TAB-011 (M): apps/server/test/integration/recommendations.int.test.ts, packages/ordering/test/recommendations.test.ts
 - TAB-015 (M): apps/server/test/integration/notifications-extra.int.test.ts, apps/server/test/integration/tablet.int.test.ts, apps/table-tablet/test/app.test.tsx, packages/mobile-core/test/tablet.test.ts, packages/mobile-native/test/kiosk.test.ts
 - QR-006 (M): packages/contracts/test/contracts.test.ts
