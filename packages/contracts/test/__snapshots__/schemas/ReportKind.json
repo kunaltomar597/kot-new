@@ -15,7 +15,8 @@
       "REPRINTS",
       "KITCHEN",
       "TABLES",
-      "RECOMMENDATIONS"
+      "RECOMMENDATIONS",
+      "AUDIT"
     ]
   },
   "output": {
@@ -34,7 +35,8 @@
       "REPRINTS",
       "KITCHEN",
       "TABLES",
-      "RECOMMENDATIONS"
+      "RECOMMENDATIONS",
+      "AUDIT"
     ]
   }
 }

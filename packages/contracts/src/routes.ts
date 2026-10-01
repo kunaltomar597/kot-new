@@ -10,7 +10,7 @@ import {
   NudgeRequest,
   NudgeResponse,
 } from './alerts.js';
-import { AuditVerifyResponse } from './audit.js';
+import { AuditListQuery, AuditListResponse, AuditVerifyResponse } from './audit.js';
 import {
   BillCustomerRequest,
   BillDiscountParams,
@@ -580,6 +580,23 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such setting.', schema: ApiError },
       422: { description: 'The value is not allowed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listAuditEntries',
+    method: 'GET',
+    path: '/api/v1/audit',
+    summary: 'Audit entries of a period, newest first, filtered and paged',
+    description:
+      'AUD-005: who did what, approved by whom, on which device, why, and the values before and ' +
+      'after. Filter by action, person or record. Owner and Manager only.',
+    tags: ['audit'],
+    requirements: ['AUD-005', 'AUD-001'],
+    capability: 'AUDIT_VIEW',
+    request: { query: AuditListQuery },
+    responses: {
+      200: { description: 'A page of entries.', schema: AuditListResponse },
+      ...standardErrors,
     },
   },
   {

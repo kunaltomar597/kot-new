@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { ReportKind, ReportRangeQuery } from '@rp/contracts';
 import { columns, type ReportCell, type ReportTable } from '@rp/domain';
+import { AuditViewerService } from '../audit/audit-viewer.service.js';
 import { formatLocal } from '../printing/escpos.js';
 import { ReportSuiteService } from './report-suite.service.js';
 import { ReportsService } from './reports.service.js';
@@ -21,6 +22,7 @@ export const REPORT_TITLES: Record<ReportKind, string> = {
   KITCHEN: 'Kitchen performance',
   TABLES: 'Table metrics',
   RECOMMENDATIONS: 'Recommendation performance',
+  AUDIT: 'Audit log',
 };
 
 const SALES_COLUMNS = columns(
@@ -67,6 +69,7 @@ export class ReportDocumentsService {
   constructor(
     private readonly reports: ReportsService,
     private readonly suite: ReportSuiteService,
+    private readonly audit: AuditViewerService,
   ) {}
 
   /** `ownShiftsOf` limits a cashier's shift report to their own shifts. */
@@ -76,6 +79,8 @@ export class ReportDocumentsService {
     range: ReportRangeQuery,
     ownShiftsOf: string | null,
     timeZone: string,
+    /** AUDIT only: one action, one person. */
+    filters: { readonly action?: string | undefined; readonly actorId?: string | undefined } = {},
   ): Promise<ReportTable[]> {
     const local = (at: string | null) => (at === null ? null : formatLocal(new Date(at), timeZone));
     switch (report) {
@@ -562,6 +567,43 @@ export class ReportDocumentsService {
             heading: 'Dishes',
             columns: [...columns(['Dish', 'text']), ...figures],
             rows: report.items.map((item) => [item.name, ...cells(item)]),
+          },
+        ];
+      }
+      case 'AUDIT': {
+        const entries = await this.audit.all(restaurantId, { ...range, ...filters });
+        const json = (value: unknown) =>
+          value === null || value === undefined ? null : JSON.stringify(value);
+        return [
+          {
+            columns: columns(
+              ['Seq', 'number'],
+              ['When', 'text'],
+              ['Business date', 'date'],
+              ['Action', 'text'],
+              ['Record', 'text'],
+              ['Record id', 'text'],
+              ['By', 'text'],
+              ['Approved by', 'text'],
+              ['Device', 'text'],
+              ['Reason', 'text'],
+              ['Before', 'text'],
+              ['After', 'text'],
+            ),
+            rows: entries.map((entry) => [
+              entry.seq,
+              local(entry.at),
+              entry.businessDate,
+              entry.action,
+              entry.entityType,
+              entry.entityId,
+              name(entry.actor),
+              name(entry.approver),
+              entry.device?.name ?? null,
+              entry.reason,
+              json(entry.before),
+              json(entry.after),
+            ]),
           },
         ];
       }

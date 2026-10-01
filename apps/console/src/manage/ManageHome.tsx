@@ -8,6 +8,7 @@ import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
 import { MenuEditor } from './menu/MenuEditor.js';
 import { PrintingScreen } from './printing/PrintingScreen.js';
+import { AuditScreen } from './audit/AuditScreen.js';
 import { ReportsArea } from './reports/ReportsArea.js';
 import { RestaurantScreen } from './restaurant/RestaurantScreen.js';
 import { NotificationRulesScreen } from './settings/NotificationRulesScreen.js';
@@ -43,6 +44,7 @@ export function ManageHome() {
   const pairsDevices = allows('DEVICE_PAIR');
   const managesMenu = allows('MENU_MANAGE');
   const seesReports = allows('REPORTS_VIEW_EXPORT');
+  const viewsAudit = allows('AUDIT_VIEW');
   const isOwner = person?.role === 'OWNER';
   const first = operates
     ? undefined
@@ -74,6 +76,11 @@ export function ManageHome() {
         {seesReports ? (
           <NavLink to="/manage/reports" className="dashboard__link">
             {t('dashboard.section.reports')}
+          </NavLink>
+        ) : null}
+        {viewsAudit ? (
+          <NavLink to="/manage/audit" className="dashboard__link">
+            {t('dashboard.section.audit')}
           </NavLink>
         ) : null}
         {managesStaff ? (
@@ -129,6 +136,7 @@ export function ManageHome() {
             <Route index element={<Navigate to={`/manage/${first}`} replace />} />
           )}
           {seesReports ? <Route path="reports/*" element={<ReportsArea />} /> : null}
+          {viewsAudit ? <Route path="audit" element={<AuditScreen />} /> : null}
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}

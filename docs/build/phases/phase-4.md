@@ -283,3 +283,10 @@ suspicious-activity report (voids after print, edits after print, discounts abov
 repeated reprints, cash variance above threshold, cancellations after preparation, KOT items never
 billed, no-sale drawer openings) with configurable thresholds and a daily generation job.
 Acceptance: scenario S12 fixture: each fraud pattern appears with the right people attributed.
+
+Built in two parts:
+
+- P4-07a Audit viewer and chain verification (done): `/manage/audit` with period, action and person
+  filters, paging, export (CSV, Excel, PDF) and "Check now" over the hash chain.
+- P4-07b Suspicious-activity report (RPT-014, AUD-006) with its thresholds, the daily job that
+  tells the Owner, a no-sale drawer action so such openings can be reported, and the S12 fixture.

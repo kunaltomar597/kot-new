@@ -4,8 +4,9 @@ import {
   type ReportExportRequest,
   type ReportExportResponse,
 } from '@rp/contracts';
-import { documentToCsv, type ReportDocument, reportRowCount } from '@rp/domain';
+import { actorGrant, documentToCsv, type ReportDocument, reportRowCount } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
+import { authErrors } from '../auth/auth-errors.js';
 import type { Principal } from '../auth/principal.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { formatLocal } from '../printing/escpos.js';
@@ -34,6 +35,16 @@ export class ReportExportService {
     ownShiftsOf: string | null,
   ): Promise<ReportExportResponse> {
     const restaurantId = principal.restaurantId;
+    // The audit log is for people who may view it (AUD-005), not everyone with reports.
+    if (
+      request.report === 'AUDIT' &&
+      actorGrant(
+        { role: principal.role, extraCapabilities: principal.capabilities },
+        'AUDIT_VIEW',
+      ) !== 'ALLOW'
+    ) {
+      throw authErrors.forbidden();
+    }
     const [restaurant, staff] = await Promise.all([
       this.prisma.restaurant.findUniqueOrThrow({
         where: { id: restaurantId },
@@ -51,6 +62,7 @@ export class ReportExportService {
       range,
       ownShiftsOf,
       restaurant.timeZone,
+      { action: request.action, actorId: request.actorId },
     );
     const now = new Date();
     const filters: [string, string][] = [
@@ -58,6 +70,14 @@ export class ReportExportService {
       ['To', request.to],
     ];
     if (ownShiftsOf !== null) filters.push(['Shifts of', staff.displayName]);
+    if (request.action !== undefined) filters.push(['Action', request.action]);
+    if (request.actorId !== undefined) {
+      const actor = await this.prisma.staff.findFirst({
+        where: { id: request.actorId, restaurantId },
+        select: { displayName: true },
+      });
+      filters.push(['Person', actor?.displayName ?? request.actorId]);
+    }
     const document: ReportDocument = {
       stamp: {
         title: REPORT_TITLES[request.report],
