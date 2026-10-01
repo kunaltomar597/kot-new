@@ -63,6 +63,8 @@ export const OrderSubmitted = event(
     orderNumber: z.int().positive(),
     source: OrderSource,
     tableSessionId: Id.optional(),
+    /** A QR order for a table that is not open names the table instead (QR-010). */
+    tableId: Id.optional(),
     needsApproval: z.boolean(),
   }),
 );

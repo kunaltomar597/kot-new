@@ -24,6 +24,7 @@ import { AppError } from '../errors/app-error.js';
 import { EventBus } from '../events/event-bus.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
+import { PacedLoop } from './paced-loop.js';
 import { RelayClient, RelayError } from './relay-client.js';
 import { readRelayCredential } from './relay-credential.js';
 
@@ -117,12 +118,7 @@ export function concernsRelay(event: DomainEvent): boolean {
 @Injectable()
 export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(RelaySyncService.name);
-  private timer: NodeJS.Timeout | undefined;
-  private nextAt = Number.POSITIVE_INFINITY;
-  private running: Promise<RelaySyncStatus> | undefined;
-  private queued: Promise<RelaySyncStatus> | undefined;
-  private stopped = false;
-  private failures = 0;
+  private readonly loop: PacedLoop;
   private unsubscribe: (() => void) | undefined;
   private state: Omit<RelaySyncStatus, 'configured'> = {
     credential: false,
@@ -140,22 +136,28 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly menus: MenuPublishService,
     private readonly events: EventBus,
     @Inject(RELAY_SYNC_OPTIONS) private readonly options: RelaySyncOptions,
-  ) {}
+  ) {
+    this.loop = new PacedLoop(
+      () => this.cycle(),
+      options,
+      (error) => {
+        const code = error instanceof RelayError ? error.code : 'INTERNAL';
+        this.fail(code, error instanceof Error ? error.message : String(error), error);
+      },
+    );
+  }
 
   onApplicationBootstrap(): void {
     if (this.config.relayUrl === undefined) return;
     this.unsubscribe = this.events.onPublished((events) => {
-      if (events.some(({ event }) => concernsRelay(event))) this.soon(this.options.debounceMs);
+      if (events.some(({ event }) => concernsRelay(event))) this.loop.soon(this.options.debounceMs);
     });
-    this.soon(this.options.firstDelayMs);
+    this.loop.start(this.options.firstDelayMs);
   }
 
   async onModuleDestroy(): Promise<void> {
-    this.stopped = true;
     this.unsubscribe?.();
-    clearTimeout(this.timer);
-    await this.queued;
-    await this.running;
+    await this.loop.stop();
   }
 
   status(): RelaySyncStatus {
@@ -164,103 +166,64 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
 
   /**
    * Syncs now (the loop calls it; so do tests and support tools) and answers with the state after
-   * it. During a sync, a call waits for it and runs one more, which every caller meanwhile shares:
-   * whatever changed before the call is in it. Never throws.
+   * it; a call during a sync waits for one more, so whatever changed before the call is in it.
    */
-  sync(): Promise<RelaySyncStatus> {
-    if (this.running === undefined) return this.start();
-    this.queued ??= this.running.then(() => {
-      this.queued = undefined;
-      return this.start();
-    });
-    return this.queued;
-  }
-
-  private start(): Promise<RelaySyncStatus> {
-    this.running = this.cycle().finally(() => {
-      this.running = undefined;
-    });
-    return this.running;
-  }
-
-  /**
-   * Runs the next sync within `delayMs` (sooner if one is already due). While the relay cannot be
-   * reached, only the loop itself schedules (its back-off); changes then wait for it.
-   */
-  private soon(delayMs: number, fromLoop = false): void {
-    if (this.stopped) return;
-    if (this.failures > 0 && !fromLoop) return;
-    const at = Date.now() + delayMs;
-    if (at >= this.nextAt) return;
-    clearTimeout(this.timer);
-    this.nextAt = at;
-    this.timer = setTimeout(() => {
-      this.nextAt = Number.POSITIVE_INFINITY;
-      void this.sync();
-    }, delayMs);
-    this.timer.unref();
-  }
-
-  private async cycle(): Promise<RelaySyncStatus> {
-    const baseUrl = this.config.relayUrl;
-    if (baseUrl === undefined) return this.status();
-    try {
-      const credential = await readRelayCredential(this.prisma, this.secrets);
-      this.state = { ...this.state, credential: credential !== undefined };
-      if (credential === undefined) {
-        this.fail('NO_CREDENTIAL', 'No relay credential is stored (pnpm relay:credential)');
-        this.soon(this.options.retryMaxMs, true);
-        return this.status();
-      }
-      const restaurant = await this.prisma.restaurant.findFirst({
-        orderBy: { createdAt: 'asc' },
-        select: { id: true, displayName: true, accentColor: true, timeZone: true },
-      });
-      if (restaurant === null) {
-        this.fail('NOT_SET_UP', 'The restaurant is not set up yet');
-        this.soon(this.options.retryMaxMs, true);
-        return this.status();
-      }
-      const client = new RelayClient({
-        baseUrl,
-        credential,
-        timeoutMs: this.options.requestTimeoutMs,
-        ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
-      });
-      const settings = await this.settings.snapshot(restaurant.id);
-      const interval = settings.get('qr.presenceIntervalSeconds') * 1_000;
-
-      const sentAt = Date.now();
-      const presence = await client.presence({
-        serverVersion: SERVER_PACKAGE.version,
-        settings: relaySettingsOf(settings),
-      });
-      const clockOffsetMs = Date.parse(presence.serverTime) - (sentAt + Date.now()) / 2;
-
-      let saved = await this.readState();
-      saved = await this.syncTables(client, restaurant.id, saved);
-      saved = await this.syncMenu(client, restaurant, settings, saved);
-
-      if (this.state.lastError !== null) this.logger.log('In step with the QR relay again');
-      this.failures = 0;
-      this.state = {
-        ...this.state,
-        lastSuccessAt: new Date(),
-        lastError: null,
-        menuVersion: saved.menuVersion === 0 ? null : saved.menuVersion,
-        clockOffsetMs: Math.round(clockOffsetMs),
-      };
-      this.soon(interval, true);
-    } catch (error) {
-      this.failures += 1;
-      const code = error instanceof RelayError ? error.code : 'INTERNAL';
-      this.fail(code, error instanceof Error ? error.message : String(error), error);
-      this.soon(
-        Math.min(this.options.retryBaseMs * 2 ** (this.failures - 1), this.options.retryMaxMs),
-        true,
-      );
-    }
+  async sync(): Promise<RelaySyncStatus> {
+    await this.loop.run();
     return this.status();
+  }
+
+  /** The relay credential and address, or undefined (with the reason noted) when not set up. */
+  async client(): Promise<RelayClient | undefined> {
+    const baseUrl = this.config.relayUrl;
+    if (baseUrl === undefined) return undefined;
+    const credential = await readRelayCredential(this.prisma, this.secrets);
+    this.state = { ...this.state, credential: credential !== undefined };
+    if (credential === undefined) {
+      this.fail('NO_CREDENTIAL', 'No relay credential is stored (pnpm relay:credential)');
+      return undefined;
+    }
+    return new RelayClient({
+      baseUrl,
+      credential,
+      timeoutMs: this.options.requestTimeoutMs,
+      ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
+    });
+  }
+
+  /** One sync; resolves with the delay until the next (the presence interval). */
+  private async cycle(): Promise<number> {
+    const client = await this.client();
+    if (client === undefined) return this.options.retryMaxMs;
+    const restaurant = await this.prisma.restaurant.findFirst({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, displayName: true, accentColor: true, timeZone: true },
+    });
+    if (restaurant === null) {
+      this.fail('NOT_SET_UP', 'The restaurant is not set up yet');
+      return this.options.retryMaxMs;
+    }
+    const settings = await this.settings.snapshot(restaurant.id);
+    const sentAt = Date.now();
+    const presence = await client.presence({
+      serverVersion: SERVER_PACKAGE.version,
+      settings: relaySettingsOf(settings),
+    });
+    const clockOffsetMs = Date.parse(presence.serverTime) - (sentAt + Date.now()) / 2;
+
+    let saved = await this.readState();
+    saved = await this.syncTables(client, restaurant.id, saved);
+    saved = await this.syncMenu(client, restaurant, settings, saved);
+
+    if (this.state.lastError !== null) this.logger.log('In step with the QR relay again');
+    this.state = {
+      ...this.state,
+      lastSuccessAt: new Date(),
+      lastError: null,
+      menuVersion: saved.menuVersion === 0 ? null : saved.menuVersion,
+      clockOffsetMs: Math.round(clockOffsetMs),
+    };
+    return settings.get('qr.presenceIntervalSeconds') * 1_000;
   }
 
   /** QR-001: every table, with its QR code's hash once it has one (P5-04). */

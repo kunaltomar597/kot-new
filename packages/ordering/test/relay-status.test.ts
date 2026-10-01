@@ -1,0 +1,66 @@
+import { describe, expect, it } from 'vitest';
+import { qrStatusOf, qrSteps } from '../src/relay-status.js';
+
+const line = (
+  state: Parameters<typeof qrStatusOf>[0]['lines'][number]['state'],
+  id = 'a',
+  endReason: string | null = null,
+) => ({
+  clientLineId: `0199a0e0-0000-7000-8000-00000000000${id === 'a' ? '1' : '2'}`,
+  state,
+  endReason,
+});
+
+describe('[QR-007] what the diner’s QR page says', () => {
+  it('says received while the waiter has not approved', () => {
+    expect(
+      qrStatusOf({ outcome: 'CREATED', rejectionReason: null, lines: [line('PENDING_APPROVAL')] }),
+    ).toEqual({
+      status: 'RECEIVED',
+      detail: {},
+    });
+  });
+
+  it('says sent to the kitchen, with each line’s state (S)', () => {
+    const target = qrStatusOf({
+      outcome: 'CREATED',
+      rejectionReason: null,
+      lines: [line('PREPARING'), line('CANCELLED', 'b')],
+    });
+    expect(target.status).toBe('SENT_TO_KITCHEN');
+    expect(target.detail.items?.map((item) => item.state)).toEqual(['PREPARING', 'CANCELLED']);
+  });
+
+  it('says rejected with the waiter’s reason, or why nothing could be made', () => {
+    expect(
+      qrStatusOf({
+        outcome: 'CREATED',
+        rejectionReason: null,
+        lines: [line('REJECTED', 'a', 'Kitchen closing')],
+      }),
+    ).toEqual({ status: 'REJECTED', detail: { rejectionReason: 'Kitchen closing' } });
+    expect(
+      qrStatusOf({ outcome: 'REJECTED', rejectionReason: 'Dal is out of stock.', lines: [] }),
+    ).toEqual({
+      status: 'REJECTED',
+      detail: { rejectionReason: 'Dal is out of stock.' },
+    });
+    expect(qrStatusOf({ outcome: 'EXPIRED', rejectionReason: null, lines: [] }).status).toBe(
+      'EXPIRED',
+    );
+  });
+});
+
+describe('[QR-007] telling the relay in the order it accepts', () => {
+  it('receives on the way, and never goes back', () => {
+    expect(qrSteps(null, 'RECEIVED')).toEqual(['RECEIVED']);
+    expect(qrSteps(null, 'SENT_TO_KITCHEN')).toEqual(['RECEIVED', 'SENT_TO_KITCHEN']);
+    expect(qrSteps(null, 'REJECTED')).toEqual(['RECEIVED', 'REJECTED']);
+    expect(qrSteps('RECEIVED', 'SENT_TO_KITCHEN')).toEqual(['SENT_TO_KITCHEN']);
+    expect(qrSteps('SENT_TO_KITCHEN', 'SENT_TO_KITCHEN')).toEqual(['SENT_TO_KITCHEN']);
+    expect(qrSteps('SENT_TO_KITCHEN', 'RECEIVED')).toEqual([]);
+    expect(qrSteps(null, 'EXPIRED')).toEqual(['EXPIRED']);
+    expect(qrSteps('RECEIVED', 'EXPIRED')).toEqual([]);
+    expect(qrSteps('REJECTED', 'SENT_TO_KITCHEN')).toEqual([]);
+  });
+});

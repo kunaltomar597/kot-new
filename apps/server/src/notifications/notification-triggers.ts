@@ -42,16 +42,22 @@ export class NotificationTriggers implements OnModuleInit {
     const restaurantId = event.restaurantId;
     switch (event.type) {
       case 'OrderSubmitted': {
-        if (!event.payload.needsApproval || event.payload.tableSessionId === undefined) return;
-        const session = await tx.tableSession.findUnique({
-          where: { id: event.payload.tableSessionId },
-          select: { tableId: true },
-        });
+        const { tableSessionId } = event.payload;
+        if (!event.payload.needsApproval) return;
+        if (tableSessionId === undefined && event.payload.tableId === undefined) return;
+        const session =
+          tableSessionId === undefined
+            ? null
+            : await tx.tableSession.findUnique({
+                where: { id: tableSessionId },
+                select: { tableId: true },
+              });
+        // QR-010: for a table that is not open, the waiter who looks after it today is told.
         await this.notifications.raise(tx, {
           restaurantId,
           type: 'ORDER_PENDING_APPROVAL',
-          tableId: session?.tableId ?? null,
-          tableSessionId: event.payload.tableSessionId,
+          tableId: session?.tableId ?? event.payload.tableId ?? null,
+          tableSessionId: tableSessionId ?? null,
           orderId: event.payload.orderId,
           dedupeKey: `approval:${event.payload.orderId}`,
           payload: { orderNumber: event.payload.orderNumber, source: event.payload.source },

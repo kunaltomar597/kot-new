@@ -39,6 +39,14 @@ import { SettingsService } from '../settings/settings.service.js';
 
 type Accepted = Extract<SubmitOrderResponse, { status: 'ACCEPTED' }>;
 
+/** What only a QR order carries (P5-03b). */
+export interface SubmitOptions {
+  /** The table, when it has no open session to name (QR-010). */
+  readonly tableId?: string;
+  /** The relay order this one came from (INT-005). */
+  readonly externalRef?: string;
+}
+
 /** Who submits an order: a signed-in person on a device, or (later) a tablet or the QR relay. */
 export interface OrderActor {
   readonly restaurantId: string;
@@ -132,7 +140,15 @@ export class OrdersService {
     private readonly settings: SettingsService,
   ) {}
 
-  async submit(actor: OrderActor, request: SubmitOrderRequest): Promise<SubmitOrderResponse> {
+  /**
+   * `options` are for orders from outside the restaurant's own screens: a QR order names its
+   * table, which may not be open (QR-010), and the relay order it came from (INT-005).
+   */
+  async submit(
+    actor: OrderActor,
+    request: SubmitOrderRequest,
+    options: SubmitOptions = {},
+  ): Promise<SubmitOrderResponse> {
     const requestHash = sha256(canonicalJson(request));
     const [menu, settings, restaurant] = await Promise.all([
       this.menu.current(actor.restaurantId),
@@ -200,12 +216,13 @@ export class OrdersService {
       if (rejected.length > 0) return { status: 'PARTIALLY_REJECTED', rejectedLines: rejected };
 
       const businessDate = await currentBusinessDate(tx, actor.restaurantId, now);
-      const table = await this.prepareTable(tx, actor.restaurantId, request, itemState);
+      const table = await this.prepareTable(tx, actor.restaurantId, request, itemState, options);
       const response = await this.create(tx, actor, request, lines, {
         businessDate,
         itemState,
         menu,
         tableId: table?.tableId ?? null,
+        externalRef: options.externalRef ?? null,
       });
 
       if (table?.newState !== undefined) {
@@ -304,8 +321,21 @@ export class OrdersService {
     restaurantId: string,
     request: SubmitOrderRequest,
     itemState: OrderItemState,
+    options: SubmitOptions,
   ): Promise<{ tableId: string; newState?: 'OCCUPIED' } | null> {
-    if (request.orderType !== 'DINE_IN' || request.tableSessionId === undefined) return null;
+    if (request.orderType !== 'DINE_IN') return null;
+    if (request.tableSessionId === undefined) {
+      if (options.tableId === undefined) return null;
+      // QR-010: a diner's order for a table that is not open waits for a waiter to approve it,
+      // which opens the table.
+      const table = await tx.diningTable.findFirst({
+        where: { id: options.tableId, restaurantId, archivedAt: null },
+        select: { id: true },
+      });
+      if (table === null) throw new AppError(404, 'TABLE_NOT_FOUND', 'There is no such table.');
+      await tx.$queryRaw`SELECT 1 AS locked FROM tables WHERE id = ${table.id}::uuid FOR UPDATE`;
+      return { tableId: table.id };
+    }
     const found = await tx.tableSession.findFirst({
       where: { id: request.tableSessionId, restaurantId },
       select: { tableId: true },
@@ -344,6 +374,7 @@ export class OrdersService {
       itemState: OrderItemState;
       menu: MenuSnapshot;
       tableId: string | null;
+      externalRef: string | null;
     },
   ): Promise<Accepted> {
     const { businessDate, itemState, menu } = context;
@@ -373,6 +404,7 @@ export class OrdersService {
         customerName: request.customerName ?? null,
         customerPhone: request.customerPhone ?? null,
         notes: request.orderNote ?? null,
+        externalRef: context.externalRef,
       },
     });
 
@@ -398,6 +430,7 @@ export class OrdersService {
           id: newId(),
           itemId: item.id,
           variantId: lineRequest.variantId ?? null,
+          clientLineId: lineRequest.clientLineId,
           name: item.name,
           variantName: line.variantName,
           quantity: lineRequest.quantity,
@@ -497,6 +530,8 @@ export class OrdersService {
           orderNumber,
           source: request.source,
           ...(order.tableSessionId !== null && { tableSessionId: order.tableSessionId }),
+          ...(order.tableSessionId === null &&
+            order.tableId !== null && { tableId: order.tableId }),
           needsApproval: itemState === 'PENDING_APPROVAL',
         },
       },

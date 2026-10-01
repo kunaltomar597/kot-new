@@ -189,7 +189,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-03b Sync agent: orders (pickup, approval, status back), then P5-03c, P5-04 to P5-06.
+- P5-03c photos to the relay's Storage, P5-03d the Realtime doorbell, then P5-04 to P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -315,8 +315,9 @@ Recommended next WPs (dependencies met):
 - [x] P5-02a Relay functions for diners (menu, submit order, order status, expiry)
 - [x] P5-02b Relay functions for local servers (session, presence, publishing, pickup)
 - [x] P5-03a Sync agent: publishing (presence, tables, QR menu) and the System page
-- [ ] P5-03b Sync agent: orders (pickup, approval, status back)
+- [x] P5-03b Sync agent: orders (pickup, approval, status back)
 - [ ] P5-03c Sync agent: photos to the relay's Storage
+- [ ] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
 - [ ] P5-04 QR tokens and table tents
 - [ ] P5-05 Next.js QR menu site
 - [ ] P5-06 Phase 5 exit test
@@ -592,6 +593,45 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-03b):
+
+350. Picking up a QR order is an inbox (`relay_orders`), written before anything else. Then:
+     1. If it is past its pickup time by the relay's clock (presence gives the offset), it is left
+        to expire and nothing is made.
+     2. Otherwise the relay is told RECEIVED first: if that answer is 410, nothing is made.
+     3. Then it becomes a normal QR order, priced here, waiting for approval.
+        A crash between the steps resumes from the inbox, and an order already made (found by its
+        `externalRef`) is never made again.
+351. A QR order for a table that is not open:
+     - keeps its table without a session;
+     - alerts the waiter who looks after that table today: the responsible waiter now falls back
+       to the table's default waiter (TBL-002) when there is no session;
+     - shows in that waiter's own approvals.
+       Approving opens the table, laid for 1 with that waiter, or joins a session someone opened
+       meanwhile (QR-010).
+352. When the restaurant cannot take the order, nothing is made and the diner is told REJECTED
+     with the reason:
+     - lines this menu can no longer serve (its own line check's words);
+     - a removed table;
+     - an order the engine refuses.
+353. What the diner is told, from the order here:
+     - RECEIVED while waiting;
+     - SENT_TO_KITCHEN with each line's state (S) once approved, including lines cancelled
+       later;
+     - REJECTED with the waiter's reason when every line was rejected.
+       It is sent in the order the relay accepts (RECEIVED on the way). A durable event consumer
+       marks each change, so nothing is lost offline; a short nudge sends it within half a second.
+354. Each order line now keeps the diner's `clientLineId`, which ties the kitchen's states to the
+     QR page.
+355. Pickup is polled every 5 s for now. The Realtime doorbell that lets polling slow down (QR-009,
+     Supabase cost) is its own part, P5-03d. It needs the project's public API key, and is
+     checked against a real Supabase.
+356. The relay sync loops share `PacedLoop`:
+     - each run sets the next;
+     - a change only ever brings it forward;
+     - back-off after failures;
+     - a caller during a run gets one more run, shared with anyone else who called meanwhile.
 
 Decided 2026-10-02 (P5-03a):
 
@@ -1839,6 +1879,40 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-03b Sync agent: orders
+
+Built:
+
+- Migration `20261002170000_qr_orders`: `order_items.client_line_id` and `relay_orders` (the
+  inbox and what the relay was told).
+- `OrdersService.submit` takes `{ tableId, externalRef }` for a QR order without a session, keeps
+  each line's `clientLineId`, and puts `tableId` in `OrderSubmitted`.
+- Alerts: the approval alert names the table, and the responsible waiter falls back to the table's
+  default waiter.
+- Approvals:
+  - a waiter's own list includes QR orders for tables they look after;
+  - approving opens the table (`floor/open-for-order.ts`).
+- `@rp/ordering` `qrStatusOf` and `qrSteps`.
+- `relay/paced-loop.ts`, with `RelaySyncService` moved onto it.
+- `relay/relay-orders.service.ts`: pickup, take, tell, and the `relay.qr-orders` consumer.
+
+Tests:
+
+- server `relay-orders.int.test.ts` 11, against a real relay:
+  - a closed table: priced here, waiter alerted, approval list, approving opens the table, KOT,
+    diner sees SENT and then PREPARING;
+  - an open table joins its session; a rejection's reason reaches the diner;
+  - lines this menu cannot serve are rejected with the reason;
+  - an expired order is never picked up; a late one by the relay's clock is told EXPIRED;
+  - three pickups at once give one order;
+  - a crash between received and made resumes;
+  - an internet cut on pickup, and on telling.
+- server unit `paced-loop.test.ts` 2;
+- ordering `relay-status.test.ts` 4.
+
+Gotcha: the schema conventions test wants `id`, `restaurant_id`, `created_at` and `updated_at` on
+every table, so the inbox keys on `id` with a unique `relay_order_id`.
 
 ### 2026-10-02: P5-03a Sync agent: publishing
 

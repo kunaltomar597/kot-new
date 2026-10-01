@@ -14,18 +14,20 @@ import {
   type OrderItemState,
   orderItemMachine,
   tableMachine,
+  tablesOf,
   transition,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { authErrors } from '../auth/auth-errors.js';
 import { AuthService } from '../auth/auth.service.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
-import { currentBusinessDate, isoDateOf } from '../common/business-dates.js';
+import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { openTableForOrder } from '../floor/open-for-order.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { ORDER_VIEW_INCLUDE, orderView, OrdersService } from './orders.service.js';
 
@@ -171,11 +173,18 @@ export class OrderApprovalsService {
   // ---------------------------------------------------------------- staff
 
   async pending(approver: Approver): Promise<PendingApprovalsResponse> {
+    const mine = approver.ownOnly ? await this.tablesLookedAfter(approver) : [];
     const orders = await this.prisma.order.findMany({
       where: {
         restaurantId: approver.restaurantId,
         items: { some: { state: 'PENDING_APPROVAL' } },
-        ...(approver.ownOnly && { tableSession: { waiterId: approver.staffId } }),
+        ...(approver.ownOnly && {
+          OR: [
+            { tableSession: { waiterId: approver.staffId } },
+            // QR-010: a diner's order for a table that is not open, which this waiter looks after.
+            { tableSessionId: null, tableId: { in: mine } },
+          ],
+        }),
       },
       include: { ...WITH_SESSION, table: { select: { label: true } } },
       orderBy: [{ createdAt: 'asc' }, { orderNumber: 'asc' }],
@@ -198,9 +207,28 @@ export class OrderApprovalsService {
     const menu = await this.menu.current(approver.restaurantId);
     const now = new Date();
     await this.prisma.transaction(async (tx) => {
-      const order = await this.lock(tx, approver, orderId);
+      let order = await this.lock(tx, approver, orderId);
       const waiting = this.waitingLines(order);
       const businessDate = await currentBusinessDate(tx, approver.restaurantId, now);
+      if (
+        order.tableSessionId === null &&
+        order.tableId !== null &&
+        order.orderType === 'DINE_IN'
+      ) {
+        // QR-010: approving a diner's order for a table that is not open opens it.
+        const sessionId = await openTableForOrder(tx, this.audit, {
+          restaurantId: approver.restaurantId,
+          tableId: order.tableId,
+          businessDate,
+          approverId: approver.staffId,
+          deviceId: approver.deviceId,
+        });
+        await tx.order.update({ where: { id: order.id }, data: { tableSessionId: sessionId } });
+        order = await tx.order.findUniqueOrThrow({
+          where: { id: order.id },
+          include: WITH_SESSION,
+        });
+      }
       const removed = await this.applyChanges(tx, approver, order, waiting, changes, now);
       const approved = waiting.filter((line) => !removed.has(line.id));
       if (approved.length === 0) throw errors.allRemoved();
@@ -386,12 +414,36 @@ export class OrderApprovalsService {
     });
     if (approver.ownOnly) {
       const owner = order.tableSession?.waiterId ?? order.createdById;
-      if (owner !== approver.staffId) throw authErrors.forbidden();
+      const looksAfter =
+        order.tableSession === null &&
+        order.tableId !== null &&
+        (await this.tablesLookedAfter(approver, tx)).includes(order.tableId);
+      if (owner !== approver.staffId && !looksAfter) throw authErrors.forbidden();
     }
     if (order.tableSession !== null && order.tableSession.status !== 'OPEN') {
       throw new AppError(409, 'TABLE_SESSION_CLOSED', 'This table has been closed.');
     }
     return order;
+  }
+
+  /** The tables a waiter looks after today, by the day's sections (TBL-002, QR-010). */
+  private async tablesLookedAfter(
+    approver: Approver,
+    client: TransactionClient | PrismaService = this.prisma,
+  ): Promise<string[]> {
+    const businessDate = await currentBusinessDate(client, approver.restaurantId);
+    const [tables, assignments] = await Promise.all([
+      client.diningTable.findMany({
+        where: { restaurantId: approver.restaurantId, archivedAt: null },
+        select: { id: true, sectionId: true },
+      }),
+      client.shiftAssignment.findMany({
+        where: { restaurantId: approver.restaurantId, businessDate: dbDate(businessDate) },
+        orderBy: { id: 'asc' },
+        select: { staffId: true, sectionId: true, tableId: true },
+      }),
+    ]);
+    return tablesOf(approver.staffId, tables, assignments);
   }
 
   /** The order's whole lines waiting for approval; none means nothing to do. */
