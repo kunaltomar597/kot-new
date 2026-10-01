@@ -120,7 +120,18 @@ export async function generateYear(
     ],
     [
       'invoices',
-      `INSERT INTO invoices (id, restaurant_id, business_date, invoice_date, financial_year,
+      `WITH billed AS (
+         SELECT oi.order_id, sum(oi.line_total) AS subtotal,
+                sum(CASE WHEN o.order_number % 20 = 0 THEN oi.line_total / 10 ELSE 0 END)
+                  AS discount,
+                sum(CASE WHEN o.order_number % 20 = 0 THEN oi.line_total * 9 / 200
+                         ELSE oi.line_total / 20 END) AS tax
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id
+         WHERE oi.restaurant_id = ${R} AND oi.business_date >= '${firstDay}'
+           AND oi.state = 'SERVED'
+         GROUP BY oi.order_id
+       )
+       INSERT INTO invoices (id, restaurant_id, business_date, invoice_date, financial_year,
                              series_id, sequence, invoice_number, status, order_id,
                              table_session_id, price_mode, subtotal, discount_total, tax_total,
                              grand_total, issued_by_id, issued_at, version)
@@ -135,14 +146,7 @@ export async function generateYear(
               'ISSUED', o.id, o.table_session_id, 'TAX_EXCLUSIVE',
               b.subtotal, b.discount, b.tax, b.subtotal - b.discount + b.tax,
               '${refs.cashierId}'::uuid, o.created_at + interval '40 minutes', 1
-       FROM orders o
-       JOIN LATERAL (
-         SELECT sum(oi.line_total) AS subtotal,
-                sum(CASE WHEN o.order_number % 20 = 0 THEN oi.line_total / 10 ELSE 0 END) AS discount,
-                sum(CASE WHEN o.order_number % 20 = 0 THEN oi.line_total * 9 / 200
-                         ELSE oi.line_total / 20 END) AS tax
-         FROM order_items oi WHERE oi.order_id = o.id AND oi.state = 'SERVED'
-       ) b ON true
+       FROM orders o JOIN billed b ON b.order_id = o.id
        WHERE o.restaurant_id = ${R} AND o.business_date >= '${firstDay}'`,
     ],
     [
@@ -322,8 +326,13 @@ export async function generateYear(
   ];
   const rows: Record<string, number> = {};
   for (const [name, sql] of statements) {
+    const started = Date.now();
     rows[name] = await prisma.$executeRawUnsafe(sql);
+    process.stderr.write(
+      `${name}: ${String(rows[name])} rows in ${String(Math.round((Date.now() - started) / 1_000))} s\n`,
+    );
+    // Fresh statistics, or the next statement plans against the empty template's tables.
+    await prisma.$executeRawUnsafe('ANALYZE');
   }
-  await prisma.$executeRawUnsafe('ANALYZE');
   return { firstDay, rows };
 }
