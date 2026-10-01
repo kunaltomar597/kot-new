@@ -172,7 +172,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-06 Phase 3 exit test (S6).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -268,7 +267,7 @@ Recommended next WPs (dependencies met):
 - [x] P3-04 Recommendation engine v1
 - [x] P3-05a Suggestion rows and tracking (tablet, waiter app)
 - [x] P3-05b Feedback after the bill
-- [ ] P3-06 Phase 3 exit test (S6)
+- [x] P3-06 Phase 3 exit test (S6)
 
 ### Phase 4: Manager dashboard and reports
 
@@ -1667,6 +1666,27 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-06 Phase 3 exit test, S6 (Phase 3 done)
+
+Built: `tablet-session.int.test.ts`, 9 steps over the API and the tablet's live connection. It
+runs:
+
+- open (the tablet unlocks and hears it);
+- order (waits, the waiter is alerted);
+- approve in the waiter app (a ticket for the kitchen);
+- kitchen to served (the tablet follows);
+- approve at the table with the waiter's PIN;
+- Water once, then Cancel clears it;
+- bill printed and feedback;
+- paid and closed (the tablet is idle, with no orders);
+- reopened, with nothing carried over (no orders, requests or open alerts, and feedback asked
+  again).
+
+Manual task 12 has the lab-rig checklist.
+
+Result: S6 passes on every build: all 9 steps, and the full check is green. The lab-rig run waits
+for the tablet hardware (manual task 12, P0-H3).
 
 ### 2026-10-02: P3-05b Feedback after the bill (P3-05 done)
 
