@@ -125,7 +125,13 @@ What exists:
   reason shown with a suggestion and the suggestion a cart line came from (P3-04); "my tables"
   from the domain's planning helper (P4-02b). 38 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
-  server and the Control Plane.
+  server, the Control Plane and the relay (Prisma or Supabase CLI migrations, optional prelude).
+- `infra/supabase` (`@rp/relay`): the QR relay's database (P5-01, ADR-0015). It has:
+  - a private `relay` schema with RLS on every table for three roles;
+  - hashed table tokens and local-server credentials, and the provisioning functions;
+  - the order rules as triggers, and hourly retention;
+  - Supabase CLI config, and 75 tests (cross-tenant isolation, roles and grants, tokens, order
+    rules, retention) on PostgreSQL, also run against local Supabase in CI.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
@@ -172,6 +178,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
+- P5-02 Relay edge functions (submit order, status, expiry, presence, server session), then P5-03
+  to P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -293,7 +301,7 @@ Recommended next WPs (dependencies met):
 
 ### Phase 5: QR menu and cloud relay
 
-- [ ] P5-01 Relay database, RLS, isolation tests (needs Supabase org)
+- [x] P5-01 Relay database, RLS, isolation tests (deploying to Supabase: manual task 20)
 - [ ] P5-02 Relay edge functions
 - [ ] P5-03 Sync agent
 - [ ] P5-04 QR tokens and table tents
@@ -571,6 +579,53 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-01), design in ADR-0015:
+
+319. The relay keeps everything in schema `relay`, which the Data API does not expose; `public`
+     stays empty. Every table has RLS, and every policy names one of three NOLOGIN roles:
+     - `relay_server`: a local server's Realtime subscription; it reads its own QR orders only;
+     - `relay_writer`: an edge function acting for a verified local server;
+     - `relay_diner`: an edge function acting for a browser whose table token resolved. It reads
+       its restaurant's menu, photos, presence and settings, and orders for its own table only.
+       Its tenant and table come from `request.jwt.claims`; a missing or malformed claim matches
+       nothing.
+320. Edge functions use their own login, `relay_edge`, not the `postgres` connection string. It
+     inherits nothing and can only switch, per transaction, to `relay_writer`, `relay_diner` or
+     `relay_provisioner`. Its password is set by hand (manual task 20). No relay role is granted to
+     `authenticator`, so the Data API can reach none of them.
+321. A local server's credential is 256 random bits, made by the Control Plane. The relay stores
+     only its SHA-256.
+     - `server-session` (P5-02) exchanges it for a short-lived JWT carrying `relay_server` and the
+       tenant, which is used for Realtime only.
+     - All writes go through edge functions (BRD §13: "Edge Functions for all writes").
+     - Revoking a credential, or suspending the restaurant, works at once.
+322. Table tokens are at least 128 random bits, made by the local server (P5-04). The relay gets
+     only the SHA-256; regenerating replaces it, so the old code stops resolving. The diner role
+     never reads a hash.
+323. Order rules are enforced in the table, whoever writes:
+     - a new order is SUBMITTED and expires after the restaurant's pickup timeout, both stamped
+       by the relay's clock;
+     - what the diner submitted never changes (`RL400`);
+     - the status moves SUBMITTED to RECEIVED or EXPIRED, then RECEIVED to SENT_TO_KITCHEN or
+       REJECTED (`RL409` otherwise);
+     - an order past its deadline cannot be received (`RL410`), so the local server rejects it as
+       expired;
+     - the idempotency key is unique per restaurant.
+324. Retention (BRD §9.3): `relay.purge()` runs hourly by pg_cron.
+     - Orders go 7 days after they were received or expired.
+     - Every menu snapshot but the latest goes after a day.
+     - Photo files and their metadata go with a Storage sweeper (P5-03), because deleting
+       Storage rows in SQL would leave the files behind.
+325. A menu snapshot carries availability. The sync agent republishes on a change, debounced
+     (P5-03), instead of keeping a separate availability table: one document for the QR site,
+     and only the latest version counts.
+326. `relay.tenant_settings` mirrors the `qr.*` settings: same defaults and limits, and a test
+     compares it with the registry. The sync agent keeps it in step (P5-03).
+327. The tests run on plain PostgreSQL 16, with a prelude that gives Supabase's API roles broad
+     default privileges (the worst case). They act as each role the way PostgREST, Realtime and
+     the edge functions do. The `relay-supabase` CI job runs the same suite on a local Supabase
+     stack; it has not run yet, because nothing can be pushed until GitHub access exists.
 
 Decided 2026-10-02 (P3-05b):
 
@@ -1666,6 +1721,68 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-01 Relay database, RLS and isolation tests
+
+Built:
+
+- ADR-0015 (QR relay on Supabase).
+- `infra/supabase` as workspace package `@rp/relay`:
+  - `config.toml`: Mumbai project; `relay` not in the Data API; public photo bucket.
+  - Migration `20261002130000_relay_schema.sql` with:
+    - the roles;
+    - tables `tenants`, `credentials`, `tenant_settings`, `dining_tables`, `menu_snapshots`,
+      `photos`, `presence`, `qr_orders`;
+    - the claim helpers;
+    - the RLS policies and column grants;
+    - the order triggers;
+    - `resolve_table_token` and `verify_credential`;
+    - the provisioning functions;
+    - `purge` with its pg_cron schedule;
+    - the Realtime publication.
+  - Tests with a Supabase prelude.
+- `@rp/test-postgres` reads Supabase CLI migrations and takes prelude files.
+- Traceability now scans `infra/`.
+- CI job `relay-supabase`.
+- Manual task 20 (create the projects, push the schema, the `relay_edge` login, check retention).
+
+Tests: `@rp/relay` 75 (1 of them skipped without pg_cron):
+
+- isolation 33: each of A's roles against B's rows, reads, inserts, updates and moves; diners
+  held to their table; tokens and credentials; no or malformed claims; API roles; no deletes;
+- roles and grants 19;
+- tokens and credentials 9;
+- order rules 11;
+- retention 3.
+
+test-postgres has 1 more test.
+
+Mutation check: each of these makes the suite fail:
+
+- a writer policy opened to `true`;
+- the diner's table check removed;
+- RLS turned off on one table;
+- suspended tenants' tokens resolving;
+- the API roles keeping function grants.
+
+Gotchas:
+
+- `SET ROLE` checks the session user, so from a superuser connection every switch succeeds. The
+  role tests use `SET LOCAL SESSION AUTHORIZATION` to act as the edge functions' login.
+- A per-schema `ALTER DEFAULT PRIVILEGES ... REVOKE` cannot undo the global `EXECUTE` for PUBLIC.
+  Every migration must revoke it from new functions; `roles.test.ts` checks this.
+- Tables are not FORCE'd, so the definer-rights functions (owned by `postgres`) bypass RLS on
+  Supabase too, where `postgres` is not a superuser.
+- RLS `WITH CHECK` runs before unique checks, so a cross-tenant insert is refused (42501) before it
+  could reveal that a row exists.
+
+- In one full `pnpm check` run, `recommendations-performance.int.test.ts` failed with "socket hang
+  up": another package's PostgreSQL cluster was starting at the same time. It passed alone and on
+  the next full run. If it repeats, give that file its own Vitest pool.
+
+Not verified here: the `relay-supabase` job (Docker is not running on this Mac, and nothing can be
+pushed yet), and the `supabase_admin` password of the CLI stack. Both get checked on the first
+CI run.
 
 ### 2026-10-02: P3-06 Phase 3 exit test, S6 (Phase 3 done)
 

@@ -1,0 +1,102 @@
+# 20. Deploy the QR relay to Supabase (Mumbai)
+
+**Why:** the QR menu (Phase 5) runs through a cloud relay on Supabase. Claude has built the
+relay's database and tested it locally and in CI, but cannot create your Supabase account or hold
+its passwords. Until this is done, QR ordering works only in tests.
+
+**Work packages:** P5-01 (database), P5-02 (edge functions), P5-03 (sync agent). The design is in
+[ADR-0015](../docs/adr/0015-qr-relay-on-supabase.md).
+
+**You need:**
+
+- A Supabase account (OWNER_CHECKLIST item 10).
+- About 30 minutes.
+- The Supabase CLI on a computer with this repository: `brew install supabase/tap/supabase` on a
+  Mac, or `npx supabase` anywhere.
+
+Never paste a password, key or connection string into a Claude session, a commit or a chat.
+
+## Steps
+
+### 1. Create the organisation and three projects
+
+1. At <https://supabase.com/dashboard>, create an organisation for the restaurant platform.
+2. In it, create three projects, all in region **South Asia (Mumbai), `ap-south-1`**:
+   - `rp-relay-dev` (Free plan is fine);
+   - `rp-relay-staging`;
+   - `rp-relay-prod` (a paid plan: Pro or higher, for daily backups and no pausing).
+3. For each project, save its database password in your password manager. Supabase shows it only
+   once.
+
+### 2. Apply the relay schema (repeat per project, dev first)
+
+From the repository root:
+
+```sh
+supabase login
+supabase link --workdir infra --project-ref <project-ref>   # Project Settings → General
+supabase db push --workdir infra                            # applies infra/supabase/migrations
+```
+
+`db push` lists the migrations it will apply. Expect `20261002130000_relay_schema.sql` and any
+later ones. Answer `Y`.
+
+### 3. Keep the relay schema private
+
+In **Project Settings → Data API**, check that **Exposed schemas** lists only `public` and
+`graphql_public`. `relay` must **not** be there (QR-006).
+
+### 4. Give the edge functions their own login
+
+Edge functions connect as `relay_edge`, which can only switch to the relay's roles. It is created
+without a password; set one now.
+
+1. Generate a password locally:
+
+   ```sh
+   openssl rand -base64 33 | tr -d '/+=' | cut -c1-40
+   ```
+
+2. Save it in your password manager.
+3. In the **SQL editor** of the project, run:
+
+   ```sql
+   ALTER ROLE relay_edge WITH LOGIN PASSWORD '<the password>';
+   ```
+
+4. Build the connection string from **Connect → Transaction pooler**: user `relay_edge.<project-ref>`,
+   port `6543`. Store it as a function secret. It never goes in the repository.
+
+   ```sh
+   supabase secrets set --workdir infra RELAY_DB_URL='postgresql://relay_edge.<ref>:<password>@<pooler-host>:6543/postgres'
+   ```
+
+The edge functions themselves come with P5-02. Claude will add their deploy command here.
+
+### 5. Check retention is scheduled
+
+In the SQL editor, run:
+
+```sql
+SELECT jobname, schedule, command FROM cron.job WHERE jobname = 'relay-purge';
+```
+
+You should see one row: `17 * * * *` and `SELECT relay.purge()`.
+
+## Results to report back
+
+Copy this into a Claude session (no passwords or keys):
+
+```
+Supabase relay deployment
+- Organisation created: yes/no
+- Projects (name → project ref, region):
+  - dev:     ______ (ap-south-1)
+  - staging: ______ (ap-south-1)
+  - prod:    ______ (ap-south-1), plan: ______
+- Migrations applied (dev/staging/prod): __/__/__
+- Exposed schemas exclude relay (dev/staging/prod): __/__/__
+- relay_edge login set and RELAY_DB_URL secret stored (dev/staging/prod): __/__/__
+- relay-purge job present (dev/staging/prod): __/__/__
+- Anything that did not match these steps:
+```

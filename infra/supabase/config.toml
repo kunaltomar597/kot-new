@@ -1,0 +1,57 @@
+# Supabase CLI configuration for the QR relay (C8, ADR-0015). Local stack:
+# `supabase start --workdir infra` (Docker), which applies ./migrations. The hosted project lives
+# in the Mumbai region (ap-south-1); see manual-tasks/13-supabase-relay.md.
+project_id = "rp-relay"
+
+[api]
+enabled = true
+port = 54321
+# The relay schema is never exposed through the Data API (ADR-0015): browsers and local servers
+# reach it only through edge functions, and local servers' Realtime subscriptions.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+# Menu photos (MENU-008): public through the CDN, written only by edge functions for the
+# restaurant's own folder (P5-03). The local server re-encodes and strips EXIF first (SEC-004).
+[storage.buckets.menu-photos]
+public = true
+file_size_limit = "2MiB"
+allowed_mime_types = ["image/webp", "image/jpeg", "image/png"]
+
+[auth]
+# No user accounts in the relay: diners are anonymous and local servers hold scoped credentials.
+enabled = false
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+deno_version = 2
+
+[analytics]
+enabled = false

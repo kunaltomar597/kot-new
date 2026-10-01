@@ -1,0 +1,146 @@
+# ADR-0015: QR relay on Supabase: a private schema, role-scoped RLS, writes only through functions
+
+Status: Accepted
+Date: 2026-10-02
+Work package: P5-01 (used by P5-02 to P5-06, P7)
+Requirements: SEC-005, QR-001, QR-006, QR-007, QR-008, QR-014, VCP-002, NFR-A01, BRD §9.3, §12
+
+## Context
+
+The QR menu needs a cloud relay (component C8): diners' phones cannot reach the local server, and
+the cloud must never connect into the restaurant (BRD §5.1). The BRD names Supabase in the Mumbai
+region: Postgres with RLS, Edge Functions for all writes, Realtime and Storage (§13).
+
+SEC-005 and QR-014 set the security bar:
+
+- RLS on every table, deny by default.
+- Local servers use per-tenant credentials, never the service-role key.
+- Browsers never write tables directly (QR-006).
+- An automated test proves that no QR code, token or credential of one restaurant can read or
+  write another's menu or orders.
+
+Retention comes from §9.3: QR orders are kept 7 days after import (expired ones 7 days); menu
+photos while the item exists plus 90 days.
+
+Supabase's own defaults are too open for this. Tables in `public` are reachable through the Data
+API (PostgREST, GraphQL), with grants to `anon` and `authenticated`. Functions are executable by
+`PUBLIC`.
+
+The relay must also be testable without Supabase. The build machine and the `check` CI job have
+PostgreSQL 16 but no Docker, so everything security-relevant must run on plain PostgreSQL.
+
+## Decision
+
+### A private schema
+
+- All relay data lives in schema `relay`. It is not listed in the Data API schemas
+  (`infra/supabase/config.toml`, `[api].schemas`); `public` stays empty.
+- `USAGE` on `relay` goes only to the three relay roles below. Default privileges grant nothing.
+- Every function has `EXECUTE` revoked from `PUBLIC`.
+
+### Three roles, all `NOLOGIN`
+
+| Role           | Who acts as it                                                        | How                                                                                                                       | May do                                                                                                 |
+| -------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `relay_server` | A local server's Realtime subscription                                | `role` claim of a short-lived JWT the `server-session` edge function signs after checking the tenant's credential (P5-02) | `SELECT` its tenant's QR orders                                                                        |
+| `relay_writer` | An edge function acting for a verified local server                   | `SET LOCAL ROLE` in the function's transaction                                                                            | Write its tenant's tables, snapshots, photos, presence, settings and order status                      |
+| `relay_diner`  | An edge function acting for a browser, after the table token resolved | `SET LOCAL ROLE` in the function's transaction                                                                            | Read its tenant's latest menu, photos, presence and settings; insert and read orders for its own table |
+
+- No role is granted to `authenticator`, so the Data API cannot switch to any of them. A JWT can
+  only carry `relay_server`, and only Realtime honours it.
+- Leaking a `relay_server` JWT exposes, for its lifetime, the order queue of one restaurant. It
+  never gives write access.
+
+### Claims carry the scope
+
+The tenant (and, for a diner, the table) travels in `request.jwt.claims`, the setting PostgREST and
+Realtime already use.
+
+- Edge functions set it with `set_config(..., true)` in the same transaction as `SET LOCAL ROLE`.
+- Every policy compares rows with `relay.claim_tenant()` and `relay.claim_table()`. An absent or
+  malformed claim matches nothing.
+- Every policy names its role (`TO relay_writer`, ...). Tables have RLS enabled and forced, so even
+  the owner's ad-hoc queries are filtered unless they explicitly bypass it.
+
+### Secrets are stored as hashes
+
+- Table tokens: at least 128 random bits, made by the local server (P5-04).
+- Tenant credentials: 256 random bits, made by the Control Plane (VCP-002).
+- The relay stores `sha256` of each, never the value.
+- Lookups go through `SECURITY DEFINER` functions with an empty `search_path`:
+  `relay.resolve_table_token` and `relay.verify_credential`.
+- Regenerating a table's code replaces its hash, so the old code stops resolving at once (QR-001).
+- Suspending a tenant or revoking a credential takes effect on the next call.
+
+### Provisioning (VCP-002)
+
+These functions are `SECURITY DEFINER` and executable by no API role:
+
+- `relay.provision_tenant`
+- `relay.add_credential`
+- `relay.revoke_credential`
+- `relay.set_tenant_status`
+
+The Control Plane calls them through a provisioning edge function that holds its own secret (P7).
+
+### Order rules live in the table
+
+- A trigger keeps what the diner submitted immutable.
+- The same trigger allows only these status moves:
+  - `SUBMITTED` to `RECEIVED` or `EXPIRED`
+  - `RECEIVED` to `SENT_TO_KITCHEN` or `REJECTED`
+  - `SENT_TO_KITCHEN` to itself (item statuses)
+- An order past its pickup time can no longer be received (QR-007); the local server then rejects
+  it as expired.
+- The idempotency key is unique per tenant (ORD-013).
+
+### Retention
+
+`relay.purge(now)` deletes:
+
+- orders 7 days after they were received or expired;
+- every menu snapshot but the latest after 1 day;
+- photo metadata 90 days after the photo was removed.
+
+pg_cron runs it hourly where the extension exists (Supabase). The relay is a transient queue; the
+local server stays the system of record (AUD-004 applies there).
+
+### Settings travel with the tenant
+
+`relay.tenant_settings` holds the QR settings the relay must enforce (`qr.*`, scope VENDOR). It
+uses the same defaults and limits as the local registry. The local server writes it through the
+sync agent (P5-03).
+
+### Tested on plain PostgreSQL, and on Supabase in CI
+
+- The migrations use Supabase objects only when present: the `authenticator` and API roles, the
+  `supabase_realtime` publication, pg_cron.
+- Tests apply a prelude that creates Supabase's API roles as Supabase does. They then act as each
+  role exactly as PostgREST and Realtime do: `SET LOCAL ROLE` plus `request.jwt.claims`.
+- The `check` CI job runs these tests on PostgreSQL 16.
+- The `relay-supabase` job runs the same suite against a local Supabase stack started by the CLI
+  (`RELAY_DATABASE_URL`).
+
+## Alternatives considered
+
+- **Tables in `public` behind the Data API, with RLS for `anon` and `authenticated`.** This is the
+  usual Supabase setup. But one wrong grant or policy exposes a table to every browser, and the BRD
+  wants all writes through functions anyway.
+- **Edge functions with the service-role key.** This is simple, but RLS no longer protects
+  anything. A bug in a function could read across tenants, and SEC-005 asks for RLS everywhere.
+- **Per-tenant Postgres login roles.** This is strong isolation, but one role per restaurant
+  complicates provisioning, pooling and migrations. Claims-based RLS gives the same guarantee and
+  is what Supabase's tooling expects.
+- **Hashing tokens with bcrypt or argon2.** Not needed: the values are 128 or 256 random bits, so a
+  fast hash cannot be brute-forced. A slow hash would also make every QR page load slower.
+
+## Consequences
+
+- Edge functions (P5-02) need a direct database connection (`SUPABASE_DB_URL`, through the
+  transaction pooler). Each request is one transaction that sets the role and claims first.
+- Realtime needs a signed JWT. `server-session` (P5-02) signs it with a key held as a function
+  secret.
+- The QR site never talks to the database. Everything it reads or writes goes through functions,
+  which can also add caching and rate limits.
+- Deploying the schema to the real Supabase project in Mumbai is a manual step
+  (`manual-tasks/20-supabase-relay.md`).

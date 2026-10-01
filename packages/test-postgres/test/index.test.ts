@@ -24,4 +24,15 @@ describe('test database helpers', () => {
       join(dir, '20260926000000_second', 'migration.sql'),
     ]);
   });
+
+  it('lists Supabase CLI migrations, which are plain SQL files, by name', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rp-migrations-'));
+    for (const name of ['20261002000000_b.sql', '20261001000000_a.sql', 'README.md']) {
+      writeFileSync(join(dir, name), 'SELECT 1;');
+    }
+    expect(migrationFiles(dir)).toEqual([
+      join(dir, '20261001000000_a.sql'),
+      join(dir, '20261002000000_b.sql'),
+    ]);
+  });
 });

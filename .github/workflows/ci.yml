@@ -131,3 +131,41 @@ jobs:
             apps/console/playwright-report
             apps/console/test-results
           retention-days: 7
+
+  relay-supabase:
+    # The relay's isolation and rule tests (P5-01) also run in the check job on plain PostgreSQL
+    # with a Supabase prelude; here they run against a real local Supabase stack (ADR-0015).
+    name: QR relay on local Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (database and Realtime) and apply the relay migrations
+        run: supabase start --workdir infra -x studio,imgproxy,logflare,vector,supavisor,postgres-meta,edge-runtime
+
+      - name: Build the test helpers
+        run: pnpm turbo run build --filter=@rp/relay^...
+
+      - name: Relay tests against Supabase
+        run: pnpm --filter @rp/relay test
+        env:
+          # A superuser on the local stack: the tests switch session authorization and roles.
+          RELAY_DATABASE_URL: postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --workdir infra --no-backup
