@@ -1,4 +1,6 @@
+import { existsSync, writeFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { INestApplication } from '@nestjs/common';
 import type { LoginResponse } from '@rp/contracts';
 import request from 'supertest';
@@ -21,6 +23,11 @@ const DAYS = Number(process.env.RP_PERF_DAYS ?? 365);
 const ORDERS_A_DAY = Number(process.env.RP_PERF_ORDERS ?? 2_000);
 const BUDGET_MS = 5_000;
 const LAST_DAY = '2027-03-31';
+/**
+ * A file path: once the year is generated its database URL is written there, and the run waits
+ * until `<path>.stop` exists, so queries can be tuned against the year from another shell.
+ */
+const HOLD = process.env.RP_PERF_HOLD;
 
 const REPORTS = [
   'sales',
@@ -114,6 +121,10 @@ describe.skipIf(!ENABLED)('[RPT-018] twelve months at design capacity', () => {
       { lastDay: LAST_DAY, days: DAYS, ordersPerDay: ORDERS_A_DAY },
     );
     firstDay = generated.firstDay;
+    if (HOLD !== undefined) {
+      writeFileSync(HOLD, `${database.url}\n${kit.restaurantId}\n${firstDay}\n`);
+      while (!existsSync(`${HOLD}.stop`)) await sleep(2_000);
+    }
     // eslint-disable-next-line no-console -- the run's size goes in the performance record
     console.log(
       `Generated ${String(DAYS)} days in ${String(Math.round((performance.now() - started) / 1_000))} s:`,
