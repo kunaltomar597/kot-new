@@ -250,8 +250,9 @@ Built in four parts, each its own pull request:
 - P4-05b Report data II (done): kitchen performance by station and dish with "Notify manager"
   presses (RPT-010), table metrics with turnover in basis points (RPT-011), recommendation
   performance per layer and dish (RPT-012).
-- P4-05c Twelve months at design capacity (RPT-018): a generated year at §7.2 capacity, every
-  report timed against it, and the P1-13 reports moved to SQL aggregation where they are slow.
+- P4-05c Twelve months at design capacity (done): `RP_PERF=1 pnpm --filter @rp/server test:perf`
+  generates a year at §7.2 capacity and times every report through HTTP; the P1-13 reports sum
+  in SQL, invoice lines keep their dish and tax share as issued, and the register is paged.
 - P4-05d The Reports area in the console: a range picker, every report as charts (Recharts) and
   tables, and drill-down to an order (RPT-015, RPT-016). Feedback (RPT-013, S) waits for the QR
   feedback data (P5).

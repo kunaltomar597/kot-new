@@ -20,6 +20,7 @@ import type { Invoice, InvoiceLine, Restaurant, TaxLine } from '../generated/pri
 import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
 import { describeItem } from './bill-calculation.js';
 import { type BillContext, BillsService } from './bills.service.js';
+import { withLineShares } from './line-shares.js';
 
 /** Sequence key of a series that runs on across financial years (PROGRESS decision 17). */
 export const CONTINUOUS_SEQUENCE = '0000-00';
@@ -127,6 +128,7 @@ export class InvoicesService {
 
       const particulars = particularsOf(restaurant, snapshot);
       const itemsById = new Map(context.items.map((item) => [item.id, item]));
+      const itemIdOf = (orderItemId: string) => itemsById.get(orderItemId)?.itemId;
       const realGroup = (key: string) => calculated.groupIdOf.get(key) ?? key;
       const sacOf = (groupId: string) => context.taxGroups.get(groupId)?.sacCode ?? null;
 
@@ -223,7 +225,7 @@ export class InvoicesService {
                 // Printing is its own step (`print`); the first successful print is the original.
                 printCount: 0,
                 replacesInvoiceId: replaces?.id ?? null,
-                lines: { create: lines },
+                lines: { create: withLineShares(lines, taxLines, itemIdOf) },
                 taxLines: { create: taxLines },
               },
             })
@@ -235,7 +237,7 @@ export class InvoicesService {
                 ...amounts,
                 version,
                 printCount: 0,
-                lines: { create: lines },
+                lines: { create: withLineShares(lines, taxLines, itemIdOf) },
                 taxLines: { create: taxLines },
               },
             });

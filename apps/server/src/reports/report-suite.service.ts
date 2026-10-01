@@ -467,8 +467,13 @@ export class ReportSuiteService {
    */
   async kitchen(restaurantId: string, range: ReportRangeQuery): Promise<KitchenReportResponse> {
     const { from, to } = range;
-    const cooked = this.prisma.$queryRaw<(KitchenRow & { station_id: string })[]>`
-      SELECT oi.station_id, count(*) AS lines, sum(oi.quantity) AS quantity,
+    // Combos are cooked as their parts; there are few, so they are left out by id.
+    const combos = (
+      await this.prisma.combo.findMany({ where: { restaurantId }, select: { itemId: true } })
+    ).map((combo) => combo.itemId);
+    // One pass over the year's lines, by dish and station; stations add up their dishes.
+    const cooked = this.prisma.$queryRaw<(KitchenRow & { item_id: string; station_id: string })[]>`
+      SELECT oi.item_id, oi.station_id, count(*) AS lines, sum(oi.quantity) AS quantity,
              sum(t.prep) FILTER (WHERE t.prep >= 0)::float8 AS prep_sum,
              count(t.prep) FILTER (WHERE t.prep >= 0) AS prep_count,
              sum(t.pickup) FILTER (WHERE t.pickup >= 0)::float8 AS pickup_sum,
@@ -480,29 +485,8 @@ export class ReportSuiteService {
       ) t
       WHERE oi.restaurant_id = ${restaurantId}::uuid AND oi.ready_at IS NOT NULL
         AND oi.business_date BETWEEN ${from}::date AND ${to}::date
-        AND NOT EXISTS (SELECT 1 FROM combos c WHERE c.item_id = oi.item_id)
-      GROUP BY 1`;
-    const byItem = this.prisma.$queryRaw<
-      (KitchenRow & { item_id: string; name: string; station: string })[]
-    >`
-      SELECT oi.item_id, i.name, s.name AS station, count(*) AS lines,
-             sum(oi.quantity) AS quantity,
-             sum(t.prep) FILTER (WHERE t.prep >= 0)::float8 AS prep_sum,
-             count(t.prep) FILTER (WHERE t.prep >= 0) AS prep_count,
-             sum(t.pickup) FILTER (WHERE t.pickup >= 0)::float8 AS pickup_sum,
-             count(t.pickup) FILTER (WHERE t.pickup >= 0) AS pickup_count
-      FROM order_items oi
-      JOIN items i ON i.id = oi.item_id
-      JOIN stations s ON s.id = oi.station_id
-      CROSS JOIN LATERAL (
-        SELECT extract(epoch FROM oi.ready_at - coalesce(oi.preparing_at, oi.sent_at)) AS prep,
-               extract(epoch FROM coalesce(oi.picked_up_at, oi.served_at) - oi.ready_at) AS pickup
-      ) t
-      WHERE oi.restaurant_id = ${restaurantId}::uuid AND oi.ready_at IS NOT NULL
-        AND oi.business_date BETWEEN ${from}::date AND ${to}::date
-        AND NOT EXISTS (SELECT 1 FROM combos c WHERE c.item_id = oi.item_id)
-      GROUP BY 1, 2, 3
-      ORDER BY 2, 1`;
+        AND NOT (oi.item_id = ANY (${combos}::uuid[]))
+      GROUP BY 1, 2`;
     const presses = this.prisma.$queryRaw<{ station_id: string; n: bigint }[]>`
       SELECT k.station_id, count(*) AS n
       FROM alerts a JOIN kots k ON k.id = a.kot_id
@@ -510,9 +494,8 @@ export class ReportSuiteService {
         AND a.raised_by_device_id IS NOT NULL
         AND a.business_date BETWEEN ${from}::date AND ${to}::date
       GROUP BY 1`;
-    const [stationRows, itemRows, pressRows, stations] = await Promise.all([
+    const [cookedRows, pressRows, stations] = await Promise.all([
       cooked,
-      byItem,
       presses,
       this.prisma.station.findMany({
         where: { restaurantId },
@@ -520,6 +503,28 @@ export class ReportSuiteService {
         orderBy: { name: 'asc' },
       }),
     ]);
+    const items = await this.prisma.item.findMany({
+      where: { id: { in: [...new Set(cookedRows.map((row) => row.item_id))] } },
+      select: { id: true, name: true },
+    });
+    const itemName = new Map(items.map((item) => [item.id, item.name]));
+    const stationName = new Map(stations.map((station) => [station.id, station.name]));
+    const stationRows = [...new Set(cookedRows.map((row) => row.station_id))].map(
+      (stationId): KitchenRow & { station_id: string } => {
+        const rows = cookedRows.filter((row) => row.station_id === stationId);
+        const total = (field: keyof KitchenRow) =>
+          rows.reduce((sum, row) => sum + num(row[field]), 0);
+        return {
+          station_id: stationId,
+          lines: BigInt(total('lines')),
+          quantity: BigInt(total('quantity')),
+          prep_sum: total('prep_sum'),
+          prep_count: BigInt(total('prep_count')),
+          pickup_sum: total('pickup_sum'),
+          pickup_count: BigInt(total('pickup_count')),
+        };
+      },
+    );
     const used = new Set([...stationRows, ...pressRows].map((row) => row.station_id));
     const shown = stations.filter((station) => station.archivedAt === null || used.has(station.id));
     const pressesOf = (stationId: string) =>
@@ -534,12 +539,14 @@ export class ReportSuiteService {
         ...kitchenTimes(stationRows.find((row) => row.station_id === station.id)),
         notifyManager: pressesOf(station.id),
       })),
-      items: itemRows.map((row) => ({
-        itemId: row.item_id,
-        name: row.name,
-        station: row.station,
-        ...kitchenTimes(row),
-      })),
+      items: cookedRows
+        .map((row) => ({
+          itemId: row.item_id,
+          name: itemName.get(row.item_id) ?? '',
+          station: stationName.get(row.station_id) ?? '',
+          ...kitchenTimes(row),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'en-IN') || a.itemId.localeCompare(b.itemId)),
       totals: {
         lines: sum('lines'),
         quantity: sum('quantity'),
@@ -624,79 +631,105 @@ export class ReportSuiteService {
 
   /**
    * RPT-012 (REC-008): suggestions shown, opened, added to a cart and ordered, per layer and dish.
-   * Revenue is the line total of suggested lines that were not rejected, cancelled or voided.
+   * Revenue is the line total of suggested lines that were not rejected, cancelled or voided. The
+   * events are counted on their own; only the ordered ones are joined to their lines (most events
+   * have no line, and joining them all on it is what made a year slow).
    */
   async recommendations(
     restaurantId: string,
     range: ReportRangeQuery,
   ): Promise<RecommendationReportResponse> {
     const { from, to } = range;
-    const [layerRows, itemRows, orderRow] = await Promise.all([
-      this.prisma.$queryRaw<(SuggestionRow & { layer: Layer })[]>`
-        SELECT e.layer::text AS layer,
-               count(*) FILTER (WHERE e.kind = 'IMPRESSION') AS impressions,
-               count(*) FILTER (WHERE e.kind = 'TAP') AS taps,
-               count(*) FILTER (WHERE e.kind = 'ADD_TO_CART') AS added,
-               count(*) FILTER (WHERE e.kind = 'ORDERED') AS ordered,
-               coalesce(sum(oi.line_total) FILTER (
-                 WHERE e.kind = 'ORDERED' AND oi.state NOT IN ('REJECTED', 'CANCELLED', 'VOIDED')
-               ), 0) AS revenue
-        FROM recommendation_events e
-        LEFT JOIN order_items oi ON oi.id = e.order_item_id
-        WHERE e.restaurant_id = ${restaurantId}::uuid
+    const [countRows, revenueRows, orderRow] = await Promise.all([
+      this.prisma.$queryRaw<
+        {
+          layer: Layer;
+          item_id: string;
+          impressions: bigint;
+          taps: bigint;
+          added: bigint;
+          ordered: bigint;
+        }[]
+      >`
+        SELECT layer::text AS layer, item_id,
+               count(*) FILTER (WHERE kind = 'IMPRESSION') AS impressions,
+               count(*) FILTER (WHERE kind = 'TAP') AS taps,
+               count(*) FILTER (WHERE kind = 'ADD_TO_CART') AS added,
+               count(*) FILTER (WHERE kind = 'ORDERED') AS ordered
+        FROM recommendation_events
+        WHERE restaurant_id = ${restaurantId}::uuid
+          AND business_date BETWEEN ${from}::date AND ${to}::date
+        GROUP BY 1, 2`,
+      // Per layer and dish, plus one row for all of them (both columns null) with the orders.
+      this.prisma.$queryRaw<
+        { layer: Layer | null; item_id: string | null; revenue: bigint; orders: bigint }[]
+      >`
+        SELECT e.layer::text AS layer, e.item_id, sum(oi.line_total) AS revenue,
+               count(DISTINCT oi.order_id) AS orders
+        FROM recommendation_events e JOIN order_items oi ON oi.id = e.order_item_id
+        WHERE e.restaurant_id = ${restaurantId}::uuid AND e.kind = 'ORDERED'
           AND e.business_date BETWEEN ${from}::date AND ${to}::date
-        GROUP BY 1`,
-      this.prisma.$queryRaw<(SuggestionRow & { item_id: string; name: string })[]>`
-        SELECT e.item_id, i.name,
-               count(*) FILTER (WHERE e.kind = 'IMPRESSION') AS impressions,
-               count(*) FILTER (WHERE e.kind = 'TAP') AS taps,
-               count(*) FILTER (WHERE e.kind = 'ADD_TO_CART') AS added,
-               count(*) FILTER (WHERE e.kind = 'ORDERED') AS ordered,
-               coalesce(sum(oi.line_total) FILTER (
-                 WHERE e.kind = 'ORDERED' AND oi.state NOT IN ('REJECTED', 'CANCELLED', 'VOIDED')
-               ), 0) AS revenue
-        FROM recommendation_events e
-        JOIN items i ON i.id = e.item_id
-        LEFT JOIN order_items oi ON oi.id = e.order_item_id
-        WHERE e.restaurant_id = ${restaurantId}::uuid
-          AND e.business_date BETWEEN ${from}::date AND ${to}::date
-        GROUP BY 1, 2
-        ORDER BY ordered DESC, revenue DESC, 2`,
-      this.prisma.$queryRaw<{ orders: bigint; with_suggestion: bigint }[]>`
-        SELECT (SELECT count(*) FROM orders
-                WHERE restaurant_id = ${restaurantId}::uuid
-                  AND business_date BETWEEN ${from}::date AND ${to}::date) AS orders,
-               (SELECT count(DISTINCT oi.order_id)
-                FROM recommendation_events e JOIN order_items oi ON oi.id = e.order_item_id
-                WHERE e.restaurant_id = ${restaurantId}::uuid AND e.kind = 'ORDERED'
-                  AND oi.state NOT IN ('REJECTED', 'CANCELLED', 'VOIDED')
-                  AND e.business_date BETWEEN ${from}::date AND ${to}::date) AS with_suggestion`,
+          AND oi.state NOT IN ('REJECTED', 'CANCELLED', 'VOIDED')
+        GROUP BY GROUPING SETS ((1, 2), ())`,
+      this.prisma.$queryRaw<{ orders: bigint }[]>`
+        SELECT count(*) AS orders FROM orders
+        WHERE restaurant_id = ${restaurantId}::uuid
+          AND business_date BETWEEN ${from}::date AND ${to}::date`,
     ]);
+    const revenueOf = (match: (row: (typeof revenueRows)[number]) => boolean) =>
+      revenueRows
+        .filter((row) => row.item_id !== null && match(row))
+        .reduce((sum, row) => sum + row.revenue, 0n);
+    const sumOf = (rows: readonly (typeof countRows)[number][]): Omit<SuggestionRow, 'revenue'> =>
+      rows.reduce(
+        (sum, row) => ({
+          impressions: sum.impressions + row.impressions,
+          taps: sum.taps + row.taps,
+          added: sum.added + row.added,
+          ordered: sum.ordered + row.ordered,
+        }),
+        { impressions: 0n, taps: 0n, added: 0n, ordered: 0n },
+      );
     const layers = (['RULE', 'LEARNED', 'BEST_SELLER'] as const satisfies readonly Layer[]).map(
-      (layer) => ({ layer, ...suggestionFigures(layerRows.find((row) => row.layer === layer)) }),
-    );
-    const all = layerRows.reduce<SuggestionRow>(
-      (sum, row) => ({
-        impressions: sum.impressions + row.impressions,
-        taps: sum.taps + row.taps,
-        added: sum.added + row.added,
-        ordered: sum.ordered + row.ordered,
-        revenue: sum.revenue + row.revenue,
+      (layer) => ({
+        layer,
+        ...suggestionFigures({
+          ...sumOf(countRows.filter((row) => row.layer === layer)),
+          revenue: revenueOf((row) => row.layer === layer),
+        }),
       }),
-      { impressions: 0n, taps: 0n, added: 0n, ordered: 0n, revenue: 0n },
     );
+    const itemIds = [...new Set(countRows.map((row) => row.item_id))];
+    const names = new Map(
+      (
+        await this.prisma.item.findMany({
+          where: { id: { in: itemIds } },
+          select: { id: true, name: true },
+        })
+      ).map((item) => [item.id, item.name]),
+    );
+    const items = itemIds
+      .map((itemId) => ({
+        itemId,
+        name: names.get(itemId) ?? '',
+        ...suggestionFigures({
+          ...sumOf(countRows.filter((row) => row.item_id === itemId)),
+          revenue: revenueOf((row) => row.item_id === itemId),
+        }),
+      }))
+      .sort(
+        (a, b) =>
+          b.ordered - a.ordered || b.revenue - a.revenue || a.name.localeCompare(b.name, 'en-IN'),
+      );
+    const overall = revenueRows.find((row) => row.layer === null && row.item_id === null);
     return {
       ...range,
       layers,
-      items: itemRows.map((row) => ({
-        itemId: row.item_id,
-        name: row.name,
-        ...suggestionFigures(row),
-      })),
+      items,
       totals: {
-        ...suggestionFigures(all),
+        ...suggestionFigures({ ...sumOf(countRows), revenue: overall?.revenue ?? 0n }),
         orders: num(orderRow[0]?.orders),
-        ordersWithSuggestion: num(orderRow[0]?.with_suggestion),
+        ordersWithSuggestion: num(overall?.orders),
       },
     };
   }

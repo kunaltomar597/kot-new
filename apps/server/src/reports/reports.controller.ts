@@ -3,6 +3,7 @@ import {
   type CancellationReportResponse,
   type DiscountReportResponse,
   type GstSummaryResponse,
+  InvoiceRegisterQuery,
   type InvoiceRegisterResponse,
   type ItemSalesResponse,
   type KitchenReportResponse,
@@ -175,9 +176,10 @@ export class ReportsController {
   @RequireCapability('REPORTS_VIEW_EXPORT')
   register(
     @Req() request: AuthenticatedRequest,
-    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+    @Query(new ZodValidationPipe(InvoiceRegisterQuery)) query: InvoiceRegisterQuery,
   ): Promise<InvoiceRegisterResponse> {
-    return this.reports.register(restaurantOf(request), range);
+    const { from, to, offset, limit } = query;
+    return this.reports.register(restaurantOf(request), { from, to }, { offset, limit });
   }
 
   /** RPT-017: a stamped, audited CSV. Cashiers may export their own shift report only. */
