@@ -1,0 +1,34 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "batteryPercent": {
+        "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+      },
+      "charging": { "type": ["boolean", "null"] },
+      "network": { "type": "string", "enum": ["WIFI", "ETHERNET", "CELLULAR", "NONE", "OTHER"] },
+      "rssi": {
+        "anyOf": [{ "type": "integer", "minimum": -127, "maximum": 0 }, { "type": "null" }]
+      },
+      "appVersion": { "type": "string", "minLength": 1, "maxLength": 40 }
+    },
+    "required": ["batteryPercent", "charging", "network", "rssi"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "batteryPercent": {
+        "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+      },
+      "charging": { "type": ["boolean", "null"] },
+      "network": { "type": "string", "enum": ["WIFI", "ETHERNET", "CELLULAR", "NONE", "OTHER"] },
+      "rssi": {
+        "anyOf": [{ "type": "integer", "minimum": -127, "maximum": 0 }, { "type": "null" }]
+      },
+      "appVersion": { "type": "string", "minLength": 1, "maxLength": 40 }
+    },
+    "required": ["batteryPercent", "charging", "network", "rssi"],
+    "additionalProperties": false
+  }
+}

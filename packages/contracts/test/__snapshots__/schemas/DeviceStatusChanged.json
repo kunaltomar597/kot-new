@@ -38,7 +38,8 @@
             "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
           },
           "online": { "type": "boolean" },
-          "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+          "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "charging": { "type": "boolean" }
         },
         "required": ["deviceId", "deviceType", "online"]
       }
@@ -92,7 +93,8 @@
             "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
           },
           "online": { "type": "boolean" },
-          "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+          "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "charging": { "type": "boolean" }
         },
         "required": ["deviceId", "deviceType", "online"],
         "additionalProperties": false

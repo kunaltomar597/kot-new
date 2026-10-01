@@ -1926,6 +1926,97 @@
         "x-requirements": ["WTR-006", "NTF-004"]
       }
     },
+    "/api/v1/devices/current/health": {
+      "post": {
+        "operationId": "reportDeviceHealth",
+        "summary": "An app reports its battery, charging, connection and version",
+        "description": "TAB-015, NTF-003: shown on the dashboard; a table tablet or kitchen screen at or below `devices.lowBatteryAlertPercent` and not charging alerts the managers once, cleared when it charges or recovers. Not for pagers (they report over MQTT).",
+        "tags": ["devices"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/DeviceHealthRequest" } }
+          }
+        },
+        "responses": {
+          "204": { "description": "Recorded." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "A pager.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["TAB-015", "NTF-003", "MGR-006"]
+      }
+    },
+    "/api/v1/devices/current/kiosk-exit": {
+      "post": {
+        "operationId": "exitKiosk",
+        "summary": "A manager lets staff out of a table tablet's kiosk mode with their PIN",
+        "description": "TAB-001, AUTH-009: checks the PIN of an active manager or the Owner (failures count towards their lock-out) and audits the exit (TABLET_KIOSK_EXITED). Only table tablets.",
+        "tags": ["devices"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/KioskExitRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Allowed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/KioskExitResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet, or not a manager.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "423": {
+            "description": "The manager's login is locked.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many attempts from this tablet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["TAB-001", "AUTH-013", "AUD-001"]
+      }
+    },
     "/api/v1/devices/current/recommendations": {
       "get": {
         "operationId": "getTableRecommendations",
@@ -2220,6 +2311,48 @@
         },
         "x-capability": "DEVICE",
         "x-requirements": ["TAB-004", "AUTH-009"]
+      }
+    },
+    "/api/v1/devices/current/table": {
+      "get": {
+        "operationId": "getTabletTable",
+        "summary": "This table tablet's table: the open session, if any, and the idle screen's promotions",
+        "description": "TAB-002, TAB-003, AUTH-009: the tablet unlocks while its table has an open session and shows its idle screen otherwise. It reads again when its table opens, closes, changes state or moves, and when the manager moves the tablet. Only table tablets.",
+        "tags": ["devices"],
+        "responses": {
+          "200": {
+            "description": "The table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TabletTableView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The tablet is not bound to a table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["TAB-002", "TAB-003", "AUTH-009"]
       }
     },
     "/api/v1/devices/pair": {
@@ -9909,6 +10042,7 @@
   },
   "components": {
     "schemas": {
+      "AccentColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
       "Address": {
         "type": "object",
         "properties": {
@@ -11430,6 +11564,22 @@
         "required": ["challenge", "expiresAt"],
         "additionalProperties": false
       },
+      "DeviceHealthRequest": {
+        "type": "object",
+        "properties": {
+          "batteryPercent": {
+            "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+          },
+          "charging": { "type": ["boolean", "null"] },
+          "network": { "$ref": "#/components/schemas/NetworkKind" },
+          "rssi": {
+            "anyOf": [{ "type": "integer", "minimum": -127, "maximum": 0 }, { "type": "null" }]
+          },
+          "appVersion": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "required": ["batteryPercent", "charging", "network", "rssi"],
+        "additionalProperties": false
+      },
       "DeviceKeyAlgorithm": { "type": "string", "enum": ["Ed25519", "ES256"] },
       "DeviceListResponse": {
         "type": "object",
@@ -11497,7 +11647,8 @@
               "deviceId": { "$ref": "#/components/schemas/Id" },
               "deviceType": { "$ref": "#/components/schemas/DeviceType" },
               "online": { "type": "boolean" },
-              "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+              "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "charging": { "type": "boolean" }
             },
             "required": ["deviceId", "deviceType", "online"],
             "additionalProperties": false
@@ -11590,6 +11741,16 @@
           "batteryPercent": {
             "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
           },
+          "charging": { "type": ["boolean", "null"] },
+          "network": {
+            "anyOf": [{ "$ref": "#/components/schemas/NetworkKind" }, { "type": "null" }]
+          },
+          "rssi": {
+            "anyOf": [
+              { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
           "firmwareVersion": { "type": ["string", "null"] },
           "serial": { "type": ["string", "null"] },
           "revokedAt": {
@@ -11609,6 +11770,9 @@
           "appVersion",
           "connected",
           "batteryPercent",
+          "charging",
+          "network",
+          "rssi",
           "firmwareVersion",
           "serial",
           "revokedAt"
@@ -12679,6 +12843,32 @@
         "required": ["station", "tickets", "recentlyBumped", "settings", "serverTime"],
         "additionalProperties": false
       },
+      "KioskExitRequest": {
+        "type": "object",
+        "properties": {
+          "staffId": { "$ref": "#/components/schemas/Id" },
+          "pin": { "$ref": "#/components/schemas/Pin" }
+        },
+        "required": ["staffId", "pin"],
+        "additionalProperties": false
+      },
+      "KioskExitResponse": {
+        "type": "object",
+        "properties": {
+          "approver": {
+            "type": "object",
+            "properties": {
+              "id": { "$ref": "#/components/schemas/Id" },
+              "displayName": { "type": "string" }
+            },
+            "required": ["id", "displayName"],
+            "additionalProperties": false
+          },
+          "exitedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["approver", "exitedAt"],
+        "additionalProperties": false
+      },
       "KitchenReportResponse": {
         "type": "object",
         "properties": {
@@ -13480,6 +13670,10 @@
         },
         "required": ["pager", "lowBatteryPercent"],
         "additionalProperties": false
+      },
+      "NetworkKind": {
+        "type": "string",
+        "enum": ["WIFI", "ETHERNET", "CELLULAR", "NONE", "OTHER"]
       },
       "NotificationEventType": {
         "type": "string",
@@ -15936,6 +16130,9 @@
           "contact": { "$ref": "#/components/schemas/RestaurantContact" },
           "businessHours": { "$ref": "#/components/schemas/BusinessHours" },
           "logoPhotoId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "accentColor": {
+            "anyOf": [{ "$ref": "#/components/schemas/AccentColor" }, { "type": "null" }]
+          },
           "timeZone": { "type": "string" },
           "businessDayCutoff": { "$ref": "#/components/schemas/TimeOfDay" },
           "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
@@ -15952,6 +16149,7 @@
           "contact",
           "businessHours",
           "logoPhotoId",
+          "accentColor",
           "timeZone",
           "businessDayCutoff",
           "updatedAt"
@@ -17841,6 +18039,48 @@
         ],
         "additionalProperties": false
       },
+      "TabletTableView": {
+        "type": "object",
+        "properties": {
+          "tableId": { "$ref": "#/components/schemas/Id" },
+          "label": { "type": "string" },
+          "state": {
+            "type": "string",
+            "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"]
+          },
+          "session": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "openedAt": { "$ref": "#/components/schemas/Timestamp" },
+                  "covers": {
+                    "anyOf": [
+                      { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["id", "openedAt", "covers"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "promotions": {
+            "type": "object",
+            "properties": {
+              "show": { "type": "boolean" },
+              "itemIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
+            },
+            "required": ["show", "itemIds"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["tableId", "label", "state", "session", "promotions"],
+        "additionalProperties": false
+      },
       "TaxComponentCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{0,9}$" },
       "TaxComponentInput": {
         "type": "object",
@@ -18044,6 +18284,9 @@
           "contact": { "$ref": "#/components/schemas/RestaurantContact" },
           "businessHours": { "$ref": "#/components/schemas/BusinessHours" },
           "logoPhotoId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "accentColor": {
+            "anyOf": [{ "$ref": "#/components/schemas/AccentColor" }, { "type": "null" }]
+          },
           "businessDayCutoff": { "$ref": "#/components/schemas/BusinessDayCutoff" },
           "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
         },

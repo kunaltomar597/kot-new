@@ -612,6 +612,14 @@ export const en = {
     notConnected: 'Not connected',
     unpairedBadge: 'Unpaired',
     battery: 'Battery {percent}%',
+    batteryCharging: 'Battery {percent}%, charging',
+    network: {
+      WIFI: 'On Wi-Fi',
+      ETHERNET: 'On a network cable',
+      CELLULAR: 'On mobile data',
+      NONE: 'No network',
+      OTHER: 'Other network',
+    },
     forTable: 'Table {table}',
     forStation: 'Station: {station}',
     allStations: 'All stations',
@@ -1679,6 +1687,10 @@ export const en = {
       cutoffValue: '{time}: sales before then count for the day before',
       logo: 'Logo',
       noLogo: 'No logo',
+      accent: 'Tablet accent colour',
+      accentHint:
+        'As #RRGGBB, for example #B4232A, for the table tablets’ buttons. Leave it empty for the standard colour.',
+      accentStandard: 'Standard',
       logoAlt: 'The restaurant’s logo',
       saved: 'The profile is saved.',
       dialogTitle: 'Change the profile',
@@ -1791,6 +1803,7 @@ export const en = {
       EMAIL_INVALID: 'Use an email address like owner@example.com.',
       HOURS_INVALID: 'Give an opening and a closing time that differ.',
       CUTOFF_INVALID: 'Use a time before 12:00.',
+      ACCENT_INVALID: 'Use # and six hex digits, like #B4232A.',
       LEGAL_NAME_REQUIRED: 'Give the legal name.',
       LINE1_REQUIRED: 'Give the address.',
       CITY_REQUIRED: 'Give the city.',
@@ -2050,6 +2063,7 @@ export const en = {
     },
     devices: {
       lowBatteryAlertPercent: 'Tablet and kitchen screen low battery at',
+      offlineAlertSeconds: 'Tablet or kitchen screen offline alert after',
     },
     orders: {
       specialInstructionsMaxLength: 'Longest special instruction',
@@ -2183,6 +2197,8 @@ export const en = {
     devices: {
       lowBatteryAlertPercent:
         'Battery level at or below which a table tablet or kitchen screen raises a low-battery alert.',
+      offlineAlertSeconds:
+        'A table tablet or kitchen screen not connected for this long alerts the managers (0: never; our default).',
     },
     orders: {
       specialInstructionsMaxLength:

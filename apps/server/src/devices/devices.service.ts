@@ -9,6 +9,7 @@ import {
   type DeviceTokenResponse,
   type DeviceView,
   deviceTokenMessage,
+  NetworkKind,
   type PairDeviceRequest,
   type PairedDevice,
   type PairingCodeResponse,
@@ -130,6 +131,9 @@ function view(device: DeviceRow, connected: ReadonlySet<string>): DeviceView {
       device.status === 'ACTIVE' &&
       (device.type === 'PAGER' ? device.online : connected.has(device.id)),
     batteryPercent: device.batteryPercent,
+    charging: device.charging,
+    network: NetworkKind.safeParse(device.network).data ?? null,
+    rssi: device.rssi,
     firmwareVersion: device.firmwareVersion,
     serial: device.serial,
     revokedAt: device.revokedAt?.toISOString() ?? null,

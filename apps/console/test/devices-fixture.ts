@@ -41,6 +41,9 @@ export function deviceView(overrides: Partial<DeviceView> = {}): DeviceView {
     appVersion: '1.4.0',
     connected: true,
     batteryPercent: null,
+    charging: null,
+    network: null,
+    rssi: null,
     firmwareVersion: null,
     serial: null,
     revokedAt: null,
@@ -59,7 +62,8 @@ export function deviceList(): { devices: DeviceView[] } {
         tableId: null,
         appVersion: null,
       }),
-      deviceView(),
+      // The tablet reports its health (TAB-015).
+      deviceView({ batteryPercent: 42, charging: true, network: 'WIFI', rssi: -60 }),
       deviceView({
         id: KDS_TANDOOR,
         type: 'KDS',

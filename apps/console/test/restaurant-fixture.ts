@@ -25,6 +25,7 @@ export function profileView(overrides: Partial<RestaurantProfile> = {}): Restaur
       { day: 'SAT', start: '11:00', end: '01:00' },
     ],
     logoPhotoId: null,
+    accentColor: null,
     timeZone: 'Asia/Kolkata',
     businessDayCutoff: '04:00',
     updatedAt: AT,

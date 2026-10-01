@@ -181,6 +181,21 @@ export function RestaurantScreen() {
                 t('restaurantPage.profile.cutoffValue', { time: profile.businessDayCutoff }),
               ],
               [
+                t('restaurantPage.profile.accent'),
+                profile.accentColor === null ? (
+                  t('restaurantPage.profile.accentStandard')
+                ) : (
+                  <span className="accent-swatch">
+                    <span
+                      className="accent-swatch__colour"
+                      style={{ background: profile.accentColor }}
+                      aria-hidden="true"
+                    />
+                    {profile.accentColor}
+                  </span>
+                ),
+              ],
+              [
                 t('restaurantPage.profile.logo'),
                 profile.logoPhotoId === null ? (
                   t('restaurantPage.profile.noLogo')

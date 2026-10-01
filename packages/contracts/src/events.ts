@@ -192,6 +192,8 @@ export const DeviceStatusChanged = event(
     deviceType: DeviceType,
     online: z.boolean(),
     batteryPercent: z.int().min(0).max(100).optional(),
+    /** On charge (apps' health reports): a charging device is not low on battery. */
+    charging: z.boolean().optional(),
   }),
 );
 

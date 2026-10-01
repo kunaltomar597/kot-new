@@ -270,6 +270,7 @@ function DeviceRow({
   const binding = bindingText(bindingOf(device, names), t);
   const details = [
     device.serial === null ? undefined : t('devices.serial', { serial: device.serial }),
+    !active || device.network === null ? undefined : t(`devices.network.${device.network}`),
     device.appVersion === null
       ? undefined
       : t('devices.appVersion', { version: device.appVersion }),
@@ -308,7 +309,11 @@ function DeviceRow({
             </Badge>
           )}
           {active && device.batteryPercent !== null ? (
-            <Badge tone="neutral">{t('devices.battery', { percent: device.batteryPercent })}</Badge>
+            <Badge tone="neutral">
+              {device.charging === true
+                ? t('devices.batteryCharging', { percent: device.batteryPercent })
+                : t('devices.battery', { percent: device.batteryPercent })}
+            </Badge>
           ) : null}
         </p>
         {details.length === 0 ? null : <p className="staff-row__contact">{details.join(' · ')}</p>}

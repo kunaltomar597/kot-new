@@ -1644,3 +1644,17 @@ body {
   font-weight: var(--rp-font-weight-semibold);
   overflow-wrap: anywhere;
 }
+
+/* The tablets' accent colour on the Restaurant page (P3-01a). */
+.accent-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rp-space-2);
+}
+
+.accent-swatch__colour {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: var(--rp-radius-sm);
+  border: 1px solid var(--rp-color-border);
+}
