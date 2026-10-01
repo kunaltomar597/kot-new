@@ -70,3 +70,8 @@ entrypoint = "./dist/functions/submit-order/index.js"
 [functions.order-status]
 verify_jwt = false
 entrypoint = "./dist/functions/order-status/index.js"
+
+# The restaurant's local server: checked by its credential, not a Supabase JWT (ADR-0015).
+[functions.server]
+verify_jwt = false
+entrypoint = "./dist/functions/server/index.js"

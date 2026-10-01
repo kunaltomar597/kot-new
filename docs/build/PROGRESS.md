@@ -134,7 +134,10 @@ What exists:
     rules, retention) on PostgreSQL, also run against local Supabase in CI.
   - The diners' edge functions (P5-02a): `qr-menu`, `submit-order` (the restaurant's own line
     check, rate limits per table and per browser, idempotent) and `order-status`. They are
-    bundled for Deno and smoke-tested there; the expiry job runs every minute. 106 tests in all.
+    bundled for Deno and smoke-tested there; the expiry job runs every minute.
+  - The local server's function `server` (P5-02b): a Realtime session, presence with the QR
+    settings, menu publishing, the tables with their code hashes, pickup and status reports.
+    124 tests in all, 3 of them under Deno.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
@@ -181,8 +184,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-02b Relay functions for local servers (session, presence, publishing, pickup), then P5-03 to
-  P5-06.
+- P5-03 Sync agent in the local server (outbox to the relay, pickup, status, presence), then P5-04
+  to P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -306,7 +309,7 @@ Recommended next WPs (dependencies met):
 
 - [x] P5-01 Relay database, RLS, isolation tests (deploying to Supabase: manual task 20)
 - [x] P5-02a Relay functions for diners (menu, submit order, order status, expiry)
-- [ ] P5-02b Relay functions for local servers (session, presence, publishing, pickup)
+- [x] P5-02b Relay functions for local servers (session, presence, publishing, pickup)
 - [ ] P5-03 Sync agent
 - [ ] P5-04 QR tokens and table tents
 - [ ] P5-05 Next.js QR menu site
@@ -583,6 +586,37 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-02b), design in ADR-0015:
+
+335. The local server's side is one function, `server`, with routes for session, presence, menu,
+     tables, orders and an order's status. Every call carries the restaurant's credential, checked
+     against its hash; the function then acts as `relay_writer` for that restaurant only.
+336. Realtime sessions:
+     - an HS256 JWT signed with the project's JWT secret (`RELAY_JWT_SECRET`, optional), with the
+       role `relay_server` and the tenant, lasting an hour;
+     - without the secret, the answer is 503 `REALTIME_NOT_CONFIGURED` and the sync agent polls
+       `server/orders`.
+       A move to asymmetric signing keys only would need an ES256 signer.
+337. Presence (every `qr.presenceIntervalSeconds`) carries the `qr.*` settings, so the relay
+     enforces the restaurant's values without another call. It answers with the relay's clock so
+     the server can spot a skew.
+338. Menu versions only grow, one publication per restaurant at a time.
+     - The same version with the same document is a replay (an outbox retry).
+     - An older version, or the same version with a different document, is refused with
+       `STALE_MENU_VERSION` and the latest version.
+339. Tables are sent as the full list, with each QR token's SHA-256 in hex.
+     - Tables left out go out of service; nothing is deleted.
+     - A table or code listed twice is a 400. A hash another restaurant already has is a 409.
+340. Pickup (polling) lists the submitted orders still inside their pickup time, oldest first, at
+     most 100, without prices or browser ids.
+341. Status reports:
+     - receiving an order past its pickup time marks it EXPIRED and answers 410 `ORDER_EXPIRED`,
+       so the restaurant rejects it (QR-007);
+     - a move the rules forbid is 409 `INVALID_STATUS_CHANGE`.
+342. Transactions follow postgres.js's rule: a failed statement fails the transaction even when
+     caught; recovering needs `Tx.savepoint`. The Node test adapter enforces the same rule, so a
+     test fails where Supabase would.
 
 Decided 2026-10-02 (P5-02a), design in ADR-0015:
 
@@ -1766,6 +1800,56 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
 
 ## Session log (newest first)
 
+### 2026-10-02: P5-02b Relay functions for local servers (P5-02 done)
+
+Built:
+
+- Contracts (`@rp/contracts/relay`):
+  - `RelayCredential`, `TokenHash`, `QrRelaySettings`;
+  - presence, session, menu publishing and table sync requests and responses;
+  - `QrPickupOrder` and `QrPickupResponse`;
+  - `UpdateQrOrderRequest` and its response;
+  - six routes, `SERVER_CREDENTIAL`.
+- Relay:
+  - `src/server.ts`, a router (`serveRoutes`) with the six routes;
+  - `src/jwt.ts` (HS256 with WebCrypto);
+  - `Tx.savepoint` on both drivers;
+  - a 413 for bodies over 8 MB;
+  - the `server` entry and its `config.toml` block.
+- Manual task 20: `RELAY_JWT_SECRET`.
+
+Tests:
+
+- relay `server-functions.test.ts` 17:
+  - credentials: unknown, revoked, suspended, a table token in its place;
+  - presence and settings;
+  - publishing: new, replay, stale, invalid, own restaurant only;
+  - tables: regenerated code, left out, duplicates, own restaurant only;
+  - pickup;
+  - status: steps, rejection reason, received too late, another restaurant;
+  - Realtime token signature and claims, and 503 without a secret.
+- `deno-smoke.test.ts` adds the `server` function under Deno: presence, publish, tables, pickup,
+  receive, and receiving too late through the savepoint.
+- contracts `relay.test.ts` 4: the settings match the registry's limits; token and credential
+  sizes; no prices or table in a diner's order.
+
+Gotchas:
+
+- postgres.js remembers the first failed statement of a transaction and rethrows it at the end,
+  even if the code caught it. Only `sql.savepoint()` recovers.
+- `ROLLBACK TO SAVEPOINT` sent as SQL does not help there. The Deno smoke test caught it: the
+  late-receive path answered 500 on Deno and 410 on Node.
+- OpenAPI paths use `{orderId}`, not `:orderId`, so look them up converted.
+- Fixed a flaky "socket hang up" in server tests.
+  - Seen in full checks: about one run in three while the relay suite ran alongside, failing a
+    different test each time.
+  - Cause: supertest listened on the IPv6 wildcard `[::]:P` for each request, then connected to
+    `127.0.0.1:P`. On macOS another process can hold `127.0.0.1:P` or `0.0.0.0:P` at the same
+    time (a test PostgreSQL, a Deno function), so the request reached that process instead.
+  - Fix: server and Control Plane test apps now always listen on `127.0.0.1:0`, and the `listen`
+    option is gone. Deno functions bind `127.0.0.1` under `RELAY_PORT`. Tests turn keep-alive off.
+  - Result: 8 of 8 stress runs clean.
+
 ### 2026-10-02: P5-02a Relay functions for diners
 
 Built:
@@ -1872,8 +1956,7 @@ Gotchas:
   could reveal that a row exists.
 
 - In one full `pnpm check` run, `recommendations-performance.int.test.ts` failed with "socket hang
-  up": another package's PostgreSQL cluster was starting at the same time. It passed alone and on
-  the next full run. If it repeats, give that file its own Vitest pool.
+  up". It was a port collision, found and fixed in P5-02b.
 
 Not verified here: the `relay-supabase` job (Docker is not running on this Mac, and nothing can be
 pushed yet), and the `supabase_admin` password of the CLI stack. Both get checked on the first

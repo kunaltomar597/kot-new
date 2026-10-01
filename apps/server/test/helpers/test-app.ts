@@ -48,8 +48,6 @@ export async function createTestApp(options: {
   }[];
   /** Runs before start-up hooks, e.g. to subscribe test consumers to the event bus. */
   beforeInit?: (app: INestApplication) => void;
-  /** Listens on a random localhost port (Socket.io clients need a real port). */
-  listen?: boolean;
 }): Promise<INestApplication> {
   const config = testConfig({ databaseUrl: options.databaseUrl, ...options.config });
   let builder = Test.createTestingModule({
@@ -69,7 +67,11 @@ export async function createTestApp(options: {
   configureApp(app);
   options.beforeInit?.(app);
   await app.init();
-  if (options.listen === true) await app.listen(0, '127.0.0.1');
+  // Always on a port of its own at 127.0.0.1. Left alone, supertest listens on the IPv6 wildcard
+  // for each request and then connects to 127.0.0.1, where another process (a test database,
+  // a relay function under Deno) may hold the same port number: macOS lets a wildcard and a
+  // specific address share it, and the request then ends in "socket hang up".
+  await app.listen(0, '127.0.0.1');
   return app;
 }
 
@@ -78,7 +80,7 @@ export function httpServer(app: INestApplication): Server {
   return app.getHttpServer() as Server;
 }
 
-/** The base URL of an app created with `listen: true` (`https:` when it serves TLS). */
+/** The base URL of a test app (`https:` when it serves TLS). */
 export function appUrl(app: INestApplication): string {
   const server: unknown = app.getHttpServer();
   const address = httpServer(app).address();

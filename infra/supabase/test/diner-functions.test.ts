@@ -15,6 +15,7 @@ import { submitOrder } from '../src/submit-order.js';
 import { IDS, POS_ONLY, qrMenuDocument } from './helpers/qr-menu.js';
 import {
   edgeDatabase,
+  letExpire,
   lastSeen,
   newTableToken,
   openRelayDb,
@@ -382,18 +383,7 @@ describe('[QR-007] an order’s status', () => {
 
   it('reads EXPIRED as soon as the pickup time has passed', async () => {
     const { order: placed } = await accepted(order());
-    const client = await db.admin.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query('SET LOCAL session_replication_role = replica');
-      await client.query(
-        "UPDATE relay.qr_orders SET expires_at = now() - interval '1 second' WHERE id = $1",
-        [placed.id],
-      );
-      await client.query('COMMIT');
-    } finally {
-      client.release();
-    }
+    await letExpire(db, placed.id);
     const view = QrOrderView.parse(
       (await call(orderStatus, 'order-status', { query: `?id=${placed.id}` })).body,
     );

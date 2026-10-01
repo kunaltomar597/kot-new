@@ -15,6 +15,12 @@ export interface Tx {
     text: string,
     params?: readonly unknown[],
   ): Promise<Row[]>;
+  /**
+   * Runs `work` so that if it fails, only its own statements are undone and the transaction can
+   * go on. A failed statement outside one fails the whole transaction, even when caught (that is
+   * how postgres.js works, so it is the rule everywhere).
+   */
+  savepoint<T>(work: (tx: Tx) => Promise<T>): Promise<T>;
 }
 
 export interface RelayDatabase {
@@ -45,6 +51,14 @@ export async function actAsDiner(tx: Tx, scope: TableScope): Promise<void> {
   await tx.query('SET LOCAL ROLE relay_diner');
   await tx.query("SELECT set_config('request.jwt.claims', $1, true)", [
     JSON.stringify({ role: 'relay_diner', tenant_id: scope.tenantId, table_id: scope.tableId }),
+  ]);
+}
+
+/** From here on the transaction acts for the restaurant's local server (`relay_writer`). */
+export async function actAsServer(tx: Tx, tenantId: string): Promise<void> {
+  await tx.query('SET LOCAL ROLE relay_writer');
+  await tx.query("SELECT set_config('request.jwt.claims', $1, true)", [
+    JSON.stringify({ role: 'relay_writer', tenant_id: tenantId }),
   ]);
 }
 

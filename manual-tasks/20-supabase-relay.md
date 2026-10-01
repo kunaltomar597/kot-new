@@ -80,6 +80,16 @@ without a password; set one now.
    supabase secrets set --workdir infra RELAY_ALLOWED_ORIGINS='https://<qr-site-domain>'
    ```
 
+   For Realtime pickup of new orders (seconds instead of a polling interval), also give the
+   functions the project's JWT secret. Find it under **Project Settings → JWT Keys → Legacy JWT
+   Secret**. Copy it straight into the command; do not paste it anywhere else.
+
+   ```sh
+   supabase secrets set --workdir infra RELAY_JWT_SECRET='<legacy JWT secret>'
+   ```
+
+   Without it, local servers poll for new orders instead, which also works.
+
 2. Bundle the functions, then deploy them:
 
    ```sh
@@ -125,6 +135,7 @@ Supabase relay deployment
 - Exposed schemas exclude relay (dev/staging/prod): __/__/__
 - relay_edge login set and RELAY_DB_URL secret stored (dev/staging/prod): __/__/__
 - Functions deployed, RELAY_ALLOWED_ORIGINS set, qr-menu answers 404 for a made-up code: __/__/__
+- RELAY_JWT_SECRET set (Realtime) or left out (polling) (dev/staging/prod): __/__/__
 - relay-purge and relay-expire jobs present (dev/staging/prod): __/__/__
 - Anything that did not match these steps:
 ```

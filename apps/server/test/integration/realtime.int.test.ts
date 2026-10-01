@@ -74,7 +74,6 @@ beforeAll(async () => {
   app = await createTestApp({
     databaseUrl: database.url,
     overrides: [{ provide: REALTIME_OPTIONS, useValue: OPTIONS }],
-    listen: true,
   });
   prisma = app.get(PrismaService);
   bus = app.get(EventBus);
@@ -154,7 +153,6 @@ describe('[AUTH-007] [SEC-003] who may connect', () => {
   it('refuses connections while the database is unreachable, and the server still starts', async () => {
     const down = await createTestApp({
       databaseUrl: 'postgresql://postgres@127.0.0.1:1/none',
-      listen: true,
     });
     try {
       expect(down.get(EventBus).ready).toBe(false);
@@ -574,7 +572,6 @@ describe('[NFR-P11] server shutdown', () => {
     const other = await createTestApp({
       databaseUrl: database.url,
       config: { dataDir: app.get<AppConfig>(APP_CONFIG).dataDir },
-      listen: true,
     });
     const client = await RealtimeTestClient.connect(appUrl(other), auth(kit.deviceId));
     await other.close();

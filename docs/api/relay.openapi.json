@@ -8,7 +8,7 @@
   "servers": [
     { "url": "https://<project-ref>.supabase.co", "description": "The Supabase project in Mumbai" }
   ],
-  "tags": [{ "name": "qr" }],
+  "tags": [{ "name": "qr" }, { "name": "server" }],
   "paths": {
     "/functions/v1/order-status": {
       "get": {
@@ -86,6 +86,270 @@
         },
         "x-capability": "TABLE_TOKEN",
         "x-requirements": ["QR-001", "QR-002", "QR-008", "QR-014"]
+      }
+    },
+    "/functions/v1/server/menu": {
+      "put": {
+        "operationId": "publishQrMenu",
+        "summary": "Publish the QR menu",
+        "description": "A new version of the document the QR site shows and checks orders against (QR-003). The same version with the same document again is a replay; an older or different one is refused (`STALE_MENU_VERSION`, with `details.latest`).",
+        "tags": ["server"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PublishQrMenuRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published, or already published.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PublishQrMenuResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing, unknown or revoked credential, or the restaurant is suspended (`CREDENTIAL_REJECTED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Older than the latest publication.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SERVER_CREDENTIAL",
+        "x-requirements": ["QR-003", "MENU-006", "MENU-013"]
+      }
+    },
+    "/functions/v1/server/orders": {
+      "get": {
+        "operationId": "listQrOrdersForPickup",
+        "summary": "Diners’ orders waiting to be picked up",
+        "description": "Submitted orders still within their pickup time, oldest first, at most 100: the polling fallback to Realtime (QR-009). An order stays here until it is marked received or expires.",
+        "tags": ["server"],
+        "responses": {
+          "200": {
+            "description": "The orders.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/QrPickupResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing, unknown or revoked credential, or the restaurant is suspended (`CREDENTIAL_REJECTED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SERVER_CREDENTIAL",
+        "x-requirements": ["QR-009", "QR-007"]
+      }
+    },
+    "/functions/v1/server/orders/{orderId}/status": {
+      "post": {
+        "operationId": "updateQrOrder",
+        "summary": "What became of a diner’s order",
+        "description": "Received (with the local order), sent to the kitchen, rejected with the reason, or expired, and the kitchen’s item states (QR-007). An order past its pickup time cannot be received: it is marked expired and the answer is `ORDER_EXPIRED`, so the restaurant rejects it.",
+        "tags": ["server"],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateQrOrderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UpdateQrOrderResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing, unknown or revoked credential, or the restaurant is suspended (`CREDENTIAL_REJECTED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such order of this restaurant (`ORDER_NOT_FOUND`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The status cannot move that way (`INVALID_STATUS_CHANGE`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "410": {
+            "description": "Not picked up in time; now expired (`ORDER_EXPIRED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SERVER_CREDENTIAL",
+        "x-requirements": ["QR-007", "QR-009"]
+      }
+    },
+    "/functions/v1/server/presence": {
+      "post": {
+        "operationId": "reportRelayPresence",
+        "summary": "The local server is here, with the QR settings to enforce",
+        "description": "Sent every `qr.presenceIntervalSeconds` (QR-008). Without it for `qr.readOnlyAfterSeconds` the QR menu turns read-only. The settings take effect for the next order.",
+        "tags": ["server"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RelayPresenceRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Noted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RelayPresenceResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing, unknown or revoked credential, or the restaurant is suspended (`CREDENTIAL_REJECTED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SERVER_CREDENTIAL",
+        "x-requirements": ["QR-008", "QR-006", "QR-007"]
+      }
+    },
+    "/functions/v1/server/session": {
+      "post": {
+        "operationId": "openRelaySession",
+        "summary": "A short-lived token for the Realtime channel of new orders",
+        "description": "Signed for the role `relay_server` and the credential's restaurant, so the subscription sees only its own orders (QR-009). It expires within the hour; the sync agent renews it and polls `GET server/orders` meanwhile.",
+        "tags": ["server"],
+        "responses": {
+          "200": {
+            "description": "The token and what to subscribe to.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RelaySessionResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing, unknown or revoked credential, or the restaurant is suspended (`CREDENTIAL_REJECTED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "Realtime tokens are not set up for this relay (`REALTIME_NOT_CONFIGURED`); poll instead.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SERVER_CREDENTIAL",
+        "x-requirements": ["QR-009", "SEC-005", "QR-014"]
+      }
+    },
+    "/functions/v1/server/tables": {
+      "put": {
+        "operationId": "syncRelayTables",
+        "summary": "Keep the tables and their QR code hashes in step",
+        "description": "Every table of the restaurant with the SHA-256 of its QR token (QR-001). A new hash replaces the old one, so a regenerated code stops the old one at once; tables left out are taken out of service.",
+        "tags": ["server"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SyncRelayTablesRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "In step.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SyncRelayTablesResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing, unknown or revoked credential, or the restaurant is suspended (`CREDENTIAL_REJECTED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SERVER_CREDENTIAL",
+        "x-requirements": ["QR-001", "QR-010"]
       }
     },
     "/functions/v1/submit-order": {
@@ -665,6 +929,24 @@
         "required": ["clientLineId", "itemId", "quantity"],
         "additionalProperties": false
       },
+      "PublishQrMenuRequest": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "document": { "$ref": "#/components/schemas/QrMenuDocument" }
+        },
+        "required": ["version", "document"],
+        "additionalProperties": false
+      },
+      "PublishQrMenuResponse": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "replayed": { "type": "boolean" }
+        },
+        "required": ["version", "replayed"],
+        "additionalProperties": false
+      },
       "QrMenuDocument": {
         "type": "object",
         "properties": {
@@ -709,6 +991,18 @@
           "document": { "$ref": "#/components/schemas/QrMenuDocument" }
         },
         "required": ["table", "version", "readOnly", "pickupTimeoutSeconds", "document"],
+        "additionalProperties": false
+      },
+      "QrOrderParams": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["orderId"],
         "additionalProperties": false
       },
       "QrOrderStatus": {
@@ -869,6 +1163,139 @@
         "required": ["width", "height", "path"],
         "additionalProperties": false
       },
+      "QrPickupOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tableId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "lines": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrderLineRequest" }
+          },
+          "orderNote": { "type": ["string", "null"] },
+          "customerName": { "type": ["string", "null"] },
+          "menuVersion": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "tableId",
+          "idempotencyKey",
+          "lines",
+          "orderNote",
+          "customerName",
+          "menuVersion",
+          "submittedAt",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "QrPickupOrderInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tableId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "lines": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrderLineRequestInput" }
+          },
+          "orderNote": { "type": ["string", "null"] },
+          "customerName": { "type": ["string", "null"] },
+          "menuVersion": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "tableId",
+          "idempotencyKey",
+          "lines",
+          "orderNote",
+          "customerName",
+          "menuVersion",
+          "submittedAt",
+          "expiresAt"
+        ]
+      },
+      "QrPickupResponse": {
+        "type": "object",
+        "properties": {
+          "orders": { "type": "array", "items": { "$ref": "#/components/schemas/QrPickupOrder" } }
+        },
+        "required": ["orders"],
+        "additionalProperties": false
+      },
+      "QrPickupResponseInput": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/QrPickupOrderInput" }
+          }
+        },
+        "required": ["orders"]
+      },
+      "QrRelaySettings": {
+        "type": "object",
+        "properties": {
+          "submissionsPerWindow": { "type": "integer", "minimum": 1, "maximum": 50 },
+          "rateLimitWindowMinutes": { "type": "integer", "minimum": 1, "maximum": 120 },
+          "pickupTimeoutSeconds": { "type": "integer", "minimum": 15, "maximum": 600 },
+          "presenceIntervalSeconds": { "type": "integer", "minimum": 5, "maximum": 300 },
+          "readOnlyAfterSeconds": { "type": "integer", "minimum": 30, "maximum": 1800 }
+        },
+        "required": [
+          "submissionsPerWindow",
+          "rateLimitWindowMinutes",
+          "pickupTimeoutSeconds",
+          "presenceIntervalSeconds",
+          "readOnlyAfterSeconds"
+        ],
+        "additionalProperties": false
+      },
       "QrSubmitOrderRequest": {
         "type": "object",
         "properties": {
@@ -986,7 +1413,126 @@
         "required": ["clientLineId", "code", "message"],
         "additionalProperties": false
       },
-      "TableToken": { "type": "string", "pattern": "^[A-Za-z0-9_-]{22,128}$" }
+      "RelayCredential": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43,200}$" },
+      "RelayPresenceRequest": {
+        "type": "object",
+        "properties": {
+          "serverVersion": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "settings": { "$ref": "#/components/schemas/QrRelaySettings" }
+        },
+        "required": ["serverVersion", "settings"],
+        "additionalProperties": false
+      },
+      "RelayPresenceResponse": {
+        "type": "object",
+        "properties": {
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["serverTime"],
+        "additionalProperties": false
+      },
+      "RelaySessionResponse": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "token": { "type": "string", "minLength": 1 },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "realtime": {
+            "type": "object",
+            "properties": {
+              "schema": { "type": "string", "const": "relay" },
+              "table": { "type": "string", "const": "qr_orders" },
+              "filter": { "type": "string" }
+            },
+            "required": ["schema", "table", "filter"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["tenantId", "token", "expiresAt", "realtime"],
+        "additionalProperties": false
+      },
+      "RelayTable": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "tokenHash": {
+            "anyOf": [{ "$ref": "#/components/schemas/TokenHash" }, { "type": "null" }]
+          },
+          "active": { "type": "boolean" }
+        },
+        "required": ["tableId", "label", "tokenHash", "active"],
+        "additionalProperties": false
+      },
+      "SyncRelayTablesRequest": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "maxItems": 500,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RelayTable" }
+          }
+        },
+        "required": ["tables"],
+        "additionalProperties": false
+      },
+      "SyncRelayTablesResponse": {
+        "type": "object",
+        "properties": {
+          "withCode": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "deactivated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["withCode", "deactivated"],
+        "additionalProperties": false
+      },
+      "TableToken": { "type": "string", "pattern": "^[A-Za-z0-9_-]{22,128}$" },
+      "TokenHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+      "UpdateQrOrderRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["RECEIVED", "SENT_TO_KITCHEN", "REJECTED", "EXPIRED"]
+          },
+          "detail": { "$ref": "#/components/schemas/QrOrderStatusDetail" },
+          "localOrderId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["status"],
+        "additionalProperties": false
+      },
+      "UpdateQrOrderResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": { "$ref": "#/components/schemas/QrOrderStatus" }
+        },
+        "required": ["id", "status"],
+        "additionalProperties": false
+      }
     }
   }
 }

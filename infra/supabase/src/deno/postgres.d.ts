@@ -1,8 +1,9 @@
 // The part of postgres.js (npm:postgres, Unlicense) the relay's Deno entry uses. The module is
 // loaded by Deno at run time and never bundled (scripts/bundle-functions.mjs).
 declare module 'npm:postgres@3.4.7' {
-  interface TransactionSql {
+  export interface TransactionSql {
     unsafe(query: string, parameters?: unknown[]): Promise<object[]>;
+    savepoint<T>(work: (tx: TransactionSql) => Promise<T>): Promise<T>;
   }
   interface Sql {
     begin<T>(work: (tx: TransactionSql) => Promise<T>): Promise<T>;
