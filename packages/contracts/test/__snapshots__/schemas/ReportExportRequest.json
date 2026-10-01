@@ -19,7 +19,8 @@
           "KITCHEN",
           "TABLES",
           "RECOMMENDATIONS",
-          "AUDIT"
+          "AUDIT",
+          "SUSPICIOUS"
         ]
       },
       "from": {
@@ -63,7 +64,8 @@
           "KITCHEN",
           "TABLES",
           "RECOMMENDATIONS",
-          "AUDIT"
+          "AUDIT",
+          "SUSPICIOUS"
         ]
       },
       "from": {

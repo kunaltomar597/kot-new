@@ -97,6 +97,17 @@ describe('[WTR-006] [NFR-U04] what an alert says on the waiter app and the POS',
     expect(describeAlert(alert({ type: 'READY_NOT_COLLECTED', payload: {} }), t).detail).toBeNull();
   });
 
+  it('[AUD-006] tells the Owner how much the daily report flagged, and from which day', () => {
+    const report = alert({ type: 'SUSPICIOUS_ACTIVITY', tableLabel: null });
+    expect(
+      describeAlert({ ...report, payload: { businessDate: '2026-09-30', flags: 3 } }, t),
+    ).toEqual({
+      title: 'Suspicious activity to review',
+      detail: '3 things to review from 30-09-2026. See Reports, Suspicious activity.',
+    });
+    expect(describeAlert({ ...report, payload: { flags: 3 } }, t).detail).toBeNull();
+  });
+
   it('[PGR-013] says which device ran low or went offline', () => {
     const pager = { deviceType: 'PAGER', deviceName: 'Pager 3', online: true, batteryPercent: 12 };
     const device = alert({ type: 'DEVICE_LOW_BATTERY_OR_OFFLINE', tableLabel: null });

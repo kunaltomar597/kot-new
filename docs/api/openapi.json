@@ -1365,6 +1365,58 @@
         "x-requirements": ["BILL-007", "BILL-003", "AUD-001"]
       }
     },
+    "/api/v1/cash-drawer/open": {
+      "post": {
+        "operationId": "openCashDrawer",
+        "summary": "Open the cash drawer without a sale, with a reason",
+        "description": "BILL-016, AUD-006. The receipt printer kicks the drawer; an opening is audited (CASH_DRAWER_OPENED) and appears in the suspicious-activity report.",
+        "tags": ["payments"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OpenCashDrawerRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Whether the printer took the kick (only an opening is audited).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OpenCashDrawerResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "No bill printer is set, or no such printer.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-016", "AUD-006", "AUD-001"]
+      }
+    },
     "/api/v1/day-end": {
       "get": {
         "operationId": "previewDayEnd",
@@ -6956,6 +7008,66 @@
         },
         "x-capability": "REPORTS_VIEW_EXPORT",
         "x-requirements": ["RPT-003", "RPT-018"]
+      }
+    },
+    "/api/v1/reports/suspicious": {
+      "get": {
+        "operationId": "getSuspiciousActivityReport",
+        "summary": "Suspicious activity: voids and edits after printing, big discounts, and more",
+        "description": "RPT-014, AUD-006. Voids after the bill printed, bill edits after printing, discounts above the threshold, repeated reprints, cash variances above the threshold, items voided after the kitchen started, items sent but never on a settled bill, and no-sale drawer openings, each with the person it is about.",
+        "tags": ["reports"],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuspiciousActivityResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["RPT-014", "AUD-006", "RPT-018"]
       }
     },
     "/api/v1/reports/tables": {
@@ -13384,7 +13496,8 @@
           "DEVICE_LOW_BATTERY_OR_OFFLINE",
           "PRINTER_OFFLINE",
           "DISK_OR_BACKUP",
-          "LICENSE_STATE"
+          "LICENSE_STATE",
+          "SUSPICIOUS_ACTIVITY"
         ]
       },
       "NotifyManagerResponse": {
@@ -13424,6 +13537,26 @@
           "tableSessionId": { "$ref": "#/components/schemas/Id" },
           "orderId": { "$ref": "#/components/schemas/Id" }
         },
+        "additionalProperties": false
+      },
+      "OpenCashDrawerRequest": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 },
+          "printerId": { "$ref": "#/components/schemas/Id" }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "OpenCashDrawerResponse": {
+        "type": "object",
+        "properties": {
+          "opened": { "type": "boolean" },
+          "error": { "type": ["string", "null"] },
+          "printerId": { "$ref": "#/components/schemas/Id" },
+          "shiftId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["opened", "error", "printerId", "shiftId"],
         "additionalProperties": false
       },
       "OpenShiftRequest": {
@@ -15607,7 +15740,8 @@
           "KITCHEN",
           "TABLES",
           "RECOMMENDATIONS",
-          "AUDIT"
+          "AUDIT",
+          "SUSPICIOUS"
         ]
       },
       "ReportRangeQuery": {
@@ -16876,6 +17010,169 @@
             "required": ["status", "rejectedLines"],
             "additionalProperties": false
           }
+        ]
+      },
+      "SuspiciousActivityResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "thresholds": {
+            "type": "object",
+            "properties": {
+              "discountFlagBp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "cashVarianceFlagPaise": { "$ref": "#/components/schemas/Paise" },
+              "reprintFlagCount": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["discountFlagBp", "cashVarianceFlagPaise", "reprintFlagCount"],
+            "additionalProperties": false
+          },
+          "flags": { "type": "array", "items": { "$ref": "#/components/schemas/SuspiciousFlag" } },
+          "totals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": { "$ref": "#/components/schemas/SuspiciousKind" },
+                "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["kind", "count"],
+              "additionalProperties": false
+            }
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" },
+                "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["id", "name", "count"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["from", "to", "thresholds", "flags", "totals", "people"],
+        "additionalProperties": false
+      },
+      "SuspiciousFlag": {
+        "type": "object",
+        "properties": {
+          "flagId": { "type": "string" },
+          "kind": { "$ref": "#/components/schemas/SuspiciousKind" },
+          "at": { "$ref": "#/components/schemas/Timestamp" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "by": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "approvedBy": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "alsoBy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"],
+              "additionalProperties": false
+            }
+          },
+          "reason": { "type": ["string", "null"] },
+          "orderId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "invoiceId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "invoiceNumber": { "type": ["string", "null"] },
+          "kotNumber": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "item": { "type": ["string", "null"] },
+          "quantity": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "amount": {
+            "anyOf": [{ "$ref": "#/components/schemas/SignedPaise" }, { "type": "null" }]
+          },
+          "rateBp": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "count": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "flagId",
+          "kind",
+          "at",
+          "businessDate",
+          "by",
+          "approvedBy",
+          "alsoBy",
+          "reason",
+          "orderId",
+          "invoiceId",
+          "invoiceNumber",
+          "kotNumber",
+          "item",
+          "quantity",
+          "amount",
+          "rateBp",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "SuspiciousKind": {
+        "type": "string",
+        "enum": [
+          "VOID_AFTER_PRINT",
+          "EDIT_AFTER_PRINT",
+          "DISCOUNT_OVER_LIMIT",
+          "REPEATED_REPRINT",
+          "CASH_VARIANCE",
+          "CANCELLED_AFTER_PREP",
+          "SENT_NOT_BILLED",
+          "NO_SALE_DRAWER"
         ]
       },
       "SystemStatusResponse": {

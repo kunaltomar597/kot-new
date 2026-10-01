@@ -132,3 +132,26 @@ export const InvoicePaymentsView = z.object({
   tableClosed: z.boolean(),
 });
 export type InvoicePaymentsView = z.infer<typeof InvoicePaymentsView>;
+
+/**
+ * Open the cash drawer without a sale (BILL-016, AUD-006): the receipt printer kicks the drawer,
+ * and the opening is audited with the reason, so the suspicious-activity report lists it. Cash
+ * payments kick the drawer on their own (`bills.cashDrawerKick`).
+ */
+export const OpenCashDrawerRequest = z.strictObject({
+  reason: Reason,
+  /** The printer the drawer hangs on; the bill printer when left out. */
+  printerId: Id.optional(),
+});
+export type OpenCashDrawerRequest = z.infer<typeof OpenCashDrawerRequest>;
+
+/** Like printing a bill: a printer that cannot be reached is an answer, not an error. */
+export const OpenCashDrawerResponse = z.object({
+  opened: z.boolean(),
+  /** Why the printer did not take the kick; null when it did. */
+  error: z.string().nullable(),
+  printerId: Id,
+  /** The person's open shift, which the opening belongs to; null without one. */
+  shiftId: Id.nullable(),
+});
+export type OpenCashDrawerResponse = z.infer<typeof OpenCashDrawerResponse>;

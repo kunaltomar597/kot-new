@@ -195,6 +195,12 @@ export async function generateYear(
        WHERE i.restaurant_id = ${R} AND i.business_date >= '${firstDay}' AND i.status <> 'VOIDED'`,
     ],
     [
+      'settled invoices',
+      // Paid in full: settled, as the server does (the voided ones stay unpaid and unbilled).
+      `UPDATE invoices i SET status = 'SETTLED', settled_at = i.issued_at + interval '5 minutes'
+       WHERE i.restaurant_id = ${R} AND i.business_date >= '${firstDay}' AND i.status = 'ISSUED'`,
+    ],
+    [
       'discounts',
       `INSERT INTO discounts (id, restaurant_id, business_date, invoice_id, kind, rate_bp, amount,
                               reason, applied_by_id)

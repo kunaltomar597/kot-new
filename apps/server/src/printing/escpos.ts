@@ -425,3 +425,12 @@ export function renderBill(
   for (const text of particulars.footerLines) receipt.lines(wrap(text, width));
   return receipt.finish();
 }
+
+/**
+ * Opens the cash drawer wired to the receipt printer (BILL-016): a 50 ms pulse on drawer pin 2
+ * (`ESC p 0`), the connector almost every drawer uses. Nothing prints and no paper moves; a
+ * printer without a drawer ignores it.
+ */
+export function renderDrawerKick(): Uint8Array {
+  return Uint8Array.from([ESC, 0x70, 0x00, 0x19, 0xfa]);
+}

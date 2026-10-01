@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "VOID_AFTER_PRINT",
+      "EDIT_AFTER_PRINT",
+      "DISCOUNT_OVER_LIMIT",
+      "REPEATED_REPRINT",
+      "CASH_VARIANCE",
+      "CANCELLED_AFTER_PREP",
+      "SENT_NOT_BILLED",
+      "NO_SALE_DRAWER"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "VOID_AFTER_PRINT",
+      "EDIT_AFTER_PRINT",
+      "DISCOUNT_OVER_LIMIT",
+      "REPEATED_REPRINT",
+      "CASH_VARIANCE",
+      "CANCELLED_AFTER_PREP",
+      "SENT_NOT_BILLED",
+      "NO_SALE_DRAWER"
+    ]
+  }
+}

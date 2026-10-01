@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-01.
+Last updated: 2026-10-02.
 
 What exists:
 
@@ -156,7 +156,8 @@ What exists:
   each report as headline figures, a bar chart where one helps and tables, CSV export, and
   drill-down from a row to everything about its order (P4-05d, Recharts); export of every report
   as CSV, Excel or PDF (P4-06); the audit trail with filters, paging, export and the chain check
-  (P4-07a). 288 tests, and 23 Playwright steps.
+  (P4-07a); the Suspicious activity report and the POS shift screen's "Open the drawer (no sale)"
+  (P4-07b). 291 tests, and 23 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -171,7 +172,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-07b Suspicious-activity report with its daily job, and a no-sale drawer action to report.
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
@@ -286,7 +286,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-05d Reports area in the console with charts and drill-down
 - [x] P4-06 Report exports
 - [x] P4-07a Audit viewer and chain verification
-- [ ] P4-07b Suspicious-activity report, daily job and the S12 fraud fixture
+- [x] P4-07b Suspicious-activity report, daily job and the S12 fraud fixture
 
 ### Phase 5: QR menu and cloud relay
 
@@ -568,6 +568,50 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-07b):
+
+281. The suspicious-activity report (RPT-014, AUD-006, `GET /api/v1/reports/suspicious`, REPORTS_VIEW_EXPORT)
+     flags eight patterns, each with the person it is about:
+     - voided after the bill printed: a bill voided after it was printed, or an item cancelled or
+       voided after a printed bill carried it. "Printed" is read from the audit trail, because an
+       edited bill's next print is an original again;
+     - a printed bill edited under its number, with the change in its total;
+     - a discount strictly above `audit.discountFlagBp` of what it applied to (a flat discount as a
+       rate of the item's line, or of the bill after item discounts, rounded up), on bills that
+       count, as RPT-007 lists them;
+     - a kitchen ticket or bill printed again `audit.reprintFlagCount` times or more in the period
+       (new setting, default 2), about whoever reprinted it most (the latest on a tie), the others
+       listed with it;
+     - a shift closed more than `audit.cashVarianceFlagPaise` over or short, about the shift's
+       holder (a manager who closed it for them is listed too);
+     - an item voided after the kitchen started it;
+     - an item sent to the kitchen that is on no settled bill once its table has left, or, without a
+       table, once its business date is over; about whoever ordered it (or accepted a diner's
+       order). Combo parts are billed through the combo, so only whole lines count;
+     - the cash drawer opened without a sale.
+       One event can match two patterns (a cooking dish voided off a printed bill): they answer
+       different questions. Totals list every pattern, and the flags per person rank whose name keeps
+       coming up. A new index on `invoice_lines(order_item_id)` keeps one day instant.
+282. The daily report: every 15 minutes, for each restaurant with `audit.dailyReportEnabled`, the
+     business date before the current one is reported once. The report runs for that date, and an
+     audit entry `SUSPICIOUS_ACTIVITY_REPORTED` (no actor, on the reported date) records the counts
+     and is how the job knows the date is done. When anything is flagged, the Owner gets a
+     `SUSPICIOUS_ACTIVITY` alert with the counts. This is a new notification event, not in
+     Appendix C: to the Owner, on the dashboard and the Control Plane, no repeat, no escalation,
+     and editable like any rule. Days missed while the server was off are not reported afterwards;
+     the report screen still shows them.
+283. The cash drawer (BILL-016) is kicked with `ESC p 0` (pin 2, 50 ms) on the bill printer.
+     - Cash payments open it once the payment is committed, when `bills.cashDrawerKick` (new,
+       default on) and a bill printer are set. A retried request never kicks it again. A failure
+       only logs and marks the printer offline; the payment stands.
+     - "Open the drawer (no sale)" on the POS shift screen (`POST /api/v1/cash-drawer/open`,
+       BILL_PRINT_AND_PAYMENT: cashiers, managers, Owner; not waiters) asks for a reason and records
+       `CASH_DRAWER_OPENED` with the person's open shift.
+     - A printer that cannot be reached answers `opened: false` with the reason (as printing a bill
+       does), and nothing is recorded, because the drawer did not open.
+     - Drawers wired to pin 5 are left for the printer test (manual task 13), which says to report
+       one.
 
 Decided 2026-10-01 (P4-07a):
 
@@ -1426,6 +1470,48 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-07b Suspicious activity, the daily report and the cash drawer (P4 done)
+
+Built:
+
+- Contracts: `SUSPICIOUS_KINDS`, `SuspiciousFlag`, `SuspiciousActivityResponse` and
+  `getSuspiciousActivityReport`; `SUSPICIOUS` export kind; `OpenCashDrawerRequest` and `Response`
+  with `openCashDrawer`; the settings `audit.reprintFlagCount` and `bills.cashDrawerKick`; the
+  `SUSPICIOUS_ACTIVITY` alert type.
+- Domain: the factory rule and pager pattern for `SUSPICIOUS_ACTIVITY`.
+- Server: `SuspiciousActivityService` (eight queries over the audit trail, bills and shifts) with
+  its document for export; `SuspiciousActivityJob` (`DAILY_REPORT_OPTIONS`, off in tests);
+  `CashDrawerService` (kick, no-sale opening, kick after cash payments) with `renderDrawerKick`;
+  migration `20261001150000_suspicious_activity` (index on `invoice_lines.order_item_id`).
+- Console: `reports/SuspiciousReport.tsx` in the Controls group, with `flagSubject` and
+  `flagFigure` in `report-view.ts`; the no-sale card on the shift screen; the alert's detail in
+  `@rp/ordering` `describeAlert`.
+
+Tests:
+
+- Server `suspicious-activity.int.test.ts` 17. It is S12: one day with every pattern and the
+  people checked one by one. It also covers the thresholds as settings, waiting for the day to end
+  before calling an item unbilled, export, access, and the drawer (kick on cash, no sale audited,
+  unreachable printer, reason and rights). It covers the daily job too: off when turned off, once
+  per date, and the Owner's alert.
+- Unit tests for the kick bytes, the flag wording and the alert text.
+- Console tests for the report page and the no-sale card.
+- The year run (`RP_PERF=1`) now times the suspicious-activity report too. Its generator now
+  settles paid invoices, as the server does; before, every item looked unbilled. Over the year,
+  warm, the slowest parts are items never billed (2.0 s, a hash anti-join over the year's
+  invoice lines) and voids after print (0.4 s); one day takes about 30 ms in all, through the new
+  index.
+
+Gotchas:
+
+- An edited bill's `print_count` starts again at 0 (its next print is an original), so "was this
+  bill printed?" must be asked of the audit trail, not of the invoice row.
+- Await a supertest request's override token before building the request (as before).
+- A report's queries run one after another. Eight slow queries in parallel took most of the
+  10-connection pool, and a request waiting more than 5 s for a connection fails.
+
+Decisions: 281 to 283. Manual task 13 now checks the cash drawer.
 
 ### 2026-10-01: P4-07a Audit viewer and chain check
 

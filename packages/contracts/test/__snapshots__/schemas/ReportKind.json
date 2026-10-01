@@ -16,7 +16,8 @@
       "KITCHEN",
       "TABLES",
       "RECOMMENDATIONS",
-      "AUDIT"
+      "AUDIT",
+      "SUSPICIOUS"
     ]
   },
   "output": {
@@ -36,7 +37,8 @@
       "KITCHEN",
       "TABLES",
       "RECOMMENDATIONS",
-      "AUDIT"
+      "AUDIT",
+      "SUSPICIOUS"
     ]
   }
 }

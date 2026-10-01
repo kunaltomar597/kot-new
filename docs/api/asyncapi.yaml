@@ -1354,6 +1354,7 @@ components:
         - PRINTER_OFFLINE
         - DISK_OR_BACKUP
         - LICENSE_STATE
+        - SUSPICIOUS_ACTIVITY
     OrderApproved:
       type: object
       properties:

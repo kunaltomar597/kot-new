@@ -44,6 +44,7 @@ const REPORTS = [
   'kitchen',
   'tables',
   'recommendations',
+  'suspicious',
 ] as const;
 
 let database: TestDatabase;

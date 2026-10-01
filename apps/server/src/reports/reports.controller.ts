@@ -19,6 +19,7 @@ import {
   type ShiftReportResponse,
   type SourceSalesResponse,
   type StaffPerformanceResponse,
+  type SuspiciousActivityResponse,
   type TableReportResponse,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
@@ -29,6 +30,7 @@ import { OrderDrillDownService } from './order-drill-down.service.js';
 import { ReportExportService } from './report-export.service.js';
 import { ReportSuiteService } from './report-suite.service.js';
 import { ReportsService } from './reports.service.js';
+import { SuspiciousActivityService } from './suspicious-activity.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
   if (request.principal === undefined) throw authErrors.unauthenticated();
@@ -51,6 +53,7 @@ export class ReportsController {
     private readonly exports: ReportExportService,
     private readonly drillDowns: OrderDrillDownService,
     private readonly suite: ReportSuiteService,
+    private readonly suspicious: SuspiciousActivityService,
   ) {}
 
   @Get('sources')
@@ -123,6 +126,15 @@ export class ReportsController {
     @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
   ): Promise<ReprintReportResponse> {
     return this.suite.reprints(restaurantOf(request), range);
+  }
+
+  @Get('suspicious')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  suspiciousActivity(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<SuspiciousActivityResponse> {
+    return this.suspicious.report(restaurantOf(request), range);
   }
 
   @Get('sales')

@@ -10,6 +10,7 @@ import {
   Paise,
   PaymentMode,
   Role,
+  SignedPaise,
   Timestamp,
 } from './common.js';
 
@@ -207,6 +208,8 @@ export const ReportKind = z.enum([
   'RECOMMENDATIONS',
   /** The audit log (AUD-005), with the optional action and person filters below. */
   'AUDIT',
+  /** Suspicious activity (RPT-014, AUD-006). */
+  'SUSPICIOUS',
 ]);
 export type ReportKind = z.infer<typeof ReportKind>;
 
@@ -598,3 +601,76 @@ export const RecommendationReportResponse = z.object({
   }),
 });
 export type RecommendationReportResponse = z.infer<typeof RecommendationReportResponse>;
+
+// ---------------------------------------------------------------- suspicious activity (P4-07b)
+
+/**
+ * The patterns AUD-006 flags, in the order the report shows them:
+ * - VOID_AFTER_PRINT: a printed bill voided, or an item cancelled or voided after its bill printed;
+ * - EDIT_AFTER_PRINT: a printed bill edited under its number (BILL-010);
+ * - DISCOUNT_OVER_LIMIT: a discount above `audit.discountFlagBp` of what it applied to;
+ * - REPEATED_REPRINT: a kitchen ticket or bill printed again `audit.reprintFlagCount` times or more;
+ * - CASH_VARIANCE: a shift closed with more than `audit.cashVarianceFlagPaise` over or short;
+ * - CANCELLED_AFTER_PREP: an item voided after the kitchen started it;
+ * - SENT_NOT_BILLED: an item sent to the kitchen that is on no settled bill once its table or day
+ *   is over;
+ * - NO_SALE_DRAWER: the cash drawer opened without a sale (BILL-016).
+ */
+export const SUSPICIOUS_KINDS = [
+  'VOID_AFTER_PRINT',
+  'EDIT_AFTER_PRINT',
+  'DISCOUNT_OVER_LIMIT',
+  'REPEATED_REPRINT',
+  'CASH_VARIANCE',
+  'CANCELLED_AFTER_PREP',
+  'SENT_NOT_BILLED',
+  'NO_SALE_DRAWER',
+] as const;
+export const SuspiciousKind = z.enum(SUSPICIOUS_KINDS);
+export type SuspiciousKind = z.infer<typeof SuspiciousKind>;
+
+export const SuspiciousFlag = z.object({
+  /** Stable within the report, e.g. the audit entry, discount, shift or order item behind it. */
+  flagId: z.string(),
+  kind: SuspiciousKind,
+  at: Timestamp,
+  businessDate: IsoDate,
+  /** The person the flag is about: who voided, edited, discounted, reprinted most, closed the
+   * shift, ordered the unbilled item or opened the drawer. */
+  by: StaffRef,
+  approvedBy: StaffRef,
+  /** Everyone else involved, e.g. the others who reprinted the same bill. */
+  alsoBy: z.array(z.object({ id: Id, name: z.string() })),
+  reason: z.string().nullable(),
+  orderId: Id.nullable(),
+  invoiceId: Id.nullable(),
+  invoiceNumber: z.string().nullable(),
+  kotNumber: z.int().positive().nullable(),
+  item: z.string().nullable(),
+  quantity: Count.nullable(),
+  /** The money at stake: the value voided or discounted, the bill's change, the variance (short
+   * is negative). Null where there is none. */
+  amount: SignedPaise.nullable(),
+  /** A discount's rate of what it applied to, in basis points. */
+  rateBp: Count.nullable(),
+  /** How many times a document was printed again. */
+  count: Count.nullable(),
+});
+export type SuspiciousFlag = z.infer<typeof SuspiciousFlag>;
+
+/** RPT-014 / AUD-006: suspicious activity in a range, with the thresholds it used. */
+export const SuspiciousActivityResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  thresholds: z.object({
+    discountFlagBp: Count,
+    cashVarianceFlagPaise: Paise,
+    reprintFlagCount: z.int().positive(),
+  }),
+  flags: z.array(SuspiciousFlag),
+  /** Flags per pattern, every pattern listed. */
+  totals: z.array(z.object({ kind: SuspiciousKind, count: Count })),
+  /** Flags per person they are about, most first. */
+  people: z.array(z.object({ id: Id, name: z.string(), count: Count })),
+});
+export type SuspiciousActivityResponse = z.infer<typeof SuspiciousActivityResponse>;

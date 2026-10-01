@@ -10,6 +10,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { CashDrawerService } from './cash-drawer.service.js';
 import { ShiftsService } from './shifts.service.js';
 
 export type ParsedPayments = ReturnType<typeof RecordPaymentsRequest.parse>;
@@ -38,6 +39,7 @@ export class PaymentsService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly shifts: ShiftsService,
+    private readonly drawer: CashDrawerService,
   ) {}
 
   async record(
@@ -62,7 +64,8 @@ export class PaymentsService {
       }
     }
 
-    return this.prisma.transaction(async (tx) => {
+    // Cash just taken opens the drawer (BILL-016); a retried request took none.
+    const recorded = await this.prisma.transaction(async (tx) => {
       await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${request.idempotencyKey}, 0))`;
       const previous = await tx.idempotencyRecord.findUnique({
         where: {
@@ -81,7 +84,7 @@ export class PaymentsService {
             'This key was used for different payments. Use a new key for new payments.',
           );
         }
-        return this.view(tx, principal.restaurantId, invoiceId);
+        return { view: await this.view(tx, principal.restaurantId, invoiceId), tookCash: false };
       }
 
       await tx.$queryRaw`SELECT 1 AS locked FROM invoices WHERE id = ${invoiceId}::uuid FOR UPDATE`;
@@ -187,8 +190,13 @@ export class PaymentsService {
           expiresAt: new Date(now.getTime() + IDEMPOTENCY_DAYS * 86_400_000),
         },
       });
-      return { ...(await this.view(tx, principal.restaurantId, invoiceId)), tableClosed };
+      return {
+        view: { ...(await this.view(tx, principal.restaurantId, invoiceId)), tableClosed },
+        tookCash: outcome.payments.some((payment) => payment.mode === 'CASH'),
+      };
     });
+    if (recorded.tookCash) this.drawer.kickForCash(principal.restaurantId);
+    return recorded.view;
   }
 
   paymentsOf(restaurantId: string, invoiceId: string): Promise<InvoicePaymentsView> {

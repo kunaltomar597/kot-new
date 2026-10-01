@@ -1,4 +1,5 @@
 import type { AlertView } from '@rp/contracts';
+import { formatDisplayDate } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 import { minutesSince } from './floor-view.js';
 
@@ -15,6 +16,8 @@ const textOf = (value: unknown): string | null =>
 
 const numberOf = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const namesOf = (value: unknown): string[] =>
   Array.isArray(value)
@@ -67,6 +70,12 @@ function detailOf(alert: AlertView, t: Translator): string | null {
     case 'BILL_REQUEST': {
       const source = textOf(payload.requestedFrom);
       return source === null ? null : t('alerts.billFrom', { source });
+    }
+    case 'SUSPICIOUS_ACTIVITY': {
+      const count = numberOf(payload.flags);
+      const date = textOf(payload.businessDate);
+      if (count === null || date === null || !ISO_DATE.test(date)) return null;
+      return t('alerts.suspicious', { count, date: formatDisplayDate(date) });
     }
     case 'DEVICE_LOW_BATTERY_OR_OFFLINE': {
       const device =

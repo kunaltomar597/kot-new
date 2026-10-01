@@ -50,6 +50,7 @@ describe('[NTF-002] [NTF-003] the Appendix C matrix', () => {
     ['PRINTER_OFFLINE', ['vikram', 'neha'], null, false, 'UNTIL_RESOLVED'],
     ['DISK_OR_BACKUP', ['asha', 'vikram'], null, false, 'DAILY'],
     ['LICENSE_STATE', ['asha', 'vikram'], null, false, 'DAILY'],
+    ['SUSPICIOUS_ACTIVITY', ['asha'], null, false, 'NONE'],
   ];
 
   it('covers every event type', () => {

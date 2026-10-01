@@ -24,7 +24,8 @@
           "DEVICE_LOW_BATTERY_OR_OFFLINE",
           "PRINTER_OFFLINE",
           "DISK_OR_BACKUP",
-          "LICENSE_STATE"
+          "LICENSE_STATE",
+          "SUSPICIOUS_ACTIVITY"
         ]
       },
       "lines": {
@@ -71,7 +72,8 @@
           "DEVICE_LOW_BATTERY_OR_OFFLINE",
           "PRINTER_OFFLINE",
           "DISK_OR_BACKUP",
-          "LICENSE_STATE"
+          "LICENSE_STATE",
+          "SUSPICIOUS_ACTIVITY"
         ]
       },
       "lines": {

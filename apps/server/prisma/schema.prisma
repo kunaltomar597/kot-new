@@ -1540,6 +1540,8 @@ model InvoiceLine {
 
   @@index([restaurantId])
   @@index([invoiceId])
+  /// The suspicious-activity report finds an item's bills (AUD-006).
+  @@index([orderItemId])
   @@map("invoice_lines")
 }
 

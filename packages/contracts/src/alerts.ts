@@ -20,6 +20,7 @@ export const NotificationEventType = z.enum([
   'PRINTER_OFFLINE',
   'DISK_OR_BACKUP',
   'LICENSE_STATE',
+  'SUSPICIOUS_ACTIVITY',
 ]);
 export type NotificationEventType = z.infer<typeof NotificationEventType>;
 

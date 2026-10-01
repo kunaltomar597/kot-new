@@ -18,6 +18,8 @@ export const NOTIFICATION_EVENTS = [
   'PRINTER_OFFLINE',
   'DISK_OR_BACKUP',
   'LICENSE_STATE',
+  /** The daily suspicious-activity report found something (AUD-006, P4-07b). */
+  'SUSPICIOUS_ACTIVITY',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
@@ -155,6 +157,8 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     'DAILY',
   ),
   LICENSE_STATE: rule(['OWNER', 'MANAGERS_ON_DUTY'], ['POS', 'DASHBOARD'], null, false, 'DAILY'),
+  // Not in Appendix C: AUD-006's daily report goes to the Owner only, once.
+  SUSPICIOUS_ACTIVITY: rule(['OWNER'], ['DASHBOARD', 'CONTROL_PLANE'], null, false, 'NONE'),
 };
 
 /** A manager's change to one event's rule (NTF-002); anything left out keeps the default. */
