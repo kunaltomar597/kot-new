@@ -30,15 +30,17 @@ Built in two parts:
   - `POST /api/v1/devices/current/kiosk-exit` checks a manager's PIN and audits the exit.
   - The restaurant's accent colour in the profile and on the Restaurant page; charging and the
     connection on the Devices page.
-- P3-01b The tablet app:
-  - a Kotlin lock-task module, with a device-admin receiver for `dpm set-device-owner` in
-    testing, and keep-screen-on;
-  - the idle screen with logo, accent colour and promotions, unlocked while a session is open;
-  - the wipe on close (cart, order history, feedback);
-  - health reports;
-  - the hidden gesture with manager tiles and a PIN pad;
-  - "Locate" (MGR-006, deferred from P4-02c);
-  - the Maestro flow and the kiosk procedure (manual task 12, P0-H3).
+- P3-01b The tablet app (done):
+  - `RpKioskModule.kt` and `RpDeviceAdminReceiver.kt` in `@rp/mobile-native`: lock-task mode,
+    keep-screen-on, health and a locate tone;
+  - `TabletSession` and `HealthReporter` in `@rp/mobile-core`;
+  - the idle screen with logo, accent colour and promotions, and the open table's screen;
+  - the wipe of `TABLET_GUEST_KEYS` on close;
+  - the hidden corner with manager tiles and a PIN pad;
+  - the Maestro flows and manual task 12 (P0-H3).
+- P3-01c "Locate" a tablet from the Devices page (MGR-006, a Should deferred from P4-02c): a
+  server endpoint and a device-room event; the tablet flashes and plays the tone already in its
+  kiosk module.
 
 ## P3-02 Service requests end to end
 

@@ -172,8 +172,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-01b Table tablet app (P3-01a done; its kiosk check needs P0-H3 on the chosen tablet, the
-  rest can be built).
+- P3-01c Locate a tablet (small; the tablet's tone is built).
+- P3-02 Service requests on the tablet (the server side is built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -260,7 +260,8 @@ Recommended next WPs (dependencies met):
 ### Phase 3: Table tablet and recommendations v1
 
 - [x] P3-01a Tablet server side: own table, health, offline, kiosk exit, accent colour
-- [ ] P3-01b Table tablet app: kiosk, idle and session screens, wipe, health, staff exit
+- [x] P3-01b Table tablet app: kiosk, idle and session screens, wipe, health, staff exit
+- [ ] P3-01c Locate a tablet from the dashboard (MGR-006, Should)
 - [ ] P3-02 Service requests on the tablet (server side in P2-06d)
 - [ ] P3-03 Customer ordering and waiter approval
 - [x] P3-04 Recommendation engine v1
@@ -569,6 +570,33 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-01b):
+
+290. The tablet locks itself in kiosk mode whenever it shows guests' screens (on start and when
+     staff mode ends) and keeps its screen on.
+     - As device owner it allows its own package to lock, takes away the lock screen and the status
+       bar, and stays on while plugged in.
+     - Without device owner, Android asks before pinning the screen, and the staff panel says so.
+     - Device owner comes from MDM in production and `dpm set-device-owner` in testing, through a
+       device-admin receiver in `@rp/mobile-native`.
+291. Staff mode: five taps within 3 s in the top-left corner (hidden from diners and screen
+     readers), a manager or the Owner from the sign-in tiles, and their PIN. The panel shows the
+     tablet, table, server, version, battery and kiosk state, and locks again after 10 minutes or
+     on "Lock the tablet again".
+292. The guests' data is wiped when the session the tablet last saw closes or another is found:
+     cart, orders and feedback under `TABLET_GUEST_KEYS`, plus the screens' state through
+     `guestEpoch`.
+     - The tablet keeps its table as last read, so a restart while the server is out of reach shows
+       the same screen (NFR-A01).
+     - The table is read again on its events, on reconnecting and when the manager moves the
+       tablet.
+293. Health is sampled every minute and sent when charging or the network kind changes, when the
+     battery moves by 5 points, and at least every 5 minutes (TAB-015).
+294. The idle screen rotates the pinned dishes every 8 s (photo, name, description and price) under
+     "Please wait to be seated"; the open table's screen welcomes the guests with their table and
+     number. The service buttons (P3-02) and ordering (P3-03) arrive there.
+295. "Locate" becomes its own small WP, P3-01c.
 
 Decided 2026-10-02 (P3-01a):
 
@@ -1502,6 +1530,41 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-01b Table tablet app (kiosk, session, health, staff exit)
+
+Built:
+
+- `@rp/mobile-native`: `RpKioskModule.kt` (lock-task, keep-screen-on, health, locate tone),
+  `RpDeviceAdminReceiver.kt` with its XML and strings, and `ACCESS_NETWORK_STATE`; `AndroidKiosk`.
+- `@rp/mobile-core`: `Kiosk`, `DeviceHealthSource`, `HealthReporter`, `TabletSession` (restore,
+  refresh on events, wipe of `TABLET_GUEST_KEYS`).
+- The tablet app:
+  - `TabletHome` (kiosk, health, accent theme, which screen), `IdleScreen`, `OpenTableScreen`,
+    `StaffPanel` with `StaffCorner`, `use-tablet.ts` and `branding.ts`;
+  - `Root` loads the kiosk module;
+  - Maestro: `pair-idle-menu` updated, `session-lifecycle` new, and `config.yaml`.
+- CI checks that the tablet's device-admin receiver is bound by the system only.
+- Manual task 12 (kiosk and session on the chosen tablet) is ready to run.
+
+Tests:
+
+- mobile-core `tablet.test.ts` 8 (idle and unlock, wipe on close and only then, a different
+  session after a restart, unbound and offline, restore, coalesced reads, health reports and
+  retries).
+- mobile-native `kiosk.test.ts` 3.
+- Tablet app 8: the smoke flow, the cached table after a restart, the idle screen with a promotion
+  and the kiosk locked, unlock and wipe on close, staff exit with a wrong and a right PIN,
+  unbound, and accent contrast.
+
+Gotchas:
+
+- An element with `importantForAccessibility="no-hide-descendants"` needs
+  `{ includeHiddenElements: true }` in Testing Library queries.
+- Fake events must match their contract (`TableOpened` needs covers and waiter), or the client
+  drops them as invalid.
+
+Decisions: 290 to 295.
 
 ### 2026-10-02: P3-01a Table tablet, server side
 

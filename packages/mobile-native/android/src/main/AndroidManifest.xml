@@ -11,6 +11,9 @@
   <uses-permission android:name="android.permission.VIBRATE" />
   <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+  <!-- The kind of network a tablet reports with its battery (P3-01b, TAB-015). -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
   <application>
     <service
       android:name="com.rp.mobilenative.RpAlertService"
@@ -24,5 +27,23 @@
     <receiver
       android:name="com.rp.mobilenative.RpAlertActionReceiver"
       android:exported="false" />
+
+    <!--
+      The table tablet's device owner (P3-01b, TAB-001): only the system may bind it; it does
+      nothing until MDM or `dpm set-device-owner` activates it.
+    -->
+    <receiver
+      android:name="com.rp.mobilenative.RpDeviceAdminReceiver"
+      android:description="@string/rp_device_admin_description"
+      android:exported="true"
+      android:label="@string/rp_device_admin_label"
+      android:permission="android.permission.BIND_DEVICE_ADMIN">
+      <meta-data
+        android:name="android.app.device_admin"
+        android:resource="@xml/rp_device_admin" />
+      <intent-filter>
+        <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

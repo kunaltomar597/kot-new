@@ -1,0 +1,7 @@
+# Maestro workspace settings for the table tablet's flows. The smoke flow pairs the tablet; the
+# session flow uses that pairing and needs a person at the POS to open and close the table.
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - pair-idle-menu
+    - session-lifecycle

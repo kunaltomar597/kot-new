@@ -7,3 +7,4 @@ export * from './outbox.js';
 export * from './server-trust.js';
 export * from './server-url.js';
 export * from './storage.js';
+export * from './tablet.js';

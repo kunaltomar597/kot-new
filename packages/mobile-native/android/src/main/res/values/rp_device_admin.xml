@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Shown only in Android's device-admin settings, which JavaScript's catalogue cannot reach
+  (NFR-L02 covers the app's own screens).
+-->
+<resources>
+  <string name="rp_device_admin_label">Restaurant table tablet</string>
+  <string name="rp_device_admin_description">Keeps the table tablet locked to the ordering app for diners.</string>
+</resources>
