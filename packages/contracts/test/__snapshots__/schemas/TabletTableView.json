@@ -50,9 +50,10 @@
           }
         },
         "required": ["show", "itemIds"]
-      }
+      },
+      "priceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] }
     },
-    "required": ["tableId", "label", "state", "session", "promotions"]
+    "required": ["tableId", "label", "state", "session", "promotions", "priceMode"]
   },
   "output": {
     "type": "object",
@@ -107,9 +108,10 @@
         },
         "required": ["show", "itemIds"],
         "additionalProperties": false
-      }
+      },
+      "priceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] }
     },
-    "required": ["tableId", "label", "state", "session", "promotions"],
+    "required": ["tableId", "label", "state", "session", "promotions", "priceMode"],
     "additionalProperties": false
   }
 }

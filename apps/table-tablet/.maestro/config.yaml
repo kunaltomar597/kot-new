@@ -6,3 +6,4 @@ executionOrder:
     - pair-idle-menu
     - session-lifecycle
     - service-requests
+    - order-from-table

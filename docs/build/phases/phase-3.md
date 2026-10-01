@@ -111,7 +111,13 @@ Built in three parts:
 - P3-03c The tablet's ordering: menu (categories, cards, filters, sorting, tax note), fuzzy search
   (fuse.js), item options, cart with review and estimated taxes, submit and "Waiting for waiter
   confirmation", live item statuses, "My order", out of stock live, "Please call a waiter"
-  offline, and "Approve at table".
+  offline, and "Approve at table" (done):
+  - `@rp/ordering` `tablet-menu.ts`: search with its own small matcher instead of fuse.js, filters,
+    sorting and the estimate (`computeBill`);
+  - the tablet's `MenuView`, `DishCard`, `CartView`, `MyOrders` and `use-cart.ts`, on
+    `OpenTableScreen` with the service buttons;
+  - `ItemSheet` moved to `@rp/mobile-shell` and shared with the waiter app;
+  - `TabletTableView.priceMode` and each order line's `endReason`.
 
 ## P3-04 Recommendation engine v1 (done)
 

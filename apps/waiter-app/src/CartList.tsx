@@ -1,6 +1,6 @@
 import { fontSize, fontWeight, radius, spacing } from '@rp/design-tokens';
 import { multiply } from '@rp/domain';
-import { useT } from '@rp/mobile-shell';
+import { INSTRUCTIONS_MAX, useT } from '@rp/mobile-shell';
 import {
   type CartLine,
   cartTotal,
@@ -11,7 +11,6 @@ import {
 } from '@rp/ordering';
 import { Button, Money, QuantityStepper, TextField, useTheme, weight } from '@rp/ui-native';
 import { StyleSheet, Text, View } from 'react-native';
-import { INSTRUCTIONS_MAX } from './ItemSheet';
 
 /**
  * The new items of a table before they are sent (WTR-003): quantity, a note for the kitchen and

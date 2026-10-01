@@ -95,6 +95,7 @@ function tableView(open: boolean, covers = 2): TabletTableView {
     state: open ? 'OCCUPIED' : 'FREE',
     session: open ? { id: SESSION_ID, openedAt: '2026-09-26T08:30:00.000Z', covers } : null,
     promotions: { show: true, itemIds: ['0199a0e0-0000-7000-8000-0000000081a2'] },
+    priceMode: 'TAX_EXCLUSIVE',
   };
 }
 

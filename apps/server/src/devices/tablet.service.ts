@@ -85,6 +85,7 @@ export class TabletService {
           ? null
           : { id: session.id, openedAt: session.openedAt.toISOString(), covers: session.covers },
       promotions: { show, itemIds: live.map((item) => item.id) },
+      priceMode: snapshot.get('billing.priceMode'),
     };
   }
 

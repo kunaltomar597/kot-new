@@ -1,0 +1,37 @@
+# Ordering from the table (P3-03c, TAB-005 to TAB-010, ORD-003, ORD-004): search the menu, add a
+# dish, send it, confirm it at the table with the waiter's PIN, and follow it to the kitchen.
+# Run on the paired tablet with its table open and the demo restaurant (Ravi, Waiter, PIN 4444):
+#   maestro test -e DISH="Dal Makhani" apps/table-tablet/.maestro/order-from-table.yaml
+appId: ${APP_ID}
+env:
+  APP_ID: in.rp.tablet.dev
+  DISH: Dal Makhani
+  WAITER_NAME: Ravi
+  PIN_DIGIT: '4'
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: menu-view
+    timeout: 180000
+- tapOn:
+    id: menu-search
+- inputText: ${DISH}
+- hideKeyboard
+- tapOn: ${DISH}.*
+- tapOn:
+    id: item-add
+- tapOn: Your order.*
+- assertVisible: Estimated GST
+- tapOn:
+    id: cart-send
+- assertVisible: Waiting for waiter confirmation
+- tapOn: 'Waiter: confirm here'
+- tapOn: ${WAITER_NAME}
+- repeat:
+    times: 4
+    commands:
+      - tapOn: ${PIN_DIGIT}
+- extendedWaitUntil:
+    visible: Received|Preparing|Ready|Served
+    timeout: 15000

@@ -1,6 +1,5 @@
 import type { MenuItem, MenuSnapshot } from '@rp/contracts';
 import { type ItemSelection, multiply, unitPriceOf, validateSelection } from '@rp/domain';
-import { useT } from '@rp/mobile-shell';
 import {
   comboOf,
   comboSlots,
@@ -20,25 +19,28 @@ import {
   TextField,
 } from '@rp/ui-native';
 import { useState } from 'react';
+import { useT } from './context.js';
 
 /** As long as the POS allows (ItemDialog). */
 export const INSTRUCTIONS_MAX = 200;
 
 /**
  * A dish's size, add-ons and combo parts, how many, and a note for the kitchen (WTR-003,
- * MENU-003 to MENU-005, MENU-012): the POS item dialog on the phone, with the same rules and
- * estimated price from `@rp/domain`.
+ * MENU-003 to MENU-005, MENU-012, TAB-008): the POS item dialog on the phone and the tablet, with
+ * the same rules and estimated price from `@rp/domain`. `addLabel` words the button for diners.
  */
 export function ItemSheet({
   menu,
   item,
   onClose,
   onAdd,
+  addLabel,
 }: {
   menu: MenuSnapshot;
   item: MenuItem;
   onClose: () => void;
   onAdd: (line: NewCartLine) => void;
+  addLabel?: string;
 }) {
   const t = useT();
   const def = selectable(menu, item);
@@ -80,7 +82,7 @@ export function ItemSheet({
             <Money paise={multiply(unitPrice, quantity)} size="lg" strong />
           )}
           <Button size="lg" testID="item-add" onPress={add} style={{ flex: 1 }}>
-            {t('pos.item.add')}
+            {addLabel ?? t('pos.item.add')}
           </Button>
         </>
       }
