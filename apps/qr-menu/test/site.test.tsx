@@ -5,6 +5,7 @@ import { en } from '@rp/i18n';
 import { IDS, MENU } from '@rp/ordering/testing';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { DishPhoto } from '../src/site/DishPhoto';
 import { I18nProvider } from '../src/site/i18n';
 import { Orders } from '../src/site/Orders';
 import { browserId, tableValue } from '../src/site/storage';
@@ -21,6 +22,39 @@ describe('[QR-013] what the browser may load', () => {
     expect(csp).toContain("connect-src 'self' https://abc.supabase.co");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).not.toMatch(/https:\/\/(?!abc\.supabase\.co)/);
+  });
+});
+
+describe('[MENU-008] [QR-012] a dish’s photo', () => {
+  const photo = {
+    photoId: IDS.dal,
+    sizes: [
+      { width: 160, height: 120, path: 'tenant/photo/160.webp' },
+      { width: 480, height: 360, path: 'tenant/photo/480.webp' },
+    ],
+  };
+  const base = 'https://abc.supabase.co/storage/v1/object/public/menu-photos';
+
+  it('lets the browser pick the size it needs, lazily, and says nothing to a screen reader', () => {
+    const { container } = render(
+      <DishPhoto photo={photo} base={base} sizes="4.5rem" className="qr-dish__photo" />,
+    );
+    const image = container.querySelector('img');
+    expect(image).toHaveAttribute('src', `${base}/tenant/photo/160.webp`);
+    expect(image).toHaveAttribute(
+      'srcset',
+      `${base}/tenant/photo/160.webp 160w, ${base}/tenant/photo/480.webp 480w`,
+    );
+    expect(image).toHaveAttribute('loading', 'lazy');
+    expect(image).toHaveAttribute('alt', '');
+    expect(image).toHaveAttribute('width', '160');
+  });
+
+  it('shows nothing without a photo or when the relay keeps none', () => {
+    const none = render(<DishPhoto photo={undefined} base={base} sizes="1rem" className="x" />);
+    expect(none.container).toBeEmptyDOMElement();
+    const off = render(<DishPhoto photo={photo} base={null} sizes="1rem" className="x" />);
+    expect(off.container).toBeEmptyDOMElement();
   });
 });
 

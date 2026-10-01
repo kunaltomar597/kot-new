@@ -19,6 +19,10 @@ import {
   UpdateQrServiceRequestResponse,
   QrSubmitOrderRequest,
   QrSubmitOrderResponse,
+  RelayPhotoParams,
+  RelayPhotoSweepRequest,
+  RelayPhotoSweepResponse,
+  RelayPhotoUploadResponse,
   RelayPresenceRequest,
   RelayPresenceResponse,
   RelaySessionResponse,
@@ -343,6 +347,41 @@ export const RELAY_ROUTES = [
       404: { description: 'No such request of this restaurant.', schema: ApiError },
       409: { description: 'The status cannot move that way.', schema: ApiError },
       410: { description: 'Not picked up in time; now expired.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'uploadRelayPhoto',
+    method: 'PUT',
+    path: '/functions/v1/server/photos/:photoId/:width',
+    summary: 'Store one size of a menu photo for the QR menu',
+    description:
+      'The body is the WebP file the local server made (P1-04), at most 2 MB. The relay stores it ' +
+      "under the restaurant's own folder and answers with the path the QR menu document names " +
+      '(MENU-008, QR-012).',
+    tags: ['server'],
+    requirements: ['MENU-008', 'QR-012', 'QR-014'],
+    capability: 'SERVER_CREDENTIAL',
+    request: { params: RelayPhotoParams },
+    responses: {
+      200: { description: 'Stored.', schema: RelayPhotoUploadResponse },
+      ...serverErrors,
+      413: { description: 'Larger than 2 MB.', schema: ApiError },
+      415: { description: 'Not a WebP image.', schema: ApiError },
+      503: { description: 'This relay takes no photos (`PHOTOS_OFF`).', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'sweepRelayPhotos',
+    method: 'POST',
+    path: '/functions/v1/server/photos/sweep',
+    summary: 'Say which photos the QR menu uses; old ones go after 90 days',
+    tags: ['server'],
+    requirements: ['MENU-008'],
+    capability: 'SERVER_CREDENTIAL',
+    request: { body: RelayPhotoSweepRequest },
+    responses: {
+      200: { description: 'Marked and swept.', schema: RelayPhotoSweepResponse },
+      ...serverErrors,
     },
   },
 ] as const satisfies readonly RouteDefinition<RelayAccess>[];

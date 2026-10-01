@@ -14,6 +14,16 @@ export interface FunctionContext {
    * secret); without it local servers poll instead (P5-02b).
    */
   readonly realtimeJwtSecret?: string | undefined;
+  /** Where menu photos are kept and served from (P5-03c); none means photos are not taken. */
+  readonly photos?: PhotoStorage | undefined;
+}
+
+/** The menu-photo bucket (Supabase Storage on the relay; memory in tests). */
+export interface PhotoStorage {
+  /** Where the site loads `path` from: `<publicBase>/<path>`. */
+  readonly publicBase: string;
+  put(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
+  remove(paths: readonly string[]): Promise<void>;
 }
 
 export type Handler = (request: Request, context: FunctionContext) => Promise<Response>;
@@ -165,6 +175,17 @@ export function serveRoutes(routes: readonly Route[]): Handler {
 
 /** The largest body a function reads: a menu of 1,000 dishes is well under 2 MB. */
 export const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+/** Reads a binary body of at most `maxBytes` (a photo); anything bigger is a 413. */
+export async function readBytes(request: Request, maxBytes: number): Promise<Uint8Array> {
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (declared > maxBytes) throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'The file is too large.');
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (bytes.length > maxBytes)
+    throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'The file is too large.');
+  if (bytes.length === 0) throw new HttpError(400, 'VALIDATION_FAILED', 'The file is empty.');
+  return bytes;
+}
 
 /** Reads and checks a JSON body; a bad one is a 400 with the problems, never the input. */
 export async function readBody<T>(request: Request, schema: z.ZodType<T>): Promise<T> {

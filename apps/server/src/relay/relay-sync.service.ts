@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import {
   Inject,
   Injectable,
@@ -6,9 +7,11 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
-import type { DomainEvent } from '@rp/contracts';
+import { type DomainEvent, PHOTO_WIDTHS } from '@rp/contracts';
 import type {
   QrMenuDocument,
+  QrPhoto,
+  QrPhotoSize,
   QrRecommendations,
   QrRelaySettings,
   RelayTable,
@@ -26,6 +29,7 @@ import { AppError } from '../errors/app-error.js';
 import { EventBus } from '../events/event-bus.js';
 import { tableTokenHash } from '../floor/table-qr.service.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
+import { PhotosService } from '../photos/photos.service.js';
 import { BestSellers } from '../recommendations/best-sellers.js';
 import { RecommendationRulesService } from '../recommendations/recommendation-rules.service.js';
 import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
@@ -80,6 +84,27 @@ const SyncState = z.object({
 type SyncState = z.infer<typeof SyncState>;
 const STATE_KEY = 'relay.sync';
 
+/** Which photos reached the relay's Storage (each size's path there), and the last sweep. */
+const PhotoState = z.object({
+  sent: z.record(
+    z.string(),
+    z.array(z.object({ width: z.int().positive(), path: z.string().min(1) })),
+  ),
+  sweptHash: z.string().nullable(),
+  sweptAt: z.iso.datetime().nullable(),
+});
+type PhotoState = z.infer<typeof PhotoState>;
+const PHOTO_STATE_KEY = 'relay.photos';
+/** The relay is told which photos are in use at least this often, so its sweep runs. */
+const PHOTO_SWEEP_EVERY_MS = 24 * 60 * 60 * 1000;
+/** After the relay says it takes no photos, ask again this much later. */
+const PHOTOS_OFF_RETRY_MS = 60 * 60 * 1000;
+/** Refusals of one photo (not of the call): the photo is left out, the menu still goes. */
+const PHOTO_REFUSALS = new Set([400, 413, 415]);
+
+const omit = <T>(record: Record<string, T>, key: string): Record<string, T> =>
+  Object.fromEntries(Object.entries(record).filter(([entry]) => entry !== key));
+
 const hashOf = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest('hex');
 
 /** QR settings the relay enforces (`qr.*`, QR-006 to QR-008). */
@@ -120,7 +145,8 @@ export function concernsRelay(event: DomainEvent): boolean {
  * the relay in step with this restaurant:
  * - presence every `qr.presenceIntervalSeconds`, with the QR settings;
  * - the tables and their QR code hashes, when they change;
- * - the QR menu (with live availability) as a new version, when it changes.
+ * - the QR menu (with live availability) as a new version, when it changes, with its dishes'
+ *   photos sent to the relay's Storage first (P5-03c).
  * What reached the relay is remembered by its hash, so a change made while offline is sent once
  * the relay answers again and nothing is ever dropped (NFR-A01). Menu, stock, settings and floor
  * events bring the next sync forward, so the QR page follows within seconds (MENU-006).
@@ -130,6 +156,9 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
   private readonly logger = new Logger(RelaySyncService.name);
   private readonly loop: PacedLoop;
   private unsubscribe: (() => void) | undefined;
+  /** Photos the relay refused (until restart), and when to ask again after PHOTOS_OFF. */
+  private readonly refusedPhotos = new Set<string>();
+  private photosOffUntil = 0;
   private state: Omit<RelaySyncStatus, 'configured'> = {
     credential: false,
     lastSuccessAt: null,
@@ -144,6 +173,7 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly menus: MenuPublishService,
+    private readonly photos: PhotosService,
     private readonly rules: RecommendationRulesService,
     private readonly bestSellers: BestSellers,
     private readonly events: EventBus,
@@ -292,6 +322,7 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
       if (error instanceof AppError && error.code === 'MENU_NOT_PUBLISHED') return saved;
       throw error;
     }
+    const qrMenu = qrChannelMenu(menu);
     const document: QrMenuDocument = {
       restaurantName: restaurant.displayName.slice(0, 120),
       ...(restaurant.accentColor !== null && { accentColor: restaurant.accentColor }),
@@ -299,9 +330,12 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
       instructionMaxLength: settings.get('orders.specialInstructionsMaxLength'),
       priceMode: settings.get('billing.priceMode'),
       serviceRequests: settings.get('qr.serviceRequests'),
-      menu: qrChannelMenu(menu),
-      // Photos are mirrored to the relay's Storage in P5-03c.
-      photos: [],
+      menu: qrMenu,
+      photos: await this.syncPhotos(
+        client,
+        restaurant.id,
+        qrMenu.items.flatMap((item) => (item.photoId === undefined ? [] : [item.photoId])),
+      ),
       recommendations: await this.recommendationsOf(restaurant, settings),
     };
     const hash = hashOf(document);
@@ -327,6 +361,96 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     const next = { ...saved, menuVersion: version, menuHash: hash };
     await this.writeState(next);
     return next;
+  }
+
+  /**
+   * MENU-008, QR-012: the QR dishes' photos in the relay's Storage. Each photo's WebP sizes go
+   * once (a photo never changes; a new one has a new id). The relay is told which photos are in
+   * use when that changes and once a day, so it removes the others' files 90 days later (BRD
+   * §9.3) and says which in-use ones it no longer has, to be sent again. Only photos the relay
+   * has are listed, so the QR page never shows a broken image.
+   */
+  private async syncPhotos(
+    client: RelayClient,
+    restaurantId: string,
+    wanted: readonly string[],
+  ): Promise<QrPhoto[]> {
+    if (Date.now() < this.photosOffUntil) return [];
+    const rows = await this.prisma.photo.findMany({
+      where: { restaurantId, id: { in: [...new Set(wanted)] } },
+      select: { id: true, storageKey: true, width: true, height: true },
+      orderBy: { id: 'asc' },
+    });
+    const state = await this.readPhotoState();
+    let changed = false;
+    try {
+      const inUse = rows.map((row) => row.id);
+      const hash = hashOf(inUse);
+      const sweepDue =
+        state.sweptAt === null || Date.now() - Date.parse(state.sweptAt) >= PHOTO_SWEEP_EVERY_MS;
+      if (hash !== state.sweptHash || sweepDue) {
+        const swept = await client.sweepPhotos({ inUse });
+        for (const photoId of swept.missing) state.sent = omit(state.sent, photoId);
+        state.sweptHash = hash;
+        state.sweptAt = new Date().toISOString();
+        changed = true;
+        if (swept.purged > 0) this.logger.log({ purged: swept.purged }, 'Old QR photos swept');
+      }
+      for (const row of rows) {
+        if (state.sent[row.id] !== undefined || this.refusedPhotos.has(row.id)) continue;
+        const sizes = await this.uploadPhoto(client, row);
+        if (sizes.length > 0) {
+          state.sent = { ...state.sent, [row.id]: sizes };
+          changed = true;
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof RelayError) || error.code !== 'PHOTOS_OFF') throw error;
+      this.logger.warn('The QR relay takes no photos; the QR menu goes without them');
+      this.photosOffUntil = Date.now() + PHOTOS_OFF_RETRY_MS;
+      return [];
+    } finally {
+      if (changed) await this.writePhotoState(state);
+    }
+    return rows.flatMap((row): QrPhoto[] => {
+      const sent = state.sent[row.id];
+      if (sent === undefined) return [];
+      // A photo narrower than a size was not enlarged: list each real width once (srcset).
+      const sizes = new Map<number, QrPhotoSize>();
+      for (const { width, path } of sent) {
+        const pixels = Math.min(width, row.width);
+        if (sizes.has(pixels)) continue;
+        const height = Math.max(1, Math.round((row.height * pixels) / row.width));
+        sizes.set(pixels, { width: pixels, height, path });
+      }
+      return [{ photoId: row.id, sizes: [...sizes.values()] }];
+    });
+  }
+
+  /** Each size of one photo on this PC to the relay; a size refused or missing is left out. */
+  private async uploadPhoto(
+    client: RelayClient,
+    row: { id: string; storageKey: string },
+  ): Promise<PhotoState['sent'][string]> {
+    const sizes: PhotoState['sent'][string] = [];
+    for (const width of PHOTO_WIDTHS) {
+      let file: Uint8Array<ArrayBuffer>;
+      try {
+        file = new Uint8Array(await readFile(this.photos.store.fileOf(row.storageKey, width)));
+      } catch {
+        continue;
+      }
+      try {
+        const { path } = await client.uploadPhoto(row.id, width, file);
+        sizes.push({ width, path });
+      } catch (error) {
+        if (!(error instanceof RelayError) || !PHOTO_REFUSALS.has(error.status ?? 0)) throw error;
+        this.logger.warn({ photoId: row.id, code: error.code }, 'The QR relay refused a photo');
+        this.refusedPhotos.add(row.id);
+        return [];
+      }
+    }
+    return sizes;
   }
 
   /**
@@ -388,6 +512,21 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     await this.prisma.systemMeta.upsert({
       where: { key: STATE_KEY },
       create: { key: STATE_KEY, value },
+      update: { value },
+    });
+  }
+
+  private async readPhotoState(): Promise<PhotoState> {
+    const row = await this.prisma.systemMeta.findUnique({ where: { key: PHOTO_STATE_KEY } });
+    const parsed = row === null ? undefined : PhotoState.safeParse(JSON.parse(row.value));
+    return parsed?.success === true ? parsed.data : { sent: {}, sweptHash: null, sweptAt: null };
+  }
+
+  private async writePhotoState(state: PhotoState): Promise<void> {
+    const value = JSON.stringify(state);
+    await this.prisma.systemMeta.upsert({
+      where: { key: PHOTO_STATE_KEY },
+      create: { key: PHOTO_STATE_KEY, value },
       update: { value },
     });
   }

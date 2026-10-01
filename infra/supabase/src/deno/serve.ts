@@ -1,6 +1,6 @@
 import postgres, { type TransactionSql } from 'npm:postgres@3.4.7';
 import type { RelayDatabase, Tx } from '../db.js';
-import type { Handler } from '../http.js';
+import type { Handler, PhotoStorage } from '../http.js';
 
 /** The part of the Deno runtime the entries use (Supabase Edge Functions run Deno 2). */
 declare const Deno: {
@@ -19,6 +19,39 @@ declare const Deno: {
  * project's JWT secret, for local servers' Realtime tokens (optional). RELAY_PORT is for running a
  * bundle under plain Deno (test/deno-smoke.test.ts); Supabase gives the port itself.
  */
+/**
+ * The menu-photo bucket in Supabase Storage, written with the service-role key that Supabase gives
+ * every edge function (inside the relay only; local servers never hold it, SEC-005). Paths never
+ * change for a photo, so the CDN may keep them for a year.
+ */
+function storage(url: string, key: string): PhotoStorage {
+  const bucket = `${url}/storage/v1/object`;
+  return {
+    publicBase: `${bucket}/public/menu-photos`,
+    async put(path, bytes, contentType) {
+      const response = await fetch(`${bucket}/menu-photos/${path}`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${key}`,
+          'content-type': contentType,
+          'cache-control': 'public, max-age=31536000, immutable',
+          'x-upsert': 'true',
+        },
+        body: bytes,
+      });
+      if (!response.ok) throw new Error(`Storage answered ${String(response.status)}`);
+    },
+    async remove(paths) {
+      const response = await fetch(`${bucket}/menu-photos`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ prefixes: paths }),
+      });
+      if (!response.ok) throw new Error(`Storage answered ${String(response.status)}`);
+    },
+  };
+}
+
 export function serve(handler: Handler): void {
   const url = Deno.env.get('RELAY_DB_URL');
   if (url === undefined || url === '') throw new Error('RELAY_DB_URL is not set');
@@ -37,8 +70,14 @@ export function serve(handler: Handler): void {
     transaction: (work) => sql.begin((transaction) => work(wrap(transaction))),
   };
   const realtimeJwtSecret = Deno.env.get('RELAY_JWT_SECRET');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const photos =
+    supabaseUrl === undefined || serviceKey === undefined
+      ? undefined
+      : storage(supabaseUrl.replace(/\/+$/, ''), serviceKey);
   const answer = (request: Request) =>
-    handler(request, { db, now: () => new Date(), allowedOrigins, realtimeJwtSecret });
+    handler(request, { db, now: () => new Date(), allowedOrigins, realtimeJwtSecret, photos });
   const port = Deno.env.get('RELAY_PORT');
   if (port === undefined) Deno.serve(answer);
   else Deno.serve({ port: Number(port), hostname: '127.0.0.1' }, answer);

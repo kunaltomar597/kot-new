@@ -6,6 +6,10 @@ import {
   QrServiceRequestPickupResponse,
   type UpdateQrServiceRequest,
   UpdateQrServiceRequestResponse,
+  type QrPhotoWidth,
+  type RelayPhotoSweepRequest,
+  RelayPhotoSweepResponse,
+  RelayPhotoUploadResponse,
   type RelayPresenceRequest,
   RelayPresenceResponse,
   RelaySessionResponse,
@@ -15,6 +19,14 @@ import {
   UpdateQrOrderResponse,
 } from '@rp/contracts/relay';
 import type { z } from 'zod';
+
+/** A file sent as it is, not as JSON. */
+class RawBody {
+  constructor(
+    readonly contentType: string,
+    readonly bytes: Uint8Array<ArrayBuffer>,
+  ) {}
+}
 
 /** A call to the relay that failed: its HTTP status and ApiError, or UNREACHABLE. */
 export class RelayError extends Error {
@@ -92,6 +104,24 @@ export class RelayClient {
     );
   }
 
+  /** MENU-008: one size of a menu photo, as the WebP file this PC made. */
+  uploadPhoto(
+    photoId: string,
+    width: QrPhotoWidth,
+    file: Uint8Array<ArrayBuffer>,
+  ): Promise<RelayPhotoUploadResponse> {
+    return this.call(
+      'PUT',
+      `photos/${encodeURIComponent(photoId)}/${String(width)}`,
+      RelayPhotoUploadResponse,
+      new RawBody('image/webp', file),
+    );
+  }
+
+  sweepPhotos(body: RelayPhotoSweepRequest): Promise<RelayPhotoSweepResponse> {
+    return this.call('POST', 'photos/sweep', RelayPhotoSweepResponse, body);
+  }
+
   private async call<S extends z.ZodType>(
     method: 'GET' | 'POST' | 'PUT',
     path: string,
@@ -99,14 +129,15 @@ export class RelayClient {
     body?: unknown,
   ): Promise<z.output<S>> {
     let response: Response;
+    const raw = body instanceof RawBody ? body : undefined;
     try {
       response = await this.fetch(`${this.options.baseUrl}/server/${path}`, {
         method,
         headers: {
           authorization: `Bearer ${this.options.credential}`,
-          ...(body !== undefined && { 'content-type': 'application/json' }),
+          ...(body !== undefined && { 'content-type': raw?.contentType ?? 'application/json' }),
         },
-        ...(body !== undefined && { body: JSON.stringify(body) }),
+        ...(body !== undefined && { body: raw?.bytes ?? JSON.stringify(body) }),
         signal: AbortSignal.timeout(this.options.timeoutMs),
       });
     } catch (error) {

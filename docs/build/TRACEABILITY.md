@@ -31,7 +31,7 @@ Must: 222 / 287 covered. Should: 9 / 24. Could: 0 / 7.
 - MENU-004 (M): apps/console/e2e/console.e2e.ts, apps/console/test/menu-editor.test.tsx, apps/console/test/menu-view.test.ts, apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts, packages/domain/test/menu-and-kot.test.ts, packages/ordering/test/line-check.test.ts, packages/ordering/test/reorder.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/ordering.test.tsx
 - MENU-005 (M): apps/console/test/menu-editor.test.tsx, apps/console/test/menu-view.test.ts, apps/server/test/integration/menu-publish.int.test.ts, apps/server/test/integration/orders.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts, packages/ordering/test/line-check.test.ts, packages/ordering/test/qr-menu.test.ts, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/ordering.test.tsx
 - MENU-006 (M): apps/console/test/menu-editor.test.tsx, apps/server/test/integration/menu-publish.int.test.ts, apps/server/test/integration/relay-sync.int.test.ts, apps/table-tablet/test/app.test.tsx, packages/contracts/test/menu-admin.test.ts, packages/mobile-core/test/mobile-core.test.ts, packages/mobile-core/test/order-outbox.test.ts, packages/ordering/test/qr-menu.test.ts, packages/ordering/test/reorder.test.ts
-- MENU-008 (M): apps/console/e2e/console.e2e.ts, apps/server/test/integration/photos.int.test.ts, apps/server/test/unit/photo-processing.test.ts
+- MENU-008 (M): apps/console/e2e/console.e2e.ts, apps/qr-menu/e2e/qr-menu.e2e.ts, apps/qr-menu/test/site.test.tsx, apps/server/test/integration/photos.int.test.ts, apps/server/test/integration/relay-sync.int.test.ts, apps/server/test/unit/photo-processing.test.ts, infra/supabase/test/server-functions.test.ts
 - MENU-009 (M): apps/console/test/menu-editor.test.tsx, apps/console/test/menu-view.test.ts, apps/server/test/integration/menu-admin.int.test.ts, apps/server/test/integration/orders.int.test.ts
 - MENU-010 (M): apps/console/test/menu-editor.test.tsx, apps/server/test/integration/menu-admin.int.test.ts, apps/server/test/integration/roles.int.test.ts
 - MENU-011 (M): apps/server/test/integration/menu-admin.int.test.ts, apps/server/test/integration/menu-import.int.test.ts, packages/contracts/test/menu-admin.test.ts, packages/domain/test/menu-import.test.ts
@@ -123,7 +123,7 @@ Must: 222 / 287 covered. Should: 9 / 24. Could: 0 / 7.
 - QR-009 (M): apps/server/test/integration/relay-orders.int.test.ts, infra/supabase/test/deno-smoke.test.ts, infra/supabase/test/server-functions.test.ts
 - QR-010 (M): apps/server/test/integration/relay-orders.int.test.ts
 - QR-011 (S): apps/qr-menu/e2e/qr-menu.e2e.ts, apps/server/test/integration/relay-orders.int.test.ts, infra/supabase/test/service-requests.test.ts, packages/ordering/test/relay-status.test.ts
-- QR-012 (M): apps/qr-menu/e2e/qr-menu.e2e.ts
+- QR-012 (M): apps/qr-menu/e2e/qr-menu.e2e.ts, apps/qr-menu/test/site.test.tsx, apps/server/test/integration/relay-sync.int.test.ts
 - QR-013 (M): apps/qr-menu/e2e/qr-menu.e2e.ts, apps/qr-menu/test/site.test.tsx
 - QR-014 (M): infra/supabase/test/diner-functions.test.ts, infra/supabase/test/isolation.test.ts, infra/supabase/test/server-functions.test.ts, infra/supabase/test/service-requests.test.ts
 - REC-001 (M): packages/domain/test/recommendations.test.ts, packages/ordering/test/qr-suggestions.test.ts

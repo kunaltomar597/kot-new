@@ -140,6 +140,31 @@ describe('[BRD §9.3] relay retention', () => {
     ]);
   });
 
+  it('forgets a photo a day after its files were swept, and keeps the others', async () => {
+    const photo = (purgedHoursAgo: number | null) => ({ id: randomUUID(), purgedHoursAgo });
+    const photos = [photo(null), photo(2), photo(30)];
+    await backdate(async (sql) => {
+      for (const { id, purgedHoursAgo } of photos) {
+        await sql(
+          `INSERT INTO relay.photos (tenant_id, photo_id, storage_path, content_type, removed_at,
+             purged_at)
+           VALUES ($1::uuid, $2::uuid, $1::text || '/' || $2::text, 'image/webp', now() - interval '100 days',
+             now() - make_interval(hours => $3::int))`,
+          [tenant.id, id, purgedHoursAgo],
+        );
+      }
+    });
+    const { rows } = await db.admin.query<{ photos: string }>('SELECT * FROM relay.purge()');
+    expect(Number(rows[0]?.photos)).toBe(1);
+    const left = await db.admin.query<{ photo_id: string }>(
+      'SELECT photo_id FROM relay.photos WHERE tenant_id = $1 AND photo_id = ANY($2::uuid[])',
+      [tenant.id, photos.map(({ id }) => id)],
+    );
+    expect(left.rows.map((row) => row.photo_id).sort()).toEqual(
+      [photos[0]?.id, photos[1]?.id].sort(),
+    );
+  });
+
   it('is run by the database itself, never by a relay or API role', async () => {
     for (const role of [...RELAY_ROLES, ...API_ROLES]) {
       const error = await refusal(

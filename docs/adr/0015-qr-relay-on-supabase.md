@@ -14,7 +14,8 @@ region: Postgres with RLS, Edge Functions for all writes, Realtime and Storage (
 SEC-005 and QR-014 set the security bar:
 
 - RLS on every table, deny by default.
-- Local servers use per-tenant credentials, never the service-role key.
+- Local servers use per-tenant credentials, never the service-role key. (Edge functions use it
+  for Storage only, to write menu photos; P5-03c.)
 - Browsers never write tables directly (QR-006).
 - An automated test proves that no QR code, token or credential of one restaurant can read or
   write another's menu or orders.
@@ -100,7 +101,7 @@ The Control Plane calls them through a provisioning edge function that holds its
 
 - orders 7 days after they were received or expired;
 - every menu snapshot but the latest after 1 day;
-- photo metadata 90 days after the photo was removed.
+- a photo's record a day after its files were swept (see Menu photos).
 
 pg_cron runs it hourly where the extension exists (Supabase). The relay is a transient queue; the
 local server stays the system of record (AUD-004 applies there).
@@ -150,6 +151,26 @@ sync agent (P5-03).
 - Transactions follow postgres.js's rule: a failed statement fails the transaction even when
   caught. Recovering needs `Tx.savepoint`, as when receiving an order too late marks it expired
   and keeps that. The Node test adapter enforces the same rule.
+
+### Menu photos (P5-03c)
+
+- The local server sends each QR dish's photo in its three WebP sizes (160, 480 and 960 px, made
+  on upload, P1-04) through `server`: `PUT photos/:photoId/:width`. The function checks the
+  credential, takes WebP files up to 2 MB only, and stores them in the public `menu-photos`
+  bucket under `<tenant>/<photo>/<width>.webp`. The path is the relay's choice, so a restaurant
+  can only ever write into its own folder (QR-014).
+- Writing to Storage needs the service-role key. Supabase gives it to every edge function
+  (`SUPABASE_SERVICE_ROLE_KEY`); the function uses it for Storage calls only, never for the
+  database, which stays behind the roles above. Local servers never hold it (SEC-005).
+- Photos never change (a new photo has a new id), so each is sent once and the CDN may keep it a
+  year. Only photos the relay has are listed in the menu document; the QR page loads them from
+  `photoBase`, which `qr-menu` returns. Without Storage (no key), uploads answer 503 `PHOTOS_OFF`
+  and the menu goes without photos.
+- `POST photos/sweep` gets the photos the menu uses now, when that changes and at least daily.
+  The others are marked removed; 90 days later their files are deleted through the Storage API
+  (Storage objects cannot be deleted from SQL) and `purged_at` is set. A photo used again within
+  the 90 days is restored; after that the sweep lists it as missing and the local server sends it
+  again.
 
 ### Tested on plain PostgreSQL, and on Supabase in CI
 

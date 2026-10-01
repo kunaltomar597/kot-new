@@ -8,6 +8,8 @@ import {
   QrPickupResponse,
   type QrRelaySettings,
   QrSubmitOrderResponse,
+  RelayPhotoSweepResponse,
+  RelayPhotoUploadResponse,
   RelayPresenceResponse,
   RelaySessionResponse,
   SyncRelayTablesResponse,
@@ -15,7 +17,7 @@ import {
   UpdateQrOrderResponse,
 } from '@rp/contracts/relay';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { FunctionContext, Handler } from '../src/http.js';
+import type { FunctionContext, Handler, PhotoStorage } from '../src/http.js';
 import { orderStatus } from '../src/order-status.js';
 import { qrMenu } from '../src/qr-menu.js';
 import { SESSION_SECONDS, server } from '../src/server.js';
@@ -39,6 +41,18 @@ import {
  */
 
 const JWT_SECRET = 'test-only-realtime-secret-0123456789abcdef';
+const bucket = new Map<string, Uint8Array>();
+const photoStorage: PhotoStorage = {
+  publicBase: 'https://cdn.example.invalid/storage/v1/object/public/menu-photos',
+  put(path, bytes) {
+    bucket.set(path, bytes);
+    return Promise.resolve();
+  },
+  remove(paths) {
+    for (const path of paths) bucket.delete(path);
+    return Promise.resolve();
+  },
+};
 let db: RelayDb;
 let context: FunctionContext;
 let a: SeededTenant;
@@ -59,6 +73,7 @@ beforeAll(async () => {
     now: () => new Date(),
     allowedOrigins: [],
     realtimeJwtSecret: JWT_SECRET,
+    photos: photoStorage,
   };
   a = await seedTenant(db, 'Server House');
   b = await seedTenant(db, 'Neighbour House');
@@ -464,5 +479,157 @@ describe('[QR-009] the Realtime session', () => {
     });
     expect(response.status).toBe(503);
     expect(codeOf(response.body)).toBe('REALTIME_NOT_CONFIGURED');
+  });
+});
+
+/** A tiny WebP: "RIFF", the length, "WEBP", then a chunk. */
+function webp(marker: number): Uint8Array {
+  const bytes = new Uint8Array(32);
+  bytes.set(new TextEncoder().encode('RIFF'), 0);
+  bytes.set([24, 0, 0, 0], 4);
+  bytes.set(new TextEncoder().encode('WEBPVP8L'), 8);
+  bytes[31] = marker;
+  return bytes;
+}
+
+async function upload(
+  photoId: string,
+  width: number,
+  bytes: Uint8Array,
+  options: { credential?: string; contentType?: string; context?: FunctionContext } = {},
+) {
+  const response = await server(
+    new Request(
+      `https://relay.example.invalid/functions/v1/server/photos/${photoId}/${String(width)}`,
+      {
+        method: 'PUT',
+        headers: {
+          authorization: `Bearer ${options.credential ?? a.credential}`,
+          'content-type': options.contentType ?? 'image/webp',
+        },
+        body: bytes,
+      },
+    ),
+    options.context ?? context,
+  );
+  const body: unknown = await response.json();
+  return { status: response.status, body };
+}
+
+const sweep = (inUse: string[], credential?: string) =>
+  asServer('photos/sweep', { method: 'POST', body: { inUse }, credential });
+
+async function photoRow(tenantId: string, photoId: string) {
+  const { rows } = await db.admin.query<{ removed_at: Date | null; purged_at: Date | null }>(
+    'SELECT removed_at, purged_at FROM relay.photos WHERE tenant_id = $1 AND photo_id = $2',
+    [tenantId, photoId],
+  );
+  return rows[0];
+}
+
+describe('[MENU-008] menu photos', () => {
+  it('stores each size under the restaurant’s own folder and tells the QR page where', async () => {
+    const photoId = randomUUID();
+    for (const width of [160, 480, 960]) {
+      const response = await upload(photoId, width, webp(width % 251));
+      expect(response.status).toBe(200);
+      expect(RelayPhotoUploadResponse.parse(response.body).path).toBe(
+        `${a.id}/${photoId}/${String(width)}.webp`,
+      );
+    }
+    expect(bucket.get(`${a.id}/${photoId}/480.webp`)?.[31]).toBe(480 % 251);
+    // Sent again (a new photo for the dish): replaced in place.
+    await upload(photoId, 480, webp(7));
+    expect(bucket.get(`${a.id}/${photoId}/480.webp`)?.[31]).toBe(7);
+    expect(await photoRow(a.id, photoId)).toMatchObject({ removed_at: null, purged_at: null });
+
+    await publish(900);
+    const menu = await diner(qrMenu, 'qr-menu', a.tables[0].token);
+    expect(QrMenuResponse.parse(menu.body).photoBase).toBe(photoStorage.publicBase);
+    const off = await call(qrMenu, 'qr-menu', {
+      method: 'GET',
+      credential: null,
+      headers: { [TABLE_TOKEN_HEADER]: a.tables[0].token },
+      context: { ...context, photos: undefined },
+    });
+    expect(QrMenuResponse.parse(off.body).photoBase).toBeNull();
+  });
+
+  it('takes WebP files of the known sizes only, and not too large', async () => {
+    const photoId = randomUUID();
+    expect((await upload(photoId, 320, webp(1))).status).toBe(400);
+    expect((await upload('not-a-photo', 160, webp(1))).status).toBe(400);
+    const jpeg = await upload(photoId, 160, webp(1), { contentType: 'image/jpeg' });
+    expect(jpeg.status).toBe(415);
+    const fake = await upload(photoId, 160, new TextEncoder().encode('<svg onload="x()"></svg>'));
+    expect(fake.status).toBe(415);
+    const huge = new Uint8Array(2 * 1024 * 1024 + 1);
+    huge.set(webp(1));
+    expect((await upload(photoId, 960, huge)).status).toBe(413);
+    expect((await upload(photoId, 160, webp(1), { credential: newCredential() })).status).toBe(401);
+    const off = await upload(photoId, 160, webp(1), { context: { ...context, photos: undefined } });
+    expect(off.status).toBe(503);
+    expect(codeOf(off.body)).toBe('PHOTOS_OFF');
+    expect(await photoRow(a.id, photoId)).toBeUndefined();
+    expect([...bucket.keys()].some((path) => path.includes(photoId))).toBe(false);
+  });
+
+  it('[QR-014] keeps one restaurant’s photos apart from another’s', async () => {
+    const photoId = randomUUID();
+    await upload(photoId, 160, webp(1), { credential: b.credential });
+    expect(bucket.has(`${b.id}/${photoId}/160.webp`)).toBe(true);
+    expect(await photoRow(a.id, photoId)).toBeUndefined();
+    // A's sweep never marks B's photo.
+    await sweep([]);
+    expect(await photoRow(b.id, photoId)).toMatchObject({ removed_at: null });
+  });
+
+  it('[BRD §9.3] removes a photo’s files 90 days after the menu stops using it', async () => {
+    const kept = randomUUID();
+    const dropped = randomUUID();
+    const back = randomUUID();
+    for (const photoId of [kept, dropped, back]) {
+      for (const width of [160, 480, 960]) await upload(photoId, width, webp(1));
+    }
+    const first = RelayPhotoSweepResponse.parse((await sweep([kept, back])).body);
+    expect(first.purged).toBe(0);
+    expect(first.missing).toEqual([]);
+    const dropMore = RelayPhotoSweepResponse.parse((await sweep([kept])).body);
+    expect(dropMore.removed).toBe(1);
+    expect((await photoRow(a.id, back))?.removed_at).not.toBeNull();
+    // The dish takes its photo back within the 90 days: nothing to send again.
+    const restored = RelayPhotoSweepResponse.parse((await sweep([kept, back])).body);
+    expect(restored).toMatchObject({ restored: 1, missing: [] });
+
+    // 89 days on, the dropped photo's files are still there; at 91 they are gone.
+    await db.admin.query(
+      `UPDATE relay.photos SET removed_at = now() - interval '89 days'
+       WHERE tenant_id = $1 AND photo_id = $2`,
+      [a.id, dropped],
+    );
+    expect(RelayPhotoSweepResponse.parse((await sweep([kept, back])).body).purged).toBe(0);
+    expect(bucket.has(`${a.id}/${dropped}/960.webp`)).toBe(true);
+    await db.admin.query(
+      `UPDATE relay.photos SET removed_at = now() - interval '91 days'
+       WHERE tenant_id = $1 AND photo_id = $2`,
+      [a.id, dropped],
+    );
+    expect(RelayPhotoSweepResponse.parse((await sweep([kept, back])).body).purged).toBe(1);
+    for (const width of [160, 480, 960]) {
+      expect(bucket.has(`${a.id}/${dropped}/${String(width)}.webp`)).toBe(false);
+    }
+    expect(bucket.has(`${a.id}/${kept}/960.webp`)).toBe(true);
+    // The record stays; a menu wanting the photo again is told to send it.
+    expect((await photoRow(a.id, dropped))?.purged_at).not.toBeNull();
+    const again = RelayPhotoSweepResponse.parse((await sweep([kept, back, dropped])).body);
+    expect(again).toMatchObject({ restored: 0, missing: [dropped] });
+    await upload(dropped, 160, webp(2));
+    expect(await photoRow(a.id, dropped)).toMatchObject({ removed_at: null, purged_at: null });
+  });
+
+  it('refuses a sweep without the credential or with a bad list', async () => {
+    expect((await sweep([], newCredential())).status).toBe(401);
+    const bad = await asServer('photos/sweep', { method: 'POST', body: { inUse: ['nope'] } });
+    expect(bad.status).toBe(400);
   });
 });

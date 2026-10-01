@@ -171,8 +171,35 @@ body {
   border-bottom: 1px solid var(--rp-color-border);
 }
 
-.qr-dish[data-unavailable] .qr-dish__what {
+.qr-dish[data-unavailable] .qr-dish__what,
+.qr-dish[data-unavailable] .qr-dish__photo {
   opacity: 0.6;
+}
+
+.qr-dish__what {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A square thumbnail; the photo keeps its shape and fills it (MENU-008). */
+.qr-dish__photo {
+  flex: none;
+  align-self: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface-sunken);
+}
+
+.qr-sheet__photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 16rem;
+  object-fit: cover;
+  border-radius: var(--rp-radius-md);
+  margin-bottom: var(--rp-space-3);
 }
 
 .qr-dish__name {
