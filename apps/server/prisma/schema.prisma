@@ -232,6 +232,8 @@ model Restaurant {
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  relayOrders RelayOrder[]
+
   @@map("restaurants")
 }
 
@@ -1022,6 +1024,7 @@ model Order {
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   bill           Bill?
+  relayOrder     RelayOrder?
 
   @@unique([restaurantId, businessDate, orderNumber])
   @@index([tableSessionId])
@@ -1039,6 +1042,9 @@ model OrderItem {
   item                 Item                 @relation(fields: [itemId], references: [id])
   variantId            String?              @map("variant_id") @db.Uuid
   variant              Variant?             @relation(fields: [variantId], references: [id])
+  /// The diner's or device's own id of the line (OrderLineRequest.clientLineId), for status back to
+  /// the QR page (QR-007).
+  clientLineId         String?              @map("client_line_id") @db.Uuid
   /// Combo component lines point at the combo's own order item.
   parentOrderItemId    String?              @map("parent_order_item_id") @db.Uuid
   parent               OrderItem?           @relation("ComboLines", fields: [parentOrderItemId], references: [id])
@@ -1844,4 +1850,32 @@ model DinerContact {
 
   @@index([restaurantId, phone])
   @@map("diner_contacts")
+}
+
+/// An order picked up from the QR relay (P5-03b, QR-009): the inbox row is written first, so a
+/// second pickup or a restart never creates the order twice; it also remembers what the relay was
+/// last told (QR-007).
+model RelayOrder {
+  id              String     @id @default(uuid(7)) @db.Uuid
+  restaurantId    String     @map("restaurant_id") @db.Uuid
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  /// The order's id at the relay; one row each, whatever happens next (ORD-013).
+  relayOrderId    String     @unique @map("relay_order_id") @db.Uuid
+  tableId         String     @map("table_id") @db.Uuid
+  /// The order as the relay gave it (QrPickupOrder).
+  payload         Json
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(3)
+  /// CREATED, REJECTED (nothing created) or EXPIRED; null while being handled.
+  outcome         String?
+  orderId         String?    @unique @map("order_id") @db.Uuid
+  order           Order?     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  rejectionReason String?    @map("rejection_reason")
+  /// What the relay last acknowledged: its status and a hash of status and detail.
+  pushedHash      String?    @map("pushed_hash")
+  pushedStatus    String?    @map("pushed_status")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, outcome])
+  @@map("relay_orders")
 }

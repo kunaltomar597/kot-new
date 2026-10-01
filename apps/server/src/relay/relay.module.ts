@@ -2,7 +2,13 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { EventsModule } from '../events/events.module.js';
 import { MenuModule } from '../menu/menu.module.js';
+import { OrdersModule } from '../orders/orders.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
+import {
+  DEFAULT_RELAY_ORDERS_OPTIONS,
+  RELAY_ORDERS_OPTIONS,
+  RelayOrdersService,
+} from './relay-orders.service.js';
 import {
   DEFAULT_RELAY_SYNC_OPTIONS,
   RELAY_SYNC_OPTIONS,
@@ -11,11 +17,13 @@ import {
 
 /** The local server's link to the QR relay (P5-03, ADR-0015). */
 @Module({
-  imports: [AuthModule, EventsModule, MenuModule, SettingsModule],
+  imports: [AuthModule, EventsModule, MenuModule, OrdersModule, SettingsModule],
   providers: [
     { provide: RELAY_SYNC_OPTIONS, useValue: DEFAULT_RELAY_SYNC_OPTIONS },
+    { provide: RELAY_ORDERS_OPTIONS, useValue: DEFAULT_RELAY_ORDERS_OPTIONS },
     RelaySyncService,
+    RelayOrdersService,
   ],
-  exports: [RelaySyncService],
+  exports: [RelaySyncService, RelayOrdersService],
 })
 export class RelayModule {}

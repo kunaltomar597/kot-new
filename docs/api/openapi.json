@@ -15407,6 +15407,7 @@
               },
               "source": { "$ref": "#/components/schemas/OrderSource" },
               "tableSessionId": { "$ref": "#/components/schemas/Id" },
+              "tableId": { "$ref": "#/components/schemas/Id" },
               "needsApproval": { "type": "boolean" }
             },
             "required": ["orderId", "orderNumber", "source", "needsApproval"],
