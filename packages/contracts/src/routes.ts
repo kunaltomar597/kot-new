@@ -154,6 +154,9 @@ import {
   ShiftView,
 } from './payments.js';
 import {
+  ApproveAtTableRequest,
+  ApproveOrderRequest,
+  BestSellersResponse,
   ModifyOrderItemRequest,
   OrderItemEndRequest,
   OrderItemParams,
@@ -161,8 +164,12 @@ import {
   OrderListResponse,
   OrderParams,
   OrderView,
+  PendingApprovalsResponse,
+  RejectOrderRequest,
   SubmitOrderRequest,
   SubmitOrderResponse,
+  TabletOrderRequest,
+  TabletOrdersResponse,
 } from './order.js';
 import {
   KotParams,
@@ -335,6 +342,62 @@ export const ROUTES = [
         description: 'The idempotency key was used for a different order, or a note is too long.',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'listPendingApprovals',
+    method: 'GET',
+    path: '/api/v1/orders/pending-approval',
+    summary: "Diners' orders waiting for approval: the approvals inbox",
+    description:
+      'WTR-004, ORD-003: tablet and QR orders not yet approved, oldest first, with their table. ' +
+      'Waiters see their own tables; cashiers and managers see all.',
+    tags: ['orders'],
+    requirements: ['WTR-004', 'ORD-003'],
+    capability: 'ORDER_APPROVE_CUSTOMER',
+    responses: {
+      200: { description: 'The waiting orders.', schema: PendingApprovalsResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'approveOrder',
+    method: 'POST',
+    path: '/api/v1/orders/:orderId/approve',
+    summary: "Send a diner's order to the kitchen, changed with the diner's agreement if needed",
+    description:
+      'ORD-003, ORD-004: quantities changed or lines removed first (with `dinerAgreed`), then ' +
+      'every waiting line goes to the kitchen as for a staff order (tickets, stock). Waiters ' +
+      'approve their own tables. Audited with the changes.',
+    tags: ['orders'],
+    requirements: ['ORD-003', 'ORD-004', 'WTR-004', 'AUD-001'],
+    capability: 'ORDER_APPROVE_CUSTOMER',
+    request: { params: OrderParams, body: ApproveOrderRequest },
+    responses: {
+      200: { description: 'The order, sent.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
+      409: {
+        description: 'Nothing waits for approval, or a dish ran out (remove it first).',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'rejectOrder',
+    method: 'POST',
+    path: '/api/v1/orders/:orderId/reject',
+    summary: "Refuse a diner's order, with a reason the diner sees",
+    description: 'ORD-003, WTR-004: every waiting line is rejected. Waiters, their own tables.',
+    tags: ['orders'],
+    requirements: ['ORD-003', 'WTR-004', 'AUD-001'],
+    capability: 'ORDER_APPROVE_CUSTOMER',
+    request: { params: OrderParams, body: RejectOrderRequest },
+    responses: {
+      200: { description: 'The order, rejected.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
+      409: { description: 'Nothing waits for approval.', schema: ApiError },
     },
   },
   {
@@ -2177,6 +2240,62 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'submitTabletOrder',
+    method: 'POST',
+    path: '/api/v1/devices/current/orders',
+    summary: "A diner's order from the table tablet, for its own open table",
+    description:
+      'TAB-008, TAB-009, ORD-003, ORD-013: priced by the server, idempotent, and waiting for a ' +
+      "waiter's approval; the table's waiter is alerted (ORD-005). Only table tablets.",
+    tags: ['orders'],
+    requirements: ['TAB-008', 'TAB-009', 'ORD-003', 'ORD-013', 'ORD-014', 'AUTH-009'],
+    capability: 'DEVICE',
+    request: { body: TabletOrderRequest },
+    responses: {
+      200: { description: 'Accepted, or lines rejected.', schema: SubmitOrderResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      409: { description: 'The table is not open.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listTabletOrders',
+    method: 'GET',
+    path: '/api/v1/devices/current/orders',
+    summary: "The orders at this table tablet's table: each line's status and the running total",
+    description: 'TAB-009, TAB-010, AUTH-009: the open session at its own table only.',
+    tags: ['orders'],
+    requirements: ['TAB-009', 'TAB-010', 'AUTH-009'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The orders.', schema: TabletOrdersResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'approveOrderAtTable',
+    method: 'POST',
+    path: '/api/v1/devices/current/orders/:orderId/approve',
+    summary: 'Approve at table: the waiter approves on the tablet with their PIN',
+    description:
+      "ORD-004: the PIN is checked like a sign-in (failures count towards the person's " +
+      "lock-out); waiters may approve only their own table's orders. Only this tablet's table.",
+    tags: ['orders'],
+    requirements: ['ORD-004', 'ORD-003', 'AUTH-013', 'AUTH-009'],
+    capability: 'DEVICE',
+    request: { params: OrderParams, body: ApproveAtTableRequest },
+    responses: {
+      200: { description: 'The order, sent.', schema: OrderView },
+      ...deviceErrors,
+      403: { description: 'Not this table, or not allowed to approve.', schema: ApiError },
+      404: { description: 'No such order at this table.', schema: ApiError },
+      409: { description: 'Nothing waits for approval, or a dish ran out.', schema: ApiError },
+      423: { description: 'The login is locked.', schema: ApiError },
+      429: { description: 'Too many attempts from this tablet.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'listDeviceAlerts',
     method: 'GET',
     path: '/api/v1/devices/current/alerts',
@@ -2367,6 +2486,21 @@ export const ROUTES = [
       ...deviceErrors,
       403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
       404: { description: 'No such request at this table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listBestSellers',
+    method: 'GET',
+    path: '/api/v1/menu/bestsellers',
+    summary: 'The most ordered dishes lately, for the bestseller badge and filter',
+    description:
+      'TAB-005, REC-004: by quantity over `reco.bestSellerDays`, the top `menu.bestSellerCount`.',
+    tags: ['menu'],
+    requirements: ['TAB-005', 'REC-004'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The bestsellers, most ordered first.', schema: BestSellersResponse },
+      ...deviceErrors,
     },
   },
   {

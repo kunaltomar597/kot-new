@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { RecommendationEventInput, RecommendationsResponse } from '@rp/contracts';
+import type {
+  BestSellersResponse,
+  RecommendationEventInput,
+  RecommendationsResponse,
+} from '@rp/contracts';
 import { daypartAt, type RecoChannel, type RecoItem, recommend, timeOfDayOf } from '@rp/domain';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { Principal } from '../auth/principal.js';
@@ -73,6 +77,40 @@ export class RecommendationsService {
     private readonly bestSellers: BestSellers,
     @Inject(RECOMMENDATION_CLOCK) private readonly clock: RecommendationClock,
   ) {}
+
+  /**
+   * The bestseller badge and filter (TAB-005, P3-03a): the most ordered dishes over the whole day
+   * for the last `reco.bestSellerDays`, the top `menu.bestSellerCount`, still on the menu.
+   */
+  async bestSellerIds(restaurantId: string): Promise<BestSellersResponse> {
+    const now = this.clock.now();
+    const [menu, settings, restaurant, businessDate] = await Promise.all([
+      this.menu.current(restaurantId),
+      this.settings.snapshot(restaurantId),
+      this.prisma.restaurant.findUniqueOrThrow({
+        where: { id: restaurantId },
+        select: { timeZone: true },
+      }),
+      currentBusinessDate(this.prisma, restaurantId, now),
+    ]);
+    const count = settings.get('menu.bestSellerCount');
+    if (count === 0) return { itemIds: [] };
+    const counts = await this.bestSellers.get({
+      restaurantId,
+      businessDate,
+      days: settings.get('reco.bestSellerDays'),
+      hours: null,
+      timeZone: restaurant.timeZone,
+    });
+    const onMenu = new Set(menu.items.filter((item) => !item.archived).map((item) => item.id));
+    return {
+      itemIds: [...counts]
+        .filter((entry) => onMenu.has(entry.itemId) && entry.quantity > 0)
+        .sort((a, b) => b.quantity - a.quantity || a.itemId.localeCompare(b.itemId))
+        .slice(0, count)
+        .map((entry) => entry.itemId),
+    };
+  }
 
   /** The waiter app and the POS: a table's suggestions, or a takeaway cart's (WTR-011). */
   async forStaff(

@@ -92,6 +92,24 @@ For the bestseller badge and filter, the server's P3-04 `BestSellers` ranking (q
 bestsellers. Approving an order changes nothing for recommendation tracking: ORDERED is counted
 when the order is submitted, and the report reads each line's final state (RPT-012).
 
+Built in three parts:
+
+- P3-03a Server (done), `apps/server/src/orders/order-approvals.service.ts`:
+  - `POST` and `GET /api/v1/devices/current/orders`: the tablet's order for its own open table,
+    waiting for approval, and the session's orders with the running and pending totals.
+  - `GET /api/v1/orders/pending-approval`, `POST /api/v1/orders/:orderId/approve` (quantities
+    changed or lines removed with `dinerAgreed`) and `/reject` (with a reason).
+  - `POST /api/v1/devices/current/orders/:orderId/approve`: "Approve at table" with the waiter's
+    PIN (`AuthService.tableApprover`).
+  - `GET /api/v1/menu/bestsellers` (`menu.bestSellerCount`).
+  - The pending-approval alert and its escalation already existed (P2-03).
+- P3-03b The waiter app's approvals inbox and the POS's approvals: view, edit with the diner's
+  agreement, approve in at most 2 taps, reject with a reason.
+- P3-03c The tablet's ordering: menu (categories, cards, filters, sorting, tax note), fuzzy search
+  (fuse.js), item options, cart with review and estimated taxes, submit and "Waiting for waiter
+  confirmation", live item statuses, "My order", out of stock live, "Please call a waiter"
+  offline, and "Approve at table".
+
 ## P3-04 Recommendation engine v1 (done)
 
 Goal: rules and best sellers, served fast with reasons.

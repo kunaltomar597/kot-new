@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@nestjs/common';
 import {
+  type BestSellersResponse,
   ArchiveRequest,
   type RecommendationRuleListResponse,
   RecommendationRuleParams,
@@ -115,5 +116,17 @@ export class RecommendationRulesController {
     @Body(new ZodValidationPipe(ArchiveRequest)) body: ArchiveRequest,
   ): Promise<RecommendationRuleView> {
     return this.rules.archive(principalOf(request), ruleId, body.reason);
+  }
+}
+
+/** The bestseller badge and filter on the tablet and QR menu (TAB-005, P3-03a). */
+@Controller('menu')
+@RequireDevice()
+export class BestSellersController {
+  constructor(private readonly recommendations: RecommendationsService) {}
+
+  @Get('bestsellers')
+  list(@Req() request: AuthenticatedRequest): Promise<BestSellersResponse> {
+    return this.recommendations.bestSellerIds(deviceOf(request).restaurantId);
   }
 }

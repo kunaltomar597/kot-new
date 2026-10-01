@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Pin } from './auth.js';
 import { Id, IdempotencyKey, OrderItemState, OrderSource, OrderType, Timestamp } from './common.js';
 import { RecommendationSource } from './recommendations.js';
 
@@ -205,3 +206,89 @@ export const ModifyOrderItemRequest = z
     message: 'Change the quantity or the instructions',
   });
 export type ModifyOrderItemRequest = z.infer<typeof ModifyOrderItemRequest>;
+
+// ---------------------------------------------------------------- diners' orders and approval (P3-03a)
+
+/**
+ * A diner's order from the table tablet (TAB-008, TAB-009): always for the tablet's own open table
+ * (AUTH-009), and without prices: the server prices it (ORD-014). It waits for a waiter's approval
+ * (ORD-003).
+ */
+export const TabletOrderRequest = z.strictObject({
+  idempotencyKey: IdempotencyKey,
+  lines: z.array(OrderLineRequest).min(1).max(100),
+  orderNote: Instructions.optional(),
+});
+export type TabletOrderRequest = z.infer<typeof TabletOrderRequest>;
+
+/**
+ * The orders placed at a tablet's table in its open session (TAB-009, TAB-010): every line's
+ * status, what will be billed so far, and what still waits for the waiter. No session: empty.
+ */
+export const TabletOrdersResponse = z.object({
+  tableSessionId: Id.nullable(),
+  orders: z.array(OrderView),
+  /** Line totals of the lines on their way to the bill (sent or further), before tax. */
+  runningTotal: z.int().nonnegative(),
+  /** Line totals of the lines waiting for the waiter's approval. */
+  pendingTotal: z.int().nonnegative(),
+});
+export type TabletOrdersResponse = z.infer<typeof TabletOrdersResponse>;
+
+/** A line's new quantity before approval; 0 removes it (ORD-003). */
+export const ApprovalChange = z.strictObject({
+  orderItemId: Id,
+  quantity: z.int().min(0).max(99),
+});
+export type ApprovalChange = z.infer<typeof ApprovalChange>;
+
+const approvalChanges = {
+  /** Quantities changed, or lines removed, before approving. */
+  changes: z.array(ApprovalChange).max(100).default([]),
+  /** Changes are made only with the diner's agreement (ORD-003). */
+  dinerAgreed: z.boolean().default(false),
+};
+
+const agreed = (request: { changes: readonly unknown[]; dinerAgreed: boolean }) =>
+  request.changes.length === 0 || request.dinerAgreed;
+const agreedMessage = {
+  message: 'Change an order only with the diner’s agreement',
+  path: ['dinerAgreed'],
+};
+
+/**
+ * ORD-003, ORD-004, WTR-004: a waiter (their own tables), the cashier or a manager sends a diner's
+ * order to the kitchen, with any quantities changed or lines removed with the diner's agreement.
+ */
+export const ApproveOrderRequest = z.strictObject(approvalChanges).refine(agreed, agreedMessage);
+export type ApproveOrderRequest = z.input<typeof ApproveOrderRequest>;
+
+/** ORD-003: a diner's order refused, with a reason the diner sees. */
+export const RejectOrderRequest = z.strictObject({ reason: z.string().trim().min(3).max(200) });
+export type RejectOrderRequest = z.infer<typeof RejectOrderRequest>;
+
+/**
+ * "Approve at table" (ORD-004): the waiter enters their PIN on the tablet while talking to the
+ * diner; the server checks it like a sign-in (lock-out included) and approves as that waiter.
+ */
+export const ApproveAtTableRequest = z
+  .strictObject({ staffId: Id, pin: Pin, ...approvalChanges })
+  .refine(agreed, agreedMessage);
+export type ApproveAtTableRequest = z.input<typeof ApproveAtTableRequest>;
+
+/** The approvals inbox (WTR-004): diners' orders waiting, oldest first, with their table. */
+export const PendingApprovalsResponse = z.object({
+  orders: z.array(
+    z.object({
+      order: OrderView,
+      tableLabel: z.string().nullable(),
+      /** The table's waiter, who is alerted (ORD-005). */
+      waiterId: Id.nullable(),
+    }),
+  ),
+});
+export type PendingApprovalsResponse = z.infer<typeof PendingApprovalsResponse>;
+
+/** The menu's bestsellers (TAB-005): the most ordered dishes lately, for the badge and filter. */
+export const BestSellersResponse = z.object({ itemIds: z.array(Id) });
+export type BestSellersResponse = z.infer<typeof BestSellersResponse>;

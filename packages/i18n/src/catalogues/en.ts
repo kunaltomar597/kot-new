@@ -1094,6 +1094,7 @@ export const en = {
       kds: 'Kitchen screens',
       tablet: 'Table tablets',
       qr: 'QR menu',
+      menu: 'Menu',
       reco: 'Suggestions',
       audit: 'Audit',
       backups: 'Backups',
@@ -2173,6 +2174,9 @@ export const en = {
       presenceIntervalSeconds: 'Presence signal every',
       readOnlyAfterSeconds: 'QR menu read-only after',
     },
+    menu: {
+      bestSellerCount: 'Dishes with the bestseller badge',
+    },
     reco: {
       learningWindowDays: 'Learn from the last',
       minSupportBp: 'Learned pairs: minimum support',
@@ -2324,6 +2328,10 @@ export const en = {
       presenceIntervalSeconds: 'How often the local server tells the QR relay it is present.',
       readOnlyAfterSeconds:
         'Without a presence signal for this long, the QR menu becomes read-only.',
+    },
+    menu: {
+      bestSellerCount:
+        'How many of the most ordered dishes carry the bestseller badge on the tablet and QR menu (0: none; our default).',
     },
     reco: {
       learningWindowDays: 'Orders the "frequently ordered together" rules learn from.',
