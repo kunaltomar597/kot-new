@@ -298,8 +298,7 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
       timeZone: restaurant.timeZone,
       instructionMaxLength: settings.get('orders.specialInstructionsMaxLength'),
       priceMode: settings.get('billing.priceMode'),
-      // QR-011 (S) comes with the QR site's service requests (P5-05).
-      serviceRequests: false,
+      serviceRequests: settings.get('qr.serviceRequests'),
       menu: qrChannelMenu(menu),
       // Photos are mirrored to the relay's Storage in P5-03c.
       photos: [],

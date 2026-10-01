@@ -3,6 +3,9 @@ import {
   PublishQrMenuResponse,
   type PublishQrMenuRequest,
   QrPickupResponse,
+  QrServiceRequestPickupResponse,
+  type UpdateQrServiceRequest,
+  UpdateQrServiceRequestResponse,
   type RelayPresenceRequest,
   RelayPresenceResponse,
   RelaySessionResponse,
@@ -69,6 +72,22 @@ export class RelayClient {
       'POST',
       `orders/${encodeURIComponent(orderId)}/status`,
       UpdateQrOrderResponse,
+      body,
+    );
+  }
+
+  pickupServiceRequests(): Promise<QrServiceRequestPickupResponse> {
+    return this.call('GET', 'service-requests', QrServiceRequestPickupResponse);
+  }
+
+  updateServiceRequest(
+    requestId: string,
+    body: UpdateQrServiceRequest,
+  ): Promise<UpdateQrServiceRequestResponse> {
+    return this.call(
+      'POST',
+      `service-requests/${encodeURIComponent(requestId)}/status`,
+      UpdateQrServiceRequestResponse,
       body,
     );
   }

@@ -231,12 +231,15 @@ describe('[QR-006] browsers never reach the database directly', () => {
     expect(exposed).toEqual(['public', 'graphql_public']);
   });
 
-  it('publishes only the order queue to Realtime', async () => {
+  it('publishes only the order and request queues to Realtime', async () => {
     const published = await query<{ name: string }>(
       `SELECT tablename AS name FROM pg_publication_tables
        WHERE pubname = 'supabase_realtime' AND schemaname = 'relay'`,
     );
-    expect(published).toEqual([{ name: 'qr_orders' }]);
+    expect(published.map((table) => table.name).sort()).toEqual([
+      'qr_orders',
+      'qr_service_requests',
+    ]);
   });
 });
 

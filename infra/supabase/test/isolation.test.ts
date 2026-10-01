@@ -139,11 +139,14 @@ describe('[SEC-005] [QR-014] a local server stays inside its restaurant', () => 
     expect(error.code).toBe('23514');
   });
 
-  it('sees only its own order queue in Realtime, and nothing else', async () => {
-    expect(new Set(await tenantsSeen('relay_server', { tenant_id: a.id }, 'qr_orders'))).toEqual(
-      new Set([a.id]),
-    );
-    for (const table of RELAY_TABLES.filter((name) => name !== 'qr_orders')) {
+  it('sees only its own order and request queues in Realtime, and nothing else', async () => {
+    const queues: readonly RelayTable[] = ['qr_orders', 'qr_service_requests'];
+    for (const queue of queues) {
+      expect(new Set(await tenantsSeen('relay_server', { tenant_id: a.id }, queue)), queue).toEqual(
+        new Set([a.id]),
+      );
+    }
+    for (const table of RELAY_TABLES.filter((name) => !queues.includes(name))) {
       const error = await refusal(tenantsSeen('relay_server', { tenant_id: a.id }, table));
       expect(error.code, table).toBe(DENIED);
     }

@@ -15,7 +15,8 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
   - The order rules are triggers.
   - Retention is `relay.purge()`, run hourly by pg_cron.
 - `src/`: the edge functions, as Fetch API handlers tested on Node.
-  - `qr-menu`, `submit-order` and `order-status` are for diners' browsers (P5-02a).
+  - `qr-menu`, `submit-order` and `order-status` are for diners' browsers (P5-02a);
+    `service-request` handles Call waiter and Request bill (P5-05c).
   - `server` is for the restaurant's local server, with its credential (P5-02b): a Realtime
     session, presence with the QR settings, publishing the menu, the tables with their code
     hashes, picking up orders and reporting their status.

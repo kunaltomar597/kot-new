@@ -75,3 +75,7 @@ entrypoint = "./dist/functions/order-status/index.js"
 [functions.server]
 verify_jwt = false
 entrypoint = "./dist/functions/server/index.js"
+
+[functions.service-request]
+verify_jwt = false
+entrypoint = "./dist/functions/service-request/index.js"

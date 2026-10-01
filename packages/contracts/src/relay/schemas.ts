@@ -312,3 +312,77 @@ export type UpdateQrOrderRequest = z.infer<typeof UpdateQrOrderRequest>;
 
 export const UpdateQrOrderResponse = z.object({ id: Id, status: QrOrderStatus });
 export type UpdateQrOrderResponse = z.infer<typeof UpdateQrOrderResponse>;
+
+// ---------------------------------------------------------------- call waiter / request bill (P5-05c)
+
+/** What a diner can ask for from the QR page (QR-011): the tablet's buttons. */
+export const QrServiceRequestType = z.enum(['WATER', 'WAITER', 'BILL']);
+export type QrServiceRequestType = z.infer<typeof QrServiceRequestType>;
+
+/**
+ * Where a diner's request is: SUBMITTED "Sending...", RECEIVED "Waiter notified", ACKNOWLEDGED
+ * "Waiter is on the way", DONE, REJECTED (with the reason) or EXPIRED (not picked up in time).
+ */
+export const QrServiceRequestStatus = z.enum([
+  'SUBMITTED',
+  'RECEIVED',
+  'ACKNOWLEDGED',
+  'DONE',
+  'REJECTED',
+  'EXPIRED',
+]);
+export type QrServiceRequestStatus = z.infer<typeof QrServiceRequestStatus>;
+
+export const QrServiceRequestView = z.object({
+  id: Id,
+  type: QrServiceRequestType,
+  status: QrServiceRequestStatus,
+  submittedAt: Timestamp,
+  expiresAt: Timestamp,
+  rejectionReason: z.string().nullable(),
+});
+export type QrServiceRequestView = z.infer<typeof QrServiceRequestView>;
+
+/** QR-011: call a waiter or ask for the bill. Again while one is open finds the open one. */
+export const QrServiceRequestBody = z.strictObject({
+  type: QrServiceRequestType,
+  idempotencyKey: IdempotencyKey,
+});
+export type QrServiceRequestBody = z.infer<typeof QrServiceRequestBody>;
+
+export const QrServiceRequestResponse = z.object({
+  /** The request was already open (pressed again, or sent again). */
+  existing: z.boolean(),
+  request: QrServiceRequestView,
+});
+export type QrServiceRequestResponse = z.infer<typeof QrServiceRequestResponse>;
+
+export const QrServiceRequestQuery = z.strictObject({ id: Id });
+export type QrServiceRequestQuery = z.infer<typeof QrServiceRequestQuery>;
+
+/** A diner's request as the local server picks it up. */
+export const QrPickupServiceRequest = z.object({
+  id: Id,
+  tableId: Id,
+  type: QrServiceRequestType,
+  submittedAt: Timestamp,
+  expiresAt: Timestamp,
+});
+export type QrPickupServiceRequest = z.infer<typeof QrPickupServiceRequest>;
+
+export const QrServiceRequestPickupResponse = z.object({
+  requests: z.array(QrPickupServiceRequest),
+});
+export type QrServiceRequestPickupResponse = z.infer<typeof QrServiceRequestPickupResponse>;
+
+export const QrServiceRequestParams = z.strictObject({ requestId: Id });
+export type QrServiceRequestParams = z.infer<typeof QrServiceRequestParams>;
+
+export const UpdateQrServiceRequest = z.strictObject({
+  status: z.enum(['RECEIVED', 'ACKNOWLEDGED', 'DONE', 'REJECTED', 'EXPIRED']),
+  rejectionReason: z.string().min(1).max(200).optional(),
+});
+export type UpdateQrServiceRequest = z.infer<typeof UpdateQrServiceRequest>;
+
+export const UpdateQrServiceRequestResponse = z.object({ id: Id, status: QrServiceRequestStatus });
+export type UpdateQrServiceRequestResponse = z.infer<typeof UpdateQrServiceRequestResponse>;

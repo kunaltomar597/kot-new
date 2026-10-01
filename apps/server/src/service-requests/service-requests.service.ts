@@ -148,6 +148,19 @@ export class ServiceRequestsService {
   }
 
   /**
+   * Call waiter / request bill from the QR page (QR-011), picked up from the relay: the same flow
+   * as the tablet's, at the table the code belongs to. The relay keeps one open request of each
+   * kind per table, so its own anti-spam stands in for the tablet's rate limit.
+   */
+  raiseFromQr(
+    restaurantId: string,
+    tableId: string,
+    type: ServiceRequestType,
+  ): Promise<ServiceRequestView> {
+    return this.raise({ restaurantId, tableId, type, source: 'QR', deviceId: null });
+  }
+
+  /**
    * Raises a request at a table and its alert, in one transaction with the table row locked, so two
    * presses at once cannot both get through the anti-spam check. A Bill also sets the table to
    * Bill requested (BILL-015) and tells the cashier through its alert.

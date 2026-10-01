@@ -83,3 +83,42 @@ export function qrSteps(
   if (target === 'RECEIVED') return ['RECEIVED'];
   return from === 'SUBMITTED' ? ['RECEIVED', target] : [target];
 }
+
+// ---------------------------------------------------------------- call waiter / request bill
+
+/** How the restaurant dealt with a request it picked up (QR-011). */
+export type QrRequestOutcome = 'RAISED' | 'REJECTED' | 'EXPIRED';
+
+export type QrRequestTarget = 'RECEIVED' | 'ACKNOWLEDGED' | 'DONE' | 'REJECTED' | 'EXPIRED';
+
+/**
+ * What the diner's page should say about a request, from the restaurant's own (TAB-004): waiter
+ * notified while it is active or escalated, on the way once acknowledged, done once cancelled or
+ * resolved.
+ */
+export function qrRequestStatusOf(
+  outcome: QrRequestOutcome,
+  state: 'ACTIVE' | 'ESCALATED' | 'ACKNOWLEDGED' | 'CANCELLED' | 'RESOLVED' | null,
+): QrRequestTarget {
+  if (outcome === 'EXPIRED') return 'EXPIRED';
+  if (outcome === 'REJECTED' || state === null) return 'REJECTED';
+  if (state === 'ACKNOWLEDGED') return 'ACKNOWLEDGED';
+  if (state === 'CANCELLED' || state === 'RESOLVED') return 'DONE';
+  return 'RECEIVED';
+}
+
+const LADDER = ['SUBMITTED', 'RECEIVED', 'ACKNOWLEDGED', 'DONE'] as const;
+
+/** The steps the relay accepts from what it was last told to `target`; it never goes back. */
+export function qrRequestSteps(
+  pushed: 'SUBMITTED' | QrRequestTarget | null,
+  target: QrRequestTarget,
+): QrRequestTarget[] {
+  const from = pushed ?? 'SUBMITTED';
+  if (from === 'DONE' || from === 'REJECTED' || from === 'EXPIRED') return [];
+  if (target === 'EXPIRED') return from === 'SUBMITTED' ? ['EXPIRED'] : [];
+  if (target === 'REJECTED') return from === 'ACKNOWLEDGED' ? [] : ['REJECTED'];
+  const at = LADDER.indexOf(from);
+  const to = LADDER.indexOf(target);
+  return LADDER.slice(at + 1, to + 1) as QrRequestTarget[];
+}

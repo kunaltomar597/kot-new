@@ -27,6 +27,7 @@ export const RELAY_TABLES = [
   'photos',
   'presence',
   'qr_orders',
+  'qr_service_requests',
 ] as const;
 export type RelayTable = (typeof RELAY_TABLES)[number];
 /** The column naming each table's tenant. */
@@ -214,6 +215,13 @@ export async function seedTenant(db: RelayDb, name: string): Promise<SeededTenan
     await submitOrder(db, id, tables[0].id),
     await submitOrder(db, id, tables[1].id),
   ];
+  await db.as('relay_diner', { tenant_id: id, table_id: tables[0].id }, (client) =>
+    client.query(
+      `INSERT INTO relay.qr_service_requests (tenant_id, table_id, idempotency_key, browser_id, type)
+       VALUES ($1, $2, $3, $4, 'WAITER')`,
+      [id, tables[0].id, randomUUID(), `browser-${randomUUID()}`],
+    ),
+  );
   return { id, name, credential, credentialId, tables, photoId, orderIds };
 }
 

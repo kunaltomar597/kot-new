@@ -64,3 +64,19 @@ describe('[QR-007] telling the relay in the order it accepts', () => {
     expect(qrSteps('REJECTED', 'SENT_TO_KITCHEN')).toEqual([]);
   });
 });
+
+describe('[QR-011] what a diner’s request says', () => {
+  it('follows the restaurant’s request: notified, on the way, done', async () => {
+    const { qrRequestStatusOf, qrRequestSteps } = await import('../src/relay-status.js');
+    expect(qrRequestStatusOf('RAISED', 'ESCALATED')).toBe('RECEIVED');
+    expect(qrRequestStatusOf('RAISED', 'ACKNOWLEDGED')).toBe('ACKNOWLEDGED');
+    expect(qrRequestStatusOf('RAISED', 'RESOLVED')).toBe('DONE');
+    expect(qrRequestStatusOf('REJECTED', null)).toBe('REJECTED');
+    expect(qrRequestSteps(null, 'DONE')).toEqual(['RECEIVED', 'ACKNOWLEDGED', 'DONE']);
+    expect(qrRequestSteps('RECEIVED', 'ACKNOWLEDGED')).toEqual(['ACKNOWLEDGED']);
+    expect(qrRequestSteps('ACKNOWLEDGED', 'RECEIVED')).toEqual([]);
+    expect(qrRequestSteps('RECEIVED', 'REJECTED')).toEqual(['REJECTED']);
+    expect(qrRequestSteps(null, 'EXPIRED')).toEqual(['EXPIRED']);
+    expect(qrRequestSteps('DONE', 'DONE')).toEqual([]);
+  });
+});

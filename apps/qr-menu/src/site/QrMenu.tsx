@@ -28,6 +28,7 @@ import { Button, ThemeRoot } from '@rp/ui-web';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { CartSheet } from './CartSheet';
 import { I18nProvider, useT } from './i18n';
+import { HelpButtons } from './HelpButtons';
 import { ItemSheet } from './ItemSheet';
 import { Orders } from './Orders';
 import { sourceOf, Suggestions } from './Suggestions';
@@ -307,6 +308,9 @@ function MenuPage({
       ) : null}
 
       <Orders orders={shownOrders} items={byId} now={now} />
+      {document.serviceRequests ? (
+        <HelpButtons token={token} relayUrl={relayUrl} readOnly={menu.readOnly} />
+      ) : null}
 
       <div className="qr-tools">
         <label className="qr-search">

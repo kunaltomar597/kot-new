@@ -54,7 +54,7 @@ export interface StoredValue<T> {
 
 export function tableValue<T>(
   token: string,
-  kind: 'cart' | 'orders',
+  kind: 'cart' | 'orders' | 'requests',
   parse: (value: unknown) => T | undefined,
   empty: T,
 ): StoredValue<T> {

@@ -15,7 +15,7 @@ export function menuDocument(): QrMenuDocument {
     timeZone: 'Asia/Kolkata',
     instructionMaxLength: 140,
     priceMode: 'TAX_EXCLUSIVE',
-    serviceRequests: false,
+    serviceRequests: true,
     menu: {
       ...MENU,
       items: MENU.items.map((item) => ({

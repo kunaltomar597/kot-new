@@ -3,6 +3,10 @@ import {
   type PublishQrMenuResponse,
   type QrPickupOrder,
   QrOrderParams,
+  type QrPickupServiceRequest,
+  QrServiceRequestParams,
+  UpdateQrServiceRequest,
+  type UpdateQrServiceRequestResponse,
   RelayCredential,
   RelayPresenceRequest,
   type RelayPresenceResponse,
@@ -308,6 +312,79 @@ async function updateOrder(
   return json(200, outcome);
 }
 
+/** QR-011: diners' requests waiting to be picked up, oldest first. */
+async function pickupRequests(request: Request, context: FunctionContext): Promise<Response> {
+  const rows = await context.db.transaction(async (tx) => {
+    await openServer(tx, request);
+    return tx.query<{
+      id: string;
+      table_id: string;
+      type: QrPickupServiceRequest['type'];
+      submitted_at: string;
+      expires_at: string;
+    }>(
+      `SELECT id, table_id, type,
+              ${isoUtc('submitted_at')} AS submitted_at, ${isoUtc('expires_at')} AS expires_at
+       FROM relay.qr_service_requests
+       WHERE status = 'SUBMITTED' AND expires_at >= now()
+       ORDER BY submitted_at, id LIMIT 100`,
+    );
+  });
+  return json(200, {
+    requests: rows.map((row): QrPickupServiceRequest => ({
+      id: row.id,
+      tableId: row.table_id,
+      type: row.type,
+      submittedAt: row.submitted_at,
+      expiresAt: row.expires_at,
+    })),
+  });
+}
+
+/** QR-011: what became of a diner's request; receiving one too late marks it expired. */
+async function updateRequest(
+  request: Request,
+  context: FunctionContext,
+  match: RegExpExecArray,
+): Promise<Response> {
+  const params = QrServiceRequestParams.safeParse({ requestId: match[1] });
+  if (!params.success) throw new HttpError(400, 'VALIDATION_FAILED', 'Unknown request id.');
+  const body = await readBody(request, UpdateQrServiceRequest);
+  const outcome = await context.db.transaction(
+    async (tx): Promise<UpdateQrServiceRequestResponse | 'EXPIRED' | 'NOT_FOUND'> => {
+      await openServer(tx, request);
+      try {
+        const [row] = await tx.savepoint((change) =>
+          change.query<UpdateQrServiceRequestResponse>(
+            `UPDATE relay.qr_service_requests SET status = $2,
+               rejection_reason = coalesce($3, rejection_reason)
+             WHERE id = $1 RETURNING id, status`,
+            [params.data.requestId, body.status, body.rejectionReason ?? null],
+          ),
+        );
+        return row ?? 'NOT_FOUND';
+      } catch (error) {
+        if (sqlStateOf(error) === 'RL409') {
+          throw new HttpError(409, 'INVALID_STATUS_CHANGE', 'The request cannot move that way.');
+        }
+        if (sqlStateOf(error) !== 'RL410') throw error;
+        await tx.query(
+          "UPDATE relay.qr_service_requests SET status = 'EXPIRED' WHERE id = $1 AND status = 'SUBMITTED'",
+          [params.data.requestId],
+        );
+        return 'EXPIRED';
+      }
+    },
+  );
+  if (outcome === 'NOT_FOUND') {
+    throw new HttpError(404, 'REQUEST_NOT_FOUND', 'No such request of this restaurant.');
+  }
+  if (outcome === 'EXPIRED') {
+    throw new HttpError(410, 'REQUEST_EXPIRED', 'The request was not picked up in time.');
+  }
+  return json(200, outcome);
+}
+
 export const server = serveRoutes([
   { method: 'POST', path: /\/server\/session$/, handler: session },
   { method: 'POST', path: /\/server\/presence$/, handler: presence },
@@ -315,4 +392,10 @@ export const server = serveRoutes([
   { method: 'PUT', path: /\/server\/tables$/, handler: syncTables },
   { method: 'GET', path: /\/server\/orders$/, handler: pickup },
   { method: 'POST', path: /\/server\/orders\/([^/]+)\/status$/, handler: updateOrder },
+  { method: 'GET', path: /\/server\/service-requests$/, handler: pickupRequests },
+  {
+    method: 'POST',
+    path: /\/server\/service-requests\/([^/]+)\/status$/,
+    handler: updateRequest,
+  },
 ]);
