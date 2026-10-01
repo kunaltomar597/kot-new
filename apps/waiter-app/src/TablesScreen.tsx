@@ -17,6 +17,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { NotificationsOff } from './notifications';
 import { OpenTableSheet } from './OpenTableSheet';
 import { PagerCard } from './PagerCard';
+import { Approvals } from './Approvals';
 import { ServiceRequests } from './ServiceRequests';
 import { UnsentHome } from './UnsentOrders';
 
@@ -108,6 +109,7 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
           setView(next === 'all' ? 'all' : 'mine');
         }}
       />
+      <Approvals />
       <ServiceRequests show={showRequest} />
       {data.status === 'loading' && <Note>{t('states.loading')}</Note>}
       {data.status === 'error' && (

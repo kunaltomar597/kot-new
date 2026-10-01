@@ -104,7 +104,10 @@ Built in three parts:
   - `GET /api/v1/menu/bestsellers` (`menu.bestSellerCount`).
   - The pending-approval alert and its escalation already existed (P2-03).
 - P3-03b The waiter app's approvals inbox and the POS's approvals: view, edit with the diner's
-  agreement, approve in at most 2 taps, reject with a reason.
+  agreement, approve in at most 2 taps, reject with a reason (done):
+  - `apps/waiter-app/src/Approvals.tsx`, on the tables screen and on each table's screen;
+  - `apps/console/src/pos/Approvals.tsx`, above the POS floor;
+  - `@rp/ordering` `approval-view.ts`, shared by both.
 - P3-03c The tablet's ordering: menu (categories, cards, filters, sorting, tax note), fuzzy search
   (fuse.js), item options, cart with review and estimated taxes, submit and "Waiting for waiter
   confirmation", live item statuses, "My order", out of stock live, "Please call a waiter"

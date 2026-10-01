@@ -7,3 +7,4 @@ export * from './menu-view.js';
 export * from './order-state.js';
 export * from './recommendation-text.js';
 export * from './reorder.js';
+export * from './approval-view.js';

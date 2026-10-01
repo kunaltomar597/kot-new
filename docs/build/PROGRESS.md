@@ -172,7 +172,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-03b Approvals in the waiter app and the POS.
 - P3-03c Ordering on the table tablet.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -264,7 +263,7 @@ Recommended next WPs (dependencies met):
 - [x] P3-01c Locate a tablet from the dashboard (MGR-006, Should)
 - [x] P3-02 Service requests on the tablet (server side in P2-06d)
 - [x] P3-03a Diners' orders and approval: server
-- [ ] P3-03b Approvals in the waiter app and the POS
+- [x] P3-03b Approvals in the waiter app and the POS
 - [ ] P3-03c Ordering on the table tablet
 - [x] P3-04 Recommendation engine v1
 - [ ] P3-05 Recommendation UI and feedback
@@ -572,6 +571,20 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-03b):
+
+305. Diners' orders waiting for approval show as a card: at the top of the waiter's tables screen,
+     on each table's screen (that table's), and above the POS floor. The card is there only while
+     something waits.
+     - Each order shows its table and number, how long it has waited, its total, and each line
+       with its choices and instructions.
+     - Approve sends it in one tap (NFR-U03).
+     - Change sets quantities with steppers (0 removes a line). It approves only once "The diner
+       agreed to these changes" is ticked, and never with nothing left.
+     - Reject asks for the reason the diner sees (3 characters at least).
+     - The cashier and managers see every table's orders, waiters their own (as the server
+       decides).
 
 Decided 2026-10-02 (P3-03a):
 
@@ -1580,6 +1593,25 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-03b Approvals in the waiter app and the POS
+
+Built:
+
+- `@rp/ordering` `approval-view.ts`: `waitingLines`, `approvalChanges`, `approvalTotal`,
+  `anythingLeft`, `approvalsFor` and `affectsApprovals`.
+- The waiter app's `Approvals` on `TablesScreen` and `TableScreen`; the POS's `Approvals` with its
+  change and reject dialogs on `TableOverview`.
+- The `approvals.*` strings, shared by both.
+
+Tests:
+
+- ordering 3;
+- waiter app 3 (one-tap approve with what was chosen, change only after agreement, reject with a
+  reason), with diners' orders in the fake restaurant;
+- console 3 (the same at the POS, with an axe check).
+
+Decision: 305.
 
 ### 2026-10-02: P3-03a Diners' orders and approval (server)
 
