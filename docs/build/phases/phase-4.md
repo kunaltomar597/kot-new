@@ -178,7 +178,7 @@ custom roles under their base role; screens use `grantOf`. The acceptance's Play
 covered by server guard tests and console screen tests instead (the browser suite already runs
 the second factor flow in P4-02a).
 
-## P4-03 Configuration screens
+## P4-03 Configuration screens (split)
 
 Requirements: MGR-007, NTF-002, REC-002, REC-009 (S), KDS-008, BILL-005, BILL-006, UPD-010.
 Depends on: P4-01, P2-03, P3-04, P1-07.
@@ -187,6 +187,18 @@ defaults shown, vendor-controlled settings read-only), notification rules editor
 rules editor with boost/pin/block, stations and printers with test print, discount limits, service
 charge, timers and thresholds. Tax and invoice settings Owner-only with step-up.
 Acceptance: every catalogue setting is editable or visibly read-only; changes audited.
+
+Built in five parts, each its own pull request:
+
+- P4-03a Settings page (done): every catalogue setting by area, the editor chosen from its schema,
+  labels and hints in i18n (`settingLabels`, `settingHints`), defaults shown, a reason kept with
+  each change, vendor settings read-only, Owner-only ones behind the second factor.
+- P4-03b Notification rules: the Appendix C table per event (recipients, channels, pager text,
+  escalate, repeat) over the `notifications.rules` setting, and the nudge presets.
+- P4-03c Recommendation rules with boost, pin and block (REC-002, REC-009).
+- P4-03d Stations and printers with test print (KDS-008, ONB-004 step 6).
+- P4-03e The Owner's restaurant profile, tax groups and invoice series (ONB-004 steps 1 to 3,
+  BILL-002 to BILL-004), with the second factor.
 
 The rules editor uses the P3-04 API (`listRecommendationRules`, `createRecommendationRule`,
 `updateRecommendationRule` with `active` to pause, `archiveRecommendationRule` with a reason), all

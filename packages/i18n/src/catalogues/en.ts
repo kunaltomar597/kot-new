@@ -317,6 +317,7 @@ export const en = {
       staff: 'Staff',
       menu: 'Menu',
       devices: 'Devices',
+      settings: 'Settings',
       security: 'Security',
     },
     overview: {
@@ -1000,6 +1001,383 @@ export const en = {
       reasonRequired: 'Give a reason of at least 3 characters.',
       confirm: 'Archive',
       cancel: 'Cancel',
+    },
+  },
+  /** The Settings page (P4-03a, MGR-007, UPD-010). */
+  settingsPage: {
+    title: 'Settings',
+    intro:
+      'Every timer, limit and switch the restaurant can change. Each change is recorded with who made it and why.',
+    loadFailed: 'The settings could not be loaded.',
+    search: 'Find a setting',
+    area: {
+      auth: 'Sign-in and security',
+      stock: 'Stock',
+      devices: 'Devices',
+      orders: 'Orders',
+      billing: 'Billing',
+      bills: 'Bills',
+      payments: 'Payments',
+      notifications: 'Alerts',
+      pagers: 'Pagers',
+      pager: 'Pagers',
+      kds: 'Kitchen screens',
+      tablet: 'Table tablets',
+      qr: 'QR menu',
+      reco: 'Suggestions',
+      audit: 'Audit',
+      backups: 'Backups',
+      storage: 'Storage',
+      retention: 'Keeping data',
+      updates: 'Updates',
+      licence: 'Licence',
+      controlPlane: 'Vendor connection',
+      onboarding: 'Installation',
+      ui: 'Display',
+    },
+    default: 'Default: {value}',
+    changed: 'Changed',
+    vendor: 'Set by the vendor',
+    ownerOnly: 'Owner only',
+    notYours: 'Someone with more rights changes this.',
+    edit: 'Change',
+    actionsFor: 'Actions for {name}',
+    on: 'On',
+    off: 'Off',
+    none: 'None',
+    empty: 'None yet',
+    unit: {
+      minutes: '{value} min',
+      seconds: '{value} s',
+      hours: '{value} h',
+      days: '{value, plural, one {# day} other {# days}}',
+      months: '{value, plural, one {# month} other {# months}}',
+      percent: '{value}%',
+      bp: '{value}%',
+      rupees: '{value}',
+      GB: '{value} GB',
+      characters: '{value} characters',
+      orders: '{value, plural, one {# order} other {# orders}}',
+      plain: '{value}',
+    },
+    windowValue: '{start} to {end}',
+    openRules: 'Open the notification rules',
+    dialog: {
+      title: 'Change “{name}”',
+      value: 'Value',
+      range: 'From {min} to {max}',
+      listHint: 'One per line.',
+      reason: 'Why (optional)',
+      reasonHint: 'Kept with the change in the audit trail.',
+      useDefault: 'Use the default',
+      save: 'Save',
+      cancel: 'Cancel',
+      invalid: 'This value is not allowed. Check the range and the format.',
+      start: 'From',
+      end: 'Until',
+    },
+    saved: '{name} is saved.',
+    choice: {
+      TAX_EXCLUSIVE: 'Before GST (GST added on the bill)',
+      TAX_INCLUSIVE: 'Include GST',
+      CONTINUOUS: 'Continuous',
+      HOURLY: 'Hourly',
+      '12h': '12-hour (1:30 pm)',
+      '24h': '24-hour (13:30)',
+      ONE_LONG: 'One long',
+      TWO_SHORT: 'Two short',
+      THREE_SHORT: 'Three short',
+      THREE: 'Three',
+      ONE_SHORT: 'One short',
+      LONG_SHORT: 'Long, then short',
+    },
+    field: {
+      READY: 'Food ready',
+      SERVICE_REQUEST: 'Service request',
+      MANAGER: 'Manager or escalation',
+      BREAKFAST: 'Breakfast',
+      LUNCH: 'Lunch',
+      EVENING: 'Evening',
+      DINNER: 'Dinner',
+    },
+  },
+  /** What each setting is called on the Settings page (P4-03a, MGR-007); keys match the catalogue. */
+  settingLabels: {
+    auth: {
+      pinLength: 'PIN length',
+      lockoutMaxFailures: 'Wrong PINs before a login locks',
+      lockoutWindowMinutes: 'Wrong PINs counted within',
+      lockoutMinutes: 'Locked login stays locked for',
+      attemptsPerMinutePerDevice: 'Sign-in attempts per device per minute',
+      accessTokenMinutes: 'Access token lifetime',
+      inactivityMinutes: 'Sign out POS and waiter phones after',
+      managerBrowserInactivityMinutes: 'Sign out manager browsers after',
+      sessionMaxHours: 'Longest session',
+      stepUpMinutes: 'Owner confirmation lasts',
+      overrideSeconds: 'Manager approval lasts',
+      kitchenIndividualLogins: 'Kitchen staff sign in one by one',
+      pairingCodeMinutes: 'Pairing code lasts',
+      deviceTokenMinutes: 'Device token lasts',
+    },
+    stock: {
+      kitchenMayManage: 'Kitchen may mark dishes out of stock',
+    },
+    devices: {
+      lowBatteryAlertPercent: 'Tablet and kitchen screen low battery at',
+    },
+    orders: {
+      specialInstructionsMaxLength: 'Longest special instruction',
+    },
+    billing: {
+      priceMode: 'Menu prices',
+      roundingUnitPaise: 'Round bills to the nearest',
+      cashierDiscountLimitBp: 'Cashier discount limit',
+      serviceChargeEnabled: 'Service charge',
+      serviceChargeRateBp: 'Service charge rate',
+    },
+    bills: {
+      headerLines: 'Bill header lines',
+      footerLines: 'Bill footer lines',
+      printerId: 'Bill printer',
+      hostedCopyDays: 'Digital bill link lasts',
+    },
+    payments: {
+      otherModes: 'Other payment modes',
+    },
+    notifications: {
+      escalationSeconds: 'Escalate to the manager after (N)',
+      repeatSeconds: 'Alert again every (R)',
+      rules: 'Notification rules',
+      nudgePresets: 'Manager nudge messages',
+      diskAlertPercent: 'Disk alert at',
+    },
+    pagers: {
+      heartbeatSeconds: 'Pager reports in every',
+      vibration: 'Pager vibration per alert',
+    },
+    kds: {
+      ageAmberMinutes: 'Ticket turns amber after',
+      ageRedMinutes: 'Ticket turns red after',
+      readyNotCollectedMinutes: 'Ready food not collected after',
+      autoEscalateNotCollected: 'Tell the manager about food not collected',
+      soundVolumePercent: 'Kitchen screen sound volume',
+    },
+    tablet: {
+      idleShowsPromotions: 'Idle tablets show promotions',
+      serviceRequestsPerMinute: 'Requests per tablet per minute',
+    },
+    pager: {
+      vibrationPatterns: 'Pager vibration patterns',
+      lowBatteryPercent: 'Pager low battery at',
+      heartbeatSeconds: 'Pager heartbeat',
+    },
+    qr: {
+      submissionsPerWindow: 'QR orders per table and browser',
+      rateLimitWindowMinutes: 'QR order limit window',
+      pickupTimeoutSeconds: 'QR order expires after (T)',
+      presenceIntervalSeconds: 'Presence signal every',
+      readOnlyAfterSeconds: 'QR menu read-only after',
+    },
+    reco: {
+      learningWindowDays: 'Learn from the last',
+      minSupportBp: 'Learned pairs: minimum support',
+      minConfidenceBp: 'Learned pairs: minimum confidence',
+      minLiftPercent: 'Learned pairs: minimum lift',
+      minOrders: 'Learn only after',
+      bestSellerDays: 'Best sellers counted over',
+      dayparts: 'Times of day',
+      courseSequence: 'Course order',
+    },
+    audit: {
+      dailyReportEnabled: 'Daily suspicious-activity report',
+      discountFlagBp: 'Report discounts above',
+      cashVarianceFlagPaise: 'Report cash differences above',
+    },
+    backups: {
+      walMode: 'Incremental backup',
+      secondLocation: 'Second backup location',
+      keepDaily: 'Daily backups kept',
+      keepWeekly: 'Weekly backups kept',
+      cloudEnabled: 'Encrypted cloud backup',
+    },
+    storage: {
+      warnPercent: 'Disk warning at',
+      criticalPercent: 'Disk critical at',
+    },
+    retention: {
+      operationalDays: 'Keep operational data for',
+      dinerContactMonths: 'Keep diner contacts for',
+      feedbackMonths: 'Keep feedback for',
+    },
+    updates: {
+      maintenanceWindow: 'Updates install between',
+    },
+    licence: {
+      validityDays: 'Licence valid for',
+      overdueToGraceDays: 'Overdue before grace (N)',
+      graceDays: 'Grace period',
+    },
+    controlPlane: {
+      heartbeatSeconds: 'Reports to the vendor every',
+    },
+    onboarding: {
+      minFreeDiskGb: 'Free space the installer needs',
+    },
+    ui: {
+      timeFormat: 'Clock',
+    },
+  },
+  /** What each setting does, from the settings catalogue's descriptions. */
+  settingHints: {
+    auth: {
+      pinLength: 'Digits in a staff PIN; the Owner may require 6.',
+      lockoutMaxFailures: 'Wrong PINs within the window that lock the login.',
+      lockoutWindowMinutes: 'Window in which wrong PINs are counted.',
+      lockoutMinutes: 'How long a locked login stays locked unless a manager unlocks it.',
+      attemptsPerMinutePerDevice: 'Login and override attempts allowed per device per minute.',
+      accessTokenMinutes: 'Lifetime of an access token (at most 15 minutes).',
+      inactivityMinutes: 'Inactivity after which a POS or waiter device signs the person out.',
+      managerBrowserInactivityMinutes:
+        'Inactivity sign-out on manager browsers (personal devices; our default).',
+      sessionMaxHours: 'Longest a session lasts, however active (one long shift; our default).',
+      stepUpMinutes:
+        'How long the Owner’s password and second factor stay fresh for Owner-only actions.',
+      overrideSeconds: 'How long a manager’s PIN approval can be used for the action it approved.',
+      kitchenIndividualLogins:
+        'Kitchen staff sign in one by one instead of the screen acting for the station.',
+      pairingCodeMinutes: 'How long a device pairing code can be used.',
+      deviceTokenMinutes: 'How long a device token lasts before the device signs a new challenge.',
+    },
+    stock: {
+      kitchenMayManage: 'Kitchen staff may mark items out of stock and set stock counts.',
+    },
+    devices: {
+      lowBatteryAlertPercent:
+        'Battery level at or below which a table tablet or kitchen screen raises a low-battery alert.',
+    },
+    orders: {
+      specialInstructionsMaxLength:
+        'Longest special instruction a guest or waiter may write on an item.',
+    },
+    billing: {
+      priceMode: 'Whether menu prices exclude or include GST (our default: exclusive).',
+      roundingUnitPaise:
+        'Grand totals round to the nearest multiple of this (0: no rounding; our default: ₹1).',
+      cashierDiscountLimitBp: 'Largest discount a cashier may give without a manager PIN.',
+      serviceChargeEnabled:
+        'Add a voluntary service charge to bills (off by default; removable on request).',
+      serviceChargeRateBp:
+        'Service charge rate on the taxable value of items when enabled (our default: 5 %).',
+    },
+    bills: {
+      headerLines:
+        'Lines printed on every bill under the restaurant particulars (48 characters each).',
+      footerLines: 'Lines printed at the foot of every bill, e.g. a thank-you note.',
+      printerId:
+        'The printer bills print on, usually the one at the cash counter (none: choose each time).',
+      hostedCopyDays: 'How long a digital bill stays available on its link.',
+    },
+    payments: {
+      otherModes: 'Names of payment modes offered besides cash, card and UPI.',
+    },
+    notifications: {
+      escalationSeconds:
+        'N: an alert not acknowledged within this time goes to the manager on duty.',
+      repeatSeconds: 'R: an unacknowledged alert or service request alerts again this often.',
+      rules:
+        'Changes to the factory notification rules (Appendix C), per event: recipients, channels, pager text, escalation and repeat.',
+      nudgePresets:
+        'Messages a manager can send to waiters with one tap (up to 40 characters each).',
+      diskAlertPercent: 'The data drive this full raises a disk alert for the Owner and managers.',
+    },
+    pagers: {
+      heartbeatSeconds:
+        'How often a pager reports in; three missed heartbeats and it counts as offline.',
+      vibration:
+        'Changes to the pager vibration per alert type (ready: one long; requests: two short; manager: three).',
+    },
+    kds: {
+      ageAmberMinutes: 'A ticket turns amber at this age.',
+      ageRedMinutes: 'A ticket turns red at this age (later than amber).',
+      readyNotCollectedMinutes: 'Ready items not picked up after this long make the ticket flash.',
+      autoEscalateNotCollected: 'Alert the manager without the kitchen pressing "Notify manager".',
+      soundVolumePercent:
+        'Volume of the new-ticket chime and the cancellation sound (our default).',
+    },
+    tablet: {
+      idleShowsPromotions: 'The idle screen of a table tablet shows promotions.',
+      serviceRequestsPerMinute:
+        'Water, Waiter and Bill requests one table tablet may raise in a minute; more are refused until the minute has passed (anti-spam, our default).',
+    },
+    pager: {
+      vibrationPatterns: 'How the pager vibrates for each kind of alert.',
+      lowBatteryPercent:
+        'Battery level at or below which a pager alerts its wearer and the manager, and the waiter app warns.',
+      heartbeatSeconds:
+        'How often a pager reports battery and signal; tuned with battery life (PGR-002).',
+    },
+    qr: {
+      submissionsPerWindow: 'QR orders allowed per table and per browser in the rate-limit window.',
+      rateLimitWindowMinutes: 'Window of the QR order rate limit.',
+      pickupTimeoutSeconds: 'T: a QR order the restaurant has not picked up by then expires.',
+      presenceIntervalSeconds: 'How often the local server tells the QR relay it is present.',
+      readOnlyAfterSeconds:
+        'Without a presence signal for this long, the QR menu becomes read-only.',
+    },
+    reco: {
+      learningWindowDays: 'Orders the "frequently ordered together" rules learn from.',
+      minSupportBp:
+        'Minimum share of orders containing a pair for a learned rule (our default: 0.5 %).',
+      minConfidenceBp: 'Minimum confidence of a learned rule (our default: 20 %).',
+      minLiftPercent: 'Minimum lift of a learned rule, in percent (120 = 1.2×; our default).',
+      minOrders: 'Orders needed before learned rules are used.',
+      bestSellerDays: 'Days of orders that rank best sellers.',
+      dayparts: 'Time-of-day windows best sellers are counted in (our defaults).',
+      courseSequence:
+        'Course order recommendations favour next (menu categories are tagged with a course).',
+    },
+    audit: {
+      dailyReportEnabled: 'Send the Owner a daily suspicious-activity report.',
+      discountFlagBp: 'Discounts above this rate appear in the daily report (our default: 20 %).',
+      cashVarianceFlagPaise:
+        'Cash variances above this appear in the daily report (our default: ₹200).',
+    },
+    backups: {
+      walMode: 'Incremental backup of the database log: continuous or hourly.',
+      secondLocation: 'Folder on a second disk, USB drive or NAS for the nightly full backup.',
+      keepDaily: 'Daily backups kept.',
+      keepWeekly: 'Weekly backups kept.',
+      cloudEnabled: 'Upload an encrypted backup to the cloud every night (the Owner may opt out).',
+    },
+    storage: {
+      warnPercent: 'Data-drive use that raises a warning.',
+      criticalPercent: 'Data-drive use that raises a critical alert (above the warning).',
+    },
+    retention: {
+      operationalDays:
+        'Notifications, heartbeats, debug logs and temporary files are removed after this.',
+      dinerContactMonths:
+        'A diner’s contact details are anonymised after this long without a visit.',
+      feedbackMonths: 'Feedback is anonymised after this long.',
+    },
+    updates: {
+      maintenanceWindow:
+        'Updates install only in this window, unless a manager presses "Install now".',
+    },
+    licence: {
+      validityDays: 'A licence is valid this long from issue and renewed while online.',
+      overdueToGraceDays:
+        'N: an overdue invoice moves the licence to grace after this long (subscription agreement).',
+      graceDays: 'Days of grace, shown on every staff screen, before the licence is restricted.',
+    },
+    controlPlane: {
+      heartbeatSeconds: 'How often this PC reports to the vendor (each answer sets it).',
+    },
+    onboarding: {
+      minFreeDiskGb: 'Free space the installer requires on the data drive.',
+    },
+    ui: {
+      timeFormat: 'Clock format on every screen, bill and report (our default: 12-hour).',
     },
   },
   /** The Owner confirms password and authenticator code for Owner-only actions (AUTH-006). */

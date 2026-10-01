@@ -1454,3 +1454,10 @@ body {
   border: 1px dashed var(--rp-color-border-strong);
   border-radius: var(--rp-radius-md);
 }
+
+/* Settings (P4-03a, MGR-007): the current value stands out from the hint above it. */
+.settings-row__value {
+  margin: 0;
+  font-weight: var(--rp-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
