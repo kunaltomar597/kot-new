@@ -53,7 +53,6 @@ beforeAll(async () => {
         useValue: { ...DEFAULT_REALTIME_OPTIONS, sweepIntervalMs: 200 },
       },
     ],
-    listen: true,
   });
   prisma = app.get(PrismaService);
   url = appUrl(app);

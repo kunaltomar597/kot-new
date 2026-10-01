@@ -3,7 +3,7 @@ import type { QrMenuDocument } from '@rp/contracts/relay';
 import { cloneTemplateDatabase } from '@rp/test-postgres';
 import pg from 'pg';
 import { inject } from 'vitest';
-import type { RelayDatabase } from '../../src/db.js';
+import type { RelayDatabase, Tx } from '../../src/db.js';
 
 /** The relay's own roles (ADR-0015). */
 export const RELAY_ROLES = [
@@ -137,8 +137,11 @@ export interface SeededTenant {
   readonly orderIds: readonly [string, string];
 }
 
-/** Lines of a QR order as the relay stores them (the contract comes with P5-02). */
-export const someLines = () => JSON.stringify([{ itemId: randomUUID(), quantity: 1 }]);
+/** Lines of a QR order as the relay stores them (`OrderLineRequest`, without prices). */
+export const someLines = () =>
+  JSON.stringify([
+    { clientLineId: randomUUID(), itemId: randomUUID(), quantity: 1, modifiers: [] },
+  ]);
 
 /** Inserts an order as the diner at `table`, returning its id. */
 export async function submitOrder(
@@ -215,19 +218,47 @@ export async function seedTenant(db: RelayDb, name: string): Promise<SeededTenan
 
 /**
  * The functions' database as on Supabase: every transaction runs as the edge functions' login
- * (`relay_edge`), which has no rights until it takes a relay role.
+ * (`relay_edge`), which has no rights until it takes a relay role. Like postgres.js on Supabase, a
+ * statement that fails outside a savepoint fails the whole transaction, even when caught.
  */
 export function edgeDatabase(db: RelayDb): RelayDatabase {
   return {
     async transaction(work) {
       const client = await db.admin.connect();
+      let depth = 0;
+      let savepoints = 0;
+      let uncaught: Error | undefined;
+      const tx: Tx = {
+        async query<Row extends object>(text: string, params: readonly unknown[] = []) {
+          try {
+            return (await client.query<Row>(text, [...params])).rows;
+          } catch (error) {
+            if (depth === 0) uncaught ??= error instanceof Error ? error : new Error(String(error));
+            throw error;
+          }
+        },
+        async savepoint(inner) {
+          savepoints += 1;
+          const name = `sp_${String(savepoints)}`;
+          await client.query(`SAVEPOINT ${name}`);
+          depth += 1;
+          try {
+            const value = await inner(tx);
+            await client.query(`RELEASE SAVEPOINT ${name}`);
+            return value;
+          } catch (error) {
+            await client.query(`ROLLBACK TO SAVEPOINT ${name}`);
+            throw error;
+          } finally {
+            depth -= 1;
+          }
+        },
+      };
       try {
         await client.query('BEGIN');
         await client.query('SET LOCAL SESSION AUTHORIZATION relay_edge');
-        const result = await work({
-          query: async <Row extends object>(text: string, params: readonly unknown[] = []) =>
-            (await client.query<Row>(text, [...params])).rows,
-        });
+        const result = await work(tx);
+        if (uncaught !== undefined) throw uncaught;
         await client.query('COMMIT');
         return result;
       } catch (error) {
@@ -265,6 +296,22 @@ export async function lastSeen(db: RelayDb, tenantId: string, secondsAgo: number
       `UPDATE relay.presence SET last_seen_at = now() - make_interval(secs => $2)
        WHERE tenant_id = $1`,
       [tenantId, secondsAgo],
+    );
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
+}
+
+/** Moves an order's pickup deadline into the past, as if T had passed (superuser, rules off). */
+export async function letExpire(db: RelayDb, orderId: string): Promise<void> {
+  const client = await db.admin.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL session_replication_role = replica');
+    await client.query(
+      "UPDATE relay.qr_orders SET expires_at = now() - interval '1 second' WHERE id = $1",
+      [orderId],
     );
     await client.query('COMMIT');
   } finally {

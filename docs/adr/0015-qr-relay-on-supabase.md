@@ -129,6 +129,28 @@ sync agent (P5-03).
   per-browser advisory locks, so a burst cannot slip past them.
 - `relay.expire_orders` runs every minute. An overdue order reads EXPIRED at once in any case.
 
+### The local server's side (P5-02b)
+
+- One function, `server`, with routes: `session`, `presence`, `menu`, `tables`, `orders` and
+  `orders/:id/status`.
+- Every call carries the restaurant's credential (`Authorization: Bearer`). The function checks
+  its hash and acts as `relay_writer` for that restaurant, so a credential never needs to be
+  exchanged before a write.
+- `session` signs an HS256 JWT for Realtime with the project's JWT secret (`RELAY_JWT_SECRET`, a
+  function secret). It carries the role `relay_server` and the tenant, and lasts an hour. Without
+  the secret, the answer is 503 and the sync agent polls `orders`.
+- Presence carries the `qr.*` settings, so the relay enforces what the restaurant set without
+  another call.
+- Menus are versioned by the local server's outbox:
+  - versions only grow, one publication per restaurant at a time;
+  - the same version with the same document is a replay;
+  - anything older is refused, with the latest version.
+- Tables are sent as the full list. A new hash replaces the old one; tables left out are taken
+  out of service, never deleted.
+- Transactions follow postgres.js's rule: a failed statement fails the transaction even when
+  caught. Recovering needs `Tx.savepoint`, as when receiving an order too late marks it expired
+  and keeps that. The Node test adapter enforces the same rule.
+
 ### Tested on plain PostgreSQL, and on Supabase in CI
 
 - The migrations use Supabase objects only when present: the `authenticator` and API roles, the
@@ -156,8 +178,9 @@ sync agent (P5-03).
 
 - Edge functions (P5-02) need a direct database connection (`SUPABASE_DB_URL`, through the
   transaction pooler). Each request is one transaction that sets the role and claims first.
-- Realtime needs a signed JWT. `server-session` (P5-02) signs it with a key held as a function
-  secret.
+- Realtime needs a signed JWT. `server/session` (P5-02b) signs it with the project's JWT secret,
+  held as a function secret. If the project moves to asymmetric signing keys only, the signer
+  changes to ES256 with an imported key; until then, local servers poll.
 - The QR site never talks to the database. Everything it reads or writes goes through functions,
   which can also add caching and rate limits.
 - Deploying the schema to the real Supabase project in Mumbai is a manual step

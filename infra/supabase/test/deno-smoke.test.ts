@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -8,12 +8,14 @@ import {
   BROWSER_ID_HEADER,
   QrMenuResponse,
   QrOrderView,
+  QrPickupResponse,
   QrSubmitOrderResponse,
   TABLE_TOKEN_HEADER,
 } from '@rp/contracts/relay';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IDS, qrMenuDocument } from './helpers/qr-menu.js';
 import {
+  letExpire,
   openRelayDb,
   publishMenu,
   type RelayDb,
@@ -102,8 +104,8 @@ async function start(name: string, databaseUrl: string): Promise<number> {
   return port;
 }
 
-const call = (name: string, init: RequestInit & { query?: string } = {}) =>
-  fetch(`http://127.0.0.1:${String(ports[name])}/${init.query ?? ''}`, {
+const call = (name: string, init: RequestInit & { query?: string; path?: string } = {}) =>
+  fetch(`http://127.0.0.1:${String(ports[name])}/${init.path ?? ''}${init.query ?? ''}`, {
     ...init,
     headers: {
       [TABLE_TOKEN_HEADER]: tenant.tables[0].token,
@@ -134,7 +136,7 @@ describe.runIf(hasDeno)('[QR-006] the bundled functions under Deno', () => {
     const url = new URL(db.url);
     url.username = 'relay_edge';
     url.password = password;
-    for (const name of ['qr-menu', 'submit-order', 'order-status']) {
+    for (const name of ['qr-menu', 'submit-order', 'order-status', 'server']) {
       ports[name] = await start(name, url.toString());
     }
   }, 180_000);
@@ -174,6 +176,59 @@ describe.runIf(hasDeno)('[QR-006] the bundled functions under Deno', () => {
       status: 'SUBMITTED',
       customerName: 'Ravi',
     });
+  });
+
+  it('[QR-009] lets the local server publish, keep its tables, pick up and report', async () => {
+    const asServer = async (path: string, method: string, body?: unknown) => {
+      const response = await call('server', {
+        path: `server/${path}`,
+        method,
+        headers: { authorization: `Bearer ${tenant.credential}` },
+        ...(body !== undefined && { body: JSON.stringify(body) }),
+      });
+      return {
+        status: response.status,
+        body: await response.json(),
+        log: denoLog.join(''),
+      };
+    };
+    const settings = {
+      submissionsPerWindow: 5,
+      rateLimitWindowMinutes: 10,
+      pickupTimeoutSeconds: 60,
+      presenceIntervalSeconds: 30,
+      readOnlyAfterSeconds: 120,
+    };
+    const presence = await asServer('presence', 'POST', { serverVersion: '1.0.0', settings });
+    expect(presence.status, JSON.stringify(presence)).toBe(200);
+    const menu = await asServer('menu', 'PUT', { version: 3, document: qrMenuDocument() });
+    expect(menu.body).toEqual({ version: 3, replayed: false });
+    const tables = await asServer('tables', 'PUT', {
+      tables: tenant.tables.map((table) => ({
+        tableId: table.id,
+        label: table.label,
+        tokenHash: createHash('sha256').update(table.token).digest('hex'),
+        active: true,
+      })),
+    });
+    expect(tables.body, JSON.stringify(tables)).toEqual({ withCode: 2, deactivated: 0 });
+    const pickup = QrPickupResponse.parse((await asServer('orders', 'GET')).body);
+    const waiting = pickup.orders.at(-1);
+    if (waiting === undefined) throw new Error('nothing to pick up');
+    const received = await asServer(`orders/${waiting.id}/status`, 'POST', { status: 'RECEIVED' });
+    expect(received.body, JSON.stringify(received)).toEqual({ id: waiting.id, status: 'RECEIVED' });
+
+    // Too late to receive: the savepoint keeps the expiry and the answer says so.
+    const late = pickup.orders[0];
+    if (late === undefined || late.id === waiting.id) throw new Error('need two orders');
+    await letExpire(db, late.id);
+    const expired = await asServer(`orders/${late.id}/status`, 'POST', { status: 'RECEIVED' });
+    expect(expired.status, JSON.stringify(expired)).toBe(410);
+    const { rows } = await db.admin.query<{ status: string }>(
+      'SELECT status FROM relay.qr_orders WHERE id = $1',
+      [late.id],
+    );
+    expect(rows[0]?.status).toBe('EXPIRED');
   });
 
   it('refuses an unknown table code', async () => {

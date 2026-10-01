@@ -65,7 +65,8 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
       version: '0.0.0-test',
     }) as unknown as Doc;
     for (const registered of relay.RELAY_ROUTES) {
-      expect(document.paths[registered.path]?.[registered.method.toLowerCase()]).toBeDefined();
+      const path = registered.path.replace(/:([A-Za-z0-9_]+)/g, '{$1}');
+      expect(document.paths[path]?.[registered.method.toLowerCase()], path).toBeDefined();
     }
     for (const name of collectSchemas(relay).keys()) {
       expect(document.components.schemas).toHaveProperty([name]);

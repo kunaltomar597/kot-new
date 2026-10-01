@@ -35,6 +35,9 @@ export async function createTestApp(
   const app = moduleRef.createNestApplication(NEST_APP_OPTIONS);
   configureControlPlaneApp(app);
   await app.init();
+  // On a port of its own at 127.0.0.1, so supertest never shares a port number with another
+  // process (see apps/server/test/helpers/test-app.ts).
+  await app.listen(0, '127.0.0.1');
   return app;
 }
 

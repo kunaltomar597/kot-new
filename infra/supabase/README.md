@@ -16,7 +16,9 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
   - Retention is `relay.purge()`, run hourly by pg_cron.
 - `src/`: the edge functions, as Fetch API handlers tested on Node.
   - `qr-menu`, `submit-order` and `order-status` are for diners' browsers (P5-02a).
-  - The local server's functions come with P5-02b.
+  - `server` is for the restaurant's local server, with its credential (P5-02b): a Realtime
+    session, presence with the QR settings, publishing the menu, the tables with their code
+    hashes, picking up orders and reporting their status.
   - `src/entries/` holds the Supabase entries. `pnpm --filter @rp/relay build` bundles them with
     esbuild into `dist/functions/<name>/index.js`, which `config.toml` names.
   - The request and response schemas are in `@rp/contracts/relay`, documented in

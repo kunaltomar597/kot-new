@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   DENIED,
+  letExpire,
   openRelayDb,
   type RelayDb,
   refusal,
@@ -54,22 +55,6 @@ const setStatus = (id: string, status: string, detail?: object) =>
       detail === undefined ? null : JSON.stringify(detail),
     ]),
   );
-
-/** Moves an order's pickup deadline into the past, as if T had passed (superuser only). */
-async function letExpire(id: string) {
-  const client = await db.admin.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SET LOCAL session_replication_role = replica');
-    await client.query(
-      "UPDATE relay.qr_orders SET expires_at = now() - interval '1 second' WHERE id = $1",
-      [id],
-    );
-    await client.query('COMMIT');
-  } finally {
-    client.release();
-  }
-}
 
 describe('[QR-007] a new order', () => {
   it('starts as SUBMITTED, stamped by the relay, and expires after T', async () => {
@@ -178,7 +163,7 @@ describe('[QR-007] status moves only forward', () => {
 describe('[QR-007] an order nobody picked up in time', () => {
   it('can no longer be received; it is marked expired and stays so', async () => {
     const id = await submitOrder(db, tenant.id, tenant.tables[0].id);
-    await letExpire(id);
+    await letExpire(db, id);
     expect((await refusal(setStatus(id, 'RECEIVED'))).code).toBe('RL410');
     await setStatus(id, 'EXPIRED');
     expect((await orderOf(id)).status).toBe('EXPIRED');

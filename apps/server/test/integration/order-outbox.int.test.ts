@@ -51,7 +51,7 @@ const phoneFetch: typeof fetch = async (input, init) => {
 
 beforeAll(async () => {
   database = await createTestDatabase();
-  app = await createTestApp({ databaseUrl: database.url, listen: true });
+  app = await createTestApp({ databaseUrl: database.url });
   prisma = app.get(PrismaService);
   kit = await createAuthKit(app);
   const base = { restaurantId: kit.restaurantId };

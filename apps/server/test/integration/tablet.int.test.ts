@@ -73,7 +73,7 @@ const openAlerts = (deviceId: string) =>
 
 beforeAll(async () => {
   database = await createTestDatabase();
-  app = await createTestApp({ databaseUrl: database.url, listen: true });
+  app = await createTestApp({ databaseUrl: database.url });
   prisma = app.get(PrismaService);
   kit = await createAuthKit(app);
   waiter = await signIn(app, kit, 'WAITER');
