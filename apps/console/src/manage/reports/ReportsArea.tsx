@@ -20,7 +20,7 @@ export const REPORT_GROUPS = {
   tax: ['gst', 'register'],
   people: ['staff', 'shifts'],
   controls: ['discounts', 'cancellations', 'reprints', 'suspicious'],
-  operations: ['kitchen', 'tables', 'suggestions'],
+  operations: ['kitchen', 'tables', 'suggestions', 'feedback'],
 } as const;
 export type ReportGroup = keyof typeof REPORT_GROUPS;
 export type ReportSlug = (typeof REPORT_GROUPS)[ReportGroup][number];

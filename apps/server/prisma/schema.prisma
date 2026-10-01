@@ -1788,3 +1788,60 @@ model InboxMessage {
   @@index([restaurantId])
   @@map("inbox")
 }
+
+// ---------------------------------------------------------------- diners' feedback (P3-05b)
+
+/// Where a diner left feedback: the table tablet, or the QR page later (P5).
+enum FeedbackSource {
+  TABLE_TABLET
+  QR
+}
+
+/// Feedback after the bill (TAB-014): food and service out of 5 and a comment. Kept for the
+/// feedback report (RPT-013); anonymised after `retention.feedbackMonths` (P7), never deleted.
+model Feedback {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  restaurantId   String         @map("restaurant_id") @db.Uuid
+  businessDate   DateTime       @map("business_date") @db.Date
+  source         FeedbackSource
+  /// One feedback per table session (the guests at the table that day).
+  tableSessionId String?        @unique @map("table_session_id") @db.Uuid
+  tableId        String?        @map("table_id") @db.Uuid
+  deviceId       String?        @map("device_id") @db.Uuid
+  foodRating     Int            @map("food_rating")
+  serviceRating  Int            @map("service_rating")
+  comment        String?
+  /// The diner's contact, given with consent; null without one or after erasure.
+  dinerContactId String?        @map("diner_contact_id") @db.Uuid
+  dinerContact   DinerContact?  @relation(fields: [dinerContactId], references: [id])
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, businessDate])
+  @@map("feedback")
+}
+
+/// A diner's phone, kept only with explicit consent recorded with its purpose, words and time
+/// (BILL-011, SEC-019). Erasure on request (DATA-011) clears the number and keeps the record of
+/// consent and erasure; invoices keep what tax law needs.
+model DinerContact {
+  id             String     @id @default(uuid(7)) @db.Uuid
+  restaurantId   String     @map("restaurant_id") @db.Uuid
+  /// E.164-style "+91…"; null once erased.
+  phone          String?
+  /// What the diner agreed to, e.g. "DIGITAL_BILL_AND_FEEDBACK".
+  consentPurpose String     @map("consent_purpose")
+  /// The exact words the diner agreed to.
+  consentText    String     @map("consent_text")
+  consentGivenAt DateTime   @map("consent_given_at") @db.Timestamptz(3)
+  /// Where consent was given (TABLE_TABLET, QR, POS).
+  consentSource  String     @map("consent_source")
+  deviceId       String?    @map("device_id") @db.Uuid
+  erasedAt       DateTime?  @map("erased_at") @db.Timestamptz(3)
+  feedback       Feedback[]
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([restaurantId, phone])
+  @@map("diner_contacts")
+}

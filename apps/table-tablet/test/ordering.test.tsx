@@ -271,8 +271,9 @@ function setup() {
   return { server, sockets, session, device, orders };
 }
 
-async function atTable() {
+async function atTable(table: TabletTableView = TABLE) {
   const context = setup();
+  context.server.on('GET', '/api/v1/devices/current/table', () => ({ status: 200, body: table }));
   await context.session.start();
   await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
   await render(<App session={context.session} translator={t} device={context.device} />);
@@ -482,5 +483,48 @@ describe('[TAB-011] [REC-008] suggestions on the tablet', () => {
       },
       { timeout: 6_000 },
     );
+  });
+});
+
+describe('[TAB-014] [BILL-011] feedback after the bill', () => {
+  it('asks once the bill is printed, and keeps a number only with consent', async () => {
+    const { server } = await atTable({ ...TABLE, state: 'BILL_PRINTED' });
+    server.on('POST', '/api/v1/devices/current/feedback', () => ({
+      status: 201,
+      body: { id: ID(7950) },
+    }));
+    expect(await screen.findByTestId('feedback')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('feedback-send'));
+    expect(screen.getByText(t('mobile.tablet.feedback.rateBoth'))).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole('radio', {
+        name: t('mobile.tablet.feedback.star', { label: 'Food', count: 5 }),
+      }),
+    );
+    await fireEvent.press(
+      screen.getByRole('radio', {
+        name: t('mobile.tablet.feedback.star', { label: 'Service', count: 4 }),
+      }),
+    );
+    await fireEvent.changeText(screen.getByTestId('feedback-phone'), '98765 43210');
+    await fireEvent.press(screen.getByTestId('feedback-send'));
+    expect(screen.getByText(t('mobile.tablet.feedback.consentNeeded'))).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole('checkbox', { name: t('mobile.tablet.feedback.consent') }),
+    );
+    await fireEvent.press(screen.getByTestId('feedback-send'));
+    expect(await screen.findByTestId('feedback-thanks')).toBeOnTheScreen();
+    expect(server.callsTo('POST', '/api/v1/devices/current/feedback')[0]?.body).toEqual({
+      foodRating: 5,
+      serviceRating: 4,
+      phone: '98765 43210',
+      consent: true,
+      consentText: t('mobile.tablet.feedback.consent'),
+    });
+  });
+
+  it('is not asked before the bill', async () => {
+    await atTable();
+    expect(screen.queryByTestId('feedback')).toBeNull();
   });
 });

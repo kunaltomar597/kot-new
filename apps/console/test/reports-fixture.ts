@@ -6,6 +6,7 @@ import type {
   RecommendationReportResponse,
   SalesSummaryResponse,
   SuspiciousActivityResponse,
+  FeedbackReportResponse,
 } from '@rp/contracts';
 import { STAFF } from './fakes.js';
 
@@ -284,6 +285,40 @@ export function suspiciousReport(from: string, to: string): SuspiciousActivityRe
     people: [
       { ...person('CASHIER'), count: 2 },
       { ...person('WAITER'), count: 1 },
+    ],
+  };
+}
+
+/** RPT-013: two tables' feedback, one with a comment and a number left with consent. */
+export function feedbackReport(from: string, to: string): FeedbackReportResponse {
+  return {
+    from,
+    to,
+    count: 2,
+    averageFood: 450,
+    averageService: 350,
+    byDay: [{ businessDate: from, count: 2, averageFood: 450, averageService: 350 }],
+    entries: [
+      {
+        id: '0199a0e0-0000-7000-8000-0000000000f1',
+        businessDate: from,
+        createdAt: '2026-10-01T09:30:00.000Z',
+        tableLabel: 'T4',
+        foodRating: 5,
+        serviceRating: 3,
+        comment: 'Lovely dal, slow service',
+        hasContact: true,
+      },
+      {
+        id: '0199a0e0-0000-7000-8000-0000000000f2',
+        businessDate: from,
+        createdAt: '2026-10-01T09:00:00.000Z',
+        tableLabel: 'T2',
+        foodRating: 4,
+        serviceRating: 4,
+        comment: null,
+        hasContact: false,
+      },
     ],
   };
 }

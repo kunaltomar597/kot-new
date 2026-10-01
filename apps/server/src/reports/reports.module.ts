@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
+import { FeedbackModule } from '../feedback/feedback.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { OrderDrillDownService } from './order-drill-down.service.js';
@@ -21,7 +22,7 @@ import { SuspiciousActivityService } from './suspicious-activity.service.js';
  * report with its daily job.
  */
 @Module({
-  imports: [SettingsModule, NotificationsModule],
+  imports: [SettingsModule, NotificationsModule, FeedbackModule],
   controllers: [ReportsController],
   providers: [
     ReportsService,

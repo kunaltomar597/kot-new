@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestj
 import {
   type CancellationReportResponse,
   type DiscountReportResponse,
+  type FeedbackReportResponse,
   type GstSummaryResponse,
   InvoiceRegisterQuery,
   type InvoiceRegisterResponse,
@@ -31,6 +32,7 @@ import { ReportExportService } from './report-export.service.js';
 import { ReportSuiteService } from './report-suite.service.js';
 import { ReportsService } from './reports.service.js';
 import { SuspiciousActivityService } from './suspicious-activity.service.js';
+import { FeedbackService } from '../feedback/feedback.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
   if (request.principal === undefined) throw authErrors.unauthenticated();
@@ -54,6 +56,7 @@ export class ReportsController {
     private readonly drillDowns: OrderDrillDownService,
     private readonly suite: ReportSuiteService,
     private readonly suspicious: SuspiciousActivityService,
+    private readonly feedback: FeedbackService,
   ) {}
 
   @Get('sources')
@@ -126,6 +129,15 @@ export class ReportsController {
     @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
   ): Promise<ReprintReportResponse> {
     return this.suite.reprints(restaurantOf(request), range);
+  }
+
+  @Get('feedback')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  feedbackReport(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<FeedbackReportResponse> {
+    return this.feedback.report(restaurantOf(request), range);
   }
 
   @Get('suspicious')

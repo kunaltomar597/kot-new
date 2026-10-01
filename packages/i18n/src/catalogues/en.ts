@@ -298,6 +298,22 @@ export const en = {
       unbound: 'This tablet has no table yet.',
       unboundHint: 'A manager chooses its table on the dashboard: Devices, then Move.',
       locating: 'Here I am: {name}',
+      /** Feedback after the bill (P3-05b, TAB-014, BILL-011). */
+      feedback: {
+        title: 'How was everything?',
+        food: 'Food',
+        service: 'Service',
+        star: '{label}: {count} of 5',
+        comment: 'Anything you want to tell us? (optional)',
+        phone: 'Your mobile number (optional)',
+        phoneHint: 'Only if you want your bill and a reply on WhatsApp or SMS.',
+        consentLegend: 'Your consent',
+        consent: 'Send my bill and follow up on my feedback on WhatsApp or SMS at this number.',
+        consentNeeded: 'Tick the box to leave your number, or clear the number.',
+        rateBoth: 'Choose a rating for the food and the service.',
+        send: 'Send',
+        thanks: 'Thank you for your feedback!',
+      },
       /** Ordering from the table (P3-03c, TAB-005 to TAB-010, TAB-013). */
       ordering: {
         views: 'Menu, your order or what you ordered',
@@ -1421,6 +1437,7 @@ export const en = {
       kitchen: 'Kitchen',
       tables: 'Tables',
       suggestions: 'Suggestions',
+      feedback: 'Feedback',
     },
     columns: {
       date: 'Date',
@@ -1451,6 +1468,7 @@ export const en = {
       station: 'Station',
       table: 'Table',
       layer: 'Layer',
+      comment: 'Comment',
     },
     source: {
       POS: 'POS',
@@ -1628,6 +1646,19 @@ export const en = {
       spend: 'Spend',
       spendPerCover: 'Spend per cover',
       table: 'By table',
+    },
+    /** RPT-013 (P3-05b). */
+    feedback: {
+      count: 'Feedback received',
+      food: 'Food',
+      service: 'Service',
+      average: '{value} of 5',
+      noRating: '–',
+      chart: 'Food rating by day',
+      table: 'What diners said',
+      table2: 'Ratings by day',
+      noComment: 'No comment',
+      contact: 'Left a number',
     },
     suggestions: {
       revenue: 'Sales from suggestions',

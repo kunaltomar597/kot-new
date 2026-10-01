@@ -24,6 +24,7 @@ export * from './recommendations.js';
 export * from './reports.js';
 export * from './routes.js';
 export * from './service-requests.js';
+export * from './feedback.js';
 export * from './settings.js';
 export * from './table-sessions.js';
 export * from './system.js';

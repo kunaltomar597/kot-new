@@ -1,0 +1,1 @@
+{ "input": { "type": "string", "maxLength": 20 }, "output": { "type": "string", "maxLength": 20 } }

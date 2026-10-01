@@ -20,7 +20,8 @@
           "TABLES",
           "RECOMMENDATIONS",
           "AUDIT",
-          "SUSPICIOUS"
+          "SUSPICIOUS",
+          "FEEDBACK"
         ]
       },
       "from": {
@@ -65,7 +66,8 @@
           "TABLES",
           "RECOMMENDATIONS",
           "AUDIT",
-          "SUSPICIOUS"
+          "SUSPICIOUS",
+          "FEEDBACK"
         ]
       },
       "from": {

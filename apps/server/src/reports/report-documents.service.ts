@@ -6,6 +6,7 @@ import { formatLocal } from '../printing/escpos.js';
 import { ReportSuiteService } from './report-suite.service.js';
 import { ReportsService } from './reports.service.js';
 import { SuspiciousActivityService } from './suspicious-activity.service.js';
+import { FeedbackService } from '../feedback/feedback.service.js';
 
 /** What each report is called at the top of its file (RPT-017). */
 export const REPORT_TITLES: Record<ReportKind, string> = {
@@ -25,6 +26,7 @@ export const REPORT_TITLES: Record<ReportKind, string> = {
   RECOMMENDATIONS: 'Recommendation performance',
   AUDIT: 'Audit log',
   SUSPICIOUS: 'Suspicious activity',
+  FEEDBACK: 'Customer feedback',
 };
 
 /** The patterns of the suspicious-activity report as its file names them (AUD-006). */
@@ -85,6 +87,7 @@ export class ReportDocumentsService {
     private readonly suite: ReportSuiteService,
     private readonly audit: AuditViewerService,
     private readonly suspicious: SuspiciousActivityService,
+    private readonly feedback: FeedbackService,
   ) {}
 
   /** `ownShiftsOf` limits a cashier's shift report to their own shifts. */
@@ -646,6 +649,49 @@ export class ReportDocumentsService {
             heading: 'People',
             columns: columns(['Person', 'text'], ['Flags', 'number']),
             rows: report.people.map((person) => [person.name, person.count]),
+          },
+        ];
+      }
+      case 'FEEDBACK': {
+        const report = await this.feedback.report(restaurantId, range);
+        const stars = (hundredths: number | null) =>
+          hundredths === null ? null : (hundredths / 100).toFixed(2);
+        return [
+          {
+            heading: 'By business date',
+            columns: columns(
+              ['Business date', 'date'],
+              ['Feedback', 'number'],
+              ['Food (of 5)', 'text'],
+              ['Service (of 5)', 'text'],
+            ),
+            rows: [
+              ...report.byDay.map((day) => [
+                day.businessDate,
+                day.count,
+                stars(day.averageFood),
+                stars(day.averageService),
+              ]),
+              ['Total', report.count, stars(report.averageFood), stars(report.averageService)],
+            ],
+            totalRow: true,
+          },
+          {
+            heading: 'Comments',
+            columns: columns(
+              ['When', 'text'],
+              ['Table', 'text'],
+              ['Food', 'number'],
+              ['Service', 'number'],
+              ['Comment', 'text'],
+            ),
+            rows: report.entries.map((entry) => [
+              local(entry.createdAt),
+              entry.tableLabel,
+              entry.foodRating,
+              entry.serviceRating,
+              entry.comment,
+            ]),
           },
         ];
       }
