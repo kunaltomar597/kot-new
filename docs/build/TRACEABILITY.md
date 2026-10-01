@@ -22,7 +22,7 @@ Must: 178 / 287 covered. Should: 4 / 24. Could: 0 / 7.
 - AUTH-013 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/auth-sessions.int.test.ts
 - ONB-001 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/devices.int.test.ts
 - ONB-003 (M): apps/control-plane/test/integration/enrolment.int.test.ts, apps/control-plane/test/unit/enrolment-code.test.ts, apps/server/test/unit/control-plane-client.test.ts, packages/contracts/test/control-plane.test.ts
-- ONB-004 (M): apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/printing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/unit/escpos.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/restaurant.test.ts, packages/contracts/test/settings.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/gstin.test.ts
+- ONB-004 (M): apps/console/test/printing-view.test.ts, apps/console/test/printing.test.tsx, apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/printing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/unit/escpos.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/restaurant.test.ts, packages/contracts/test/settings.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/gstin.test.ts
 - ONB-005 (M): apps/server/test/integration/menu-import.int.test.ts, apps/server/test/unit/menu-workbook.test.ts, packages/domain/test/csv.test.ts, packages/domain/test/menu-import.test.ts
 - ONB-009 (M): apps/server/test/integration/menu-import.int.test.ts
 - MENU-001 (M): apps/console/test/menu-editor.test.tsx, apps/console/test/menu-view.test.ts, apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/menu-admin.test.ts
@@ -58,13 +58,13 @@ Must: 178 / 287 covered. Should: 4 / 24. Could: 0 / 7.
 - ORD-015 (M): packages/contracts/test/contracts.test.ts
 - ORD-017 (M): apps/server/test/integration/orders.int.test.ts, apps/waiter-app/test/orders.test.tsx, packages/contracts/test/contracts.test.ts
 - KDS-001 (M): apps/console/e2e/console.e2e.ts, apps/console/test/console.test.tsx, apps/console/test/kds-screen.test.tsx, apps/console/test/modes.test.ts, apps/server/test/integration/console-static.int.test.ts, apps/server/test/integration/kds.int.test.ts
-- KDS-002 (M): apps/console/test/devices-view.test.ts, apps/console/test/kds-screen.test.tsx, apps/server/test/integration/kds.int.test.ts, apps/server/test/integration/printing.int.test.ts
+- KDS-002 (M): apps/console/test/devices-view.test.ts, apps/console/test/kds-screen.test.tsx, apps/console/test/printing-view.test.ts, apps/server/test/integration/kds.int.test.ts, apps/server/test/integration/printing.int.test.ts
 - KDS-003 (M): apps/console/e2e/console.e2e.ts, apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts, apps/server/test/integration/kds.int.test.ts, packages/contracts/test/contracts.test.ts
 - KDS-004 (M): apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts
 - KDS-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts, apps/server/test/integration/kds.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts
 - KDS-006 (M): apps/console/test/alerts.test.tsx, apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts, apps/server/test/integration/kds.int.test.ts, apps/server/test/unit/notification-triggers.test.ts, packages/ordering/test/alert-text.test.ts
 - KDS-007 (M): apps/console/e2e/console.e2e.ts, apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts, apps/server/test/integration/kds.int.test.ts, apps/waiter-app/test/serving.test.tsx
-- KDS-008 (M): apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/printing.int.test.ts, apps/server/test/unit/escpos.test.ts, apps/server/test/unit/printer-routing.test.ts, apps/server/test/unit/realtime-rooms.test.ts
+- KDS-008 (M): apps/console/test/printing-view.test.ts, apps/console/test/printing.test.tsx, apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/printing.int.test.ts, apps/server/test/unit/escpos.test.ts, apps/server/test/unit/printer-routing.test.ts, apps/server/test/unit/realtime-rooms.test.ts
 - KDS-009 (M): apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts
 - KDS-010 (S): apps/console/test/kds-view.test.ts
 - KDS-011 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/PinPad.test.tsx, packages/ui-web/test/styles.test.ts
@@ -99,13 +99,13 @@ Must: 178 / 287 covered. Should: 4 / 24. Could: 0 / 7.
 - TAB-015 (M): apps/server/test/integration/notifications-extra.int.test.ts
 - QR-006 (M): packages/contracts/test/contracts.test.ts
 - REC-001 (M): packages/domain/test/recommendations.test.ts
-- REC-002 (M): apps/console/test/recommendations-view.test.ts, apps/console/test/recommendations.test.tsx, apps/server/test/integration/recommendations.int.test.ts, packages/contracts/test/recommendations.test.ts, packages/domain/test/recommendations.test.ts
+- REC-002 (M): apps/console/e2e/console.e2e.ts, apps/console/test/recommendations-view.test.ts, apps/console/test/recommendations.test.tsx, apps/server/test/integration/recommendations.int.test.ts, packages/contracts/test/recommendations.test.ts, packages/domain/test/recommendations.test.ts
 - REC-004 (M): apps/server/test/integration/recommendations.int.test.ts, packages/domain/test/recommendations.test.ts
 - REC-005 (M): apps/server/test/integration/recommendations.int.test.ts, packages/contracts/test/recommendations.test.ts, packages/domain/test/recommendations.test.ts
 - REC-006 (M): apps/server/test/integration/recommendations.int.test.ts, packages/domain/test/recommendations.test.ts, packages/ordering/test/recommendations.test.ts
 - REC-007 (M): apps/server/test/integration/recommendations.int.test.ts, packages/contracts/test/recommendations.test.ts, packages/domain/test/recommendations.test.ts
 - REC-008 (M): apps/server/test/integration/recommendations.int.test.ts, packages/contracts/test/recommendations.test.ts, packages/ordering/test/recommendations.test.ts
-- REC-009 (S): apps/console/test/recommendations-view.test.ts, apps/console/test/recommendations.test.tsx, apps/server/test/integration/recommendations.int.test.ts, packages/domain/test/recommendations.test.ts, packages/ordering/test/recommendations.test.ts
+- REC-009 (S): apps/console/e2e/console.e2e.ts, apps/console/test/recommendations-view.test.ts, apps/console/test/recommendations.test.tsx, apps/server/test/integration/recommendations.int.test.ts, packages/domain/test/recommendations.test.ts, packages/ordering/test/recommendations.test.ts
 - REC-011 (M): apps/server/test/integration/recommendations-performance.int.test.ts, packages/domain/test/recommendations.test.ts
 - NTF-001 (M): apps/server/test/integration/notifications.int.test.ts
 - NTF-002 (M): apps/console/test/notification-rules.test.tsx, apps/server/test/integration/notifications.int.test.ts, apps/server/test/integration/service-requests.int.test.ts, packages/domain/test/notifications.test.ts
