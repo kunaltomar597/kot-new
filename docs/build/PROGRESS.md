@@ -172,7 +172,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-05b Feedback after the bill.
+- P3-06 Phase 3 exit test (S6).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -267,7 +267,7 @@ Recommended next WPs (dependencies met):
 - [x] P3-03c Ordering on the table tablet
 - [x] P3-04 Recommendation engine v1
 - [x] P3-05a Suggestion rows and tracking (tablet, waiter app)
-- [ ] P3-05b Feedback after the bill
+- [x] P3-05b Feedback after the bill
 - [ ] P3-06 Phase 3 exit test (S6)
 
 ### Phase 4: Manager dashboard and reports
@@ -572,6 +572,30 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-05b):
+
+315. The tablet asks for feedback once the table's bill is printed (BILL_PRINTED), while it is
+     online, once per visit: the server takes one per table session and the tablet remembers it
+     with the guests' data.
+316. The feedback form:
+     - food and service out of 5 (large stars), a comment up to 500 characters, and an optional
+       Indian mobile number;
+     - the number needs its consent box ticked. The words of the box are stored with the purpose
+       (`DIGITAL_BILL_AND_FEEDBACK`), the time, where (TABLE_TABLET) and the device (BILL-011,
+       SEC-019).
+     - The consent is audited without the number.
+317. The Feedback report (RPT-013, a Should) gives the averages (in hundredths of a star), the
+     ratings by day with a chart, and every comment with its table, newest first. A diner who left
+     a number is marked, but the number is never shown. It is exported as `FEEDBACK`.
+318. Erasure (DATA-011) is for the Owner with a fresh second factor (DATA_ADMIN), by number:
+     - the number is cleared and `erasedAt` set, and feedback is unlinked from it;
+     - the record that consent was given stays, invoices keep what tax law needs, and the audit
+       entry carries no number.
+       Still to come:
+     - the screen for erasure and the anonymising of old feedback after
+       `retention.feedbackMonths` come with P7's data tools;
+     - sending the digital bill on WhatsApp or SMS comes with P5/P7, which have the provider.
 
 Decided 2026-10-02 (P3-05a):
 
@@ -1643,6 +1667,29 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-05b Feedback after the bill (P3-05 done)
+
+Built:
+
+- Migration `20261002120000_feedback`: `feedback` (unique per table session, rating checks) and
+  `diner_contacts` (consent purpose, words, time, source, device; `erasedAt`).
+- Contracts `feedback.ts`: `Rating`, `IndianMobile`, `TabletFeedbackRequest`, `FeedbackView`,
+  `FeedbackReportResponse`, `EraseDinerContactRequest`; three routes; the `FEEDBACK` export.
+- Server: `FeedbackModule` (`FeedbackService`, the tablet and erase controllers), the report route
+  and its document.
+- Tablet: `FeedbackCard` on the open table while the bill is printed.
+- Console: the Feedback report in Operations.
+
+Tests:
+
+- server `feedback.int.test.ts` 6 (open table and tablet only; once per visit; consent needed for
+  a number and kept with its words; report and export without numbers; erasure by the Owner only,
+  unlinked, audited without the number);
+- tablet 2 (asked after the bill, consent needed; not before);
+- console 1.
+
+Decisions: 315 to 318.
 
 ### 2026-10-02: P3-05a Suggestion rows and tracking
 

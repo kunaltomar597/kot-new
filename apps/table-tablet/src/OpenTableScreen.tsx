@@ -8,6 +8,7 @@ import { SegmentedControl, useTheme, weight } from '@rp/ui-native';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { CartView } from './CartView';
+import { FeedbackCard } from './FeedbackCard';
 import { MenuView } from './MenuView';
 import { MyOrders } from './MyOrders';
 import { ServiceButtons } from './ServiceButtons';
@@ -103,6 +104,9 @@ export function OpenTableScreen({
         <Note tone="danger" testID="call-waiter">
           {t('mobile.tablet.ordering.callWaiter')}
         </Note>
+      )}
+      {table.state === 'BILL_PRINTED' && online && (
+        <FeedbackCard store={store} guestEpoch={guestEpoch} />
       )}
       <ServiceButtons disabled={!online} />
       <SegmentedControl

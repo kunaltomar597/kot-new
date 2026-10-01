@@ -17,9 +17,10 @@ import {
   StatTiles,
   textColumn,
 } from './ReportParts.js';
+import { FeedbackReport } from './FeedbackReport.js';
 import { useReport } from './use-report.js';
 
-type Slug = 'kitchen' | 'tables' | 'suggestions';
+type Slug = 'kitchen' | 'tables' | 'suggestions' | 'feedback';
 type Translate = ReturnType<typeof useT>;
 type StationRow = KitchenReportResponse['stations'][number];
 type DishRow = KitchenReportResponse['items'][number];
@@ -265,5 +266,7 @@ export function OperationsReport({ slug, range }: { slug: Slug; range: ReportRan
       return <Tables range={range} />;
     case 'suggestions':
       return <Suggestions range={range} />;
+    case 'feedback':
+      return <FeedbackReport range={range} />;
   }
 }

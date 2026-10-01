@@ -14,6 +14,7 @@
     { "name": "billing" },
     { "name": "day-end" },
     { "name": "devices" },
+    { "name": "feedback" },
     { "name": "floor" },
     { "name": "kitchen" },
     { "name": "menu" },
@@ -1988,6 +1989,58 @@
         "x-requirements": ["WTR-006", "NTF-004"]
       }
     },
+    "/api/v1/devices/current/feedback": {
+      "post": {
+        "operationId": "submitTabletFeedback",
+        "summary": "Feedback from the table after the bill: food and service, a comment, a number",
+        "description": "TAB-014, BILL-011, SEC-019: once per table session, from the tablet of the open table. A phone number is kept only with consent, recorded with its purpose, words and time.",
+        "tags": ["feedback"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TabletFeedbackRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Thank you.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TabletFeedbackResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device, or invalid credentials.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a table tablet bound to a table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table is not open, or this table already gave feedback.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["TAB-014", "BILL-011", "SEC-019", "AUTH-009"]
+      }
+    },
     "/api/v1/devices/current/health": {
       "post": {
         "operationId": "reportDeviceHealth",
@@ -2741,6 +2794,52 @@
         },
         "x-capability": "PUBLIC",
         "x-requirements": ["AUTH-007", "SEC-006"]
+      }
+    },
+    "/api/v1/diner-contacts/erase": {
+      "post": {
+        "operationId": "eraseDinerContact",
+        "summary": "Erase a diner's phone number on their request",
+        "description": "DATA-011, SEC-019: the number is cleared from every contact record and feedback keeps no link to it; invoices keep what tax law needs. Audited without the number.",
+        "tags": ["feedback"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EraseDinerContactRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Erased.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EraseDinerContactResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["DATA-011", "SEC-019", "AUD-001"]
       }
     },
     "/api/v1/floor": {
@@ -6861,6 +6960,65 @@
         },
         "x-capability": "REPORTS_VIEW_EXPORT",
         "x-requirements": ["RPT-017", "AUD-001"]
+      }
+    },
+    "/api/v1/reports/feedback": {
+      "get": {
+        "operationId": "getFeedbackReport",
+        "summary": "Diners' feedback: ratings by day and the comments",
+        "tags": ["reports"],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FeedbackReportResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["RPT-013", "TAB-014"]
       }
     },
     "/api/v1/reports/gst": {
@@ -11858,6 +12016,7 @@
         "required": ["itemId", "components", "activeFrom", "activeUntil", "timeWindow"],
         "additionalProperties": false
       },
+      "ConsentPurpose": { "type": "string", "enum": ["DIGITAL_BILL_AND_FEEDBACK"] },
       "CreatePagerRequest": {
         "type": "object",
         "properties": {
@@ -12499,8 +12658,90 @@
           { "$ref": "#/components/schemas/RestaurantChanged" }
         ]
       },
+      "EraseDinerContactRequest": {
+        "type": "object",
+        "properties": {
+          "phone": { "$ref": "#/components/schemas/IndianMobile" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["phone", "reason"],
+        "additionalProperties": false
+      },
+      "EraseDinerContactResponse": {
+        "type": "object",
+        "properties": {
+          "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["erased"],
+        "additionalProperties": false
+      },
       "ExportFormat": { "type": "string", "enum": ["CSV", "XLSX", "PDF"] },
       "ExternalId": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "FeedbackReportResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "averageFood": {
+            "anyOf": [{ "type": "integer", "minimum": 100, "maximum": 500 }, { "type": "null" }]
+          },
+          "averageService": {
+            "anyOf": [{ "type": "integer", "minimum": 100, "maximum": 500 }, { "type": "null" }]
+          },
+          "byDay": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+                "count": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                "averageFood": {
+                  "anyOf": [
+                    { "type": "integer", "minimum": 100, "maximum": 500 },
+                    { "type": "null" }
+                  ]
+                },
+                "averageService": {
+                  "anyOf": [
+                    { "type": "integer", "minimum": 100, "maximum": 500 },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": ["businessDate", "count", "averageFood", "averageService"],
+              "additionalProperties": false
+            }
+          },
+          "entries": { "type": "array", "items": { "$ref": "#/components/schemas/FeedbackView" } }
+        },
+        "required": ["from", "to", "count", "averageFood", "averageService", "byDay", "entries"],
+        "additionalProperties": false
+      },
+      "FeedbackView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "tableLabel": { "type": ["string", "null"] },
+          "foodRating": { "$ref": "#/components/schemas/Rating" },
+          "serviceRating": { "$ref": "#/components/schemas/Rating" },
+          "comment": { "type": ["string", "null"] },
+          "hasContact": { "type": "boolean" }
+        },
+        "required": [
+          "id",
+          "businessDate",
+          "createdAt",
+          "tableLabel",
+          "foodRating",
+          "serviceRating",
+          "comment",
+          "hasContact"
+        ],
+        "additionalProperties": false
+      },
       "FloorArchiveRequest": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
@@ -12597,6 +12838,7 @@
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
       },
+      "IndianMobile": { "type": "string", "maxLength": 20 },
       "InvoiceLineView": {
         "type": "object",
         "properties": {
@@ -15922,6 +16164,7 @@
         "required": ["type"],
         "additionalProperties": false
       },
+      "Rating": { "type": "integer", "minimum": 1, "maximum": 5 },
       "RealtimeEndReason": {
         "type": "string",
         "enum": ["DEVICE_REVOKED", "DEVICE_CHANGED", "SESSION_ENDED"]
@@ -16516,7 +16759,8 @@
           "TABLES",
           "RECOMMENDATIONS",
           "AUDIT",
-          "SUSPICIOUS"
+          "SUSPICIOUS",
+          "FEEDBACK"
         ]
       },
       "ReportRangeQuery": {
@@ -18618,6 +18862,38 @@
           "businessDate",
           "payload"
         ],
+        "additionalProperties": false
+      },
+      "TabletFeedbackRequest": {
+        "type": "object",
+        "properties": {
+          "foodRating": { "$ref": "#/components/schemas/Rating" },
+          "serviceRating": { "$ref": "#/components/schemas/Rating" },
+          "comment": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "phone": { "$ref": "#/components/schemas/IndianMobile" },
+          "consent": { "default": false, "type": "boolean" },
+          "consentText": { "type": "string", "minLength": 10, "maxLength": 300 }
+        },
+        "required": ["foodRating", "serviceRating", "consent"],
+        "additionalProperties": false
+      },
+      "TabletFeedbackRequestInput": {
+        "type": "object",
+        "properties": {
+          "foodRating": { "$ref": "#/components/schemas/Rating" },
+          "serviceRating": { "$ref": "#/components/schemas/Rating" },
+          "comment": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "phone": { "$ref": "#/components/schemas/IndianMobile" },
+          "consent": { "default": false, "type": "boolean" },
+          "consentText": { "type": "string", "minLength": 10, "maxLength": 300 }
+        },
+        "required": ["foodRating", "serviceRating"],
+        "additionalProperties": false
+      },
+      "TabletFeedbackResponse": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" } },
+        "required": ["id"],
         "additionalProperties": false
       },
       "TabletOrderRequest": {

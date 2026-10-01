@@ -154,6 +154,13 @@ import {
   ShiftView,
 } from './payments.js';
 import {
+  EraseDinerContactRequest,
+  EraseDinerContactResponse,
+  FeedbackReportResponse,
+  TabletFeedbackRequest,
+  TabletFeedbackResponse,
+} from './feedback.js';
+import {
   ApproveAtTableRequest,
   ApproveOrderRequest,
   BestSellersResponse,
@@ -2240,6 +2247,45 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'submitTabletFeedback',
+    method: 'POST',
+    path: '/api/v1/devices/current/feedback',
+    summary: 'Feedback from the table after the bill: food and service, a comment, a number',
+    description:
+      'TAB-014, BILL-011, SEC-019: once per table session, from the tablet of the open table. ' +
+      'A phone number is kept only with consent, recorded with its purpose, words and time.',
+    tags: ['feedback'],
+    requirements: ['TAB-014', 'BILL-011', 'SEC-019', 'AUTH-009'],
+    capability: 'DEVICE',
+    request: { body: TabletFeedbackRequest },
+    responses: {
+      201: { description: 'Thank you.', schema: TabletFeedbackResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet bound to a table.', schema: ApiError },
+      409: {
+        description: 'The table is not open, or this table already gave feedback.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'eraseDinerContact',
+    method: 'POST',
+    path: '/api/v1/diner-contacts/erase',
+    summary: "Erase a diner's phone number on their request",
+    description:
+      'DATA-011, SEC-019: the number is cleared from every contact record and feedback keeps no ' +
+      'link to it; invoices keep what tax law needs. Audited without the number.',
+    tags: ['feedback'],
+    requirements: ['DATA-011', 'SEC-019', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: EraseDinerContactRequest },
+    responses: {
+      200: { description: 'Erased.', schema: EraseDinerContactResponse },
+      ...standardErrors,
+    },
+  },
+  {
     operationId: 'submitTabletOrder',
     method: 'POST',
     path: '/api/v1/devices/current/orders',
@@ -3618,6 +3664,20 @@ export const ROUTES = [
     request: { query: ReportRangeQuery },
     responses: {
       200: { description: 'The report.', schema: SuspiciousActivityResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getFeedbackReport',
+    method: 'GET',
+    path: '/api/v1/reports/feedback',
+    summary: "Diners' feedback: ratings by day and the comments",
+    tags: ['reports'],
+    requirements: ['RPT-013', 'TAB-014'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: FeedbackReportResponse },
       ...standardErrors,
     },
   },

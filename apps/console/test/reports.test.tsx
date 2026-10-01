@@ -12,6 +12,7 @@ import {
   salesReport,
   suggestionReport,
   suspiciousReport,
+  feedbackReport,
 } from './reports-fixture.js';
 import { profileView } from './restaurant-fixture.js';
 
@@ -41,6 +42,10 @@ function reportsServer(): FakeServer {
     .on('GET', '/api/v1/reports/kitchen', (call) => {
       const { from, to } = rangeOf(call.path);
       return { status: 200, body: kitchenReport(from, to) };
+    })
+    .on('GET', '/api/v1/reports/feedback', (call) => {
+      const { from, to } = rangeOf(call.path);
+      return { status: 200, body: feedbackReport(from, to) };
     })
     .on('GET', '/api/v1/reports/suspicious', (call) => {
       const { from, to } = rangeOf(call.path);
@@ -288,6 +293,25 @@ describe('[RPT-014] [AUD-006] suspicious activity', () => {
         t('reportsPage.suspicious.thresholds', { discount: '20%', cash: '₹200.00', count: 2 }),
       ),
     ).toBeVisible();
+    await expectNoAxeViolations(container);
+  });
+});
+
+describe('[RPT-013] customer feedback', () => {
+  it('shows the averages, the ratings by day and every comment', async () => {
+    const { container } = await renderConsole({
+      fake: reportsServer(),
+      path: `/manage/reports/feedback?from=${TODAY}&to=${TODAY}`,
+      signedIn: 'MANAGER',
+    });
+    const comments = within(
+      await screen.findByRole('table', { name: t('reportsPage.feedback.table') }),
+    );
+    expect(comments.getByText('Lovely dal, slow service')).toBeVisible();
+    expect(comments.getByText(t('reportsPage.feedback.noComment'))).toBeVisible();
+    expect(
+      screen.getAllByText(t('reportsPage.feedback.average', { value: '4.50' })).length,
+    ).toBeGreaterThan(0);
     await expectNoAxeViolations(container);
   });
 });

@@ -210,6 +210,8 @@ export const ReportKind = z.enum([
   'AUDIT',
   /** Suspicious activity (RPT-014, AUD-006). */
   'SUSPICIOUS',
+  /** Diners' feedback (RPT-013). */
+  'FEEDBACK',
 ]);
 export type ReportKind = z.infer<typeof ReportKind>;
 

@@ -1,0 +1,13 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } },
+    "required": ["erased"]
+  },
+  "output": {
+    "type": "object",
+    "properties": { "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } },
+    "required": ["erased"],
+    "additionalProperties": false
+  }
+}

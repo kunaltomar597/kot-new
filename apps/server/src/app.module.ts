@@ -17,6 +17,7 @@ import { ObservabilityModule } from './observability/error-reporter.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { KitchenModule } from './kitchen/kitchen.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { FeedbackModule } from './feedback/feedback.module.js';
 import { FloorModule } from './floor/floor.module.js';
 import { MenuModule } from './menu/menu.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
@@ -65,6 +66,7 @@ export class AppModule {
         PhotosModule,
         DayEndModule,
         ReportsModule,
+        FeedbackModule,
         KitchenModule,
         DevicesModule,
         EventsModule,

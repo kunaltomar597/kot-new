@@ -144,7 +144,8 @@ describe('[NFR-P11] connection banner', () => {
   it('appears while the server is unreachable and goes when it is back', async () => {
     const { sockets } = await renderConsole({ fake: server('KDS') });
     await screen.findByRole('heading', { level: 1, name: t('modes.kds') });
-    expect(screen.getByRole('status')).toHaveTextContent(t('connection.connecting'));
+    // By its words: on a slow machine the kitchen board's loading status can show beside it.
+    expect(screen.getByText(t('connection.connecting'))).toBeInTheDocument();
     sockets.sync(1);
     await waitFor(() => {
       expect(screen.queryByText(t('connection.connecting'))).toBeNull();

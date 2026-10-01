@@ -209,7 +209,12 @@ Built in two parts:
   - on the waiter app: "Suggest to the table" on a table's order view (WTR-011).
 - P3-05b Feedback after the bill (TAB-014, S): food and service ratings, a comment, and an
   optional phone with explicit consent recorded with its purpose and time (BILL-011, SEC-019),
-  erasable (DATA-011 hook); and where managers read it.
+  erasable (DATA-011 hook); and where managers read it (done):
+  - the `feedback` and `diner_contacts` tables (migration `20261002120000_feedback`);
+  - `apps/server/src/feedback/` with `POST /api/v1/devices/current/feedback`,
+    `POST /api/v1/diner-contacts/erase` and `GET /api/v1/reports/feedback` (RPT-013, exported as
+    `FEEDBACK`);
+  - the tablet's `FeedbackCard` and the console's Feedback report.
 
 ## P3-06 Phase 3 exit test: tablet session (S6)
 
