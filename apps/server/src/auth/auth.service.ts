@@ -388,6 +388,54 @@ export class AuthService {
   }
 
   /**
+   * A manager lets staff out of a table tablet's kiosk mode with their PIN (TAB-001). Nobody is
+   * signed in on a tablet, so the manager is chosen from the tiles; the attempt is throttled per
+   * tablet, a wrong PIN counts towards the manager's lock-out (AUTH-013), and the exit is audited.
+   */
+  async kioskExit(
+    device: AuthenticatedDevice,
+    staffId: string,
+    pin: string,
+  ): Promise<{ readonly approver: SessionStaff; readonly exitedAt: Date }> {
+    const settings = await this.settings.get(device.restaurantId);
+    this.throttle(`kiosk:${device.deviceId}`, settings);
+    const now = new Date();
+    const outcome = await this.prisma.transaction(async (tx): Promise<Outcome<SessionStaff>> => {
+      const approver = await this.activeStaff(tx, device.restaurantId, staffId);
+      const base = { tx, device, staffId, method: 'KIOSK' as const };
+      if (approver === null || !canApproveOverride(approver.role)) {
+        await this.hasher.verifyNothing(pin);
+        await this.failure(base, 'Not an active manager or owner');
+        return { error: authErrors.approverNotAllowed() };
+      }
+      const credential = await this.lockedCredential(tx, approver.id, 'PIN');
+      if (credential === null) {
+        await this.hasher.verifyNothing(pin);
+        return { error: await this.failure(base, 'Manager has no PIN') };
+      }
+      if (this.isLocked(credential, now)) {
+        return { error: await this.lockedFailure(base, credential.lockedUntil ?? now) };
+      }
+      if (!(await this.hasher.verify(credential.secretHash, pin))) {
+        return { error: await this.wrongSecret(base, credential, settings, now, 'Wrong PIN') };
+      }
+      await this.clearFailures(tx, credential.id);
+      await this.audit.record(tx, {
+        action: 'TABLET_KIOSK_EXITED',
+        entityType: 'device',
+        entityId: device.deviceId,
+        actorId: approver.id,
+        deviceId: device.deviceId,
+        restaurantId: device.restaurantId,
+        after: { tableId: device.tableId },
+      });
+      return { ok: approver };
+    });
+    if ('error' in outcome) throw outcome.error;
+    return { approver: outcome.ok, exitedAt: now };
+  }
+
+  /**
    * Uses up an override token for `capability`, if it was issued to this person's session on this
    * device, is unused and has not expired. Single use: a second request with it is refused.
    */
@@ -736,7 +784,11 @@ export class AuthService {
   ): Promise<AppError> {
     const override = context.method === 'OVERRIDE';
     await this.audit.record(context.tx, {
-      action: override ? 'OVERRIDE_DENIED' : 'LOGIN_FAILED',
+      action: override
+        ? 'OVERRIDE_DENIED'
+        : context.method === 'KIOSK'
+          ? 'TABLET_KIOSK_EXIT_DENIED'
+          : 'LOGIN_FAILED',
       entityType: 'staff',
       entityId: context.staffId,
       actorId: override ? (context.requesterId ?? null) : null,
@@ -765,7 +817,7 @@ interface FailureContext {
   readonly device: AuthenticatedDevice;
   /** The person whose credential was tried (the approver, for overrides). */
   readonly staffId: string;
-  readonly method: 'PIN' | 'OWNER_PASSWORD' | 'STEP_UP' | 'OVERRIDE';
+  readonly method: 'PIN' | 'OWNER_PASSWORD' | 'STEP_UP' | 'OVERRIDE' | 'KIOSK';
   readonly requesterId?: string;
   readonly capability?: string;
 }

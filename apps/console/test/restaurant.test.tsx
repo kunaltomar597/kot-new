@@ -102,10 +102,18 @@ describe('[ONB-004] [BILL-002] [BILL-003] [BILL-004] the restaurant page', () =>
     );
     const email = form.getByRole('textbox', { name: t('restaurantPage.profile.email') });
     await user.type(email, 'owner@spiceroute.in');
+    // The tablets' accent colour (P3-01a): checked like the other fields.
+    const accent = form.getByRole('textbox', { name: t('restaurantPage.profile.accent') });
+    await user.type(accent, 'red');
+    await user.click(form.getByRole('button', { name: t('restaurantPage.save') }));
+    expect(form.getByText(t('restaurantPage.problems.ACCENT_INVALID'))).toBeVisible();
+    await user.clear(accent);
+    await user.type(accent, '#b4232a');
     await user.click(form.getByRole('button', { name: t('restaurantPage.save') }));
     expect(await screen.findByText(t('restaurantPage.profile.saved'))).toBeVisible();
     expect(fake.callsTo('PUT', '/api/v1/restaurant/profile')[0]?.body).toMatchObject({
       contact: { phone: '+91 98765 43210', email: 'owner@spiceroute.in' },
+      accentColor: '#B4232A',
       businessDayCutoff: '04:00',
     });
   });

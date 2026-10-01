@@ -1,4 +1,5 @@
 import {
+  AccentColor,
   BusinessDayCutoff,
   InvoiceSeriesRequest,
   type InvoiceSeriesView,
@@ -48,6 +49,8 @@ export interface ProfileDraft {
   readonly email: string;
   readonly hours: readonly HoursDraft[];
   readonly logoPhotoId: string | null;
+  /** "#RRGGBB", or empty for the standard colour (the tablets' accent, P3-01a). */
+  readonly accent: string;
   readonly cutoff: string;
 }
 
@@ -64,6 +67,7 @@ export function profileDraftOf(profile: RestaurantProfile): ProfileDraft {
     email: profile.contact.email ?? '',
     hours: profile.businessHours.map((window) => ({ key: hoursKey(), ...window })),
     logoPhotoId: profile.logoPhotoId,
+    accent: profile.accentColor ?? '',
     cutoff: profile.businessDayCutoff,
   };
 }
@@ -74,6 +78,7 @@ export const PROFILE_PROBLEMS = [
   'EMAIL_INVALID',
   'HOURS_INVALID',
   'CUTOFF_INVALID',
+  'ACCENT_INVALID',
 ] as const;
 export type ProfileProblem = (typeof PROFILE_PROBLEMS)[number];
 
@@ -104,6 +109,9 @@ export function checkProfileDraft(draft: ProfileDraft): ProfileProblem[] {
   }
   if (badHours(draft).size > 0) problems.push('HOURS_INVALID');
   if (!BusinessDayCutoff.safeParse(draft.cutoff).success) problems.push('CUTOFF_INVALID');
+  if (draft.accent.trim() !== '' && !AccentColor.safeParse(draft.accent.trim()).success) {
+    problems.push('ACCENT_INVALID');
+  }
   return problems;
 }
 
@@ -123,6 +131,7 @@ export function profileRequestOf(
       .sort((a, b) => order(a.day) - order(b.day) || a.start.localeCompare(b.start))
       .map(({ day, start, end }) => ({ day, start, end })),
     logoPhotoId: draft.logoPhotoId,
+    accentColor: draft.accent.trim() === '' ? null : draft.accent.trim().toUpperCase(),
     businessDayCutoff: draft.cutoff,
     ...(reason.trim() !== '' && { reason: reason.trim() }),
   });

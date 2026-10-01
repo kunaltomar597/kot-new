@@ -284,6 +284,16 @@ export function ProfileDialog({
           change({ cutoff: event.target.value });
         }}
       />
+      <TextField
+        label={t('restaurantPage.profile.accent')}
+        hint={t('restaurantPage.profile.accentHint')}
+        value={draft.accent}
+        maxLength={7}
+        error={problemText('ACCENT_INVALID')}
+        onChange={(event) => {
+          change({ accent: event.target.value });
+        }}
+      />
       <PhotoPicker
         photoId={draft.logoPhotoId}
         onChange={(logoPhotoId) => {

@@ -138,7 +138,13 @@ export class NotificationTriggers implements OnModuleInit {
   private async deviceChanged(
     tx: TransactionClient,
     restaurantId: string,
-    change: { deviceId: string; deviceType: string; online: boolean; batteryPercent?: number },
+    change: {
+      deviceId: string;
+      deviceType: string;
+      online: boolean;
+      batteryPercent?: number;
+      charging?: boolean;
+    },
   ): Promise<void> {
     if (!['PAGER', 'TABLE_TABLET', 'KDS'].includes(change.deviceType)) return;
     const settings = await this.notifications.settingsOf(restaurantId);
@@ -147,7 +153,8 @@ export class NotificationTriggers implements OnModuleInit {
       change.deviceType === 'PAGER'
         ? settings.get('pager.lowBatteryPercent')
         : settings.get('devices.lowBatteryAlertPercent');
-    const low = isLowBattery(change.batteryPercent ?? null, threshold);
+    // A device on charge is being looked after (TAB-015).
+    const low = isLowBattery(change.batteryPercent ?? null, threshold) && change.charging !== true;
     const offlineKey = `device:${change.deviceId}:offline`;
     const lowKey = `device:${change.deviceId}:low`;
     if (change.online) await this.notifications.clear(tx, { restaurantId, dedupeKey: offlineKey });

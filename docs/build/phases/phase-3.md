@@ -18,6 +18,28 @@ low-battery alert at 20 %; restaurant branding (logo, accent colour).
 Acceptance: Maestro test for open → use → close → wiped; server rejects the tablet acting on
 another table.
 
+Built in two parts:
+
+- P3-01a Server side (done):
+  - `GET /api/v1/devices/current/table` returns the tablet's own table, its open session and the
+    idle screen's promotions (the pinned dishes).
+  - `POST /api/v1/devices/current/health` records battery, charging, connection and version for
+    any app, and raises low-battery alerts for tablets and kitchen screens.
+  - `DevicePresenceMonitor` marks tablets and kitchen screens offline after
+    `devices.offlineAlertSeconds` and alerts the managers.
+  - `POST /api/v1/devices/current/kiosk-exit` checks a manager's PIN and audits the exit.
+  - The restaurant's accent colour in the profile and on the Restaurant page; charging and the
+    connection on the Devices page.
+- P3-01b The tablet app:
+  - a Kotlin lock-task module, with a device-admin receiver for `dpm set-device-owner` in
+    testing, and keep-screen-on;
+  - the idle screen with logo, accent colour and promotions, unlocked while a session is open;
+  - the wipe on close (cart, order history, feedback);
+  - health reports;
+  - the hidden gesture with manager tiles and a PIN pad;
+  - "Locate" (MGR-006, deferred from P4-02c);
+  - the Maestro flow and the kiosk procedure (manual task 12, P0-H3).
+
 ## P3-02 Service requests end to end
 
 Goal: the Water / Waiter / Bill / Cancel buttons work like a cabin call light.

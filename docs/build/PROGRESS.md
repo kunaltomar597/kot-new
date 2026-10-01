@@ -172,8 +172,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
-  be built).
+- P3-01b Table tablet app (P3-01a done; its kiosk check needs P0-H3 on the chosen tablet, the
+  rest can be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -259,7 +259,8 @@ Recommended next WPs (dependencies met):
 
 ### Phase 3: Table tablet and recommendations v1
 
-- [ ] P3-01 Table tablet app: kiosk, pairing, lifecycle, health
+- [x] P3-01a Tablet server side: own table, health, offline, kiosk exit, accent colour
+- [ ] P3-01b Table tablet app: kiosk, idle and session screens, wipe, health, staff exit
 - [ ] P3-02 Service requests on the tablet (server side in P2-06d)
 - [ ] P3-03 Customer ordering and waiter approval
 - [x] P3-04 Recommendation engine v1
@@ -568,6 +569,37 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-01a):
+
+284. P3-01 is built in two parts: a the server side (with the console's accent colour and device
+     health), b the tablet app.
+285. A tablet reads its own table at `GET /api/v1/devices/current/table`. The answer gives the
+     label, the state and the open session (the tablet unlocks while there is one), and the idle
+     screen's promotions. Only table tablets bound to a table may read it (403 `NOT_A_TABLE_TABLET`,
+     409 `TABLET_NOT_BOUND`).
+     - The promotions are the restaurant's pinned dishes (P4-03c) that are live, available and
+       offered on the tablet, while `tablet.idleShowsPromotions` is on. They come in menu order,
+       because settings keep no order.
+286. Every app except a pager reports its battery, charging, kind of connection, Wi-Fi signal and
+     version (`POST /api/v1/devices/current/health`); the Devices page shows them.
+     - Managers hear about it (`DeviceStatusChanged`) only when low battery starts or ends, or
+       charging or the connection kind changes.
+     - A device on charge does not count as low, so plugging a tablet in clears its alert.
+     - Tablets and kitchen screens alert the managers (Appendix C). Phones do not: the waiter app
+       warns its own holder.
+287. Tablets and kitchen screens are online while connected. One away for
+     `devices.offlineAlertSeconds` goes offline: new setting, default 120 s, 0 never. The managers
+     are then alerted once, and the alert clears on reconnecting. The check runs every 15 s.
+288. Staff leave a tablet's kiosk mode with a manager's or the Owner's PIN, chosen from the sign-in
+     tiles, since nobody signs in on a tablet (`POST /api/v1/devices/current/kiosk-exit`).
+     - The PIN check has the same throttle and lock-out as the others.
+     - Exits are audited as `TABLET_KIOSK_EXITED`, refusals as `TABLET_KIOSK_EXIT_DENIED`.
+     - Moving a tablet to another table stays on the dashboard (Devices, Move), where a manager is
+       signed in with their PIN (AUTH-009).
+289. The restaurant's brand on the tablets is the logo (already in the profile) and a new accent
+     colour. It is kept as #RRGGBB in upper case; left out of an update it is unchanged, null means
+     the standard colour. The tablets choose black or white text on it for contrast (P3-01b).
 
 Decided 2026-10-01 (P4-07b):
 
@@ -1470,6 +1502,34 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-01a Table tablet, server side
+
+Built:
+
+- Contracts: `TabletTableView`, `DeviceHealthRequest` with `NetworkKind`, `KioskExitRequest` and
+  `KioskExitResponse`; the routes `getTabletTable`, `reportDeviceHealth` and `exitKiosk`.
+  `DeviceView` gains `charging`, `network` and `rssi`; `DeviceStatusChanged` gains `charging`. The
+  profile gains `accentColor` (`AccentColor`); new setting `devices.offlineAlertSeconds`.
+- Server: `devices/tablet.service.ts` with `tablet.controller.ts`; `device-presence.monitor.ts`
+  (`PRESENCE_OPTIONS`, off in tests); `AuthService.kioskExit`; the trigger treats a charging device
+  as not low. Migration `20261002090000_tablet_health` (`restaurants.accent_color`,
+  `devices.charging`, `devices.network`).
+- Console: the accent colour on the Restaurant page (field and swatch); charging and the connection
+  on the Devices page.
+
+Tests:
+
+- Server `tablet.int.test.ts` 11: the table and promotions, unlocking on open with the event,
+  only for a bound tablet, health shown and its alert raised once and cleared on charge, refusals,
+  offline after the setting's time and back, never with 0, kiosk exit with the right PIN, a wrong
+  one, a waiter and a kitchen screen.
+- One more in `restaurant.int.test.ts` (the accent colour).
+- Console tests for the accent field and the tablet's battery and connection.
+
+Gotcha: jsonb does not keep object key order, so anything ordered must not rely on a setting's keys.
+
+Decisions: 284 to 289.
 
 ### 2026-10-01: P4-07b Suspicious activity, the daily report and the cash drawer (P4 done)
 

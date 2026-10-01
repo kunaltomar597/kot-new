@@ -224,6 +224,8 @@ model Restaurant {
   logoPhotoId       String?  @map("logo_photo_id") @db.Uuid
   /// Restrict: a photo in use as the logo is never removed by photo clean-up (P1-04).
   logoPhoto         Photo?   @relation(fields: [logoPhotoId], references: [id], onDelete: Restrict)
+  /// Brand colour of the table tablets, "#RRGGBB" (TAB-003); null: the standard colour.
+  accentColor       String?  @map("accent_color")
   timeZone          String   @default("Asia/Kolkata") @map("time_zone")
   /// Business-day cut-off, local time HH:MM (default 04:00).
   businessDayCutoff String   @default("04:00") @map("business_day_cutoff")
@@ -394,11 +396,16 @@ model Device {
   serial                 String?
   /// Peppered Argon2id hash of the pager's MQTT secret (SEC-012); the secret is shown once when issued (P2-04).
   mqttSecretHash         String?      @map("mqtt_secret_hash")
-  /// Last heartbeat's battery, signal and firmware (PGR-007).
+  /// Last battery and signal: a pager's heartbeat (PGR-007), an app's health report (TAB-015).
   batteryPercent         Int?         @map("battery_percent")
   rssi                   Int?
   firmwareVersion        String?      @map("firmware_version")
-  /// Connected and heard from within 3 heartbeats (pagers); kept current by the pager service.
+  /// An app's last health report: on charge, and how it reached the network (TAB-015).
+  charging               Boolean?
+  /// "WIFI", "ETHERNET", "CELLULAR", "NONE" or "OTHER" (`NetworkKind`).
+  network                String?
+  /// Pagers: heard from within 3 heartbeats (the pager service). Tablets and kitchen screens:
+  /// connected, or not yet away for `devices.offlineAlertSeconds` (the presence monitor).
   online                 Boolean      @default(false)
   staff                  Staff?       @relation(fields: [staffId], references: [id])
   sessions               Session[]

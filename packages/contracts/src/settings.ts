@@ -272,6 +272,17 @@ export const SETTINGS = [
     requirements: ['TAB-015', 'NTF-003'],
     unit: 'percent',
   }),
+  setting({
+    key: 'devices.offlineAlertSeconds',
+    schema: int(0, 3_600),
+    defaultValue: 120,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'A table tablet or kitchen screen not connected for this long alerts the managers (0: never; our default).',
+    requirements: ['TAB-015', 'NTF-003'],
+    unit: 'seconds',
+  }),
 
   // Orders, billing and payments (ORD, BILL)
   setting({

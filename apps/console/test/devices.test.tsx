@@ -73,6 +73,8 @@ describe('[MGR-006] the device list', () => {
     const tablet = await rowOf('Tablet T7');
     expect(within(tablet).getByText(t('devices.forTable', { table: 'T7' }))).toBeVisible();
     expect(within(tablet).getByText(t('devices.connected'))).toBeVisible();
+    expect(within(tablet).getByText(t('devices.batteryCharging', { percent: 42 }))).toBeVisible();
+    expect(within(tablet).getByText(t('devices.network.WIFI'), { exact: false })).toBeVisible();
     expect(
       within(await actionsFor('Tablet T7'))
         .getAllByRole('button')

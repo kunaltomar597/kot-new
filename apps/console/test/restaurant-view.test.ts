@@ -38,6 +38,7 @@ describe('[ONB-004] the profile a manager keeps up to date', () => {
         { day: 'SAT', start: '11:00', end: '01:00' },
       ],
       logoPhotoId: null,
+      accentColor: null,
       businessDayCutoff: '04:00',
       reason: 'New email',
     });

@@ -74,15 +74,19 @@ import {
   CreatePairingCodeRequest,
   DeviceChallengeRequest,
   DeviceChallengeResponse,
+  DeviceHealthRequest,
   DeviceListResponse,
   DeviceSummary,
   DeviceTokenRequest,
   DeviceTokenResponse,
+  KioskExitRequest,
+  KioskExitResponse,
   PairDeviceRequest,
   PairedDevice,
   PairingCodeResponse,
   RenameDeviceRequest,
   RevokeDeviceRequest,
+  TabletTableView,
 } from './devices.js';
 import {
   FloorArchiveRequest,
@@ -2091,6 +2095,65 @@ export const ROUTES = [
       200: { description: 'The alert.', schema: AlertView },
       ...standardErrors,
       404: { description: 'No such alert, or not one for you.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getTabletTable',
+    method: 'GET',
+    path: '/api/v1/devices/current/table',
+    summary:
+      "This table tablet's table: the open session, if any, and the idle screen's promotions",
+    description:
+      'TAB-002, TAB-003, AUTH-009: the tablet unlocks while its table has an open session and ' +
+      'shows its idle screen otherwise. It reads again when its table opens, closes, changes ' +
+      'state or moves, and when the manager moves the tablet. Only table tablets.',
+    tags: ['devices'],
+    requirements: ['TAB-002', 'TAB-003', 'AUTH-009'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The table.', schema: TabletTableView },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet.', schema: ApiError },
+      409: { description: 'The tablet is not bound to a table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'reportDeviceHealth',
+    method: 'POST',
+    path: '/api/v1/devices/current/health',
+    summary: 'An app reports its battery, charging, connection and version',
+    description:
+      'TAB-015, NTF-003: shown on the dashboard; a table tablet or kitchen screen at or below ' +
+      '`devices.lowBatteryAlertPercent` and not charging alerts the managers once, cleared when ' +
+      'it charges or recovers. Not for pagers (they report over MQTT).',
+    tags: ['devices'],
+    requirements: ['TAB-015', 'NTF-003', 'MGR-006'],
+    capability: 'DEVICE',
+    request: { body: DeviceHealthRequest },
+    responses: {
+      204: { description: 'Recorded.' },
+      ...deviceErrors,
+      403: { description: 'A pager.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'exitKiosk',
+    method: 'POST',
+    path: '/api/v1/devices/current/kiosk-exit',
+    summary: "A manager lets staff out of a table tablet's kiosk mode with their PIN",
+    description:
+      'TAB-001, AUTH-009: checks the PIN of an active manager or the Owner (failures count ' +
+      'towards their lock-out) and audits the exit (TABLET_KIOSK_EXITED). Only table tablets.',
+    tags: ['devices'],
+    requirements: ['TAB-001', 'AUTH-013', 'AUD-001'],
+    capability: 'DEVICE',
+    request: { body: KioskExitRequest },
+    responses: {
+      200: { description: 'Allowed.', schema: KioskExitResponse },
+      ...deviceErrors,
+      403: { description: 'Not a table tablet, or not a manager.', schema: ApiError },
+      423: { description: "The manager's login is locked.", schema: ApiError },
+      429: { description: 'Too many attempts from this tablet.', schema: ApiError },
     },
   },
   {

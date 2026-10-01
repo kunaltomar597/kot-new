@@ -87,6 +87,7 @@ function setup() {
         contact: { phone: null, email: null },
         businessHours: [],
         logoPhotoId: null,
+        accentColor: null,
         timeZone: 'Asia/Kolkata',
         businessDayCutoff: '04:00',
         updatedAt: '2026-09-26T08:00:00.000Z',

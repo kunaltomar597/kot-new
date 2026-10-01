@@ -1504,7 +1504,8 @@
                     ]
                   },
                   "online": { "type": "boolean" },
-                  "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+                  "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+                  "charging": { "type": "boolean" }
                 },
                 "required": ["deviceId", "deviceType", "online"]
               }
@@ -3299,7 +3300,8 @@
                     ]
                   },
                   "online": { "type": "boolean" },
-                  "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+                  "batteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+                  "charging": { "type": "boolean" }
                 },
                 "required": ["deviceId", "deviceType", "online"],
                 "additionalProperties": false

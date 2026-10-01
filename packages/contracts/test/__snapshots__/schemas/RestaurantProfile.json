@@ -77,6 +77,9 @@
           { "type": "null" }
         ]
       },
+      "accentColor": {
+        "anyOf": [{ "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }, { "type": "null" }]
+      },
       "timeZone": { "type": "string" },
       "businessDayCutoff": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
       "updatedAt": {
@@ -97,6 +100,7 @@
       "contact",
       "businessHours",
       "logoPhotoId",
+      "accentColor",
       "timeZone",
       "businessDayCutoff",
       "updatedAt"
@@ -180,6 +184,9 @@
           { "type": "null" }
         ]
       },
+      "accentColor": {
+        "anyOf": [{ "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }, { "type": "null" }]
+      },
       "timeZone": { "type": "string" },
       "businessDayCutoff": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
       "updatedAt": {
@@ -200,6 +207,7 @@
       "contact",
       "businessHours",
       "logoPhotoId",
+      "accentColor",
       "timeZone",
       "businessDayCutoff",
       "updatedAt"

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Pin } from './auth.js';
 import { DeviceType, Id, Timestamp } from './common.js';
 import { CaFingerprint } from './system.js';
 
@@ -100,6 +101,11 @@ export const PairingCodeResponse = z.object({
 });
 export type PairingCodeResponse = z.infer<typeof PairingCodeResponse>;
 
+/** How an app is connected (TAB-015). */
+export const NETWORK_KINDS = ['WIFI', 'ETHERNET', 'CELLULAR', 'NONE', 'OTHER'] as const;
+export const NetworkKind = z.enum(NETWORK_KINDS);
+export type NetworkKind = z.infer<typeof NetworkKind>;
+
 /** The device presents the code with its new public key (SPKI, DER, base64). */
 export const PairDeviceRequest = z.strictObject({
   code: PairingCode,
@@ -172,8 +178,14 @@ export const DeviceView = DeviceSummary.extend({
    * last three heartbeats (PGR-007).
    */
   connected: z.boolean(),
-  /** Last reported battery (pagers now; tablets and phones from P3-01, TAB-015). */
+  /** Last reported battery: pagers by heartbeat, apps by their health reports (TAB-015). */
   batteryPercent: z.number().int().min(0).max(100).nullable(),
+  /** On charge at the last health report; null when the device does not say (pagers). */
+  charging: z.boolean().nullable(),
+  /** How an app reached the network at its last health report (TAB-015). */
+  network: NetworkKind.nullable(),
+  /** Wi-Fi signal in dBm at the last heartbeat or health report. */
+  rssi: z.int().nullable(),
   /** Pager firmware version (PGR-007). */
   firmwareVersion: z.string().nullable(),
   /** Serial on a pager's label (PGR-012). */
@@ -193,3 +205,51 @@ export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;
 
 export const BindTableRequest = z.strictObject({ tableId: Id });
 export type BindTableRequest = z.infer<typeof BindTableRequest>;
+
+// ---------------------------------------------------------------- device health (P3-01a)
+
+/**
+ * What an app reports about itself (TAB-015): battery, charging, connection and version. Tablets
+ * send it when they start, every few minutes and when something changes; the dashboard shows it
+ * and a low battery alerts the managers (`devices.lowBatteryAlertPercent`).
+ */
+export const DeviceHealthRequest = z.strictObject({
+  batteryPercent: z.int().min(0).max(100).nullable(),
+  charging: z.boolean().nullable(),
+  network: NetworkKind,
+  /** Wi-Fi signal in dBm, when on Wi-Fi and the device can tell. */
+  rssi: z.int().min(-127).max(0).nullable(),
+  appVersion: z.string().trim().min(1).max(40).optional(),
+});
+export type DeviceHealthRequest = z.infer<typeof DeviceHealthRequest>;
+
+// ---------------------------------------------------------------- the table tablet (P3-01a)
+
+/**
+ * A table tablet's own table (TAB-002, TAB-003, AUTH-009): whether a session is open (the tablet
+ * unlocks) and what the idle screen shows. A tablet can read only its own table.
+ */
+export const TabletTableView = z.object({
+  tableId: Id,
+  /** The table's label, e.g. "T4". */
+  label: z.string(),
+  state: z.enum(['FREE', 'OCCUPIED', 'BILL_REQUESTED', 'BILL_PRINTED']),
+  /** The open session, or null: the tablet shows its idle screen. */
+  session: z.object({ id: Id, openedAt: Timestamp, covers: z.int().min(1).nullable() }).nullable(),
+  /** The idle screen's promotions (`tablet.idleShowsPromotions`): the restaurant's pinned dishes. */
+  promotions: z.object({ show: z.boolean(), itemIds: z.array(Id) }),
+});
+export type TabletTableView = z.infer<typeof TabletTableView>;
+
+/**
+ * Staff leave the tablet's kiosk mode with a manager's PIN (TAB-001): the hidden gesture shows the
+ * managers to choose from; the server checks the PIN (with the usual lock-out) and audits the exit.
+ */
+export const KioskExitRequest = z.strictObject({ staffId: Id, pin: Pin });
+export type KioskExitRequest = z.infer<typeof KioskExitRequest>;
+
+export const KioskExitResponse = z.object({
+  approver: z.object({ id: Id, displayName: z.string() }),
+  exitedAt: Timestamp,
+});
+export type KioskExitResponse = z.infer<typeof KioskExitResponse>;
