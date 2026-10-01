@@ -16,7 +16,8 @@ declare const Deno: {
  * Serves a relay function on Supabase. RELAY_DB_URL is the edge functions' own login
  * (`relay_edge`, through the transaction pooler; manual task 20), never the service role.
  * RELAY_ALLOWED_ORIGINS lists the QR site's origins, comma-separated. RELAY_JWT_SECRET is the
- * project's JWT secret, for local servers' Realtime tokens (optional). RELAY_PORT is for running a
+ * project's JWT secret, for local servers' Realtime tokens (optional); RELAY_REALTIME_API_KEY, the
+ * project's publishable key, is needed only where Supabase does not give SUPABASE_ANON_KEY. RELAY_PORT is for running a
  * bundle under plain Deno (test/deno-smoke.test.ts); Supabase gives the port itself.
  */
 /**
@@ -70,6 +71,8 @@ export function serve(handler: Handler): void {
     transaction: (work) => sql.begin((transaction) => work(wrap(transaction))),
   };
   const realtimeJwtSecret = Deno.env.get('RELAY_JWT_SECRET');
+  const realtimeApiKey =
+    Deno.env.get('RELAY_REALTIME_API_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const photos =
@@ -77,7 +80,14 @@ export function serve(handler: Handler): void {
       ? undefined
       : storage(supabaseUrl.replace(/\/+$/, ''), serviceKey);
   const answer = (request: Request) =>
-    handler(request, { db, now: () => new Date(), allowedOrigins, realtimeJwtSecret, photos });
+    handler(request, {
+      db,
+      now: () => new Date(),
+      allowedOrigins,
+      realtimeJwtSecret,
+      realtimeApiKey,
+      photos,
+    });
   const port = Deno.env.get('RELAY_PORT');
   if (port === undefined) Deno.serve(answer);
   else Deno.serve({ port: Number(port), hostname: '127.0.0.1' }, answer);

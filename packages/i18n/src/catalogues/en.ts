@@ -1908,6 +1908,8 @@ export const en = {
       qrRelayNoCredential: 'Waiting for the vendor’s relay credential',
       qrRelayNever: 'No contact yet',
       qrRelayOk: 'In step, menu version {version}, last contact {date} {time}',
+      qrRelayRealtime: 'New QR orders arrive instantly',
+      qrRelayPolling: 'New QR orders are checked every few seconds',
       qrRelayError:
         'Cannot reach the QR relay ({code}): the QR menu turns read-only; changes are sent when it is back',
     },

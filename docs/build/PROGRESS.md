@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-03d the Realtime doorbell, then P5-06.
+- P5-06 the Phase 5 exit test.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -320,7 +320,7 @@ Recommended next WPs (dependencies met):
 - [x] P5-03a Sync agent: publishing (presence, tables, QR menu) and the System page
 - [x] P5-03b Sync agent: orders (pickup, approval, status back)
 - [x] P5-03c Sync agent: photos to the relay's Storage
-- [ ] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
+- [x] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
 - [x] P5-04 QR tokens and table tents
 - [x] P5-05a QR menu site: menu, cart, ordering, statuses, read-only, privacy
 - [x] P5-05b QR menu site: suggestions and the speed budget
@@ -598,6 +598,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-03d):
+
+380. The doorbell is a hand-written Phoenix client (protocol 1.0.0, JSON) over Node's built-in
+     WebSocket, not `@supabase/realtime-js`: the server needs one channel and five message
+     kinds, and no new runtime dependency. A change only rings; orders and requests are still
+     read through the `server` function.
+381. `session` returns the public API key and the changes to listen for, so the local server
+     needs no Realtime setting of its own; Realtime's address is derived from `RP_RELAY_URL`'s
+     host. The key is `RELAY_REALTIME_API_KEY` if set, else Supabase's `SUPABASE_ANON_KEY`.
+382. Timings (constants, not BRD values): polling 5 s without the doorbell and 60 s with it; a
+     ring picks up after 100 ms (one pickup per burst); heartbeat 25 s, a line is dead when one
+     goes unanswered; the token is renewed 5 minutes before its hour is up; rejoining backs off
+     from 5 s to 60 s; a relay without Realtime is asked again after an hour. The doorbell starts
+     12 s after start-up.
+383. The System page's QR relay line says whether new QR orders "arrive instantly" (Realtime) or
+     are "checked every few seconds" (`qrRelay.realtime`).
+384. Supabase Realtime applies RLS by taking on the token's role, so the migration grants
+     `relay_server` to `supabase_realtime_admin` where that role exists. The tests' Supabase
+     stand-in creates it, and a roles test checks it is the only relay role Realtime can take.
 
 Decided 2026-10-02 (P5-03c):
 
@@ -2029,6 +2049,46 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-03d Realtime doorbell for new QR orders (P5-03 done)
+
+Built:
+
+- Relay:
+  - `session` returns `realtime.apiKey` and `realtime.changes` (orders and service requests);
+    503 without a JWT secret or an API key;
+  - migration `20261002233000_realtime_doorbell` (`relay_server` to `supabase_realtime_admin`);
+  - `@rp/relay/testing` `startFakeRealtime`: Phoenix socket at `/realtime/v1/websocket`, HS256
+    token check, heartbeats, token refresh, `phx_leave`, changes from a test-only trigger and
+    NOTIFY delivered to the restaurant's own subscribers; `relay.realtime`, dropped by `cut()`.
+    `ws` added to `@rp/relay`.
+- Server: `RelayRealtime` (`relay-realtime.ts`); `RelayOrdersService` starts it, rings the loop,
+  slows polling while subscribed, `realtimeSubscribed`, `startRealtimeNow()`; System status
+  `qrRelay.realtime`.
+- Console: the QR relay line says how new orders arrive (`qrRelayRealtime`, `qrRelayPolling`).
+- Docs: ADR-0015 (The Realtime doorbell), manual task 20 (API key, the check, report line),
+  phase-5 split, relay README.
+
+Tests:
+
+- server `relay-realtime.int.test.ts` 6: an order and a call arrive within a second with
+  polling at an hour; what came before the join is picked up; the token is renewed and it keeps
+  ringing; a cut falls back and joins again; the System page follows. (That Realtime shows a
+  restaurant only its own rows is RLS, tested in the relay's isolation and session tests.)
+- server unit `paced-loop.test.ts` +1: a change during the run that ends a back-off is kept.
+- server unit `relay-realtime.test.ts` 8: the join, a partial grant refused, a silent line
+  dropped, answered heartbeats kept, a closed channel rejoined, token renewal on the channel, no
+  Realtime at the relay, back-off.
+- relay: session contract, roles (Realtime may take `relay_server` only); console system test.
+
+Fixed: `PacedLoop` dropped a change that came during the run ending a back-off (that run had
+already read), so after an internet cut the first ring waited for the next poll. It now runs
+once more when that run works.
+
+Notes for the next session:
+
+- The real Supabase Realtime is checked only by manual task 20 (no Docker here). If it refuses
+  the join, the server falls back to polling, so nothing breaks.
 
 ### 2026-10-02: P5-03c Menu photos on the QR page
 

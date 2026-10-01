@@ -20,6 +20,7 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
       lastContactAt: '2026-10-02T08:00:00.000Z',
       lastError: null,
       menuVersion: 3,
+      realtime: true,
     },
     storage: {
       totalBytes: 256 * GB,

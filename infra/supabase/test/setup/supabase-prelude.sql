@@ -15,6 +15,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticator') THEN
     CREATE ROLE authenticator NOINHERIT;
   END IF;
+  -- Realtime's own login, which takes on each subscriber's role to apply RLS.
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_realtime_admin') THEN
+    CREATE ROLE supabase_realtime_admin NOINHERIT;
+  END IF;
 END
 $$;
 

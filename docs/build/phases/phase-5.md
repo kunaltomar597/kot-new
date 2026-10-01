@@ -77,6 +77,11 @@ functions over HTTP, `@rp/relay/testing`) in place of a local Supabase.
 - **P5-03c Photos.**
   - menu photos mirrored to the relay's Storage in their sizes, listed in the QR menu;
   - removed photos swept after 90 days.
+- **P5-03d Realtime doorbell.**
+  - a Realtime subscription to the restaurant's new QR orders and requests, which rings a pickup;
+  - polling slows to a safety net while it works, and speeds up at once when it drops;
+  - heartbeats, token renewal and rejoining with back-off; checked on a real Supabase by manual
+    task 20.
 
 ## P5-04 QR table tokens and table-tent PDFs
 

@@ -73,6 +73,7 @@ beforeAll(async () => {
     now: () => new Date(),
     allowedOrigins: [],
     realtimeJwtSecret: JWT_SECRET,
+    realtimeApiKey: 'test-publishable-key',
     photos: photoStorage,
   };
   a = await seedTenant(db, 'Server House');
@@ -444,7 +445,18 @@ describe('[QR-009] the Realtime session', () => {
     const session = RelaySessionResponse.parse(response.body);
     expect(session).toMatchObject({
       tenantId: a.id,
-      realtime: { schema: 'relay', table: 'qr_orders', filter: `tenant_id=eq.${a.id}` },
+      realtime: {
+        apiKey: 'test-publishable-key',
+        changes: [
+          { event: 'INSERT', schema: 'relay', table: 'qr_orders', filter: `tenant_id=eq.${a.id}` },
+          {
+            event: 'INSERT',
+            schema: 'relay',
+            table: 'qr_service_requests',
+            filter: `tenant_id=eq.${a.id}`,
+          },
+        ],
+      },
     });
     const [header, payload, signature] = session.token.split('.');
     const expected = createHmac('sha256', JWT_SECRET)
@@ -479,6 +491,11 @@ describe('[QR-009] the Realtime session', () => {
     });
     expect(response.status).toBe(503);
     expect(codeOf(response.body)).toBe('REALTIME_NOT_CONFIGURED');
+    const noKey = await asServer('session', {
+      method: 'POST',
+      context: { ...context, realtimeApiKey: undefined },
+    });
+    expect(codeOf(noKey.body)).toBe('REALTIME_NOT_CONFIGURED');
   });
 });
 

@@ -152,6 +152,8 @@ beforeAll(async () => {
           ...later,
           pollMs: 3_600_000,
           pushDebounceMs: 3_600_000,
+          // This relay has no Realtime (polling only); the doorbell has its own tests.
+          realtimeDelayMs: 3_600_000,
         },
       },
     ],

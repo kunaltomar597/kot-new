@@ -14,6 +14,8 @@ export interface FunctionContext {
    * secret); without it local servers poll instead (P5-02b).
    */
   readonly realtimeJwtSecret?: string | undefined;
+  /** The project's public API key, which Realtime's socket asks for (P5-03d). */
+  readonly realtimeApiKey?: string | undefined;
   /** Where menu photos are kept and served from (P5-03c); none means photos are not taken. */
   readonly photos?: PhotoStorage | undefined;
 }

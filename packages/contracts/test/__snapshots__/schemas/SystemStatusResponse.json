@@ -67,9 +67,17 @@
               { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
               { "type": "null" }
             ]
-          }
+          },
+          "realtime": { "type": "boolean" }
         },
-        "required": ["configured", "credential", "lastContactAt", "lastError", "menuVersion"]
+        "required": [
+          "configured",
+          "credential",
+          "lastContactAt",
+          "lastError",
+          "menuVersion",
+          "realtime"
+        ]
       },
       "storage": {
         "type": "object",
@@ -335,9 +343,17 @@
               { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
               { "type": "null" }
             ]
-          }
+          },
+          "realtime": { "type": "boolean" }
         },
-        "required": ["configured", "credential", "lastContactAt", "lastError", "menuVersion"],
+        "required": [
+          "configured",
+          "credential",
+          "lastContactAt",
+          "lastError",
+          "menuVersion",
+          "realtime"
+        ],
         "additionalProperties": false
       },
       "storage": {

@@ -153,6 +153,17 @@ describe('[SEC-005] roles', () => {
     }
   });
 
+  it('[QR-009] lets Realtime take on the local server’s role only, to apply its RLS', async () => {
+    const memberships = await query<{ role: string; member: boolean }>(
+      `SELECT r AS role, pg_has_role('supabase_realtime_admin', r, 'MEMBER') AS member
+       FROM unnest($1::text[]) AS r ORDER BY r`,
+      [[...RELAY_ROLES]],
+    );
+    expect(memberships.filter((row) => row.member).map((row) => row.role)).toEqual([
+      'relay_server',
+    ]);
+  });
+
   it('lets the edge functions switch to a writer, diner or provisioner, inheriting nothing', async () => {
     const memberships = await query<{ role: string; member: boolean; inherits: boolean }>(
       `SELECT r AS role, pg_has_role('relay_edge', r, 'MEMBER') AS member,

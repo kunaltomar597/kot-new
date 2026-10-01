@@ -90,6 +90,8 @@ export const SystemStatusResponse = z.object({
     lastError: z.string().nullable(),
     /** The menu version the QR page shows, null before the first. */
     menuVersion: z.int().positive().nullable(),
+    /** New QR orders ring by Realtime (P5-03d); false while they are polled. */
+    realtime: z.boolean(),
   }),
   storage: z.object({
     totalBytes: Bytes.nullable(),

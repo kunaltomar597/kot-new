@@ -29,6 +29,8 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
   - The function tests call each handler with a `Request`, on a connection logged in as
     `relay_edge`.
   - `deno-smoke.test.ts` runs the real bundles under Deno when `deno` is installed.
+  - `startRelay` (`@rp/relay/testing`) runs the functions over HTTP for other packages' tests,
+    with an in-memory photo bucket and, given a JWT secret, a stand-in for Realtime (P5-03d).
   - `test/setup/supabase-prelude.sql` stands in for Supabase's own roles and publication.
   - The tests act as each role the way PostgREST, Realtime and the edge functions do:
     `SET LOCAL ROLE` plus `request.jwt.claims`.
@@ -50,4 +52,4 @@ Adding a migration:
 Deploying to the real projects is
 [manual task 20](../../manual-tasks/20-supabase-relay.md).
 
-Built by: P5-01 (database), P5-02 (edge functions), P5-03c (photos).
+Built by: P5-01 (database), P5-02 (edge functions), P5-03c (photos), P5-03d (Realtime).
