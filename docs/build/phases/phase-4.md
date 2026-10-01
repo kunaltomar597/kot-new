@@ -202,8 +202,9 @@ Built in five parts, each its own pull request:
   sellers, blocked ones never (reason `FEATURED` for pinned and added boosted dishes).
 - P4-03d Stations and printers with test print (done): the "Kitchen and printers" page over the
   P1-07 API, with test page, redirect of a broken printer's tickets and archive with a reason.
-- P4-03e The Owner's restaurant profile, tax groups and invoice series (ONB-004 steps 1 to 3,
-  BILL-002 to BILL-004), with the second factor.
+- P4-03e The Owner's restaurant profile, tax groups and invoice series (done): the "Restaurant"
+  page; managers keep the profile, the Owner changes the invoice particulars, tax groups and
+  invoice series with the second factor.
 
 The rules editor uses the P3-04 API (`listRecommendationRules`, `createRecommendationRule`,
 `updateRecommendationRule` with `active` to pause, `archiveRecommendationRule` with a reason), all
