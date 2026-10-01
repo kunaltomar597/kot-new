@@ -78,6 +78,40 @@ describe('[ORD-001] [MENU-012] taking an order at a table', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('[MENU-005] shows a combo outside its hours, by the restaurant’s clock, as not orderable', async () => {
+    // An hour's window that is never now: six hours ahead of Kolkata time.
+    const hour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        hourCycle: 'h23',
+      }).format(new Date()),
+    );
+    const at = (offset: number) => `${String((hour + offset) % 24).padStart(2, '0')}:00`;
+    const lunchOnly = {
+      ...MENU,
+      timeZone: 'Asia/Kolkata',
+      combos: MENU.combos.map((combo) => ({
+        ...combo,
+        timeWindow: { start: at(6), end: at(7) },
+      })),
+    };
+    const { user } = await renderConsole({
+      fake: signsInAs(server(), 'CASHIER')
+        .on('GET', '/api/v1/menu', () => ({ status: 200, body: lunchOnly }))
+        .on('GET', `/api/v1/table-sessions/${IDS.session}/orders`, () => ({
+          status: 200,
+          body: { orders: [] },
+        })),
+      signedIn: 'CASHIER',
+      path: TABLE_PATH,
+    });
+    await screen.findByRole('heading', { name: t('pos.table.title', { table: 'T1' }) });
+    await user.click(await screen.findByRole('button', { name: 'Main Course' }));
+    const thali = await card(new RegExp(`^Veg Thali Combo, .*, Only ${at(6)}–${at(7)}$`));
+    expect(thali).toBeDisabled();
+  });
+
   it(
     'adds a dish with a variant and modifiers, a combo with its choice, and sends once',
     { timeout: 20_000 },

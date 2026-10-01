@@ -2808,6 +2808,7 @@ export const en = {
       left: '{count} left',
       soldOut: 'Sold out',
       notAvailable: 'Not available now',
+      onlyAt: 'Only {hours}',
     },
     item: {
       add: 'Add to order',

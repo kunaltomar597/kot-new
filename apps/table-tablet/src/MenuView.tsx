@@ -6,6 +6,7 @@ import {
   Note,
   SuggestionRow,
   useDeviceSession,
+  useNow,
   useSuggestions,
   useT,
 } from '@rp/mobile-shell';
@@ -20,7 +21,7 @@ import {
   TABLET_SORTS,
   type TabletFilter,
   type TabletSort,
-  unavailableReason,
+  menuNote,
 } from '@rp/ordering';
 import { Button, ChoiceGroup, SegmentedControl, TextField } from '@rp/ui-native';
 import { useState } from 'react';
@@ -55,6 +56,8 @@ export function MenuView({
   onAdd: (line: NewCartLine, source?: RecommendationSource) => void;
 }) {
   const t = useT();
+  // MENU-005: a combo shows as unavailable outside its hours.
+  const now = useNow(30_000);
   const session = useDeviceSession();
   const items = channelItems(menu, 'TABLE_TABLET');
   const categories = menuCategories(menu, items);
@@ -157,7 +160,7 @@ export function MenuView({
               key={item.id}
               item={item}
               bestseller={bestsellers.has(item.id)}
-              soldOut={unavailableReason(item) !== undefined}
+              unavailable={menuNote(menu, item, t, now).unavailable}
               disabled={!ordering}
               onSelect={() => {
                 setChosen({ item });

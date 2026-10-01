@@ -18,6 +18,7 @@ import { useConsole } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useLive } from '../app/use-live.js';
+import { useNow } from '../app/use-now.js';
 import {
   addLine,
   type CartLine,
@@ -231,6 +232,8 @@ function MenuBrowser({
   onChoose: (item: MenuItem, menu: MenuSnapshot) => void;
 }) {
   const t = useT();
+  // MENU-005: a combo shows as unavailable outside its hours.
+  const now = useNow(30_000);
   const items = channelItems(menu, 'POS');
   const categories = menuCategories(menu, items);
   const [query, setQuery] = useState('');
@@ -276,7 +279,7 @@ function MenuBrowser({
               price={displayPrice(item)}
               foodType={item.foodType}
               foodTypeLabel={t(`pos.menu.foodType.${item.foodType}`)}
-              {...menuNote(menu, item, t)}
+              {...menuNote(menu, item, t, now)}
               onSelect={() => {
                 onChoose(item, menu);
               }}

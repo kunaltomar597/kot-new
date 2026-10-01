@@ -192,8 +192,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-01 combo and modifier parity, P6-02 learned recommendations, P6-04 AI menu import, P6-05
-  the should-have batch, then Phase 7.
+- P6-02 learned recommendations, P6-04 AI menu import, P6-05 the should-have batch, then
+  Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -330,7 +330,7 @@ Recommended next WPs (dependencies met):
 
 ### Phase 6: Advanced menu and intelligence
 
-- [ ] P6-01 Combo and modifier parity on every surface
+- [x] P6-01 Combo and modifier parity on every surface
 - [ ] P6-02 Learned recommendations
 - [ ] P6-03 Voice search [H]
 - [ ] P6-04 AI-assisted menu import
@@ -599,6 +599,21 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-01):
+
+388. Combo choice slots, variants and modifiers were already shared on every surface (the
+     `@rp/ordering` selection, slots, summaries, price estimate and `requestLines`, and the
+     ComboChoices / ItemOptions components for web and native); the server and the relay check
+     them with the same `resolveOrderLine`. P6-01 adds what was missing: combo dates and hours
+     on the menu cards.
+389. The menu as served (`GET /menu`, and so the QR document) carries the restaurant's time zone
+     (`MenuSnapshot.timeZone`, optional; stored versions leave it out), so every device judges
+     combo hours by the restaurant's clock, not its own. Without it, Asia/Kolkata.
+390. `unavailableReason(item, {menu, now})` adds NOT_NOW for a combo outside its dates or hours;
+     cards say "Only 12:00–15:00" (or "Not available now" without hours) and cannot be chosen, on
+     the POS, the waiter app, the tablet and the QR page; the waiter app's cart and "order
+     again" flag it too. The clocks tick every 30 s (the QR page with its menu refresh).
 
 Decided 2026-10-02 (P5-06):
 
@@ -2064,6 +2079,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-01 Combo and modifier parity on every surface
+
+Built:
+
+- Contracts: `MenuSnapshot.timeZone` (optional); the served menu sets it (`MenuPublishService.current`).
+- `@rp/ordering`: `unavailableReason` with NOT_NOW, `comboHours`, `unavailableText`,
+  `menuNote(…, now)`, `lineProblems(…, now)` with NOT_NOW; string `pos.menu.onlyAt`.
+- Surfaces: POS menu grid, waiter app menu, cart and "order again", tablet `DishCard`
+  (`unavailable` text instead of `soldOut`), QR dish rows; each with a 30 s clock.
+
+Tests:
+
+- server `combo-parity.int.test.ts` 4 (the acceptance test): the same order (Paneer Tikka Full
+  with two extras ×2, less spicy; a Thali with Chaas as its choice) built with the shared cart
+  logic and placed at the POS, in the waiter app, on a tablet and on the QR page through the
+  relay; identical lines, modifiers, combo parts and prices (equal to the surfaces' estimate),
+  identical kitchen tickets per station; a combo outside its hours shown as NOT_NOW and refused
+  with the same code and words on all four.
+- ordering +3 (hours by the restaurant's clock, dates, the cart); console +1 (the POS card).
 
 ### 2026-10-02: P5-06 Phase 5 exit test, S2 (QR), S11, S13 (Phase 5 done)
 

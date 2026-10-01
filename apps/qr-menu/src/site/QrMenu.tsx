@@ -21,7 +21,7 @@ import {
   searchMenu,
   selectable,
   type TabletFilter,
-  unavailableReason,
+  menuNote,
   updateLine,
 } from '@rp/ordering';
 import { Button, ThemeRoot } from '@rp/ui-web';
@@ -127,6 +127,11 @@ function MenuPage({
 
   const document = menu.document;
   const items = useMemo(() => channelItems(document.menu, 'QR'), [document]);
+  // MENU-005: combo hours by the restaurant's clock.
+  const menuAt = useMemo(
+    () => ({ ...document.menu, timeZone: document.menu.timeZone ?? document.timeZone }),
+    [document],
+  );
   const photos = useMemo(
     () => new Map(document.photos.map((photo) => [photo.photoId, photo])),
     [document],
@@ -169,6 +174,8 @@ function MenuPage({
   // QR-008: the menu, availability and the restaurant's presence, kept fresh.
   useEffect(() => {
     const timer = setInterval(() => {
+      // The page's clock moves with the menu (combo hours, best sellers by time of day).
+      setNow(Date.now());
       fetchMenu(relayUrl, token, menu.version).then(
         (fresh) => {
           setMenu((current) => ({
@@ -396,6 +403,7 @@ function MenuPage({
                 <DishRow
                   key={item.id}
                   item={item}
+                  unavailable={menuNote(menuAt, item, t, now).unavailable}
                   photo={
                     <DishPhoto
                       photo={photoOf(item)}
@@ -486,6 +494,7 @@ function MenuPage({
 
 function DishRow({
   item,
+  unavailable,
   photo,
   needsChoice,
   readOnly,
@@ -493,6 +502,8 @@ function DishRow({
   onAdd,
 }: {
   item: MenuItem;
+  /** Why it cannot be ordered now (sold out, off, or a combo outside its hours). */
+  unavailable: string | undefined;
   /** Its photo, when the restaurant has one at the relay. */
   photo: ReactNode;
   needsChoice: boolean;
@@ -501,7 +512,6 @@ function DishRow({
   onAdd: () => void;
 }) {
   const t = useT();
-  const reason = unavailableReason(item);
   const foodType =
     item.foodType === 'VEG'
       ? t('qrSite.veg')
@@ -509,7 +519,7 @@ function DishRow({
         ? t('qrSite.egg')
         : t('qrSite.nonVeg');
   return (
-    <li className="qr-dish" data-unavailable={reason === undefined ? undefined : true}>
+    <li className="qr-dish" data-unavailable={unavailable === undefined ? undefined : true}>
       {photo}
       <div className="qr-dish__what">
         <p className="qr-dish__name">
@@ -528,10 +538,8 @@ function DishRow({
         </p>
       </div>
       <div className="qr-dish__action">
-        {reason !== undefined ? (
-          <span className="qr-dish__unavailable">
-            {reason === 'SOLD_OUT' ? t('qrSite.soldOut') : t('qrSite.notAvailable')}
-          </span>
+        {unavailable !== undefined ? (
+          <span className="qr-dish__unavailable">{unavailable}</span>
         ) : needsChoice ? (
           <Button
             variant="secondary"

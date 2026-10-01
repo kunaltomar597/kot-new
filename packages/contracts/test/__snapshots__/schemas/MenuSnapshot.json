@@ -319,7 +319,8 @@
           },
           "required": ["id", "name", "mode"]
         }
-      }
+      },
+      "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 }
     },
     "required": [
       "version",
@@ -664,7 +665,8 @@
           "required": ["id", "name", "mode"],
           "additionalProperties": false
         }
-      }
+      },
+      "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 }
     },
     "required": [
       "version",
