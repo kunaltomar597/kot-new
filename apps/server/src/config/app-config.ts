@@ -56,6 +56,19 @@ export const AppConfigSchema = z.object({
     .transform(withoutTrailingSlashes)
     .optional(),
   /**
+   * The QR relay's functions (ADR-0015), e.g. `https://<project>.supabase.co/functions/v1`. Unset:
+   * no QR menu sync (development, tests, a restaurant without QR ordering). Its credential is kept
+   * apart, sealed in the database (`relay:credential`).
+   */
+  relayUrl: z
+    .url({ protocol: /^https?$/ })
+    .refine((url) => {
+      const parsed = new URL(url);
+      return parsed.search === '' && parsed.hash === '';
+    }, 'RP_RELAY_URL must be the functions address, e.g. https://abc.supabase.co/functions/v1')
+    .transform(withoutTrailingSlashes)
+    .optional(),
+  /**
    * Version of the installed product (the Windows installer, `RESTAURANT_PC`), set by the installer
    * (P0-16); the server's own version when unset.
    */
@@ -112,6 +125,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     buildId: env.RP_BUILD_ID,
     consoleDir: env.RP_CONSOLE_DIR,
     controlPlaneUrl: env.RP_CONTROL_PLANE_URL,
+    relayUrl: env.RP_RELAY_URL,
     productVersion: env.RP_PRODUCT_VERSION,
     mqtt: env.RP_MQTT,
     mqttPort: env.RP_MQTT_PORT,
@@ -132,6 +146,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // SEC-001: the cloud is reached over TLS only.
   if (config.nodeEnv === 'production' && config.controlPlaneUrl?.startsWith('https://') === false) {
     throw new ConfigError('In production RP_CONTROL_PLANE_URL must use https://');
+  }
+  if (config.nodeEnv === 'production' && config.relayUrl?.startsWith('https://') === false) {
+    throw new ConfigError('In production RP_RELAY_URL must use https://');
   }
   return Object.freeze(config);
 }

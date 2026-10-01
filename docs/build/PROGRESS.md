@@ -138,6 +138,11 @@ What exists:
   - The local server's function `server` (P5-02b): a Realtime session, presence with the QR
     settings, menu publishing, the tables with their code hashes, pickup and status reports.
     124 tests in all, 3 of them under Deno.
+  - `@rp/relay/testing`: the relay in-process for other packages' tests (P5-03a).
+- `apps/server/src/relay`: the QR relay sync agent's publishing side (P5-03a). It sends presence
+  with the QR settings, and the tables and the QR menu by content hash. It backs off while offline
+  and catches up after. The credential is sealed (`relay:credential`). The System page shows its
+  state.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
@@ -184,8 +189,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-03 Sync agent in the local server (outbox to the relay, pickup, status, presence), then P5-04
-  to P5-06.
+- P5-03b Sync agent: orders (pickup, approval, status back), then P5-03c, P5-04 to P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -310,7 +314,9 @@ Recommended next WPs (dependencies met):
 - [x] P5-01 Relay database, RLS, isolation tests (deploying to Supabase: manual task 20)
 - [x] P5-02a Relay functions for diners (menu, submit order, order status, expiry)
 - [x] P5-02b Relay functions for local servers (session, presence, publishing, pickup)
-- [ ] P5-03 Sync agent
+- [x] P5-03a Sync agent: publishing (presence, tables, QR menu) and the System page
+- [ ] P5-03b Sync agent: orders (pickup, approval, status back)
+- [ ] P5-03c Sync agent: photos to the relay's Storage
 - [ ] P5-04 QR tokens and table tents
 - [ ] P5-05 Next.js QR menu site
 - [ ] P5-06 Phase 5 exit test
@@ -586,6 +592,40 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-03a):
+
+343. P5-03 is built in three parts: a publishing, b orders, c photos. The tests run the real
+     relay in-process (`@rp/relay/testing`: its schema in the test cluster, its functions over
+     HTTP) in place of a local Supabase, which needs Docker. An internet cut is the relay dropping
+     every connection.
+344. The relay address is `RP_RELAY_URL` (https in production). The credential is not
+     configuration:
+     - `pnpm --filter @rp/server relay:credential < file` stores it, sealed in the database with
+       a new SecretStore key, and audits that without the value;
+     - the Control Plane will deliver it in P7.
+345. The sync is reconciliation, not a queue of events.
+     - One loop sends presence every `qr.presenceIntervalSeconds`.
+     - Each time, it builds the tables and the QR menu and compares their hashes with what reached
+       the relay. That record (`relay.sync`) is kept across restarts.
+     - A change made while offline is therefore sent once the relay answers, and nothing is ever
+       dropped or sent twice.
+     - Menu, stock, QR-settings and floor events bring the loop forward within 2 s (MENU-006).
+     - Back-off after a failure: 5 s doubling to 60 s.
+346. Versions: the QR menu version is the relay's publication counter. If the relay already has a
+     newer one (a restored backup), the next version is the relay's latest plus one.
+347. The QR menu holds only what the QR channel offers:
+     - its dishes and the parts of their combos;
+     - their categories, option groups and tax groups;
+     - no stations.
+       Counted stock is published only as sold out (0) or not, so it does not republish on every
+       order. `serviceRequests` stays false until the QR site offers it (P5-05), and photos come
+       with P5-03c.
+348. Tables carry no QR code hash until P5-04 makes the codes. A removed (archived) table goes out
+     of service at the relay, and labels are cut to 40 characters.
+349. The System page shows "QR menu online": not set up, waiting for the credential, in step with
+     the menu version and last contact, or the error with what it means (read-only QR menu;
+     changes sent when it is back).
 
 Decided 2026-10-02 (P5-02b), design in ADR-0015:
 
@@ -1799,6 +1839,46 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-03a Sync agent: publishing
+
+Built:
+
+- `@rp/ordering` `qrChannelMenu` (QR dishes, combo parts, what they use; stock shown only as sold
+  out).
+- `@rp/relay/testing`: `startRelay` (schema in the cluster, functions over HTTP, `provision`,
+  `cut`/`restore`, a request log), `pgRelayDatabase` and `nodeListener`. The relay now builds
+  with tsc as well as esbuild.
+- `@rp/test-postgres` `createMigratedDatabase` takes preludes.
+- Server `src/relay`:
+  - `relay-client.ts` (contract-checked, timeouts, `RelayError`);
+  - `relay-credential.ts` (sealed with the `relay-credential-key` secret);
+  - `relay-sync.service.ts` (the loop);
+  - `relay-cli.ts` (`relay:credential`);
+  - `relay.module.ts`.
+- Config `RP_RELAY_URL`.
+- `SystemStatusResponse.qrRelay`, with its line on the System page.
+- Manual task 20: connecting a restaurant by hand.
+
+Tests:
+
+- server `relay-sync.int.test.ts` 10:
+  - presence, settings, tables and menu reach a real relay;
+  - nothing is resent while nothing changed;
+  - a dish running out shows as a new version within seconds;
+  - an internet cut, then catch-up with exactly one new version;
+  - QR settings sent;
+  - an archived table goes out of service;
+  - recovery from a forgotten version;
+  - which events matter;
+  - the credential is sealed;
+  - no credential means no calls.
+- ordering `qr-menu.test.ts` 4;
+- console System page 1 (the line).
+
+Gotcha: a call to `sync()` during a running sync used to get that older run's result, which
+broke tests under load. Now it waits and runs once more, and calls made meanwhile share that run,
+so the answer includes everything changed before the call.
 
 ### 2026-10-02: P5-02b Relay functions for local servers (P5-02 done)
 

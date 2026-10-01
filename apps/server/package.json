@@ -19,6 +19,7 @@
     "clean": "rm -rf dist coverage src/generated",
     "db:seed": "node --env-file-if-exists=.env dist/database/seed-cli.js",
     "control-plane:enrol": "node --env-file-if-exists=.env dist/cloud/enrol-cli.js",
+    "relay:credential": "node --env-file-if-exists=.env dist/relay/relay-cli.js credential",
     "menu:template": "node dist/menu/import/menu-template-cli.js",
     "scenario:service-day": "vitest run --project scenario",
     "test:perf": "RP_PERF=1 vitest run --project performance"
@@ -57,6 +58,7 @@
     "@rp/api-client": "workspace:*",
     "@rp/control-plane": "workspace:*",
     "@rp/mobile-core": "workspace:*",
+    "@rp/relay": "workspace:*",
     "@rp/test-postgres": "workspace:*",
     "@swc/core": "^1.16.2",
     "@types/express": "^5.0.6",

@@ -79,6 +79,18 @@ export const SystemStatusResponse = z.object({
     /** `UNREACHABLE`, `NOT_ENROLLED` or the Control Plane's error code; null when fine. */
     lastError: z.string().nullable(),
   }),
+  /** The QR relay (P5-03, ADR-0015): whether the QR menu online is in step with this PC. */
+  qrRelay: z.object({
+    /** A relay address is set (no QR ordering without it). */
+    configured: z.boolean(),
+    /** The vendor's credential for the relay is stored. */
+    credential: z.boolean(),
+    lastContactAt: Timestamp.nullable(),
+    /** `UNREACHABLE`, `NO_CREDENTIAL` or the relay's error code; null when fine. */
+    lastError: z.string().nullable(),
+    /** The menu version the QR page shows, null before the first. */
+    menuVersion: z.int().positive().nullable(),
+  }),
   storage: z.object({
     totalBytes: Bytes.nullable(),
     freeBytes: Bytes.nullable(),

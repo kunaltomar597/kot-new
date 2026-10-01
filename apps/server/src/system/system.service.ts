@@ -16,6 +16,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { AuditService } from '../audit/audit.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { RelaySyncService } from '../relay/relay-sync.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
   CATEGORY_FOLDERS,
@@ -46,6 +47,7 @@ export class SystemService {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly heartbeat: HeartbeatService,
+    private readonly relay: RelaySyncService,
     private readonly realtime: RealtimeGateway,
     private readonly audit: AuditService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -74,6 +76,7 @@ export class SystemService {
             select: { displayName: true },
           });
     const cloud = this.heartbeat.status();
+    const qr = this.relay.status();
     const percent = space === null ? null : usedPercent(space);
     const warnPercent = settings.get('storage.warnPercent');
     const criticalPercent = settings.get('storage.criticalPercent');
@@ -94,6 +97,13 @@ export class SystemService {
         enrolled: cloud.installationId !== null,
         lastContactAt: cloud.lastSuccessAt?.toISOString() ?? null,
         lastError: cloud.lastError,
+      },
+      qrRelay: {
+        configured: qr.configured,
+        credential: qr.credential,
+        lastContactAt: qr.lastSuccessAt?.toISOString() ?? null,
+        lastError: qr.lastError,
+        menuVersion: qr.menuVersion,
       },
       storage: {
         totalBytes: space?.totalBytes ?? null,

@@ -104,6 +104,40 @@ without a password; set one now.
    curl -i https://<project-ref>.supabase.co/functions/v1/qr-menu -H 'x-rp-table-token: AAAAAAAAAAAAAAAAAAAAAA'
    ```
 
+### 4c. Connect a restaurant (until the Control Plane does it, P7)
+
+The Control Plane will create each restaurant in the relay and hand its PC a credential (VCP-002).
+Until then, do it by hand for the pilot restaurant.
+
+1. On your computer, make a credential and its hash. Keep `credential.txt` safe and delete it
+   afterwards.
+
+   ```sh
+   openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' > credential.txt
+   shasum -a 256 credential.txt | cut -d' ' -f1    # its SHA-256, for the next step
+   ```
+
+   `shasum` hashes the file exactly as written, without a newline; the relay hashes the same
+   text.
+
+2. In the project's **SQL editor**, with a new UUID for the restaurant:
+
+   ```sql
+   SELECT relay.provision_tenant('<restaurant uuid>', '<restaurant name>');
+   SELECT relay.add_credential('<restaurant uuid>', decode('<sha256 hex>', 'hex'), 'Restaurant PC');
+   ```
+
+3. On the restaurant PC:
+   - set `RP_RELAY_URL=https://<project-ref>.supabase.co/functions/v1` in the server's
+     configuration;
+   - store the credential, then restart the server:
+
+     ```sh
+     pnpm --filter @rp/server relay:credential < credential.txt
+     ```
+
+4. Within a minute the **System** page shows "QR menu online: In step, menu version 1".
+
 ### 5. Check retention is scheduled
 
 In the SQL editor, run:
@@ -137,5 +171,6 @@ Supabase relay deployment
 - Functions deployed, RELAY_ALLOWED_ORIGINS set, qr-menu answers 404 for a made-up code: __/__/__
 - RELAY_JWT_SECRET set (Realtime) or left out (polling) (dev/staging/prod): __/__/__
 - relay-purge and relay-expire jobs present (dev/staging/prod): __/__/__
+- Pilot restaurant connected; System page shows the QR relay in step: yes/no
 - Anything that did not match these steps:
 ```

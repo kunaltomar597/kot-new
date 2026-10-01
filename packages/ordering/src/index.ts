@@ -10,3 +10,4 @@ export * from './reorder.js';
 export * from './approval-view.js';
 export * from './tablet-menu.js';
 export * from './line-check.js';
+export * from './qr-menu.js';

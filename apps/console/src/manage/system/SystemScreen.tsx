@@ -54,6 +54,18 @@ function vendorText(controlPlane: SystemStatusResponse['controlPlane'], t: Trans
     : t('systemPage.services.vendorOk', displayDateTime(new Date(controlPlane.lastContactAt)));
 }
 
+function relayText(relay: SystemStatusResponse['qrRelay'], t: Translate): string {
+  if (!relay.configured) return t('systemPage.services.qrRelayOff');
+  if (!relay.credential) return t('systemPage.services.qrRelayNoCredential');
+  if (relay.lastError !== null)
+    return t('systemPage.services.qrRelayError', { code: relay.lastError });
+  if (relay.lastContactAt === null) return t('systemPage.services.qrRelayNever');
+  return t('systemPage.services.qrRelayOk', {
+    version: relay.menuVersion ?? 0,
+    ...displayDateTime(new Date(relay.lastContactAt)),
+  });
+}
+
 function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) {
   return (
     <dl className="restaurant-facts">
@@ -149,6 +161,7 @@ export function SystemScreen() {
               ],
               [t('systemPage.services.uptime'), uptimeText(system.uptimeSeconds, t)],
               [t('systemPage.services.vendor'), vendorText(system.controlPlane, t)],
+              [t('systemPage.services.qrRelay'), relayText(system.qrRelay, t)],
             ]}
           />
         </section>

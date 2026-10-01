@@ -1732,6 +1732,13 @@ export const en = {
       vendorOk: 'Last contact {date} {time}',
       vendorNever: 'No contact yet',
       vendorError: 'Cannot reach the vendor ({code}); the restaurant works without it',
+      qrRelay: 'QR menu online',
+      qrRelayOff: 'Not set up (no QR ordering)',
+      qrRelayNoCredential: 'Waiting for the vendor’s relay credential',
+      qrRelayNever: 'No contact yet',
+      qrRelayOk: 'In step, menu version {version}, last contact {date} {time}',
+      qrRelayError:
+        'Cannot reach the QR relay ({code}): the QR menu turns read-only; changes are sent when it is back',
     },
     uptime: {
       minutes: '{minutes} min',
