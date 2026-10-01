@@ -205,6 +205,8 @@ export const ReportKind = z.enum([
   'KITCHEN',
   'TABLES',
   'RECOMMENDATIONS',
+  /** The audit log (AUD-005), with the optional action and person filters below. */
+  'AUDIT',
 ]);
 export type ReportKind = z.infer<typeof ReportKind>;
 
@@ -226,6 +228,12 @@ export const ReportExportRequest = z
     from: IsoDate,
     to: IsoDate,
     format: ExportFormat.default('CSV'),
+    /** AUDIT only: one action, one person. */
+    action: z
+      .string()
+      .regex(/^[A-Z][A-Z_]{1,59}$/)
+      .optional(),
+    actorId: Id.optional(),
   })
   .refine(withinRange, rangeMessages.order)
   .refine(withinMaxDays, rangeMessages.length);

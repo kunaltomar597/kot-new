@@ -193,7 +193,16 @@ function fileBytes(file: { content: string; encoding: 'utf-8' | 'base64' }): Blo
  * Downloads a report as CSV, Excel or PDF, stamped and audited by the server (RPT-017, P4-06).
  * One button per format, so the choice is one tap.
  */
-export function ExportButtons({ report, range }: { report: ReportKind; range: ReportRange }) {
+export function ExportButtons({
+  report,
+  range,
+  filters = {},
+}: {
+  report: ReportKind;
+  range: ReportRange;
+  /** The audit log's action and person filters (AUDIT only). */
+  filters?: { readonly action?: string; readonly actorId?: string };
+}) {
   const t = useT();
   const controller = useConsole();
   const toast = useToast();
@@ -213,7 +222,9 @@ export function ExportButtons({ report, range }: { report: ReportKind; range: Re
           onClick={() => {
             setBusy(format);
             controller.api
-              .exportReport({ body: { report, from: range.from, to: range.to, format } })
+              .exportReport({
+                body: { report, from: range.from, to: range.to, format, ...filters },
+              })
               .then(
                 (file) => {
                   const url = URL.createObjectURL(

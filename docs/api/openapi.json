@@ -171,6 +171,108 @@
         "x-requirements": ["NTF-008", "NTF-004"]
       }
     },
+    "/api/v1/audit": {
+      "get": {
+        "operationId": "listAuditEntries",
+        "summary": "Audit entries of a period, newest first, filtered and paged",
+        "description": "AUD-005: who did what, approved by whom, on which device, why, and the values before and after. Filter by action, person or record. Owner and Manager only.",
+        "tags": ["audit"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "pattern": "^[A-Z][A-Z_]{1,59}$" }
+          },
+          {
+            "name": "actorId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "entityId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "pattern": "^[a-z][a-z_]{1,39}$" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "default": 100, "type": "integer", "minimum": 1, "maximum": 500 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": { "default": 0, "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of entries.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AuditListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "AUDIT_VIEW",
+        "x-requirements": ["AUD-005", "AUD-001"]
+      }
+    },
     "/api/v1/audit/verify": {
       "get": {
         "operationId": "verifyAuditChain",
@@ -9991,6 +10093,7 @@
         "additionalProperties": false
       },
       "AssignableRole": { "type": "string", "enum": ["MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+      "AuditAction": { "type": "string", "pattern": "^[A-Z][A-Z_]{1,59}$" },
       "AuditChainBreak": {
         "type": "string",
         "enum": ["HASH_MISMATCH", "PREV_HASH_MISMATCH", "SEQUENCE_GAP"]
@@ -10002,6 +10105,144 @@
           "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
         },
         "required": ["seq", "hash"],
+        "additionalProperties": false
+      },
+      "AuditEntryView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "at": { "$ref": "#/components/schemas/Timestamp" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "action": { "type": "string" },
+          "entityType": { "type": "string" },
+          "entityId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "approver": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "name": { "type": "string" },
+                  "type": { "$ref": "#/components/schemas/DeviceType" }
+                },
+                "required": ["id", "name", "type"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "reason": { "type": ["string", "null"] },
+          "before": {},
+          "after": {}
+        },
+        "required": [
+          "id",
+          "seq",
+          "at",
+          "businessDate",
+          "action",
+          "entityType",
+          "entityId",
+          "actor",
+          "approver",
+          "device",
+          "reason",
+          "before",
+          "after"
+        ],
+        "additionalProperties": false
+      },
+      "AuditListQuery": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "action": { "$ref": "#/components/schemas/AuditAction" },
+          "actorId": { "$ref": "#/components/schemas/Id" },
+          "entityType": { "type": "string", "pattern": "^[a-z][a-z_]{1,39}$" },
+          "entityId": { "$ref": "#/components/schemas/Id" },
+          "offset": { "default": 0, "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "limit": { "default": 100, "type": "integer", "minimum": 1, "maximum": 500 }
+        },
+        "required": ["from", "to", "offset", "limit"],
+        "additionalProperties": false
+      },
+      "AuditListQueryInput": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "action": { "$ref": "#/components/schemas/AuditAction" },
+          "actorId": { "$ref": "#/components/schemas/Id" },
+          "entityType": { "type": "string", "pattern": "^[a-z][a-z_]{1,39}$" },
+          "entityId": { "$ref": "#/components/schemas/Id" },
+          "offset": { "default": 0, "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "limit": { "default": 100, "type": "integer", "minimum": 1, "maximum": 500 }
+        },
+        "required": ["from", "to"],
+        "additionalProperties": false
+      },
+      "AuditListResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "total": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "offset": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "nextOffset": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "entries": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AuditEntryView" }
+          },
+          "actions": { "type": "array", "items": { "type": "string" } },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["from", "to", "total", "offset", "nextOffset", "entries", "actions", "people"],
         "additionalProperties": false
       },
       "AuditVerifyResponse": {
@@ -15310,7 +15551,9 @@
           "report": { "$ref": "#/components/schemas/ReportKind" },
           "from": { "$ref": "#/components/schemas/IsoDate" },
           "to": { "$ref": "#/components/schemas/IsoDate" },
-          "format": { "default": "CSV", "$ref": "#/components/schemas/ExportFormat" }
+          "format": { "default": "CSV", "$ref": "#/components/schemas/ExportFormat" },
+          "action": { "type": "string", "pattern": "^[A-Z][A-Z_]{1,59}$" },
+          "actorId": { "$ref": "#/components/schemas/Id" }
         },
         "required": ["report", "from", "to", "format"],
         "additionalProperties": false
@@ -15321,7 +15564,9 @@
           "report": { "$ref": "#/components/schemas/ReportKind" },
           "from": { "$ref": "#/components/schemas/IsoDate" },
           "to": { "$ref": "#/components/schemas/IsoDate" },
-          "format": { "default": "CSV", "$ref": "#/components/schemas/ExportFormat" }
+          "format": { "default": "CSV", "$ref": "#/components/schemas/ExportFormat" },
+          "action": { "type": "string", "pattern": "^[A-Z][A-Z_]{1,59}$" },
+          "actorId": { "$ref": "#/components/schemas/Id" }
         },
         "required": ["report", "from", "to"],
         "additionalProperties": false
@@ -15361,7 +15606,8 @@
           "REPRINTS",
           "KITCHEN",
           "TABLES",
-          "RECOMMENDATIONS"
+          "RECOMMENDATIONS",
+          "AUDIT"
         ]
       },
       "ReportRangeQuery": {

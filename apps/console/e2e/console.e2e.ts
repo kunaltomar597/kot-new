@@ -1047,6 +1047,22 @@ test.describe.serial('the web console', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
   });
 
+  test('[AUD-005] [AUD-003] a manager finds a setting change in the audit trail and checks the chain', async () => {
+    // Still the manager.
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.audit') }).click();
+    await page
+      .getByRole('combobox', { name: t('auditPage.action') })
+      .selectOption({ label: 'Setting changed' });
+    const table = page.getByRole('table', { name: t('auditPage.table') });
+    const change = table.getByRole('row').filter({ hasText: 'Busy grill' });
+    await expect(change).toHaveCount(1);
+    await expect(change).toContainText('Vikram (Manager)');
+    await expectAccessible(page);
+    await page.getByRole('button', { name: t('auditPage.verify.run') }).click();
+    await expect(page.getByText(t('auditPage.verify.intact'))).toBeVisible();
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();

@@ -155,7 +155,8 @@ What exists:
   (P4-04); the Reports area: one range for every report (presets or dates, kept in the address),
   each report as headline figures, a bar chart where one helps and tables, CSV export, and
   drill-down from a row to everything about its order (P4-05d, Recharts); export of every report
-  as CSV, Excel or PDF (P4-06). 283 tests, and 22 Playwright steps.
+  as CSV, Excel or PDF (P4-06); the audit trail with filters, paging, export and the chain check
+  (P4-07a). 288 tests, and 23 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -170,7 +171,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-07 Audit viewer, chain verification and the suspicious-activity report.
+- P4-07b Suspicious-activity report with its daily job, and a no-sale drawer action to report.
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
@@ -284,7 +285,8 @@ Recommended next WPs (dependencies met):
 - [x] P4-05c Twelve months at design capacity (RPT-018)
 - [x] P4-05d Reports area in the console with charts and drill-down
 - [x] P4-06 Report exports
-- [ ] P4-07 Audit viewer, verification, suspicious-activity report
+- [x] P4-07a Audit viewer and chain verification
+- [ ] P4-07b Suspicious-activity report, daily job and the S12 fraud fixture
 
 ### Phase 5: QR menu and cloud relay
 
@@ -566,6 +568,20 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-07a):
+
+277. P4-07 is built in two parts: a the audit viewer and chain check, b the suspicious-activity
+     report, its daily job and the S12 fixture.
+278. The audit trail (`/manage/audit`, AUDIT_VIEW: Owner and Manager) lists a period's entries
+     newest first, 100 at a time, filtered by action and person (both kept in the address), with
+     who, approver, device, reason and the recorded values before and after behind "Changes".
+     Actions and record types are shown as recorded, made readable ("Invoice voided"): many are
+     composed at run time, so they are data, not interface text.
+279. The audit log exports like a report (`AUDIT`, with the action and person filters in the
+     stamp); only people who may view the trail may export it, whatever their report rights.
+280. "Check now" runs the existing chain verification over the whole trail and says where it
+     broke and why, or that it is intact with the head the vendor also receives.
 
 Decided 2026-10-01 (P4-06):
 
@@ -1410,6 +1426,21 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-07a Audit viewer and chain check
+
+Built: contracts `AuditListQuery`, `AuditEntryView`, `AuditListResponse` and `listAuditEntries`
+(`GET /api/v1/audit`); `AUDIT` in `ReportKind` with `action` and `actorId` on export requests; the
+server's `AuditViewerService` (filtered, paged, names and devices) and the AUDIT document; the
+console's `AuditScreen` at `/manage/audit` with `audit-view.ts`, the period filter now shared as
+`reports/RangeFilter.tsx`, `useReport` reading again when filters change, and export buttons that
+carry filters.
+
+Tests: server `audit-viewer.int.test.ts` 4 (newest first with names and values, filters and pages,
+access and range, export with filters and refused to a waiter); console `audit.test.tsx` 4; one
+e2e step (23): the kitchen-timer change found in the trail and the chain checked.
+
+Decisions: 277 to 280.
 
 ### 2026-10-01: P4-06 Report exports
 

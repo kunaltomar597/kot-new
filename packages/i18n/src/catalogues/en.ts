@@ -320,6 +320,7 @@ export const en = {
       printing: 'Kitchen and printers',
       restaurant: 'Restaurant',
       reports: 'Reports',
+      audit: 'Audit trail',
       system: 'System',
       settings: 'Settings',
       security: 'Security',
@@ -1181,6 +1182,43 @@ export const en = {
     },
     saved: 'The rule for “{name}” is saved.',
     resetDone: '“{name}” uses the factory rule again.',
+  },
+  /** The audit trail (P4-07a, AUD-003, AUD-005). */
+  auditPage: {
+    title: 'Audit trail',
+    intro:
+      'Every change to money, people, the menu and the settings: who did it, who approved it, on which device, why, and what it was before and after. Nothing here can be changed or deleted.',
+    loadFailed: 'The audit trail could not be loaded.',
+    entries: 'Entries',
+    filters: 'Filters',
+    action: 'Action',
+    allActions: 'All actions',
+    person: 'Person',
+    everyone: 'Everyone',
+    count: 'Entries in this period',
+    table: 'Audit entries, newest first',
+    record: 'Record',
+    device: 'Device',
+    changes: 'Changes',
+    before: 'Before',
+    after: 'After',
+    showing: 'Showing {shown} of {total}.',
+    more: 'Show more',
+    verify: {
+      title: 'Check the trail',
+      hint: 'Each entry carries a fingerprint of the one before it, so a changed or removed entry breaks the chain. The check reads the whole trail and can take a minute.',
+      run: 'Check now',
+      intact: 'Intact',
+      intactDetail:
+        '{count, plural, one {# entry} other {# entries}} checked; the latest is number {seq} ({hash}…), the same fingerprint the vendor receives.',
+      broken:
+        'The trail is broken at entry number {seq}: {reason}. Call support and do not change anything on this PC.',
+      reason: {
+        HASH_MISMATCH: 'the entry was changed after it was written',
+        PREV_HASH_MISMATCH: 'the entry does not follow the one before it',
+        SEQUENCE_GAP: 'entries are missing',
+      },
+    },
   },
   /** The Reports area (P4-05d, RPT-001 to RPT-016). */
   reportsPage: {

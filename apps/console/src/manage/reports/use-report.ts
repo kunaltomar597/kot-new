@@ -18,6 +18,8 @@ export type ReportData<T> =
 export function useReport<T>(
   load: (range: ReportRange) => Promise<T>,
   range: ReportRange,
+  /** Anything else the report depends on (filters): a change reads it again too. */
+  also = '',
 ): { data: ReportData<T>; reload: () => void } {
   const [data, setData] = useState<ReportData<T>>({ status: 'loading' });
   const generation = useRef(0);
@@ -37,7 +39,8 @@ export function useReport<T>(
         if (current === generation.current) setData({ status: 'error', error });
       },
     );
-  }, [range.from, range.to]);
+    // `also` is only a trigger: what it stands for is in `load`.
+  }, [range.from, range.to, also]);
 
   useEffect(() => {
     reload();
