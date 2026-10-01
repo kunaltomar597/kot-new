@@ -103,6 +103,12 @@
       "externalId": { "type": ["string", "null"] },
       "available": { "type": "boolean" },
       "trackStock": { "type": "boolean" },
+      "stockCount": {
+        "anyOf": [
+          { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      },
       "archivedAt": {
         "anyOf": [
           {
@@ -142,6 +148,7 @@
       "externalId",
       "available",
       "trackStock",
+      "stockCount",
       "archivedAt",
       "updatedAt"
     ]
@@ -251,6 +258,12 @@
       "externalId": { "type": ["string", "null"] },
       "available": { "type": "boolean" },
       "trackStock": { "type": "boolean" },
+      "stockCount": {
+        "anyOf": [
+          { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          { "type": "null" }
+        ]
+      },
       "archivedAt": {
         "anyOf": [
           {
@@ -290,6 +303,7 @@
       "externalId",
       "available",
       "trackStock",
+      "stockCount",
       "archivedAt",
       "updatedAt"
     ],

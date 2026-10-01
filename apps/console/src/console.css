@@ -1307,3 +1307,150 @@ body {
   font-size: var(--rp-font-size-sm);
   overflow-wrap: anywhere;
 }
+
+/* The menu editor (P4-02d, MGR-005). */
+.menu-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  padding-top: var(--rp-space-3);
+}
+
+.menu-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rp-space-3);
+}
+
+.menu-toolbar > .rp-field {
+  flex: 1 1 14rem;
+}
+
+.menu-toolbar__check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rp-space-2);
+  min-height: var(--rp-touch-min);
+  cursor: pointer;
+}
+
+.menu-toolbar__check input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.menu-row__photo {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--rp-radius-md);
+  object-fit: cover;
+}
+
+.menu-row__code {
+  padding: 0 var(--rp-space-2);
+  border: 1px solid var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-sm);
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-sm);
+  font-weight: var(--rp-font-weight-regular);
+}
+
+.staff-row[data-depth='1'] {
+  margin-left: var(--rp-space-6);
+}
+
+.menu-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+}
+
+.menu-form__section > legend {
+  padding: 0 var(--rp-space-2);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.menu-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rp-space-3);
+}
+
+.menu-form__row > .rp-field {
+  flex: 1 1 10rem;
+}
+
+.menu-form__hint {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.menu-form__error {
+  margin: 0;
+  color: var(--rp-color-danger-text);
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.menu-photo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--rp-space-3);
+}
+
+.menu-photo__preview {
+  width: 6rem;
+  height: 6rem;
+  border-radius: var(--rp-radius-md);
+  object-fit: cover;
+}
+
+.menu-photo__actions {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+}
+
+.menu-photo__label {
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.menu-photo__hint {
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+/* The real file input stays for screen readers and tests; the button opens it. */
+.menu-photo__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.menu-combo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+}
+
+.menu-combo__part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  margin: 0;
+  padding: var(--rp-space-3);
+  border: 1px dashed var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-md);
+}

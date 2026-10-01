@@ -4,6 +4,7 @@ import {
   ComboView,
   ItemAvailabilityView,
   type LoginResponse,
+  MenuDraftResponse,
   MenuPublishResponse,
   MenuSnapshot,
 } from '@rp/contracts';
@@ -265,5 +266,32 @@ describe('[MENU-006] availability and stock', () => {
     expect(
       await prisma.auditLog.count({ where: { action: 'ITEM_AVAILABILITY_CHANGED' } }),
     ).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('[MGR-005] the draft for the menu editor', () => {
+  it('holds each combo’s parts and each counted item’s stock', async () => {
+    await server()
+      .put(`/api/v1/menu/items/${id('Lassi')}/availability`)
+      .set(as(manager))
+      .send({ available: true, stockCount: 12 });
+    const response = await server().get('/api/v1/menu/draft').set(as(manager));
+    expect(response.status).toBe(200);
+    const draft = MenuDraftResponse.parse(response.body);
+    expect(draft.combos.find((combo) => combo.itemId === id('Veg Thali'))?.components).toHaveLength(
+      3,
+    );
+    const stockOf = (name: string) => draft.items.find((item) => item.id === id(name))?.stockCount;
+    expect(stockOf('Lassi')).toBe(12);
+    expect(stockOf('Dal')).toBeNull();
+    // Counting stock is not an item change: the item's audit stays as it was.
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          action: { in: ['MENU_ITEM_CHANGED', 'ITEM_PRICE_CHANGED'] },
+          entityId: id('Lassi'),
+        },
+      }),
+    ).toBe(0);
   });
 });

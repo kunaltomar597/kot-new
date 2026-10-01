@@ -155,6 +155,13 @@ variants, modifiers, combos, tags, synonyms), availability and stock counts, dra
 Acceptance: Playwright flow creating an item with a variant, a modifier and a photo, publishing it
 and seeing it on the POS.
 
+As built (done): the draft now carries `combos` and each item's `stockCount`. Console
+`src/manage/menu/`: `/manage/menu` with tabs Dishes (filter, search, archived, stock, archive with
+reason, restore), Categories (one level of sub-categories) and Option groups (rule and priced
+options), the dish dialog with every MENU-002 field, photo upload, sizes, option groups, an
+optional price-change reason and the combo editor, and Publish with the new version in a toast.
+A combo stays a combo (archive it to stop selling it).
+
 ### P4-02e Custom roles (S)
 
 Requirements: AUTH-012 (S).

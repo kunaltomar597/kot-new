@@ -837,6 +837,89 @@ test.describe.serial('the web console', () => {
     await kitchen.close();
   });
 
+  test('[MGR-005] [MENU-002] [MENU-003] [MENU-004] [MENU-008] [MENU-013] a manager adds a dish with sizes, add-ons and a photo, publishes it and the POS sells it', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.menu') })
+      .click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('menuEditor.title') }),
+    ).toBeVisible();
+    await expectAccessible(page);
+
+    await page.getByRole('button', { name: t('menuEditor.items.add') }).click();
+    const dish = page.getByRole('dialog', { name: t('menuEditor.item.addTitle') });
+    await dish
+      .getByLabel(t('menuEditor.item.name'), { exact: false })
+      .first()
+      .fill('Kulcha Platter');
+    await dish
+      .getByLabel(t('menuEditor.item.category'), { exact: false })
+      .selectOption({ label: 'Breads' });
+    await dish.getByLabel(/^Price/).fill('120');
+    await dish
+      .getByLabel(t('menuEditor.item.taxGroup'), { exact: false })
+      .selectOption({ label: 'GST 5 %' });
+    await dish
+      .getByLabel(t('menuEditor.item.station'), { exact: false })
+      .selectOption({ label: 'Kitchen' });
+    // A 1 × 1 PNG: the server re-encodes it to WebP renditions.
+    await dish.getByLabel(t('menuEditor.item.uploadPhoto')).setInputFiles({
+      name: 'kulcha.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+    await expect(
+      dish.getByRole('img', { name: t('menuEditor.item.photoAlt', { name: 'Kulcha Platter' }) }),
+    ).toBeVisible();
+    for (const [size, price] of [
+      ['Two pieces', '120'],
+      ['Four pieces', '220'],
+    ] as const) {
+      await dish.getByRole('button', { name: t('menuEditor.item.addVariant') }).click();
+      await dish.getByLabel(t('menuEditor.item.variantName'), { exact: false }).last().fill(size);
+      await dish
+        .getByLabel(/^Size price/)
+        .last()
+        .fill(price);
+    }
+    await dish.getByRole('checkbox', { name: 'Add-ons' }).check();
+    await expectAccessible(page);
+    await dish.getByRole('button', { name: t('menuEditor.item.add') }).click();
+    await expect(
+      page.getByText(t('menuEditor.items.added', { name: 'Kulcha Platter' })),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: t('menuEditor.publish') }).click();
+    await expect(page.getByText(/^Menu version \d+ is published/)).toBeVisible();
+
+    // A 360 px phone: the menu editor fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(page.getByRole('heading', { level: 3, name: /^Kulcha Platter/ })).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // The cashier sells it at once, with its sizes and add-ons (MENU-012).
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
+    await page.keyboard.type('3333');
+    await expect(page).toHaveURL(/\/pos$/);
+    await page.getByRole('button', { name: t('pos.takeaway') }).click();
+    await page.getByRole('button', { name: 'Breads', exact: true }).click();
+    await page.getByRole('button', { name: /^Kulcha Platter, / }).click();
+    const options = page.getByRole('dialog', { name: 'Kulcha Platter' });
+    await expect(options.getByRole('radio', { name: /Four pieces/ })).toBeVisible();
+    await expect(options.getByRole('checkbox', { name: /Extra butter/ })).toBeVisible();
+    await page.keyboard.press('Escape');
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
