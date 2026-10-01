@@ -126,6 +126,31 @@ test.describe('[QR-002] [QR-006] [QR-007] ordering from the table', () => {
   });
 });
 
+test.describe('[MENU-008] [QR-012] photos', () => {
+  test('shows a dish’s photo from the relay’s bucket, and none where there is none', async ({
+    page,
+  }) => {
+    await tablePage(page);
+    const mains = page.getByRole('region', { name: 'Main Course' });
+    const dal = mains.getByRole('listitem').filter({ hasText: 'Dal Makhani' });
+    const photo = dal.locator('img.qr-dish__photo');
+    await photo.scrollIntoViewIfNeeded();
+    // Loaded (the CSP lets the relay's origin in) and decorative: the name is beside it.
+    // (A failed load has no natural size; srcset scales a loaded one to its density.)
+    await expect
+      .poll(() =>
+        photo.evaluate((image) => {
+          const loaded = image as HTMLImageElement;
+          return loaded.complete && loaded.naturalWidth > 0;
+        }),
+      )
+      .toBe(true);
+    await expect(photo).toHaveAttribute('alt', '');
+    await expect(page.getByRole('img')).toHaveCount(0);
+    await expect(page.locator('img.qr-dish__photo')).toHaveCount(1);
+  });
+});
+
 test.describe('[QR-004] suggestions', () => {
   test('suggests what goes with the cart, in the restaurant’s words, and counts it when ordered', async ({
     page,

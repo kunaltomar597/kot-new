@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-03c photos to the relay's Storage, P5-03d the Realtime doorbell, then P5-06.
+- P5-03d the Realtime doorbell, then P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -319,7 +319,7 @@ Recommended next WPs (dependencies met):
 - [x] P5-02b Relay functions for local servers (session, presence, publishing, pickup)
 - [x] P5-03a Sync agent: publishing (presence, tables, QR menu) and the System page
 - [x] P5-03b Sync agent: orders (pickup, approval, status back)
-- [ ] P5-03c Sync agent: photos to the relay's Storage
+- [x] P5-03c Sync agent: photos to the relay's Storage
 - [ ] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
 - [x] P5-04 QR tokens and table tents
 - [x] P5-05a QR menu site: menu, cart, ordering, statuses, read-only, privacy
@@ -598,6 +598,30 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-03c):
+
+376. Menu photos go to the relay's public `menu-photos` Storage bucket through the `server`
+     function (`PUT photos/:photoId/:width`), never with a key on the local PC. The function picks
+     the path, `<tenant>/<photo>/<width>.webp`, and takes WebP files up to 2 MB only (checked by
+     the content type and the file's own header). Edge functions use the service-role key that
+     Supabase gives them for Storage calls only (ADR-0015 updated).
+377. The sync agent sends the three sizes the PC already made (160, 480 and 960 px) once per photo,
+     since a photo never changes (a new one has a new id); what was sent is kept in system_meta
+     `relay.photos`. Only QR dishes' photos are sent. The menu document lists only photos the relay
+     has, with each real width once (a photo narrower than 960 px is not enlarged), so the page
+     never shows a broken image. A photo the relay refuses (400, 413 or 415) is left out until the
+     server restarts; the menu still goes. A relay without Storage answers 503 `PHOTOS_OFF`, and
+     the agent asks again an hour later.
+378. Retention (BRD §9.3, "while the item exists + 90 days"): the agent tells the relay which
+     photos the menu uses (`POST photos/sweep`) when that changes and at least daily. The others
+     are marked removed; their files are deleted 90 days later through the Storage API, and the
+     record a day after that by `relay.purge()`. A photo used again within 90 days is restored;
+     later, the sweep reports it missing and the agent sends it again.
+379. The QR page shows a 72 px square thumbnail in each dish row and a wider photo in the dish
+     sheet, as `<img srcset>` straight from the bucket (lazy, `alt=""` since the dish name is
+     beside it). The CSP already allows the relay's origin, which serves Storage too. Combos and
+     suggestions show no photos in v1.
 
 Decided 2026-10-02 (P5-05c):
 
@@ -2005,6 +2029,41 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-03c Menu photos on the QR page
+
+Built:
+
+- Relay:
+  - migration `20261002230000_photo_sweep`: `relay.photos.purged_at`, the public `menu-photos`
+    bucket (Supabase only), and `relay.purge()` now also forgets swept photos;
+  - `server` routes `PUT photos/:photoId/:width` and `POST photos/sweep`;
+  - `PhotoStorage` in the function context: Supabase Storage over HTTP in Deno, an in-memory
+    bucket in `startRelay` (served at `/storage/v1/object/public/menu-photos/...`);
+  - `qr-menu` returns `photoBase`.
+- Contracts: `photoBase` on `QrMenuResponse`; `QrPhotoWidth`, `RelayPhotoParams`,
+  `RelayPhotoUploadResponse`, `RelayPhotoSweepRequest`/`Response`; routes `uploadRelayPhoto`
+  and `sweepRelayPhotos`; `QrPhoto` and `QrPhotoSize` types.
+- Server: `RelayClient.uploadPhoto` and `sweepPhotos`; `RelaySyncService.syncPhotos` (the relay
+  module now imports `PhotosModule`).
+- QR site: `DishPhoto` in dish rows and the dish sheet.
+- Docs: ADR-0015 (Menu photos), relay README, manual task 20 (bucket check, report line).
+
+Tests:
+
+- relay `server-functions.test.ts` +5: sizes stored under the restaurant's folder and replaced
+  in place, `photoBase`; WebP only, known sizes, 2 MB, credential, `PHOTOS_OFF`; tenants apart;
+  the 90-day sweep, restore, purge and missing; a bad sweep. `retention.test.ts` +1.
+- server `relay-sync.int.test.ts` +3: each QR dish's sizes sent once and served from the bucket
+  (POS-only dish's photo not sent); a narrow photo lists each real width once; a swept photo is
+  sent again when the dish takes it back.
+- qr-menu unit +2 (`DishPhoto`), e2e +1 (the Dal photo loads through the CSP).
+
+Notes for the next session:
+
+- The relay's in-memory bucket in `startRelay` is exposed as `relay.photoFiles`.
+- The 1×1 WebP in `e2e/fixture.ts` reports a density-scaled `naturalWidth` (72) because of
+  `srcset`; check `complete && naturalWidth > 0` for "loaded".
 
 ### 2026-10-02: P5-05c Call waiter and request bill from the QR page
 

@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { EventsModule } from '../events/events.module.js';
 import { MenuModule } from '../menu/menu.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
+import { PhotosModule } from '../photos/photos.module.js';
 import { RecommendationsModule } from '../recommendations/recommendations.module.js';
 import { ServiceRequestsModule } from '../service-requests/service-requests.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -24,6 +25,7 @@ import {
     EventsModule,
     MenuModule,
     OrdersModule,
+    PhotosModule,
     RecommendationsModule,
     ServiceRequestsModule,
     SettingsModule,

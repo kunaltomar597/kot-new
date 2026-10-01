@@ -19,7 +19,8 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
     `service-request` handles Call waiter and Request bill (P5-05c).
   - `server` is for the restaurant's local server, with its credential (P5-02b): a Realtime
     session, presence with the QR settings, publishing the menu, the tables with their code
-    hashes, picking up orders and reporting their status.
+    hashes, picking up orders and reporting their status, and menu photos into the
+    `menu-photos` Storage bucket with their 90-day sweep (P5-03c).
   - `src/entries/` holds the Supabase entries. `pnpm --filter @rp/relay build` bundles them with
     esbuild into `dist/functions/<name>/index.js`, which `config.toml` names.
   - The request and response schemas are in `@rp/contracts/relay`, documented in
@@ -49,4 +50,4 @@ Adding a migration:
 Deploying to the real projects is
 [manual task 20](../../manual-tasks/20-supabase-relay.md).
 
-Built by: P5-01 (database), P5-02 (edge functions).
+Built by: P5-01 (database), P5-02 (edge functions), P5-03c (photos).

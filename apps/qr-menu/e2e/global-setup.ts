@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RELAY_MIGRATIONS_DIR, startRelay, SUPABASE_PRELUDE } from '@rp/relay/testing';
 import { startTestDatabase } from '@rp/test-postgres';
-import { bigMenuDocument, menuDocument } from './fixture.js';
+import { bigMenuDocument, DAL_PHOTO_ID, menuDocument, TINY_WEBP } from './fixture.js';
 import { STATE_FILE } from './state.js';
 
 const SITE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -70,7 +70,18 @@ export default async function setup(): Promise<() => Promise<void>> {
       active: true,
     })),
   });
-  await asServer('PUT', 'menu', { version: 1, document: menuDocument() });
+  // Dal's photo goes to the relay's bucket first, as the sync agent sends it (MENU-008).
+  const photo = await fetch(`${relay.baseUrl}/server/photos/${DAL_PHOTO_ID}/160`, {
+    method: 'PUT',
+    headers: { authorization: `Bearer ${credential}`, 'content-type': 'image/webp' },
+    body: new Uint8Array(TINY_WEBP),
+  });
+  if (!photo.ok) throw new Error(`photo: ${String(photo.status)} ${await photo.text()}`);
+  const { path } = (await photo.json()) as { path: string };
+  await asServer('PUT', 'menu', {
+    version: 1,
+    document: menuDocument({ photoId: DAL_PHOTO_ID, sizes: [{ width: 1, height: 1, path }] }),
+  });
 
   // A second restaurant with a large menu, for the speed budget (QR-012).
   const big = await relay.provision('Grand Thali House');

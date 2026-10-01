@@ -28,12 +28,14 @@ export const QrPhotoSize = z.strictObject({
   height: z.int().positive().max(4096),
   path: z.string().min(1).max(300),
 });
+export type QrPhotoSize = z.infer<typeof QrPhotoSize>;
 
 /** A menu photo in every size the site may pick from (`srcset`), smallest first. */
 export const QrPhoto = z.strictObject({
   photoId: Id,
   sizes: z.array(QrPhotoSize).min(1).max(6),
 });
+export type QrPhoto = z.infer<typeof QrPhoto>;
 
 /** A restaurant's rule as the QR page runs it (REC-002), already limited to the QR channel. */
 export const QrRecommendationRule = z.strictObject({
@@ -116,6 +118,8 @@ export const QrMenuResponse = z.object({
   pickupTimeoutSeconds: z.int().positive(),
   /** The menu; null when the browser already has this version (`?known=`). */
   document: QrMenuDocument.nullable(),
+  /** Photos load from `<photoBase>/<path>` (the relay's Storage, through its CDN, QR-012). */
+  photoBase: z.string().nullable(),
 });
 export type QrMenuResponse = z.infer<typeof QrMenuResponse>;
 
@@ -386,3 +390,35 @@ export type UpdateQrServiceRequest = z.infer<typeof UpdateQrServiceRequest>;
 
 export const UpdateQrServiceRequestResponse = z.object({ id: Id, status: QrServiceRequestStatus });
 export type UpdateQrServiceRequestResponse = z.infer<typeof UpdateQrServiceRequestResponse>;
+
+// ---------------------------------------------------------------- menu photos (P5-03c)
+
+/** Photo sizes the relay stores: the local server's WebP renditions (P1-04). */
+export const QrPhotoWidth = z.union([z.literal(160), z.literal(480), z.literal(960)]);
+export type QrPhotoWidth = z.infer<typeof QrPhotoWidth>;
+
+export const RelayPhotoParams = z.strictObject({
+  photoId: Id,
+  width: z.coerce.number().pipe(QrPhotoWidth),
+});
+export type RelayPhotoParams = z.infer<typeof RelayPhotoParams>;
+
+/** Where the relay put one size of a photo, for the QR menu document. */
+export const RelayPhotoUploadResponse = z.object({ path: z.string().min(1).max(300) });
+export type RelayPhotoUploadResponse = z.infer<typeof RelayPhotoUploadResponse>;
+
+/**
+ * The photos the QR menu shows now (MENU-008). The others are marked removed and their files are
+ * deleted 90 days after (BRD §9.3).
+ */
+export const RelayPhotoSweepRequest = z.strictObject({ inUse: z.array(Id).max(5_000) });
+export type RelayPhotoSweepRequest = z.infer<typeof RelayPhotoSweepRequest>;
+
+export const RelayPhotoSweepResponse = z.object({
+  removed: z.int().nonnegative(),
+  restored: z.int().nonnegative(),
+  purged: z.int().nonnegative(),
+  /** Photos in use whose files the relay does not have (never sent, or swept): send them again. */
+  missing: z.array(Id),
+});
+export type RelayPhotoSweepResponse = z.infer<typeof RelayPhotoSweepResponse>;

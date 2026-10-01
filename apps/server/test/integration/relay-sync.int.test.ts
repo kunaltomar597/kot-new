@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { type LoginResponse } from '@rp/contracts';
 import { QrMenuResponse } from '@rp/contracts/relay';
 import { startRelay, type TestRelay } from '@rp/relay/testing';
+import sharp from 'sharp';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { SECRET_STORE, type SecretStore } from '../../src/auth/secret-store.js';
@@ -322,6 +323,113 @@ describe('[QR-008] [QR-003] keeping the relay in step', () => {
     expect(concernsRelay({ type: 'RestaurantChanged', payload: { part: 'FLOOR' } } as never)).toBe(
       true,
     );
+  });
+});
+
+describe('[MENU-008] [QR-012] the dishes’ photos', () => {
+  const photo = async (width: number, height: number): Promise<string> => {
+    const content = await sharp({ create: { width, height, channels: 3, background: '#c86428' } })
+      .jpeg()
+      .toBuffer();
+    const response = await server()
+      .post('/api/v1/photos')
+      .set(as(manager))
+      .send({ contentBase64: content.toString('base64') });
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    return (response.body as { id: string }).id;
+  };
+  const show = async (item: string, photoId: string) => {
+    await prisma.item.update({ where: { id: ids[item] }, data: { photoId } });
+    expect((await server().post('/api/v1/menu/publish').set(as(manager))).status).toBe(200);
+    await sync.sync();
+  };
+  const files = (photoId: string) =>
+    [...relay.photoFiles.keys()].filter((path) => path.includes(photoId)).sort();
+  const photoRows = () =>
+    relayRow<{ photo_id: string; removed: boolean; purged: boolean }>(
+      `SELECT photo_id, removed_at IS NOT NULL AS removed, purged_at IS NOT NULL AS purged
+       FROM relay.photos WHERE tenant_id = $1 ORDER BY photo_id`,
+    );
+  let wide = '';
+  let narrow = '';
+
+  it('sends each QR dish’s photo sizes once, and lists only what the relay has', async () => {
+    wide = await photo(1200, 900);
+    narrow = await photo(300, 200);
+    await prisma.item.update({ where: { id: ids['Staff Meal'] }, data: { photoId: narrow } });
+    await show('Dal Makhani', wide);
+    const menu = await relayMenu();
+    const path = (width: number) => `${tenantId}/${wide}/${String(width)}.webp`;
+    expect(menu.document?.photos).toEqual([
+      {
+        photoId: wide,
+        sizes: [
+          { width: 160, height: 120, path: path(160) },
+          { width: 480, height: 360, path: path(480) },
+          { width: 960, height: 720, path: path(960) },
+        ],
+      },
+    ]);
+    // The QR page loads it from the relay's public bucket, as this PC made it.
+    expect(menu.photoBase).not.toBeNull();
+    const served = await fetch(`${menu.photoBase ?? ''}/${path(960)}`);
+    expect(served.status).toBe(200);
+    const metadata = await sharp(Buffer.from(await served.arrayBuffer())).metadata();
+    expect(metadata).toMatchObject({ format: 'webp', width: 960, height: 720 });
+    // MENU-012: a POS-only dish's photo never leaves this PC.
+    expect(files(narrow)).toEqual([]);
+
+    const before = relay.requests.length;
+    await sync.sync();
+    expect(relay.requests.slice(before)).toEqual(['POST /functions/v1/server/presence']);
+  });
+
+  it('lists each real width once for a photo narrower than the largest size', async () => {
+    await show('Dal Makhani', narrow);
+    const photos = (await relayMenu()).document?.photos;
+    expect(photos).toEqual([
+      {
+        photoId: narrow,
+        sizes: [
+          { width: 160, height: 107, path: `${tenantId}/${narrow}/160.webp` },
+          { width: 300, height: 200, path: `${tenantId}/${narrow}/480.webp` },
+        ],
+      },
+    ]);
+    // The photo no longer shown is marked at the relay; its files stay for now.
+    expect(await photoRows()).toEqual(
+      [
+        { photo_id: wide, removed: true, purged: false },
+        { photo_id: narrow, removed: false, purged: false },
+      ].sort((a, b) => (a.photo_id < b.photo_id ? -1 : 1)),
+    );
+    expect(files(wide)).toHaveLength(3);
+  });
+
+  it('[BRD §9.3] sends a photo again once the relay has swept it', async () => {
+    // 91 days later, the daily sweep removes the unused photo's files.
+    await relay.admin.query(
+      `UPDATE relay.photos SET removed_at = now() - interval '91 days'
+       WHERE tenant_id = $1 AND photo_id = $2`,
+      [tenantId, wide],
+    );
+    const state = await prisma.systemMeta.findUniqueOrThrow({ where: { key: 'relay.photos' } });
+    const yesterday = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    await prisma.systemMeta.update({
+      where: { key: 'relay.photos' },
+      data: { value: JSON.stringify({ ...JSON.parse(state.value), sweptAt: yesterday }) },
+    });
+    await sync.sync();
+    expect(files(wide)).toEqual([]);
+
+    // The dish takes it back: the relay says it lacks it, and this PC sends it again.
+    await show('Dal Makhani', wide);
+    expect(files(wide)).toHaveLength(3);
+    expect((await relayMenu()).document?.photos.map((entry) => entry.photoId)).toEqual([wide]);
+    expect((await photoRows()).find((row) => row.photo_id === wide)).toMatchObject({
+      removed: false,
+      purged: false,
+    });
   });
 });
 

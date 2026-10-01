@@ -1,0 +1,13 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 300 } },
+    "required": ["path"]
+  },
+  "output": {
+    "type": "object",
+    "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 300 } },
+    "required": ["path"],
+    "additionalProperties": false
+  }
+}

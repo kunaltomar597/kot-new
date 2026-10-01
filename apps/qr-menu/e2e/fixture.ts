@@ -1,4 +1,4 @@
-import type { QrMenuDocument } from '@rp/contracts/relay';
+import type { QrMenuDocument, QrPhoto } from '@rp/contracts/relay';
 import { IDS, MENU } from '@rp/ordering/testing';
 
 export { IDS };
@@ -6,8 +6,13 @@ export { IDS };
 /** "Sweet finish": a restaurant rule suggesting Rasmalai with Dal Makhani (REC-002). */
 export const RULE_ID = '0199a0e0-0000-7000-8000-000000000301';
 
-/** The shared test menu as a restaurant publishes it for its QR page. */
-export function menuDocument(): QrMenuDocument {
+/** Dal Makhani's photo (MENU-008). */
+export const DAL_PHOTO_ID = '0199a0e0-0000-7000-8000-000000000401';
+/** A 1×1 lossless WebP, as the relay stores it. */
+export const TINY_WEBP = Buffer.from('UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==', 'base64');
+
+/** The shared test menu as a restaurant publishes it for its QR page, with Dal's photo if sent. */
+export function menuDocument(dalPhoto?: QrPhoto): QrMenuDocument {
   const onQr = new Set<string>([IDS.tikka, IDS.dal, IDS.thali, IDS.jamun, IDS.rasmalai]);
   return {
     restaurantName: 'Spice Route',
@@ -25,10 +30,11 @@ export function menuDocument(): QrMenuDocument {
           : item.channels,
         ...(item.id === IDS.dal && {
           description: 'Black lentils slow-cooked overnight with butter.',
+          ...(dalPhoto !== undefined && { photoId: dalPhoto.photoId }),
         }),
       })),
     },
-    photos: [],
+    photos: dalPhoto === undefined ? [] : [dalPhoto],
     recommendations: {
       rules: [
         {

@@ -22,6 +22,7 @@ export const qrMenu: Handler = serveWith('GET', (request, context) =>
       readOnly: state.readOnly,
       pickupTimeoutSeconds: state.pickupTimeoutSeconds,
       document,
+      photoBase: context.photos?.publicBase ?? null,
     };
     return json(200, body);
   }),

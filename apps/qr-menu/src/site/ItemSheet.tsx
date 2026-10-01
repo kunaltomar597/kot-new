@@ -13,7 +13,7 @@ import {
 } from '@rp/ordering';
 import { Button, ComboChoices, Dialog, ItemOptions, QuantityStepper, TextField } from '@rp/ui-web';
 import { formatRupees } from '@rp/domain';
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { useT } from './i18n';
 
 /**
@@ -23,6 +23,7 @@ import { useT } from './i18n';
 export function ItemSheet({
   menu,
   item,
+  photo,
   instructionMaxLength,
   recommendation,
   onClose,
@@ -30,6 +31,8 @@ export function ItemSheet({
 }: {
   menu: MenuSnapshot;
   item: MenuItem;
+  /** The dish's photo, when it has one (MENU-008). */
+  photo?: ReactNode;
   instructionMaxLength: number;
   /** The suggestion it was opened from (REC-008). */
   recommendation?: RecommendationSource | undefined;
@@ -81,6 +84,7 @@ export function ItemSheet({
         </Button>
       }
     >
+      {photo}
       {item.description === undefined ? null : (
         <p className="qr-sheet__description">{item.description}</p>
       )}

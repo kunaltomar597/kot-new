@@ -25,10 +25,19 @@ import {
   updateLine,
 } from '@rp/ordering';
 import { Button, ThemeRoot } from '@rp/ui-web';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { CartSheet } from './CartSheet';
 import { I18nProvider, useT } from './i18n';
 import { HelpButtons } from './HelpButtons';
+import { DishPhoto } from './DishPhoto';
 import { ItemSheet } from './ItemSheet';
 import { Orders } from './Orders';
 import { sourceOf, Suggestions } from './Suggestions';
@@ -118,6 +127,12 @@ function MenuPage({
 
   const document = menu.document;
   const items = useMemo(() => channelItems(document.menu, 'QR'), [document]);
+  const photos = useMemo(
+    () => new Map(document.photos.map((photo) => [photo.photoId, photo])),
+    [document],
+  );
+  const photoOf = (item: MenuItem) =>
+    item.photoId === undefined ? undefined : photos.get(item.photoId);
   const byId = useMemo(
     () => new Map(document.menu.items.map((item) => [item.id, item])),
     [document],
@@ -381,6 +396,14 @@ function MenuPage({
                 <DishRow
                   key={item.id}
                   item={item}
+                  photo={
+                    <DishPhoto
+                      photo={photoOf(item)}
+                      base={menu.photoBase}
+                      sizes="4.5rem"
+                      className="qr-dish__photo"
+                    />
+                  }
                   needsChoice={needsOptions(document.menu, item)}
                   readOnly={menu.readOnly}
                   onChoose={() => {
@@ -417,6 +440,14 @@ function MenuPage({
         <ItemSheet
           menu={document.menu}
           item={open.item}
+          photo={
+            <DishPhoto
+              photo={photoOf(open.item)}
+              base={menu.photoBase}
+              sizes="(min-width: 40rem) 36rem, 100vw"
+              className="qr-sheet__photo"
+            />
+          }
           recommendation={open.recommendation}
           instructionMaxLength={document.instructionMaxLength}
           onClose={() => {
@@ -455,12 +486,15 @@ function MenuPage({
 
 function DishRow({
   item,
+  photo,
   needsChoice,
   readOnly,
   onChoose,
   onAdd,
 }: {
   item: MenuItem;
+  /** Its photo, when the restaurant has one at the relay. */
+  photo: ReactNode;
   needsChoice: boolean;
   readOnly: boolean;
   onChoose: () => void;
@@ -476,6 +510,7 @@ function DishRow({
         : t('qrSite.nonVeg');
   return (
     <li className="qr-dish" data-unavailable={reason === undefined ? undefined : true}>
+      {photo}
       <div className="qr-dish__what">
         <p className="qr-dish__name">
           <span className="rp-food-mark" data-food={item.foodType} title={foodType} />

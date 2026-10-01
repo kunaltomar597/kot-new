@@ -707,9 +707,10 @@
           },
           { "type": "null" }
         ]
-      }
+      },
+      "photoBase": { "type": ["string", "null"] }
     },
-    "required": ["table", "version", "readOnly", "pickupTimeoutSeconds", "document"]
+    "required": ["table", "version", "readOnly", "pickupTimeoutSeconds", "document", "photoBase"]
   },
   "output": {
     "type": "object",
@@ -1433,9 +1434,10 @@
           },
           { "type": "null" }
         ]
-      }
+      },
+      "photoBase": { "type": ["string", "null"] }
     },
-    "required": ["table", "version", "readOnly", "pickupTimeoutSeconds", "document"],
+    "required": ["table", "version", "readOnly", "pickupTimeoutSeconds", "document", "photoBase"],
     "additionalProperties": false
   }
 }

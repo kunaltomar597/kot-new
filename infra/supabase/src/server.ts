@@ -5,6 +5,10 @@ import {
   QrOrderParams,
   type QrPickupServiceRequest,
   QrServiceRequestParams,
+  RelayPhotoParams,
+  RelayPhotoSweepRequest,
+  type RelayPhotoSweepResponse,
+  type RelayPhotoUploadResponse,
   UpdateQrServiceRequest,
   type UpdateQrServiceRequestResponse,
   RelayCredential,
@@ -22,6 +26,7 @@ import {
   HttpError,
   json,
   readBody,
+  readBytes,
   serveRoutes,
   sqlStateOf,
 } from './http.js';
@@ -385,6 +390,114 @@ async function updateRequest(
   return json(200, outcome);
 }
 
+/** The largest photo file the relay takes: a 960 px WebP is far smaller. */
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+/** BRD §9.3: menu photos stay 90 days after the dish stops using them. */
+const PHOTO_KEEP_DAYS = 90;
+const PHOTO_WIDTHS = [160, 480, 960] as const;
+
+function photosOf(context: FunctionContext) {
+  if (context.photos === undefined) {
+    throw new HttpError(503, 'PHOTOS_OFF', 'This relay does not take menu photos.');
+  }
+  return context.photos;
+}
+
+/** A WebP file starts "RIFF", a length, then "WEBP". */
+function isWebp(bytes: Uint8Array): boolean {
+  const text = (from: number) => String.fromCharCode(...bytes.slice(from, from + 4));
+  return bytes.length > 12 && text(0) === 'RIFF' && text(8) === 'WEBP';
+}
+
+/** MENU-008: one size of a menu photo, stored under the restaurant's own folder. */
+async function uploadPhoto(
+  request: Request,
+  context: FunctionContext,
+  match: RegExpExecArray,
+): Promise<Response> {
+  const photos = photosOf(context);
+  const params = RelayPhotoParams.safeParse({ photoId: match[1], width: match[2] });
+  if (!params.success) throw new HttpError(400, 'VALIDATION_FAILED', 'Unknown photo or size.');
+  if (request.headers.get('content-type') !== 'image/webp') {
+    throw new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Send the photo as image/webp.');
+  }
+  const bytes = await readBytes(request, PHOTO_MAX_BYTES);
+  if (!isWebp(bytes))
+    throw new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', 'That is not a WebP image.');
+  const answer = await context.db.transaction(async (tx): Promise<RelayPhotoUploadResponse> => {
+    const { tenantId } = await openServer(tx, request);
+    const folder = `${tenantId}/${params.data.photoId}`;
+    const path = `${folder}/${String(params.data.width)}.webp`;
+    await photos.put(path, bytes, 'image/webp');
+    await tx.query(
+      `INSERT INTO relay.photos (tenant_id, photo_id, storage_path, content_type, removed_at)
+       VALUES ($1, $2, $3, 'image/webp', NULL)
+       ON CONFLICT (tenant_id, photo_id) DO UPDATE SET removed_at = NULL, purged_at = NULL`,
+      [tenantId, params.data.photoId, folder],
+    );
+    return { path };
+  });
+  return json(200, answer);
+}
+
+/**
+ * MENU-008, BRD §9.3: the photos the QR menu uses now. The others are marked removed and their
+ * files deleted 90 days later; photos in use that the relay has no files for are listed, so the
+ * local server sends them (again).
+ */
+async function sweepPhotos(request: Request, context: FunctionContext): Promise<Response> {
+  const photos = photosOf(context);
+  const { inUse } = await readBody(request, RelayPhotoSweepRequest);
+  const ids = `{${inUse.join(',')}}`;
+  const answer = await context.db.transaction(async (tx): Promise<RelayPhotoSweepResponse> => {
+    const { tenantId } = await openServer(tx, request);
+    const removed = await tx.query(
+      `UPDATE relay.photos SET removed_at = now()
+       WHERE tenant_id = $1 AND removed_at IS NULL AND NOT (photo_id = ANY($2::text::uuid[]))
+       RETURNING photo_id`,
+      [tenantId, ids],
+    );
+    const restored = await tx.query(
+      `UPDATE relay.photos SET removed_at = NULL
+       WHERE tenant_id = $1 AND removed_at IS NOT NULL AND purged_at IS NULL
+         AND photo_id = ANY($2::text::uuid[])
+       RETURNING photo_id`,
+      [tenantId, ids],
+    );
+    const old = await tx.query<{ photo_id: string; storage_path: string }>(
+      `SELECT photo_id, storage_path FROM relay.photos
+       WHERE tenant_id = $1 AND purged_at IS NULL
+         AND removed_at < now() - make_interval(days => $2)`,
+      [tenantId, PHOTO_KEEP_DAYS],
+    );
+    if (old.length > 0) {
+      await photos.remove(
+        old.flatMap((row) =>
+          PHOTO_WIDTHS.map((width) => `${row.storage_path}/${String(width)}.webp`),
+        ),
+      );
+      await tx.query(
+        `UPDATE relay.photos SET purged_at = now()
+         WHERE tenant_id = $1 AND photo_id = ANY($2::text::uuid[])`,
+        [tenantId, `{${old.map((row) => row.photo_id).join(',')}}`],
+      );
+    }
+    const kept = await tx.query<{ photo_id: string }>(
+      `SELECT photo_id FROM relay.photos
+       WHERE tenant_id = $1 AND purged_at IS NULL AND photo_id = ANY($2::text::uuid[])`,
+      [tenantId, ids],
+    );
+    const have = new Set(kept.map((row) => row.photo_id));
+    return {
+      removed: removed.length,
+      restored: restored.length,
+      purged: old.length,
+      missing: inUse.filter((id) => !have.has(id)),
+    };
+  });
+  return json(200, answer);
+}
+
 export const server = serveRoutes([
   { method: 'POST', path: /\/server\/session$/, handler: session },
   { method: 'POST', path: /\/server\/presence$/, handler: presence },
@@ -393,6 +506,8 @@ export const server = serveRoutes([
   { method: 'GET', path: /\/server\/orders$/, handler: pickup },
   { method: 'POST', path: /\/server\/orders\/([^/]+)\/status$/, handler: updateOrder },
   { method: 'GET', path: /\/server\/service-requests$/, handler: pickupRequests },
+  { method: 'POST', path: /\/server\/photos\/sweep$/, handler: sweepPhotos },
+  { method: 'PUT', path: /\/server\/photos\/([^/]+)\/(\d+)$/, handler: uploadPhoto },
   {
     method: 'POST',
     path: /\/server\/service-requests\/([^/]+)\/status$/,

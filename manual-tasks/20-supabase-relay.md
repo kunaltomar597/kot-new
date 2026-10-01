@@ -90,6 +90,10 @@ without a password; set one now.
 
    Without it, local servers poll for new orders instead, which also works.
 
+   Menu photos need nothing more: the migrations create the public `menu-photos` bucket, and
+   Supabase gives every function `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` itself. Never set
+   or copy the service-role key anywhere else.
+
 2. Bundle the functions, then deploy them:
 
    ```sh
@@ -156,6 +160,16 @@ SELECT jobname, schedule, command FROM cron.job WHERE jobname = 'relay-expire';
 
 You should see `* * * * *` and `SELECT relay.expire_orders()`.
 
+Then check the photo bucket:
+
+```sql
+SELECT id, public, file_size_limit, allowed_mime_types FROM storage.buckets WHERE id = 'menu-photos';
+```
+
+You should see one row: `true`, `2097152` and `{image/webp}`. Once the pilot restaurant is
+connected, give a QR dish a photo in the console, publish the menu, and open the table's QR page on
+a phone: the photo should show beside the dish within a minute.
+
 ## Results to report back
 
 Copy this into a Claude session (no passwords or keys):
@@ -173,6 +187,8 @@ Supabase relay deployment
 - Functions deployed, RELAY_ALLOWED_ORIGINS set, qr-menu answers 404 for a made-up code: __/__/__
 - RELAY_JWT_SECRET set (Realtime) or left out (polling) (dev/staging/prod): __/__/__
 - relay-purge and relay-expire jobs present (dev/staging/prod): __/__/__
+- menu-photos bucket present and public (dev/staging/prod): __/__/__; a dish photo shows on the
+  pilot's QR page: yes/no
 - Pilot restaurant connected; System page shows the QR relay in step: yes/no
 - Anything that did not match these steps:
 ```

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createMigratedDatabase, type TestDatabase } from '@rp/test-postgres';
 import pg from 'pg';
 import type { RelayDatabase, Tx } from '../db.js';
-import type { FunctionContext, Handler } from '../http.js';
+import type { FunctionContext, Handler, PhotoStorage } from '../http.js';
 import { orderStatus } from '../order-status.js';
 import { qrMenu } from '../qr-menu.js';
 import { server } from '../server.js';
@@ -145,6 +145,8 @@ export interface TestRelay {
   restore(): void;
   /** Requests the functions answered (not the dropped ones), by path. */
   readonly requests: string[];
+  /** The photo files in the relay's bucket, by path. */
+  readonly photoFiles: ReadonlyMap<string, Uint8Array>;
   stop(): Promise<void>;
 }
 
@@ -175,31 +177,59 @@ export async function startRelay(options: {
     await lock.end();
   }
   const admin = new pg.Pool({ connectionString: database.url, max: 6 });
+  // The port is known only once listening, so the photo store learns its address after.
+  let origin = '';
+  const files = new Map<string, Uint8Array>();
+  const photos: PhotoStorage = {
+    get publicBase() {
+      return `${origin}/storage/v1/object/public/menu-photos`;
+    },
+    put(path, bytes) {
+      files.set(path, bytes);
+      return Promise.resolve();
+    },
+    remove(paths) {
+      for (const path of paths) files.delete(path);
+      return Promise.resolve();
+    },
+  };
   const context: FunctionContext = {
     db: pgRelayDatabase(admin),
     now: () => new Date(),
     allowedOrigins: ['*'],
     realtimeJwtSecret: options.realtimeJwtSecret,
+    photos,
   };
   const listener = nodeListener(FUNCTIONS, context);
   const requests: string[] = [];
   let reachable = true;
+  const PUBLIC = '/storage/v1/object/public/menu-photos/';
   const http: Server = createServer((incoming, outgoing) => {
     if (!reachable) {
       incoming.socket.destroy();
       return;
     }
-    requests.push(`${incoming.method ?? 'GET'} ${incoming.url ?? ''}`);
+    const url = incoming.url ?? '';
+    // The bucket's public address, as the CDN serves it.
+    if (url.startsWith(PUBLIC)) {
+      const file = files.get(decodeURIComponent(url.slice(PUBLIC.length)));
+      if (file === undefined) outgoing.writeHead(404).end();
+      else outgoing.writeHead(200, { 'content-type': 'image/webp' }).end(file);
+      return;
+    }
+    requests.push(`${incoming.method ?? 'GET'} ${url}`);
     listener(incoming, outgoing);
   });
   await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
   const address = http.address();
   const port = typeof address === 'object' && address !== null ? address.port : 0;
+  origin = `http://127.0.0.1:${String(port)}`;
   return {
     baseUrl: `http://127.0.0.1:${String(port)}/functions/v1`,
     admin,
     databaseUrl: database.url,
     requests,
+    photoFiles: files,
     async provision(name) {
       const tenantId = randomUUID();
       const credential = randomBytes(32).toString('base64url');

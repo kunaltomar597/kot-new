@@ -9,3 +9,6 @@ docs/brd/requirements.json
 docs/brd/requirements.md
 firmware
 storybook-static
+# Written by `next build` (and git-ignored)
+next-env.d.ts
+.next
