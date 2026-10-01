@@ -1,6 +1,6 @@
 'use client';
 
-import type { MenuItem, MenuSnapshot } from '@rp/contracts';
+import type { MenuItem, MenuSnapshot, RecommendationSource } from '@rp/contracts';
 import { type ItemSelection, unitPriceOf, validateSelection } from '@rp/domain';
 import {
   comboOf,
@@ -24,12 +24,15 @@ export function ItemSheet({
   menu,
   item,
   instructionMaxLength,
+  recommendation,
   onClose,
   onAdd,
 }: {
   menu: MenuSnapshot;
   item: MenuItem;
   instructionMaxLength: number;
+  /** The suggestion it was opened from (REC-008). */
+  recommendation?: RecommendationSource | undefined;
   onClose: () => void;
   onAdd: (line: NewCartLine) => void;
 }) {
@@ -60,6 +63,7 @@ export function ItemSheet({
       ...(comboChoices !== undefined && { comboChoices }),
       instructions: instructions.trim(),
       unitPrice: unitPriceOf(def, selection),
+      ...(recommendation !== undefined && { recommendation }),
     });
   };
 

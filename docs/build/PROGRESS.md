@@ -192,8 +192,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-05b (recommendations, call waiter / request bill, Lighthouse), P5-03c photos to the relay's
-  Storage, P5-03d the Realtime doorbell, then P5-06.
+- P5-05c call waiter / request bill (S), P5-03c photos to the relay's Storage, P5-03d the
+  Realtime doorbell, then P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -324,7 +324,8 @@ Recommended next WPs (dependencies met):
 - [ ] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
 - [x] P5-04 QR tokens and table tents
 - [x] P5-05a QR menu site: menu, cart, ordering, statuses, read-only, privacy
-- [ ] P5-05b QR menu site: recommendations, call waiter / request bill (S), photos, Lighthouse budget
+- [x] P5-05b QR menu site: suggestions and the speed budget
+- [ ] P5-05c QR menu site: call waiter / request bill (S)
 - [ ] P5-06 Phase 5 exit test
 
 ### Phase 6: Advanced menu and intelligence
@@ -598,6 +599,31 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-05b):
+
+369. The QR page's suggestions run the same engine as every surface (`recommend()` in
+     `@rp/ordering` `qrSuggestions`), in the browser, on a snapshot the local server publishes
+     with the menu. The snapshot holds:
+     - the QR-channel rules;
+     - best sellers by time of day and for the whole day, as rankings of `menu.bestSellerCount`
+       dishes rather than counts, so the menu is not republished after every order;
+     - dayparts, the business-day cut-off, the course order, the pins and blocks, and learned
+       pairings (empty until P6-02).
+       Rule edits raise no event; the next presence cycle (30 s) republishes them. Recommendation
+       and price settings bring it forward.
+370. The page shows one suggestion row, "You may like" (or "Add to your order" once the cart has
+     something). Each suggestion shows the reason in the restaurant's words when it has them.
+     Adding one sends its source with the line, so the restaurant counts it as ordered
+     (REC-008). Shown and tapped events are not sent from QR pages (no tracking, QR-013). The
+     best-seller filter appears once a snapshot exists.
+371. "Added to your order" is no longer a toast on the QR page: on a phone it covered the cart
+     bar. The bar shows the count and total, and a hidden live region tells screen readers.
+372. The speed budget (QR-012, NFR-P12) is a Playwright test, not Lighthouse CI:
+     - the same metric (LCP) and mobile profile (Slow 4G at 150 ms and 1.6 Mbps, a 4× slower
+       CPU), measured on a 300-dish menu;
+     - budget 2.5 s; measured 548 ms with a 406 kB page before compression;
+     - this avoids a heavy CI dependency, and the test prints its figures in the CI log.
 
 Decided 2026-10-02 (P5-05a):
 
@@ -1957,6 +1983,28 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-05b QR suggestions and the speed budget
+
+Built:
+
+- Contracts `QrRecommendationRule` and `QrRecommendations` (optional in `QrMenuDocument`).
+- `@rp/ordering` `qrSuggestions` and `qrBestSellers`.
+- The relay sync publishes the snapshot (QR rules, rankings by daypart, dayparts, cut-off,
+  courses, preferences). `RecommendationRulesService` is now exported.
+- The QR page: a suggestion row with reasons, the best-seller filter, suggestion sources on cart
+  lines, and a live region in place of the add toast.
+- The e2e setup adds a second restaurant with a 300-dish menu for the speed test.
+
+Tests:
+
+- ordering `qr-suggestions.test.ts` 4;
+- server relay-sync 1 (only QR rules are published; rankings and cut-off present);
+- qr-menu e2e 2: the rule's suggestion reaches the cart and its source reaches the restaurant;
+  LCP ≤ 2.5 s on a 300-dish menu (548 ms).
+
+Gotcha: once a dish is also a best seller, "Add Dal Makhani" matches both the suggestion and the
+menu; tests scope to the menu section's region.
 
 ### 2026-10-02: P5-05a QR menu site
 

@@ -274,7 +274,42 @@ describe('[QR-008] [QR-003] keeping the relay in step', () => {
     expect((await relayMenu()).document?.restaurantName).toBe('Spice Route Bistro');
   });
 
+  it('[QR-004] sends what the QR page’s suggestions run on, with the QR rules only', async () => {
+    const rule = (channels: string[], label: string) =>
+      server()
+        .post('/api/v1/recommendation-rules')
+        .set(as(manager))
+        .send({
+          when: { kind: 'ITEM', itemId: ids['Dal Makhani'] },
+          suggest: { kind: 'ITEM', itemId: ids['Dal Makhani'] },
+          priority: 10,
+          channels,
+          timeWindow: null,
+          activeFrom: null,
+          activeUntil: null,
+          label,
+          active: true,
+        });
+    expect((await rule(['QR', 'TABLE_TABLET'], 'Also online')).status).toBe(201);
+    expect((await rule(['POS'], 'Counter only')).status).toBe(201);
+    await sync.sync();
+    await giveT1ACode();
+    const snapshot = (await relayMenu()).document?.recommendations;
+    expect(snapshot?.rules.map((entry) => entry.label)).toEqual(['Also online']);
+    expect(Object.keys(snapshot?.bestSellers ?? {}).sort()).toEqual([
+      'ALL_DAY',
+      'BREAKFAST',
+      'DINNER',
+      'EVENING',
+      'LUNCH',
+    ]);
+    expect(snapshot?.businessDayCutoff).toBe('04:00');
+  });
+
   it('knows which changes the QR page shows', () => {
+    expect(
+      concernsRelay({ type: 'SettingsChanged', payload: { keys: ['reco.dayparts'] } } as never),
+    ).toBe(true);
     expect(concernsRelay({ type: 'MenuPublished', payload: { menuVersion: 2 } } as never)).toBe(
       true,
     );
