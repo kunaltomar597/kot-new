@@ -124,5 +124,10 @@ export const MenuSnapshot = z.object({
   combos: z.array(Combo),
   taxGroups: z.array(TaxGroup),
   stations: z.array(Station),
+  /**
+   * The restaurant's IANA time zone, on the menu as served (combo hours, MENU-005); stored
+   * versions leave it out.
+   */
+  timeZone: z.string().min(1).max(64).optional(),
 });
 export type MenuSnapshot = z.infer<typeof MenuSnapshot>;

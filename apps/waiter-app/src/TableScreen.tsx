@@ -123,8 +123,8 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
     () =>
       menu === null || menu === undefined
         ? new Map<string, LineProblem>()
-        : lineProblems(menu, cart, 'WAITER_APP'),
-    [menu, cart],
+        : lineProblems(menu, cart, 'WAITER_APP', now),
+    [menu, cart, now],
   );
 
   // An order for this table reached the kitchen, now or later on reconnect: show it at once.

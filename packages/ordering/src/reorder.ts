@@ -2,7 +2,7 @@ import type { MenuSnapshot, OrderView } from '@rp/contracts';
 import { type ItemSelection, unitPriceOf, validateSelection } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 import type { CartLine, NewCartLine } from './cart.js';
-import { summaryOf, unavailableReason } from './item-choice.js';
+import { comboHours, summaryOf, unavailableReason } from './item-choice.js';
 import { comboOf, comboSlots, type SalesChannel, selectable } from './menu-view.js';
 
 type SentLine = OrderView['items'][number];
@@ -77,18 +77,22 @@ export function againLine(
 export type LineProblem =
   | { readonly kind: 'SOLD_OUT' }
   | { readonly kind: 'NOT_AVAILABLE' }
+  /** A combo outside its dates or hours (MENU-005), with its hours when it has them. */
+  | { readonly kind: 'NOT_NOW'; readonly hours?: string }
   | { readonly kind: 'OFF_MENU' }
   | { readonly kind: 'TOO_FEW_LEFT'; readonly left: number };
 
 /**
  * The cart lines that cannot be sent as they are, by client line id: sold out or switched off
- * since they were added, no longer sold on this channel, or more than the stock left (counting
- * every line of the item). The server checks again when the order is sent.
+ * since they were added, no longer sold on this channel, a combo past its hours (given `now`), or
+ * more than the stock left (counting every line of the item). The server checks again when the
+ * order is sent.
  */
 export function lineProblems(
   menu: MenuSnapshot,
   lines: readonly CartLine[],
   channel: SalesChannel,
+  now?: Date | number,
 ): Map<string, LineProblem> {
   const problems = new Map<string, LineProblem>();
   const wanted = new Map<string, number>();
@@ -101,8 +105,11 @@ export function lineProblems(
       problems.set(line.clientLineId, { kind: 'OFF_MENU' });
       continue;
     }
-    const reason = unavailableReason(item);
-    if (reason !== undefined) {
+    const reason = unavailableReason(item, now === undefined ? undefined : { menu, now });
+    if (reason === 'NOT_NOW') {
+      const hours = comboHours(menu, item);
+      problems.set(line.clientLineId, { kind: reason, ...(hours !== undefined && { hours }) });
+    } else if (reason !== undefined) {
       problems.set(line.clientLineId, { kind: reason });
     } else if (item.stockCount !== null && (wanted.get(item.id) ?? 0) > item.stockCount) {
       problems.set(line.clientLineId, { kind: 'TOO_FEW_LEFT', left: item.stockCount });
@@ -117,6 +124,10 @@ export function lineProblemText(problem: LineProblem, t: Translator): string {
       return t('pos.menu.soldOut');
     case 'NOT_AVAILABLE':
       return t('pos.menu.notAvailable');
+    case 'NOT_NOW':
+      return problem.hours === undefined
+        ? t('pos.menu.notAvailable')
+        : t('pos.menu.onlyAt', { hours: problem.hours });
     case 'OFF_MENU':
       return t('pos.cart.offMenu');
     case 'TOO_FEW_LEFT':

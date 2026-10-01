@@ -10,24 +10,25 @@ const FOOD_TONE = { VEG: 'success', NON_VEG: 'danger', EGG: 'warning' } as const
 
 /**
  * A dish on the tablet's menu (TAB-005): photo, name, price, the veg / non-veg / egg mark with
- * its word, spice level, tags and the bestseller badge; sold-out dishes cannot be chosen
- * (TAB-012). A large touch target, in plain words (TAB-016).
+ * its word, spice level, tags and the bestseller badge; sold-out dishes, and combos outside their
+ * hours, cannot be chosen (TAB-012, MENU-005). A large touch target, in plain words (TAB-016).
  */
 export function DishCard({
   item,
   bestseller,
-  soldOut,
+  unavailable,
   disabled = false,
   onSelect,
 }: {
   item: MenuItem;
   bestseller: boolean;
-  soldOut: boolean;
+  /** Why it cannot be chosen now: sold out, switched off, or a combo outside its hours. */
+  unavailable: string | undefined;
   /** Ordering is paused, e.g. while the server cannot be reached (TAB-013). */
   disabled?: boolean;
   onSelect: () => void;
 }) {
-  const off = soldOut || disabled;
+  const off = unavailable !== undefined || disabled;
   const t = useT();
   const { colors } = useTheme();
   const { serverUrl } = useSessionState();
@@ -43,7 +44,7 @@ export function DishCard({
       testID={`dish-${item.id}`}
       accessibilityRole="button"
       accessibilityState={{ disabled: off }}
-      accessibilityLabel={[item.name, facts, soldOut ? t('mobile.tablet.ordering.soldOut') : '']
+      accessibilityLabel={[item.name, facts, unavailable ?? '']
         .filter((part) => part !== '')
         .join(', ')}
       disabled={off}
@@ -89,9 +90,9 @@ export function DishCard({
         )}
         <View style={styles.footer}>
           <Money paise={displayPrice(item)} size="lg" strong />
-          {soldOut && (
+          {unavailable !== undefined && (
             <Text style={{ color: colors.dangerText, fontWeight: weight(fontWeight.semibold) }}>
-              {t('mobile.tablet.ordering.soldOut')}
+              {unavailable}
             </Text>
           )}
         </View>

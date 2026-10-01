@@ -14486,7 +14486,8 @@
           },
           "combos": { "type": "array", "items": { "$ref": "#/components/schemas/Combo" } },
           "taxGroups": { "type": "array", "items": { "$ref": "#/components/schemas/TaxGroup" } },
-          "stations": { "type": "array", "items": { "$ref": "#/components/schemas/Station" } }
+          "stations": { "type": "array", "items": { "$ref": "#/components/schemas/Station" } },
+          "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 }
         },
         "required": [
           "version",

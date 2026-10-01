@@ -1,6 +1,6 @@
 import type { MenuItem, MenuSnapshot } from '@rp/contracts';
 import { spacing } from '@rp/design-tokens';
-import { Note, useT } from '@rp/mobile-shell';
+import { Note, useNow, useT } from '@rp/mobile-shell';
 import { channelItems, displayPrice, menuCategories, menuNote, visibleItems } from '@rp/ordering';
 import { Button, MenuItemCard, TextField } from '@rp/ui-native';
 import { useMemo, useState } from 'react';
@@ -19,6 +19,8 @@ export function MenuBrowser({
   onChoose: (item: MenuItem) => void;
 }) {
   const t = useT();
+  // MENU-005: a combo shows as unavailable outside its hours.
+  const now = useNow(30_000);
   const items = useMemo(() => channelItems(menu, 'WAITER_APP'), [menu]);
   const categories = useMemo(() => menuCategories(menu, items), [menu, items]);
   const [query, setQuery] = useState('');
@@ -75,7 +77,7 @@ export function MenuBrowser({
                 price={displayPrice(item)}
                 foodType={item.foodType}
                 foodTypeLabel={t(`pos.menu.foodType.${item.foodType}`)}
-                {...menuNote(menu, item, t)}
+                {...menuNote(menu, item, t, now)}
                 onSelect={() => {
                   onChoose(item);
                 }}
