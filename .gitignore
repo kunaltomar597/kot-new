@@ -52,3 +52,6 @@ apps/control-plane/src/generated/
 # Local copies kept beside the repository (the BRD is tracked in docs/brd/)
 /latest_context.md
 /Restaurant_Platform_BRD_v1.0.pdf
+
+# Vitest report output
+.vitest/
