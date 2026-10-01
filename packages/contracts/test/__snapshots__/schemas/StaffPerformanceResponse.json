@@ -1,0 +1,124 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "staff": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "staffId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": { "type": "string" },
+            "role": {
+              "type": "string",
+              "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"]
+            },
+            "ordersCreated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "ordersApproved": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "net": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "acknowledgements": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "averageAckSeconds": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "escalations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "cancellations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "voids": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": [
+            "staffId",
+            "name",
+            "role",
+            "ordersCreated",
+            "ordersApproved",
+            "net",
+            "acknowledgements",
+            "averageAckSeconds",
+            "escalations",
+            "cancellations",
+            "voids"
+          ]
+        }
+      }
+    },
+    "required": ["from", "to", "staff"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "staff": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "staffId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": { "type": "string" },
+            "role": {
+              "type": "string",
+              "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"]
+            },
+            "ordersCreated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "ordersApproved": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "net": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "acknowledgements": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "averageAckSeconds": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "escalations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "cancellations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "voids": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": [
+            "staffId",
+            "name",
+            "role",
+            "ordersCreated",
+            "ordersApproved",
+            "net",
+            "acknowledgements",
+            "averageAckSeconds",
+            "escalations",
+            "cancellations",
+            "voids"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["from", "to", "staff"],
+    "additionalProperties": false
+  }
+}

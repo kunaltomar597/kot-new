@@ -5972,6 +5972,124 @@
         "x-requirements": ["REC-008"]
       }
     },
+    "/api/v1/reports/cancellations": {
+      "get": {
+        "operationId": "getCancellationReport",
+        "summary": "Items cancelled or voided with their stage (wastage), and bills voided",
+        "tags": ["reports"],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CancellationReportResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["RPT-008", "RPT-018"]
+      }
+    },
+    "/api/v1/reports/discounts": {
+      "get": {
+        "operationId": "getDiscountReport",
+        "summary": "Discounts and complimentary items with who, approver, reason and value",
+        "tags": ["reports"],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DiscountReportResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["RPT-007", "RPT-018"]
+      }
+    },
     "/api/v1/reports/exports": {
       "post": {
         "operationId": "exportReport",
@@ -6307,6 +6425,65 @@
         "x-requirements": ["RPT-005"]
       }
     },
+    "/api/v1/reports/reprints": {
+      "get": {
+        "operationId": "getReprintReport",
+        "summary": "Kitchen tickets and bills printed again, and bills edited after printing",
+        "tags": ["reports"],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReprintReportResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["RPT-009", "RPT-018"]
+      }
+    },
     "/api/v1/reports/sales": {
       "get": {
         "operationId": "getSalesSummary",
@@ -6423,6 +6600,124 @@
         },
         "x-capability": "REPORTS_VIEW_EXPORT",
         "x-requirements": ["RPT-005"]
+      }
+    },
+    "/api/v1/reports/sources": {
+      "get": {
+        "operationId": "getSourceSales",
+        "summary": "Sales by order source and order type",
+        "tags": ["reports"],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SourceSalesResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["RPT-004", "RPT-018"]
+      }
+    },
+    "/api/v1/reports/staff": {
+      "get": {
+        "operationId": "getStaffPerformance",
+        "summary": "Each person: orders, approvals, sales, acknowledgements, escalations, cancellations",
+        "tags": ["reports"],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StaffPerformanceResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["RPT-003", "RPT-018"]
       }
     },
     "/api/v1/restaurant": {
@@ -9856,6 +10151,163 @@
         "items": { "$ref": "#/components/schemas/OpeningHours" }
       },
       "CaFingerprint": { "type": "string", "pattern": "^([0-9A-F]{2}:){31}[0-9A-F]{2}$" },
+      "CancellationReportResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "auditId": { "$ref": "#/components/schemas/Id" },
+                "at": { "$ref": "#/components/schemas/Timestamp" },
+                "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+                "kind": { "type": "string", "enum": ["CANCELLED", "VOIDED"] },
+                "orderId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+                "orderItemId": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+                },
+                "item": { "type": "string" },
+                "quantity": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "stage": {
+                  "anyOf": [{ "$ref": "#/components/schemas/OrderItemState" }, { "type": "null" }]
+                },
+                "value": { "$ref": "#/components/schemas/Paise" },
+                "wastage": { "type": "boolean" },
+                "by": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "approvedBy": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "reason": { "type": ["string", "null"] }
+              },
+              "required": [
+                "auditId",
+                "at",
+                "businessDate",
+                "kind",
+                "orderId",
+                "orderItemId",
+                "item",
+                "quantity",
+                "stage",
+                "value",
+                "wastage",
+                "by",
+                "approvedBy",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "bills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "auditId": { "$ref": "#/components/schemas/Id" },
+                "at": { "$ref": "#/components/schemas/Timestamp" },
+                "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+                "invoiceId": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+                },
+                "invoiceNumber": { "type": "string" },
+                "value": { "$ref": "#/components/schemas/Paise" },
+                "by": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "approvedBy": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "reason": { "type": ["string", "null"] }
+              },
+              "required": [
+                "auditId",
+                "at",
+                "businessDate",
+                "invoiceId",
+                "invoiceNumber",
+                "value",
+                "by",
+                "approvedBy",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "cancelledCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "cancelledValue": { "$ref": "#/components/schemas/Paise" },
+              "voidedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "voidedValue": { "$ref": "#/components/schemas/Paise" },
+              "wastageValue": { "$ref": "#/components/schemas/Paise" },
+              "billCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "billValue": { "$ref": "#/components/schemas/Paise" }
+            },
+            "required": [
+              "cancelledCount",
+              "cancelledValue",
+              "voidedCount",
+              "voidedValue",
+              "wastageValue",
+              "billCount",
+              "billValue"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["from", "to", "items", "bills", "totals"],
+        "additionalProperties": false
+      },
       "Capability": {
         "type": "string",
         "enum": [
@@ -10613,6 +11065,98 @@
           "serial",
           "revokedAt"
         ],
+        "additionalProperties": false
+      },
+      "DiscountReportResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "discounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "discountId": { "$ref": "#/components/schemas/Id" },
+                "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+                "invoiceId": { "$ref": "#/components/schemas/Id" },
+                "invoiceNumber": { "type": "string" },
+                "orderId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+                "item": { "type": ["string", "null"] },
+                "complimentary": { "type": "boolean" },
+                "kind": { "type": "string", "enum": ["PERCENT", "FLAT"] },
+                "rateBp": {
+                  "anyOf": [
+                    { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    { "type": "null" }
+                  ]
+                },
+                "amount": { "$ref": "#/components/schemas/Paise" },
+                "reason": { "type": "string" },
+                "appliedBy": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "approvedBy": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": [
+                "discountId",
+                "businessDate",
+                "invoiceId",
+                "invoiceNumber",
+                "orderId",
+                "item",
+                "complimentary",
+                "kind",
+                "rateBp",
+                "amount",
+                "reason",
+                "appliedBy",
+                "approvedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "amount": { "$ref": "#/components/schemas/Paise" },
+              "complimentaryCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "complimentaryAmount": { "$ref": "#/components/schemas/Paise" }
+            },
+            "required": ["count", "amount", "complimentaryCount", "complimentaryAmount"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["from", "to", "discounts", "totals"],
         "additionalProperties": false
       },
       "DiscountRequest": {
@@ -14368,6 +14912,106 @@
         "required": ["from", "to"],
         "additionalProperties": false
       },
+      "ReprintReportResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "auditId": { "$ref": "#/components/schemas/Id" },
+                "at": { "$ref": "#/components/schemas/Timestamp" },
+                "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+                "kind": { "type": "string", "enum": ["KOT_REPRINT", "BILL_REPRINT", "BILL_EDIT"] },
+                "reference": { "type": "string" },
+                "orderId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+                "invoiceId": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+                },
+                "by": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "approvedBy": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "reason": { "type": ["string", "null"] },
+                "before": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "after": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": [
+                "auditId",
+                "at",
+                "businessDate",
+                "kind",
+                "reference",
+                "orderId",
+                "invoiceId",
+                "by",
+                "approvedBy",
+                "reason",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "kotReprints": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "billReprints": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "billEdits": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["kotReprints", "billReprints", "billEdits"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["from", "to", "events", "totals"],
+        "additionalProperties": false
+      },
       "RestaurantChanged": {
         "type": "object",
         "properties": {
@@ -15137,6 +15781,42 @@
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
       },
+      "SourceSalesResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "gross": { "$ref": "#/components/schemas/Paise" },
+                "discounts": { "$ref": "#/components/schemas/Paise" },
+                "net": { "$ref": "#/components/schemas/Paise" },
+                "source": { "$ref": "#/components/schemas/OrderSource" },
+                "orderType": { "$ref": "#/components/schemas/OrderType" },
+                "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["gross", "discounts", "net", "source", "orderType", "orders"],
+              "additionalProperties": false
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "gross": { "$ref": "#/components/schemas/Paise" },
+              "discounts": { "$ref": "#/components/schemas/Paise" },
+              "net": { "$ref": "#/components/schemas/Paise" },
+              "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["gross", "discounts", "net", "orders"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["from", "to", "rows", "totals"],
+        "additionalProperties": false
+      },
       "SplitBillRequest": {
         "oneOf": [
           {
@@ -15247,6 +15927,57 @@
         "type": "object",
         "properties": { "staffId": { "$ref": "#/components/schemas/Id" } },
         "required": ["staffId"],
+        "additionalProperties": false
+      },
+      "StaffPerformanceResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/IsoDate" },
+          "to": { "$ref": "#/components/schemas/IsoDate" },
+          "staff": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "staffId": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" },
+                "role": { "$ref": "#/components/schemas/Role" },
+                "ordersCreated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "ordersApproved": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "net": { "$ref": "#/components/schemas/Paise" },
+                "acknowledgements": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "averageAckSeconds": {
+                  "anyOf": [
+                    { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    { "type": "null" }
+                  ]
+                },
+                "escalations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "cancellations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "voids": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": [
+                "staffId",
+                "name",
+                "role",
+                "ordersCreated",
+                "ordersApproved",
+                "net",
+                "acknowledgements",
+                "averageAckSeconds",
+                "escalations",
+                "cancellations",
+                "voids"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["from", "to", "staff"],
         "additionalProperties": false
       },
       "StaffTile": {

@@ -1,0 +1,87 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "gross": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "net": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "source": { "type": "string", "enum": ["POS", "WAITER_APP", "TABLE_TABLET", "QR"] },
+            "orderType": { "type": "string", "enum": ["DINE_IN", "TAKEAWAY"] },
+            "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["gross", "discounts", "net", "source", "orderType", "orders"]
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "gross": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "net": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["gross", "discounts", "net", "orders"]
+      }
+    },
+    "required": ["from", "to", "rows", "totals"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "gross": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "net": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "source": { "type": "string", "enum": ["POS", "WAITER_APP", "TABLE_TABLET", "QR"] },
+            "orderType": { "type": "string", "enum": ["DINE_IN", "TAKEAWAY"] },
+            "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["gross", "discounts", "net", "source", "orderType", "orders"],
+          "additionalProperties": false
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "gross": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "discounts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "net": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["gross", "discounts", "net", "orders"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["from", "to", "rows", "totals"],
+    "additionalProperties": false
+  }
+}
