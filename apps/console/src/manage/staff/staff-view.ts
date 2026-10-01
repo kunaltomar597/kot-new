@@ -1,9 +1,15 @@
-import { CreateStaffRequest, type StaffView, type UpdateStaffRequest } from '@rp/contracts';
+import {
+  CreateStaffRequest,
+  type RoleView,
+  type StaffView,
+  type UpdateStaffRequest,
+} from '@rp/contracts';
 import {
   decideStaffChange,
   isAssignableRole,
   isValidPin,
   type Role,
+  ROLES,
   type StaffChange,
 } from '@rp/domain';
 
@@ -52,6 +58,8 @@ export function staffActions(actor: StaffActorView, person: StaffView, now: numb
 export interface PersonForm {
   readonly displayName: string;
   readonly role: Role;
+  /** A custom role on `role` (AUTH-012), or empty for the built-in one. */
+  readonly customRoleId: string;
   readonly phone: string;
   readonly email: string;
   /** Only when adding someone. */
@@ -66,13 +74,14 @@ export type PersonProblem =
   'nameRequired' | 'phoneInvalid' | 'emailInvalid' | 'pinInvalid' | 'pinMismatch';
 
 export function emptyPersonForm(role: Role): PersonForm {
-  return { displayName: '', role, phone: '', email: '', pin: '', pinAgain: '' };
+  return { displayName: '', role, customRoleId: '', phone: '', email: '', pin: '', pinAgain: '' };
 }
 
 export function personFormOf(person: StaffView): PersonForm {
   return {
     displayName: person.displayName,
     role: person.role,
+    customRoleId: person.customRoleId ?? '',
     phone: person.phone ?? '',
     email: person.email ?? '',
     pin: '',
@@ -125,6 +134,7 @@ export function createRequestOf(form: PersonForm): CreateStaffRequest {
   return {
     displayName: form.displayName.trim(),
     role: form.role,
+    ...(form.customRoleId !== '' && { customRoleId: form.customRoleId }),
     pin: form.pin,
     phone: contact(form.phone),
     email: contact(form.email),
@@ -141,8 +151,52 @@ export function updateRequestOf(
 ): UpdateStaffRequest | undefined {
   const changes: UpdateStaffRequest = {};
   if (form.displayName.trim() !== person.displayName) changes.displayName = form.displayName.trim();
-  if (form.role !== person.role && isAssignableRole(form.role)) changes.role = form.role;
+  const customRoleId = form.customRoleId === '' ? null : form.customRoleId;
+  if (form.role !== person.role && isAssignableRole(form.role)) {
+    // A new built-in role drops any custom role on the server; only a custom one is named.
+    changes.role = form.role;
+    if (customRoleId !== null) changes.customRoleId = customRoleId;
+  } else if (customRoleId !== person.customRoleId) {
+    changes.customRoleId = customRoleId;
+  }
   if (contact(form.phone) !== person.phone) changes.phone = contact(form.phone);
   if (contact(form.email) !== person.email) changes.email = contact(form.email);
   return Object.keys(changes).length === 0 ? undefined : changes;
+}
+
+/**
+ * The role choices for a person (AUTH-012): each built-in role they may be given, followed by the
+ * active custom roles built on it. The value is the role, or `custom:<id>` for a custom role.
+ */
+export function roleChoices(
+  offered: readonly Role[],
+  customRoles: readonly RoleView[],
+  label: (role: Role) => string,
+): { readonly value: string; readonly label: string }[] {
+  return offered.flatMap((role) => [
+    { value: role, label: label(role) },
+    ...customRoles
+      .filter((custom) => custom.baseRole === role && custom.archivedAt === null && !custom.builtIn)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((custom) => ({ value: `custom:${custom.id}`, label: custom.name })),
+  ]);
+}
+
+/** The value of a form's role in `roleChoices`. */
+export function roleChoiceOf(form: Pick<PersonForm, 'role' | 'customRoleId'>): string {
+  return form.customRoleId === '' ? form.role : `custom:${form.customRoleId}`;
+}
+
+/** The role and custom role a chosen value stands for. */
+export function fromRoleChoice(
+  value: string,
+  customRoles: readonly RoleView[],
+): Pick<PersonForm, 'role' | 'customRoleId'> | undefined {
+  if (value.startsWith('custom:')) {
+    const custom = customRoles.find((role) => role.id === value.slice('custom:'.length));
+    return custom === undefined ? undefined : { role: custom.baseRole, customRoleId: custom.id };
+  }
+  return (ROLES as readonly string[]).includes(value)
+    ? { role: value as Role, customRoleId: '' }
+    : undefined;
 }

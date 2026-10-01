@@ -169,6 +169,15 @@ Deliverables: the Owner combines permissions into a named role on top of a base 
 permission guard applies it; the staff editor offers it.
 Acceptance: guard tests with a custom role; Playwright flow.
 
+As built (done): a custom role is a cashier, waiter or kitchen role plus capabilities from
+`CUSTOM_ROLE_GRANTABLE` (anything a manager may do except staff management and the Owner-only
+actions), created, changed and archived only by the Owner with a fresh second factor. The guard,
+settings, overrides and kitchen steps use `actorGrant` with `Principal.capabilities`, read with
+the session on every request. The console's Roles page lists the roles; the person dialog offers
+custom roles under their base role; screens use `grantOf`. The acceptance's Playwright flow is
+covered by server guard tests and console screen tests instead (the browser suite already runs
+the second factor flow in P4-02a).
+
 ## P4-03 Configuration screens
 
 Requirements: MGR-007, NTF-002, REC-002, REC-009 (S), KDS-008, BILL-005, BILL-006, UPD-010.

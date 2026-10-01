@@ -6,6 +6,7 @@ import type {
   UpdateStaffRequest,
 } from '@rp/contracts';
 import {
+  ASSIGNABLE_ROLES,
   type AssignableRole,
   decideStaffChange,
   grantFor,
@@ -26,7 +27,7 @@ import { announceSetupChange, lockSetup } from '../restaurant/setup-changes.js';
 import { staffErrors } from './staff-errors.js';
 
 const STAFF_INCLUDE = {
-  role: { select: { baseRole: true } },
+  role: { select: { id: true, baseRole: true, builtIn: true, name: true } },
   credentials: { select: { kind: true, lockedUntil: true } },
 } as const;
 
@@ -39,8 +40,20 @@ interface StaffRow {
   readonly photoId: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
-  readonly role: { readonly baseRole: Role };
+  readonly role: {
+    readonly id: string;
+    readonly baseRole: Role;
+    readonly builtIn: boolean;
+    readonly name: string;
+  };
   readonly credentials: readonly { readonly kind: string; readonly lockedUntil: Date | null }[];
+}
+
+/** The role as one that can be given, or undefined for the Owner. */
+function assignableOf(role: Role): AssignableRole | undefined {
+  return (ASSIGNABLE_ROLES as readonly string[]).includes(role)
+    ? (role as AssignableRole)
+    : undefined;
 }
 
 /** Names of the built-in roles, created with the first person given each role. */
@@ -60,6 +73,8 @@ function view(person: StaffRow, now: Date): StaffView {
     id: person.id,
     displayName: person.displayName,
     role: person.role.baseRole,
+    customRoleId: person.role.builtIn ? null : person.role.id,
+    customRoleName: person.role.builtIn ? null : person.role.name,
     active: person.active,
     phone: person.phone,
     email: person.email,
@@ -110,7 +125,7 @@ export class StaffService {
     const secretHash = await this.hasher.hash(request.pin);
     const { restaurantId } = principal;
     const person = await this.prisma.transaction(async (tx) => {
-      const role = await this.builtInRole(tx, restaurantId, request.role);
+      const role = await this.roleFor(tx, restaurantId, request.role, request.customRoleId ?? null);
       const created = await tx.staff.create({
         data: {
           restaurantId,
@@ -125,6 +140,7 @@ export class StaffService {
       await this.record(tx, principal, 'STAFF_CREATED', created.id, null, {
         displayName: created.displayName,
         role: request.role,
+        ...(created.role.builtIn ? {} : { customRole: created.role.name }),
         hasPhone: created.phone !== null,
         hasEmail: created.email !== null,
       });
@@ -147,10 +163,19 @@ export class StaffService {
     const { restaurantId } = principal;
     const person = await this.prisma.transaction(async (tx) => {
       const target = await this.lockedTarget(tx, restaurantId, staffId);
-      const newRole =
-        request.role !== undefined && request.role !== target.role.baseRole
-          ? request.role
+      const roleChange = request.customRoleId !== undefined || request.role !== undefined;
+      const base = request.role ?? assignableOf(target.role.baseRole);
+      if (roleChange && base === undefined) {
+        // The Owner's record: its role never changes (refused as OWNER_RECORD).
+        this.require(principal, settings, target, { kind: 'CHANGE_ROLE', role: 'MANAGER' });
+      }
+      // A new built-in role drops any custom role; a custom role is given on its base role.
+      const wantedRole =
+        roleChange && base !== undefined
+          ? await this.roleFor(tx, restaurantId, base, request.customRoleId ?? null)
           : undefined;
+      const newRole =
+        wantedRole !== undefined && wantedRole.id !== target.role.id ? base : undefined;
       const details = (['displayName', 'phone', 'email'] as const).filter(
         (field) => request[field] !== undefined && request[field] !== target[field],
       );
@@ -166,9 +191,7 @@ export class StaffService {
           ...(request.displayName !== undefined && { displayName: request.displayName }),
           ...(request.phone !== undefined && { phone: request.phone }),
           ...(request.email !== undefined && { email: request.email }),
-          ...(newRole !== undefined && {
-            roleId: (await this.builtInRole(tx, restaurantId, newRole)).id,
-          }),
+          ...(newRole !== undefined && wantedRole !== undefined && { roleId: wantedRole.id }),
         },
         include: STAFF_INCLUDE,
       });
@@ -184,11 +207,17 @@ export class StaffService {
         target.id,
         {
           ...(details.includes('displayName') && { displayName: target.displayName }),
-          ...(newRole !== undefined && { role: target.role.baseRole }),
+          ...(newRole !== undefined && {
+            role: target.role.baseRole,
+            ...(target.role.builtIn ? {} : { customRole: target.role.name }),
+          }),
         },
         {
           ...(details.includes('displayName') && { displayName: updated.displayName }),
-          ...(newRole !== undefined && { role: newRole }),
+          ...(newRole !== undefined && {
+            role: newRole,
+            ...(updated.role.builtIn ? {} : { customRole: updated.role.name }),
+          }),
           changed: [...details, ...(newRole === undefined ? [] : ['role'])],
           ...(leftSections > 0 && { leftSections }),
         },
@@ -357,6 +386,26 @@ export class StaffService {
     });
     if (person === null) throw staffErrors.notFound();
     return person;
+  }
+
+  /**
+   * The role row a person gets: a custom role built on `role` (AUTH-012), or the built-in one.
+   * A custom role must be active and built on that same role.
+   */
+  private async roleFor(
+    tx: TransactionClient,
+    restaurantId: string,
+    role: AssignableRole,
+    customRoleId: string | null,
+  ): Promise<{ id: string }> {
+    if (customRoleId === null) return this.builtInRole(tx, restaurantId, role);
+    const custom = await tx.role.findFirst({
+      where: { id: customRoleId, restaurantId, builtIn: false, archivedAt: null },
+      select: { id: true, baseRole: true },
+    });
+    if (custom === null) throw staffErrors.customRoleNotFound();
+    if (custom.baseRole !== role) throw staffErrors.customRoleMismatch();
+    return { id: custom.id };
   }
 
   /** The restaurant's built-in role, created with the first person given it. */

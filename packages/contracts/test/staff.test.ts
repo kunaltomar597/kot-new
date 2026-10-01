@@ -44,6 +44,8 @@ describe('[MGR-004] staff administration requests', () => {
       id: id(1),
       displayName: 'Ravi',
       role: 'WAITER',
+      customRoleId: null,
+      customRoleName: null,
       active: true,
       phone: null,
       email: null,

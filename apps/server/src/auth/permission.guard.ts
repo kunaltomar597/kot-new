@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OVERRIDE_TOKEN_HEADER } from '@rp/contracts';
-import { grantFor, OWNER_SECOND_FACTOR_CAPABILITIES } from '@rp/domain';
+import { actorGrant, grantFor, OWNER_SECOND_FACTOR_CAPABILITIES } from '@rp/domain';
 import { authErrors } from './auth-errors.js';
 import { AuthSettingsService } from './auth-settings.js';
 import { AuthService } from './auth.service.js';
@@ -99,7 +99,10 @@ export class PermissionGuard implements CanActivate {
     capability: Extract<RouteAccess, { kind: 'CAPABILITY' }>['capability'],
   ): Promise<boolean> {
     const principal = this.principal(request);
-    switch (grantFor(principal.role, capability)) {
+    // A custom role's extra capabilities count as ALLOW (AUTH-012).
+    switch (
+      actorGrant({ role: principal.role, extraCapabilities: principal.capabilities }, capability)
+    ) {
       case 'ALLOW':
         if (OWNER_SECOND_FACTOR_CAPABILITIES.has(capability)) {
           const settings = await this.settings.get(principal.restaurantId);

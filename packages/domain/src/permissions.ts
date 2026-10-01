@@ -106,7 +106,98 @@ export const OWNER_SECOND_FACTOR_CAPABILITIES: ReadonlySet<Capability> = new Set
 /** Roles whose PIN can approve an OVERRIDE action (AUTH-011). */
 export const OVERRIDE_APPROVER_ROLES: ReadonlySet<Role> = new Set<Role>(['OWNER', 'MANAGER']);
 
+/**
+ * Built-in roles a custom role can build on (AUTH-012). The Owner and managers already have every
+ * grantable capability, so a custom role starts from a cashier, waiter or kitchen role.
+ */
+export const CUSTOM_ROLE_BASES = ['CASHIER', 'WAITER', 'KITCHEN'] as const;
+export type CustomRoleBase = (typeof CUSTOM_ROLE_BASES)[number];
+
+/**
+ * Capabilities a custom role may add on top of its base role (AUTH-012): anything a manager may
+ * do, except managing staff (whose rules follow the built-in roles) and the Owner-only actions.
+ */
+export const CUSTOM_ROLE_GRANTABLE: readonly Capability[] = CAPABILITIES.filter(
+  (capability) =>
+    DEFAULT_PERMISSION_MATRIX[capability].MANAGER === 'ALLOW' &&
+    capability !== 'STAFF_MANAGE' &&
+    !OWNER_SECOND_FACTOR_CAPABILITIES.has(capability),
+);
+
+const GRANTABLE = new Set<string>(CUSTOM_ROLE_GRANTABLE);
+
+/** Someone acting: their built-in role and the extra capabilities of their custom role, if any. */
+export interface Actor {
+  readonly role: Role;
+  readonly extraCapabilities?: readonly Capability[];
+}
+
+/**
+ * The extra capabilities a custom role really adds to `baseRole`: known, grantable, not already
+ * allowed by the base role, each once, in catalogue order. Anything else stored is ignored, so a
+ * stored list can never grant more than the rules allow.
+ */
+export function extraCapabilitiesOf(baseRole: Role, stored: readonly string[]): Capability[] {
+  const wanted = new Set(stored);
+  return CUSTOM_ROLE_GRANTABLE.filter(
+    (capability) => wanted.has(capability) && grantFor(baseRole, capability) !== 'ALLOW',
+  );
+}
+
+/** The grant an actor has: ALLOW when their custom role adds the capability, else their role's. */
+export function actorGrant(
+  actor: Actor,
+  capability: Capability,
+  matrix: PermissionMatrix = DEFAULT_PERMISSION_MATRIX,
+): Grant {
+  if (GRANTABLE.has(capability) && actor.extraCapabilities?.includes(capability) === true) {
+    return 'ALLOW';
+  }
+  return grantFor(actor.role, capability, matrix);
+}
+
+export interface CustomRoleDraft {
+  readonly name: string;
+  readonly baseRole: Role;
+  readonly capabilities: readonly string[];
+}
+
+export type CustomRoleProblem =
+  | 'NAME_REQUIRED'
+  | 'NAME_TAKEN'
+  | 'BASE_ROLE_INVALID'
+  | 'CAPABILITY_NOT_GRANTABLE'
+  | 'NOTHING_ADDED';
+
+/**
+ * Checks a custom role (AUTH-012): a name no other role uses, a cashier, waiter or kitchen base,
+ * only grantable capabilities, and at least one the base role does not already have.
+ */
+export function checkCustomRole(
+  draft: CustomRoleDraft,
+  otherNames: readonly string[],
+): CustomRoleProblem[] {
+  const problems: CustomRoleProblem[] = [];
+  const name = draft.name.trim().toLowerCase();
+  if (name === '') problems.push('NAME_REQUIRED');
+  else if (otherNames.some((other) => other.trim().toLowerCase() === name)) {
+    problems.push('NAME_TAKEN');
+  }
+  if (!(CUSTOM_ROLE_BASES as readonly string[]).includes(draft.baseRole)) {
+    problems.push('BASE_ROLE_INVALID');
+    return problems;
+  }
+  if (draft.capabilities.some((capability) => !GRANTABLE.has(capability))) {
+    problems.push('CAPABILITY_NOT_GRANTABLE');
+  } else if (extraCapabilitiesOf(draft.baseRole, draft.capabilities).length === 0) {
+    problems.push('NOTHING_ADDED');
+  }
+  return problems;
+}
+
 export interface PermissionContext {
+  /** Capabilities the actor's custom role adds (AUTH-012). */
+  readonly extraCapabilities?: readonly Capability[];
   /** True when the target table / shift belongs to the acting person. */
   readonly isOwn?: boolean;
   /** Role of the manager who entered their PIN for this action, if any. */
@@ -138,7 +229,16 @@ export function evaluatePermission(
   context: PermissionContext = {},
   matrix: PermissionMatrix = DEFAULT_PERMISSION_MATRIX,
 ): PermissionDecision {
-  const grant = grantFor(role, capability, matrix);
+  const grant = actorGrant(
+    {
+      role,
+      ...(context.extraCapabilities !== undefined && {
+        extraCapabilities: context.extraCapabilities,
+      }),
+    },
+    capability,
+    matrix,
+  );
   switch (grant) {
     case 'ALLOW':
       return { allowed: true, viaOverride: false };

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { CurrentSessionResponse, LoginResponse } from '@rp/contracts';
-import type { Role } from '@rp/domain';
+import { type Capability, extraCapabilitiesOf, type Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
@@ -21,6 +21,17 @@ export interface SessionStaff {
   readonly id: string;
   readonly displayName: string;
   readonly role: Role;
+  /** What the person's custom role adds (AUTH-012); empty for a built-in role. */
+  readonly capabilities: readonly Capability[];
+}
+
+/** A custom role's capabilities as the rules allow them; none once it is archived. */
+export function roleCapabilities(role: {
+  readonly baseRole: Role;
+  readonly capabilities: readonly string[];
+  readonly archivedAt: Date | null;
+}): Capability[] {
+  return role.archivedAt === null ? extraCapabilitiesOf(role.baseRole, role.capabilities) : [];
 }
 
 interface SessionRow {
@@ -142,7 +153,12 @@ export class SessionService {
         expiresAt: session.expiresAt.toISOString(),
         inactivityTimeoutSeconds: this.inactivityMs(settings, input.device) / 1000,
       },
-      staff: { id: input.staff.id, displayName: input.staff.displayName, role: input.staff.role },
+      staff: {
+        id: input.staff.id,
+        displayName: input.staff.displayName,
+        role: input.staff.role,
+        capabilities: [...input.staff.capabilities],
+      },
       secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
     };
   }
@@ -168,6 +184,7 @@ export class SessionService {
         id: session.staffId,
         displayName: session.staff.displayName,
         role: session.staff.role.baseRole,
+        capabilities: roleCapabilities(session.staff.role),
       },
       secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
     };
@@ -224,6 +241,8 @@ export class SessionService {
         deviceId: session.deviceId,
         sessionId: session.id,
         secondFactorAt: session.secondFactorAt,
+        // Read with the session on every request, so a changed custom role applies at once.
+        capabilities: roleCapabilities(session.staff.role),
       },
     };
   }
@@ -344,6 +363,7 @@ export class SessionService {
         id: session.staffId,
         displayName: session.staff.displayName,
         role: session.staff.role.baseRole,
+        capabilities: roleCapabilities(session.staff.role),
       },
       device,
       settings,

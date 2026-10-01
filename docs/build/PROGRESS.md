@@ -144,7 +144,8 @@ What exists:
   give, take back, a new credential, connection and battery) (P4-02b); the Devices page (pair with
   a QR code, the code, addresses and CA fingerprint; rename; move a tablet; unpair) (P4-02c); the
   menu editor (dishes with photos, sizes, option groups, combos, stock; categories; option
-  groups; publish) (P4-02d). 209 tests, and 18 Playwright steps.
+  groups; publish) (P4-02d); the Roles page and custom roles for people, with screens that show
+  what a custom role adds (P4-02e). 216 tests, and 18 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -159,7 +160,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02e Custom roles (S), the last part of P4-02 (see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -264,7 +264,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02b Sections and pagers
 - [x] P4-02c Devices
 - [x] P4-02d Menu editor
-- [ ] P4-02e Custom roles (S)
+- [x] P4-02e Custom roles (S)
 - [ ] P4-03 Configuration screens
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
@@ -551,6 +551,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-02e):
+
+227. A custom role is a cashier, waiter or kitchen role plus extra capabilities; it never takes
+     anything away. It may add anything a manager may do except managing staff (whose rules
+     follow the built-in roles) and the Owner-only actions (`@rp/domain`
+     `CUSTOM_ROLE_GRANTABLE`). The stored list is filtered by `extraCapabilitiesOf` on every
+     read, so even a hand-edited row cannot grant more.
+228. Only the Owner, with a fresh second factor, creates, changes or archives a custom role;
+     managers see the Roles page and give people custom roles like any other role (STAFF_MANAGE).
+229. A role people have keeps its base role, and is archived only when nobody active has it.
+     Built-in roles never change.
+230. The person's extra capabilities are read with the session on every request, so a change
+     applies on their next request. Sign-in and the current session carry them
+     (`LoginResponse.staff.capabilities`), and the console shows what they open (the dashboard
+     for a role that adds the menu, staff or devices; its overview, orders and alerts stay with
+     OPERATIONS_CONFIGURE).
+231. Real-time rooms still follow the built-in role: a custom role that adds, say, billing sees
+     billing changes when its screen reads again, not live. The waiter app and tablet still show
+     what the base role allows; the server honours the extra grants everywhere.
 
 Decided 2026-10-01 (P4-02d):
 
@@ -1187,6 +1207,38 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-02e Custom roles (P4-02 done)
+
+Built: `@rp/domain` `CUSTOM_ROLE_BASES`, `CUSTOM_ROLE_GRANTABLE`, `extraCapabilitiesOf`,
+`actorGrant`, `checkCustomRole`, and `evaluatePermission` with `extraCapabilities`; migration
+`20261001100000_custom_roles` (`roles.archived_at`); contracts `roles.ts` (`RoleView`,
+`RoleRequest`, routes `listRoles`, `createRole`, `updateRole`, `archiveRole`), `customRoleId` on
+staff requests and `customRoleId`/`customRoleName` on `StaffView`, and
+`LoginResponse.staff.capabilities`; server `Principal.capabilities` and `SessionStaff.capabilities`
+(`roleCapabilities`), the guard, settings, overrides and kitchen steps through `actorGrant`, the
+`RolesService` and `RolesController`, and custom roles given in the staff service; console
+`grantOf` and person-aware `modesFor`/`homeFor` in `app/modes.ts`, the Roles page
+(`RolesScreen.tsx`, `roles-view.ts`) under Staff, custom roles in the person dialog and row, and a
+dashboard that opens on the first page a custom role allows.
+
+Tests: domain permissions 9 (4 new), server `roles.int.test.ts` 6 (Owner-only with a fresh second
+factor, every refusal, a captain who may read reports until the Owner takes it away on the very
+next request, a hand-edited row that cannot grant staff management, archive and base-role
+rules, built-in roles unchanged) and the permission suites unchanged (227), console
+`roles.test.tsx` 6 and `modes.test.ts` with custom roles.
+
+Gotchas:
+
+- Never check a person's permission with `grantFor(role, …)` on the server or in the console:
+  use `actorGrant` (server, with `principal.capabilities`) or `grantOf(person, …)` (console).
+- `LoginResponse.staff.capabilities` is optional in the contract so older fixtures and devices
+  still parse; the server always sends it.
+
+Deferred: live real-time rooms for custom grants and showing them in the Android apps
+(decision 231).
+
+Decisions: 227 to 231.
 
 ### 2026-10-01: P4-02d Menu editor
 

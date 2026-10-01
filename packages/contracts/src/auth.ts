@@ -67,7 +67,13 @@ export const LoginResponse = z.object({
     /** The session ends after this many seconds without activity. */
     inactivityTimeoutSeconds: z.int().positive(),
   }),
-  staff: z.object({ id: Id, displayName: z.string(), role: Role }),
+  staff: z.object({
+    id: Id,
+    displayName: z.string(),
+    role: Role,
+    /** What the person's custom role adds to `role` (AUTH-012); screens use it to show more. */
+    capabilities: z.array(Capability).optional(),
+  }),
   /** Until when the Owner's password + TOTP step-up is valid, if it was done. */
   secondFactorValidUntil: Timestamp.nullable(),
 });

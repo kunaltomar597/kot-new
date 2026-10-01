@@ -1,4 +1,4 @@
-import type { Role } from '@rp/domain';
+import type { Capability, Role } from '@rp/domain';
 import type { Request } from 'express';
 import type { AppError } from '../errors/app-error.js';
 import type { AuthenticatedDevice } from './device.js';
@@ -12,6 +12,11 @@ export interface Principal {
   readonly sessionId: string;
   /** When the Owner last confirmed password + second factor in this session (AUTH-006). */
   readonly secondFactorAt: Date | null;
+  /**
+   * What the person's custom role adds to `role` (AUTH-012), already limited to what may be added;
+   * empty for a built-in role. Use `@rp/domain` `actorGrant` with it, never `grantFor` alone.
+   */
+  readonly capabilities: readonly Capability[];
 }
 
 /**
@@ -33,6 +38,8 @@ export interface Actor {
   /** Null in station mode. */
   readonly staffId: string | null;
   readonly role: Role;
+  /** A person's custom-role capabilities (AUTH-012); none in station mode. */
+  readonly capabilities?: readonly Capability[];
   /** Set in station mode when the screen is bound to one station. */
   readonly stationId?: string | null;
 }

@@ -1,4 +1,5 @@
-import { grantFor } from '@rp/domain';
+import type { Capability } from '@rp/domain';
+import { grantOf } from '../app/modes.js';
 import { Navigate, NavLink, Route, Routes } from 'react-router';
 import { AlertCentre } from '../alerts/AlertCentre.js';
 import { useConsoleState } from '../app/console-context.js';
@@ -22,22 +23,40 @@ import { StaffArea } from './staff/StaffArea.js';
 export function ManageHome() {
   const t = useT();
   const { person } = useConsoleState();
-  const managesStaff = person !== undefined && grantFor(person.role, 'STAFF_MANAGE') === 'ALLOW';
-  const pairsDevices = person !== undefined && grantFor(person.role, 'DEVICE_PAIR') === 'ALLOW';
-  const managesMenu = person !== undefined && grantFor(person.role, 'MENU_MANAGE') === 'ALLOW';
+  const allows = (capability: Capability) =>
+    person !== undefined && grantOf(person, capability) === 'ALLOW';
+  // The overview, order feed and alerts are the managers' view of service (OPERATIONS_CONFIGURE);
+  // a custom role that only adds, say, the menu opens straight on its own page (AUTH-012).
+  const operates = allows('OPERATIONS_CONFIGURE');
+  const managesStaff = allows('STAFF_MANAGE');
+  const pairsDevices = allows('DEVICE_PAIR');
+  const managesMenu = allows('MENU_MANAGE');
   const isOwner = person?.role === 'OWNER';
+  const first = operates
+    ? undefined
+    : managesMenu
+      ? 'menu'
+      : managesStaff
+        ? 'staff'
+        : pairsDevices
+          ? 'devices'
+          : undefined;
   return (
     <div className="dashboard">
       <nav aria-label={t('dashboard.navigation')} className="dashboard__nav">
-        <NavLink to="/manage" end className="dashboard__link">
-          {t('dashboard.section.overview')}
-        </NavLink>
-        <NavLink to="/manage/orders" className="dashboard__link">
-          {t('dashboard.section.orders')}
-        </NavLink>
-        <NavLink to="/manage/alerts" className="dashboard__link">
-          {t('dashboard.section.alerts')}
-        </NavLink>
+        {operates ? (
+          <>
+            <NavLink to="/manage" end className="dashboard__link">
+              {t('dashboard.section.overview')}
+            </NavLink>
+            <NavLink to="/manage/orders" className="dashboard__link">
+              {t('dashboard.section.orders')}
+            </NavLink>
+            <NavLink to="/manage/alerts" className="dashboard__link">
+              {t('dashboard.section.alerts')}
+            </NavLink>
+          </>
+        ) : null}
         {managesStaff ? (
           <NavLink to="/manage/staff" className="dashboard__link">
             {t('dashboard.section.staff')}
@@ -61,9 +80,15 @@ export function ManageHome() {
       </nav>
       <div className="dashboard__content">
         <Routes>
-          <Route index element={<Overview />} />
-          <Route path="orders" element={<OrderFeedScreen />} />
-          <Route path="alerts" element={<AlertsSection />} />
+          {operates ? (
+            <>
+              <Route index element={<Overview />} />
+              <Route path="orders" element={<OrderFeedScreen />} />
+              <Route path="alerts" element={<AlertsSection />} />
+            </>
+          ) : first === undefined ? null : (
+            <Route index element={<Navigate to={`/manage/${first}`} replace />} />
+          )}
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}

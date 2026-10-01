@@ -48,7 +48,7 @@ export function login(role: Role, inactivityTimeoutSeconds = 600): LoginResponse
       expiresAt: inMinutes(600),
       inactivityTimeoutSeconds,
     },
-    staff: { id: person.staffId, displayName: person.displayName, role },
+    staff: { id: person.staffId, displayName: person.displayName, role, capabilities: [] },
     secondFactorValidUntil: null,
   };
 }
