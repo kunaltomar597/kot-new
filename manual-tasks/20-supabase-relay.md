@@ -137,6 +137,8 @@ Until then, do it by hand for the pilot restaurant.
      ```
 
 4. Within a minute the **System** page shows "QR menu online: In step, menu version 1".
+5. Once the QR menu site is live (P5-05), also set `RP_QR_SITE_URL=https://<qr-site-domain>`,
+   restart, and print the table tents from **Manage → QR codes**.
 
 ### 5. Check retention is scheduled
 

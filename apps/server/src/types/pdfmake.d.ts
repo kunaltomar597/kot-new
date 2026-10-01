@@ -13,7 +13,33 @@ declare module 'pdfmake' {
   }
 
   export type Content =
-    | { readonly text: string; readonly style?: string }
+    | {
+        readonly text: string;
+        readonly style?: string;
+        readonly color?: string;
+        readonly fontSize?: number;
+        readonly bold?: boolean;
+        readonly alignment?: 'left' | 'right' | 'center';
+        readonly margin?: Margins;
+      }
+    | {
+        /** A QR code of `qr`, at most `fit` points wide (P5-04). */
+        readonly qr: string;
+        readonly fit: number;
+        readonly eccLevel?: 'L' | 'M' | 'Q' | 'H';
+        readonly alignment?: 'left' | 'right' | 'center';
+        readonly margin?: Margins;
+      }
+    | {
+        readonly stack: readonly Content[];
+        readonly margin?: Margins;
+        readonly pageBreak?: 'before';
+      }
+    | {
+        readonly columns: readonly (Content & { readonly width?: '*' | number })[];
+        readonly columnGap?: number;
+        readonly pageBreak?: 'before';
+      }
     | {
         readonly table: {
           readonly headerRows: number;
@@ -32,8 +58,24 @@ declare module 'pdfmake' {
     readonly margin?: Margins;
   }
 
+  export interface CanvasLine {
+    readonly type: 'line';
+    readonly x1: number;
+    readonly y1: number;
+    readonly x2: number;
+    readonly y2: number;
+    readonly lineWidth?: number;
+    readonly lineColor?: string;
+    readonly dash?: { readonly length: number };
+  }
+
   export interface DocumentDefinition {
-    readonly pageSize: 'A4';
+    readonly pageSize: 'A4' | 'A5' | 'A6';
+    /** Drawn under each page's content, e.g. a fold line. */
+    readonly background?: (
+      page: number,
+      size: { readonly width: number; readonly height: number },
+    ) => { readonly canvas: readonly CanvasLine[] } | null;
     readonly pageOrientation: 'portrait' | 'landscape';
     readonly pageMargins: Margins;
     readonly info?: Readonly<Record<string, string>>;

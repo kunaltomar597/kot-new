@@ -69,6 +69,18 @@ export const AppConfigSchema = z.object({
     .transform(withoutTrailingSlashes)
     .optional(),
   /**
+   * The public QR menu site (P5-05), e.g. `https://menu.example.in`. Table QR codes open
+   * `<site>/t/<token>`; unset, codes can be made but not printed.
+   */
+  qrSiteUrl: z
+    .url({ protocol: /^https?$/ })
+    .refine((url) => {
+      const parsed = new URL(url);
+      return parsed.pathname === '/' && parsed.search === '' && parsed.hash === '';
+    }, 'RP_QR_SITE_URL must be the site origin, e.g. https://menu.example.in')
+    .transform(withoutTrailingSlashes)
+    .optional(),
+  /**
    * Version of the installed product (the Windows installer, `RESTAURANT_PC`), set by the installer
    * (P0-16); the server's own version when unset.
    */
@@ -126,6 +138,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     consoleDir: env.RP_CONSOLE_DIR,
     controlPlaneUrl: env.RP_CONTROL_PLANE_URL,
     relayUrl: env.RP_RELAY_URL,
+    qrSiteUrl: env.RP_QR_SITE_URL,
     productVersion: env.RP_PRODUCT_VERSION,
     mqtt: env.RP_MQTT,
     mqttPort: env.RP_MQTT_PORT,
@@ -149,6 +162,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (config.nodeEnv === 'production' && config.relayUrl?.startsWith('https://') === false) {
     throw new ConfigError('In production RP_RELAY_URL must use https://');
+  }
+  if (config.nodeEnv === 'production' && config.qrSiteUrl?.startsWith('https://') === false) {
+    throw new ConfigError('In production RP_QR_SITE_URL must use https://');
   }
   return Object.freeze(config);
 }

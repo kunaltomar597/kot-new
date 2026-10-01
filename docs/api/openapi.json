@@ -10188,6 +10188,68 @@
         "x-requirements": ["TBL-003", "TBL-004", "AUD-001"]
       }
     },
+    "/api/v1/tables/{tableId}/qr-code": {
+      "post": {
+        "operationId": "regenerateTableQrCode",
+        "summary": "Give a table a new QR code; the printed one stops working",
+        "description": "For a code that was copied or photographed. The old code stops opening the menu as soon as the relay hears of it (seconds when online). Audited with the reason.",
+        "tags": ["floor"],
+        "parameters": [
+          {
+            "name": "tableId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegenerateTableQrRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The table’s new code.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableQrView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such active table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["QR-001", "AUD-001"]
+      }
+    },
     "/api/v1/tables/{tableId}/restore": {
       "post": {
         "operationId": "restoreTable",
@@ -10283,6 +10345,129 @@
         },
         "x-capability": "SESSION",
         "x-requirements": ["TBL-007", "WTR-002"]
+      }
+    },
+    "/api/v1/tables/qr-codes": {
+      "get": {
+        "operationId": "listTableQrCodes",
+        "summary": "Every table’s QR code, or that it has none yet",
+        "tags": ["floor"],
+        "responses": {
+          "200": {
+            "description": "The tables in floor order.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TableQrCodesResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["QR-001", "ONB-004"]
+      },
+      "post": {
+        "operationId": "issueTableQrCodes",
+        "summary": "Give every table without a QR code one",
+        "description": "Each code has at least 128 random bits; the relay is sent only its hash. Tables that have a code keep it. Audited.",
+        "tags": ["floor"],
+        "responses": {
+          "200": {
+            "description": "Every table’s code now.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TableQrCodesResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["QR-001", "ONB-004", "AUD-001"]
+      }
+    },
+    "/api/v1/tables/qr-codes/tents": {
+      "post": {
+        "operationId": "printTableTents",
+        "summary": "Table tents to print, as a PDF",
+        "description": "Each table’s code with the restaurant’s name and colour and the table’s label (ONB-004 step 10). Needs RP_QR_SITE_URL (`QR_SITE_NOT_SET`); tables without a code are left out.",
+        "tags": ["floor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TableTentsRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The PDF, base64.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TableTentsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The QR site is not set, or no table to print has a code.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["QR-001", "ONB-004"]
       }
     },
     "/api/v1/tax-groups": {
@@ -16656,6 +16841,12 @@
         "required": ["refreshToken"],
         "additionalProperties": false
       },
+      "RegenerateTableQrRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "RejectOrderRequest": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
@@ -18619,6 +18810,30 @@
         "required": ["tableId"],
         "additionalProperties": false
       },
+      "TableQrCodesResponse": {
+        "type": "object",
+        "properties": {
+          "siteUrl": { "type": ["string", "null"] },
+          "tables": { "type": "array", "items": { "$ref": "#/components/schemas/TableQrView" } }
+        },
+        "required": ["siteUrl", "tables"],
+        "additionalProperties": false
+      },
+      "TableQrView": {
+        "type": "object",
+        "properties": {
+          "tableId": { "$ref": "#/components/schemas/Id" },
+          "label": { "type": "string" },
+          "sectionName": { "type": "string" },
+          "url": { "type": ["string", "null"] },
+          "hasCode": { "type": "boolean" },
+          "issuedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": ["tableId", "label", "sectionName", "url", "hasCode", "issuedAt"],
+        "additionalProperties": false
+      },
       "TableRecommendationsQuery": {
         "type": "object",
         "properties": {
@@ -18819,6 +19034,33 @@
           "businessDate",
           "payload"
         ],
+        "additionalProperties": false
+      },
+      "TableTentSize": { "type": "string", "enum": ["A6", "A5"] },
+      "TableTentsRequest": {
+        "type": "object",
+        "properties": {
+          "size": { "$ref": "#/components/schemas/TableTentSize" },
+          "tableIds": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          }
+        },
+        "required": ["size"],
+        "additionalProperties": false
+      },
+      "TableTentsResponse": {
+        "type": "object",
+        "properties": {
+          "filename": { "type": "string" },
+          "contentType": { "type": "string", "const": "application/pdf" },
+          "encoding": { "type": "string", "const": "base64" },
+          "content": { "type": "string" },
+          "pages": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["filename", "contentType", "encoding", "content", "pages"],
         "additionalProperties": false
       },
       "TableView": {

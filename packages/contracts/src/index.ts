@@ -4,6 +4,7 @@ export * from './auth.js';
 export * from './common.js';
 export * from './devices.js';
 export * from './floor.js';
+export * from './table-qr.js';
 export * from './kds.js';
 export * from './menu.js';
 export * from './menu-admin.js';

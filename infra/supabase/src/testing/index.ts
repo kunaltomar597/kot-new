@@ -154,13 +154,23 @@ export async function startRelay(options: {
   readonly runId: string;
   readonly realtimeJwtSecret?: string;
 }): Promise<TestRelay> {
-  const database: TestDatabase = await createMigratedDatabase({
-    adminUrl: options.adminUrl,
-    runId: options.runId,
-    prefix: 'relay',
-    migrationsDir: RELAY_MIGRATIONS_DIR,
-    preludeFiles: [SUPABASE_PRELUDE],
-  });
+  // The relay's roles are cluster-wide: test files that start a relay at the same time would race
+  // to create them, so one at a time (a lock in the cluster's own database, held by this session).
+  const lock = new pg.Client({ connectionString: options.adminUrl });
+  await lock.connect();
+  let database: TestDatabase;
+  try {
+    await lock.query("SELECT pg_advisory_lock(hashtext('rp.test.relay-database'))");
+    database = await createMigratedDatabase({
+      adminUrl: options.adminUrl,
+      runId: options.runId,
+      prefix: 'relay',
+      migrationsDir: RELAY_MIGRATIONS_DIR,
+      preludeFiles: [SUPABASE_PRELUDE],
+    });
+  } finally {
+    await lock.end();
+  }
   const admin = new pg.Pool({ connectionString: database.url, max: 6 });
   const context: FunctionContext = {
     db: pgRelayDatabase(admin),

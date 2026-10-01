@@ -42,7 +42,6 @@ let kit: AuthKit;
 let waiter: LoginResponse;
 let manager: LoginResponse;
 let kitchen: LoginResponse;
-let tenantId = '';
 const ids: Record<string, string> = {};
 const tokens: Record<string, string> = {};
 const id = (name: string) => ids[name] ?? '';
@@ -50,14 +49,12 @@ const id = (name: string) => ids[name] ?? '';
 const server = () => request(httpServer(app));
 const as = (login: LoginResponse) => authHeaders(kit.deviceId, login.accessToken);
 
-/** QR codes for the tables straight at the relay (P5-04 makes real ones). */
+/** Every table's QR code, made as a manager would (P5-04); the relay gets their hashes. */
 async function giveCodes(): Promise<void> {
+  expect((await server().post('/api/v1/tables/qr-codes').set(as(manager))).status).toBe(200);
   for (const label of ['T1', 'T2', 'T3']) {
-    tokens[label] ??= randomUUID().replaceAll('-', '');
-    await relay.admin.query(
-      "UPDATE relay.dining_tables SET token_hash = sha256(convert_to($2, 'UTF8')) WHERE tenant_id = $1 AND table_id = $3",
-      [tenantId, tokens[label], id(label)],
-    );
+    const table = await prisma.diningTable.findUniqueOrThrow({ where: { id: id(label) } });
+    tokens[label] = table.qrToken ?? '';
   }
 }
 
@@ -133,7 +130,6 @@ beforeAll(async () => {
   database = await createTestDatabase();
   relay = await startRelay({ adminUrl: inject('pgAdminUrl'), runId: inject('pgRunId') });
   const tenant = await relay.provision('Spice Route');
-  tenantId = tenant.tenantId;
   const later = { firstDelayMs: 3_600_000, retryBaseMs: 3_600_000, retryMaxMs: 3_600_000 };
   app = await createTestApp({
     databaseUrl: database.url,
@@ -213,8 +209,8 @@ beforeAll(async () => {
   // Many orders go to T3 here; the relay's rate limit has tests of its own (QR-006).
   await prisma.setting.create({ data: { ...base, key: 'qr.submissionsPerWindow', value: 50 } });
   app.get(SettingsService).invalidate();
-  expect((await sync.sync()).lastError).toBeNull();
   await giveCodes();
+  expect((await sync.sync()).lastError).toBeNull();
 });
 
 afterAll(async () => {

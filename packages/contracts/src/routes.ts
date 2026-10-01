@@ -102,6 +102,13 @@ import {
   WaiterAssignmentsResponse,
 } from './floor.js';
 import {
+  RegenerateTableQrRequest,
+  TableQrCodesResponse,
+  TableQrView,
+  TableTentsRequest,
+  TableTentsResponse,
+} from './table-qr.js';
+import {
   CategoryRequest,
   CategoryView,
   ComboRequest,
@@ -1524,6 +1531,74 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such section.', schema: ApiError },
       409: { description: 'An active section has its name.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listTableQrCodes',
+    method: 'GET',
+    path: '/api/v1/tables/qr-codes',
+    summary: 'Every table’s QR code, or that it has none yet',
+    tags: ['floor'],
+    requirements: ['QR-001', 'ONB-004'],
+    capability: 'STAFF_MANAGE',
+    responses: {
+      200: { description: 'The tables in floor order.', schema: TableQrCodesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'issueTableQrCodes',
+    method: 'POST',
+    path: '/api/v1/tables/qr-codes',
+    summary: 'Give every table without a QR code one',
+    description:
+      'Each code has at least 128 random bits; the relay is sent only its hash. Tables that have a ' +
+      'code keep it. Audited.',
+    tags: ['floor'],
+    requirements: ['QR-001', 'ONB-004', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    responses: {
+      200: { description: 'Every table’s code now.', schema: TableQrCodesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'regenerateTableQrCode',
+    method: 'POST',
+    path: '/api/v1/tables/:tableId/qr-code',
+    summary: 'Give a table a new QR code; the printed one stops working',
+    description:
+      'For a code that was copied or photographed. The old code stops opening the menu as soon ' +
+      'as the relay hears of it (seconds when online). Audited with the reason.',
+    tags: ['floor'],
+    requirements: ['QR-001', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: TableParams, body: RegenerateTableQrRequest },
+    responses: {
+      200: { description: 'The table’s new code.', schema: TableQrView },
+      ...standardErrors,
+      404: { description: 'No such active table.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'printTableTents',
+    method: 'POST',
+    path: '/api/v1/tables/qr-codes/tents',
+    summary: 'Table tents to print, as a PDF',
+    description:
+      'Each table’s code with the restaurant’s name and colour and the table’s label (ONB-004 ' +
+      'step 10). Needs RP_QR_SITE_URL (`QR_SITE_NOT_SET`); tables without a code are left out.',
+    tags: ['floor'],
+    requirements: ['QR-001', 'ONB-004'],
+    capability: 'STAFF_MANAGE',
+    request: { body: TableTentsRequest },
+    responses: {
+      200: { description: 'The PDF, base64.', schema: TableTentsResponse },
+      ...standardErrors,
+      409: {
+        description: 'The QR site is not set, or no table to print has a code.',
+        schema: ApiError,
+      },
     },
   },
   {
