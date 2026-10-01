@@ -147,8 +147,8 @@ What exists:
   groups; publish) (P4-02d); the Roles page and custom roles for people, with screens that show
   what a custom role adds (P4-02e); the Settings page with an editor for every catalogue
   setting (P4-03a); the notification rules page (P4-03b); the Suggestions page with the
-  recommendation rules and the pinned, boosted and blocked dishes (P4-03c). 242 tests, and 20
-  Playwright steps.
+  recommendation rules and the pinned, boosted and blocked dishes (P4-03c); the kitchen stations
+  and printers with test print and redirect (P4-03d). 253 tests, and 20 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -163,7 +163,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03d Stations and printers, then P4-03e (P4-03 is split in five, see phase-4.md).
+- P4-03e Restaurant profile, tax groups and invoice series (the last part of P4-03, see
+  phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -271,7 +272,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-03a Settings page (every catalogue setting)
 - [x] P4-03b Notification rules editor
 - [x] P4-03c Recommendation rules editor with boost, pin and block
-- [ ] P4-03d Stations and printers
+- [x] P4-03d Stations and printers
 - [ ] P4-03e Restaurant profile, tax groups and invoice series (Owner)
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
@@ -558,6 +559,18 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-03d):
+
+244. Stations and printers are one dashboard page, "Kitchen and printers" (`/manage/printing`,
+     OPERATIONS_CONFIGURE), not part of Settings: they are records with their own API (P1-07),
+     not catalogue values. Archived ones are not listed; they stay in the database.
+245. A printer is shown as printing (it took the last job), offline (since when, and why) or not
+     tested yet (nothing sent to it). The test page answers in a toast; the list reads the
+     printer again afterwards, and follows `PrinterStatusChanged` and `RestaurantChanged`.
+246. Sending a printer's tickets elsewhere, printing there again and archiving all ask for a
+     reason (audited on the server). Only active printers that are not themselves redirected are
+     offered as the target. A screen-only station may keep a printer for reprints.
 
 Decided 2026-10-01 (P4-03c):
 
@@ -1266,6 +1279,24 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-03d Stations and printers
+
+Built: the console's `PrintingScreen` at `/manage/printing` ("Kitchen and printers" in the
+dashboard navigation) over the P1-07 API: printers with address, paper, the stations they print
+for, state and redirect, with test page, change, send tickets elsewhere or print here again, and
+archive; stations with mode and printer, add, change and archive. `printing-view.ts` holds the
+drafts, their checks (the same patterns as the contracts) and the printer state. `ReasonDialog`
+takes an optional hint, tone and extra fields.
+
+Tests: console `printing-view.test.ts` 6 and `printing.test.tsx` 5.
+
+Gotchas:
+
+- Narrowing a union whose members share several `kind` literals needs an `in` check
+  (`'printer' in open`), not a comparison of `kind`.
+
+Decisions: 244 to 246.
 
 ### 2026-10-01: P4-03c Suggestions page (recommendation rules, pin, boost and block)
 

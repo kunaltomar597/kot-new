@@ -1,8 +1,11 @@
 import { ConfirmDialog, TextField } from '@rp/ui-web';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useT } from '../../app/i18n.js';
 
-/** Archiving is audited with a reason (MENU-010, AUD-001), so it asks for one before going on. */
+/**
+ * Archiving is audited with a reason (MENU-010, AUD-001), so it asks for one before going on.
+ * Other audited changes use it too, with their own hint, tone and fields above the reason.
+ */
 export function ReasonDialog({
   title,
   description,
@@ -11,6 +14,9 @@ export function ReasonDialog({
   error,
   onConfirm,
   onCancel,
+  hint,
+  tone = 'danger',
+  children,
 }: {
   title: string;
   description: string;
@@ -19,6 +25,9 @@ export function ReasonDialog({
   error: string | undefined;
   onConfirm: (reason: string) => void;
   onCancel: () => void;
+  hint?: string;
+  tone?: 'danger' | 'primary';
+  children?: ReactNode;
 }) {
   const t = useT();
   const [reason, setReason] = useState('');
@@ -27,7 +36,7 @@ export function ReasonDialog({
   return (
     <ConfirmDialog
       open
-      tone="danger"
+      tone={tone}
       title={title}
       description={description}
       confirmLabel={confirmLabel}
@@ -39,9 +48,10 @@ export function ReasonDialog({
       }}
       onCancel={onCancel}
     >
+      {children}
       <TextField
         label={t('menuEditor.reason')}
-        hint={t('menuEditor.reasonHint')}
+        hint={hint ?? t('menuEditor.reasonHint')}
         value={reason}
         maxLength={200}
         autoComplete="off"

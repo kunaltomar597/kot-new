@@ -200,7 +200,8 @@ Built in five parts, each its own pull request:
   with the rules over the P3-04 API and the featured dishes in the `reco.itemPreferences` setting;
   pinned dishes first in up to half the places, boosted ones first among learned pairings and best
   sellers, blocked ones never (reason `FEATURED` for pinned and added boosted dishes).
-- P4-03d Stations and printers with test print (KDS-008, ONB-004 step 6).
+- P4-03d Stations and printers with test print (done): the "Kitchen and printers" page over the
+  P1-07 API, with test page, redirect of a broken printer's tickets and archive with a reason.
 - P4-03e The Owner's restaurant profile, tax groups and invoice series (ONB-004 steps 1 to 3,
   BILL-002 to BILL-004), with the second factor.
 
