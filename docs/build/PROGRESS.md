@@ -192,7 +192,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-06 the Phase 5 exit test.
+- P6-01 combo and modifier parity, P6-02 learned recommendations, P6-04 AI menu import, P6-05
+  the should-have batch, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -325,7 +326,7 @@ Recommended next WPs (dependencies met):
 - [x] P5-05a QR menu site: menu, cart, ordering, statuses, read-only, privacy
 - [x] P5-05b QR menu site: suggestions and the speed budget
 - [x] P5-05c QR menu site: call waiter / request bill (S)
-- [ ] P5-06 Phase 5 exit test
+- [x] P5-06 Phase 5 exit test
 
 ### Phase 6: Advanced menu and intelligence
 
@@ -598,6 +599,20 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-06):
+
+385. The Phase 5 exit test runs the local server against the in-process relay (its migrations,
+     rules and functions over HTTP) in the `check` job, as the P5-03 tests do; "against local
+     Supabase" is covered by the `relay-supabase` CI job, which runs the relay's own suites
+     (isolation, roles, orders, retention, functions) on a Supabase stack, and by manual task 20
+     on the real projects. S11's Control Plane half is tested with P7.
+386. A 30-minute outage is simulated at the relay's clock (presence 30 minutes old, the expiry
+     job run by hand), not by waiting. The test relay can now cut only the restaurant's traffic
+     (`cut('restaurant')`), so diners' phones still reach the relay as they would.
+387. An order the relay offers again after the restaurant dealt with it (its "received" lost, or
+     a relay restored) is acknowledged again from the start; nothing is made twice (found by the
+     exit test).
 
 Decided 2026-10-02 (P5-03d):
 
@@ -2049,6 +2064,35 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-06 Phase 5 exit test, S2 (QR), S11, S13 (Phase 5 done)
+
+Built: `qr-exit.int.test.ts`, 10 steps, the local server against a real relay:
+
+- S2 (QR part), the restaurant's internet out for 30 minutes mid-service:
+  - before: a POS order at T1 and a QR order at T2 in the kitchen, the diner told;
+  - during: POS orders, kitchen steps and a dish running out all work; the System page shows
+    the relay unreachable;
+  - the QR page turns read-only with the menu still readable; orders and calls are refused with
+    "please call a waiter";
+  - after: one new menu version (with the dish out), the diner sees the dish served, and every
+    queue run again sends nothing and makes nothing twice; QR ordering works again.
+- S13: an order left at the relay reads expired once its pickup time passes and is never made;
+  a late pickup is rejected as expired whether the relay's job or the restaurant notices first.
+- S11 (relay part): another restaurant's server cannot see, take or change this restaurant's
+  orders; a diner cannot order another menu's dish or follow another table's order.
+- Duplicate replay: a diner's retry is the same order; an order offered again after its
+  acknowledgement was lost makes one order and one ticket; a repeated status push changes nothing.
+
+Fixed: an order offered again after it was dealt with is acknowledged again (decision 387;
+`relay-orders.int.test.ts` +1). `@rp/relay/testing` `cut('restaurant')`.
+
+Covered elsewhere and part of the exit: the QR site e2e (the "call a waiter" screen, read-only
+banner, ordering, suggestions, photos, calls), the relay's isolation and roles suites, the
+Realtime doorbell tests (P5-03d).
+
+Result: all Phase 5 scenarios pass on every build; the full check and both e2e suites are green.
+Real Supabase and the QR site's hosting are manual tasks 20 and 21.
 
 ### 2026-10-02: P5-03d Realtime doorbell for new QR orders (P5-03 done)
 

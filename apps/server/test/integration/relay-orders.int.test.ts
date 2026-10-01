@@ -400,6 +400,27 @@ describe('[ORD-013] [NFR-A01] never twice, never lost', () => {
     expect(await prisma.order.count({ where: { externalRef: relayOrderId } })).toBe(1);
   });
 
+  it('acknowledges again an order the relay offers again, and makes nothing twice', async () => {
+    const relayOrderId = await dinerOrders('T3', [{ item: 'Jeera Rice', quantity: 1 }]);
+    await qr.run();
+    expect((await dinerSees('T3', relayOrderId)).status).toBe('RECEIVED');
+    // The relay lost "received" (restored from a backup, say): it offers the order again.
+    const client = await relay.admin.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL session_replication_role = replica');
+      await client.query("UPDATE relay.qr_orders SET status = 'SUBMITTED' WHERE id = $1", [
+        relayOrderId,
+      ]);
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+    await qr.run();
+    expect((await dinerSees('T3', relayOrderId)).status).toBe('RECEIVED');
+    expect(await prisma.order.count({ where: { externalRef: relayOrderId } })).toBe(1);
+  });
+
   it('catches up after an internet cut, on both sides', async () => {
     const relayOrderId = await dinerOrders('T3', [{ item: 'Jeera Rice', quantity: 1 }]);
     relay.cut();

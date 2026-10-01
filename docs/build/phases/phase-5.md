@@ -130,3 +130,6 @@ Deliverables: automated scenarios: internet outage 30 min (QR read-only, queues 
 recovery without duplicates), cross-tenant isolation, QR order with restaurant offline (please call
 a waiter after T; late arrival rejected as expired), duplicate replay.
 Acceptance: all pass in CI against local Supabase; summary in PROGRESS.md.
+
+Built as `apps/server/test/integration/qr-exit.int.test.ts` against the in-process relay; the
+relay's own suites run on a Supabase stack in the `relay-supabase` job (decision 385).
