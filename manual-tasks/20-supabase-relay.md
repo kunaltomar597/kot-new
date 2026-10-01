@@ -88,7 +88,13 @@ without a password; set one now.
    supabase secrets set --workdir infra RELAY_JWT_SECRET='<legacy JWT secret>'
    ```
 
-   Without it, local servers poll for new orders instead, which also works.
+   Without it, local servers poll for new orders instead, which also works. Realtime also needs
+   the project's public API key, which Supabase gives the functions as `SUPABASE_ANON_KEY`. If the
+   project has only the new publishable key (legacy API keys turned off), set it too:
+
+   ```sh
+   supabase secrets set --workdir infra RELAY_REALTIME_API_KEY='<publishable key>'
+   ```
 
    Menu photos need nothing more: the migrations create the public `menu-photos` bucket, and
    Supabase gives every function `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` itself. Never set
@@ -166,7 +172,13 @@ Then check the photo bucket:
 SELECT id, public, file_size_limit, allowed_mime_types FROM storage.buckets WHERE id = 'menu-photos';
 ```
 
-You should see one row: `true`, `2097152` and `{image/webp}`. Once the pilot restaurant is
+You should see one row: `true`, `2097152` and `{image/webp}`.
+
+If you set `RELAY_JWT_SECRET`, check the Realtime doorbell once the pilot restaurant is connected:
+about 15 seconds after the local server starts, its System page should say "New QR orders arrive
+instantly". Order a dish from a table's QR page; it should reach the waiter within a couple of
+seconds. "Checked every few seconds" means the server is polling: send the server log lines that
+mention Realtime. Once the pilot restaurant is
 connected, give a QR dish a photo in the console, publish the menu, and open the table's QR page on
 a phone: the photo should show beside the dish within a minute.
 
@@ -186,6 +198,7 @@ Supabase relay deployment
 - relay_edge login set and RELAY_DB_URL secret stored (dev/staging/prod): __/__/__
 - Functions deployed, RELAY_ALLOWED_ORIGINS set, qr-menu answers 404 for a made-up code: __/__/__
 - RELAY_JWT_SECRET set (Realtime) or left out (polling) (dev/staging/prod): __/__/__
+- System page says "New QR orders arrive instantly" (pilot): yes/no
 - relay-purge and relay-expire jobs present (dev/staging/prod): __/__/__
 - menu-photos bucket present and public (dev/staging/prod): __/__/__; a dish photo shows on the
   pilot's QR page: yes/no

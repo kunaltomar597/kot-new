@@ -60,10 +60,12 @@ function relayText(relay: SystemStatusResponse['qrRelay'], t: Translate): string
   if (relay.lastError !== null)
     return t('systemPage.services.qrRelayError', { code: relay.lastError });
   if (relay.lastContactAt === null) return t('systemPage.services.qrRelayNever');
-  return t('systemPage.services.qrRelayOk', {
+  const inStep = t('systemPage.services.qrRelayOk', {
     version: relay.menuVersion ?? 0,
     ...displayDateTime(new Date(relay.lastContactAt)),
   });
+  // P5-03d: how new QR orders reach this PC.
+  return `${inStep}. ${t(relay.realtime ? 'systemPage.services.qrRelayRealtime' : 'systemPage.services.qrRelayPolling')}`;
 }
 
 function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) {

@@ -228,18 +228,27 @@ export const RelayPresenceResponse = z.object({
 });
 export type RelayPresenceResponse = z.infer<typeof RelayPresenceResponse>;
 
+/** One kind of change a local server listens for on Realtime (P5-03d). */
+export const RelayRealtimeChange = z.object({
+  event: z.literal('INSERT'),
+  schema: z.literal('relay'),
+  table: z.enum(['qr_orders', 'qr_service_requests']),
+  filter: z.string(),
+});
+export type RelayRealtimeChange = z.infer<typeof RelayRealtimeChange>;
+
 /**
  * A short-lived token for the relay's Realtime channel (QR-009): the role `relay_server` and the
- * restaurant, so the subscription sees only its own new orders.
+ * restaurant, so the subscription sees only its own new orders and requests. With it come the
+ * project's public API key (Realtime's socket asks for one) and the changes to listen for.
  */
 export const RelaySessionResponse = z.object({
   tenantId: Id,
   token: z.string().min(1),
   expiresAt: Timestamp,
   realtime: z.object({
-    schema: z.literal('relay'),
-    table: z.literal('qr_orders'),
-    filter: z.string(),
+    apiKey: z.string().min(1),
+    changes: z.array(RelayRealtimeChange).min(1),
   }),
 });
 export type RelaySessionResponse = z.infer<typeof RelaySessionResponse>;

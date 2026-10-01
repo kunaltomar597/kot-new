@@ -45,6 +45,40 @@ describe('the relay sync loop', () => {
     await loop.stop();
   });
 
+  it('[QR-009] keeps a change that came during the run that ended a back-off', async () => {
+    vi.useFakeTimers();
+    const runs: number[] = [];
+    let fail = true;
+    let release: (() => void) | undefined;
+    const loop = new PacedLoop(
+      async () => {
+        runs.push(Date.now());
+        if (fail) throw new Error('offline');
+        // The run that works takes a while; a ring comes meanwhile.
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return 3_600_000;
+      },
+      { retryBaseMs: 1_000, retryMaxMs: 1_000 },
+      () => undefined,
+    );
+    loop.start(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(loop.failing).toBe(1);
+    fail = false;
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(runs).toHaveLength(2);
+    loop.soon(20);
+    release?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(loop.failing).toBe(0);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(runs).toHaveLength(3);
+    release?.();
+    await loop.stop();
+  });
+
   it('runs once more for callers who came during a run, and they share it', async () => {
     let release: () => void = () => undefined;
     let count = 0;

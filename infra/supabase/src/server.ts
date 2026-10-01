@@ -69,7 +69,8 @@ async function openServer(tx: Tx, request: Request): Promise<ServerScope> {
 async function session(request: Request, context: FunctionContext): Promise<Response> {
   const scope = await context.db.transaction((tx) => openServer(tx, request));
   const secret = context.realtimeJwtSecret;
-  if (secret === undefined || secret === '') {
+  const apiKey = context.realtimeApiKey;
+  if (secret === undefined || secret === '' || apiKey === undefined || apiKey === '') {
     throw new HttpError(
       503,
       'REALTIME_NOT_CONFIGURED',
@@ -93,7 +94,16 @@ async function session(request: Request, context: FunctionContext): Promise<Resp
     tenantId: scope.tenantId,
     token,
     expiresAt: new Date(expiresAt * 1000).toISOString(),
-    realtime: { schema: 'relay', table: 'qr_orders', filter: `tenant_id=eq.${scope.tenantId}` },
+    // QR-009: new orders and service requests ring the local server's doorbell (P5-03d).
+    realtime: {
+      apiKey,
+      changes: (['qr_orders', 'qr_service_requests'] as const).map((table) => ({
+        event: 'INSERT',
+        schema: 'relay',
+        table,
+        filter: `tenant_id=eq.${scope.tenantId}`,
+      })),
+    },
   };
   return json(200, body);
 }

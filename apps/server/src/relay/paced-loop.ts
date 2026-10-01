@@ -1,7 +1,9 @@
 /**
  * A self-scheduling loop for the relay's sync agent (P5-03). Each run says when the next is due.
  * - A failed run backs off: `retryBaseMs`, doubling, up to `retryMaxMs`.
- * - A change can bring the next run forward, except while backing off.
+ * - A change can bring the next run forward, except while backing off. A change that comes
+ *   during the run that ends a back-off is kept: that run may have read before it, so another
+ *   follows (a Realtime ring must never wait for the next poll).
  * - `run()` during a run waits for it and runs once more, shared by every caller meanwhile, so
  *   whatever changed before the call is included.
  */
@@ -12,6 +14,8 @@ export class PacedLoop {
   private queued: Promise<void> | undefined;
   private failures = 0;
   private stopped = false;
+  /** A change during a run while backing off: run again this soon if the run works. */
+  private pending: number | undefined;
 
   constructor(
     /** One run; resolves with the delay until the next one. */
@@ -32,6 +36,10 @@ export class PacedLoop {
 
   /** Brings the next run within `delayMs`, unless backing off after a failure. */
   soon(delayMs: number): void {
+    if (this.failures > 0 && this.running !== undefined) {
+      this.pending = Math.min(this.pending ?? delayMs, delayMs);
+      return;
+    }
     this.schedule(delayMs, false);
   }
 
@@ -69,7 +77,10 @@ export class PacedLoop {
       this.onFailure(error);
       next = Math.min(this.options.retryBaseMs * 2 ** (this.failures - 1), this.options.retryMaxMs);
     }
-    this.schedule(next, true);
+    // After a failure the retry reads everything anyway.
+    const pending = this.failures === 0 ? this.pending : undefined;
+    this.pending = undefined;
+    this.schedule(Math.min(next, pending ?? next), true);
   }
 
   private schedule(delayMs: number, fromLoop: boolean): void {

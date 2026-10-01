@@ -30,14 +30,24 @@ import { OrdersService } from '../orders/orders.service.js';
 import { ServiceRequestsService } from '../service-requests/service-requests.service.js';
 import { PacedLoop } from './paced-loop.js';
 import { type RelayClient, RelayError } from './relay-client.js';
+import { RelayRealtime } from './relay-realtime.js';
 import { RelaySyncService } from './relay-sync.service.js';
 
 export const RELAY_ORDERS_OPTIONS = Symbol('RELAY_ORDERS_OPTIONS');
 
 export interface RelayOrdersOptions {
   readonly firstDelayMs: number;
-  /** How often to look for diners' orders (the fallback to Realtime, QR-009). */
+  /** How often to look for diners' orders without the Realtime doorbell (QR-009). */
   readonly pollMs: number;
+  /** How often to look anyway while the doorbell works: a safety net (P5-03d). */
+  readonly pollWithRealtimeMs: number;
+  /** Wait after start-up before joining Realtime. */
+  readonly realtimeDelayMs: number;
+  /** A ring picks up this soon, so a burst of orders is one pickup. */
+  readonly ringDelayMs: number;
+  readonly heartbeatMs: number;
+  /** Renew the Realtime token this long before it runs out. */
+  readonly refreshBeforeMs: number;
   /** After the restaurant acts on a QR order, tell the relay this soon (QR-007). */
   readonly pushDebounceMs: number;
   readonly retryBaseMs: number;
@@ -47,6 +57,11 @@ export interface RelayOrdersOptions {
 export const DEFAULT_RELAY_ORDERS_OPTIONS: RelayOrdersOptions = {
   firstDelayMs: 12_000,
   pollMs: 5_000,
+  pollWithRealtimeMs: 60_000,
+  realtimeDelayMs: 12_000,
+  ringDelayMs: 100,
+  heartbeatMs: 25_000,
+  refreshBeforeMs: 5 * 60_000,
   pushDebounceMs: 500,
   retryBaseMs: 5_000,
   retryMaxMs: 60_000,
@@ -60,7 +75,8 @@ const TABLE_NOT_SEATED = 'This table is not open yet. Please wave to a waiter to
 const hashOf = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest('hex');
 
 /**
- * The QR relay's sync agent, order side (P5-03b, QR-007, QR-009, QR-010, ORD-013).
+ * The QR relay's sync agent, order side (P5-03b, QR-007, QR-009, QR-010, ORD-013). New orders
+ * and requests ring a Realtime doorbell (P5-03d), so polling slows to a safety net while it works.
  *
  * 1. Pick up: diners' orders waiting at the relay go into the inbox (`relay_orders`), once each.
  * 2. Take: an order past its pickup time is left to expire. Otherwise the relay is told it was
@@ -77,6 +93,7 @@ export class RelayOrdersService implements OnModuleInit, OnApplicationBootstrap,
   private readonly loop: PacedLoop;
   private unsubscribe: (() => void) | undefined;
   private lastError: string | null = null;
+  private realtime: RelayRealtime | undefined;
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -154,11 +171,45 @@ export class RelayOrdersService implements OnModuleInit, OnApplicationBootstrap,
       }
     });
     this.loop.start(this.options.firstDelayMs);
+    this.realtime = new RelayRealtime({
+      relayUrl: this.config.relayUrl,
+      session: async () => (await this.sync.client())?.session(),
+      onRing: () => {
+        this.loop.soon(this.options.ringDelayMs);
+      },
+      onChange: (subscribed) => {
+        this.logger.log(
+          subscribed
+            ? 'QR orders arrive by Realtime; polling slows down'
+            : 'QR orders are polled until Realtime is back',
+        );
+        // Without the doorbell, look again at the normal pace straight away.
+        if (!subscribed) this.loop.soon(this.options.pollMs);
+      },
+      heartbeatMs: this.options.heartbeatMs,
+      refreshBeforeMs: this.options.refreshBeforeMs,
+      retryBaseMs: this.options.retryBaseMs,
+      retryMaxMs: this.options.retryMaxMs,
+      notConfiguredRetryMs: 60 * 60_000,
+    });
+    this.realtime.start(this.options.realtimeDelayMs);
   }
 
   async onModuleDestroy(): Promise<void> {
     this.unsubscribe?.();
+    this.realtime?.stop();
     await this.loop.stop();
+  }
+
+  /** Joins Realtime now rather than after `realtimeDelayMs` (tests, support tools). */
+  startRealtimeNow(): void {
+    this.realtime?.stop();
+    this.realtime?.start(0);
+  }
+
+  /** New QR orders ring by Realtime (true), or are polled (P5-03d). */
+  get realtimeSubscribed(): boolean {
+    return this.realtime?.subscribed ?? false;
   }
 
   /** Picks up, takes and tells now (the loop calls it; so do tests). Never throws. */
@@ -184,7 +235,7 @@ export class RelayOrdersService implements OnModuleInit, OnApplicationBootstrap,
     await this.raiseWaiting(client, restaurant.id);
     await this.tellRequests(client, restaurant.id);
     this.lastError = null;
-    return this.options.pollMs;
+    return this.realtimeSubscribed ? this.options.pollWithRealtimeMs : this.options.pollMs;
   }
 
   /** The inbox: one row per relay order, whatever happens next (ORD-013). */

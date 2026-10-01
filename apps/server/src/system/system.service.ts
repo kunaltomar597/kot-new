@@ -16,6 +16,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { AuditService } from '../audit/audit.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { RelayOrdersService } from '../relay/relay-orders.service.js';
 import { RelaySyncService } from '../relay/relay-sync.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
@@ -48,6 +49,7 @@ export class SystemService {
     private readonly settings: SettingsService,
     private readonly heartbeat: HeartbeatService,
     private readonly relay: RelaySyncService,
+    private readonly relayOrders: RelayOrdersService,
     private readonly realtime: RealtimeGateway,
     private readonly audit: AuditService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -104,6 +106,7 @@ export class SystemService {
         lastContactAt: qr.lastSuccessAt?.toISOString() ?? null,
         lastError: qr.lastError,
         menuVersion: qr.menuVersion,
+        realtime: this.relayOrders.realtimeSubscribed,
       },
       storage: {
         totalBytes: space?.totalBytes ?? null,

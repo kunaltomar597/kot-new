@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
+import type { Duplex } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { createMigratedDatabase, type TestDatabase } from '@rp/test-postgres';
 import pg from 'pg';
@@ -11,6 +12,9 @@ import { qrMenu } from '../qr-menu.js';
 import { server } from '../server.js';
 import { serviceRequest } from '../service-request.js';
 import { submitOrder } from '../submit-order.js';
+import { type FakeRealtime, startFakeRealtime } from './realtime.js';
+
+export type { FakeRealtime } from './realtime.js';
 
 /**
  * The QR relay for tests outside this package (`@rp/relay/testing`): its schema in a database of
@@ -147,6 +151,8 @@ export interface TestRelay {
   readonly requests: string[];
   /** The photo files in the relay's bucket, by path. */
   readonly photoFiles: ReadonlyMap<string, Uint8Array>;
+  /** The stand-in for Supabase Realtime, when started with a JWT secret (P5-03d). */
+  readonly realtime: FakeRealtime | undefined;
   stop(): Promise<void>;
 }
 
@@ -157,7 +163,10 @@ export interface TestRelay {
 export async function startRelay(options: {
   readonly adminUrl: string;
   readonly runId: string;
+  /** Turns on Realtime: sessions are signed with it, and a stand-in Realtime takes them. */
   readonly realtimeJwtSecret?: string;
+  /** The project's public API key the Realtime socket asks for. */
+  readonly realtimeApiKey?: string;
 }): Promise<TestRelay> {
   // The relay's roles are cluster-wide: test files that start a relay at the same time would race
   // to create them, so one at a time (a lock in the cluster's own database, held by this session).
@@ -198,8 +207,18 @@ export async function startRelay(options: {
     now: () => new Date(),
     allowedOrigins: ['*'],
     realtimeJwtSecret: options.realtimeJwtSecret,
+    realtimeApiKey: options.realtimeApiKey ?? 'test-publishable-key',
     photos,
   };
+  const realtime =
+    options.realtimeJwtSecret === undefined
+      ? undefined
+      : await startFakeRealtime({
+          admin,
+          databaseUrl: database.url,
+          jwtSecret: options.realtimeJwtSecret,
+          apiKey: context.realtimeApiKey ?? '',
+        });
   const listener = nodeListener(FUNCTIONS, context);
   const requests: string[] = [];
   let reachable = true;
@@ -220,6 +239,9 @@ export async function startRelay(options: {
     requests.push(`${incoming.method ?? 'GET'} ${url}`);
     listener(incoming, outgoing);
   });
+  http.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+    if (!reachable || realtime?.upgrade(request, socket, head) !== true) socket.destroy();
+  });
   await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
   const address = http.address();
   const port = typeof address === 'object' && address !== null ? address.port : 0;
@@ -230,6 +252,7 @@ export async function startRelay(options: {
     databaseUrl: database.url,
     requests,
     photoFiles: files,
+    realtime,
     async provision(name) {
       const tenantId = randomUUID();
       const credential = randomBytes(32).toString('base64url');
@@ -254,11 +277,13 @@ export async function startRelay(options: {
     },
     cut() {
       reachable = false;
+      realtime?.dropAll();
     },
     restore() {
       reachable = true;
     },
     async stop() {
+      await realtime?.close();
       http.closeAllConnections();
       await new Promise<void>((resolve) => {
         http.close(() => {

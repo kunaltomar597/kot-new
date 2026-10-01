@@ -47,6 +47,7 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     // P5-03a: whether the QR menu online is in step.
     expect(services.getByText(t('systemPage.services.qrRelay'))).toBeVisible();
     expect(services.getByText(/In step, menu version 3/)).toBeVisible();
+    expect(services.getByText(/New QR orders arrive instantly/)).toBeVisible();
 
     const storage = await section(t('systemPage.storage.title'));
     expect(

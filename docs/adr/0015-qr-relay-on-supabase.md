@@ -152,6 +152,26 @@ sync agent (P5-03).
   caught. Recovering needs `Tx.savepoint`, as when receiving an order too late marks it expired
   and keeps that. The Node test adapter enforces the same rule.
 
+### The Realtime doorbell (P5-03d)
+
+- `session` also returns the project's public API key (`SUPABASE_ANON_KEY`, or
+  `RELAY_REALTIME_API_KEY` where only a publishable key exists) and the changes to listen for:
+  INSERTs on `relay.qr_orders` and `relay.qr_service_requests`, filtered to the restaurant.
+- The local server joins one channel on Realtime's socket, on the relay's own host
+  (`/realtime/v1/websocket`), speaking the Phoenix protocol (1.0.0, JSON) over Node's WebSocket,
+  without a Supabase client library. Realtime applies RLS by taking on the token's role, so
+  `relay_server` is granted to `supabase_realtime_admin`.
+- A change only rings: the server then picks up through `server/orders` and
+  `server/service-requests` as before, so there is one trusted way in and nothing in the message
+  is relied on.
+- While the doorbell works, polling slows from 5 s to 60 s (a safety net). Heartbeats every 25 s;
+  an unanswered one, a refused join, a closed channel or a dropped socket fall back to 5 s
+  polling at once and join again with back-off. The token is renewed 5 minutes before it runs
+  out, on the same channel.
+- The tests use a stand-in for Realtime in `@rp/relay/testing`: the Phoenix socket, the token
+  check, and changes from a trigger in the test database, delivered after commit to the
+  restaurant's own subscribers. Manual task 20 checks the real one.
+
 ### Menu photos (P5-03c)
 
 - The local server sends each QR dish's photo in its three WebP sizes (160, 480 and 960 px, made
