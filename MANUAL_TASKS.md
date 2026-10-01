@@ -25,7 +25,8 @@ code from going live:
 - [ ] Domain name + DNS (QR site, Control Plane, update server).
 - [ ] Cloud hosting in India + cloud KMS / secrets manager (Control Plane, licence-signing key).
 - [ ] Windows code-signing certificate (signed installer and updates).
-- [ ] Supabase organisation, Mumbai region (QR relay).
+- [ ] Supabase organisation, Mumbai region (QR relay), then deploy the relay schema and give the
+      edge functions their login: [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).
 - [ ] Expo account + Android app-signing keystore (signed APKs, OTA updates).
 - [ ] MDM subscription (kiosk tablets, APK distribution).
 - [ ] Backup storage in India (S3-compatible), error monitoring (Sentry), transactional e-mail.

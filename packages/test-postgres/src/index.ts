@@ -24,10 +24,15 @@ export interface TestDatabaseCluster {
 }
 
 export interface TestDatabaseOptions {
-  /** The Prisma migrations folder (`prisma/migrations`) applied to the template. */
+  /**
+   * The migrations folder applied to the template: Prisma's (`<name>/migration.sql`) or the
+   * Supabase CLI's (`<timestamp>_<name>.sql`).
+   */
   readonly migrationsDir: string;
   /** Prefix of every database the run creates, e.g. `rp` or `cp` (lower case, digits, `_`). */
   readonly prefix: string;
+  /** SQL files applied before the migrations, e.g. the objects a hosted platform provides. */
+  readonly preludeFiles?: readonly string[];
 }
 
 export interface TestDatabase {
@@ -147,13 +152,23 @@ async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Prom
   };
 }
 
-/** Migration SQL files in the order Prisma applies them. */
+/**
+ * Migration SQL files in the order they are applied: by name, as Prisma (`<name>/migration.sql`)
+ * and the Supabase CLI (`<timestamp>_<name>.sql`) both do.
+ */
 export function migrationFiles(migrationsDir: string): string[] {
   return readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
-    .map((name) => join(migrationsDir, name, 'migration.sql'))
+    .map((entry) => ({
+      name: entry.name,
+      file: entry.isDirectory()
+        ? join(migrationsDir, entry.name, 'migration.sql')
+        : entry.isFile() && entry.name.endsWith('.sql')
+          ? join(migrationsDir, entry.name)
+          : undefined,
+    }))
+    .filter((entry): entry is { name: string; file: string } => entry.file !== undefined)
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    .map((entry) => entry.file)
     .filter((file) => existsSync(file));
 }
 
@@ -170,13 +185,17 @@ async function withClient<T>(
   }
 }
 
-/** Applies every migration in `migrationsDir` to the database at `connectionString`. */
+/**
+ * Applies the prelude files, then every migration in `migrationsDir`, to the database at
+ * `connectionString`.
+ */
 export async function applyMigrations(
   connectionString: string,
   migrationsDir: string,
+  preludeFiles: readonly string[] = [],
 ): Promise<void> {
   await withClient(connectionString, async (client) => {
-    for (const file of migrationFiles(migrationsDir)) {
+    for (const file of [...preludeFiles, ...migrationFiles(migrationsDir)]) {
       await client.query(readFileSync(file, 'utf8'));
     }
   });
@@ -196,7 +215,11 @@ export async function startTestDatabase(
   await withClient(adminUrl, (client) =>
     client.query(`CREATE DATABASE ${quoteIdentifier(templateDatabase)}`),
   );
-  await applyMigrations(withDatabase(adminUrl, templateDatabase), options.migrationsDir);
+  await applyMigrations(
+    withDatabase(adminUrl, templateDatabase),
+    options.migrationsDir,
+    options.preludeFiles,
+  );
 
   return {
     adminUrl,

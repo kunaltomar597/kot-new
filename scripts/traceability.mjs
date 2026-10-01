@@ -41,7 +41,7 @@ function* walk(directory) {
 
 const coverage = new Map();
 const unknown = new Map();
-for (const directory of ['apps', 'packages', 'firmware', 'tests']) {
+for (const directory of ['apps', 'packages', 'infra', 'firmware', 'tests']) {
   let files;
   try {
     files = [...walk(join(root, directory))];
