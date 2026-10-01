@@ -192,8 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-05c call waiter / request bill (S), P5-03c photos to the relay's Storage, P5-03d the
-  Realtime doorbell, then P5-06.
+- P5-03c photos to the relay's Storage, P5-03d the Realtime doorbell, then P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -325,7 +324,7 @@ Recommended next WPs (dependencies met):
 - [x] P5-04 QR tokens and table tents
 - [x] P5-05a QR menu site: menu, cart, ordering, statuses, read-only, privacy
 - [x] P5-05b QR menu site: suggestions and the speed budget
-- [ ] P5-05c QR menu site: call waiter / request bill (S)
+- [x] P5-05c QR menu site: call waiter / request bill (S)
 - [ ] P5-06 Phase 5 exit test
 
 ### Phase 6: Advanced menu and intelligence
@@ -599,6 +598,29 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-05c):
+
+373. Call waiter / request bill (QR-011) has its own queue at the relay,
+     `relay.qr_service_requests`, kept like the order queue:
+     - RLS for the same three roles;
+     - stamped by the relay and expiring after the pickup timeout;
+     - status moves only forward: notified, on the way, done; or rejected, or expired;
+     - 7-day retention; on the Realtime publication.
+       One request of each kind may be open per table (a partial unique index), so pressing again,
+       from any phone, finds the open one. A browser may make at most 6 requests in ten minutes (a
+       relay constant: not a BRD value).
+374. The local server picks requests up through an inbox (`relay_service_requests`), tells the
+     relay "received", then raises them like the tablet's, with source QR (`raiseFromQr`).
+     - The table must be open, as at the tablet; otherwise the diner is told it is not open
+       yet and to wave to a waiter.
+     - A request of that kind already open at the table (from the tablet or another phone) is the
+       same request.
+     - "Waiter is on the way" and "done" go back through a durable event consumer, as order
+       statuses do.
+375. Setting `qr.serviceRequests` (restaurant, default on) turns the QR page's buttons on. They
+     are the two QR-011 names, Call waiter and Request bill; Water stays on the tablet. Each
+     shows its latest status, followed every 3 s until it is settled.
 
 Decided 2026-10-02 (P5-05b):
 
@@ -1983,6 +2005,39 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-05c Call waiter and request bill from the QR page
+
+Built:
+
+- Relay:
+  - migration `20261002210000_qr_service_requests` (table, rules, RLS, publication; expiry and
+    purge cover it);
+  - the `service-request` function (POST to ask, GET to follow), and `server/service-requests`
+    routes;
+  - contracts and routes in `@rp/contracts/relay`.
+- Server:
+  - setting `qr.serviceRequests`;
+  - migration `20261002210000_qr_service_requests` (the inbox);
+  - `ServiceRequestsService.raiseFromQr`;
+  - pickup, raise and tell in `RelayOrdersService`, with the `relay.qr-service-requests`
+    consumer.
+- `@rp/ordering` `qrRequestStatusOf` and `qrRequestSteps`.
+- QR page `HelpButtons`, and `qrSite.help.*` strings.
+
+Tests:
+
+- relay `service-requests.test.ts` 9:
+  - one open per kind, from any phone; a retry finds it;
+  - followed at its own table only;
+  - off, offline, the per-browser limit;
+  - pickup and the status steps, received too late, another restaurant's request.
+- relay isolation and roles updated for the new queue.
+- server `relay-orders.int.test.ts` +3:
+  - waiter alerted, then on the way, then done;
+  - a bill request sets Bill requested;
+  - a closed table says it is not open.
+- ordering 1; qr-menu e2e 1 (call waiter, then notified, then on the way).
 
 ### 2026-10-02: P5-05b QR suggestions and the speed budget
 

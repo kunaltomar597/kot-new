@@ -234,6 +234,8 @@ model Restaurant {
 
   relayOrders RelayOrder[]
 
+  relayServiceRequests RelayServiceRequest[]
+
   @@map("restaurants")
 }
 
@@ -1270,6 +1272,8 @@ model ServiceRequest {
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  relayRequests RelayServiceRequest[]
+
   @@index([restaurantId, state])
   @@index([tableSessionId, state])
   @@index([restaurantId, businessDate])
@@ -1881,4 +1885,29 @@ model RelayOrder {
 
   @@index([restaurantId, outcome])
   @@map("relay_orders")
+}
+
+/// A diner's call for a waiter or the bill picked up from the QR relay (P5-05c, QR-011). Several
+/// relay requests may point at one local request: a tablet or another phone asked first.
+model RelayServiceRequest {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  restaurantId     String          @map("restaurant_id") @db.Uuid
+  restaurant       Restaurant      @relation(fields: [restaurantId], references: [id])
+  relayRequestId   String          @unique @map("relay_request_id") @db.Uuid
+  tableId          String          @map("table_id") @db.Uuid
+  type             String
+  expiresAt        DateTime        @map("expires_at") @db.Timestamptz(3)
+  /// RAISED, REJECTED (nothing raised) or EXPIRED; null while being handled.
+  outcome          String?
+  serviceRequestId String?         @map("service_request_id") @db.Uuid
+  serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id], onDelete: Restrict)
+  rejectionReason  String?         @map("rejection_reason")
+  pushedHash       String?         @map("pushed_hash")
+  pushedStatus     String?         @map("pushed_status")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([serviceRequestId])
+  @@index([restaurantId, outcome])
+  @@map("relay_service_requests")
 }

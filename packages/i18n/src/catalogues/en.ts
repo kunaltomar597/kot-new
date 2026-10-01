@@ -1807,6 +1807,22 @@ export const en = {
         VOIDED: 'Cancelled',
       },
     },
+    help: {
+      title: 'Need something?',
+      WAITER: 'Call waiter',
+      BILL: 'Request bill',
+      WATER: 'Water',
+      status: {
+        SUBMITTED: 'Sending…',
+        RECEIVED: 'Waiter notified',
+        ACKNOWLEDGED: 'Waiter is on the way',
+        DONE: 'Done',
+        REJECTED: 'Not sent: {reason}',
+        EXPIRED: 'We couldn’t reach the restaurant right now. Please call a waiter.',
+      },
+      line: '{what}: {status}',
+      failed: 'That didn’t go through. Please call a waiter.',
+    },
     footer: {
       privacy: 'Privacy',
       terms: 'Terms',
@@ -2429,6 +2445,7 @@ export const en = {
       pickupTimeoutSeconds: 'QR order expires after (T)',
       presenceIntervalSeconds: 'Presence signal every',
       readOnlyAfterSeconds: 'QR menu read-only after',
+      serviceRequests: 'Call waiter and Request bill on the QR menu',
     },
     menu: {
       bestSellerCount: 'Dishes with the bestseller badge',
@@ -2582,6 +2599,8 @@ export const en = {
       rateLimitWindowMinutes: 'Window of the QR order rate limit.',
       pickupTimeoutSeconds: 'T: a QR order the restaurant has not picked up by then expires.',
       presenceIntervalSeconds: 'How often the local server tells the QR relay it is present.',
+      serviceRequests:
+        'For tables without a tablet: diners can call a waiter or ask for the bill from the QR menu, like the tablet’s buttons.',
       readOnlyAfterSeconds:
         'Without a presence signal for this long, the QR menu becomes read-only.',
     },

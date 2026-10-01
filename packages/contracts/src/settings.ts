@@ -629,6 +629,15 @@ export const SETTINGS = [
     unit: 'seconds',
   }),
   setting({
+    key: 'qr.serviceRequests',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'The QR page offers Call waiter and Request bill (for tables without a tablet).',
+    requirements: ['QR-011'],
+  }),
+  setting({
     key: 'qr.readOnlyAfterSeconds',
     schema: int(30, 1_800),
     defaultValue: 120,

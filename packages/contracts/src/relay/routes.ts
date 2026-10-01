@@ -9,6 +9,14 @@ import {
   QrOrderStatusQuery,
   QrOrderView,
   QrPickupResponse,
+  QrServiceRequestBody,
+  QrServiceRequestParams,
+  QrServiceRequestPickupResponse,
+  QrServiceRequestQuery,
+  QrServiceRequestResponse,
+  QrServiceRequestView,
+  UpdateQrServiceRequest,
+  UpdateQrServiceRequestResponse,
   QrSubmitOrderRequest,
   QrSubmitOrderResponse,
   RelayPresenceRequest,
@@ -256,6 +264,85 @@ export const RELAY_ROUTES = [
         description: 'Not picked up in time; now expired (`ORDER_EXPIRED`).',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'raiseQrServiceRequest',
+    method: 'POST',
+    path: '/functions/v1/service-request',
+    summary: 'Call a waiter or ask for the bill from the QR page',
+    description:
+      'For tables without a tablet (QR-011), through the restaurant’s own service requests: the ' +
+      'waiter is alerted, and asking for the bill also tells the cashier. One open request of ' +
+      'each kind per table: asking again finds the open one (`existing`). Needs `x-rp-browser`.',
+    tags: ['qr'],
+    requirements: ['QR-011', 'QR-014'],
+    capability: 'TABLE_TOKEN',
+    request: { body: QrServiceRequestBody },
+    responses: {
+      200: { description: 'The request, new or already open.', schema: QrServiceRequestResponse },
+      ...dinerErrors,
+      409: {
+        description:
+          'The restaurant does not take requests from the QR page (`SERVICE_REQUESTS_OFF`), or ' +
+          'the key was used for another request (`IDEMPOTENCY_KEY_REUSED`).',
+        schema: ApiError,
+      },
+      503: {
+        description: 'The restaurant is offline (`RESTAURANT_OFFLINE`).',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getQrServiceRequest',
+    method: 'GET',
+    path: '/functions/v1/service-request',
+    summary: 'Where a diner’s request is',
+    tags: ['qr'],
+    requirements: ['QR-011', 'QR-014'],
+    capability: 'TABLE_TOKEN',
+    request: { query: QrServiceRequestQuery },
+    responses: {
+      200: { description: 'The request.', schema: QrServiceRequestView },
+      400: dinerErrors[400],
+      404: {
+        description: `${dinerErrors[404].description} Or no such request here (\`REQUEST_NOT_FOUND\`).`,
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'listQrServiceRequestsForPickup',
+    method: 'GET',
+    path: '/functions/v1/server/service-requests',
+    summary: 'Diners’ requests waiting to be picked up',
+    tags: ['server'],
+    requirements: ['QR-011'],
+    capability: 'SERVER_CREDENTIAL',
+    responses: {
+      200: { description: 'The requests, oldest first.', schema: QrServiceRequestPickupResponse },
+      ...serverErrors,
+    },
+  },
+  {
+    operationId: 'updateQrServiceRequest',
+    method: 'POST',
+    path: '/functions/v1/server/service-requests/:requestId/status',
+    summary: 'What became of a diner’s request',
+    description:
+      'Received (the waiter is alerted), acknowledged (on the way), done, or rejected with the ' +
+      'reason. Receiving one past its pickup time marks it expired (`REQUEST_EXPIRED`).',
+    tags: ['server'],
+    requirements: ['QR-011'],
+    capability: 'SERVER_CREDENTIAL',
+    request: { params: QrServiceRequestParams, body: UpdateQrServiceRequest },
+    responses: {
+      200: { description: 'Updated.', schema: UpdateQrServiceRequestResponse },
+      ...serverErrors,
+      404: { description: 'No such request of this restaurant.', schema: ApiError },
+      409: { description: 'The status cannot move that way.', schema: ApiError },
+      410: { description: 'Not picked up in time; now expired.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition<RelayAccess>[];

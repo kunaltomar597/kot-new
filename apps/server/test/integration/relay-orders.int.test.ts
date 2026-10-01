@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { type LoginResponse, PendingApprovalsResponse } from '@rp/contracts';
-import { QrOrderView, QrSubmitOrderResponse } from '@rp/contracts/relay';
+import {
+  QrOrderView,
+  QrServiceRequestResponse,
+  QrServiceRequestView,
+  QrSubmitOrderResponse,
+} from '@rp/contracts/relay';
 import { startRelay, type TestRelay } from '@rp/relay/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
@@ -52,7 +57,7 @@ const as = (login: LoginResponse) => authHeaders(kit.deviceId, login.accessToken
 /** Every table's QR code, made as a manager would (P5-04); the relay gets their hashes. */
 async function giveCodes(): Promise<void> {
   expect((await server().post('/api/v1/tables/qr-codes').set(as(manager))).status).toBe(200);
-  for (const label of ['T1', 'T2', 'T3']) {
+  for (const label of ['T1', 'T2', 'T3', 'T4']) {
     const table = await prisma.diningTable.findUniqueOrThrow({ where: { id: id(label) } });
     tokens[label] = table.qrToken ?? '';
   }
@@ -196,7 +201,7 @@ beforeAll(async () => {
   }
   expect((await server().post('/api/v1/menu/publish').set(as(manager))).status).toBe(200);
   const hall = await prisma.section.create({ data: { ...base, name: 'Hall' } });
-  for (const label of ['T1', 'T2', 'T3']) {
+  for (const label of ['T1', 'T2', 'T3', 'T4']) {
     ids[label] = (
       await prisma.diningTable.create({ data: { ...base, sectionId: hall.id, label } })
     ).id;
@@ -413,5 +418,96 @@ describe('[ORD-013] [NFR-A01] never twice, never lost', () => {
     await qr.run();
     expect((await dinerSees('T3', relayOrderId)).status).toBe('SENT_TO_KITCHEN');
     expect(await prisma.order.count({ where: { externalRef: relayOrderId } })).toBe(1);
+  });
+});
+
+/** A diner presses Call waiter or Request bill on the QR page at `table` (QR-011). */
+async function dinerAsks(table: string, type: 'WAITER' | 'BILL'): Promise<string> {
+  const response = await fetch(`${relay.baseUrl}/service-request`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-rp-table-token': tokens[table] ?? '',
+      'x-rp-browser': `browser-${table}-0000000000`,
+    },
+    body: JSON.stringify({ type, idempotencyKey: randomUUID() }),
+  });
+  const answer = QrServiceRequestResponse.parse(await response.json());
+  return answer.request.id;
+}
+
+async function dinerSeesRequest(table: string, requestId: string): Promise<QrServiceRequestView> {
+  const response = await fetch(`${relay.baseUrl}/service-request?id=${requestId}`, {
+    headers: { 'x-rp-table-token': tokens[table] ?? '' },
+  });
+  return QrServiceRequestView.parse(await response.json());
+}
+
+const localRequestOf = async (relayRequestId: string) =>
+  (await prisma.relayServiceRequest.findUnique({ where: { relayRequestId } }))?.serviceRequestId ??
+  null;
+
+async function requestMarked(relayRequestId: string): Promise<void> {
+  await until(
+    async () =>
+      (await prisma.relayServiceRequest.findUnique({ where: { relayRequestId } }))?.pushedHash ===
+      null,
+    5_000,
+    'the change to be marked for the relay',
+  );
+}
+
+describe('[QR-011] call waiter and request bill from the QR page', () => {
+  it('alerts the table’s waiter, and the diner sees him coming, then done', async () => {
+    const relayRequestId = await dinerAsks('T2', 'WAITER');
+    await qr.run();
+    const localId = await localRequestOf(relayRequestId);
+    const local = await prisma.serviceRequest.findUniqueOrThrow({ where: { id: localId ?? '' } });
+    expect(local).toMatchObject({
+      type: 'WAITER',
+      source: 'QR',
+      tableId: id('T2'),
+      state: 'ACTIVE',
+    });
+    expect(
+      await prisma.alert.count({
+        where: { type: 'WAITER_REQUEST', tableId: id('T2'), status: 'OPEN' },
+      }),
+    ).toBe(1);
+    expect((await dinerSeesRequest('T2', relayRequestId)).status).toBe('RECEIVED');
+
+    const acknowledged = await server()
+      .post(`/api/v1/service-requests/${local.id}/acknowledge`)
+      .set(as(waiter))
+      .send({});
+    expect(acknowledged.status, JSON.stringify(acknowledged.body)).toBe(200);
+    await requestMarked(relayRequestId);
+    await qr.run();
+    expect((await dinerSeesRequest('T2', relayRequestId)).status).toBe('ACKNOWLEDGED');
+
+    const resolved = await server()
+      .post(`/api/v1/service-requests/${local.id}/resolve`)
+      .set(as(waiter))
+      .send({});
+    expect(resolved.status, JSON.stringify(resolved.body)).toBe(200);
+    await requestMarked(relayRequestId);
+    await qr.run();
+    expect((await dinerSeesRequest('T2', relayRequestId)).status).toBe('DONE');
+  });
+
+  it('[BILL-015] asks for the bill: the table shows Bill requested', async () => {
+    const relayRequestId = await dinerAsks('T1', 'BILL');
+    await qr.run();
+    expect(await localRequestOf(relayRequestId)).not.toBeNull();
+    const table = await prisma.diningTable.findUniqueOrThrow({ where: { id: id('T1') } });
+    expect(table.state).toBe('BILL_REQUESTED');
+  });
+
+  it('says a table that is not open cannot take a request, as at the tablet', async () => {
+    const relayRequestId = await dinerAsks('T4', 'WAITER');
+    await qr.run();
+    const seen = await dinerSeesRequest('T4', relayRequestId);
+    expect(seen.status).toBe('REJECTED');
+    expect(seen.rejectionReason).toContain('not open');
   });
 });

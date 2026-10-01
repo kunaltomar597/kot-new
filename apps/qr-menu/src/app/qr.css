@@ -378,3 +378,22 @@ body {
   margin: 0;
   font-weight: var(--rp-font-weight-semibold);
 }
+
+.qr-help {
+  margin: var(--rp-space-4) 0;
+}
+
+.qr-help__buttons {
+  display: flex;
+  gap: var(--rp-space-3);
+}
+
+.qr-help__buttons > * {
+  flex: 1;
+}
+
+.qr-help__status {
+  margin: var(--rp-space-2) 0 0;
+  font-size: var(--rp-font-size-sm);
+  color: var(--rp-color-info-text);
+}

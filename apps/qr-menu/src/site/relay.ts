@@ -2,6 +2,9 @@ import {
   BROWSER_ID_HEADER,
   QrMenuResponse,
   QrOrderView,
+  QrServiceRequestResponse,
+  type QrServiceRequestType,
+  QrServiceRequestView,
   QrSubmitOrderResponse,
   type QrSubmitOrderRequest,
   TABLE_TOKEN_HEADER,
@@ -83,5 +86,39 @@ export function fetchOrder(relayUrl: string, token: string, orderId: string): Pr
     `${relayUrl}/order-status?id=${encodeURIComponent(orderId)}`,
     { headers: { [TABLE_TOKEN_HEADER]: token } },
     (body) => QrOrderView.parse(body),
+  );
+}
+
+export function raiseServiceRequest(
+  relayUrl: string,
+  token: string,
+  browserId: string,
+  type: QrServiceRequestType,
+  idempotencyKey: string,
+): Promise<QrServiceRequestResponse> {
+  return call(
+    `${relayUrl}/service-request`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [TABLE_TOKEN_HEADER]: token,
+        [BROWSER_ID_HEADER]: browserId,
+      },
+      body: JSON.stringify({ type, idempotencyKey }),
+    },
+    (body) => QrServiceRequestResponse.parse(body),
+  );
+}
+
+export function fetchServiceRequest(
+  relayUrl: string,
+  token: string,
+  requestId: string,
+): Promise<QrServiceRequestView> {
+  return call(
+    `${relayUrl}/service-request?id=${encodeURIComponent(requestId)}`,
+    { headers: { [TABLE_TOKEN_HEADER]: token } },
+    (body) => QrServiceRequestView.parse(body),
   );
 }

@@ -4,6 +4,7 @@ import { EventsModule } from '../events/events.module.js';
 import { MenuModule } from '../menu/menu.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
 import { RecommendationsModule } from '../recommendations/recommendations.module.js';
+import { ServiceRequestsModule } from '../service-requests/service-requests.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import {
   DEFAULT_RELAY_ORDERS_OPTIONS,
@@ -24,6 +25,7 @@ import {
     MenuModule,
     OrdersModule,
     RecommendationsModule,
+    ServiceRequestsModule,
     SettingsModule,
   ],
   providers: [

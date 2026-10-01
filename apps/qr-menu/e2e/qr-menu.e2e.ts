@@ -151,6 +151,27 @@ test.describe('[QR-004] suggestions', () => {
   });
 });
 
+test.describe('[QR-011] call waiter and request bill', () => {
+  test('calls a waiter and follows the answer', async ({ page }) => {
+    await tablePage(page, 'T2');
+    await page.getByRole('button', { name: s.help.WAITER }).click();
+    const status = (state: string) =>
+      s.help.line.replace('{what}', s.help.WAITER).replace('{status}', state);
+    await expect(page.getByText(status(s.help.status.SUBMITTED))).toBeVisible();
+    // The restaurant picks it up, then the waiter is on the way.
+    const { requests } = await asServer<{ requests: { id: string; type: string }[] }>(
+      'GET',
+      'service-requests',
+    );
+    const request = requests.find((entry) => entry.type === 'WAITER');
+    if (request === undefined) throw new Error('nothing to pick up');
+    await asServer('POST', `service-requests/${request.id}/status`, { status: 'RECEIVED' });
+    await expect(page.getByText(status(s.help.status.RECEIVED))).toBeVisible();
+    await asServer('POST', `service-requests/${request.id}/status`, { status: 'ACKNOWLEDGED' });
+    await expect(page.getByText(status(s.help.status.ACKNOWLEDGED))).toBeVisible();
+  });
+});
+
 test.describe('[QR-012] [NFR-P12] speed on a mid-range phone over 4G', () => {
   test('paints a 300-dish menu within 2.5 s', async ({ page, context }) => {
     // Lighthouse's mobile profile: Slow 4G (150 ms, 1.6 Mbps down, 750 kbps up) and a CPU four
