@@ -196,7 +196,10 @@ Built in five parts, each its own pull request:
 - P4-03b Notification rules (done): the Appendix C table per event (recipients, channels, pager
   text, escalate, repeat) over the `notifications.rules` setting, storing only differences; the
   nudge presets are a list on the Settings page.
-- P4-03c Recommendation rules with boost, pin and block (REC-002, REC-009).
+- P4-03c Recommendation rules with boost, pin and block (done): the Suggestions page under Settings
+  with the rules over the P3-04 API and the featured dishes in the `reco.itemPreferences` setting;
+  pinned dishes first in up to half the places, boosted ones first among learned pairings and best
+  sellers, blocked ones never (reason `FEATURED` for pinned and added boosted dishes).
 - P4-03d Stations and printers with test print (KDS-008, ONB-004 step 6).
 - P4-03e The Owner's restaurant profile, tax groups and invoice series (ONB-004 steps 1 to 3,
   BILL-002 to BILL-004), with the second factor.

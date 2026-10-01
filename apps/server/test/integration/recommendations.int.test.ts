@@ -485,6 +485,48 @@ describe('[REC-004] best sellers of the time of day', () => {
   });
 });
 
+describe('[REC-009] pinned, boosted and blocked dishes', () => {
+  const prefer = (value: unknown, who: LoginResponse = manager) =>
+    server().put('/api/v1/settings/reco.itemPreferences').set(as(who)).send({ value });
+
+  afterEach(async () => {
+    expect((await prefer({})).status).toBe(200);
+  });
+
+  it('shows a pinned dish first, a boosted one higher, and never a blocked one', async () => {
+    const changed = await prefer({
+      [id('Raita')]: 'PIN',
+      [id('Gulab Jamun')]: 'BOOST',
+      [id('Paneer Tikka')]: 'BLOCK',
+    });
+    expect(changed.status).toBe(200);
+    const suggestions = await suggest({ channel: 'WAITER_APP' });
+    expect(names(suggestions)).toEqual([
+      'Raita',
+      'Gulab Jamun',
+      'Chicken Biryani',
+      'Veg Biryani',
+      'Butter Naan',
+      'Masala Chaas',
+    ]);
+    expect(suggestions.recommendations[0]).toEqual({
+      itemId: id('Raita'),
+      layer: 'RULE',
+      reason: { kind: 'FEATURED' },
+    });
+    expect(suggestions.recommendations[1]?.reason).toEqual({
+      kind: 'BEST_SELLER',
+      daypart: 'LUNCH',
+    });
+  });
+
+  it('takes only dish ids, from people who configure operations', async () => {
+    expect((await prefer({ 'not-a-dish': 'PIN' })).status).toBe(422);
+    expect((await prefer({ [id('Raita')]: 'HIDE' })).status).toBe(422);
+    expect((await prefer({ [id('Raita')]: 'PIN' }, waiter)).status).toBe(403);
+  });
+});
+
 describe('[REC-002] [REC-006] the rules a table’s order triggers', () => {
   let t1: TableSessionView;
 

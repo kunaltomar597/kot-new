@@ -35,6 +35,10 @@ describe('[REC-006] [TAB-011] the reason shown with a suggestion', () => {
       'Bestseller this evening',
     );
   });
+
+  it('[REC-009] says the restaurant recommends a pinned or boosted dish', () => {
+    expect(describeRecommendation({ kind: 'FEATURED' }, t)).toBe('Recommended by the restaurant');
+  });
 });
 
 describe('[REC-008] a cart line added from a suggestion', () => {

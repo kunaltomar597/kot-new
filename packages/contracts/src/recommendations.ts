@@ -31,6 +31,8 @@ export const RecommendationReason = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('LEARNED'), becauseOf: z.string() }),
   /** A best seller of this time of day, or of the whole day outside every window. */
   z.object({ kind: z.literal('BEST_SELLER'), daypart: Daypart.nullable() }),
+  /** Pinned or boosted by the restaurant (`reco.itemPreferences`, REC-009). */
+  z.object({ kind: z.literal('FEATURED') }),
 ]);
 export type RecommendationReason = z.infer<typeof RecommendationReason>;
 

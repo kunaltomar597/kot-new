@@ -146,8 +146,12 @@ describe('[NTF-002] the notification rules', () => {
     const row = (
       await screen.findByRole('heading', { level: 4, name: t('settingLabels.notifications.rules') })
     ).closest('li') as HTMLElement;
-    expect(within(row).getByText(t('settingsPage.rulesChanged', { count: 0 }))).toBeVisible();
-    await user.click(within(row).getByRole('link', { name: t('settingsPage.openRules') }));
+    expect(
+      within(row).getByText(t('settingsPage.pageValue.notifications', { count: 0 })),
+    ).toBeVisible();
+    await user.click(
+      within(row).getByRole('link', { name: t('settingsPage.openPage.notifications') }),
+    );
     expect(
       await screen.findByRole('heading', { level: 2, name: t('notificationRules.title') }),
     ).toBeVisible();

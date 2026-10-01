@@ -82,6 +82,14 @@ export interface LearnedPair {
   readonly score: number;
 }
 
+/**
+ * A manager's say over single dishes (REC-009): PIN shows it first, BOOST ranks it higher among
+ * learned pairings and best sellers (and adds it there), BLOCK never suggests it.
+ */
+export const ITEM_PREFERENCES = ['PIN', 'BOOST', 'BLOCK'] as const;
+export type ItemPreference = (typeof ITEM_PREFERENCES)[number];
+export type ItemPreferences = Readonly<Partial<Record<string, ItemPreference>>>;
+
 /** How many of an item were sold in the window counted, for its best-seller rank (REC-004). */
 export interface ItemCount {
   readonly itemId: string;
@@ -99,7 +107,9 @@ export type RecommendationReason =
       readonly becauseOf: string;
     }
   | { readonly kind: 'LEARNED'; readonly becauseOf: string }
-  | { readonly kind: 'BEST_SELLER'; readonly daypart: Daypart | null };
+  | { readonly kind: 'BEST_SELLER'; readonly daypart: Daypart | null }
+  /** Pinned or boosted by the restaurant (REC-009). */
+  | { readonly kind: 'FEATURED' };
 
 export interface Recommendation {
   readonly itemId: string;
@@ -127,6 +137,8 @@ export interface RecommendationInput {
   /** Course names in serving order (`reco.courseSequence` ⚙). */
   readonly courseSequence: readonly string[];
   readonly limit: number;
+  /** Pinned, boosted and blocked dishes (`reco.itemPreferences` ⚙, REC-009). */
+  readonly preferences?: ItemPreferences;
 }
 
 /** The daypart a local time falls in, or null outside every window (REC-004). */
@@ -220,6 +232,7 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     if (course === undefined || course > nextCourse) return 1;
     return course === nextCourse ? 0 : 2;
   };
+  const preferences = input.preferences ?? {};
   const byCourseThenSales = (a: RecoItem, b: RecoItem): number =>
     courseRank(a) - courseRank(b) ||
     (sold.get(b.id) ?? 0) - (sold.get(a.id) ?? 0) ||
@@ -227,6 +240,7 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     a.id.localeCompare(b.id);
 
   const servable = (item: RecoItem): boolean =>
+    preferences[item.id] !== 'BLOCK' &&
     item.archived !== true &&
     item.available &&
     item.stockCount !== 0 &&
@@ -253,6 +267,16 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     }
     return found;
   };
+
+  // Pinned dishes first, but in at most half the places so the rules still show (REC-009).
+  const pinLimit = Math.ceil(input.limit / 2);
+  const pinned = input.items
+    .filter((item) => preferences[item.id] === 'PIN')
+    .sort(byCourseThenSales);
+  for (const item of pinned) {
+    if (chosen.length >= pinLimit) break;
+    take(item, 'RULE', { kind: 'FEATURED' });
+  }
 
   // Layer 1: the restaurant's rules, highest priority first (REC-002).
   const rules = input.rules
@@ -282,9 +306,10 @@ export function recommend(input: RecommendationInput): Recommendation[] {
   }
 
   // Layer 2: pairings learned from this restaurant's orders, strongest first (P6-02).
+  const boostedFirst = (id: string) => (preferences[id] === 'BOOST' ? 0 : 1);
   const learned = [...(input.learned ?? [])]
     .filter((pair) => ordered.has(pair.fromItemId))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => boostedFirst(a.toItemId) - boostedFirst(b.toItemId) || b.score - a.score);
   for (const pair of learned) {
     if (chosen.length >= input.limit) break;
     const from = items.get(pair.fromItemId);
@@ -294,16 +319,27 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     }
   }
 
-  // Layer 3: best sellers of the time of day, the next course first (REC-004).
+  // Layer 3: best sellers of the time of day, the next course first (REC-004); boosted dishes
+  // come before them, and join them when they are not best sellers (REC-009).
   const bestSellers = input.bestSellers
     .flatMap((count) => {
       const item = items.get(count.itemId);
       return item === undefined || count.quantity <= 0 ? [] : [item];
     })
     .sort(byCourseThenSales);
-  for (const item of bestSellers) {
+  const selling = new Set(bestSellers.map((item) => item.id));
+  const isBoosted = (item: RecoItem) => preferences[item.id] === 'BOOST';
+  const candidates = [
+    ...input.items.filter(isBoosted).sort(byCourseThenSales),
+    ...bestSellers.filter((item) => !isBoosted(item)),
+  ];
+  for (const item of candidates) {
     if (chosen.length >= input.limit) break;
-    take(item, 'BEST_SELLER', { kind: 'BEST_SELLER', daypart: input.daypart });
+    take(
+      item,
+      'BEST_SELLER',
+      selling.has(item.id) ? { kind: 'BEST_SELLER', daypart: input.daypart } : { kind: 'FEATURED' },
+    );
   }
   return chosen;
 }
