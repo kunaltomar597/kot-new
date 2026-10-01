@@ -172,7 +172,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-03 Customer ordering from the tablet and the waiter's approval.
+- P3-03b Approvals in the waiter app and the POS.
+- P3-03c Ordering on the table tablet.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -262,7 +263,9 @@ Recommended next WPs (dependencies met):
 - [x] P3-01b Table tablet app: kiosk, idle and session screens, wipe, health, staff exit
 - [x] P3-01c Locate a tablet from the dashboard (MGR-006, Should)
 - [x] P3-02 Service requests on the tablet (server side in P2-06d)
-- [ ] P3-03 Customer ordering and waiter approval
+- [x] P3-03a Diners' orders and approval: server
+- [ ] P3-03b Approvals in the waiter app and the POS
+- [ ] P3-03c Ordering on the table tablet
 - [x] P3-04 Recommendation engine v1
 - [ ] P3-05 Recommendation UI and feedback
 - [ ] P3-06 Phase 3 exit test (S6)
@@ -569,6 +572,34 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-03a):
+
+298. P3-03 is built in three parts: a the server, b the staff screens (waiter app and POS), c the
+     tablet's ordering.
+299. A tablet orders only for the open session at its own table: `TABLE_NOT_OPEN` otherwise, and
+     no table session id is accepted from it. The order is priced and checked like any other
+     (ORD-013, ORD-014, the tablet channel), and every line waits for approval.
+300. Approving (ORDER_APPROVE_CUSTOMER: waiters for their own tables, by the session's waiter;
+     the cashier, managers and the Owner for all):
+     - Changes first: a quantity changed, or 0 to remove a line, only with `dinerAgreed`. A removed
+       line is REJECTED with "Removed with the diner's agreement"; removing every line is refused
+       (reject instead).
+     - Stock is checked again; a dish that ran out refuses the approval and names it.
+     - The rest go to the kitchen exactly as a staff order does: SENT with the approver, tickets
+       per station and stock taken off. A table waiting for its bill becomes OCCUPIED again.
+     - Audited as `ORDER_APPROVED` with the changes, followed by `OrderApproved`.
+301. Rejecting needs a reason (3 to 200 characters) that the diner sees. Every waiting line is
+     REJECTED, and an order with nothing left is CANCELLED. Audited as `ORDER_REJECTED`.
+302. Approve at table: the waiter (or the cashier or a manager) picks their name and enters their
+     PIN on the tablet. It is checked like a sign-in (throttle, lock-out, `TABLE_APPROVAL_DENIED`
+     on failure), and a waiter may approve only their own table. It approves the tablet's own
+     table's orders only.
+303. The approvals inbox lists orders with any waiting line, oldest first, with the table and its
+     waiter: a waiter's own tables, or all for the others.
+304. Bestsellers are the most ordered dishes over the whole day for `reco.bestSellerDays`, still
+     on the menu. There are `menu.bestSellerCount` of them: new setting, default 10, 0 for no
+     badge.
 
 Decided 2026-10-02 (P3-02):
 
@@ -1549,6 +1580,34 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-03a Diners' orders and approval (server)
+
+Built:
+
+- Contracts: `TabletOrderRequest`, `TabletOrdersResponse`, `ApprovalChange`,
+  `ApproveOrderRequest`, `RejectOrderRequest`, `ApproveAtTableRequest`,
+  `PendingApprovalsResponse` and `BestSellersResponse`; seven routes; setting
+  `menu.bestSellerCount` (with a Menu area on the Settings page).
+- Server:
+  - `OrderApprovalsService` with `TabletOrdersController` and the approve, reject and
+    pending-approval routes on `OrdersController`.
+  - `OrdersService.sendToKitchen` is now public, and `orderView` and `ORDER_VIEW_INCLUDE` are
+    exported.
+  - `AuthService.pinOnDevice` is shared by `kioskExit` and the new `tableApprover`.
+  - `RecommendationsService.bestSellerIds` with `BestSellersController`.
+
+Tests: `order-approvals.int.test.ts` 10:
+
+- the table must be open, waiting lines and the waiter's alert, each tablet kept to its own table;
+- the inbox per role, changes needing agreement and own tables;
+- approve with a changed quantity and a removed line (KOT, alert cleared, audit, totals);
+- reject with a reason; refused when a dish ran out;
+- approve at table with a wrong PIN, kitchen staff, another waiter and the right waiter (stock
+  taken off);
+- bestsellers and their setting.
+
+Decisions: 298 to 304.
 
 ### 2026-10-02: P3-02 Service requests on the tablet
 

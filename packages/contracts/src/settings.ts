@@ -692,6 +692,16 @@ export const SETTINGS = [
     unit: 'orders',
   }),
   setting({
+    key: 'menu.bestSellerCount',
+    schema: int(0, 50),
+    defaultValue: 10,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'How many of the most ordered dishes carry the bestseller badge on the tablet and QR menu (0: none; our default).',
+    requirements: ['TAB-005'],
+  }),
+  setting({
     key: 'reco.bestSellerDays',
     schema: int(1, 365),
     defaultValue: 30,

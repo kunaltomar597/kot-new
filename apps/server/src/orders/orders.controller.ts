@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Req } from '@nestjs/common';
 import {
+  ApproveAtTableRequest,
+  ApproveOrderRequest,
   ModifyOrderItemRequest,
   OrderItemEndRequest,
   OrderItemParams,
@@ -8,15 +10,21 @@ import {
   type OrderFeedResponse,
   OrderParams,
   type OrderView,
+  type PendingApprovalsResponse,
+  RejectOrderRequest,
   SubmitOrderRequest,
   type SubmitOrderResponse,
   TableSessionParams,
+  TabletOrderRequest,
+  type TabletOrdersResponse,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
-import { RequireCapability, RequireSession } from '../auth/decorators.js';
+import { RequireCapability, RequireDevice, RequireSession } from '../auth/decorators.js';
+import type { AuthenticatedDevice } from '../auth/device.js';
 import { actorOf, type AuthenticatedRequest, type Principal } from '../auth/principal.js';
 import { AppError } from '../errors/app-error.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { type Approver, OrderApprovalsService } from './order-approvals.service.js';
 import { OrderFeedService } from './order-feed.service.js';
 import { OrderItemsService } from './order-items.service.js';
 import { OrdersService } from './orders.service.js';
@@ -26,10 +34,61 @@ function principalOf(request: AuthenticatedRequest): Principal {
   return request.principal;
 }
 
+/** The person approving diners' orders; waiters only their own tables (ORD-003, WTR-004). */
+function approverOf(request: AuthenticatedRequest): Approver {
+  const principal = principalOf(request);
+  return {
+    restaurantId: principal.restaurantId,
+    staffId: principal.staffId,
+    deviceId: principal.deviceId,
+    ownOnly: request.ownershipRequired === true,
+  };
+}
+
+function deviceOf(request: AuthenticatedRequest): AuthenticatedDevice {
+  if (request.device === undefined) throw authErrors.deviceNotRecognised();
+  return request.device;
+}
+
+/** A diner's orders from the table tablet, and "Approve at table" (P3-03a, AUTH-009). */
+@Controller('devices/current/orders')
+@RequireDevice()
+export class TabletOrdersController {
+  constructor(private readonly approvals: OrderApprovalsService) {}
+
+  @Post()
+  @HttpCode(200)
+  submit(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(TabletOrderRequest)) body: TabletOrderRequest,
+  ): Promise<SubmitOrderResponse> {
+    return this.approvals.submitFromTablet(deviceOf(request), body);
+  }
+
+  @Get()
+  list(@Req() request: AuthenticatedRequest): Promise<TabletOrdersResponse> {
+    return this.approvals.listForTablet(deviceOf(request));
+  }
+
+  @Post(':orderId/approve')
+  @HttpCode(200)
+  approve(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderParams)) params: OrderParams,
+    @Body(new ZodValidationPipe(ApproveAtTableRequest)) body: ApproveAtTableRequest,
+  ): Promise<OrderView> {
+    const parsed = ApproveAtTableRequest.parse(body);
+    return this.approvals.approveAtTable(deviceOf(request), params.orderId, parsed);
+  }
+}
+
 /** Orders from staff surfaces: the POS and the waiter app (P1-06a, ORD-001). */
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly approvals: OrderApprovalsService,
+  ) {}
 
   @Post()
   @HttpCode(200)
@@ -57,7 +116,36 @@ export class OrdersController {
     );
   }
 
-  // Declared before `:orderId` so "takeaway" is not read as an order id.
+  // Declared before `:orderId` so these paths are not read as an order id.
+  @Get('pending-approval')
+  @RequireCapability('ORDER_APPROVE_CUSTOMER')
+  pending(@Req() request: AuthenticatedRequest): Promise<PendingApprovalsResponse> {
+    return this.approvals.pending(approverOf(request));
+  }
+
+  @Post(':orderId/approve')
+  @HttpCode(200)
+  @RequireCapability('ORDER_APPROVE_CUSTOMER')
+  approve(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderParams)) params: OrderParams,
+    @Body(new ZodValidationPipe(ApproveOrderRequest)) body: ApproveOrderRequest,
+  ): Promise<OrderView> {
+    const parsed = ApproveOrderRequest.parse(body);
+    return this.approvals.approve(approverOf(request), params.orderId, parsed.changes);
+  }
+
+  @Post(':orderId/reject')
+  @HttpCode(200)
+  @RequireCapability('ORDER_APPROVE_CUSTOMER')
+  reject(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderParams)) params: OrderParams,
+    @Body(new ZodValidationPipe(RejectOrderRequest)) body: RejectOrderRequest,
+  ): Promise<OrderView> {
+    return this.approvals.reject(approverOf(request), params.orderId, body);
+  }
+
   @Get('takeaway')
   @RequireCapability('ORDER_CREATE')
   takeaway(@Req() request: AuthenticatedRequest): Promise<OrderListResponse> {

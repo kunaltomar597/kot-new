@@ -84,12 +84,12 @@ function reject(line: OrderLineRequest, code: RejectedLine['code'], message: str
  * deductions. Staff orders go straight to the kitchen as per-station KOTs; customer orders wait
  * for approval (P3-03).
  */
-const ORDER_VIEW_INCLUDE = {
+export const ORDER_VIEW_INCLUDE = {
   items: { orderBy: { id: 'asc' }, include: { modifiers: { orderBy: { id: 'asc' } } } },
   kots: { orderBy: { kotNumber: 'asc' }, include: { station: { select: { name: true } } } },
 } as const satisfies Prisma.OrderInclude;
 
-function orderView(
+export function orderView(
   order: Prisma.OrderGetPayload<{ include: typeof ORDER_VIEW_INCLUDE }>,
 ): OrderView {
   return {
@@ -635,8 +635,11 @@ export class OrdersService {
     return { status: 'ACCEPTED', orderId: order.id, orderNumber, replayed: false, itemState };
   }
 
-  /** Per-station KOTs with their day numbers (ORD-007, ORD-008); combos exploded into parts. */
-  private async sendToKitchen(
+  /**
+   * Per-station KOTs with their day numbers (ORD-007, ORD-008); combos exploded into parts. Also
+   * used when a diner's order is approved (P3-03a).
+   */
+  async sendToKitchen(
     tx: TransactionClient,
     restaurantId: string,
     businessDate: string,

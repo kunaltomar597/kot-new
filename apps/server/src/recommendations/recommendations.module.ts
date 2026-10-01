@@ -8,6 +8,7 @@ import { RECOMMENDATION_CLOCK, SYSTEM_RECOMMENDATION_CLOCK } from './clock.js';
 import { RecommendationOrders } from './recommendation-orders.js';
 import { RecommendationRulesService } from './recommendation-rules.service.js';
 import {
+  BestSellersController,
   RecommendationRulesController,
   RecommendationsController,
   TabletRecommendationsController,
@@ -25,6 +26,7 @@ import { RecommendationsService } from './recommendations.service.js';
     RecommendationsController,
     TabletRecommendationsController,
     RecommendationRulesController,
+    BestSellersController,
   ],
   providers: [
     RecommendationsService,
