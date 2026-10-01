@@ -274,6 +274,7 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
       ...(restaurant.accentColor !== null && { accentColor: restaurant.accentColor }),
       timeZone: restaurant.timeZone,
       instructionMaxLength: settings.get('orders.specialInstructionsMaxLength'),
+      priceMode: settings.get('billing.priceMode'),
       // QR-011 (S) comes with the QR site's service requests (P5-05).
       serviceRequests: false,
       menu: qrChannelMenu(menu),

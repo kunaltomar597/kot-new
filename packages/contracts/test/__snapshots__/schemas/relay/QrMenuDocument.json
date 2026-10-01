@@ -6,6 +6,7 @@
       "accentColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
       "timeZone": { "type": "string", "minLength": 1, "maxLength": 60 },
       "instructionMaxLength": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "priceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] },
       "serviceRequests": { "type": "boolean" },
       "menu": {
         "type": "object",
@@ -376,6 +377,7 @@
       "restaurantName",
       "timeZone",
       "instructionMaxLength",
+      "priceMode",
       "serviceRequests",
       "menu",
       "photos"
@@ -389,6 +391,7 @@
       "accentColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
       "timeZone": { "type": "string", "minLength": 1, "maxLength": 60 },
       "instructionMaxLength": { "type": "integer", "minimum": 0, "maximum": 500 },
+      "priceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] },
       "serviceRequests": { "type": "boolean" },
       "menu": {
         "type": "object",
@@ -772,6 +775,7 @@
       "restaurantName",
       "timeZone",
       "instructionMaxLength",
+      "priceMode",
       "serviceRequests",
       "menu",
       "photos"

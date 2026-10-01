@@ -144,7 +144,7 @@ describe('[QR-002] [QR-008] the menu', () => {
       readOnly: false,
       pickupTimeoutSeconds: 60,
     });
-    expect(menu.document.restaurantName).toBe('Spice Route');
+    expect(menu.document?.restaurantName).toBe('Spice Route');
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
@@ -446,5 +446,15 @@ describe('browsers', () => {
     const wrong = await call(qrMenu, 'qr-menu', { method: 'POST', body: {} });
     expect(wrong.status).toBe(405);
     expect(wrong.headers.get('allow')).toBe('GET, OPTIONS');
+  });
+});
+
+describe('[QR-002] refreshing the menu', () => {
+  it('sends the menu again only when it changed', async () => {
+    const same = QrMenuResponse.parse((await call(qrMenu, 'qr-menu', { query: '?known=2' })).body);
+    expect(same).toMatchObject({ version: 2, document: null });
+    const older = QrMenuResponse.parse((await call(qrMenu, 'qr-menu', { query: '?known=1' })).body);
+    expect(older.document?.restaurantName).toBe('Spice Route');
+    expect((await call(qrMenu, 'qr-menu', { query: '?known=abc' })).status).toBe(400);
   });
 });

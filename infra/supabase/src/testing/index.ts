@@ -135,6 +135,7 @@ export interface TestRelay {
   readonly baseUrl: string;
   /** The relay's database, as its superuser. */
   readonly admin: pg.Pool;
+  readonly databaseUrl: string;
   /** Creates a restaurant with a credential, as the Control Plane's provisioning does. */
   provision(name: string): Promise<ProvisionedTenant>;
   /** Cuts the internet: every request is dropped until `restore()`. */
@@ -195,6 +196,7 @@ export async function startRelay(options: {
   return {
     baseUrl: `http://127.0.0.1:${String(port)}/functions/v1`,
     admin,
+    databaseUrl: database.url,
     requests,
     async provision(name) {
       const tenantId = randomUUID();

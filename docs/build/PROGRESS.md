@@ -139,6 +139,9 @@ What exists:
     settings, menu publishing, the tables with their code hashes, pickup and status reports.
     124 tests in all, 3 of them under Deno.
   - `@rp/relay/testing`: the relay in-process for other packages' tests (P5-03a).
+- `apps/qr-menu` (P5-05a): the public QR menu site on Next.js 16, a table's menu from the relay
+  with search, filters, options, cart, sending and following orders, read-only when the restaurant
+  is absent, and privacy and terms. Tested on a phone (Playwright, Pixel 7) against a real relay.
 - `apps/server/src/relay`: the QR relay sync agent's publishing side (P5-03a). It sends presence
   with the QR settings, and the tables and the QR menu by content hash. It backs off while offline
   and catches up after. The credential is sealed (`relay:credential`). The System page shows its
@@ -189,8 +192,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-05 Next.js QR menu site; P5-03c photos to the relay's Storage; P5-03d the Realtime doorbell;
-  then P5-06.
+- P5-05b (recommendations, call waiter / request bill, Lighthouse), P5-03c photos to the relay's
+  Storage, P5-03d the Realtime doorbell, then P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -320,7 +323,8 @@ Recommended next WPs (dependencies met):
 - [ ] P5-03c Sync agent: photos to the relay's Storage
 - [ ] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
 - [x] P5-04 QR tokens and table tents
-- [ ] P5-05 Next.js QR menu site
+- [x] P5-05a QR menu site: menu, cart, ordering, statuses, read-only, privacy
+- [ ] P5-05b QR menu site: recommendations, call waiter / request bill (S), photos, Lighthouse budget
 - [ ] P5-06 Phase 5 exit test
 
 ### Phase 6: Advanced menu and intelligence
@@ -594,6 +598,53 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-05a):
+
+361. P5-05 is built in two parts:
+     - a, the site;
+     - b, recommendations (the local server will publish them in the QR menu document),
+       call waiter / request bill (S), photos (after P5-03c) and the Lighthouse budget.
+362. The QR site is Next.js 16 (App Router).
+     - The table page fetches the menu on the server, so the first view is the menu (QR-012).
+     - After that, the browser calls the relay's functions directly (CORS).
+     - `RELAY_URL` is read at request time, so one build serves dev, staging and prod.
+363. Privacy (QR-013):
+     - a Content-Security-Policy set per request in `src/proxy.ts` (next.config headers are fixed
+       at build time), allowing only the site and the relay;
+     - `Referrer-Policy: no-referrer`, because the address holds the table's code;
+     - no third-party resources, and pages not indexed;
+     - the browser keeps only a random id for the rate limit, the cart, and the ids of orders
+       sent from it, under keys that hold only the start of the code;
+     - Next.js telemetry is off in the scripts.
+364. Same behaviour as every surface (MENU-012):
+     - the selection rules, search, filters, cart and estimate come from `@rp/domain` and
+       `@rp/ordering`; components from `@rp/ui-web`; words from `qrSite.*`;
+     - only QR-channel dishes are shown;
+     - a search's results form one list, best first; otherwise the dishes are shown by section;
+     - filters are veg, Jain and spicy; best sellers come with P5-05b's snapshot.
+365. Sending an order:
+     - the idempotency key belongs to the cart as it is, and is sent again on a network retry,
+       so a retry never orders twice;
+     - lines the menu refuses are marked with the reason, and the menu reloads;
+     - a rate limit says how long to wait; the restaurant being offline turns the page
+       read-only;
+     - read-only disables adding and sending.
+366. Following orders:
+     - each order is checked every 3 s until it is settled;
+     - one still waiting past its pickup time reads "Please call a waiter" by the page's own
+       clock too;
+     - each dish's kitchen state is shown (S).
+367. The page refreshes the menu every 60 s with `?known=<version>`; the relay answers
+     `document: null` when nothing changed. The QR menu document gained `priceMode` for the
+     estimate.
+368. Licences:
+     - exceljs (P4-06) carries a zip reader that brings in `traverse` and `chainsaw`, declared
+       "MIT/X11" (MIT), and `buffers`, which declares none;
+     - they are now reviewed exceptions, with `buffers` to confirm, or the reader dropped,
+       before the pilot;
+     - the licence check runs in the security workflow, not in `pnpm check`, which is why it had
+       been failing unnoticed since P4-06.
 
 Decided 2026-10-02 (P5-04):
 
@@ -1906,6 +1957,42 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-05a QR menu site
+
+Built:
+
+- `apps/qr-menu` (Next.js 16.3.8, MIT):
+  - `src/app` pages: `/`, `/t/[token]`, `/privacy`, `/terms`, not-found;
+  - `src/site` parts: `QrMenu`, `ItemSheet`, `CartSheet`, `Orders`, `relay.ts`, `storage.ts`
+    (`useSyncExternalStore` values), `i18n.tsx`;
+  - `src/proxy.ts` (CSP), `qr.css`.
+- `qrSite.*` strings, including drafts of the privacy notice and terms.
+- The relay: `qr-menu` takes `?known=`, and the QR menu document has `priceMode`.
+- `@rp/relay/testing` exposes `databaseUrl`.
+- turbo caches `.next`; the CI e2e job runs the site's phone tests.
+- Manual task 21 (hosting), and a legal-review item.
+- Licence exceptions for exceljs's zip reader.
+
+Tests:
+
+- qr-menu e2e 6 on a Pixel 7 against a real relay:
+  - find, order and follow to the kitchen, with an axe check;
+  - sizes and extras;
+  - nobody picks up, so "call a waiter";
+  - read-only and back;
+  - an unused code;
+  - privacy, terms and headers.
+- qr-menu unit 5 (CSP, browser id, per-table storage, the status panel).
+- relay 1 (`known`).
+- Checked by eye: phone screenshots of the menu, the cart and the status.
+
+Gotchas:
+
+- Next.js resolves `headers()` in next.config at build time, so a CSP naming a runtime URL
+  must be set in `proxy.ts`.
+- A screenshot just after a dialog opens catches its fade-in and looks see-through: wait for the
+  animation first.
 
 ### 2026-10-02: P5-04 Table QR codes and tents
 

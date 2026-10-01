@@ -113,7 +113,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build server and console
+      - name: Build the server, the console and the QR site
         run: pnpm build
 
       - name: Install Chromium for Playwright
@@ -121,6 +121,9 @@ jobs:
 
       - name: Console end-to-end tests
         run: pnpm --filter @rp/console e2e
+
+      - name: QR menu end-to-end tests (a phone against a real relay)
+        run: pnpm --filter @rp/qr-menu e2e
 
       - name: Keep the Playwright report
         if: failure()
@@ -130,6 +133,8 @@ jobs:
           path: |
             apps/console/playwright-report
             apps/console/test-results
+            apps/qr-menu/playwright-report
+            apps/qr-menu/test-results
           retention-days: 7
 
   relay-supabase:

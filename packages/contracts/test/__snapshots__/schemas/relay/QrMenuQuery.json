@@ -1,0 +1,16 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "known": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "known": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "additionalProperties": false
+  }
+}
