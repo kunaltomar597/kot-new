@@ -8,6 +8,7 @@ import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
 import { MenuEditor } from './menu/MenuEditor.js';
 import { PrintingScreen } from './printing/PrintingScreen.js';
+import { RestaurantScreen } from './restaurant/RestaurantScreen.js';
 import { NotificationRulesScreen } from './settings/NotificationRulesScreen.js';
 import { RecommendationsScreen } from './settings/RecommendationsScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
@@ -19,7 +20,8 @@ import { StaffArea } from './staff/StaffArea.js';
  * The manager dashboard (P4-01, MGR-001): the overview, the live order feed and the alert centre,
  * one at a time under `/manage`, then the setup pages: Staff for people who manage staff (people,
  * today's sections and pagers; P4-02a, P4-02b, MGR-004), the menu editor (P4-02d, MGR-005), Devices for people
- * who pair them (P4-02c, MGR-006), the kitchen stations and printers (P4-03d, KDS-008), the
+ * who pair them (P4-02c, MGR-006), the restaurant's profile, tax groups and invoice series
+ * (P4-03e, ONB-004), the kitchen stations and printers (P4-03d, KDS-008), the
  * settings with their own pages (P4-03a to P4-03c, MGR-007) and the Owner's own sign-in security
  * (AUTH-006). The navigation sits beside them on a wide screen and above them on a phone
  * (MGR-011); the page shown is marked for screen readers, not by colour alone. Pages a role cannot
@@ -78,6 +80,11 @@ export function ManageHome() {
           </NavLink>
         ) : null}
         {operates ? (
+          <NavLink to="/manage/restaurant" className="dashboard__link">
+            {t('dashboard.section.restaurant')}
+          </NavLink>
+        ) : null}
+        {operates ? (
           <NavLink to="/manage/printing" className="dashboard__link">
             {t('dashboard.section.printing')}
           </NavLink>
@@ -107,6 +114,7 @@ export function ManageHome() {
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
+          {operates ? <Route path="restaurant" element={<RestaurantScreen />} /> : null}
           {operates ? <Route path="printing" element={<PrintingScreen />} /> : null}
           {operates ? <Route path="settings" element={<SettingsScreen />} /> : null}
           {operates ? (

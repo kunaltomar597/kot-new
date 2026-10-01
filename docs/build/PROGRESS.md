@@ -148,7 +148,9 @@ What exists:
   what a custom role adds (P4-02e); the Settings page with an editor for every catalogue
   setting (P4-03a); the notification rules page (P4-03b); the Suggestions page with the
   recommendation rules and the pinned, boosted and blocked dishes (P4-03c); the kitchen stations
-  and printers with test print and redirect (P4-03d). 253 tests, and 20 Playwright steps.
+  and printers with test print and redirect (P4-03d); the Restaurant page with the profile, and
+  the Owner's invoice particulars, tax groups and invoice series behind the second factor
+  (P4-03e). 266 tests, and 20 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -163,8 +165,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03e Restaurant profile, tax groups and invoice series (the last part of P4-03, see
-  phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -273,7 +273,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-03b Notification rules editor
 - [x] P4-03c Recommendation rules editor with boost, pin and block
 - [x] P4-03d Stations and printers
-- [ ] P4-03e Restaurant profile, tax groups and invoice series (Owner)
+- [x] P4-03e Restaurant profile, tax groups and invoice series (Owner)
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
 - [ ] P4-06 Report exports
@@ -559,6 +559,21 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-03e):
+
+247. The restaurant's own setup is one dashboard page, "Restaurant" (`/manage/restaurant`,
+     OPERATIONS_CONFIGURE): managers change the profile (name, contact, opening hours, logo,
+     business-day cut-off); the invoice particulars, tax groups and invoice series show to them
+     read-only and are changed by the Owner (TAX_AND_INVOICE_SETTINGS), each change asking for the
+     second factor when the server wants it.
+248. Opening hours are entered per weekday, up to four windows a day; a day without one is closed,
+     and closing before opening means after midnight. Tax rates are typed as a percent with up to
+     two decimals and stored in basis points; a new group starts as CGST and SGST with SAC 996331.
+249. A series with invoices keeps its format: the form shows why and only the name can change. The
+     default series has no Make default or Archive; the server refuses both anyway. A GSTIN is
+     tidied (upper case, no spaces) when the field is left, and checked against the state.
+250. The photo upload of the menu editor is a shared `PhotoPicker`, also used for the logo.
 
 Decided 2026-10-01 (P4-03d):
 
@@ -1279,6 +1294,30 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-03e Restaurant profile, tax groups and invoice series (P4-03 done)
+
+Built: the console's `RestaurantScreen` at `/manage/restaurant` over the P1-01b API with
+`ProfileDialog`, `LegalDialog`, `TaxGroupDialog` and `SeriesDialog`; `restaurant-view.ts` with the
+drafts, their checks (the contracts' own schemas and the domain's GSTIN and invoice-number rules)
+and the example number; `PhotoPicker` shared with the menu editor; CSS for the facts list and the
+opening-hours editor.
+
+Tests: console `restaurant-view.test.ts` 8 and `restaurant.test.tsx` 5 (the page for the Owner,
+a manager's profile change with the Owner's parts read-only, a tax group added through the second
+factor, archive and default series, a series with invoices kept fixed).
+
+Check: `pnpm check` passed everything but one server test that lost its socket ("socket hang up"
+in the manager-override test) while the check loaded every core; no server code changed and the
+server suite alone passes (733 tests). Such load flakes hit 3 of the last 5 full checks on this
+Mac; if they keep coming, run the tests with a lower Turborepo concurrency.
+
+Gotchas:
+
+- An accessible name collapses spaces, so labels built from values that may be empty ("Remove
+  Tuesday to ") never match: number such buttons instead.
+
+Decisions: 247 to 250.
 
 ### 2026-10-01: P4-03d Stations and printers
 

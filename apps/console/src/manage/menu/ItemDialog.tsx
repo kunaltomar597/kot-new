@@ -1,14 +1,10 @@
-import {
-  type ItemAvailabilityRequest,
-  type ItemView,
-  PHOTO_MAX_BYTES,
-  photoUrl,
-} from '@rp/contracts';
+import type { ItemAvailabilityRequest, ItemView } from '@rp/contracts';
 import { Button, ChoiceGroup, Dialog, IconButton, Icon, Select, TextField } from '@rp/ui-web';
-import { useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
+import { PhotoPicker } from '../PhotoPicker.js';
 import { ComboFields } from './ComboFields.js';
 import type { MenuData } from './MenuEditor.js';
 import {
@@ -29,21 +25,6 @@ import {
   SALES_CHANNELS,
   SPICE_LEVELS,
 } from './menu-view.js';
-
-/** Reads a chosen file as base64 without the `data:` prefix. */
-function base64Of(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      resolve(result.slice(result.indexOf(',') + 1));
-    };
-    reader.onerror = () => {
-      reject(reader.error ?? new Error('The file could not be read'));
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 /**
  * Adds or edits a dish (MENU-002 to MENU-005, MENU-008, MENU-011): every attribute, a photo, sizes
@@ -85,7 +66,6 @@ export function ItemDialog({
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const fileInput = useRef<HTMLInputElement>(null);
   const problems = checkItem(form);
   const comboProblems = isCombo ? checkCombo(combo) : {};
   const problemOf = (field: ItemField) => {
@@ -96,27 +76,6 @@ export function ItemDialog({
   };
   const set = <K extends keyof ItemForm>(key: K, value: ItemForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
-  };
-
-  const upload = async (file: File | undefined) => {
-    if (file === undefined) return;
-    setError(undefined);
-    if (file.size > PHOTO_MAX_BYTES) {
-      setError(t('menuEditor.item.photoTooLarge'));
-      return;
-    }
-    setUploading(true);
-    try {
-      const photo = await controller.api.uploadPhoto({
-        body: { contentBase64: await base64Of(file) },
-      });
-      set('photoId', photo.id);
-    } catch (failure) {
-      setError(messageOf(failure, t));
-    } finally {
-      setUploading(false);
-      if (fileInput.current !== null) fileInput.current.value = '';
-    }
   };
 
   const save = async () => {
@@ -212,54 +171,21 @@ export function ItemDialog({
               set('description', event.target.value);
             }}
           />
-          <div className="menu-photo">
-            {form.photoId === null ? null : (
-              <img
-                className="menu-photo__preview"
-                src={photoUrl(form.photoId, 160)}
-                alt={t('menuEditor.item.photoAlt', { name: form.name })}
-                width={96}
-                height={96}
-              />
-            )}
-            <div className="menu-photo__actions">
-              <span className="menu-photo__label">{t('menuEditor.item.photo')}</span>
-              <span className="menu-photo__hint">{t('menuEditor.item.photoHint')}</span>
-              <input
-                ref={fileInput}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="menu-photo__input"
-                aria-label={t('menuEditor.item.uploadPhoto')}
-                onChange={(event) => {
-                  void upload(event.target.files?.[0]);
-                }}
-              />
-              <div className="staff-row__actions">
-                <Button
-                  variant="secondary"
-                  loading={uploading}
-                  onClick={() => {
-                    fileInput.current?.click();
-                  }}
-                >
-                  {form.photoId === null
-                    ? t('menuEditor.item.uploadPhoto')
-                    : t('menuEditor.item.replacePhoto')}
-                </Button>
-                {form.photoId === null ? null : (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      set('photoId', null);
-                    }}
-                  >
-                    {t('menuEditor.item.removePhoto')}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
+          <PhotoPicker
+            photoId={form.photoId}
+            onChange={(photoId) => {
+              set('photoId', photoId);
+            }}
+            onUploading={setUploading}
+            onError={setError}
+            label={t('menuEditor.item.photo')}
+            hint={t('menuEditor.item.photoHint')}
+            alt={t('menuEditor.item.photoAlt', { name: form.name })}
+            uploadLabel={t('menuEditor.item.uploadPhoto')}
+            replaceLabel={t('menuEditor.item.replacePhoto')}
+            removeLabel={t('menuEditor.item.removePhoto')}
+            tooLarge={t('menuEditor.item.photoTooLarge')}
+          />
           <ChoiceGroup
             legend={t('menuEditor.item.foodType')}
             mode="single"
