@@ -155,6 +155,19 @@ describe.skipIf(!ENABLED)('[RPT-018] twelve months at design capacity', () => {
     120_000,
   );
 
+  it('pages through the year’s invoice register within five seconds a page', async () => {
+    const started = performance.now();
+    const response = await request(httpServer(app))
+      .get('/api/v1/reports/invoice-register')
+      .query({ from: firstDay, to: LAST_DAY, offset: 300_000, limit: 1_000 })
+      .set(authHeaders(kit.deviceId, manager.accessToken));
+    const elapsed = Math.round(performance.now() - started);
+    timings['invoice-register page'] = elapsed;
+    expect(response.status).toBe(200);
+    expect((response.body as { total: number }).total).toBe(DAYS * ORDERS_A_DAY);
+    expect(elapsed).toBeLessThanOrEqual(BUDGET_MS);
+  }, 120_000);
+
   it('exports the year’s sales as CSV within five seconds', async () => {
     const started = performance.now();
     const response = await request(httpServer(app))

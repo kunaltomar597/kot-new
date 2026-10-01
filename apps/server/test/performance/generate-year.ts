@@ -153,10 +153,12 @@ export async function generateYear(
       'invoice_lines',
       `INSERT INTO invoice_lines (id, restaurant_id, invoice_id, order_item_id, description,
                                   quantity, unit_price, line_total, discount, taxable_value,
-                                  tax_group_id, sac_code, version)
+                                  tax_group_id, sac_code, item_id, tax_share, version)
        SELECT ${id("'l:' || oi.id")}, ${R}, ${id("'v:' || oi.order_id")}, oi.id, oi.name,
               oi.quantity, oi.unit_price, oi.line_total, x.discount, oi.line_total - x.discount,
-              oi.tax_group_id, '996331', 1
+              oi.tax_group_id, '996331', oi.item_id,
+              -- Each line's tax is exactly 5 % of its taxable value here, so that is its share.
+              (oi.line_total - x.discount) / 20, 1
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        CROSS JOIN LATERAL (SELECT CASE WHEN o.order_number % 20 = 0 THEN oi.line_total / 10

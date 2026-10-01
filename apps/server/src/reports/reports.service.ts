@@ -103,10 +103,9 @@ export class ReportsService {
   }
 
   /**
-   * RPT-002: item-wise and category-wise sales, summed in PostgreSQL. Each tax group's tax is
-   * spread over the invoice's lines by taxable value with the largest-remainder method of
-   * `@rp/domain` `allocate` (ties to the lower line id), so an invoice's lines add up to its tax.
-   * A dish split into equal parts appears on every part at its full quantity: it counts once.
+   * RPT-002: item-wise and category-wise sales, summed in PostgreSQL from each line's dish and
+   * tax share as issued (P4-05c), so a year at design capacity stays within RPT-018. A dish split
+   * into equal parts appears on every part at its full quantity: it counts once.
    */
   async items(restaurantId: string, range: ReportRangeQuery): Promise<ItemSalesResponse> {
     const rows = await this.prisma.$queryRaw<
@@ -122,54 +121,34 @@ export class ReportsService {
         tax: bigint;
       }[]
     >`
-      WITH live AS (
+      WITH live AS NOT MATERIALIZED (
         SELECT id, version FROM invoices
         WHERE restaurant_id = ${restaurantId}::uuid AND status <> 'VOIDED'
           AND business_date BETWEEN ${range.from}::date AND ${range.to}::date
-      ), lines AS (
-        SELECT il.id, il.invoice_id, il.tax_group_id, il.taxable_value, il.line_total,
-               il.discount, il.quantity, il.order_item_id
+      ), lines AS MATERIALIZED (
+        SELECT il.item_id, il.order_item_id, il.quantity, il.line_total, il.discount,
+               il.taxable_value, il.tax_share
         FROM invoice_lines il JOIN live l ON l.id = il.invoice_id AND il.version = l.version
         WHERE il.order_item_id IS NOT NULL
-      ), tax AS (
-        SELECT tl.invoice_id, tl.tax_group_id, sum(tl.amount) AS tax
-        FROM tax_lines tl JOIN live l ON l.id = tl.invoice_id AND tl.version = l.version
-        GROUP BY 1, 2
-      ), split AS (
-        SELECT ln.id, t.tax,
-               sum(ln.taxable_value) OVER g AS weight,
-               t.tax::bigint * ln.taxable_value AS product,
-               ln.invoice_id, ln.tax_group_id
-        FROM lines ln
-        JOIN tax t ON t.invoice_id = ln.invoice_id AND t.tax_group_id = ln.tax_group_id
-        WINDOW g AS (PARTITION BY ln.invoice_id, ln.tax_group_id)
-      ), base AS (
-        SELECT id, invoice_id, tax_group_id, tax,
-               CASE WHEN weight = 0 THEN 0 ELSE product / weight END AS share,
-               CASE WHEN weight = 0 THEN 0 ELSE product % weight END AS remainder
-        FROM split
-      ), shares AS (
-        SELECT id,
-               share + CASE WHEN remainder > 0 AND row_number() OVER (
-                   PARTITION BY invoice_id, tax_group_id ORDER BY remainder DESC, id
-                 ) <= tax - sum(share) OVER (PARTITION BY invoice_id, tax_group_id)
-               THEN 1 ELSE 0 END AS line_tax
-        FROM base
-      ), per_line AS (
-        SELECT ln.order_item_id, sum(ln.quantity) AS billed, sum(ln.line_total) AS gross,
-               sum(ln.discount) AS discounts, sum(ln.taxable_value) AS net,
-               coalesce(sum(sh.line_tax), 0) AS tax
-        FROM lines ln LEFT JOIN shares sh ON sh.id = ln.id
+      ), money AS (
+        SELECT item_id, sum(quantity) AS quantity, sum(line_total) AS gross,
+               sum(discount) AS discounts, sum(taxable_value) AS net,
+               coalesce(sum(tax_share), 0) AS tax
+        FROM lines GROUP BY 1
+      ), repeats AS (
+        SELECT r.item_id, sum(r.billed - least(oi.quantity, r.billed)) AS excess
+        FROM (
+          SELECT order_item_id, item_id, sum(quantity) AS billed
+          FROM lines GROUP BY 1, 2 HAVING count(*) > 1
+        ) r JOIN order_items oi ON oi.id = r.order_item_id
         GROUP BY 1
       )
       SELECT it.id AS item_id, it.name, c.id AS category_id, c.name AS category,
-             sum(least(oi.quantity, pl.billed)) AS quantity, sum(pl.gross) AS gross,
-             sum(pl.discounts) AS discounts, sum(pl.net) AS net, sum(pl.tax) AS tax
-      FROM per_line pl
-      JOIN order_items oi ON oi.id = pl.order_item_id
-      JOIN items it ON it.id = oi.item_id
+             m.quantity - coalesce(r.excess, 0) AS quantity, m.gross, m.discounts, m.net, m.tax
+      FROM money m
+      JOIN items it ON it.id = m.item_id
       JOIN categories c ON c.id = it.category_id
-      GROUP BY 1, 2, 3, 4`;
+      LEFT JOIN repeats r ON r.item_id = m.item_id`;
     type Figures = ItemSalesResponse['items'][number];
     const items: Figures[] = rows.map((row) => ({
       itemId: row.item_id,
@@ -377,25 +356,34 @@ export class ReportsService {
     };
   }
 
-  /** RPT-006: every invoice number of the invoice-date range in sequence, voided ones included. */
-  async register(restaurantId: string, range: ReportRangeQuery): Promise<InvoiceRegisterResponse> {
-    const rows = await this.prisma.$queryRaw<
-      {
-        id: string;
-        invoice_number: string;
-        invoice_date: Date;
-        business_date: Date;
-        series: string;
-        status: 'ISSUED' | 'SETTLED' | 'VOIDED';
-        customer_name: string | null;
-        customer_gstin: string | null;
-        tax_total: number;
-        round_off: number;
-        grand_total: number;
-        void_reason: string | null;
-        replaces: string | null;
-      }[]
-    >`
+  /**
+   * RPT-006: every invoice number of the invoice-date range in sequence, voided ones included, a
+   * page at a time; the CSV export takes the whole range (no `page`).
+   */
+  async register(
+    restaurantId: string,
+    range: ReportRangeQuery,
+    page?: { readonly offset: number; readonly limit: number },
+  ): Promise<InvoiceRegisterResponse> {
+    const offset = page?.offset ?? 0;
+    const [rows, counted] = await Promise.all([
+      this.prisma.$queryRaw<
+        {
+          id: string;
+          invoice_number: string;
+          invoice_date: Date;
+          business_date: Date;
+          series: string;
+          status: 'ISSUED' | 'SETTLED' | 'VOIDED';
+          customer_name: string | null;
+          customer_gstin: string | null;
+          tax_total: number;
+          round_off: number;
+          grand_total: number;
+          void_reason: string | null;
+          replaces: string | null;
+        }[]
+      >`
       SELECT i.id, i.invoice_number, i.invoice_date, i.business_date, s.name AS series,
              i.status::text AS status, i.customer_name, i.customer_gstin, i.tax_total,
              i.round_off, i.grand_total, i.void_reason, r.invoice_number AS replaces
@@ -404,9 +392,22 @@ export class ReportsService {
       LEFT JOIN invoices r ON r.id = i.replaces_invoice_id
       WHERE i.restaurant_id = ${restaurantId}::uuid
         AND i.invoice_date BETWEEN ${range.from}::date AND ${range.to}::date
-      ORDER BY s.name, i.financial_year, i.sequence`;
+      ORDER BY s.name, i.financial_year, i.sequence
+      OFFSET ${offset} LIMIT ${page?.limit ?? null}`,
+      this.prisma.$queryRaw<{ total: bigint; voided: bigint }[]>`
+        SELECT count(*) AS total, count(*) FILTER (WHERE status = 'VOIDED') AS voided
+        FROM invoices
+        WHERE restaurant_id = ${restaurantId}::uuid
+          AND invoice_date BETWEEN ${range.from}::date AND ${range.to}::date`,
+    ]);
+    const total = Number(counted[0]?.total ?? 0);
     return {
-      ...range,
+      from: range.from,
+      to: range.to,
+      total,
+      voided: Number(counted[0]?.voided ?? 0),
+      offset,
+      nextOffset: offset + rows.length < total && page !== undefined ? offset + rows.length : null,
       invoices: rows.map((row) => ({
         invoiceId: row.id,
         invoiceNumber: row.invoice_number,

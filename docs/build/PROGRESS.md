@@ -167,8 +167,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-05c Twelve months at design capacity, then P4-05d the Reports area (P4-05 is split in four,
-  see phase-4.md).
+- P4-05d the Reports area in the console (the last part of P4-05, see phase-4.md).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
@@ -279,7 +278,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-04 Alert centre and system screen
 - [x] P4-05a Report data I: sources, staff, discounts, cancellations, reprints
 - [x] P4-05b Report data II: kitchen, tables, recommendations
-- [ ] P4-05c Twelve months at design capacity (RPT-018)
+- [x] P4-05c Twelve months at design capacity (RPT-018)
 - [ ] P4-05d Reports area in the console with charts and drill-down
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
@@ -564,6 +563,27 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-05c):
+
+264. RPT-018 is checked by an opt-in test (`RP_PERF=1 pnpm --filter @rp/server test:perf`) on a
+     generated year at §7.2 capacity: 730,000 orders, 2.9 million order and invoice lines, 1.5
+     million audit entries and alerts, 2 million suggestion events. Every report must answer for
+     the whole year within 5 s through HTTP. It is not part of `pnpm check`: the year takes about
+     four minutes to generate. `RP_PERF_HOLD=<file>` keeps the year open for tuning queries.
+265. The P1-13 reports now sum in PostgreSQL like the P4-05 ones; the shift report reads the cash
+     of all its shifts in three queries, with payments indexed by shift.
+266. Each invoice line keeps its dish (`item_id`) and its share of its tax group's tax
+     (`tax_share`), set when issued with `@rp/domain` `lineTaxShares` (also on split parts) and
+     filled for existing lines by the migration the same way. The item-wise report adds them up:
+     2.5 s for a year instead of 16 s spreading every invoice's tax again. The figures are the
+     same to the paisa (checked over the generated year).
+267. The invoice register API returns a page (500 by default, at most 1,000) with the total and
+     the next offset; a year is over 200 MB as one answer. The CSV export still takes the whole
+     range in one file; P4-06 makes long exports a download.
+268. Suggestion counts come from the events alone and only ordered events join their lines:
+     joining every event on its mostly empty line column made one hash bucket of nulls (156 s).
+     The kitchen report reads the year once by dish and station, with combos left out by id.
 
 Decided 2026-10-01 (P4-05b):
 
@@ -1351,6 +1371,40 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-05c Twelve months at design capacity (RPT-018)
+
+Built: `apps/server/test/performance/` with `generate-year.ts` (set-based SQL, deterministic ids
+and figures) and `reports.perf.test.ts` (project `performance`, script `test:perf`, opt-in with
+`RP_PERF=1`, sizes from `RP_PERF_DAYS` and `RP_PERF_ORDERS`, `RP_PERF_HOLD` to tune against the
+year); the P1-13 sales, items, GST, register and shift reports in SQL; migrations
+`20261001130000_report_performance` (payments by shift) and `20261001140000_invoice_line_shares`
+(dish and tax share per invoice line, with the backfill); `billing/line-shares.ts` used when an
+invoice or a split part is issued; the register paged (`InvoiceRegisterQuery`).
+
+Timings for the whole generated year (730,000 orders), through HTTP on this Mac:
+sales 0.26 s, items 2.5 s (16 s before), payments 0.04 s, shifts 0.01 s, GST 3.8 s, invoice
+register page 0.1 to 0.3 s, sources 2.4 s, staff 1.9 s, discounts 0.2 s, cancellations 0.3 s,
+reprints 0.3 s, kitchen 0.7 s (6 s before), tables 0.7 s, suggestions 0.5 s (over 120 s before),
+sales export 0.3 s, order drill-down 0.03 s. Generating the year takes about 3.5 minutes. GST and
+sources are the closest to the limit; if a restaurant runs above §7.2 they are the next to move
+to stored figures.
+
+Tests: `reports.int.test.ts` 2 new (register pages, each line's dish and tax share adding up to
+the invoice), the earlier report tests unchanged with the SQL versions.
+
+Gotchas:
+
+- Bulk-filled tables need `ANALYZE` before the next statement, or the planner plans for the empty
+  template and one insert takes forever.
+- A materialised CTE has no column statistics: joining it on a second column (`version`) was
+  estimated 200 times too selective and turned into a 2.9-million-step nested loop. Mark such
+  CTEs `NOT MATERIALIZED`.
+- A hash join on a column that is mostly NULL puts every NULL in one bucket; join only the rows
+  that have a value.
+- Zod 4 `z.uuid()` checks the version and variant, so `md5(...)::uuid` ids are refused by the
+  API; the generator makes them version 4.
+- macOS has no `timeout`; `perl -e 'alarm N; exec @ARGV' …` stops a hung command.
 
 ### 2026-10-01: P4-05b Report data II
 
