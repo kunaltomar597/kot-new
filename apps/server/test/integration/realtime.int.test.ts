@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { REALTIME_CONNECT_ERRORS, type DomainEvent } from '@rp/contracts';
+import { DeviceListResponse, REALTIME_CONNECT_ERRORS, type DomainEvent } from '@rp/contracts';
 import { businessDateOf } from '@rp/domain';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -173,6 +173,27 @@ describe('[AUTH-007] [SEC-003] who may connect', () => {
       head: bus.head,
       replayed: 0,
       fullRefresh: true,
+    });
+  });
+});
+
+describe('[MGR-006] the device list says which apps are connected', () => {
+  it('shows a device as connected while it has a live connection, and not after', async () => {
+    const screen = await addDevice(app, kit, 'KDS', { stationId: stationA });
+    const manager = await signIn(app, kit, 'MANAGER');
+    const connectedNow = async () => {
+      const response = await request(httpServer(app))
+        .get('/api/v1/devices')
+        .set(authHeaders(kit.deviceId, manager.accessToken));
+      return DeviceListResponse.parse(response.body).devices.find((device) => device.id === screen)
+        ?.connected;
+    };
+    expect(await connectedNow()).toBe(false);
+    const client = await connect(auth(screen));
+    expect(await connectedNow()).toBe(true);
+    client.close();
+    await vi.waitFor(async () => {
+      expect(await connectedNow()).toBe(false);
     });
   });
 });

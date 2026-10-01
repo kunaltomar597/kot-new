@@ -59,6 +59,50 @@ describe('database access', () => {
   });
 });
 
+describe('[NFR-O04] instants stay right whatever the database time zone', () => {
+  let database: TestDatabase;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    // A cluster set up on a PC in India defaults to India time, as the installer's would.
+    const client = new pg.Client({ connectionString: database.url });
+    await client.connect();
+    try {
+      const name = new URL(database.url).pathname.slice(1);
+      await client.query(`ALTER DATABASE "${name}" SET timezone TO 'Asia/Kolkata'`);
+    } finally {
+      await client.end();
+    }
+  });
+
+  afterAll(async () => {
+    await database.drop();
+  });
+
+  it('reads a time PostgreSQL wrote with now() as the same instant the server sees', async () => {
+    const prisma = new PrismaService(testConfig({ databaseUrl: database.url }));
+    try {
+      const restaurant = await prisma.restaurant.create({ data: { displayName: 'Test Dhaba' } });
+      // Written by the database itself, like a report filter or a test backdating a dish.
+      await prisma.$executeRaw`UPDATE restaurants SET updated_at = now() - interval '30 minutes' WHERE id = ${restaurant.id}::uuid`;
+      const read = await prisma.restaurant.findUniqueOrThrow({ where: { id: restaurant.id } });
+      const minutesAgo = (Date.now() - read.updatedAt.getTime()) / 60_000;
+      expect(minutesAgo).toBeGreaterThan(29);
+      expect(minutesAgo).toBeLessThan(31);
+
+      // And a time the server writes is the instant PostgreSQL holds.
+      const at = new Date('2026-10-01T10:00:00.000Z');
+      await prisma.restaurant.update({ where: { id: restaurant.id }, data: { updatedAt: at } });
+      const [row] = await prisma.$queryRaw<
+        { epoch: number }[]
+      >`SELECT extract(epoch FROM updated_at)::float8 AS epoch FROM restaurants WHERE id = ${restaurant.id}::uuid`;
+      expect(row?.epoch).toBe(at.getTime() / 1000);
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+});
+
 describe('migrations match the Prisma schema', () => {
   let shadowUrl: string;
   const shadowName = `rp_shadow_${String(process.pid)}_${Date.now().toString(36)}`;

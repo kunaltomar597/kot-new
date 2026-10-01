@@ -1244,3 +1244,66 @@ body {
     padding: var(--rp-space-3) var(--rp-space-4);
   }
 }
+
+/* Devices (P4-02c, MGR-006): one group per type, unpaired ones folded away. */
+.device-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+}
+
+.device-group__heading {
+  margin: 0;
+  font-size: var(--rp-font-size-md);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.device-group--unpaired summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--rp-touch-min);
+  cursor: pointer;
+}
+
+.device-group--unpaired summary:focus-visible {
+  outline: 3px solid var(--rp-color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The pairing code: the QR code beside the code and addresses, stacked on a phone. */
+.device-pairing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--rp-space-4);
+}
+
+.device-pairing .pager-credential {
+  flex: 1 1 14rem;
+}
+
+.device-pairing__code {
+  display: block;
+  font-size: var(--rp-font-size-2xl);
+  letter-spacing: 0.08em;
+}
+
+.device-pairing__expiry,
+.device-pairing__hint {
+  display: block;
+  color: var(--rp-color-text-muted);
+  font-size: var(--rp-font-size-sm);
+}
+
+.device-pairing__urls {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.device-pairing__fingerprint {
+  display: block;
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-sm);
+  overflow-wrap: anywhere;
+}

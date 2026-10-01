@@ -28,11 +28,14 @@ export function deviceTokenMessage(deviceId: string, challenge: string): string 
   return `rp-device-token:v1:${deviceId}:${challenge}`;
 }
 
+/** A device's name is what staff call it, like "Kitchen screen 2" (MGR-006). */
+export const DeviceName = z.string().trim().min(1).max(60);
+
 /** A manager prepares the pairing of one device (AUTH-007). */
 export const CreatePairingCodeRequest = z
   .strictObject({
     type: DeviceType,
-    name: z.string().trim().min(1).max(60),
+    name: DeviceName,
     /** Required for table tablets: the one table the tablet serves (AUTH-009). */
     tableId: Id.optional(),
     /** For kitchen screens: the station whose tickets it shows (KDS-002). */
@@ -159,8 +162,31 @@ export const DeviceSummary = z.object({
 });
 export type DeviceSummary = z.infer<typeof DeviceSummary>;
 
-export const DeviceListResponse = z.object({ devices: z.array(DeviceSummary) });
+/**
+ * A device as the manager's device list shows it (MGR-006): its summary plus whether it is
+ * connected now, what it last reported and when it was unpaired.
+ */
+export const DeviceView = DeviceSummary.extend({
+  /**
+   * Connected now: an app with a live connection to the server, a pager heard from within its
+   * last three heartbeats (PGR-007).
+   */
+  connected: z.boolean(),
+  /** Last reported battery (pagers now; tablets and phones from P3-01, TAB-015). */
+  batteryPercent: z.number().int().min(0).max(100).nullable(),
+  /** Pager firmware version (PGR-007). */
+  firmwareVersion: z.string().nullable(),
+  /** Serial on a pager's label (PGR-012). */
+  serial: z.string().nullable(),
+  revokedAt: Timestamp.nullable(),
+});
+export type DeviceView = z.infer<typeof DeviceView>;
+
+export const DeviceListResponse = z.object({ devices: z.array(DeviceView) });
 export type DeviceListResponse = z.infer<typeof DeviceListResponse>;
+
+export const RenameDeviceRequest = z.strictObject({ name: DeviceName });
+export type RenameDeviceRequest = z.infer<typeof RenameDeviceRequest>;
 
 export const RevokeDeviceRequest = z.strictObject({ reason: z.string().trim().min(3).max(200) });
 export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;

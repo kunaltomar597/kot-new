@@ -7,13 +7,16 @@ import { CredentialHasher } from '../auth/credential-hasher.js';
 import { FileSecretStore } from '../auth/secret-store.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { seedDevelopmentData } from './dev-seed.js';
+import { UTC_SESSION } from './utc-session.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl === undefined) {
   process.stderr.write('Set DATABASE_URL to the development database.\n');
   process.exit(1);
 }
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: databaseUrl, options: UTC_SESSION }),
+});
 try {
   const hasher = new CredentialHasher(
     new FileSecretStore(join(process.env.RP_DATA_DIR ?? './.data', 'secrets')),

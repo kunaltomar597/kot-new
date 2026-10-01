@@ -750,6 +750,93 @@ test.describe.serial('the web console', () => {
     await expectAccessible(page);
   });
 
+  test('[MGR-006] [AUTH-007] [AUTH-008] a manager pairs a kitchen screen, renames it and unpairs it', async ({
+    browser,
+  }) => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.devices') })
+      .click();
+    await expect(page.getByRole('heading', { level: 2, name: t('devices.title') })).toBeVisible();
+
+    await page.getByRole('button', { name: t('devices.pair') }).click();
+    const form = page.getByRole('dialog', { name: t('devices.pairForm.title') });
+    await form.getByLabel(t('devices.pairForm.type')).selectOption('KDS');
+    await form
+      .getByLabel(t('devices.pairForm.name'), { exact: false })
+      .first()
+      .fill('Grill screen');
+    await form.getByRole('button', { name: t('devices.pairForm.create') }).click();
+    const shown = page.getByRole('dialog', {
+      name: t('devices.codeDialog.title', { name: 'Grill screen' }),
+    });
+    await expect(
+      shown.getByRole('img', { name: t('devices.codeDialog.qrLabel', { name: 'Grill screen' }) }),
+    ).toBeVisible();
+    await expectAccessible(page);
+    const code = (await shown.locator('.device-pairing__code').textContent()) ?? '';
+    expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+
+    // A new browser (its own device key) pairs with the code and opens the kitchen display.
+    const kitchen = await browser.newContext();
+    const screenPage = await kitchen.newPage();
+    await screenPage.goto(server.url);
+    await expect(screenPage).toHaveURL(/\/pair$/);
+    await screenPage.getByLabel(t('pairing.codeLabel')).fill(code);
+    await screenPage.getByRole('button', { name: t('pairing.submit') }).click();
+    await expect(screenPage).toHaveURL(/\/kds$/);
+
+    await shown.getByRole('button', { name: t('devices.codeDialog.done') }).click();
+    // Connections are read again every half minute; a reload shows the new one at once.
+    await page.reload();
+    const row = page.locator('li', {
+      has: page.getByRole('heading', { level: 4, name: 'Grill screen' }),
+    });
+    await expect(row.getByText(t('devices.allStations'))).toBeVisible();
+    await expect(row.getByText(t('devices.connected'))).toBeVisible();
+
+    const actions = page.getByRole('group', {
+      name: t('devices.actionsFor', { name: 'Grill screen' }),
+    });
+    await actions.getByRole('button', { name: t('devices.rename') }).click();
+    const rename = page.getByRole('dialog', {
+      name: t('devices.renameDialog.title', { name: 'Grill screen' }),
+    });
+    await rename.getByLabel(t('devices.renameDialog.name'), { exact: false }).fill('Grill pass');
+    await rename.getByRole('button', { name: t('devices.renameDialog.save') }).click();
+    await expect(page.getByText(t('devices.renamed', { name: 'Grill pass' }))).toBeVisible();
+
+    // A 360 px phone: the Devices page fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(page.getByRole('heading', { level: 4, name: 'Grill pass' })).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await expectAccessible(page);
+
+    await page
+      .getByRole('group', { name: t('devices.actionsFor', { name: 'Grill pass' }) })
+      .getByRole('button', { name: t('devices.unpair') })
+      .click();
+    const unpair = page.getByRole('dialog', {
+      name: t('devices.unpairDialog.title', { name: 'Grill pass' }),
+    });
+    await unpair
+      .getByLabel(t('devices.unpairDialog.reason'), { exact: false })
+      .fill('Screen moved');
+    await unpair.getByRole('button', { name: t('devices.unpairDialog.confirm') }).click();
+    await expect(page.getByText(t('devices.unpaired', { name: 'Grill pass' }))).toBeVisible();
+    const unpaired = Date.now();
+
+    // The kitchen screen stops at once and asks to be paired again (AUTH-008).
+    await expect(screenPage.getByText(t('pairing.revoked'))).toBeVisible({ timeout: 5_000 });
+    expect(Date.now() - unpaired).toBeLessThan(5_000);
+    await kitchen.close();
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
