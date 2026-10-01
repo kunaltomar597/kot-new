@@ -4,6 +4,7 @@ import * as prettier from 'prettier';
 import { describe, expect, it } from 'vitest';
 import * as controlPlane from '../src/control-plane/index.js';
 import * as contracts from '../src/index.js';
+import * as relay from '../src/relay/index.js';
 import { collectSchemas, toStandaloneJsonSchema } from '../scripts/lib/schema-catalog.js';
 
 /**
@@ -22,9 +23,15 @@ const controlPlaneSchemas = new Map(
   [...collectSchemas(controlPlane)].filter(([, schema]) => !shared.has(schema)),
 );
 
+/** QR relay schemas (ADR-0015), without the shared ones it re-exports. */
+const relaySchemas = new Map(
+  [...collectSchemas(relay)].filter(([, schema]) => !shared.has(schema)),
+);
+
 const SETS = [
   { label: 'local', dir: SNAPSHOT_DIR, schemas },
   { label: 'control-plane', dir: `${SNAPSHOT_DIR}control-plane/`, schemas: controlPlaneSchemas },
+  { label: 'relay', dir: `${SNAPSHOT_DIR}relay/`, schemas: relaySchemas },
 ] as const;
 
 describe('[INT-002] [UPD-006] contract schema snapshots', () => {

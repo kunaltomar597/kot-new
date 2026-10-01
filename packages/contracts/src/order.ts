@@ -71,6 +71,7 @@ export const RejectedLine = z.object({
   ]),
   message: z.string(),
 });
+export type RejectedLine = z.infer<typeof RejectedLine>;
 
 export const SubmitOrderResponse = z.discriminatedUnion('status', [
   z.object({

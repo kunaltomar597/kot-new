@@ -5,13 +5,13 @@ import type {
   RecommendationsResponse,
 } from '@rp/contracts';
 import { daypartAt, type RecoChannel, type RecoItem, recommend, timeOfDayOf } from '@rp/domain';
+import { comboOnNow } from '@rp/ordering';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
-import { comboOnNow } from '../menu/menu-content.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { BestSellers } from './best-sellers.js';

@@ -28,6 +28,23 @@ servers (every 30 s) and read-only switch when absent for 2 minutes; contract sc
 Acceptance: function tests for every validation and rate limit; replayed submissions return the
 original order.
 
+Split in two (2026-10-02):
+
+- **P5-02a Diners' functions.**
+  - `qr-menu` (the latest menu, read-only when the restaurant is absent), `submit-order` and
+    `order-status`;
+  - the expiry job and the rate limits in SQL;
+  - `@rp/contracts/relay` with its OpenAPI document;
+  - the local server's line check moved to `@rp/ordering`, so the relay runs the same one;
+  - the bundling for Deno, with a Deno smoke test.
+- **P5-02b Local servers' functions.**
+  - `server-session`: a credential exchanged for a short-lived Realtime JWT;
+  - presence, and the QR settings, every 30 s;
+  - publishing the menu document and photo metadata, and keeping the tables (token hashes) in
+    step;
+  - picking up new orders (polling fallback) and reporting their status;
+  - all checked against the contracts, acting as `relay_writer`.
+
 ## P5-03 Sync agent in the local server
 
 Requirements: QR-003, QR-009, QR-010, MENU-006 (≤ 30 s to QR), MENU-008 (photo mirror), NFR-P05,

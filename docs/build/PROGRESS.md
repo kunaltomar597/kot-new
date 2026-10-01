@@ -132,6 +132,9 @@ What exists:
   - the order rules as triggers, and hourly retention;
   - Supabase CLI config, and 75 tests (cross-tenant isolation, roles and grants, tokens, order
     rules, retention) on PostgreSQL, also run against local Supabase in CI.
+  - The diners' edge functions (P5-02a): `qr-menu`, `submit-order` (the restaurant's own line
+    check, rate limits per table and per browser, idempotent) and `order-status`. They are
+    bundled for Deno and smoke-tested there; the expiry job runs every minute. 106 tests in all.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
@@ -178,8 +181,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-02 Relay edge functions (submit order, status, expiry, presence, server session), then P5-03
-  to P5-06.
+- P5-02b Relay functions for local servers (session, presence, publishing, pickup), then P5-03 to
+  P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -302,7 +305,8 @@ Recommended next WPs (dependencies met):
 ### Phase 5: QR menu and cloud relay
 
 - [x] P5-01 Relay database, RLS, isolation tests (deploying to Supabase: manual task 20)
-- [ ] P5-02 Relay edge functions
+- [x] P5-02a Relay functions for diners (menu, submit order, order status, expiry)
+- [ ] P5-02b Relay functions for local servers (session, presence, publishing, pickup)
 - [ ] P5-03 Sync agent
 - [ ] P5-04 QR tokens and table tents
 - [ ] P5-05 Next.js QR menu site
@@ -579,6 +583,46 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-02a), design in ADR-0015:
+
+328. P5-02 is built in two parts: a, the diners' functions; b, the local servers' functions.
+329. The diners' functions are `qr-menu`, `submit-order` and `order-status`.
+     - The table's QR token travels in the `x-rp-table-token` header, so it stays out of URLs and
+       logs. The browser's anonymous random id travels in `x-rp-browser`.
+     - Every answer is `no-store`. CORS allows only the QR site's origins
+       (`RELAY_ALLOWED_ORIGINS`). The platform's JWT check is off for these functions.
+     - Unexpected failures are logged with their name, code and message, never a database
+       error's detail, which can hold the row's values.
+330. A submission answers 200, like the local API:
+     - ACCEPTED, for a new order or a replay of the same key at the same table (`replayed`,
+       ORD-013);
+     - or REJECTED, with every line the latest menu cannot serve and the version it was checked
+       against; nothing is stored then.
+       The check is the restaurant's own (`@rp/ordering` `resolveOrderLine`, channel QR), against the
+       latest publication.
+       Other answers:
+     - a key already used at another table: 409 `IDEMPOTENCY_KEY_REUSED`;
+     - the restaurant absent (QR-008): 503 `RESTAURANT_OFFLINE`;
+     - no menu yet: 503 `MENU_NOT_PUBLISHED`.
+       The relay stores the lines as sent, without prices; the local server prices them when it
+       picks the order up (ORD-014).
+331. Rate limits (QR-006) count the orders stored in the window: per table, and per browser across
+     the restaurant's tables. Advisory locks per table, then per browser, stop a burst from slipping
+     past.
+     - Over the limit: 429 `RATE_LIMITED`, with `Retry-After` set to when the window frees up.
+     - Replays and refused submissions do not count.
+332. The QR menu document (`QrMenuDocument`) holds:
+     - the restaurant's name and accent colour;
+     - its time zone and the instruction limit;
+     - whether Call waiter / Request bill is offered;
+     - the menu snapshot for the QR channel, with live availability;
+     - the photos, each in up to six sizes.
+       Recommendations will be added as an optional field with P5-03.
+333. The expiry job runs every minute (pg_cron). An order past its pickup time reads EXPIRED to its
+     diner at once.
+334. Packaging: the edge functions are Node-tested TypeScript, bundled by esbuild for Deno, as set
+     out in ADR-0015. Bundles are about 500 kB minified, mostly zod. Supabase allows 20 MB.
 
 Decided 2026-10-02 (P5-01), design in ADR-0015:
 
@@ -1721,6 +1765,57 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-02a Relay functions for diners
+
+Built:
+
+- `@rp/ordering` `resolveOrderLine`, `comboOnNow` and `rejectLine`: the local server's line check
+  and pricing, moved out of `OrdersService` and the menu module, which now call them. The QR relay
+  runs the same check.
+- `@rp/contracts/relay` (a new entry point):
+  - the headers, `TableToken`, `BrowserId`;
+  - `QrMenuDocument` and `QrMenuResponse`;
+  - `QrSubmitOrderRequest` and `QrSubmitOrderResponse`;
+  - `QrOrderStatus`, `QrOrderStatusDetail` and `QrOrderView`;
+  - `RELAY_ROUTES`, documented in `docs/api/relay.openapi.json`;
+  - schema snapshots under `relay/`.
+- Migration `20261002150000_qr_order_limits`: `relay.rate_limit_wait` (for diners, from the claims,
+  under advisory locks) and `relay.expire_orders`, run every minute by pg_cron.
+- `infra/supabase/src`:
+  - `db.ts` (transactions, token resolution, acting as the diner);
+  - `http.ts` (errors, CORS, methods, body checks, failure log);
+  - `diner.ts`, `qr-menu.ts`, `submit-order.ts`, `order-status.ts`;
+  - `deno/serve.ts` on postgres.js, and the entries.
+- `scripts/bundle-functions.mjs` (esbuild), and `config.toml` functions with `verify_jwt = false`.
+- The CI `relay-supabase` job builds the bundles and installs Deno.
+- Manual task 20 deploys the functions.
+
+Tests:
+
+- ordering `line-check.test.ts` 8;
+- relay `diner-functions.test.ts` 26:
+  - the menu, read-only and tokens;
+  - submission, replay, a burst of one key, a key used at another table;
+  - a request with a price is refused; every refused line is reported; combos; the latest menu;
+    the restaurant offline;
+  - limits per table and per browser, a burst under the limit, a replay not counted;
+  - status, overdue reads EXPIRED, other tables and restaurants;
+  - a regenerated code; CORS and methods.
+- `expiry.test.ts` 3;
+- `deno-smoke.test.ts` 2: the real bundles under Deno 2.7 on a `relay_edge` login.
+- contracts docs 1 (and the generated document).
+- Server order tests unchanged and passing after the move (61 in the order files).
+
+Gotchas:
+
+- postgres.js reads a parameter's type from the statement and JSON-encodes a string again when it
+  is `jsonb`; node-postgres turns a JS array into a SQL array. Pass JSON as a string with
+  `::text::jsonb`. Only the Deno smoke test caught this.
+- zod's `z` namespace keeps every locale in a bundle; minified it is about 500 kB, which is fine
+  for Supabase.
+- Against a shared Supabase database (`RELAY_DATABASE_URL`) the test files run one at a time,
+  since expiry and retention act on every restaurant.
 
 ### 2026-10-02: P5-01 Relay database, RLS and isolation tests
 

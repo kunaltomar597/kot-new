@@ -2,7 +2,7 @@
 
 Status: Accepted
 Date: 2026-10-02
-Work package: P5-01 (used by P5-02 to P5-06, P7)
+Work package: P5-01, P5-02 (used by P5-03 to P5-06, P7)
 Requirements: SEC-005, QR-001, QR-006, QR-007, QR-008, QR-014, VCP-002, NFR-A01, BRD §9.3, §12
 
 ## Context
@@ -110,6 +110,24 @@ local server stays the system of record (AUD-004 applies there).
 `relay.tenant_settings` holds the QR settings the relay must enforce (`qr.*`, scope VENDOR). It
 uses the same defaults and limits as the local registry. The local server writes it through the
 sync agent (P5-03).
+
+### Edge functions are Node-tested TypeScript, bundled for Deno (P5-02)
+
+- Each function is a Fetch API handler (`Request` in, `Response` out) in `infra/supabase/src`,
+  with its database behind a two-method interface (one transaction, parameterised queries).
+- The functions share code with the rest of the platform instead of copying it:
+  - `@rp/contracts/relay` holds the request and response schemas.
+  - `@rp/ordering` `resolveOrderLine` is the local server's own line check.
+- Vitest runs the handlers on Node, on node-postgres, logged in as `relay_edge`.
+- esbuild bundles each entry into `dist/functions/<name>/index.js`. Only the Deno database driver
+  (`npm:postgres`) stays an import. `config.toml` points Supabase at the bundles.
+- A smoke test runs the real bundles under Deno where Deno is installed. That is how a
+  driver-only difference was found: JSON parameters must be cast `::text::jsonb`.
+- Diners' functions turn off the platform's JWT check (`verify_jwt = false`) and check the
+  table token themselves. Responses are `no-store`, and CORS allows only the QR site's origins.
+- Rate limits are counted in the database (`relay.rate_limit_wait`), under per-table and
+  per-browser advisory locks, so a burst cannot slip past them.
+- `relay.expire_orders` runs every minute. An overdue order reads EXPIRED at once in any case.
 
 ### Tested on plain PostgreSQL, and on Supabase in CI
 

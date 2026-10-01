@@ -154,13 +154,17 @@ jobs:
         with:
           version: latest
 
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Build the relay functions and what they use
+        run: pnpm turbo run build --filter=@rp/relay...
+
       - name: Start Supabase (database and Realtime) and apply the relay migrations
         run: supabase start --workdir infra -x studio,imgproxy,logflare,vector,supavisor,postgres-meta,edge-runtime
 
-      - name: Build the test helpers
-        run: pnpm turbo run build --filter=@rp/relay^...
-
-      - name: Relay tests against Supabase
+      - name: Relay tests against Supabase (the bundled functions run under Deno too)
         run: pnpm --filter @rp/relay test
         env:
           # A superuser on the local stack: the tests switch session authorization and roles.

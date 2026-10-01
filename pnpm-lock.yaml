@@ -244,6 +244,9 @@ importers:
       '@rp/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@rp/ordering':
+        specifier: workspace:*
+        version: link:../../packages/ordering
       aedes:
         specifier: ^1.2.0
         version: 1.2.0
@@ -540,10 +543,17 @@ importers:
         version: 1.3.0(@types/react@19.2.18)(react@19.2.3)
 
   infra/supabase:
-    devDependencies:
+    dependencies:
       '@rp/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@rp/ordering':
+        specifier: workspace:*
+        version: link:../../packages/ordering
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
       '@rp/test-postgres':
         specifier: workspace:*
         version: link:../../packages/test-postgres
@@ -553,6 +563,9 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       pg:
         specifier: ^8.23.0
         version: 8.23.0

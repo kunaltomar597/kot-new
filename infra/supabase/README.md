@@ -14,8 +14,17 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
   - Tokens and credentials are stored only as SHA-256 hashes.
   - The order rules are triggers.
   - Retention is `relay.purge()`, run hourly by pg_cron.
-- `functions/`: edge functions (P5-02).
+- `src/`: the edge functions, as Fetch API handlers tested on Node.
+  - `qr-menu`, `submit-order` and `order-status` are for diners' browsers (P5-02a).
+  - The local server's functions come with P5-02b.
+  - `src/entries/` holds the Supabase entries. `pnpm --filter @rp/relay build` bundles them with
+    esbuild into `dist/functions/<name>/index.js`, which `config.toml` names.
+  - The request and response schemas are in `@rp/contracts/relay`, documented in
+    `docs/api/relay.openapi.json`.
 - `test/`: Vitest suites, which run on a throwaway PostgreSQL 16.
+  - The function tests call each handler with a `Request`, on a connection logged in as
+    `relay_edge`.
+  - `deno-smoke.test.ts` runs the real bundles under Deno when `deno` is installed.
   - `test/setup/supabase-prelude.sql` stands in for Supabase's own roles and publication.
   - The tests act as each role the way PostgREST, Realtime and the edge functions do:
     `SET LOCAL ROLE` plus `request.jwt.claims`.
@@ -23,7 +32,8 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
     instead. The `relay-supabase` CI job does this.
 
 ```
-pnpm --filter @rp/relay test        # isolation (SEC-005, QR-014), roles, tokens, order rules, retention
+pnpm --filter @rp/relay build       # bundle the edge functions
+pnpm --filter @rp/relay test        # isolation, roles, tokens, order rules, retention, functions
 ```
 
 Adding a migration:

@@ -1,0 +1,10 @@
+{
+  "input": {
+    "type": "string",
+    "enum": ["SUBMITTED", "RECEIVED", "SENT_TO_KITCHEN", "REJECTED", "EXPIRED"]
+  },
+  "output": {
+    "type": "string",
+    "enum": ["SUBMITTED", "RECEIVED", "SENT_TO_KITCHEN", "REJECTED", "EXPIRED"]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "photoId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "sizes": {
+        "minItems": 1,
+        "maxItems": 6,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "width": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+            "height": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+            "path": { "type": "string", "minLength": 1, "maxLength": 300 }
+          },
+          "required": ["width", "height", "path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["photoId", "sizes"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "photoId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "sizes": {
+        "minItems": 1,
+        "maxItems": 6,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "width": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+            "height": { "type": "integer", "exclusiveMinimum": 0, "maximum": 4096 },
+            "path": { "type": "string", "minLength": 1, "maxLength": 300 }
+          },
+          "required": ["width", "height", "path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["photoId", "sizes"],
+    "additionalProperties": false
+  }
+}
