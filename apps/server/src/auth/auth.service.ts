@@ -15,7 +15,7 @@ import type {
   TotpConfirmResponse,
   TotpEnrollmentResponse,
 } from '@rp/contracts';
-import { canApproveOverride, decideStaffChange, grantFor, type Role } from '@rp/domain';
+import { actorGrant, canApproveOverride, decideStaffChange, type Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
@@ -30,7 +30,7 @@ import type { ConsumedOverride, Principal } from './principal.js';
 import { RateLimiter } from './rate-limiter.js';
 import { open, seal } from './secret-box.js';
 import { SECRET_STORE, type SecretStore } from './secret-store.js';
-import { SessionService, type SessionStaff } from './session.service.js';
+import { roleCapabilities, SessionService, type SessionStaff } from './session.service.js';
 import { randomToken, sha256Hex } from './tokens.js';
 import { base32Encode, generateTotpSecret, otpauthUri, verifyTotp } from './totp.js';
 
@@ -307,7 +307,10 @@ export class AuthService {
     device: AuthenticatedDevice,
     request: OverrideRequest,
   ): Promise<OverrideResponse> {
-    const grant = grantFor(principal.role, request.capability);
+    const grant = actorGrant(
+      { role: principal.role, extraCapabilities: principal.capabilities },
+      request.capability,
+    );
     if (grant === 'DENY') throw authErrors.forbidden();
     if (grant !== 'OVERRIDE') throw authErrors.overrideNotNeeded();
     const settings = await this.settings.get(principal.restaurantId);
@@ -598,7 +601,12 @@ export class AuthService {
     });
     return staff === null
       ? null
-      : { id: staff.id, displayName: staff.displayName, role: staff.role.baseRole };
+      : {
+          id: staff.id,
+          displayName: staff.displayName,
+          role: staff.role.baseRole,
+          capabilities: roleCapabilities(staff.role),
+        };
   }
 
   /** Reads a credential with a row lock, so concurrent attempts count one after another. */

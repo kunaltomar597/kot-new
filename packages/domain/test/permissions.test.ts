@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  actorGrant,
   CAPABILITIES,
   canApproveOverride,
+  checkCustomRole,
+  CUSTOM_ROLE_GRANTABLE,
   DEFAULT_PERMISSION_MATRIX,
   evaluatePermission,
+  extraCapabilitiesOf,
   grantFor,
   OWNER_SECOND_FACTOR_CAPABILITIES,
   ROLES,
@@ -83,5 +87,78 @@ describe('[AUTH-011] permission evaluation', () => {
     });
     expect(canApproveOverride('OWNER')).toBe(true);
     expect(canApproveOverride('WAITER')).toBe(false);
+  });
+});
+
+describe('[AUTH-012] custom roles', () => {
+  it('may add what a manager does, never managing staff or the Owner-only actions', () => {
+    expect(CUSTOM_ROLE_GRANTABLE).toContain('REPORTS_VIEW_EXPORT');
+    expect(CUSTOM_ROLE_GRANTABLE).toContain('DISCOUNT_ABOVE_LIMIT');
+    expect(CUSTOM_ROLE_GRANTABLE).toContain('MENU_MANAGE');
+    for (const never of [
+      'STAFF_MANAGE',
+      'TAX_AND_INVOICE_SETTINGS',
+      'DATA_ADMIN',
+      'LICENSE_MANAGE',
+    ]) {
+      expect(CUSTOM_ROLE_GRANTABLE).not.toContain(never);
+    }
+  });
+
+  it('adds grants on top of the base role, and nothing else', () => {
+    const captain = {
+      role: 'WAITER' as const,
+      extraCapabilities: ['ORDER_APPROVE_CUSTOMER' as const, 'DISCOUNT_WITHIN_LIMIT' as const],
+    };
+    expect(actorGrant(captain, 'ORDER_APPROVE_CUSTOMER')).toBe('ALLOW');
+    expect(actorGrant(captain, 'DISCOUNT_WITHIN_LIMIT')).toBe('ALLOW');
+    expect(actorGrant(captain, 'BILL_PRINT_AND_PAYMENT')).toBe('DENY');
+    expect(actorGrant({ role: 'WAITER' }, 'ORDER_APPROVE_CUSTOMER')).toBe('OWN');
+    // A stored capability that may not be granted is ignored.
+    expect(
+      actorGrant({ role: 'WAITER', extraCapabilities: ['STAFF_MANAGE'] }, 'STAFF_MANAGE'),
+    ).toBe('DENY');
+    expect(
+      evaluatePermission('CASHIER', 'ITEM_VOID_AFTER_PREP', {
+        extraCapabilities: ['ITEM_VOID_AFTER_PREP'],
+      }),
+    ).toEqual({ allowed: true, viaOverride: false });
+    expect(evaluatePermission('CASHIER', 'ITEM_VOID_AFTER_PREP')).toEqual({
+      allowed: false,
+      reason: 'NEEDS_OVERRIDE',
+    });
+  });
+
+  it('keeps only what really adds to the base role', () => {
+    expect(
+      extraCapabilitiesOf('WAITER', [
+        'REPORTS_VIEW_EXPORT',
+        'ORDER_CREATE',
+        'STAFF_MANAGE',
+        'NOT_A_CAPABILITY',
+        'REPORTS_VIEW_EXPORT',
+        'ORDER_APPROVE_CUSTOMER',
+      ]),
+    ).toEqual(['ORDER_APPROVE_CUSTOMER', 'REPORTS_VIEW_EXPORT']);
+  });
+
+  it('checks the name, base role and capabilities', () => {
+    const draft = {
+      name: 'Senior captain',
+      baseRole: 'WAITER' as const,
+      capabilities: ['DISCOUNT_WITHIN_LIMIT'],
+    };
+    expect(checkCustomRole(draft, ['Manager', 'Head chef'])).toEqual([]);
+    expect(checkCustomRole({ ...draft, name: ' senior CAPTAIN ' }, ['Senior captain'])).toEqual([
+      'NAME_TAKEN',
+    ]);
+    expect(checkCustomRole({ ...draft, name: ' ' }, [])).toEqual(['NAME_REQUIRED']);
+    expect(checkCustomRole({ ...draft, baseRole: 'MANAGER' }, [])).toEqual(['BASE_ROLE_INVALID']);
+    expect(checkCustomRole({ ...draft, capabilities: ['DATA_ADMIN'] }, [])).toEqual([
+      'CAPABILITY_NOT_GRANTABLE',
+    ]);
+    expect(checkCustomRole({ ...draft, capabilities: ['ORDER_CREATE'] }, [])).toEqual([
+      'NOTHING_ADDED',
+    ]);
   });
 });

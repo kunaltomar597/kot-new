@@ -27,6 +27,9 @@ export const StaffView = z.object({
   id: Id,
   displayName: z.string(),
   role: Role,
+  /** The Owner's custom role the person has on top of `role` (AUTH-012), if any. */
+  customRoleId: Id.nullable(),
+  customRoleName: z.string().nullable(),
   active: z.boolean(),
   phone: z.string().nullable(),
   email: z.string().nullable(),
@@ -50,6 +53,8 @@ export type StaffListResponse = z.infer<typeof StaffListResponse>;
 export const CreateStaffRequest = z.strictObject({
   displayName: DisplayName,
   role: AssignableRole,
+  /** A custom role built on `role` (AUTH-012); omitted or null for the built-in one. */
+  customRoleId: Id.nullable().optional(),
   /** Exactly `pinLength` digits; PINs need not be unique, as people pick their name first. */
   pin: Pin,
   phone: PhoneNumber.nullable().optional(),
@@ -62,6 +67,8 @@ export const UpdateStaffRequest = z
   .strictObject({
     displayName: DisplayName.optional(),
     role: AssignableRole.optional(),
+    /** With `role` (or the person's current one): a custom role on it, or null for none. */
+    customRoleId: Id.nullable().optional(),
     phone: PhoneNumber.nullable().optional(),
     email: Email.nullable().optional(),
   })

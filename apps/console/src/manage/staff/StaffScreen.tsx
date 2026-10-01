@@ -43,7 +43,13 @@ export function StaffScreen() {
   const now = useNow(CLOCK_MS);
   const { withSecondFactor, dialog: secondFactorDialog } = useSecondFactor();
   const { data, reload } = useLive(
-    () => controller.api.listStaff(),
+    async () => {
+      const [list, roles] = await Promise.all([
+        controller.api.listStaff(),
+        controller.api.listRoles(),
+      ]);
+      return { ...list, roles: roles.roles };
+    },
     (type) => type === 'RestaurantChanged',
   );
   const [open, setOpen] = useState<Open | undefined>();
@@ -151,6 +157,7 @@ export function StaffScreen() {
         <PersonDialog
           actor={actor}
           person={open.kind === 'EDIT' ? open.person : undefined}
+          customRoles={data.status === 'ready' ? data.value.roles : []}
           pinLength={pinLength}
           withSecondFactor={withSecondFactor}
           onSaved={(saved) => {
@@ -255,7 +262,14 @@ function StaffRow({
           {person.displayName}
           {self ? <Badge tone="info">{t('staff.you')}</Badge> : null}
         </h3>
-        <p className="staff-row__role">{t(`roles.${person.role}`)}</p>
+        <p className="staff-row__role">
+          {person.customRoleName === null
+            ? t(`roles.${person.role}`)
+            : t('staff.customRole', {
+                name: person.customRoleName,
+                role: t(`roles.${person.role}`),
+              })}
+        </p>
         <p className="staff-row__states">
           {person.active ? (
             <Badge tone="success">{t('staff.active')}</Badge>

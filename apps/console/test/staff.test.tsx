@@ -19,6 +19,7 @@ const RAVI = STAFF.WAITER.staffId;
 function staffServer(role: 'MANAGER' | 'OWNER' = 'MANAGER'): FakeServer {
   return signsInAs(server(), role)
     .on('GET', '/api/v1/staff', () => ({ status: 200, body: staffList() }))
+    .on('GET', '/api/v1/roles', () => ({ status: 200, body: { roles: [] } }))
     .on('GET', '/api/v1/auth/owner/security', () => ({ status: 200, body: ownerSecurity() }));
 }
 

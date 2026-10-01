@@ -209,6 +209,13 @@ import {
   SettingView,
   UpdateSettingRequest,
 } from './settings.js';
+import {
+  ArchiveRoleRequest,
+  RoleListResponse,
+  RoleParams,
+  RoleRequest,
+  RoleView,
+} from './roles.js';
 import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
 import {
   CreateStaffRequest,
@@ -732,6 +739,72 @@ export const ROUTES = [
     responses: {
       200: { description: 'What is set up.', schema: OwnerSecurityResponse },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'listRoles',
+    method: 'GET',
+    path: '/api/v1/roles',
+    summary: 'The built-in roles and the Owner’s custom roles, with how many people have each',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'MGR-004'],
+    capability: 'STAFF_MANAGE',
+    responses: { 200: { description: 'Roles.', schema: RoleListResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'createRole',
+    method: 'POST',
+    path: '/api/v1/roles',
+    summary: 'Create a custom role: a cashier, waiter or kitchen role with extra capabilities',
+    description:
+      'Owner only, with a fresh second factor (AUTH-006). Staff management and the Owner-only ' +
+      'actions can never be added. Audited.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { body: RoleRequest },
+    responses: {
+      201: { description: 'Created.', schema: RoleView },
+      ...standardErrors,
+      422: { description: 'A name in use, or nothing that can be added.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateRole',
+    method: 'PUT',
+    path: '/api/v1/roles/:roleId',
+    summary: 'Change a custom role; people with it get the change on their next request',
+    description: 'Owner only, with a fresh second factor (AUTH-006). Audited.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: RoleParams, body: RoleRequest },
+    responses: {
+      200: { description: 'Changed.', schema: RoleView },
+      ...standardErrors,
+      404: { description: 'No such custom role.', schema: ApiError },
+      409: {
+        description: 'A built-in or archived role, or a new base role while people have it.',
+        schema: ApiError,
+      },
+      422: { description: 'A name in use, or nothing that can be added.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'archiveRole',
+    method: 'POST',
+    path: '/api/v1/roles/:roleId/archive',
+    summary: 'Archive a custom role nobody active has',
+    description: 'Owner only, with a fresh second factor (AUTH-006). Audited with the reason.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: RoleParams, body: ArchiveRoleRequest },
+    responses: {
+      200: { description: 'Archived.', schema: RoleView },
+      ...standardErrors,
+      404: { description: 'No such custom role.', schema: ApiError },
+      409: { description: 'People still have the role.', schema: ApiError },
     },
   },
   {

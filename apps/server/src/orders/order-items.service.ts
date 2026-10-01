@@ -8,7 +8,7 @@ import type {
 import {
   canTransition,
   type Capability,
-  grantFor,
+  actorGrant,
   type OrderItemEvent,
   type OrderItemState,
   orderItemMachine,
@@ -120,7 +120,14 @@ export class OrderItemsService {
     orderItemId: string,
     event: OrderItemStatusRequest['event'],
   ): Promise<OrderView> {
-    if (grantFor(principal.role, STEP_CAPABILITY[event]) !== 'ALLOW') throw authErrors.forbidden();
+    if (
+      actorGrant(
+        { role: principal.role, extraCapabilities: principal.capabilities ?? [] },
+        STEP_CAPABILITY[event],
+      ) !== 'ALLOW'
+    ) {
+      throw authErrors.forbidden();
+    }
     const orderId = await this.prisma.transaction(async (tx) => {
       // The combo line is locked before its part, in the order cancel and void lock them.
       const found = await tx.orderItem.findFirst({

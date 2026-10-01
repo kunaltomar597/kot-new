@@ -1,4 +1,3 @@
-import type { Role } from '@rp/domain';
 import { Button, ConnectionBanner, ThemeRoot } from '@rp/ui-web';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
@@ -6,7 +5,7 @@ import type { ConsoleSnapshot } from '../app/console-controller.js';
 import { useConsole, useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { InactivityTracker } from '../app/inactivity.js';
-import { modeOfPath, modesFor } from '../app/modes.js';
+import { modeOfPath, modesFor, type Person } from '../app/modes.js';
 import { AlertPanels, AlertsButton } from '../alerts/AlertCentre.js';
 import { AlertsProvider } from '../alerts/alerts-context.js';
 
@@ -44,7 +43,7 @@ export function ModeLayout() {
     <ThemeRoot className="console-shell" {...(mode === 'kds' && { theme: 'kds' as const })}>
       <header className="console-header">
         <span className="console-header__app">{t('app.name')}</span>
-        {person === undefined ? null : <ModeLinks role={person.role} />}
+        {person === undefined ? null : <ModeLinks person={person} />}
         <AlertsButton />
         <span className="console-header__device">{state.device?.name}</span>
         {person === undefined ? null : (
@@ -85,9 +84,9 @@ export function ModeLayout() {
   );
 }
 
-function ModeLinks({ role }: { role: Role }) {
+function ModeLinks({ person }: { person: Person }) {
   const t = useT();
-  const modes = modesFor(role);
+  const modes = modesFor(person);
   if (modes.length < 2) return null;
   return (
     <nav aria-label={t('modes.navigation')} className="console-header__modes">

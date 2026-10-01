@@ -298,8 +298,11 @@ model Role {
   name         String
   baseRole     StaffRole @map("base_role")
   builtIn      Boolean   @default(true) @map("built_in")
-  /// Extra capabilities granted on top of the base role (custom roles, later WPs).
+  /// Extra capabilities granted on top of the base role (custom roles, AUTH-012). Only those
+  /// `@rp/domain` `extraCapabilitiesOf` accepts are ever applied.
   capabilities String[]  @default([])
+  /// Custom roles are archived, never deleted; built-in roles are never archived.
+  archivedAt   DateTime? @map("archived_at") @db.Timestamptz(3)
   staff        Staff[]
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)

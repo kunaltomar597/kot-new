@@ -5,6 +5,18 @@ import { AppError } from '../errors/app-error.js';
 /** Errors of staff administration (P4-02a), in plain language that says what to do (NFR-U04). */
 export const staffErrors = {
   notFound: () => new AppError(404, 'STAFF_NOT_FOUND', 'There is no such person.'),
+  customRoleNotFound: () =>
+    new AppError(
+      422,
+      'CUSTOM_ROLE_NOT_FOUND',
+      'That role does not exist or is archived. Choose another role.',
+    ),
+  customRoleMismatch: () =>
+    new AppError(
+      422,
+      'CUSTOM_ROLE_MISMATCH',
+      'That custom role is built on another role. Choose the role it is built on.',
+    ),
   pinLength: (length: number) =>
     new AppError(422, 'PIN_LENGTH', `The PIN must have exactly ${String(length)} digits.`, {
       pinLength: length,

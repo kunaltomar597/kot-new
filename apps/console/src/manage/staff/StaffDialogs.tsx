@@ -1,4 +1,4 @@
-import type { StaffView } from '@rp/contracts';
+import type { RoleView, StaffView } from '@rp/contracts';
 import { rolesOffered } from '@rp/domain';
 import { Button, Dialog, Select, TextField } from '@rp/ui-web';
 import { useId, useState } from 'react';
@@ -11,10 +11,13 @@ import {
   checkPin,
   createRequestOf,
   emptyPersonForm,
+  fromRoleChoice,
   type PersonField,
   type PersonForm,
   type PersonProblem,
   personFormOf,
+  roleChoiceOf,
+  roleChoices,
   type StaffActorView,
   updateRequestOf,
 } from './staff-view.js';
@@ -65,6 +68,7 @@ function PinField({
 export function PersonDialog({
   actor,
   person,
+  customRoles,
   pinLength,
   withSecondFactor,
   onSaved,
@@ -73,6 +77,8 @@ export function PersonDialog({
   actor: StaffActorView;
   /** Undefined to add someone. */
   person: StaffView | undefined;
+  /** The Owner's custom roles (AUTH-012), offered under their base role. */
+  customRoles: readonly RoleView[];
   pinLength: number;
   withSecondFactor: WithSecondFactor;
   onSaved: (saved: StaffView) => void;
@@ -84,6 +90,7 @@ export function PersonDialog({
   const target =
     person === undefined ? null : { staffId: person.id, role: person.role, active: person.active };
   const roles = rolesOffered(actor, target);
+  const choices = roleChoices(roles, customRoles, (role) => t(`roles.${role}`));
   const [form, setForm] = useState<PersonForm>(() =>
     person === undefined
       ? emptyPersonForm(roles.includes('WAITER') ? 'WAITER' : (roles[0] ?? 'WAITER'))
@@ -172,13 +179,14 @@ export function PersonDialog({
             set('displayName')(event.target.value);
           }}
         />
-        {roles.length > 1 ? (
+        {choices.length > 1 ? (
           <Select
             label={t('staff.form.role')}
-            value={form.role}
-            options={roles.map((role) => ({ value: role, label: t(`roles.${role}`) }))}
+            value={roleChoiceOf(form)}
+            options={choices}
             onChange={(event) => {
-              set('role')(event.target.value);
+              const chosen = fromRoleChoice(event.target.value, customRoles);
+              if (chosen !== undefined) setForm((current) => ({ ...current, ...chosen }));
             }}
           />
         ) : (

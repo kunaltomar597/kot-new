@@ -20,8 +20,8 @@ export function ModeHome({ mode }: { mode: Mode }) {
   if (person === undefined) {
     // A kitchen screen works for its station without anybody signed in (station mode).
     if (!(mode === 'kds' && isStationMode(device))) return <Navigate to="/login" replace />;
-  } else if (!modesFor(person.role).includes(mode)) {
-    const home = homeFor(person.role);
+  } else if (!modesFor(person).includes(mode)) {
+    const home = homeFor(person);
     return (
       <ErrorState
         title={t('modes.notAllowed', { mode: name })}
