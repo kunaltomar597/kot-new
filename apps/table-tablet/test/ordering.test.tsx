@@ -138,6 +138,21 @@ function setup() {
       status: 200,
       body: { itemIds: [DISH.dal] },
     }))
+    .on('GET', '/api/v1/devices/current/recommendations', () => ({
+      status: 200,
+      body: {
+        recommendations: [
+          {
+            itemId: DISH.tikka,
+            layer: 'BEST_SELLER',
+            reason: { kind: 'BEST_SELLER', daypart: null },
+          },
+        ],
+        daypart: null,
+        menuVersion: 1,
+      },
+    }))
+    .on('POST', '/api/v1/devices/current/recommendations/events', () => ({ status: 204 }))
     .on('GET', '/api/v1/devices/current/service-requests', () => ({
       status: 200,
       body: { tableSessionId: SESSION_ID, requests: [] },
@@ -436,5 +451,36 @@ describe('[TAB-013] without the server', () => {
       expect(screen.queryByTestId('call-waiter')).toBeNull();
     });
     expect(screen.getByTestId('cart-send')).toBeEnabled();
+  });
+});
+
+describe('[TAB-011] [REC-008] suggestions on the tablet', () => {
+  it('suggests on the menu with the reason, and an ordered suggestion carries where it came from', async () => {
+    const { server } = await atTable();
+    const row = within(await screen.findByTestId('suggestions-menu'));
+    expect(row.getByText(t('reco.reason.bestSeller'))).toBeOnTheScreen();
+    await fireEvent.press(row.getByTestId(`suggestion-${DISH.tikka}`));
+    await fireEvent.press(await screen.findByTestId('item-add'));
+    await fireEvent.press(tab(t('mobile.tablet.ordering.cartTab', { count: 1 })));
+    await fireEvent.press(await screen.findByTestId('cart-send'));
+    await waitFor(() => {
+      expect(server.callsTo('POST', '/api/v1/devices/current/orders')).toHaveLength(1);
+    });
+    const sent = server.callsTo('POST', '/api/v1/devices/current/orders')[0]
+      ?.body as TabletOrderRequest;
+    expect(sent.lines[0]).toMatchObject({
+      itemId: DISH.tikka,
+      recommendation: { layer: 'BEST_SELLER', ruleId: null },
+    });
+    await waitFor(
+      () => {
+        const kinds = server
+          .callsTo('POST', '/api/v1/devices/current/recommendations/events')
+          .flatMap((call) => (call.body as { events: { kind: string }[] }).events)
+          .map((event) => event.kind);
+        expect(kinds).toEqual(expect.arrayContaining(['IMPRESSION', 'TAP', 'ADD_TO_CART']));
+      },
+      { timeout: 6_000 },
+    );
   });
 });

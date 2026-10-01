@@ -1,20 +1,22 @@
 import { newIdempotencyKey, uuidV4 } from '@rp/api-client';
-import type { MenuItem, OrderView, TableOverviewEntry } from '@rp/contracts';
+import type { MenuItem, OrderView, RecommendationSource, TableOverviewEntry } from '@rp/contracts';
 import { fontSize, fontWeight, spacing } from '@rp/design-tokens';
 import { formatRupees } from '@rp/domain';
-import type { OrderDraft } from '@rp/mobile-core';
+import { type OrderDraft, SuggestionTracker } from '@rp/mobile-core';
 import {
   ItemSheet,
   messageOf,
   Note,
   OverrideCancelled,
   Screen,
+  SuggestionRow,
   useDeviceSession,
   useLive,
   useMenu,
   useNow,
   useOverride,
   useSessionState,
+  useSuggestions,
   useT,
   useUnsentOrders,
 } from '@rp/mobile-shell';
@@ -75,6 +77,35 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   const [cart, setCart] = useCart(sessionId);
   const [view, setView] = useState<TableView>('order');
   const [choosing, setChoosing] = useState<MenuItem | undefined>();
+  /** The suggestion the dish being chosen came from (REC-008). */
+  const [choosingSource, setChoosingSource] = useState<RecommendationSource | undefined>();
+  /** What the waiter does with suggestions, sent in batches (REC-008). */
+  const tracker = useMemo(
+    () =>
+      new SuggestionTracker({
+        send: async (events) => {
+          await session.api.recordRecommendationEvents({
+            body: { tableSessionId: sessionId, channel: 'WAITER_APP', events },
+          });
+        },
+      }),
+    [session, sessionId],
+  );
+  useEffect(
+    () => () => {
+      void tracker.stop();
+    },
+    [tracker],
+  );
+  const cartIds = cart.map((line) => line.itemId);
+  const upsell = useSuggestions(
+    () =>
+      session.api.getRecommendations({
+        query: { tableSessionId: sessionId, channel: 'WAITER_APP', cart: cartIds, limit: 4 },
+      }),
+    cartIds.join(','),
+    menu !== null && menu !== undefined,
+  );
   const [moving, setMoving] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const [asking, setAsking] = useState(false);
@@ -124,26 +155,36 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   const closed = tables.data.status === 'ready' && table === undefined;
   const label = table?.label ?? drafts[0]?.body.tableLabel ?? '';
 
-  const add = (line: Omit<CartLine, 'clientLineId' | 'error'>) => {
+  const add = (line: Omit<CartLine, 'clientLineId' | 'error'>, source?: RecommendationSource) => {
     setNotice(undefined);
-    setCart((lines) => addLine(lines, line, uuidV4));
+    setCart((lines) =>
+      addLine(lines, source === undefined ? line : { ...line, recommendation: source }, uuidV4),
+    );
+    // WTR-011: a suggestion the waiter put in the order (REC-008).
+    if (source !== undefined) {
+      tracker.record({ kind: 'ADD_TO_CART', itemId: line.itemId, ...source });
+    }
   };
 
-  const choose = (item: MenuItem) => {
+  const choose = (item: MenuItem, source?: RecommendationSource) => {
     if (menu === null || menu === undefined) return;
     if (needsOptions(menu, item)) {
       setChoosing(item);
+      setChoosingSource(source);
       return;
     }
-    add({
-      itemId: item.id,
-      name: item.name,
-      summary: '',
-      quantity: 1,
-      selection: {},
-      instructions: '',
-      unitPrice: item.basePrice,
-    });
+    add(
+      {
+        itemId: item.id,
+        name: item.name,
+        summary: '',
+        quantity: 1,
+        selection: {},
+        instructions: '',
+        unitPrice: item.basePrice,
+      },
+      source,
+    );
   };
 
   const again = (order: OrderView, line: OrderView['items'][number]) => {
@@ -437,6 +478,16 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
             )
           ) : (
             <>
+              {menu !== null && menu !== undefined && (
+                <SuggestionRow
+                  title={t('reco.row.upsell')}
+                  suggestions={upsell}
+                  menu={menu}
+                  tracker={tracker}
+                  testID="suggestions-upsell"
+                  onChoose={choose}
+                />
+              )}
               <Text accessibilityRole="header" style={[styles.heading, { color: colors.text }]}>
                 {t('pos.cart.title')}
               </Text>
@@ -489,10 +540,12 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
           item={choosing}
           onClose={() => {
             setChoosing(undefined);
+            setChoosingSource(undefined);
           }}
           onAdd={(line) => {
-            add(line);
+            add(line, choosingSource);
             setChoosing(undefined);
+            setChoosingSource(undefined);
           }}
         />
       ) : null}

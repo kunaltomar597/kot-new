@@ -172,7 +172,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-05 Recommendation UI and feedback.
+- P3-05b Feedback after the bill.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -266,7 +266,8 @@ Recommended next WPs (dependencies met):
 - [x] P3-03b Approvals in the waiter app and the POS
 - [x] P3-03c Ordering on the table tablet
 - [x] P3-04 Recommendation engine v1
-- [ ] P3-05 Recommendation UI and feedback
+- [x] P3-05a Suggestion rows and tracking (tablet, waiter app)
+- [ ] P3-05b Feedback after the bill
 - [ ] P3-06 Phase 3 exit test (S6)
 
 ### Phase 4: Manager dashboard and reports
@@ -571,6 +572,25 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-05a):
+
+312. P3-05 is built in two parts: a the suggestion rows and their tracking, b feedback after the
+     bill.
+313. The tablet suggests in three places, each row with the dish, its price and the reason:
+     - "You may like" above the menu (for what is in the cart, veg-only following the filter);
+     - "Goes well with this" in a dish's sheet (the cart and that dish);
+     - "Add to your order" in the cart.
+       The waiter app shows "Suggest to the table" on a table's order view (WTR-011), for the
+       table's orders and the cart. Rows show only when online and only when there are suggestions.
+314. Tracking (REC-008):
+     - Each suggested dish counts once as shown while its row is up; a press counts as a tap;
+       adding it to the cart counts as added. The line then carries its source, so the server
+       counts it as ordered.
+     - Events go in batches every 3 s (50 at most), and any still waiting are sent when the
+       screen closes.
+     - When the server cannot be reached they are kept (500 at most, oldest dropped first) and
+       sent later.
 
 Decided 2026-10-02 (P3-03c):
 
@@ -1623,6 +1643,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-05a Suggestion rows and tracking
+
+Built:
+
+- `@rp/mobile-core` `SuggestionTracker`.
+- `@rp/mobile-shell` `SuggestionRow`, `useSuggestions` and `sourceOf`; `ItemSheet` takes an
+  `extra` slot.
+- The tablet's menu, item and cart rows, with a tracker per open table.
+- The waiter app's upsell row with a tracker per table screen.
+- `reco.row.*` strings.
+
+Tests:
+
+- mobile-core `suggestions.test.ts` 2;
+- waiter app 1 (a suggestion added in one tap; its source on the KOT; impressions, taps and adds
+  sent);
+- tablet 1 (the same from the menu row).
+
+Decisions: 312 to 314.
 
 ### 2026-10-02: P3-03c Ordering on the table tablet (P3-03 done)
 

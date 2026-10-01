@@ -1,6 +1,14 @@
-import type { MenuItem, MenuSnapshot } from '@rp/contracts';
+import type { MenuItem, MenuSnapshot, RecommendationSource } from '@rp/contracts';
 import { spacing } from '@rp/design-tokens';
-import { ItemSheet, Note, useT } from '@rp/mobile-shell';
+import type { SuggestionTracker } from '@rp/mobile-core';
+import {
+  ItemSheet,
+  Note,
+  SuggestionRow,
+  useDeviceSession,
+  useSuggestions,
+  useT,
+} from '@rp/mobile-shell';
 import {
   channelItems,
   filterMenu,
@@ -31,6 +39,8 @@ export function MenuView({
   bestsellers,
   priceMode,
   ordering,
+  cartItemIds,
+  tracker,
   onAdd,
 }: {
   menu: MenuSnapshot;
@@ -38,16 +48,40 @@ export function MenuView({
   priceMode: 'TAX_EXCLUSIVE' | 'TAX_INCLUSIVE';
   /** False while the tablet cannot reach the server (TAB-013). */
   ordering: boolean;
-  onAdd: (line: NewCartLine) => void;
+  /** The dishes in the diners' order, which the suggestions go with (TAB-011). */
+  cartItemIds: readonly string[];
+  tracker: SuggestionTracker;
+  /** A dish chosen from a suggestion carries where it came from (REC-008). */
+  onAdd: (line: NewCartLine, source?: RecommendationSource) => void;
 }) {
   const t = useT();
+  const session = useDeviceSession();
   const items = channelItems(menu, 'TABLE_TABLET');
   const categories = menuCategories(menu, items);
   const [category, setCategory] = useState(ALL);
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ReadonlySet<TabletFilter>>(new Set());
   const [sort, setSort] = useState<TabletSort>('menu');
-  const [chosen, setChosen] = useState<MenuItem | null>(null);
+  const [chosen, setChosen] = useState<{ item: MenuItem; source?: RecommendationSource } | null>(
+    null,
+  );
+  const vegOnly = filters.has('veg');
+  const forMenu = useSuggestions(
+    () =>
+      session.api.getTableRecommendations({
+        query: { cart: [...cartItemIds], vegOnly, limit: 6 },
+      }),
+    `${cartItemIds.join(',')}|${String(vegOnly)}`,
+    ordering,
+  );
+  const forItem = useSuggestions(
+    () =>
+      session.api.getTableRecommendations({
+        query: { cart: [...cartItemIds, chosen?.item.id ?? ''], vegOnly, limit: 4 },
+      }),
+    `${cartItemIds.join(',')}|${chosen?.item.id ?? ''}|${String(vegOnly)}`,
+    ordering && chosen !== null,
+  );
 
   const inCategory =
     category === ALL || query.trim() !== ''
@@ -58,6 +92,16 @@ export function MenuView({
   return (
     <View style={styles.view} testID="menu-view">
       <Note tone="text">{t('mobile.tablet.ordering.taxNote', { mode: priceMode })}</Note>
+      <SuggestionRow
+        title={t('reco.row.menu')}
+        suggestions={forMenu}
+        menu={menu}
+        tracker={tracker}
+        testID="suggestions-menu"
+        onChoose={(item, source) => {
+          setChosen({ item, source });
+        }}
+      />
       <TextField
         label={t('mobile.tablet.ordering.search')}
         hint={t('mobile.tablet.ordering.searchHint')}
@@ -116,7 +160,7 @@ export function MenuView({
               soldOut={unavailableReason(item) !== undefined}
               disabled={!ordering}
               onSelect={() => {
-                setChosen(item);
+                setChosen({ item });
               }}
             />
           ))}
@@ -124,16 +168,29 @@ export function MenuView({
       )}
       {chosen !== null && (
         <ItemSheet
+          key={chosen.item.id}
           menu={menu}
-          item={chosen}
+          item={chosen.item}
           addLabel={t('mobile.tablet.ordering.add')}
           onClose={() => {
             setChosen(null);
           }}
           onAdd={(line) => {
-            onAdd(line);
+            onAdd(line, chosen.source);
             setChosen(null);
           }}
+          extra={
+            <SuggestionRow
+              title={t('reco.row.item')}
+              suggestions={forItem.filter((suggestion) => suggestion.itemId !== chosen.item.id)}
+              menu={menu}
+              tracker={tracker}
+              testID="suggestions-item"
+              onChoose={(item, source) => {
+                setChosen({ item, source });
+              }}
+            />
+          }
         />
       )}
     </View>

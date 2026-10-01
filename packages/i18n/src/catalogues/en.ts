@@ -2921,6 +2921,14 @@ export const en = {
         DINNER: 'Bestseller at dinner',
       },
     },
+    /** The suggestion rows (P3-05a, TAB-011, WTR-011). */
+    row: {
+      menu: 'You may like',
+      item: 'Goes well with this',
+      cart: 'Add to your order',
+      upsell: 'Suggest to the table',
+      open: '{name}, {price}. {reason}',
+    },
   },
   states: {
     loading: 'Loading…',

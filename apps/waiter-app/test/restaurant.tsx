@@ -8,6 +8,7 @@ import type {
   OrderView,
   OverrideRequest,
   PagerView,
+  RecommendationsResponse,
   ServiceRequestView,
   SubmitOrderRequest,
   SubmitOrderResponse,
@@ -133,6 +134,8 @@ export class Restaurant {
   /** Manager approvals issued and not used yet (single use, AUTH-011). */
   private readonly approvals = new Set<string>();
   private nextOrder = 20;
+  /** What the server suggests for a table (P3-05a); none unless a test sets them. */
+  suggestions: RecommendationsResponse['recommendations'] = [];
   /** Approve and reject requests the server received (P3-03b). */
   readonly decisions: { orderId: string; kind: 'approve' | 'reject'; body: unknown }[] = [];
 
@@ -638,6 +641,11 @@ export class Restaurant {
       .on('POST', '/api/v1/service-requests/:requestId/resolve', (call) =>
         this.requestStep(call, 'resolve'),
       )
+      .on('GET', '/api/v1/recommendations', () => ({
+        status: 200,
+        body: { recommendations: this.suggestions, daypart: null, menuVersion: 1 },
+      }))
+      .on('POST', '/api/v1/recommendations/events', () => ({ status: 204 }))
       .on('GET', '/api/v1/orders/pending-approval', () => ({
         status: 200,
         body: { orders: this.pendingApprovals() },

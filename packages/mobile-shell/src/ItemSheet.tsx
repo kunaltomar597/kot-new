@@ -18,7 +18,7 @@ import {
   Sheet,
   TextField,
 } from '@rp/ui-native';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useT } from './context.js';
 
 /** As long as the POS allows (ItemDialog). */
@@ -35,12 +35,15 @@ export function ItemSheet({
   onClose,
   onAdd,
   addLabel,
+  extra,
 }: {
   menu: MenuSnapshot;
   item: MenuItem;
   onClose: () => void;
   onAdd: (line: NewCartLine) => void;
   addLabel?: string;
+  /** Shown under the dish's choices, e.g. what goes well with it (TAB-011). */
+  extra?: ReactNode;
 }) {
   const t = useT();
   const def = selectable(menu, item);
@@ -123,6 +126,7 @@ export function ItemSheet({
         maxLength={INSTRUCTIONS_MAX}
         multiline
       />
+      {extra}
     </Sheet>
   );
 }
