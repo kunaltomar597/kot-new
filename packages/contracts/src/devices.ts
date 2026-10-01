@@ -203,6 +203,12 @@ export type RenameDeviceRequest = z.infer<typeof RenameDeviceRequest>;
 export const RevokeDeviceRequest = z.strictObject({ reason: z.string().trim().min(3).max(200) });
 export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;
 
+/** "Locate" (MGR-006, P3-01c): how long the device shows itself. */
+export const LOCATE_SECONDS = 15;
+
+export const LocateDeviceResponse = z.object({ seconds: z.int().positive() });
+export type LocateDeviceResponse = z.infer<typeof LocateDeviceResponse>;
+
 export const BindTableRequest = z.strictObject({ tableId: Id });
 export type BindTableRequest = z.infer<typeof BindTableRequest>;
 

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { accentColorsOf } from './branding';
 import { IdleScreen } from './IdleScreen';
+import { LocateOverlay } from './LocateOverlay';
 import { OpenTableScreen } from './OpenTableScreen';
 import { StaffCorner, StaffPanel } from './StaffPanel';
 import { useTablet } from './use-tablet';
@@ -111,6 +112,7 @@ export function TabletHome({ store, kiosk, health, appVersion }: TabletDevice) {
             onClose={closeStaff}
           />
         )}
+        <LocateOverlay kiosk={kiosk} />
       </View>
     </ThemeProvider>
   );

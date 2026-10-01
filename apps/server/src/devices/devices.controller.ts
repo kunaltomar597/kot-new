@@ -19,6 +19,7 @@ import {
   type DeviceSummary,
   DeviceTokenRequest,
   type DeviceTokenResponse,
+  type LocateDeviceResponse,
   PairDeviceRequest,
   type PairedDevice,
   type PairingCodeResponse,
@@ -135,6 +136,16 @@ export class DevicesController {
     @Body(new ZodValidationPipe(RevokeDeviceRequest)) body: RevokeDeviceRequest,
   ): Promise<DeviceSummary> {
     return this.devices.revoke(principalOf(request), deviceId, body.reason);
+  }
+
+  @Post(':deviceId/locate')
+  @HttpCode(200)
+  @RequireCapability('DEVICE_PAIR')
+  locate(
+    @Req() request: AuthenticatedRequest,
+    @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
+  ): Promise<LocateDeviceResponse> {
+    return this.devices.locate(principalOf(request), deviceId);
   }
 
   @Put(':deviceId/table')

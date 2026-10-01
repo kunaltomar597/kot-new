@@ -38,9 +38,9 @@ Built in two parts:
   - the wipe of `TABLET_GUEST_KEYS` on close;
   - the hidden corner with manager tiles and a PIN pad;
   - the Maestro flows and manual task 12 (P0-H3).
-- P3-01c "Locate" a tablet from the Devices page (MGR-006, a Should deferred from P4-02c): a
-  server endpoint and a device-room event; the tablet flashes and plays the tone already in its
-  kiosk module.
+- P3-01c "Locate" a tablet from the Devices page (MGR-006, a Should deferred from P4-02c) (done):
+  `POST /api/v1/devices/:deviceId/locate` and `DeviceLocateRequested` to the device's own room;
+  the tablet flashes its name and plays its kiosk module's tone.
 
 ## P3-02 Service requests end to end
 

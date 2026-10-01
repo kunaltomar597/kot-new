@@ -337,3 +337,40 @@ describe('[TAB-001] leaving kiosk mode', () => {
     expect(codeOf(fromKds)).toBe('NOT_A_TABLE_TABLET');
   });
 });
+
+describe('[MGR-006] locate a tablet', () => {
+  const locate = (deviceId: string, login = manager) =>
+    server()
+      .post(`/api/v1/devices/${deviceId}/locate`)
+      .set(authHeaders(kit.deviceId, login.accessToken));
+
+  it('makes a connected tablet show itself, and only that tablet hears it', async () => {
+    const live = await RealtimeTestClient.connect(appUrl(app), {
+      deviceToken: deviceTokenOf(id('tablet')),
+    });
+    clients.push(live);
+    const response = await locate(id('tablet'));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body).toEqual({ seconds: 15 });
+    const heard = await live.waitFor(() =>
+      live.received.find((event) => event.type === 'DeviceLocateRequested'),
+    );
+    expect(heard.payload).toEqual({ deviceId: id('tablet'), seconds: 15 });
+    live.close();
+  });
+
+  it('refuses a tablet that is not connected, other devices and non-managers', async () => {
+    await until(
+      () => !app.get(RealtimeGateway).connectedDeviceIds(kit.restaurantId).has(id('tablet')),
+      5_000,
+      'the disconnect',
+    );
+    const away = await locate(id('tablet'));
+    expect(away.status).toBe(409);
+    expect(codeOf(away)).toBe('DEVICE_NOT_CONNECTED');
+    const kds = await locate(id('kds'));
+    expect(codeOf(kds)).toBe('LOCATE_NOT_SUPPORTED');
+    const byWaiter = await locate(id('tablet'), waiter);
+    expect(byWaiter.status).toBe(403);
+  });
+});

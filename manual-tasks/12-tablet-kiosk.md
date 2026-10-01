@@ -51,6 +51,7 @@ restaurant server running on this Mac.
     it; finish with `adb shell dumpsys battery reset`.
 13. **Offline alert**: turn the tablet's Wi-Fi off for 3 minutes: the dashboard alerts the
     managers that it is offline. Turn Wi-Fi on: the alert clears and the tablet carries on.
+    Then Dashboard → Devices → the tablet → Locate: it flashes its name and sounds for 15 s.
 14. **Restart**: hold the power button and restart. Note whether the app comes back by itself
     (MDM's kiosk launcher does this in production; with only `dpm` it may not).
 15. **To undo**, factory reset the tablet (a device owner can only be removed that way).
@@ -72,6 +73,7 @@ Staff exit with PIN, locks again:     yes / no
 Wrong PIN refused:                    yes / no
 Battery alert at 15 %, cleared on charge: yes / no, after about ... minutes
 Offline alert after 2 min, cleared:   yes / no
+Locate flashes and sounds:            yes / no
 App back after a restart:             yes / no
 Anything else odd:
 ```

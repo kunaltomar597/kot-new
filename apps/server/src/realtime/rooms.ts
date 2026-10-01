@@ -107,6 +107,8 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   AlertCleared: 'MANAGERS',
   DeviceStatusChanged: 'DEVICE_PAIR',
   DeviceRevoked: 'DEVICE_PAIR',
+  // Managers see that someone asked; the device itself hears it through its own room (P3-01c).
+  DeviceLocateRequested: 'DEVICE_PAIR',
   // The POS and managers are alerted when a printer stops or starts again (KDS-008, NTF-003).
   PrinterStatusChanged: 'BILL_PRINT_AND_PAYMENT',
   // Only the changed keys: every screen may hear it and reads what it may see again.
@@ -199,6 +201,10 @@ export function roomsForEvent(
     event.type === 'AlertCleared'
   ) {
     for (const staffId of event.payload.recipients) targets.add(rooms.alerts(rid, staffId));
+  }
+  // "Locate" goes to the one device asked (MGR-006).
+  if (event.type === 'DeviceLocateRequested') {
+    targets.add(rooms.device(rid, event.payload.deviceId));
   }
   return [...targets];
 }
