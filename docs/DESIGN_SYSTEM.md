@@ -152,15 +152,15 @@ components`. Both take the same props and tokens. A new primitive goes into the 
 app) with tests, and gets a line here in the same pull request. Shared ordering behaviour
 (MENU-012) lives in `@rp/domain` and `@rp/ordering`, not in a component.
 
-| Group    | Web (`@rp/ui-web`)                                                             | Native (`@rp/ui-native`)                                                    |
-| -------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| Actions  | `Button`, `IconButton`, `Icon`, `Spinner`                                      | `Button`, `Glyph`                                                           |
-| Input    | `PinPad`, `NumberPad`, `TextField`, `Select`, `QuantityStepper`, `ChoiceGroup` | `PinPad`, `TextField`, `QuantityStepper`, `ChoiceGroup`, `SegmentedControl` |
-| Ordering | `MenuItemCard`, `ItemOptions`, `ComboChoices`, `TableTile`                     | `MenuItemCard`, `ItemOptions`, `ComboChoices`, `TableTile`                  |
-| Overlays | `Dialog`, `Sheet`, `ConfirmDialog`, `ToastProvider` + `useToast`               | `Sheet`, `Toast`                                                            |
-| Display  | `Badge`, `StatusChip`, `Money`, `Card`, `Table`, `Tabs`, `QrCode`              | `StatusChip`, `Money`                                                       |
-| States   | `EmptyState`, `LoadingState`, `ErrorState`, `ConnectionBanner`                 | (screens in `@rp/mobile-shell`: connection banner, alerts)                  |
-| Setup    | `ThemeRoot`, `UiStringsProvider`                                               | theme provider in `theme.tsx`                                               |
+| Group    | Web (`@rp/ui-web`)                                                                         | Native (`@rp/ui-native`)                                                    |
+| -------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Actions  | `Button`, `IconButton`, `Icon`, `Spinner`                                                  | `Button`, `Glyph`                                                           |
+| Input    | `PinPad`, `NumberPad`, `TextField`, `TextArea`, `Select`, `QuantityStepper`, `ChoiceGroup` | `PinPad`, `TextField`, `QuantityStepper`, `ChoiceGroup`, `SegmentedControl` |
+| Ordering | `MenuItemCard`, `ItemOptions`, `ComboChoices`, `TableTile`                                 | `MenuItemCard`, `ItemOptions`, `ComboChoices`, `TableTile`                  |
+| Overlays | `Dialog`, `Sheet`, `ConfirmDialog`, `ToastProvider` + `useToast`                           | `Sheet`, `Toast`                                                            |
+| Display  | `Badge`, `StatusChip`, `Money`, `Card`, `Table`, `Tabs`, `QrCode`                          | `StatusChip`, `Money`                                                       |
+| States   | `EmptyState`, `LoadingState`, `ErrorState`, `ConnectionBanner`                             | (screens in `@rp/mobile-shell`: connection banner, alerts)                  |
+| Setup    | `ThemeRoot`, `UiStringsProvider`                                                           | theme provider in `theme.tsx`                                               |
 
 Buttons: variants `primary` (one per screen, the main action), `secondary`, `ghost`, `danger`
 (destructive, always confirmed) and `accent` (diner surfaces). Sizes `md` (meets 48 px) and `lg`

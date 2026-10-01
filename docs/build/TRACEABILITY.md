@@ -73,7 +73,7 @@ Must: 178 / 287 covered. Should: 3 / 24. Could: 0 / 7.
 - BILL-002 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/unit/bill-template.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/gstin.test.ts
 - BILL-003 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/schema.int.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/dates-and-invoices.test.ts
 - BILL-004 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/tax-and-bill.test.ts
-- BILL-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/tax-and-bill.test.ts
+- BILL-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-screens.test.tsx, apps/console/test/settings.test.tsx, apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/tax-and-bill.test.ts
 - BILL-006 (M): apps/server/test/integration/billing.int.test.ts, apps/server/test/unit/bill-calculation.test.ts, packages/domain/test/tax-and-bill.test.ts
 - BILL-007 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-corrections.test.tsx, apps/console/test/billing-logic.test.ts, apps/server/test/integration/bill-split.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/bill-split.test.ts, packages/domain/test/money.test.ts
 - BILL-008 (M): apps/console/e2e/console.e2e.ts, apps/console/test/billing-logic.test.ts, apps/console/test/billing-screens.test.tsx, apps/server/test/integration/payments.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/payments.test.ts
@@ -129,7 +129,7 @@ Must: 178 / 287 covered. Should: 3 / 24. Could: 0 / 7.
 - MGR-004 (M): apps/console/e2e/console.e2e.ts, apps/console/test/roles.test.tsx, apps/console/test/sections.test.tsx, apps/console/test/staff-view.test.ts, apps/console/test/staff.test.tsx, apps/server/test/integration/staff.int.test.ts, packages/contracts/test/staff.test.ts, packages/domain/test/staff.test.ts
 - MGR-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/menu-editor.test.tsx, apps/server/test/integration/menu-publish.int.test.ts
 - MGR-006 (M): apps/console/e2e/console.e2e.ts, apps/console/test/devices-view.test.ts, apps/console/test/devices.test.tsx, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/realtime.int.test.ts
-- MGR-007 (M): apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/settings.test.ts
+- MGR-007 (M): apps/console/e2e/console.e2e.ts, apps/console/test/settings-view.test.ts, apps/console/test/settings.test.tsx, apps/server/test/integration/settings.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/settings.test.ts
 - MGR-008 (M): apps/console/e2e/console.e2e.ts, apps/console/test/alert-view.test.ts, apps/console/test/alerts.test.tsx, packages/domain/test/notifications.test.ts
 - MGR-011 (M): apps/console/e2e/console.e2e.ts, apps/console/test/dashboard.test.tsx
 - RPT-001 (M): apps/server/test/integration/reports.int.test.ts, packages/contracts/test/billing-payments.test.ts
@@ -138,7 +138,7 @@ Must: 178 / 287 covered. Should: 3 / 24. Could: 0 / 7.
 - RPT-006 (M): apps/server/test/integration/reports.int.test.ts, packages/domain/test/reports.test.ts
 - RPT-015 (M): apps/server/test/integration/reports.int.test.ts
 - RPT-017 (M): apps/server/test/integration/reports.int.test.ts, packages/contracts/test/billing-payments.test.ts, packages/domain/test/csv.test.ts
-- AUD-001 (M): apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/recommendations.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts
+- AUD-001 (M): apps/console/e2e/console.e2e.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/recommendations.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/settings.int.test.ts
 - AUD-002 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/unit/audit-hash.test.ts
 - AUD-003 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/unit/audit-hash.test.ts, packages/domain/test/canonical-json.test.ts
 - AUD-004 (M): apps/server/test/integration/audit.int.test.ts, apps/server/test/integration/schema.int.test.ts
@@ -150,7 +150,7 @@ Must: 178 / 287 covered. Should: 3 / 24. Could: 0 / 7.
 - UPD-002 (M): apps/control-plane/test/integration/admin.int.test.ts, apps/control-plane/test/integration/heartbeats.int.test.ts, apps/control-plane/test/unit/semver.test.ts, apps/server/test/integration/control-plane.int.test.ts, packages/contracts/test/control-plane.test.ts, packages/contracts/test/docs.test.ts
 - UPD-006 (M): packages/contracts/test/snapshot.test.ts
 - UPD-007 (M): apps/control-plane/test/integration/heartbeats.int.test.ts, packages/contracts/test/control-plane.test.ts
-- UPD-010 (M): apps/server/test/integration/settings.int.test.ts, packages/contracts/test/settings.test.ts
+- UPD-010 (M): apps/console/test/settings.test.tsx, apps/server/test/integration/settings.int.test.ts, packages/contracts/test/settings.test.ts
 - VCP-001 (M): apps/control-plane/test/integration/admin.int.test.ts
 - VCP-002 (M): apps/control-plane/test/integration/admin.int.test.ts
 - VCP-005 (M): apps/control-plane/test/integration/heartbeats.int.test.ts, apps/server/test/integration/control-plane.int.test.ts, apps/server/test/unit/control-plane-client.test.ts, packages/contracts/test/control-plane.test.ts, packages/contracts/test/docs.test.ts
@@ -166,7 +166,7 @@ Must: 178 / 287 covered. Should: 3 / 24. Could: 0 / 7.
 - NFR-U03 (M): apps/waiter-app/test/orders.test.tsx, packages/design-tokens/test/themes.test.ts, packages/mobile-shell/test/alerts.test.tsx, packages/ordering/test/reorder.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/NumberPad.test.tsx, packages/ui-web/test/ordering.test.tsx, packages/ui-web/test/styles.test.ts
 - NFR-U04 (M): apps/console/test/messages.test.ts, apps/server/test/unit/error-mapping.test.ts, packages/api-client/test/client.test.ts, packages/mobile-shell/test/alerts.test.tsx, packages/ordering/test/alert-text.test.ts, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Toast.test.tsx, packages/ui-web/test/display.test.tsx
 - NFR-U05 (M): apps/console/e2e/console.e2e.ts, packages/design-tokens/test/color.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-native/test/floor.test.tsx, packages/ui-web/test/TableTile.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/fields.test.tsx
-- NFR-L02 (M): packages/i18n/test/message-format.test.ts, packages/i18n/test/translator.test.ts, packages/i18n/test/ui-text-rule.test.ts, packages/ui-web/test/display.test.tsx
+- NFR-L02 (M): apps/console/test/settings-view.test.ts, packages/i18n/test/message-format.test.ts, packages/i18n/test/translator.test.ts, packages/i18n/test/ui-text-rule.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-L03 (M): apps/server/test/integration/restaurant.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/restaurant.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/money.test.ts, packages/ui-web/test/display.test.tsx
 - NFR-M01 (M): packages/ui-web/test/display.test.tsx
 - NFR-M06 (M): packages/contracts/test/docs.test.ts

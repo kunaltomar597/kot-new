@@ -145,7 +145,8 @@ What exists:
   a QR code, the code, addresses and CA fingerprint; rename; move a tablet; unpair) (P4-02c); the
   menu editor (dishes with photos, sizes, option groups, combos, stock; categories; option
   groups; publish) (P4-02d); the Roles page and custom roles for people, with screens that show
-  what a custom role adds (P4-02e). 216 tests, and 18 Playwright steps.
+  what a custom role adds (P4-02e); the Settings page with an editor for every catalogue
+  setting (P4-03a). 227 tests, and 19 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -160,7 +161,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
+- P4-03b Notification rules editor, then P4-03c to P4-03e (P4-03 is split in five, see
+  phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -265,7 +267,11 @@ Recommended next WPs (dependencies met):
 - [x] P4-02c Devices
 - [x] P4-02d Menu editor
 - [x] P4-02e Custom roles (S)
-- [ ] P4-03 Configuration screens
+- [x] P4-03a Settings page (every catalogue setting)
+- [ ] P4-03b Notification rules editor
+- [ ] P4-03c Recommendation rules editor with boost, pin and block
+- [ ] P4-03d Stations and printers
+- [ ] P4-03e Restaurant profile, tax groups and invoice series (Owner)
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
 - [ ] P4-06 Report exports
@@ -551,6 +557,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-03a):
+
+232. P4-03 is built in five parts: a settings page, b notification rules, c recommendation rules
+     with boost, pin and block, d stations and printers, e the Owner's restaurant profile, tax
+     groups and invoice series.
+233. The Settings page is generated from the catalogue: each setting's editor comes from its
+     schema (switch, number, choice, list, text, printer, time window, fields, per-event choice).
+     Labels and hints live in i18n under `settingLabels` and `settingHints`, keyed like the
+     catalogue (hints copied from its descriptions); a test fails when a setting lacks either, or
+     when its default does not survive the editor.
+234. Basis points are typed as a percent with up to two decimals, paise as rupees, lists one per
+     line. "Use the default" fills in the default; the change still needs Save. An optional
+     reason goes to the audit with the change.
+235. The page is for OPERATIONS_CONFIGURE (Owner and Manager). A setting the person may not change
+     says so; vendor settings are read-only (UPD-010); Owner-only settings ask for the second
+     factor through the same dialog as the Staff page.
+236. `pager.*` and `pagers.*` keys show as one Pagers area. Two settings overlap: vibration per
+     kind of alert (`pager.vibrationPatterns`) and per event (`pagers.vibration`). The firmware
+     (P2-05) applies a per-event choice when one is set, else the kind's.
 
 Decided 2026-10-01 (P4-02e):
 
@@ -1207,6 +1233,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-03a Settings page
+
+Split P4-03 in five (a settings, b notification rules, c recommendation rules, d stations and
+printers, e the Owner's profile, tax groups and invoice series).
+
+Built: `@rp/ui-web` `TextArea`; i18n `settingLabels`, `settingHints` (all 77 settings) and
+`settingsPage`; the console's Settings page (`src/manage/settings/`: `SettingsScreen` with its
+dialog, `settings-view.ts` choosing an editor from each schema and converting percent, rupees,
+lists, windows, fields and per-event choices), linked from the dashboard for Owner and Manager.
+No server change: the P1-01a settings API already lists editability and checks every value.
+
+Tests: ui-web `TextArea` (axe), console `settings-view.test.ts` 6 (every setting has an editor,
+label and hint, and its default round-trips) and `settings.test.tsx` 5, and the 19th Playwright
+step: a manager changes the amber threshold with a reason and sees it changed, on a 360 px phone.
+
+Gotchas:
+
+- Zod 4 schemas expose their shape through `schema.def` (`type`, `innerType`, `element`,
+  `keyType`, `valueType`, `format`) and numbers through `minValue`/`maxValue`.
+- Message keys with parentheses (`Why (optional)`) break `new RegExp` matchers in tests: match the
+  accessible name exactly instead.
+
+Deferred: the notification rules row links to its own page in P4-03b.
+
+Decisions: 232 to 236.
 
 ### 2026-10-01: P4-02e Custom roles (P4-02 done)
 

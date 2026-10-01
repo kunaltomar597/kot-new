@@ -920,6 +920,33 @@ test.describe.serial('the web console', () => {
     await page.keyboard.press('Escape');
   });
 
+  test('[MGR-007] [AUD-001] a manager changes a kitchen timer with a reason', async () => {
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.settings') })
+      .click();
+    const name = t('settingLabels.kds.ageAmberMinutes');
+    const row = page.locator('li', { has: page.getByRole('heading', { level: 4, name }) });
+    await expect(row.getByText(t('settingsPage.unit.minutes', { value: 10 }))).toBeVisible();
+    await row.getByRole('button', { name: t('settingsPage.edit') }).click();
+    const dialog = page.getByRole('dialog', { name: t('settingsPage.dialog.title', { name }) });
+    await dialog.getByRole('textbox', { name }).fill('12');
+    await dialog.getByRole('textbox', { name: t('settingsPage.dialog.reason') }).fill('Busy grill');
+    await expectAccessible(page);
+    await dialog.getByRole('button', { name: t('settingsPage.dialog.save') }).click();
+    await expect(page.getByText(t('settingsPage.saved', { name }))).toBeVisible();
+    await expect(row.getByText(t('settingsPage.changed'))).toBeVisible();
+    await expect(row.getByText(t('settingsPage.unit.minutes', { value: 12 }))).toBeVisible();
+    // A 360 px phone: the Settings page fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();

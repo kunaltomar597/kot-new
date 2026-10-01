@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Select, TextField } from '../src/index.js';
+import { Select, TextArea, TextField } from '../src/index.js';
 import { expectNoAxeViolations, renderUi } from './render.js';
 
 describe('[NFR-U05] TextField', () => {
@@ -32,6 +32,21 @@ describe('[NFR-U05] TextField', () => {
     expect(input).toHaveAttribute('id', 'name');
     expect(input).not.toHaveAttribute('aria-describedby');
     expect(input).not.toHaveAttribute('aria-invalid');
+  });
+});
+
+describe('[NFR-U05] TextArea', () => {
+  it('labels the field, links hint and error, and takes several lines', async () => {
+    const { user, container } = renderUi(
+      <TextArea label="Header lines" hint="One per line." error="Use up to 4 lines." rows={3} />,
+    );
+    const area = screen.getByRole('textbox', { name: 'Header lines' });
+    expect(area).toHaveAttribute('rows', '3');
+    expect(area).toHaveAttribute('aria-invalid', 'true');
+    expect(area).toHaveAccessibleDescription('One per line. Use up to 4 lines.');
+    await user.type(area, 'Thank you{Enter}Visit again');
+    expect(area).toHaveValue('Thank you\nVisit again');
+    await expectNoAxeViolations(container);
   });
 });
 

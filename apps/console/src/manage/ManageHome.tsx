@@ -7,6 +7,7 @@ import { useT } from '../app/i18n.js';
 import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
 import { MenuEditor } from './menu/MenuEditor.js';
+import { SettingsScreen } from './settings/SettingsScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
 import { StaffArea } from './staff/StaffArea.js';
@@ -72,6 +73,11 @@ export function ManageHome() {
             {t('dashboard.section.devices')}
           </NavLink>
         ) : null}
+        {operates ? (
+          <NavLink to="/manage/settings" className="dashboard__link">
+            {t('dashboard.section.settings')}
+          </NavLink>
+        ) : null}
         {isOwner ? (
           <NavLink to="/manage/security" className="dashboard__link">
             {t('dashboard.section.security')}
@@ -92,6 +98,7 @@ export function ManageHome() {
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
+          {operates ? <Route path="settings" element={<SettingsScreen />} /> : null}
           {isOwner ? <Route path="security" element={<OwnerSecurityScreen />} /> : null}
           <Route path="*" element={<Navigate to="/manage" replace />} />
         </Routes>
