@@ -1639,6 +1639,7 @@ model Payment {
 
   @@index([invoiceId])
   @@index([restaurantId, businessDate])
+  @@index([shiftId])
   @@map("payments")
 }
 
