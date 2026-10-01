@@ -13,6 +13,10 @@
     "./control-plane": {
       "types": "./dist/control-plane/index.d.ts",
       "import": "./dist/control-plane/index.js"
+    },
+    "./relay": {
+      "types": "./dist/relay/index.d.ts",
+      "import": "./dist/relay/index.js"
     }
   },
   "files": [

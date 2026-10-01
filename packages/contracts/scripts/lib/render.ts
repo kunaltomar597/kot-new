@@ -14,6 +14,11 @@ export interface RenderOptions {
     namespace: Readonly<Record<string, unknown>>;
     routes: readonly RouteDefinition<string>[];
   };
+  /** The QR relay's edge functions (`@rp/contracts/relay`, ADR-0015). */
+  relay: {
+    namespace: Readonly<Record<string, unknown>>;
+    routes: readonly RouteDefinition<string>[];
+  };
   version: string;
   /** Directory the files are written to; Prettier resolves its config from here. */
   outDir: string;
@@ -32,6 +37,18 @@ export const CONTROL_PLANE_INFO: OpenApiInfo = {
   ],
 };
 
+export const RELAY_INFO: OpenApiInfo = {
+  title: 'Restaurant Operations Platform: QR relay functions',
+  description:
+    'Generated from @rp/contracts/relay by `pnpm contracts:docs`; do not edit by hand. The QR ' +
+    'menu site calls these Supabase edge functions (ADR-0015). `x-capability` is `TABLE_TOKEN` for ' +
+    "a table's QR token in the `x-rp-table-token` header, with the browser's anonymous id in " +
+    '`x-rp-browser` where a rate limit applies. `x-requirements` lists the BRD requirement IDs.',
+  servers: [
+    { url: 'https://<project-ref>.supabase.co', description: 'The Supabase project in Mumbai' },
+  ],
+};
+
 export interface RenderedFile {
   name: string;
   content: string;
@@ -46,6 +63,7 @@ export async function renderDocs(options: RenderOptions): Promise<RenderedFile[]
     version: options.version,
     info: CONTROL_PLANE_INFO,
   });
+  const relay = buildOpenApi({ ...options.relay, version: options.version, info: RELAY_INFO });
   return [
     {
       name: 'openapi.json',
@@ -57,6 +75,10 @@ export async function renderDocs(options: RenderOptions): Promise<RenderedFile[]
         JSON.stringify(controlPlane),
         `${options.outDir}/control-plane.openapi.json`,
       ),
+    },
+    {
+      name: 'relay.openapi.json',
+      content: await format(JSON.stringify(relay), `${options.outDir}/relay.openapi.json`),
     },
     {
       name: 'asyncapi.yaml',

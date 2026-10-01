@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
     globalSetup: ['test/setup/global-setup.ts'],
+    // On a shared Supabase database the files would see each other's orders (expiry, retention).
+    fileParallelism: (process.env.RELAY_DATABASE_URL ?? '') === '',
     testTimeout: 30_000,
     hookTimeout: 60_000,
   },

@@ -113,7 +113,7 @@ describe('[SEC-005] privileges', () => {
     const claims = ['claim_table', 'claim_tenant', 'claim_uuid'];
     expect(byRole('relay_server')).toEqual(claims);
     expect(byRole('relay_writer')).toEqual(claims);
-    expect(byRole('relay_diner')).toEqual(claims);
+    expect(byRole('relay_diner')).toEqual([...claims, 'rate_limit_wait']);
     expect(byRole('relay_edge')).toEqual(['resolve_table_token', 'verify_credential']);
     expect(byRole('relay_provisioner')).toEqual([
       'add_credential',

@@ -1,7 +1,9 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import type { QrMenuDocument } from '@rp/contracts/relay';
 import { cloneTemplateDatabase } from '@rp/test-postgres';
 import pg from 'pg';
 import { inject } from 'vitest';
+import type { RelayDatabase } from '../../src/db.js';
 
 /** The relay's own roles (ADR-0015). */
 export const RELAY_ROLES = [
@@ -35,6 +37,8 @@ export interface Claims {
 }
 
 export interface RelayDb {
+  /** Where the database is, as the superuser that set it up. */
+  readonly url: string;
   /** The superuser connection that set the database up. */
   readonly admin: pg.Pool;
   /**
@@ -67,6 +71,7 @@ export async function openRelayDb(): Promise<RelayDb> {
   }
   const admin = new pg.Pool({ connectionString: url, max: 4 });
   return {
+    url,
     admin,
     async as(role, claims, work) {
       const client = await admin.connect();
@@ -206,4 +211,63 @@ export async function seedTenant(db: RelayDb, name: string): Promise<SeededTenan
     await submitOrder(db, id, tables[1].id),
   ];
   return { id, name, credential, credentialId, tables, photoId, orderIds };
+}
+
+/**
+ * The functions' database as on Supabase: every transaction runs as the edge functions' login
+ * (`relay_edge`), which has no rights until it takes a relay role.
+ */
+export function edgeDatabase(db: RelayDb): RelayDatabase {
+  return {
+    async transaction(work) {
+      const client = await db.admin.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL SESSION AUTHORIZATION relay_edge');
+        const result = await work({
+          query: async <Row extends object>(text: string, params: readonly unknown[] = []) =>
+            (await client.query<Row>(text, [...params])).rows,
+        });
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
+
+/** Publishes `document` as the tenant's menu `version`, as the sync agent will (P5-03). */
+export async function publishMenu(
+  db: RelayDb,
+  tenantId: string,
+  version: number,
+  document: QrMenuDocument,
+): Promise<void> {
+  await db.as('relay_writer', { tenant_id: tenantId }, (client) =>
+    client.query(
+      'INSERT INTO relay.menu_snapshots (tenant_id, version, menu) VALUES ($1, $2, $3)',
+      [tenantId, version, JSON.stringify(document)],
+    ),
+  );
+}
+
+/** The restaurant was last heard from `secondsAgo` ago (QR-008), whatever the trigger stamps. */
+export async function lastSeen(db: RelayDb, tenantId: string, secondsAgo: number): Promise<void> {
+  const client = await db.admin.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL session_replication_role = replica');
+    await client.query(
+      `UPDATE relay.presence SET last_seen_at = now() - make_interval(secs => $2)
+       WHERE tenant_id = $1`,
+      [tenantId, secondsAgo],
+    );
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+  }
 }

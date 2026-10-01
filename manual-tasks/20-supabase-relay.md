@@ -71,7 +71,28 @@ without a password; set one now.
    supabase secrets set --workdir infra RELAY_DB_URL='postgresql://relay_edge.<ref>:<password>@<pooler-host>:6543/postgres'
    ```
 
-The edge functions themselves come with P5-02. Claude will add their deploy command here.
+### 4b. Deploy the edge functions
+
+1. Set which sites may call the functions from a browser: the QR menu's address, without a
+   trailing slash.
+
+   ```sh
+   supabase secrets set --workdir infra RELAY_ALLOWED_ORIGINS='https://<qr-site-domain>'
+   ```
+
+2. Bundle the functions, then deploy them:
+
+   ```sh
+   pnpm install && pnpm --filter @rp/relay... build
+   supabase functions deploy --workdir infra
+   ```
+
+3. Check that the menu function answers. A made-up code should give `404` with `TABLE_NOT_FOUND`
+   (real codes come with the table tents, P5-04):
+
+   ```sh
+   curl -i https://<project-ref>.supabase.co/functions/v1/qr-menu -H 'x-rp-table-token: AAAAAAAAAAAAAAAAAAAAAA'
+   ```
 
 ### 5. Check retention is scheduled
 
@@ -81,7 +102,13 @@ In the SQL editor, run:
 SELECT jobname, schedule, command FROM cron.job WHERE jobname = 'relay-purge';
 ```
 
-You should see one row: `17 * * * *` and `SELECT relay.purge()`.
+You should see one row: `17 * * * *` and `SELECT relay.purge()`. Then check the expiry job:
+
+```sql
+SELECT jobname, schedule, command FROM cron.job WHERE jobname = 'relay-expire';
+```
+
+You should see `* * * * *` and `SELECT relay.expire_orders()`.
 
 ## Results to report back
 
@@ -97,6 +124,7 @@ Supabase relay deployment
 - Migrations applied (dev/staging/prod): __/__/__
 - Exposed schemas exclude relay (dev/staging/prod): __/__/__
 - relay_edge login set and RELAY_DB_URL secret stored (dev/staging/prod): __/__/__
-- relay-purge job present (dev/staging/prod): __/__/__
+- Functions deployed, RELAY_ALLOWED_ORIGINS set, qr-menu answers 404 for a made-up code: __/__/__
+- relay-purge and relay-expire jobs present (dev/staging/prod): __/__/__
 - Anything that did not match these steps:
 ```

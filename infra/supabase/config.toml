@@ -55,3 +55,18 @@ deno_version = 2
 
 [analytics]
 enabled = false
+
+# Edge functions (P5-02): bundled from src/ into dist/functions by `pnpm --filter @rp/relay build`.
+# Diners' browsers carry a table's QR token, not a Supabase JWT, so the platform's JWT check is
+# off for them; each function checks the token itself (ADR-0015).
+[functions.qr-menu]
+verify_jwt = false
+entrypoint = "./dist/functions/qr-menu/index.js"
+
+[functions.submit-order]
+verify_jwt = false
+entrypoint = "./dist/functions/submit-order/index.js"
+
+[functions.order-status]
+verify_jwt = false
+entrypoint = "./dist/functions/order-status/index.js"

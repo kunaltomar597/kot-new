@@ -5,16 +5,22 @@
   "description": "QR relay on Supabase (C8, ADR-0015): migrations, Row-Level Security, edge functions and their tests.",
   "type": "module",
   "scripts": {
+    "build": "node scripts/bundle-functions.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run",
-    "clean": "rm -rf coverage"
+    "clean": "rm -rf dist coverage"
   },
   "devDependencies": {
-    "@rp/contracts": "workspace:*",
     "@rp/test-postgres": "workspace:*",
     "@types/node": "^22.20.4",
     "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
     "pg": "^8.23.0"
+  },
+  "dependencies": {
+    "@rp/contracts": "workspace:*",
+    "@rp/ordering": "workspace:*",
+    "zod": "^4.6.5"
   }
 }

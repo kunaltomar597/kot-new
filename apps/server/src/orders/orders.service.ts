@@ -3,9 +3,9 @@ import { Injectable } from '@nestjs/common';
 import type {
   DomainEvent,
   MenuSnapshot,
-  OrderLineRequest,
   OrderListResponse,
   OrderView,
+  RejectedLine,
   SubmitOrderRequest,
   SubmitOrderResponse,
 } from '@rp/contracts';
@@ -17,10 +17,15 @@ import {
   splitIntoKots,
   tableMachine,
   transition,
-  unitPriceOf,
-  validateSelection,
   type KotItemInput,
 } from '@rp/domain';
+import {
+  isRejectedLine,
+  rejectLine,
+  resolveOrderLine,
+  type ResolvedOrderLine,
+  type SalesChannel,
+} from '@rp/ordering';
 import { AuditService } from '../audit/audit.service.js';
 import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
@@ -29,15 +34,9 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { appendEvent, type EventAudience } from '../events/outbox.js';
-import { comboOnNow } from '../menu/menu-content.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
-type MenuItem = MenuSnapshot['items'][number];
-type RejectedLine = Extract<
-  SubmitOrderResponse,
-  { status: 'PARTIALLY_REJECTED' }
->['rejectedLines'][number];
 type Accepted = Extract<SubmitOrderResponse, { status: 'ACCEPTED' }>;
 
 /** Who submits an order: a signed-in person on a device, or (later) a tablet or the QR relay. */
@@ -48,19 +47,11 @@ export interface OrderActor {
 }
 
 /** A priced, validated line, ready to be written. */
-interface ResolvedLine {
-  readonly request: OrderLineRequest;
-  readonly item: MenuItem;
-  readonly variantName: string | null;
-  readonly modifiers: readonly { optionId: string; name: string; priceDelta: number }[];
-  readonly unitPrice: number;
-  /** Combo parts with their per-combo quantity (MENU-005). */
-  readonly components: readonly { item: MenuItem; quantity: number }[];
-}
+type ResolvedLine = ResolvedOrderLine;
 
 const IDEMPOTENCY_SCOPE = 'orders.submit';
 const IDEMPOTENCY_DAYS = 7;
-const CHANNEL_OF: Readonly<Record<OrderSource, MenuItem['channels'][number]>> = {
+const CHANNEL_OF: Readonly<Record<OrderSource, SalesChannel>> = {
   POS: 'POS',
   WAITER_APP: 'WAITER_APP',
   TABLE_TABLET: 'TABLE_TABLET',
@@ -69,10 +60,6 @@ const CHANNEL_OF: Readonly<Record<OrderSource, MenuItem['channels'][number]>> = 
 
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
-}
-
-function reject(line: OrderLineRequest, code: RejectedLine['code'], message: string): RejectedLine {
-  return { clientLineId: line.clientLineId, code, message };
 }
 
 /**
@@ -191,15 +178,13 @@ export class OrdersService {
       const rejected: RejectedLine[] = [];
       const lines: ResolvedLine[] = [];
       for (const line of request.lines) {
-        const resolved = this.resolve(
-          line,
-          menu,
-          request.source,
-          maxLength,
+        const resolved = resolveOrderLine(menu, line, {
+          channel: CHANNEL_OF[request.source],
+          instructionMaxLength: maxLength,
           now,
-          restaurant.timeZone,
-        );
-        if ('code' in resolved) rejected.push(resolved);
+          timeZone: restaurant.timeZone,
+        });
+        if (isRejectedLine(resolved)) rejected.push(resolved);
         else lines.push(resolved);
       }
       const itemState = initialOrderItemState(request.source);
@@ -207,7 +192,9 @@ export class OrdersService {
       for (const line of lines) {
         const ids = [line.item.id, ...line.components.map((component) => component.item.id)];
         if (ids.some((id) => stockProblems.has(id))) {
-          rejected.push(reject(line.request, 'OUT_OF_STOCK', `${line.item.name} is out of stock.`));
+          rejected.push(
+            rejectLine(line.request, 'OUT_OF_STOCK', `${line.item.name} is out of stock.`),
+          );
         }
       }
       if (rejected.length > 0) return { status: 'PARTIALLY_REJECTED', rejectedLines: rejected };
@@ -282,106 +269,6 @@ export class OrdersService {
       orderBy: [{ createdAt: 'asc' }, { orderNumber: 'asc' }],
     });
     return { orders: orders.map(orderView) };
-  }
-
-  /** Prices and checks one line against the published menu; a rejection says why (ORD-017). */
-  private resolve(
-    line: OrderLineRequest,
-    menu: MenuSnapshot,
-    source: OrderSource,
-    maxLength: number,
-    now: Date,
-    timeZone: string,
-  ): ResolvedLine | RejectedLine {
-    const items = new Map(menu.items.map((item) => [item.id, item]));
-    const item = items.get(line.itemId);
-    if (item === undefined) return reject(line, 'ARCHIVED', 'This item is no longer on the menu.');
-    if (!item.available) {
-      return item.stockCount === 0
-        ? reject(line, 'OUT_OF_STOCK', `${item.name} is out of stock.`)
-        : reject(line, 'NOT_AVAILABLE_NOW', `${item.name} is not available right now.`);
-    }
-    if (!item.channels.includes(CHANNEL_OF[source])) {
-      return reject(line, 'NOT_ON_CHANNEL', `${item.name} cannot be ordered here.`);
-    }
-    if ((line.instructions?.length ?? 0) > maxLength) {
-      return reject(
-        line,
-        'INVALID_SELECTION',
-        `Instructions are limited to ${String(maxLength)} characters.`,
-      );
-    }
-
-    const groups = new Map(menu.modifierGroups.map((group) => [group.id, group]));
-    const definition = {
-      id: item.id,
-      basePrice: item.basePrice,
-      variants: item.variants,
-      modifierGroups: item.modifierGroupIds.flatMap((id) => {
-        const group = groups.get(id);
-        return group === undefined ? [] : [group];
-      }),
-    };
-    const selection = {
-      ...(line.variantId !== undefined && { variantId: line.variantId }),
-      modifiers: line.modifiers,
-    };
-    const issues = validateSelection(definition, selection);
-    if (issues.length > 0) {
-      return reject(line, 'INVALID_SELECTION', issues.map((issue) => issue.message).join('; '));
-    }
-
-    const components: { item: MenuItem; quantity: number }[] = [];
-    const combo = menu.combos.find((entry) => entry.itemId === item.id);
-    if (combo !== undefined) {
-      if (!comboOnNow(combo, now, timeZone)) {
-        return reject(line, 'NOT_AVAILABLE_NOW', `${item.name} is not offered at this time.`);
-      }
-      const choices = [...(line.comboChoices ?? [])];
-      const slots = combo.components.filter((component) => component.kind === 'CHOICE');
-      if (choices.length !== slots.length) {
-        return reject(line, 'INVALID_SELECTION', `Choose one item for each part of ${item.name}.`);
-      }
-      for (const component of combo.components) {
-        const chosen = component.kind === 'FIXED' ? component.itemId : choices.shift();
-        if (
-          component.kind === 'CHOICE' &&
-          (chosen === undefined || !component.itemIds.includes(chosen))
-        ) {
-          return reject(
-            line,
-            'INVALID_SELECTION',
-            `That is not one of the choices for ${component.label}.`,
-          );
-        }
-        const part = items.get(chosen ?? '');
-        if (part?.available !== true) {
-          return reject(line, 'OUT_OF_STOCK', `Part of ${item.name} is out of stock.`);
-        }
-        components.push({ item: part, quantity: component.quantity });
-      }
-    } else if ((line.comboChoices ?? []).length > 0) {
-      return reject(line, 'INVALID_SELECTION', `${item.name} is not a combo.`);
-    }
-
-    const chosen = new Set(line.modifiers.flatMap((modifier) => modifier.optionIds));
-    const modifiers = definition.modifierGroups.flatMap((group) =>
-      group.options
-        .filter((option) => chosen.has(option.id))
-        .map((option) => ({
-          optionId: option.id,
-          name: option.name,
-          priceDelta: option.priceDelta,
-        })),
-    );
-    return {
-      request: line,
-      item,
-      variantName: item.variants.find((variant) => variant.id === line.variantId)?.name ?? null,
-      modifiers,
-      unitPrice: unitPriceOf(definition, selection),
-      components,
-    };
   }
 
   /** Items whose counted stock is short, checked under the item row locks (MENU-006). */

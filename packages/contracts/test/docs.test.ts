@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import * as controlPlane from '../src/control-plane/index.js';
 import * as contracts from '../src/index.js';
+import * as relay from '../src/relay/index.js';
 import { buildAsyncApi } from '../scripts/lib/asyncapi.js';
 import { buildOpenApi } from '../scripts/lib/openapi.js';
 import { renderDocs } from '../scripts/lib/render.js';
@@ -15,6 +16,7 @@ const options = {
   routes: contracts.ROUTES,
   events: contracts.DomainEvent,
   controlPlane: { namespace: controlPlane, routes: controlPlane.CONTROL_PLANE_ROUTES },
+  relay: { namespace: relay, routes: relay.RELAY_ROUTES },
   version: '0.0.0-test',
   outDir,
 };
@@ -51,8 +53,26 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
     expect(first.map((file) => file.name)).toEqual([
       'openapi.json',
       'control-plane.openapi.json',
+      'relay.openapi.json',
       'asyncapi.yaml',
     ]);
+  });
+
+  it('[QR-006] documents the QR relay functions separately, without prices in the order', () => {
+    const document = buildOpenApi({
+      namespace: relay,
+      routes: relay.RELAY_ROUTES,
+      version: '0.0.0-test',
+    }) as unknown as Doc;
+    for (const registered of relay.RELAY_ROUTES) {
+      expect(document.paths[registered.path]?.[registered.method.toLowerCase()]).toBeDefined();
+    }
+    for (const name of collectSchemas(relay).keys()) {
+      expect(document.components.schemas).toHaveProperty([name]);
+    }
+    const body = JSON.stringify(document.paths['/functions/v1/submit-order']?.post?.requestBody);
+    expect(body).not.toMatch(/price/i);
+    expect(openapi.components.schemas).not.toHaveProperty(['QrSubmitOrderRequest']);
   });
 
   it('[VCP-005] [UPD-002] documents the Control Plane API separately, route by route', () => {
