@@ -141,7 +141,9 @@ function describe(
             .join(' · ');
     }
     case 'RULES':
-      return t('settingsPage.rulesChanged', { count: Object.keys(value ?? {}).length });
+      return t(`settingsPage.pageValue.${editor.page}`, {
+        count: Object.keys(value ?? {}).length,
+      });
   }
 }
 
@@ -276,8 +278,8 @@ export function SettingsScreen() {
                     </div>
                     {editor?.kind === 'RULES' ? (
                       <div className="staff-row__actions">
-                        <Link to="/manage/settings/notifications" className="staff-pages__link">
-                          {t('settingsPage.openRules')}
+                        <Link to={`/manage/settings/${editor.page}`} className="staff-pages__link">
+                          {t(`settingsPage.openPage.${editor.page}`)}
                         </Link>
                       </div>
                     ) : setting.editable && editor !== undefined ? (

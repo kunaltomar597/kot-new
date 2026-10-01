@@ -44,6 +44,11 @@
               }
             },
             "required": ["kind", "daypart"]
+          },
+          {
+            "type": "object",
+            "properties": { "kind": { "type": "string", "const": "FEATURED" } },
+            "required": ["kind"]
           }
         ]
       }
@@ -97,6 +102,12 @@
               }
             },
             "required": ["kind", "daypart"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": { "kind": { "type": "string", "const": "FEATURED" } },
+            "required": ["kind"],
             "additionalProperties": false
           }
         ]

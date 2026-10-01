@@ -8,6 +8,7 @@ import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
 import { MenuEditor } from './menu/MenuEditor.js';
 import { NotificationRulesScreen } from './settings/NotificationRulesScreen.js';
+import { RecommendationsScreen } from './settings/RecommendationsScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
@@ -102,6 +103,9 @@ export function ManageHome() {
           {operates ? <Route path="settings" element={<SettingsScreen />} /> : null}
           {operates ? (
             <Route path="settings/notifications" element={<NotificationRulesScreen />} />
+          ) : null}
+          {operates ? (
+            <Route path="settings/recommendations" element={<RecommendationsScreen />} />
           ) : null}
           {isOwner ? <Route path="security" element={<OwnerSecurityScreen />} /> : null}
           <Route path="*" element={<Navigate to="/manage" replace />} />

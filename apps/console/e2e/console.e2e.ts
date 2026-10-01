@@ -947,6 +947,51 @@ test.describe.serial('the web console', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
   });
 
+  test('[REC-002] [REC-009] a manager adds a suggestion rule and pins a dish', async () => {
+    // Still the manager, on the Settings page.
+    const name = t('settingLabels.reco.itemPreferences');
+    const row = page.locator('li', { has: page.getByRole('heading', { level: 4, name }) });
+    await row.getByRole('link', { name: t('settingsPage.openPage.recommendations') }).click();
+    await expect(page).toHaveURL(/\/manage\/settings\/recommendations$/);
+    await expect(page.getByText(t('recoPage.rules.empty'))).toBeVisible();
+
+    await page.getByRole('button', { name: t('recoPage.rules.add') }).click();
+    const dialog = page.getByRole('dialog', { name: t('recoPage.dialog.addTitle') });
+    const dishes = dialog.getByRole('combobox', {
+      name: t('recoPage.dialog.dish'),
+      exact: true,
+    });
+    await dishes.nth(0).selectOption({ label: 'Chicken Tikka' });
+    await dishes.nth(1).selectOption({ label: 'Butter Naan' });
+    await dialog
+      .getByRole('textbox', { name: t('recoPage.dialog.label') })
+      .fill('Mop up the gravy');
+    await expectAccessible(page);
+    await dialog.getByRole('button', { name: t('recoPage.dialog.save') }).click();
+    await expect(page.getByText(t('recoPage.rules.added'))).toBeVisible();
+    const rule = t('recoPage.rules.summary', { when: 'Chicken Tikka', suggest: 'Butter Naan' });
+    await expect(page.getByRole('heading', { level: 4, name: rule })).toBeVisible();
+    // The toasts sit over the form below; put them away.
+    const dismiss = page.getByRole('button', { name: t('ui.toast.dismiss') });
+    while ((await dismiss.count()) > 0) await dismiss.first().click();
+
+    const add = page.getByRole('form', { name: t('recoPage.featured.add') });
+    await add
+      .getByRole('combobox', { name: t('recoPage.featured.dish'), exact: true })
+      .selectOption({ label: 'Veg Thali Combo' });
+    await add.getByRole('button', { name: t('recoPage.featured.add') }).click();
+    const featured = page.getByRole('list', { name: t('recoPage.featured.title') });
+    await expect(featured.getByText(t('recoPage.featured.preference.PIN'))).toBeVisible();
+    await expect(
+      featured.getByRole('heading', { level: 4, name: 'Veg Thali Combo' }),
+    ).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole('link', { name: t('recoPage.back') }).click();
+    await expect(
+      row.getByText(t('settingsPage.pageValue.recommendations', { count: 1 })),
+    ).toBeVisible();
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();

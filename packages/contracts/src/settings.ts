@@ -1,7 +1,8 @@
+import { ITEM_PREFERENCES } from '@rp/domain';
 import { z } from 'zod';
 import { NotificationEventType, NUDGE_MESSAGE_MAX } from './alerts.js';
 import { Capability } from './auth.js';
-import { Timestamp } from './common.js';
+import { Id, Timestamp } from './common.js';
 
 /**
  * The settings catalogue (P1-01a, MGR-007, UPD-010): every configurable value the BRD marks with
@@ -16,6 +17,9 @@ import { Timestamp } from './common.js';
  * thresholds (the Control Plane, P7-03) and the whole-financial-year archive period (fixed by
  * law, DATA-008).
  */
+
+/** The most dishes `reco.itemPreferences` may name (REC-009). */
+export const ITEM_PREFERENCES_MAX = 500;
 
 /** RESTAURANT: changed on the dashboard (MGR-007). VENDOR: set by the vendor through the Control Plane and read-only here (UPD-010). */
 export const SETTING_SCOPES = ['RESTAURANT', 'VENDOR'] as const;
@@ -704,6 +708,20 @@ export const SETTINGS = [
     description:
       'Course order recommendations favour next (menu categories are tagged with a course).',
     requirements: ['REC-005'],
+  }),
+  setting({
+    key: 'reco.itemPreferences',
+    schema: z
+      .record(Id, z.enum(ITEM_PREFERENCES))
+      .refine((preferences) => Object.keys(preferences).length <= ITEM_PREFERENCES_MAX, {
+        message: `At most ${String(ITEM_PREFERENCES_MAX)} dishes.`,
+      }),
+    defaultValue: {},
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Dishes the restaurant pins (shown first), boosts (ranked higher) or blocks (never suggested).',
+    requirements: ['REC-009'],
   }),
 
   // Audit, storage, backups and retention (AUD, DATA, §9.3)

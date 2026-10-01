@@ -146,7 +146,9 @@ What exists:
   menu editor (dishes with photos, sizes, option groups, combos, stock; categories; option
   groups; publish) (P4-02d); the Roles page and custom roles for people, with screens that show
   what a custom role adds (P4-02e); the Settings page with an editor for every catalogue
-  setting (P4-03a); the notification rules page (P4-03b). 231 tests, and 19 Playwright steps.
+  setting (P4-03a); the notification rules page (P4-03b); the Suggestions page with the
+  recommendation rules and the pinned, boosted and blocked dishes (P4-03c). 242 tests, and 20
+  Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -161,8 +163,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03c Recommendation rules with boost, pin and block, then P4-03d and P4-03e (P4-03 is split in
-  five, see phase-4.md).
+- P4-03d Stations and printers, then P4-03e (P4-03 is split in five, see phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -269,7 +270,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02e Custom roles (S)
 - [x] P4-03a Settings page (every catalogue setting)
 - [x] P4-03b Notification rules editor
-- [ ] P4-03c Recommendation rules editor with boost, pin and block
+- [x] P4-03c Recommendation rules editor with boost, pin and block
 - [ ] P4-03d Stations and printers
 - [ ] P4-03e Restaurant profile, tax groups and invoice series (Owner)
 - [ ] P4-04 Alert centre and system screen
@@ -557,6 +558,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-03c):
+
+240. Pin, boost and block (REC-009) are one choice per dish in the `reco.itemPreferences` setting
+     (dish id to PIN, BOOST or BLOCK; at most 500 dishes), so they are audited and announced like
+     any setting, and a dish no longer on the menu is simply ignored.
+241. Pinned dishes come first but take at most half the places (rounded up), so the restaurant's
+     rules still show; among themselves they follow the next course, then sales. Boosted dishes
+     rank first among the learned pairings and among the best sellers, and join the best sellers
+     when they are not one. Blocked dishes are never suggested, whatever the layer. The usual
+     filters (stock, channel, veg-only, already ordered) apply to all of them.
+242. A pinned dish, and a boosted dish that is not a best seller, carries the new reason
+     `FEATURED`, shown as "Recommended by the restaurant". A pinned dish counts in the RULE layer
+     for tracking (REC-008) with no rule id, like a rule without one would; boosted ones keep their
+     layer.
+243. The rules and the featured dishes share one page under Settings
+     (`/manage/settings/recommendations`, OPERATIONS_CONFIGURE), with dishes and categories from
+     the published menu. Pause and resume send the whole rule with `active` changed; archiving asks
+     for a reason. Rule changes are not announced to other screens yet; the page reloads after its
+     own changes.
 
 Decided 2026-10-01 (P4-03b):
 
@@ -1245,6 +1266,38 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-03c Suggestions page (recommendation rules, pin, boost and block)
+
+Built: `@rp/domain` `ITEM_PREFERENCES` and `recommend` with `preferences` (pinned first in up to
+half the places, boosted first among learned pairings and best sellers, blocked never) and the
+`FEATURED` reason; the `reco.itemPreferences` setting and the reason in `@rp/contracts`; the
+server passes the setting to the engine; `describeRecommendation` says "Recommended by the
+restaurant"; the console's `RecommendationsScreen` at `/manage/settings/recommendations` with the
+rules (add, change, pause, resume, archive with a reason) and the featured dishes, linked from
+the Settings page (the page-link editor now names its page).
+
+Tests: domain recommendations 22 (5 new), server recommendations 21 (2 new), ordering 1 new,
+console `recommendations-view.test.ts` 6 and `recommendations.test.tsx` 5, and an e2e step (a
+manager adds a rule and pins a dish; 20 steps).
+
+Check: `pnpm check` passed everything except one timing test in the server suite (30 nudges
+within 2 s took 3.6 s while the check held the load average at 83 on 10 cores); the server suite
+alone passes (733 tests).
+
+Gotchas:
+
+- A setting that has its own page needs `editorOf` to return `{ kind: 'RULES', page }`, or the
+  "every setting has an editor" test fails.
+- An invalid setting value is a 422 from the server, not a 400.
+- In Playwright, `getByRole('combobox', { name: 'Dish' })` also matches "Dish or category"; pass
+  `exact: true`. Toasts left from earlier steps cover buttons at the bottom of a page: dismiss
+  them first.
+- The engine's speed test runs in about 1 ms per call alone but over 50 ms at the 95th percentile
+  while `pnpm check` loads every core; it now checks the median under 50 ms and the 95th
+  percentile under the 200 ms budget, after five untimed warm-up runs.
+
+Decisions: 240 to 243.
 
 ### 2026-10-01: P4-03b Notification rules
 

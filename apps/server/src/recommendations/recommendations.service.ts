@@ -206,6 +206,7 @@ export class RecommendationsService {
       businessDate,
       courseSequence: settings.get('reco.courseSequence'),
       limit: ask.limit,
+      preferences: settings.get('reco.itemPreferences'),
     });
     return { recommendations, daypart, menuVersion: menu.version };
   }

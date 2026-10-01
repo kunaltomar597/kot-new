@@ -32,8 +32,10 @@ export type Editor =
       readonly keys: readonly string[];
       readonly options: readonly string[];
     }
-  /** The notification rules have their own page (P4-03b). */
-  | { readonly kind: 'RULES' };
+  /** Edited on a page of their own: the notification rules (P4-03b), the suggestions (P4-03c). */
+  | { readonly kind: 'RULES'; readonly page: RulesPage };
+
+export type RulesPage = 'notifications' | 'recommendations';
 
 interface Def {
   readonly type: string;
@@ -123,7 +125,8 @@ export function editorOfSchema(schema: z.ZodType, unit?: string): Editor | undef
 
 /** The editor for a catalogue setting. */
 export function editorOf(key: string): Editor | undefined {
-  if (key === 'notifications.rules') return { kind: 'RULES' };
+  if (key === 'notifications.rules') return { kind: 'RULES', page: 'notifications' };
+  if (key === 'reco.itemPreferences') return { kind: 'RULES', page: 'recommendations' };
   const definition = settingDefinition(key);
   return definition === undefined ? undefined : editorOfSchema(definition.schema, definition.unit);
 }
