@@ -1,6 +1,7 @@
-# Smoke flow (P2-01c, MENU-013): pair the tablet to its table and see the live menu, no login.
-# Run against a development build with Metro running (see apps/table-tablet/README.md):
-#   maestro test -e PAIRING_CODE=ABCD-EFGH -e TABLE_NAME="Table T4" apps/table-tablet/.maestro
+# Smoke flow (P2-01c, P3-01b): pair the tablet to its table, with no login, and see the idle
+# screen of a free table. Run against a development build with Metro running (see
+# apps/table-tablet/README.md):
+#   maestro test -e PAIRING_CODE=ABCD-EFGH apps/table-tablet/.maestro/pair-idle-menu.yaml
 appId: ${APP_ID}
 env:
   APP_ID: in.rp.tablet.dev
@@ -23,9 +24,9 @@ env:
 - hideKeyboard
 - tapOn:
     id: pairing-submit
-- assertVisible: ${TABLE_NAME}
+# A free table: the idle screen (P3-01b, TAB-003).
 - extendedWaitUntil:
     visible:
-      id: menu-count
+      id: idle-screen
     timeout: 15000
-- assertVisible: .*on the menu today
+- assertVisible: Please wait to be seated

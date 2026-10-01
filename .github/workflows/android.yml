@@ -88,6 +88,14 @@ jobs:
               [ "${{ matrix.app }}" != waiter-app ] || { echo "::error::The waiter app lacks $permission"; exit 1; }
             fi
           done
+          # The tablet's kiosk (P3-01b): its device-admin receiver, bindable only by the system.
+          if [ "${{ matrix.app }}" = table-tablet ]; then
+            grep -A8 'com.rp.mobilenative.RpDeviceAdminReceiver' manifest.txt | tee admin.txt
+            grep -q 'android.permission.BIND_DEVICE_ADMIN' admin.txt || {
+              echo '::error::The device-admin receiver is not protected by BIND_DEVICE_ADMIN'
+              exit 1
+            }
+          fi
           if [ "${{ matrix.app }}" = waiter-app ]; then
             grep -A6 'com.rp.mobilenative.RpAlertService' manifest.txt | tee service.txt
             grep -q -E 'foregroundServiceType.*(0x40000000|1073741824|specialUse)' service.txt || {

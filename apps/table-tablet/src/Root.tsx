@@ -1,6 +1,7 @@
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession } from '@rp/mobile-core';
+import { DeviceSession, type KeyValueStore } from '@rp/mobile-core';
 import {
+  AndroidKiosk,
   AndroidServerTrust,
   installRandomValues,
   KeystoreDeviceKeys,
@@ -10,37 +11,54 @@ import {
 import Constants from 'expo-constants';
 import { useEffect, useState } from 'react';
 import { App } from './App';
+import type { TabletDevice } from './TabletHome';
 
 const translator = createTranslator();
+const appVersion = Constants.expoConfig?.version;
 
 /**
  * Wires the device session to the Keystore, the secure store and AsyncStorage; the session keeps
  * the menu cache in AsyncStorage (P2-01c). The restaurant's LAN certificate is pinned at pairing
  * (P2-01d, ADR-0011). Secure random values first: every request carries a random correlation id.
+ * The kiosk module gives lock-task mode and the tablet's health (P3-01b).
  */
-async function createSession(): Promise<DeviceSession> {
+async function createSession(): Promise<{ session: DeviceSession; device: TabletDevice }> {
   await installRandomValues();
-  return new DeviceSession({
+  const store: KeyValueStore = await plainStore();
+  const kiosk = await AndroidKiosk.load();
+  const session = new DeviceSession({
     secureStore: await secureStore(),
-    plainStore: await plainStore(),
+    plainStore: store,
     keys: new KeystoreDeviceKeys(),
     trust: new AndroidServerTrust(),
-    ...(Constants.expoConfig?.version !== undefined && {
-      appVersion: Constants.expoConfig.version,
-    }),
+    ...(appVersion !== undefined && { appVersion }),
   });
+  return {
+    session,
+    device: {
+      store,
+      kiosk,
+      health: kiosk,
+      ...(appVersion !== undefined && { appVersion }),
+    },
+  };
 }
 
 export function Root() {
-  const [session, setSession] = useState<DeviceSession | null>(null);
+  const [created, setCreated] = useState<{
+    session: DeviceSession;
+    device: TabletDevice;
+  } | null>(null);
   useEffect(() => {
     let current: DeviceSession | undefined;
-    void createSession().then((created) => {
-      current = created;
-      setSession(created);
-      return created.start();
+    void createSession().then((made) => {
+      current = made.session;
+      setCreated(made);
+      return made.session.start();
     });
     return () => current?.stop();
   }, []);
-  return session === null ? null : <App session={session} translator={translator} />;
+  return created === null ? null : (
+    <App session={created.session} translator={translator} device={created.device} />
+  );
 }

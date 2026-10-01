@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Device owner for the table tablet's kiosk (P3-01b): no device-admin policies are used. -->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-policies />
+</device-admin>

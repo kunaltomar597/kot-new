@@ -7,7 +7,9 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * build profile (`eas.json`) or the shell: `development` (default), `preview` or `production`.
  * Each environment is its own Android package, so a test build never replaces the real app.
  *
- * Kiosk lock-task mode is set by MDM as device owner (P3-01); the app itself asks for nothing extra.
+ * Kiosk lock-task mode needs the app to be device owner, set by MDM (or `dpm set-device-owner` in
+ * testing) through `@rp/mobile-native`'s device-admin receiver (P3-01b); the app asks for no
+ * permission for it.
  *
  * Nothing secret lives here (SEC-002): the Android signing keystore and the EAS Update code
  * signing private key are EAS secrets. Only the update signing certificate (public) is committed,

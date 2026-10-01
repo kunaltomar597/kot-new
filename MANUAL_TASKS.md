@@ -41,7 +41,7 @@ results into a session (or into the results template in each file).
 | ------------------------------------------------------ | ------------- | -------------------------------------- | -------------------------- |
 | Pager battery test (≥ 14 h at 60 alerts/hour)          | P0-H1         | `manual-tasks/10-pager-battery.md`     | Not yet (firmware to come) |
 | Wi-Fi coverage walk test at the pilot site             | P0-H2         | `manual-tasks/11-wifi-coverage.md`     | Yes (phone pass)           |
-| Kiosk mode on the chosen tablet                        | P0-H3         | `manual-tasks/12-tablet-kiosk.md`      | Not yet                    |
+| Kiosk mode and session on the chosen tablet            | P0-H3, P3-01b | `manual-tasks/12-tablet-kiosk.md`      | Yes (dev or preview build) |
 | Thermal printers and cash drawer (80/58 mm, USB, LAN)  | P0-H4, P4-07b | `manual-tasks/13-printer-test.md`      | Yes (network printers)     |
 | Installer on a clean Windows 11 PC                     | P0-16         | `manual-tasks/14-windows-installer.md` | Not yet                    |
 | Flash and test the production pager firmware           | P2-05         | `manual-tasks/15-pager-firmware.md`    | Not yet                    |
