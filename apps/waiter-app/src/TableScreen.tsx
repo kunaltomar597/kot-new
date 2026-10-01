@@ -43,6 +43,7 @@ import { ItemSheet } from './ItemSheet';
 import { MenuBrowser } from './MenuBrowser';
 import { mayMove, MoveSheet } from './MoveSheet';
 import { SentOrders } from './SentOrders';
+import { Approvals } from './Approvals';
 import { ServiceRequests } from './ServiceRequests';
 import { UnsentOrders } from './UnsentOrders';
 
@@ -410,6 +411,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
         </>
       )}
       {notice === undefined ? null : <Note tone="danger">{notice}</Note>}
+      <Approvals sessionId={sessionId} />
       <ServiceRequests show={(request) => request.tableSessionId === sessionId} />
       <UnsentOrders entries={drafts} personId={person.id} onChange={putBack} />
       {closed ? null : (

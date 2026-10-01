@@ -9,6 +9,7 @@ import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
 import { useOpenBill } from '../billing/use-open-bill.js';
 import { floorSections, tileAlert, tileDetails } from '@rp/ordering';
+import { Approvals } from './Approvals.js';
 import { MoveTableDialog } from './MoveTableDialog.js';
 import { OpenTableDialog } from './OpenTableDialog.js';
 import { useFloor } from './use-floor.js';
@@ -92,6 +93,7 @@ export function TableOverview() {
           </Button>
         </div>
       </div>
+      <Approvals />
       {sections.map((section) => (
         <section
           key={section.id}

@@ -133,6 +133,8 @@ export class Restaurant {
   /** Manager approvals issued and not used yet (single use, AUTH-011). */
   private readonly approvals = new Set<string>();
   private nextOrder = 20;
+  /** Approve and reject requests the server received (P3-03b). */
+  readonly decisions: { orderId: string; kind: 'approve' | 'reject'; body: unknown }[] = [];
 
   constructor() {
     // T2 asked for water four minutes ago, on its tablet (TAB-004).
@@ -479,6 +481,109 @@ export class Restaurant {
     return answer;
   }
 
+  /**
+   * A diner's order from the table's tablet, waiting for approval (P3-03b, ORD-003): 2 Paneer
+   * Tikka (half, extra cheese) and a dal.
+   */
+  dinerOrder(label: string, minutesAgo = 1): OrderView {
+    const table = this.table(label);
+    if (table.session === null) throw new Error(`${label} is not open`);
+    this.nextOrder += 1;
+    const orderId = id(7000 + this.nextOrder);
+    const order: OrderView = {
+      id: orderId,
+      orderNumber: this.nextOrder,
+      orderType: 'DINE_IN',
+      source: 'TABLE_TABLET',
+      status: 'OPEN',
+      tableSessionId: table.session.id,
+      tableId: table.id,
+      takeawayToken: null,
+      customerName: null,
+      businessDate: '2026-09-26',
+      createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+      note: null,
+      items: [
+        {
+          id: id(7400 + this.nextOrder),
+          itemId: IDS.tikka,
+          parentOrderItemId: null,
+          name: 'Paneer Tikka',
+          variantId: IDS.half,
+          variantName: 'Half',
+          modifiers: [{ optionId: IDS.cheese, name: 'Extra cheese', priceDelta: 3_000 }],
+          quantity: 2,
+          unitPrice: 21_000,
+          lineTotal: 42_000,
+          stationId: IDS.kitchen,
+          state: 'PENDING_APPROVAL',
+          instructions: null,
+        },
+        {
+          id: id(7500 + this.nextOrder),
+          itemId: IDS.dal,
+          parentOrderItemId: null,
+          name: 'Dal Makhani',
+          variantId: null,
+          variantName: null,
+          modifiers: [],
+          quantity: 1,
+          unitPrice: 24_000,
+          lineTotal: 24_000,
+          stationId: IDS.kitchen,
+          state: 'PENDING_APPROVAL',
+          instructions: 'Less spicy',
+        },
+      ],
+      kots: [],
+    };
+    this.orders.set(table.session.id, [...(this.orders.get(table.session.id) ?? []), order]);
+    return order;
+  }
+
+  /** Orders with a line waiting for approval, oldest first, with their table. */
+  pendingApprovals() {
+    return this.allOrders()
+      .filter((order) => order.items.some((item) => item.state === 'PENDING_APPROVAL'))
+      .map((order) => {
+        const table = this.tables.find((candidate) => candidate.id === order.tableId);
+        return {
+          order,
+          tableLabel: table?.label ?? null,
+          waiterId: table?.session?.waiterId ?? null,
+        };
+      });
+  }
+
+  private decide(call: RecordedCall, kind: 'approve' | 'reject'): FakeResponse {
+    const order = this.allOrders().find((candidate) => call.path.includes(candidate.id));
+    if (order === undefined)
+      return { status: 404, body: { code: 'ORDER_NOT_FOUND', message: 'No such order.' } };
+    this.decisions.push({ orderId: order.id, kind, body: call.body });
+    const changes = new Map(
+      ((call.body as { changes?: { orderItemId: string; quantity: number }[] }).changes ?? []).map(
+        (change) => [change.orderItemId, change.quantity],
+      ),
+    );
+    const decided: OrderView = {
+      ...order,
+      items: order.items.map((item) => {
+        if (item.state !== 'PENDING_APPROVAL') return item;
+        const quantity = changes.get(item.id) ?? item.quantity;
+        if (kind === 'reject' || quantity === 0) return { ...item, state: 'REJECTED' };
+        return { ...item, quantity, lineTotal: item.unitPrice * quantity, state: 'SENT' };
+      }),
+    };
+    const sessionId = order.tableSessionId ?? '';
+    this.orders.set(
+      sessionId,
+      (this.orders.get(sessionId) ?? []).map((candidate) =>
+        candidate.id === order.id ? decided : candidate,
+      ),
+    );
+    return { status: 200, body: decided };
+  }
+
   /** Every order the server has made, whichever table. */
   allOrders(): OrderView[] {
     return [...this.orders.values()].flat();
@@ -533,6 +638,12 @@ export class Restaurant {
       .on('POST', '/api/v1/service-requests/:requestId/resolve', (call) =>
         this.requestStep(call, 'resolve'),
       )
+      .on('GET', '/api/v1/orders/pending-approval', () => ({
+        status: 200,
+        body: { orders: this.pendingApprovals() },
+      }))
+      .on('POST', '/api/v1/orders/:orderId/approve', (call) => this.decide(call, 'approve'))
+      .on('POST', '/api/v1/orders/:orderId/reject', (call) => this.decide(call, 'reject'))
       .on('GET', '/api/v1/pagers/mine', () => ({
         status: 200,
         body: { pager: this.pager, lowBatteryPercent: 15 } satisfies MyPagerResponse,

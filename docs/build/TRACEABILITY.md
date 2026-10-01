@@ -46,8 +46,8 @@ Must: 201 / 287 covered. Should: 5 / 24. Could: 0 / 7.
 - TBL-008 (M): apps/console/e2e/console.e2e.ts, apps/console/test/order-entry.test.tsx, apps/server/test/integration/orders.int.test.ts
 - ORD-001 (M): apps/console/e2e/console.e2e.ts, apps/console/test/order-entry.test.tsx, apps/server/test/integration/orders.int.test.ts, packages/ordering/test/order-logic.test.ts
 - ORD-002 (M): packages/domain/test/state-machines.test.ts
-- ORD-003 (M): apps/server/test/integration/order-approvals.int.test.ts, apps/server/test/integration/orders.int.test.ts, packages/domain/test/state-machines.test.ts
-- ORD-004 (M): apps/server/test/integration/order-approvals.int.test.ts
+- ORD-003 (M): apps/server/test/integration/order-approvals.int.test.ts, apps/server/test/integration/orders.int.test.ts, apps/waiter-app/test/approvals.test.tsx, packages/domain/test/state-machines.test.ts, packages/ordering/test/approval-view.test.ts
+- ORD-004 (M): apps/console/test/pos-approvals.test.tsx, apps/server/test/integration/order-approvals.int.test.ts
 - ORD-005 (M): apps/server/test/integration/order-approvals.int.test.ts, apps/server/test/unit/notification-triggers.test.ts
 - ORD-007 (M): apps/server/test/integration/printing.int.test.ts, apps/server/test/unit/escpos.test.ts, packages/domain/test/menu-and-kot.test.ts
 - ORD-008 (M): apps/server/test/integration/schema.int.test.ts
@@ -88,7 +88,7 @@ Must: 201 / 287 covered. Should: 5 / 24. Could: 0 / 7.
 - WTR-001 (M): apps/waiter-app/test/app.test.tsx
 - WTR-002 (M): apps/waiter-app/test/tables.test.tsx, packages/domain/test/floor.test.ts, packages/ordering/test/floor-view.test.ts, packages/ui-native/test/floor.test.tsx
 - WTR-003 (M): apps/waiter-app/test/orders.test.tsx
-- WTR-004 (M): apps/server/test/integration/order-approvals.int.test.ts
+- WTR-004 (M): apps/console/test/pos-approvals.test.tsx, apps/server/test/integration/order-approvals.int.test.ts, apps/waiter-app/test/approvals.test.tsx, packages/ordering/test/approval-view.test.ts
 - WTR-005 (M): apps/server/test/integration/service-requests.int.test.ts, apps/waiter-app/test/notifications.test.tsx, apps/waiter-app/test/requests.test.tsx, packages/domain/test/state-machines.test.ts, packages/mobile-core/test/alert-center.test.ts, packages/mobile-native/test/alerts.test.ts
 - WTR-006 (M): apps/server/test/integration/pagers.int.test.ts, apps/server/test/integration/phone-alerts.int.test.ts, apps/server/test/integration/realtime.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, apps/waiter-app/test/app.test.tsx, packages/domain/test/notifications.test.ts, packages/mobile-core/test/alert-center.test.ts, packages/mobile-native/test/alerts.test.ts, packages/mobile-shell/test/alerts.test.tsx, packages/ordering/test/alert-text.test.ts
 - WTR-007 (M): apps/server/test/integration/order-items.int.test.ts, apps/waiter-app/test/serving.test.tsx, packages/ordering/test/floor-view.test.ts, packages/ordering/test/order-logic.test.ts
@@ -187,7 +187,7 @@ Must: 201 / 287 covered. Should: 5 / 24. Could: 0 / 7.
 - NFR-A04 (M): apps/server/test/integration/health.int.test.ts
 - NFR-U01 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-native/test/floor.test.tsx, packages/ui-native/test/overlays.test.tsx, packages/ui-web/test/Button.test.tsx, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Tabs.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/styles.test.ts
 - NFR-U02 (M): packages/design-tokens/test/css.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-web/test/display.test.tsx
-- NFR-U03 (M): apps/waiter-app/test/orders.test.tsx, packages/design-tokens/test/themes.test.ts, packages/mobile-shell/test/alerts.test.tsx, packages/ordering/test/reorder.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/NumberPad.test.tsx, packages/ui-web/test/ordering.test.tsx, packages/ui-web/test/styles.test.ts
+- NFR-U03 (M): apps/waiter-app/test/approvals.test.tsx, apps/waiter-app/test/orders.test.tsx, packages/design-tokens/test/themes.test.ts, packages/mobile-shell/test/alerts.test.tsx, packages/ordering/test/reorder.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-native/test/ordering.test.tsx, packages/ui-web/test/NumberPad.test.tsx, packages/ui-web/test/ordering.test.tsx, packages/ui-web/test/styles.test.ts
 - NFR-U04 (M): apps/console/test/messages.test.ts, apps/server/test/unit/error-mapping.test.ts, packages/api-client/test/client.test.ts, packages/mobile-shell/test/alerts.test.tsx, packages/ordering/test/alert-text.test.ts, packages/ui-web/test/Dialog.test.tsx, packages/ui-web/test/Toast.test.tsx, packages/ui-web/test/display.test.tsx
 - NFR-U05 (M): apps/console/e2e/console.e2e.ts, packages/design-tokens/test/color.test.ts, packages/design-tokens/test/themes.test.ts, packages/ui-native/test/controls.test.tsx, packages/ui-native/test/floor.test.tsx, packages/ui-web/test/TableTile.test.tsx, packages/ui-web/test/display.test.tsx, packages/ui-web/test/fields.test.tsx
 - NFR-L02 (M): apps/console/test/settings-view.test.ts, packages/i18n/test/message-format.test.ts, packages/i18n/test/translator.test.ts, packages/i18n/test/ui-text-rule.test.ts, packages/ui-web/test/display.test.tsx
