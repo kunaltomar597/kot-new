@@ -167,7 +167,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-05b Report data II, then P4-05c the Reports area (P4-05 is split in three, see phase-4.md).
+- P4-05c Twelve months at design capacity, then P4-05d the Reports area (P4-05 is split in four,
+  see phase-4.md).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
@@ -277,8 +278,9 @@ Recommended next WPs (dependencies met):
 - [x] P4-03e Restaurant profile, tax groups and invoice series (Owner)
 - [x] P4-04 Alert centre and system screen
 - [x] P4-05a Report data I: sources, staff, discounts, cancellations, reprints
-- [ ] P4-05b Report data II: kitchen, tables, recommendations, 12-month performance
-- [ ] P4-05c Reports area in the console with charts and drill-down
+- [x] P4-05b Report data II: kitchen, tables, recommendations
+- [ ] P4-05c Twelve months at design capacity (RPT-018)
+- [ ] P4-05d Reports area in the console with charts and drill-down
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
 
@@ -563,10 +565,25 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-10-01 (P4-05b):
+
+260. Prep time runs from the kitchen starting a dish (or from sending, for a dish bumped straight
+     to ready) to ready; pickup time from ready to picked up (or served). Combos count as their
+     parts. A negative span (a clock change) is left out of the averages.
+261. "Notify manager" presses are the uncollected-dish alerts the kitchen raised itself (with a
+     device), not the ones the timer raised.
+262. Table metrics count closed sessions, leaving out those closed as opened by mistake; a moved
+     party stays one session. Spend is the grand total of the session's bills that count; spend
+     per cover is rounded to the paisa; turnover is sessions per table (not archived) per day, in
+     basis points.
+263. The attach rate of suggestions is ordered per impression, in basis points; revenue is the
+     line total of suggested lines not rejected, cancelled or voided. The totals also give the
+     share of orders with at least one suggested line.
+
 Decided 2026-10-01 (P4-05a):
 
-255. P4-05 is built in three parts: a report data I, b report data II with the 12-month
-     performance test, c the console's Reports area.
+255. P4-05 is built in four parts: a report data I, b report data II, c the 12-month
+     performance test, d the console's Reports area.
 256. The new reports aggregate in PostgreSQL (`$queryRaw`), not in memory, for RPT-018 at §7.2
      capacity (2,000 orders a day). Indexes added: audit entries by action and business date,
      alerts and service requests by business date.
@@ -1334,6 +1351,17 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-05b Report data II
+
+Built: contracts `KitchenReportResponse`, `TableReportResponse`, `RecommendationReportResponse`
+and their routes; `ReportSuiteService.kitchen`, `tables` and `recommendations` (SQL aggregates)
+behind `/api/v1/reports/kitchen`, `tables` and `recommendations`.
+
+Tests: `report-suite.int.test.ts` now 9 (3 new), with kitchen times, closed sessions and
+suggestion events set on the same day's data.
+
+Decisions: 260 to 263.
 
 ### 2026-10-01: P4-05a Report data I
 

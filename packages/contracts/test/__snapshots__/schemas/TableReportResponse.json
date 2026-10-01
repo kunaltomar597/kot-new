@@ -1,0 +1,179 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "tables": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sessions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "covers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "averageSeatedSeconds": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "spend": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "spendPerCover": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "tableId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "label": { "type": "string" }
+          },
+          "required": [
+            "sessions",
+            "covers",
+            "averageSeatedSeconds",
+            "spend",
+            "spendPerCover",
+            "tableId",
+            "label"
+          ]
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "sessions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "covers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "averageSeatedSeconds": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "spend": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "spendPerCover": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "tableCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "days": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+          "turnoverBp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "sessions",
+          "covers",
+          "averageSeatedSeconds",
+          "spend",
+          "spendPerCover",
+          "tableCount",
+          "days",
+          "turnoverBp"
+        ]
+      }
+    },
+    "required": ["from", "to", "tables", "totals"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "tables": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sessions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "covers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "averageSeatedSeconds": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "spend": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "spendPerCover": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "tableId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "label": { "type": "string" }
+          },
+          "required": [
+            "sessions",
+            "covers",
+            "averageSeatedSeconds",
+            "spend",
+            "spendPerCover",
+            "tableId",
+            "label"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "sessions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "covers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "averageSeatedSeconds": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "spend": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "spendPerCover": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "tableCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "days": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+          "turnoverBp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "sessions",
+          "covers",
+          "averageSeatedSeconds",
+          "spend",
+          "spendPerCover",
+          "tableCount",
+          "days",
+          "turnoverBp"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": ["from", "to", "tables", "totals"],
+    "additionalProperties": false
+  }
+}

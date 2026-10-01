@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RecommendationLayer } from './recommendations.js';
 import {
   DeviceType,
   Id,
@@ -465,3 +466,77 @@ export const ReprintReportResponse = z.object({
   totals: z.object({ kotReprints: Count, billReprints: Count, billEdits: Count }),
 });
 export type ReprintReportResponse = z.infer<typeof ReprintReportResponse>;
+
+// ---------------------------------------------------------------- the full suite (P4-05b)
+
+const Seconds = Count.nullable();
+
+/** Average prep time (kitchen start, or sending, to ready) and ready-to-pickup time, in seconds. */
+const KitchenTimes = z.object({
+  /** Dishes cooked: lines that reached ready. */
+  lines: Count,
+  quantity: Count,
+  averagePrepSeconds: Seconds,
+  averagePickupSeconds: Seconds,
+});
+
+/** RPT-010: kitchen performance by station and by dish, and "Notify manager" presses. */
+export const KitchenReportResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  stations: z.array(KitchenTimes.extend({ stationId: Id, name: z.string(), notifyManager: Count })),
+  items: z.array(KitchenTimes.extend({ itemId: Id, name: z.string(), station: z.string() })),
+  totals: KitchenTimes.extend({ notifyManager: Count }),
+});
+export type KitchenReportResponse = z.infer<typeof KitchenReportResponse>;
+
+const TableFigures = z.object({
+  /** Tables served: closed sessions, not ones closed as opened by mistake. */
+  sessions: Count,
+  covers: Count,
+  averageSeatedSeconds: Seconds,
+  /** Grand total of the sessions' bills that count. */
+  spend: Paise,
+  /** Spend per cover; null without covers. */
+  spendPerCover: Paise.nullable(),
+});
+
+/** RPT-011: covers, turnover, seated time and spend per cover, by table and in total. */
+export const TableReportResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  tables: z.array(TableFigures.extend({ tableId: Id, label: z.string() })),
+  totals: TableFigures.extend({
+    /** Tables not archived, and days in the range: turnover is sessions per table per day. */
+    tableCount: Count,
+    days: z.int().min(1),
+    /** Sessions per table per day, in basis points (2.5 turns a day is 25,000). */
+    turnoverBp: Count,
+  }),
+});
+export type TableReportResponse = z.infer<typeof TableReportResponse>;
+
+const SuggestionFigures = z.object({
+  impressions: Count,
+  taps: Count,
+  addedToCart: Count,
+  ordered: Count,
+  /** Ordered per impression, in basis points; null without impressions. */
+  attachRateBp: Count.nullable(),
+  /** Line totals of suggested lines ordered and not rejected, cancelled or voided. */
+  revenue: Paise,
+});
+
+/** RPT-012: suggestions shown, opened, added and ordered, with revenue, per layer and dish. */
+export const RecommendationReportResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  layers: z.array(SuggestionFigures.extend({ layer: RecommendationLayer })),
+  items: z.array(SuggestionFigures.extend({ itemId: Id, name: z.string() })),
+  totals: SuggestionFigures.extend({
+    /** Orders in the range, and those with at least one suggested line. */
+    orders: Count,
+    ordersWithSuggestion: Count,
+  }),
+});
+export type RecommendationReportResponse = z.infer<typeof RecommendationReportResponse>;
