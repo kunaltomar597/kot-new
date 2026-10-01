@@ -1,8 +1,17 @@
 import { newIdempotencyKey } from '@rp/api-client';
-import type { MenuSnapshot } from '@rp/contracts';
+import type { MenuItem, MenuSnapshot, RecommendationSource } from '@rp/contracts';
 import { fontSize, fontWeight, radius, spacing } from '@rp/design-tokens';
-import { messageOf, Note, useDeviceSession, useT } from '@rp/mobile-shell';
-import { estimateCart, requestLines } from '@rp/ordering';
+import type { SuggestionTracker } from '@rp/mobile-core';
+import {
+  ItemSheet,
+  messageOf,
+  Note,
+  SuggestionRow,
+  useDeviceSession,
+  useSuggestions,
+  useT,
+} from '@rp/mobile-shell';
+import { estimateCart, type NewCartLine, requestLines } from '@rp/ordering';
 import { Button, Money, QuantityStepper, useTheme, useToast, weight } from '@rp/ui-native';
 import { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -19,12 +28,16 @@ export function CartView({
   menu,
   priceMode,
   ordering,
+  tracker,
+  onAdd,
   onSent,
 }: {
   cart: Cart;
   menu: MenuSnapshot;
   priceMode: 'TAX_EXCLUSIVE' | 'TAX_INCLUSIVE';
   ordering: boolean;
+  tracker: SuggestionTracker;
+  onAdd: (line: NewCartLine, source?: RecommendationSource) => void;
   onSent: () => void;
 }) {
   const t = useT();
@@ -36,6 +49,15 @@ export function CartView({
   /** One key per sending of these exact lines; a changed order gets a new one. */
   const attempt = useRef<{ key: string; lines: string } | null>(null);
   const estimate = estimateCart(cart.lines, menu, priceMode);
+  const [chosen, setChosen] = useState<{ item: MenuItem; source: RecommendationSource } | null>(
+    null,
+  );
+  const cartIds = cart.lines.map((line) => line.itemId);
+  const suggestions = useSuggestions(
+    () => session.api.getTableRecommendations({ query: { cart: cartIds, limit: 4 } }),
+    cartIds.join(','),
+    ordering && cart.lines.length > 0,
+  );
 
   if (cart.lines.length === 0) {
     return <Note tone="text">{t('mobile.tablet.ordering.cartEmpty')}</Note>;
@@ -117,6 +139,31 @@ export function CartView({
         <Row label={t('mobile.tablet.ordering.total')} paise={estimate.total} strong />
         <Text style={{ color: colors.textMuted }}>{t('mobile.tablet.ordering.estimateNote')}</Text>
       </View>
+      <SuggestionRow
+        title={t('reco.row.cart')}
+        suggestions={suggestions}
+        menu={menu}
+        tracker={tracker}
+        testID="suggestions-cart"
+        onChoose={(item, source) => {
+          setChosen({ item, source });
+        }}
+      />
+      {chosen !== null && (
+        <ItemSheet
+          key={chosen.item.id}
+          menu={menu}
+          item={chosen.item}
+          addLabel={t('mobile.tablet.ordering.add')}
+          onClose={() => {
+            setChosen(null);
+          }}
+          onAdd={(line) => {
+            onAdd(line, chosen.source);
+            setChosen(null);
+          }}
+        />
+      )}
       {error !== null && <Note tone="danger">{error}</Note>}
       <Button
         size="lg"

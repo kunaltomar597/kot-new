@@ -199,6 +199,18 @@ and put in the cart to their `.../recommendations/events` route in batches. A di
 suggestion goes into the cart with `recommendation` (`addLine`), which the order line carries so
 the server counts it as ordered. `describeRecommendation` gives the reason label.
 
+Built in two parts:
+
+- P3-05a Suggestion rows and tracking (done):
+  - `@rp/mobile-shell` `SuggestionRow` with `useSuggestions` and `sourceOf`;
+  - `@rp/mobile-core` `SuggestionTracker`;
+  - on the tablet: rows on the menu ("You may like"), in the item sheet ("Goes well with this")
+    and in the cart ("Add to your order");
+  - on the waiter app: "Suggest to the table" on a table's order view (WTR-011).
+- P3-05b Feedback after the bill (TAB-014, S): food and service ratings, a comment, and an
+  optional phone with explicit consent recorded with its purpose and time (BILL-011, SEC-019),
+  erasable (DATA-011 hook); and where managers read it.
+
 ## P3-06 Phase 3 exit test: tablet session (S6)
 
 Goal: prove S6: open → order → approval (app and at-table PIN) → status → Water/Cancel → bill →

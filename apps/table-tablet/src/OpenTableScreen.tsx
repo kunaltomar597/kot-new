@@ -1,9 +1,11 @@
 import type { MenuSnapshot, RestaurantProfile, TabletTableView } from '@rp/contracts';
 import { fontSize, fontWeight, spacing } from '@rp/design-tokens';
-import type { KeyValueStore } from '@rp/mobile-core';
+import type { RecommendationSource } from '@rp/contracts';
+import { type KeyValueStore, SuggestionTracker } from '@rp/mobile-core';
+import type { NewCartLine } from '@rp/ordering';
 import { Note, Screen, useDeviceSession, useLive, useSessionState, useT } from '@rp/mobile-shell';
 import { SegmentedControl, useTheme, weight } from '@rp/ui-native';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { CartView } from './CartView';
 import { MenuView } from './MenuView';
@@ -52,6 +54,29 @@ export function OpenTableScreen({
   );
   const covers = table.session?.covers ?? null;
   const count = cart.lines.reduce((total, line) => total + line.quantity, 0);
+  /** What the diners do with suggestions, sent in batches (REC-008). */
+  const tracker = useMemo(
+    () =>
+      new SuggestionTracker({
+        send: async (events) => {
+          await session.api.recordTableRecommendationEvents({ body: { events } });
+        },
+      }),
+    [session],
+  );
+  useEffect(
+    () => () => {
+      void tracker.stop();
+    },
+    [tracker],
+  );
+  /** A dish into the order; one from a suggestion counts as added to the cart (REC-008). */
+  const add = (line: NewCartLine, source?: RecommendationSource) => {
+    cart.add(source === undefined ? line : { ...line, recommendation: source });
+    if (source !== undefined)
+      tracker.record({ kind: 'ADD_TO_CART', itemId: line.itemId, ...source });
+  };
+  const cartItemIds = cart.lines.map((line) => line.itemId);
 
   return (
     <Screen>
@@ -98,9 +123,9 @@ export function OpenTableScreen({
           bestsellers={new Set(bestsellers.status === 'ready' ? bestsellers.value.itemIds : [])}
           priceMode={table.priceMode}
           ordering={online}
-          onAdd={(line) => {
-            cart.add(line);
-          }}
+          cartItemIds={cartItemIds}
+          tracker={tracker}
+          onAdd={add}
         />
       ) : view === 'cart' ? (
         <CartView
@@ -108,6 +133,8 @@ export function OpenTableScreen({
           menu={menu}
           priceMode={table.priceMode}
           ordering={online}
+          tracker={tracker}
+          onAdd={add}
           onSent={() => {
             setView('orders');
           }}
