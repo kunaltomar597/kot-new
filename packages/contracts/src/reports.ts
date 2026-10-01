@@ -8,6 +8,7 @@ import {
   OrderType,
   Paise,
   PaymentMode,
+  Role,
   Timestamp,
 } from './common.js';
 
@@ -314,3 +315,153 @@ export const OrderDrillDownResponse = z.object({
   ),
 });
 export type OrderDrillDownResponse = z.infer<typeof OrderDrillDownResponse>;
+
+// ---------------------------------------------------------------- the full suite (P4-05a)
+
+const Count = z.int().min(0);
+
+/** Money of billed lines: before discounts, the discounts, and the taxable value after them. */
+const LineMoney = z.object({ gross: Paise, discounts: Paise, net: Paise });
+
+/** RPT-004: billed sales by where the order came from and by order type. */
+export const SourceSalesResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  rows: z.array(LineMoney.extend({ source: OrderSource, orderType: OrderType, orders: Count })),
+  totals: LineMoney.extend({ orders: Count }),
+});
+export type SourceSalesResponse = z.infer<typeof SourceSalesResponse>;
+
+/**
+ * RPT-003: each person's work. Sales are the billed taxable value of the items they took or, for
+ * a guest's order, approved. Acknowledgements cover alerts and service requests; escalations are
+ * their alerts that went on to the managers; cancellations and voids are the ones they asked for.
+ */
+export const StaffPerformanceResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  staff: z.array(
+    z.object({
+      staffId: Id,
+      name: z.string(),
+      role: Role,
+      ordersCreated: Count,
+      ordersApproved: Count,
+      net: Paise,
+      acknowledgements: Count,
+      /** Whole seconds from raised to acknowledged; null without any. */
+      averageAckSeconds: Count.nullable(),
+      escalations: Count,
+      cancellations: Count,
+      voids: Count,
+    }),
+  ),
+});
+export type StaffPerformanceResponse = z.infer<typeof StaffPerformanceResponse>;
+
+/** RPT-007: every discount and complimentary item on a bill that counts, with who and why. */
+export const DiscountReportResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  discounts: z.array(
+    z.object({
+      discountId: Id,
+      businessDate: IsoDate,
+      invoiceId: Id,
+      invoiceNumber: z.string(),
+      orderId: Id.nullable(),
+      /** The dish, or null for a discount on the whole bill. */
+      item: z.string().nullable(),
+      complimentary: z.boolean(),
+      kind: z.enum(['PERCENT', 'FLAT']),
+      rateBp: z.int().min(0).nullable(),
+      amount: Paise,
+      reason: z.string(),
+      appliedBy: StaffRef,
+      approvedBy: StaffRef,
+    }),
+  ),
+  totals: z.object({
+    count: Count,
+    amount: Paise,
+    complimentaryCount: Count,
+    complimentaryAmount: Paise,
+  }),
+});
+export type DiscountReportResponse = z.infer<typeof DiscountReportResponse>;
+
+/**
+ * RPT-008: items cancelled or voided, with the stage they had reached (a void after the kitchen
+ * started is wastage), and bills voided. Who, the approver, the reason and the value.
+ */
+export const CancellationReportResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  items: z.array(
+    z.object({
+      auditId: Id,
+      at: Timestamp,
+      businessDate: IsoDate,
+      kind: z.enum(['CANCELLED', 'VOIDED']),
+      orderId: Id.nullable(),
+      orderItemId: Id.nullable(),
+      item: z.string(),
+      quantity: Count,
+      stage: OrderItemState.nullable(),
+      value: Paise,
+      wastage: z.boolean(),
+      by: StaffRef,
+      approvedBy: StaffRef,
+      reason: z.string().nullable(),
+    }),
+  ),
+  bills: z.array(
+    z.object({
+      auditId: Id,
+      at: Timestamp,
+      businessDate: IsoDate,
+      invoiceId: Id.nullable(),
+      invoiceNumber: z.string(),
+      value: Paise,
+      by: StaffRef,
+      approvedBy: StaffRef,
+      reason: z.string().nullable(),
+    }),
+  ),
+  totals: z.object({
+    cancelledCount: Count,
+    cancelledValue: Paise,
+    voidedCount: Count,
+    voidedValue: Paise,
+    wastageValue: Paise,
+    billCount: Count,
+    billValue: Paise,
+  }),
+});
+export type CancellationReportResponse = z.infer<typeof CancellationReportResponse>;
+
+/** RPT-009: kitchen tickets printed again, bills printed again (DUPLICATE) and bills edited. */
+export const ReprintReportResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  events: z.array(
+    z.object({
+      auditId: Id,
+      at: Timestamp,
+      businessDate: IsoDate,
+      kind: z.enum(['KOT_REPRINT', 'BILL_REPRINT', 'BILL_EDIT']),
+      /** "KOT 12" or the invoice number. */
+      reference: z.string(),
+      orderId: Id.nullable(),
+      invoiceId: Id.nullable(),
+      by: StaffRef,
+      approvedBy: StaffRef,
+      reason: z.string().nullable(),
+      /** A bill edit's grand total before and after. */
+      before: z.int().nullable(),
+      after: z.int().nullable(),
+    }),
+  ),
+  totals: z.object({ kotReprints: Count, billReprints: Count, billEdits: Count }),
+});
+export type ReprintReportResponse = z.infer<typeof ReprintReportResponse>;

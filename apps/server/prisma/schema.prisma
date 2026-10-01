@@ -1200,6 +1200,7 @@ model Alert {
   @@index([status, escalateAt])
   @@index([status, nextRepeatAt])
   @@index([restaurantId, dedupeKey])
+  @@index([restaurantId, businessDate])
   @@map("alerts")
 }
 
@@ -1255,6 +1256,7 @@ model ServiceRequest {
 
   @@index([restaurantId, state])
   @@index([tableSessionId, state])
+  @@index([restaurantId, businessDate])
   @@map("service_requests")
 }
 
@@ -1723,6 +1725,7 @@ model AuditLog {
   @@index([restaurantId, businessDate])
   @@index([entityType, entityId])
   @@index([actorId])
+  @@index([restaurantId, action, businessDate])
   @@map("audit_log")
 }
 

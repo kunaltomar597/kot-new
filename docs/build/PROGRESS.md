@@ -167,7 +167,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
+- P4-05b Report data II, then P4-05c the Reports area (P4-05 is split in three, see phase-4.md).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
@@ -276,7 +276,9 @@ Recommended next WPs (dependencies met):
 - [x] P4-03d Stations and printers
 - [x] P4-03e Restaurant profile, tax groups and invoice series (Owner)
 - [x] P4-04 Alert centre and system screen
-- [ ] P4-05 Full report suite
+- [x] P4-05a Report data I: sources, staff, discounts, cancellations, reprints
+- [ ] P4-05b Report data II: kitchen, tables, recommendations, 12-month performance
+- [ ] P4-05c Reports area in the console with charts and drill-down
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
 
@@ -560,6 +562,23 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-05a):
+
+255. P4-05 is built in three parts: a report data I, b report data II with the 12-month
+     performance test, c the console's Reports area.
+256. The new reports aggregate in PostgreSQL (`$queryRaw`), not in memory, for RPT-018 at §7.2
+     capacity (2,000 orders a day). Indexes added: audit entries by action and business date,
+     alerts and service requests by business date.
+257. Money in the new reports is billed money: invoice lines of invoices not voided, at their
+     current version (gross, discounts, taxable value), by the invoice's business date. Who, the
+     approver and the reason come from the audit trail (discounts from their own records).
+258. A person's sales (RPT-003) are the items they took, or for a guest's order the items they
+     approved. Acknowledgements count alerts and service requests together; escalations are
+     alerts that reached the managers while the person was an original recipient; cancellations
+     and voids are the ones they performed.
+259. A void is wastage when the item had reached preparing or later (every void does, since a
+     dish not started is cancelled instead). A voided bill's value is its grand total.
 
 Decided 2026-10-01 (P4-04):
 
@@ -1315,6 +1334,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-05a Report data I
+
+Built: contracts `SourceSalesResponse`, `StaffPerformanceResponse`, `DiscountReportResponse`,
+`CancellationReportResponse`, `ReprintReportResponse` with their routes; the server's
+`ReportSuiteService` (SQL aggregates and audit-trail reads) behind `/api/v1/reports/sources`,
+`staff`, `discounts`, `cancellations` and `reprints`; migration `20261001120000_report_indexes`.
+
+Tests: server `report-suite.int.test.ts` 6, on a day with known answers built through the API
+(cancel, void with a PIN, discount, complimentary, print, reprint, KOT reprint, edit after print,
+voided and re-issued takeaway) plus seeded alerts and a service request.
+
+Gotchas:
+
+- Supertest: build a request only after awaiting what goes into its headers (an override token);
+  awaiting another request in between gives ECONNREFUSED.
+- Several contract enums are values only; derive their types from a response type
+  (`SourceSalesResponse['rows'][number]['source']`).
+
+Decisions: 255 to 259.
 
 ### 2026-10-01: P4-04 System page
 

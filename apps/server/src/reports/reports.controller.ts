@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
 import {
+  type CancellationReportResponse,
+  type DiscountReportResponse,
   type GstSummaryResponse,
   type InvoiceRegisterResponse,
   type ItemSalesResponse,
@@ -9,8 +11,11 @@ import {
   ReportExportRequest,
   type ReportExportResponse,
   ReportRangeQuery,
+  type ReprintReportResponse,
   type SalesSummaryResponse,
   type ShiftReportResponse,
+  type SourceSalesResponse,
+  type StaffPerformanceResponse,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability } from '../auth/decorators.js';
@@ -18,6 +23,7 @@ import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { OrderDrillDownService } from './order-drill-down.service.js';
 import { ReportExportService } from './report-export.service.js';
+import { ReportSuiteService } from './report-suite.service.js';
 import { ReportsService } from './reports.service.js';
 
 function principalOf(request: AuthenticatedRequest): Principal {
@@ -40,7 +46,53 @@ export class ReportsController {
     private readonly reports: ReportsService,
     private readonly exports: ReportExportService,
     private readonly drillDowns: OrderDrillDownService,
+    private readonly suite: ReportSuiteService,
   ) {}
+
+  @Get('sources')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  sources(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<SourceSalesResponse> {
+    return this.suite.sources(restaurantOf(request), range);
+  }
+
+  @Get('staff')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  staff(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<StaffPerformanceResponse> {
+    return this.suite.staff(restaurantOf(request), range);
+  }
+
+  @Get('discounts')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  discounts(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<DiscountReportResponse> {
+    return this.suite.discounts(restaurantOf(request), range);
+  }
+
+  @Get('cancellations')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  cancellations(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<CancellationReportResponse> {
+    return this.suite.cancellations(restaurantOf(request), range);
+  }
+
+  @Get('reprints')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  reprints(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<ReprintReportResponse> {
+    return this.suite.reprints(restaurantOf(request), range);
+  }
 
   @Get('sales')
   @RequireCapability('REPORTS_VIEW_EXPORT')

@@ -114,6 +114,8 @@ import {
 } from './menu-admin.js';
 import { MenuSnapshot } from './menu.js';
 import {
+  CancellationReportResponse,
+  DiscountReportResponse,
   GstSummaryResponse,
   InvoiceRegisterResponse,
   ItemSalesResponse,
@@ -123,8 +125,11 @@ import {
   ReportExportRequest,
   ReportExportResponse,
   ReportRangeQuery,
+  ReprintReportResponse,
   SalesSummaryResponse,
   ShiftReportResponse,
+  SourceSalesResponse,
+  StaffPerformanceResponse,
 } from './reports.js';
 import {
   CashMovementRequest,
@@ -3262,6 +3267,76 @@ export const ROUTES = [
     request: { query: ReportRangeQuery },
     responses: {
       200: { description: 'The report.', schema: InvoiceRegisterResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getSourceSales',
+    method: 'GET',
+    path: '/api/v1/reports/sources',
+    summary: 'Sales by order source and order type',
+    tags: ['reports'],
+    requirements: ['RPT-004', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: SourceSalesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getStaffPerformance',
+    method: 'GET',
+    path: '/api/v1/reports/staff',
+    summary: 'Each person: orders, approvals, sales, acknowledgements, escalations, cancellations',
+    tags: ['reports'],
+    requirements: ['RPT-003', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: StaffPerformanceResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getDiscountReport',
+    method: 'GET',
+    path: '/api/v1/reports/discounts',
+    summary: 'Discounts and complimentary items with who, approver, reason and value',
+    tags: ['reports'],
+    requirements: ['RPT-007', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: DiscountReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getCancellationReport',
+    method: 'GET',
+    path: '/api/v1/reports/cancellations',
+    summary: 'Items cancelled or voided with their stage (wastage), and bills voided',
+    tags: ['reports'],
+    requirements: ['RPT-008', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: CancellationReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getReprintReport',
+    method: 'GET',
+    path: '/api/v1/reports/reprints',
+    summary: 'Kitchen tickets and bills printed again, and bills edited after printing',
+    tags: ['reports'],
+    requirements: ['RPT-009', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: ReprintReportResponse },
       ...standardErrors,
     },
   },
