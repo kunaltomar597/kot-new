@@ -81,6 +81,7 @@ import {
   PairDeviceRequest,
   PairedDevice,
   PairingCodeResponse,
+  RenameDeviceRequest,
   RevokeDeviceRequest,
 } from './devices.js';
 import {
@@ -959,10 +960,30 @@ export const ROUTES = [
     method: 'GET',
     path: '/api/v1/devices',
     summary: 'Paired and revoked devices of the restaurant',
+    description:
+      'Each device with its binding, whether it is connected now, its last reported battery and ' +
+      'versions, and when it was last seen (MGR-006).',
     tags: ['devices'],
-    requirements: ['AUTH-007', 'AUTH-008'],
+    requirements: ['AUTH-007', 'AUTH-008', 'MGR-006'],
     capability: 'DEVICE_PAIR',
     responses: { 200: { description: 'Devices.', schema: DeviceListResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'renameDevice',
+    method: 'PATCH',
+    path: '/api/v1/devices/:deviceId',
+    summary: 'Rename a device',
+    description: 'Audited, and announced to every screen as `RestaurantChanged` `DEVICES`.',
+    tags: ['devices'],
+    requirements: ['MGR-006', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }), body: RenameDeviceRequest },
+    responses: {
+      200: { description: 'Renamed.', schema: DeviceSummary },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+      409: { description: 'The device is unpaired.', schema: ApiError },
+    },
   },
   {
     operationId: 'revokeDevice',

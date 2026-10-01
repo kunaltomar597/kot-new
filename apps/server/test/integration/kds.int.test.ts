@@ -296,7 +296,10 @@ describe('[KDS-005] [KDS-006] [KDS-007] kitchen steps, bump, recall and notify m
     expect((await tickets(screen('kitchenScreen'))).tickets.map((entry) => entry.kotId)).toEqual([
       ticket.kotId,
     ]);
-    const bumps = await prisma.outboxEvent.findMany({ where: { eventType: 'KotBumped' } });
+    const bumps = await prisma.outboxEvent.findMany({
+      where: { eventType: 'KotBumped' },
+      orderBy: { writeOrder: 'asc' },
+    });
     expect(
       bumps.map((event) => (event.payload as { payload: { bumped: boolean } }).payload.bumped),
     ).toEqual([true, false]);

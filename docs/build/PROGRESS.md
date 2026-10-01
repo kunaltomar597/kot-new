@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-09-28.
+Last updated: 2026-10-01.
 
 What exists:
 
@@ -76,7 +76,8 @@ What exists:
   (P4-01); staff management with audit: add, change, new PIN, unlock, deactivate (sessions,
   pager, phone and sections taken back at once) and reactivate, managers kept to the Owner with a
   fresh second factor (P4-02a); pager changes announced to every screen and the low-battery level
-  with the pager list (P4-02b).
+  with the pager list (P4-02b); the device list with live connections, rename, and device changes
+  announced, with every database session in UTC (P4-02c).
   717 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
@@ -140,8 +141,9 @@ What exists:
   second factor asked for when an action needs it, and sign-in tiles that follow staff changes
   (P4-02a); the Staff area's Today's sections page (sections and single tables per person, the
   tables nobody looks after, the last day's sections given again) and Pagers page (register,
-  give, take back, a new credential, connection and battery) (P4-02b). 169 tests, and 16
-  Playwright steps.
+  give, take back, a new credential, connection and battery) (P4-02b); the Devices page (pair with
+  a QR code, the code, addresses and CA fingerprint; rename; move a tablet; unpair) (P4-02c).
+  187 tests, and 17 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -156,8 +158,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02c Devices (P4-02a and P4-02b done), then P4-02d Menu editor and P4-02e Custom roles
-  (P4-02 is split in five, see phase-4.md).
+- P4-02d Menu editor, then P4-02e Custom roles (P4-02 is split in five, see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -260,7 +261,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-01 Dashboard shell and live views
 - [x] P4-02a Staff and the Owner's sign-in security
 - [x] P4-02b Sections and pagers
-- [ ] P4-02c Devices
+- [x] P4-02c Devices
 - [ ] P4-02d Menu editor
 - [ ] P4-02e Custom roles (S)
 - [ ] P4-03 Configuration screens
@@ -549,6 +550,31 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-02c):
+
+213. Devices are a dashboard page of their own (`/manage/devices`) for people who pair devices
+     (DEVICE_PAIR: Owner and Manager), not part of the Staff area: devices belong to tables,
+     stations and the counter as much as to people. Pagers are listed there too, but registered
+     and given out on the Pagers page.
+214. The device list (`DeviceView`) adds whether a device is connected now (an app with a live
+     socket, a pager by its heartbeats), its last battery, firmware, serial and when it was
+     unpaired. `DeviceSummary`, which the apps read about themselves, is unchanged.
+215. Pairing, unpairing, renaming and moving a tablet are announced as `RestaurantChanged`
+     `DEVICES`. Connections are not announced (they come and go all the time); the page reads
+     them again every 30 seconds.
+216. Renaming is audited (`DEVICE_RENAMED`, old and new name); the same name again records
+     nothing; an unpaired device cannot be renamed. Unpairing asks for a reason of at least 3
+     characters for the audit trail.
+217. The device in use cannot unpair itself from its own page (the server already refused it).
+218. "Locate" (MGR-006, a Should) waits for the device side: the table tablet's app (P3-01) and the
+     pager firmware (P2-05) will each act on a locate message.
+219. Every database session runs in UTC (`-c TimeZone=UTC`, server, Control Plane and seed). Found
+     building on a PC set to India time: PostgreSQL's `initdb` copies the PC's zone, and the pg
+     driver adapter sends and reads timestamps without an offset, so every stored instant was
+     5 h 30 off and times PostgreSQL wrote itself (`now()`) read wrong. CI never saw it because its
+     database runs in UTC. The installer (P0-16) sets up PostgreSQL on an India-time PC, so this
+     mattered for every restaurant.
 
 Decided 2026-09-28 (P4-02b):
 
@@ -1138,6 +1164,47 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-02c Devices (first session on the local Mac)
+
+The build moved from Claude Code on the web to the Business Owner's Mac. Set up: pnpm through
+corepack in `~/.local/bin`, PostgreSQL 16 binaries from `@embedded-postgres/darwin-arm64` in
+`~/.local/pg16` with `PG_BIN` (Homebrew there belongs to another macOS user), Playwright's
+Chromium. GitHub has no credentials on this Mac yet, so work packages are merged into local `main`
+and pushed once someone runs `gh auth login` (MANUAL_TASKS.md). Added `AGENTS.md`,
+`docs/PRD.md`, `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md`, `MANUAL_TASKS.md` and
+`manual-tasks/`.
+
+Built: contracts `DeviceView` (connected, battery, firmware, serial, unpaired at),
+`DeviceName`, `RenameDeviceRequest` and the `renameDevice` route; the server's
+`RealtimeGateway.connectedDeviceIds`, the device list from it, rename (audited), and
+`RestaurantChanged` `DEVICES` on pair, unpair, rename and move; `@rp/domain`
+`formatDisplayDate` and `displayDateTime` (DD-MM-YYYY, NFR-L03); the console's Devices page
+(`src/manage/devices/`: `DevicesScreen`, `DeviceDialogs` with pair, code, rename, move and unpair,
+`devices-view.ts`) linked from the dashboard for Owner and Manager.
+
+Fixed: every database session runs in UTC (decision 219, `utc-session.ts`). The Phase 4 dashboard
+browser test failed on this Mac (India time) and passes now; `database.int.test.ts` keeps a
+regression test with the database's own zone set to Asia/Kolkata.
+
+Tests: domain (2 new), contracts (snapshots for `DeviceView`, `DeviceName`), server device tests
+21 (was 15) and a real-time test that a live connection shows as connected, console 18 new
+(`devices-view.test.ts` 8, `devices.test.tsx` 10), and 17 Playwright steps (was 16): a manager
+pairs a second browser as a kitchen screen with the code shown, sees it connected, renames it on
+a 360 px phone with axe, unpairs it and the screen is back on the pairing page within 5 s.
+
+Gotchas:
+
+- Run the console's browser tests in the PC's own zone too (`pnpm --filter @rp/console e2e`); CI
+  runs in UTC and hides time-zone bugs.
+- `pnpm check` formats-checks untracked files as well: keep scratch notes out of the repository
+  root (`latest_context.md` and the root copy of the BRD PDF are git-ignored for this reason).
+- A test that counts a device's outbox events must filter by event type now that device changes
+  are also announced as `RestaurantChanged`.
+
+Deferred: "Locate" (S) to P3-01 (tablet) and P2-05 (pager).
+
+Decisions: 213 to 219.
 
 ### 2026-09-28: P4-02b Sections and pagers
 

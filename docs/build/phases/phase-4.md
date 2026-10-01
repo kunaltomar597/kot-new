@@ -131,6 +131,22 @@ dialog shows the QR code (`qrPayload`), the code, the server addresses (`serverU
 fingerprint (`caSha256`), which phones typing an address compare (P2-01d).
 Acceptance: Playwright pair, rename and unpair flow.
 
+As built (done):
+
+- Contracts: `DeviceView` (the list's rows: `DeviceSummary` plus `connected`, `batteryPercent`,
+  `firmwareVersion`, `serial`, `revokedAt`), `DeviceName`, `RenameDeviceRequest`, route
+  `renameDevice` (`PATCH /api/v1/devices/:deviceId`, DEVICE_PAIR).
+- Server: `RealtimeGateway.connectedDeviceIds`; `DevicesService.rename` (audited
+  `DEVICE_RENAMED`); pair, unpair, rename and move announce `RestaurantChanged` `DEVICES`. Every
+  database session runs in UTC (`database/utc-session.ts`).
+- Console `src/manage/devices/`: the Devices page under `/manage/devices` (Owner and Manager),
+  grouped by type, unpaired devices folded away; the pair dialog (type, name, table, station or
+  person, then the QR code, the code with a countdown, the server addresses and the CA
+  fingerprint, and a new code when it expires), rename, move a tablet, unpair with a reason. The
+  list follows `RestaurantChanged`, `DeviceStatusChanged` and `DeviceRevoked` and reads
+  connections again every 30 s.
+- "Locate" (S) is left to the device side: P3-01 (tablet) and P2-05 (pager).
+
 ### P4-02d Menu editor
 
 Requirements: MGR-005, MENU-001 to MENU-011 (the manager's side).

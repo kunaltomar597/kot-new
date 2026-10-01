@@ -6,8 +6,11 @@ import {
   calendarDateOf,
   cutoffChangeMovesBusinessDate,
   DEFAULT_INVOICE_SERIES,
+  displayDateTime,
+  DomainError,
   financialYearFromStart,
   financialYearOf,
+  formatDisplayDate,
   formatInvoiceNumber,
   maxSequenceFor,
   nextBusinessDayStart,
@@ -156,5 +159,20 @@ describe('[BILL-003] GST invoice numbering', () => {
     expect(validateInvoiceSeries({ ...DEFAULT_INVOICE_SERIES, sequencePadding: 0 })).toContain(
       'Sequence padding must be at least 1',
     );
+  });
+});
+
+describe('[NFR-L03] dates as people read them', () => {
+  it('shows a calendar date as DD-MM-YYYY', () => {
+    expect(formatDisplayDate('2026-04-01')).toBe('01-04-2026');
+    expect(() => formatDisplayDate('2026-02-30')).toThrow(DomainError);
+  });
+
+  it('shows an instant in the restaurant’s time zone, across midnight', () => {
+    // 19:00 UTC on 31 March is 00:30 on 1 April in IST.
+    expect(displayDateTime(new Date('2026-03-31T19:00:00Z'))).toEqual({
+      date: '01-04-2026',
+      time: '00:30',
+    });
   });
 });

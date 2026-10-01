@@ -1403,6 +1403,7 @@
       "get": {
         "operationId": "listDevices",
         "summary": "Paired and revoked devices of the restaurant",
+        "description": "Each device with its binding, whether it is connected now, its last reported battery and versions, and when it was last seen (MGR-006).",
         "tags": ["devices"],
         "responses": {
           "200": {
@@ -1433,7 +1434,73 @@
           }
         },
         "x-capability": "DEVICE_PAIR",
-        "x-requirements": ["AUTH-007", "AUTH-008"]
+        "x-requirements": ["AUTH-007", "AUTH-008", "MGR-006"]
+      }
+    },
+    "/api/v1/devices/{deviceId}": {
+      "patch": {
+        "operationId": "renameDevice",
+        "summary": "Rename a device",
+        "description": "Audited, and announced to every screen as `RestaurantChanged` `DEVICES`.",
+        "tags": ["devices"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RenameDeviceRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Renamed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DeviceSummary" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such device.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The device is unpaired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["MGR-006", "AUD-001"]
       }
     },
     "/api/v1/devices/{deviceId}/revoke": {
@@ -9837,7 +9904,7 @@
         "type": "object",
         "properties": {
           "type": { "$ref": "#/components/schemas/DeviceType" },
-          "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "name": { "$ref": "#/components/schemas/DeviceName" },
           "tableId": { "$ref": "#/components/schemas/Id" },
           "stationId": { "$ref": "#/components/schemas/Id" },
           "staffId": { "$ref": "#/components/schemas/Id" }
@@ -10037,11 +10104,12 @@
       "DeviceListResponse": {
         "type": "object",
         "properties": {
-          "devices": { "type": "array", "items": { "$ref": "#/components/schemas/DeviceSummary" } }
+          "devices": { "type": "array", "items": { "$ref": "#/components/schemas/DeviceView" } }
         },
         "required": ["devices"],
         "additionalProperties": false
       },
+      "DeviceName": { "type": "string", "minLength": 1, "maxLength": 60 },
       "DeviceRevoked": {
         "type": "object",
         "properties": {
@@ -10170,6 +10238,52 @@
       "DeviceType": {
         "type": "string",
         "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
+      },
+      "DeviceView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/DeviceStatus" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "pairedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastSeenAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "appVersion": { "type": ["string", "null"] },
+          "connected": { "type": "boolean" },
+          "batteryPercent": {
+            "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+          },
+          "firmwareVersion": { "type": ["string", "null"] },
+          "serial": { "type": ["string", "null"] },
+          "revokedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "status",
+          "tableId",
+          "stationId",
+          "staffId",
+          "pairedAt",
+          "lastSeenAt",
+          "appVersion",
+          "connected",
+          "batteryPercent",
+          "firmwareVersion",
+          "serial",
+          "revokedAt"
+        ],
+        "additionalProperties": false
       },
       "DiscountRequest": {
         "type": "object",
@@ -13846,6 +13960,12 @@
           "message": { "type": "string" }
         },
         "required": ["clientLineId", "code", "message"],
+        "additionalProperties": false
+      },
+      "RenameDeviceRequest": {
+        "type": "object",
+        "properties": { "name": { "$ref": "#/components/schemas/DeviceName" } },
+        "required": ["name"],
         "additionalProperties": false
       },
       "ReopenInvoiceRequest": {

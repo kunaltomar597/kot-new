@@ -78,6 +78,14 @@ afterEach(() => {
 
 const server = () => request(httpServer(app));
 const asManager = () => authHeaders(kit.deviceId, manager.accessToken);
+
+/** How many `RestaurantChanged` `DEVICES` events name this device (MGR-006). */
+async function devicesAnnounced(deviceId: string): Promise<number> {
+  const events = await prisma.outboxEvent.findMany({
+    where: { aggregateId: deviceId, eventType: 'RestaurantChanged' },
+  });
+  return events.filter((event) => JSON.stringify(event.payload).includes('"DEVICES"')).length;
+}
 const codeOf = (response: request.Response) => ApiError.parse(response.body).code;
 
 interface DeviceKeys {
@@ -356,7 +364,9 @@ describe('[AUTH-008] unpairing', () => {
     const session = await prisma.session.findUniqueOrThrow({ where: { id: waiter.session.id } });
     expect(session.revokeReason).toBe('DEVICE_REVOKED');
 
-    const event = await prisma.outboxEvent.findFirstOrThrow({ where: { aggregateId: phone } });
+    const event = await prisma.outboxEvent.findFirstOrThrow({
+      where: { aggregateId: phone, eventType: 'DeviceRevoked' },
+    });
     expect(DeviceRevoked.parse(event.payload).payload).toEqual({
       deviceId: phone,
       deviceType: 'WAITER_PHONE',
@@ -371,7 +381,11 @@ describe('[AUTH-008] unpairing', () => {
       .set(asManager())
       .send({ reason: 'Phone lost' });
     expect(again.status).toBe(200);
-    expect(await prisma.outboxEvent.count({ where: { aggregateId: phone } })).toBe(1);
+    expect(
+      await prisma.outboxEvent.count({ where: { aggregateId: phone, eventType: 'DeviceRevoked' } }),
+    ).toBe(1);
+    // The device list on every manager screen hears of it too (MGR-006).
+    expect(await devicesAnnounced(phone)).toBe(1);
   });
 
   it('refuses to unpair the device the manager is using', async () => {
@@ -424,6 +438,7 @@ describe('[AUTH-009] [SEC-003] table tablets', () => {
     expect(
       await prisma.auditLog.count({ where: { action: 'DEVICE_TABLE_CHANGED', entityId: tablet } }),
     ).toBe(1);
+    expect(await devicesAnnounced(tablet)).toBe(1);
 
     const notTablet = await server()
       .put(`/api/v1/devices/${kit.deviceId}/table`)
@@ -453,5 +468,126 @@ describe('[AUTH-007] [AUTH-009] the current device', () => {
 
   it('needs a paired device', async () => {
     expect(codeOf(await server().get('/api/v1/devices/current'))).toBe('DEVICE_NOT_RECOGNISED');
+  });
+});
+
+describe('[MGR-006] the device list', () => {
+  it('shows each device with its binding, connection, battery, versions and when it was unpaired', async () => {
+    const tablet = await addDevice(app, kit, 'TABLE_TABLET', { tableId: tables[1]! });
+    const pagerId = await addDevice(app, kit, 'PAGER', { staffId: kit.staff.WAITER });
+    await prisma.device.update({
+      where: { id: pagerId },
+      data: { serial: 'WP-0042', online: true, batteryPercent: 64, firmwareVersion: '1.2.0' },
+    });
+    const gone = await addDevice(app, kit, 'KDS');
+    await server()
+      .post(`/api/v1/devices/${gone}/revoke`)
+      .set(asManager())
+      .send({ reason: 'Broken' });
+
+    const response = await server().get('/api/v1/devices').set(asManager());
+    expect(response.status).toBe(200);
+    const devices = new Map(
+      DeviceListResponse.parse(response.body).devices.map((device) => [device.id, device]),
+    );
+    expect(devices.get(tablet)).toMatchObject({
+      type: 'TABLE_TABLET',
+      tableId: tables[1],
+      status: 'ACTIVE',
+      // No live connection in this test (the real-time tests connect apps).
+      connected: false,
+      batteryPercent: null,
+      revokedAt: null,
+    });
+    expect(devices.get(pagerId)).toMatchObject({
+      type: 'PAGER',
+      staffId: kit.staff.WAITER,
+      serial: 'WP-0042',
+      connected: true,
+      batteryPercent: 64,
+      firmwareVersion: '1.2.0',
+    });
+    const unpaired = devices.get(gone);
+    expect(unpaired?.status).toBe('REVOKED');
+    expect(unpaired?.connected).toBe(false);
+    expect(unpaired?.revokedAt).not.toBeNull();
+  });
+
+  it('announces a newly paired device to every screen', async () => {
+    const { code } = await createCode({ type: 'KDS', name: 'Tandoor screen' });
+    const paired = PairedDevice.parse((await pair(code, keys())).body);
+    expect(await devicesAnnounced(paired.deviceId)).toBe(1);
+  });
+
+  it('is only for people who pair devices', async () => {
+    const cashier = await signIn(app, kit, 'CASHIER');
+    const response = await server()
+      .get('/api/v1/devices')
+      .set(authHeaders(kit.deviceId, cashier.accessToken));
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('[MGR-006] [AUD-001] renaming a device', () => {
+  it('renames it, audits the old and new name, and tells every screen', async () => {
+    const screen = await addDevice(app, kit, 'KDS');
+    const renamed = await server()
+      .patch(`/api/v1/devices/${screen}`)
+      .set(asManager())
+      .send({ name: '  Tandoor screen  ' });
+    expect(renamed.status, JSON.stringify(renamed.body)).toBe(200);
+    expect(DeviceSummary.parse(renamed.body).name).toBe('Tandoor screen');
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'DEVICE_RENAMED', entityId: screen },
+    });
+    expect(audit.after).toEqual({ name: 'Tandoor screen' });
+    expect(audit.actorId).toBe(kit.staff.MANAGER);
+    expect(await devicesAnnounced(screen)).toBe(1);
+
+    // The same name again changes nothing and records nothing.
+    const same = await server()
+      .patch(`/api/v1/devices/${screen}`)
+      .set(asManager())
+      .send({ name: 'Tandoor screen' });
+    expect(same.status).toBe(200);
+    expect(
+      await prisma.auditLog.count({ where: { action: 'DEVICE_RENAMED', entityId: screen } }),
+    ).toBe(1);
+
+    // The device itself reads its new name.
+    const current = await server().get('/api/v1/devices/current').set(authHeaders(screen));
+    expect(DeviceSummary.parse(current.body).name).toBe('Tandoor screen');
+  });
+
+  it('refuses an empty name, an unpaired device, an unknown one and other roles', async () => {
+    const phone = await addDevice(app, kit, 'WAITER_PHONE');
+    const empty = await server()
+      .patch(`/api/v1/devices/${phone}`)
+      .set(asManager())
+      .send({ name: ' ' });
+    expect(empty.status).toBe(400);
+
+    const waiter = await signIn(app, kit, 'WAITER');
+    const refused = await server()
+      .patch(`/api/v1/devices/${phone}`)
+      .set(authHeaders(kit.deviceId, waiter.accessToken))
+      .send({ name: 'Mine now' });
+    expect(refused.status).toBe(403);
+
+    await server()
+      .post(`/api/v1/devices/${phone}/revoke`)
+      .set(asManager())
+      .send({ reason: 'Lost' });
+    const revoked = await server()
+      .patch(`/api/v1/devices/${phone}`)
+      .set(asManager())
+      .send({ name: 'Found again' });
+    expect(codeOf(revoked)).toBe('DEVICE_REVOKED');
+
+    const unknown = await server()
+      .patch('/api/v1/devices/0199a0e0-0000-7000-8000-000000009999')
+      .set(asManager())
+      .send({ name: 'Nobody' });
+    expect(unknown.status).toBe(404);
   });
 });

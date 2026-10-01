@@ -191,6 +191,16 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     io?.engine.close();
   }
 
+  /** Devices of the restaurant with at least one live connection now (MGR-006). */
+  connectedDeviceIds(restaurantId: string): ReadonlySet<string> {
+    const ids = new Set<string>();
+    for (const socket of this.namespace?.sockets.values() ?? []) {
+      const { device } = socket.data;
+      if (device.restaurantId === restaurantId) ids.add(device.deviceId);
+    }
+    return ids;
+  }
+
   /**
    * Re-checks every live connection: the device must still be paired with the same binding, and
    * a signed-in person's session must still be live with the same role (AUTH-005, AUTH-008).

@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 60 } },
+    "required": ["name"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 60 } },
+    "required": ["name"],
+    "additionalProperties": false
+  }
+}

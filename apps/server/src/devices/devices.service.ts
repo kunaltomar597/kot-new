@@ -7,6 +7,7 @@ import {
   type DeviceSummary,
   type DeviceTokenRequest,
   type DeviceTokenResponse,
+  type DeviceView,
   deviceTokenMessage,
   type PairDeviceRequest,
   type PairedDevice,
@@ -32,6 +33,8 @@ import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { announceSetupChange } from '../restaurant/setup-changes.js';
 import { TlsService } from '../tls/tls.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -119,6 +122,22 @@ function summary(device: DeviceRow): DeviceSummary {
   };
 }
 
+/** The manager's view (MGR-006): a pager is connected by its heartbeats, an app by its socket. */
+function view(device: DeviceRow, connected: ReadonlySet<string>): DeviceView {
+  return {
+    ...summary(device),
+    connected:
+      device.status === 'ACTIVE' &&
+      (device.type === 'PAGER' ? device.online : connected.has(device.id)),
+    batteryPercent: device.batteryPercent,
+    firmwareVersion: device.firmwareVersion,
+    serial: device.serial,
+    revokedAt: device.revokedAt?.toISOString() ?? null,
+  };
+}
+
+const deviceAggregate = (id: string) => ({ type: 'device', id });
+
 /**
  * Pairing and managing devices (AUTH-007 to AUTH-009). A manager creates a one-time code; the
  * device pairs with it and its public key; afterwards it authenticates by signing challenges.
@@ -132,6 +151,7 @@ export class DevicesService {
     private readonly audit: AuditService,
     private readonly limiter: RateLimiter,
     private readonly tls: TlsService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   async createPairingCode(
@@ -225,6 +245,7 @@ export class DevicesService {
           keyAlgorithm: request.algorithm,
         },
       });
+      await announceSetupChange(tx, code.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return { device };
     });
     if ('error' in outcome) throw outcome.error;
@@ -287,7 +308,33 @@ export class DevicesService {
       where: { restaurantId: principal.restaurantId },
       orderBy: { createdAt: 'asc' },
     });
-    return { devices: devices.map(summary) };
+    const connected = this.realtime.connectedDeviceIds(principal.restaurantId);
+    return { devices: devices.map((device) => view(device, connected)) };
+  }
+
+  /** Renames a device (MGR-006): audited, and every screen hears of it. */
+  async rename(principal: Principal, deviceId: string, name: string): Promise<DeviceSummary> {
+    return this.prisma.transaction(async (tx) => {
+      const device = await tx.device.findFirst({
+        where: { id: deviceId, restaurantId: principal.restaurantId },
+      });
+      if (device === null) throw errors.notFound();
+      if (device.status === 'REVOKED') throw errors.deviceRevoked();
+      if (device.name === name) return summary(device);
+      const renamed = await tx.device.update({ where: { id: device.id }, data: { name } });
+      await this.audit.record(tx, {
+        action: 'DEVICE_RENAMED',
+        entityType: 'device',
+        entityId: device.id,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: { name: device.name },
+        after: { name },
+      });
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
+      return summary(renamed);
+    });
   }
 
   /**
@@ -342,6 +389,7 @@ export class DevicesService {
         after: { status: 'REVOKED', sessionsRevoked: sessions.count },
         reason,
       });
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return summary(revoked);
     });
   }
@@ -370,6 +418,7 @@ export class DevicesService {
         before: { tableId: device.tableId },
         after: { tableId },
       });
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return summary(updated);
     });
   }
