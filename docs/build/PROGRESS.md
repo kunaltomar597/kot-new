@@ -189,7 +189,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P5-03c photos to the relay's Storage, P5-03d the Realtime doorbell, then P5-04 to P5-06.
+- P5-05 Next.js QR menu site; P5-03c photos to the relay's Storage; P5-03d the Realtime doorbell;
+  then P5-06.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -318,7 +319,7 @@ Recommended next WPs (dependencies met):
 - [x] P5-03b Sync agent: orders (pickup, approval, status back)
 - [ ] P5-03c Sync agent: photos to the relay's Storage
 - [ ] P5-03d Sync agent: Realtime doorbell for new QR orders (polling slows down)
-- [ ] P5-04 QR tokens and table tents
+- [x] P5-04 QR tokens and table tents
 - [ ] P5-05 Next.js QR menu site
 - [ ] P5-06 Phase 5 exit test
 
@@ -593,6 +594,32 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P5-04):
+
+357. A table's QR code opens `<RP_QR_SITE_URL>/t/<token>`. The token is 128 random bits in
+     base64url (22 characters).
+     - This PC keeps the token so the tent can be printed again. It is in the restaurant's own
+       database, behind the same backups.
+     - The relay gets only its SHA-256 (hex over the UTF-8), with the table sync.
+     - The site address is installation config, like the relay's, and set by the vendor. Without
+       it, codes can be made but not printed (`QR_SITE_NOT_SET`).
+358. Codes are made for every table without one in one step. A new code for one table needs a
+     reason; it replaces the old token, so the relay stops the old code at its next sync (seconds
+     online). Both are audited without the token and announced as a floor change. Both need
+     STAFF_MANAGE, like the tables.
+359. Tents are a PDF from pdfmake (its own QR drawing, error correction M):
+     - A6: one card per page, for stands;
+     - A5: landscape, two A6 panels side by side, which fold on a dashed line into a standing tent
+       with the code on both faces.
+       Each panel has the restaurant's name in its accent colour, "Scan to see the menu and order",
+       the code, "Table <label>", a line saying the waiter confirms the order, and the address.
+       Printed in English, like the QR site for now.
+360. The console has a QR codes page (managers and the Owner):
+     - each table's code, with Show and New code;
+     - make the missing codes;
+     - download the tents as A6 or A5.
+       The pdfmake setup moved to `common/pdf.ts`, and the download helper to `app/download.ts`.
 
 Decided 2026-10-02 (P5-03b):
 
@@ -1879,6 +1906,34 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P5-04 Table QR codes and tents
+
+Built:
+
+- Migration `20261002190000_table_qr_codes` (`tables.qr_token` unique, `qr_token_issued_at`).
+- Config `RP_QR_SITE_URL`.
+- Contracts `table-qr.ts` and four routes.
+- `TableQrService` and its controller (registered before `TablesController`).
+- `table-tents.ts` (pdfmake A6 and A5), and `common/pdf.ts` shared with report exports.
+- The relay sync sends `tokenHash`.
+- Console `QrCodesScreen` with its navigation link and strings, and `app/download.ts`.
+- `@rp/relay/testing` `startRelay` makes its database under an advisory lock, because test files
+  starting relays at once raced to create the cluster-wide roles.
+- The relay-sync and relay-orders tests now use real codes.
+
+Tests:
+
+- server `table-qr.int.test.ts` 8:
+  - floor order;
+  - unique 22-character codes, audited without them, kept on a second run;
+  - only the hash at the relay, which opens the table;
+  - acceptance: a regenerated code is refused by the relay (404), and the new one opens;
+  - managers only;
+  - A6 PDF (3 pages, A6 media box); A5 tents for chosen tables (landscape);
+  - `QR_SITE_NOT_SET` and `NO_QR_CODES`.
+- console `qr-codes.test.tsx` 3.
+- Checked by eye: the A6 card and the A5 tent, rendered to PNG.
 
 ### 2026-10-02: P5-03b Sync agent: orders
 

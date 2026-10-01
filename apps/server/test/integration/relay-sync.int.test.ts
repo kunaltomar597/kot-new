@@ -49,16 +49,14 @@ async function relayMenu(): Promise<QrMenuResponse> {
   return QrMenuResponse.parse(await response.json());
 }
 
-/**
- * A QR code for T1 straight at the relay, so a browser can read the menu. P5-04 makes real ones;
- * until then the local server sends tables without codes, so this is redone after a table sync.
- */
+/** T1's QR code, made as a manager would (P5-04), sent to the relay with the next sync. */
 async function giveT1ACode(): Promise<void> {
-  tableToken = 'A'.repeat(22);
-  await relay.admin.query(
-    "UPDATE relay.dining_tables SET token_hash = sha256(convert_to($2, 'UTF8')) WHERE tenant_id = $1 AND table_id = $3",
-    [tenantId, tableToken, ids.T1],
-  );
+  if (tableToken === '') {
+    expect((await server().post('/api/v1/tables/qr-codes').set(as(manager))).status).toBe(200);
+    tableToken =
+      (await prisma.diningTable.findUniqueOrThrow({ where: { id: ids.T1 } })).qrToken ?? '';
+  }
+  await sync.sync();
 }
 
 const relayRow = async <T extends object>(sql: string) =>

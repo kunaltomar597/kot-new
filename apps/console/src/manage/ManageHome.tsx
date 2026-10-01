@@ -14,6 +14,7 @@ import { RestaurantScreen } from './restaurant/RestaurantScreen.js';
 import { NotificationRulesScreen } from './settings/NotificationRulesScreen.js';
 import { RecommendationsScreen } from './settings/RecommendationsScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
+import { QrCodesScreen } from './qr/QrCodesScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
 import { StaffArea } from './staff/StaffArea.js';
@@ -88,6 +89,11 @@ export function ManageHome() {
             {t('dashboard.section.staff')}
           </NavLink>
         ) : null}
+        {managesStaff ? (
+          <NavLink to="/manage/qr-codes" className="dashboard__link">
+            {t('dashboard.section.qrCodes')}
+          </NavLink>
+        ) : null}
         {managesMenu ? (
           <NavLink to="/manage/menu" className="dashboard__link">
             {t('dashboard.section.menu')}
@@ -138,6 +144,7 @@ export function ManageHome() {
           {seesReports ? <Route path="reports/*" element={<ReportsArea />} /> : null}
           {viewsAudit ? <Route path="audit" element={<AuditScreen />} /> : null}
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
+          {managesStaff ? <Route path="qr-codes" element={<QrCodesScreen />} /> : null}
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
           {operates ? <Route path="restaurant" element={<RestaurantScreen />} /> : null}

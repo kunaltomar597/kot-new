@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import { useConsole } from '../../app/console-context.js';
+import { downloadFile } from '../../app/download.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import type { ReportData } from './use-report.js';
@@ -181,14 +182,6 @@ export function BarChartFigure({
 }
 
 /** The file's bytes: CSV comes as text, Excel and PDF as base64. */
-function fileBytes(file: { content: string; encoding: 'utf-8' | 'base64' }): BlobPart {
-  if (file.encoding === 'utf-8') return file.content;
-  const binary = atob(file.content);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
-}
-
 /**
  * Downloads a report as CSV, Excel or PDF, stamped and audited by the server (RPT-017, P4-06).
  * One button per format, so the choice is one tap.
@@ -227,14 +220,7 @@ export function ExportButtons({
               })
               .then(
                 (file) => {
-                  const url = URL.createObjectURL(
-                    new Blob([fileBytes(file)], { type: file.contentType }),
-                  );
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = file.filename;
-                  link.click();
-                  URL.revokeObjectURL(url);
+                  downloadFile(file);
                   toast.show({
                     title: t('reportsPage.exported', { file: file.filename }),
                     tone: 'success',

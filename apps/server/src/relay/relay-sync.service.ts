@@ -22,6 +22,7 @@ import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { EventBus } from '../events/event-bus.js';
+import { tableTokenHash } from '../floor/table-qr.service.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
 import { PacedLoop } from './paced-loop.js';
@@ -235,12 +236,13 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     const rows = await this.prisma.diningTable.findMany({
       where: { restaurantId },
       orderBy: [{ displayOrder: 'asc' }, { label: 'asc' }],
-      select: { id: true, label: true, archivedAt: true },
+      select: { id: true, label: true, archivedAt: true, qrToken: true },
     });
     const tables: RelayTable[] = rows.map((row) => ({
       tableId: row.id,
       label: row.label.slice(0, 40),
-      tokenHash: null,
+      // Only the hash leaves this PC (QR-001, ADR-0015).
+      tokenHash: row.qrToken === null ? null : tableTokenHash(row.qrToken),
       active: row.archivedAt === null,
     }));
     const hash = hashOf(tables);

@@ -1,10 +1,9 @@
-import { createRequire } from 'node:module';
-import { dirname } from 'node:path';
 import { EXPORT_ROW_LIMITS, type ExportFormat } from '@rp/contracts';
 import { type ColumnKind, displayValue, type ReportCell, type ReportDocument } from '@rp/domain';
 import ExcelJS from 'exceljs';
 import { AppError } from '../errors/app-error.js';
-import pdfmake, { type Content, type DocumentDefinition, type TableCell } from 'pdfmake';
+import type { Content, DocumentDefinition, TableCell } from 'pdfmake';
+import { pdfmake } from '../common/pdf.js';
 
 /**
  * Excel and PDF files of a report document (P4-06, RPT-017). CSV comes from `@rp/domain`
@@ -105,17 +104,6 @@ export async function documentToXlsx(document: ReportDocument): Promise<Buffer> 
 }
 
 // ---------------------------------------------------------------- PDF
-
-const require = createRequire(import.meta.url);
-/** Roboto as shipped with pdfmake: it has the ₹ sign. */
-const FONTS = require('pdfmake/fonts/Roboto') as {
-  Roboto: { normal: string; bold: string; italics: string; bolditalics: string };
-};
-const FONT_DIR = dirname(FONTS.Roboto.normal);
-pdfmake.setFonts(FONTS);
-// Reports never load anything from the network or the disk beyond the fonts.
-pdfmake.setUrlAccessPolicy(() => false);
-pdfmake.setLocalAccessPolicy((path) => path.startsWith(FONT_DIR));
 
 const NUMERIC: ReadonlySet<ColumnKind> = new Set(['money', 'number', 'percent']);
 

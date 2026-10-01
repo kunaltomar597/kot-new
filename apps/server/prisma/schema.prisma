@@ -526,25 +526,28 @@ model Section {
 }
 
 model DiningTable {
-  id           String            @id @default(uuid(7)) @db.Uuid
-  restaurantId String            @map("restaurant_id") @db.Uuid
-  sectionId    String            @map("section_id") @db.Uuid
-  section      Section           @relation(fields: [sectionId], references: [id])
+  id              String            @id @default(uuid(7)) @db.Uuid
+  restaurantId    String            @map("restaurant_id") @db.Uuid
+  sectionId       String            @map("section_id") @db.Uuid
+  section         Section           @relation(fields: [sectionId], references: [id])
   /// Number or name shown to staff and on KOTs, e.g. "12" or "Terrace 3".
-  label        String
-  capacity     Int               @default(4)
-  state        TableState        @default(FREE)
+  label           String
+  capacity        Int               @default(4)
+  state           TableState        @default(FREE)
   /// Position on the visual floor plan (S requirement), free-form.
-  layout       Json?
-  displayOrder Int               @default(0) @map("display_order")
-  externalId   String?           @map("external_id")
-  archivedAt   DateTime?         @map("archived_at") @db.Timestamptz(3)
-  sessions     TableSession[]
-  devices      Device[]
-  orders       Order[]
-  assignments  ShiftAssignment[]
-  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  layout          Json?
+  displayOrder    Int               @default(0) @map("display_order")
+  externalId      String?           @map("external_id")
+  /// The table's QR code token (QR-001, P5-04); the relay keeps only its SHA-256.
+  qrToken         String?           @unique @map("qr_token")
+  qrTokenIssuedAt DateTime?         @map("qr_token_issued_at") @db.Timestamptz(3)
+  archivedAt      DateTime?         @map("archived_at") @db.Timestamptz(3)
+  sessions        TableSession[]
+  devices         Device[]
+  orders          Order[]
+  assignments     ShiftAssignment[]
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([restaurantId, label])
   @@index([restaurantId])

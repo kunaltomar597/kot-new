@@ -457,6 +457,7 @@ export const en = {
       system: 'System',
       settings: 'Settings',
       security: 'Security',
+      qrCodes: 'QR codes',
     },
     overview: {
       glance: 'At a glance',
@@ -1713,6 +1714,40 @@ export const en = {
     },
   },
   /** The System page (P4-04, MGR-010, NFR-I03, DATA-006, UPD-004). */
+  qrCodes: {
+    title: 'Table QR codes',
+    intro:
+      'Each table has its own code that opens the QR menu for that table. Print them as table tents. If a printed code is copied or photographed, give the table a new one: the old one stops working.',
+    loadFailed: 'The table QR codes could not be loaded.',
+    noTables: 'There are no tables yet. Add them on the floor first.',
+    noSite:
+      'The QR menu site is not set up on this PC yet, so codes cannot be printed. The vendor sets it.',
+    missing: '{count, plural, one {# table has} other {# tables have}} no code yet.',
+    issue: 'Make {count, plural, one {a code} other {# codes}}',
+    issued: 'The tables have their codes.',
+    table: 'Table {label}',
+    noCode: 'No code yet',
+    madeAt: 'Code made {date} {time}',
+    show: 'Show',
+    showOf: 'Show the code of table {label}',
+    codeOf: 'QR code of table {label}',
+    new: 'New code',
+    newOf: 'New code for table {label}',
+    newWarning:
+      'The printed code on table {label} will stop working within seconds. Print the new one and replace it.',
+    reason: 'Why? (kept in the audit trail)',
+    newConfirm: 'Make a new code',
+    regenerated: 'Table {label} has a new code. Print it and replace the old one.',
+    cancel: 'Cancel',
+    size: 'Print as',
+    sizes: {
+      A6: 'A6 cards (one per page, for a stand)',
+      A5: 'A5 tents (fold on the dashed line)',
+    },
+    print: 'Download table tents (PDF)',
+    printed: 'Saved {file}',
+    failed: 'That did not work: {message}',
+  },
   systemPage: {
     title: 'System',
     intro:
