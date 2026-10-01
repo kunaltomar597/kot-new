@@ -167,6 +167,78 @@ export function effectiveRule(
   return { ...DEFAULT_NOTIFICATION_RULES[event], ...overrides[event] };
 }
 
+/** Recipients any event can go to; the special ones only where Appendix C uses them. */
+const GENERAL_RECIPIENTS: readonly RecipientKind[] = [
+  'RESPONSIBLE_WAITER',
+  'SECTION_WAITERS',
+  'ALL_WAITERS',
+  'MANAGERS_ON_DUTY',
+  'CASHIER',
+  'OWNER',
+];
+const GENERAL_CHANNELS: readonly NotificationChannel[] = [
+  'PAGER',
+  'WAITER_APP',
+  'POS',
+  'DASHBOARD',
+];
+
+/**
+ * Who a manager may send an event to (NTF-002): the usual people, plus a station, a pager's wearer
+ * or the chosen waiters only for the events that have one.
+ */
+export function recipientChoices(event: NotificationEvent): RecipientKind[] {
+  const own = DEFAULT_NOTIFICATION_RULES[event].recipients;
+  return RECIPIENT_KINDS.filter((kind) => GENERAL_RECIPIENTS.includes(kind) || own.includes(kind));
+}
+
+/** Where an event can show: the usual channels, plus the kitchen, tablet, slip or vendor where it has them. */
+export function channelChoices(event: NotificationEvent): NotificationChannel[] {
+  const own = DEFAULT_NOTIFICATION_RULES[event].channels;
+  return NOTIFICATION_CHANNELS.filter(
+    (channel) => GENERAL_CHANNELS.includes(channel) || own.includes(channel),
+  );
+}
+
+const sameSet = <T>(a: readonly T[], b: readonly T[]) =>
+  a.length === b.length && a.every((value) => b.includes(value));
+
+/**
+ * What a manager's rule changes from the factory one (NTF-002), field by field; undefined when it
+ * is the factory rule. Only this difference is stored, so later factory changes still apply.
+ */
+export function ruleOverride(
+  event: NotificationEvent,
+  rule: NotificationRule,
+): NotificationRuleOverride | undefined {
+  const factory = DEFAULT_NOTIFICATION_RULES[event];
+  const override: { -readonly [K in keyof NotificationRule]?: NotificationRule[K] } = {};
+  if (!sameSet(rule.recipients, factory.recipients)) override.recipients = rule.recipients;
+  if (!sameSet(rule.channels, factory.channels)) override.channels = rule.channels;
+  if (rule.pagerText !== factory.pagerText) override.pagerText = rule.pagerText;
+  if (rule.escalate !== factory.escalate) override.escalate = rule.escalate;
+  if (rule.repeat !== factory.repeat) override.repeat = rule.repeat;
+  return Object.keys(override).length === 0 ? undefined : override;
+}
+
+export type NotificationRuleProblem =
+  'RECIPIENTS_REQUIRED' | 'CHANNELS_REQUIRED' | 'PAGER_TEXT_REQUIRED' | 'PAGER_TEXT_TOO_LONG';
+
+/** A rule must reach someone somewhere, and a pager alert needs its line of text. */
+export function checkRule(rule: NotificationRule): NotificationRuleProblem[] {
+  const problems: NotificationRuleProblem[] = [];
+  if (rule.recipients.length === 0) problems.push('RECIPIENTS_REQUIRED');
+  if (rule.channels.length === 0) problems.push('CHANNELS_REQUIRED');
+  if (rule.channels.includes('PAGER')) {
+    if (rule.pagerText === null || rule.pagerText.trim() === '') {
+      problems.push('PAGER_TEXT_REQUIRED');
+    } else if (rule.pagerText.trim().length > PAGER_TEXT_MAX) {
+      problems.push('PAGER_TEXT_TOO_LONG');
+    }
+  }
+  return problems;
+}
+
 /** A pager line: at most 20 characters on the wrist display (PGR), in capitals as Appendix C. */
 export const PAGER_TEXT_MAX = 20;
 

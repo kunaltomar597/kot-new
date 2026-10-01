@@ -7,6 +7,7 @@ import { useT } from '../app/i18n.js';
 import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
 import { MenuEditor } from './menu/MenuEditor.js';
+import { NotificationRulesScreen } from './settings/NotificationRulesScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
@@ -99,6 +100,9 @@ export function ManageHome() {
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
           {operates ? <Route path="settings" element={<SettingsScreen />} /> : null}
+          {operates ? (
+            <Route path="settings/notifications" element={<NotificationRulesScreen />} />
+          ) : null}
           {isOwner ? <Route path="security" element={<OwnerSecurityScreen />} /> : null}
           <Route path="*" element={<Navigate to="/manage" replace />} />
         </Routes>

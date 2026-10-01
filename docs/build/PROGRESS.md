@@ -146,7 +146,7 @@ What exists:
   menu editor (dishes with photos, sizes, option groups, combos, stock; categories; option
   groups; publish) (P4-02d); the Roles page and custom roles for people, with screens that show
   what a custom role adds (P4-02e); the Settings page with an editor for every catalogue
-  setting (P4-03a). 227 tests, and 19 Playwright steps.
+  setting (P4-03a); the notification rules page (P4-03b). 231 tests, and 19 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -161,8 +161,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03b Notification rules editor, then P4-03c to P4-03e (P4-03 is split in five, see
-  phase-4.md).
+- P4-03c Recommendation rules with boost, pin and block, then P4-03d and P4-03e (P4-03 is split in
+  five, see phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -268,7 +268,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02d Menu editor
 - [x] P4-02e Custom roles (S)
 - [x] P4-03a Settings page (every catalogue setting)
-- [ ] P4-03b Notification rules editor
+- [x] P4-03b Notification rules editor
 - [ ] P4-03c Recommendation rules editor with boost, pin and block
 - [ ] P4-03d Stations and printers
 - [ ] P4-03e Restaurant profile, tax groups and invoice series (Owner)
@@ -557,6 +557,18 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-03b):
+
+237. The notification rules are a page under Settings (`/manage/settings/notifications`), linked
+     from the rules row. Only a rule's difference from Appendix C is stored in
+     `notifications.rules`; "Use the factory rule" removes it, so the event follows later factory
+     changes again.
+238. A station, a pager's wearer and the chosen waiters are offered as recipients, and the kitchen
+     screen, tablet, printed slip and vendor as channels, only for the events whose factory rule
+     has them; any event may go to the usual people and to pager, waiter app, POS and dashboard.
+239. A rule needs at least one recipient and one channel; sending to pagers needs a pager line of
+     at most 20 characters.
 
 Decided 2026-10-01 (P4-03a):
 
@@ -1233,6 +1245,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-03b Notification rules
+
+Built: `@rp/domain` `recipientChoices`, `channelChoices`, `ruleOverride` and `checkRule`; i18n
+`notificationRules`; the console's `NotificationRulesScreen` (each event's rule in words with
+Change and "Use the factory rule", the rule dialog) at `/manage/settings/notifications`, linked
+from the Settings page.
+
+Tests: domain notifications 29 (3 new), console `notification-rules.test.tsx` 4 (factory rules
+with N and R, a change stored as its difference with the pager line checked, reset, read-only and
+the link from Settings).
+
+Gotchas:
+
+- A literal `{table}` in a catalogue message must be quoted ICU-style (`'{table}'`) or it is read
+  as a placeholder.
+- ESLint's `--fix` may drop a type assertion as "unnecessary" when the loader has no return type,
+  leaving `{}`: give such loaders an explicit return type.
+
+Decisions: 237 to 239.
 
 ### 2026-10-01: P4-03a Settings page
 
