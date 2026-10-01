@@ -12,3 +12,4 @@ export * from './tablet-menu.js';
 export * from './line-check.js';
 export * from './qr-menu.js';
 export * from './relay-status.js';
+export * from './qr-suggestions.js';

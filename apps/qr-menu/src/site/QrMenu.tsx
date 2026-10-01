@@ -1,8 +1,8 @@
 'use client';
 
-import type { MenuItem } from '@rp/contracts';
+import type { MenuItem, RecommendationSource } from '@rp/contracts';
 import type { QrMenuDocument, QrMenuResponse, QrOrderView } from '@rp/contracts/relay';
-import { formatRupees, unitPriceOf } from '@rp/domain';
+import { formatRupees, type Recommendation, unitPriceOf } from '@rp/domain';
 import {
   addLine,
   type CartLine,
@@ -14,6 +14,8 @@ import {
   menuCategories,
   needsOptions,
   type NewCartLine,
+  qrBestSellers,
+  qrSuggestions,
   removeLine,
   requestLines,
   searchMenu,
@@ -22,12 +24,13 @@ import {
   unavailableReason,
   updateLine,
 } from '@rp/ordering';
-import { Button, ThemeRoot, ToastProvider, useToast } from '@rp/ui-web';
+import { Button, ThemeRoot } from '@rp/ui-web';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { CartSheet } from './CartSheet';
 import { I18nProvider, useT } from './i18n';
 import { ItemSheet } from './ItemSheet';
 import { Orders } from './Orders';
+import { sourceOf, Suggestions } from './Suggestions';
 import { fetchMenu, fetchOrder, RelayCallError, submitOrder } from './relay';
 import { browserId, newUuid, tableValue } from './storage';
 
@@ -37,7 +40,9 @@ type LoadedMenu = QrMenuResponse & { document: QrMenuDocument };
 const MENU_REFRESH_MS = 60_000;
 /** How often an order on its way is checked (QR-007). */
 const ORDER_POLL_MS = 3_000;
-const FILTERS: readonly TabletFilter[] = ['veg', 'jain', 'spicy'];
+const FILTERS: readonly TabletFilter[] = ['veg', 'jain', 'spicy', 'bestseller'];
+/** How many suggestions a row shows (REC-005). */
+const SUGGESTIONS = 4;
 const NO_LINES: readonly CartLine[] = [];
 const NO_ORDERS: readonly string[] = [];
 
@@ -50,9 +55,7 @@ export function QrMenu(props: { token: string; relayUrl: string; initial: Loaded
   return (
     <ThemeRoot theme="light" accent={props.initial.document.accentColor} className="qr-root">
       <I18nProvider>
-        <ToastProvider>
-          <MenuPage {...props} />
-        </ToastProvider>
+        <MenuPage {...props} />
       </I18nProvider>
     </ThemeRoot>
   );
@@ -68,11 +71,15 @@ function MenuPage({
   initial: LoadedMenu;
 }) {
   const t = useT();
-  const toast = useToast();
+  // What was just added, for screen readers; the cart bar shows it to everyone else. (A toast
+  // would cover the cart bar on a phone.)
+  const [announced, setAnnounced] = useState('');
   const [menu, setMenu] = useState<LoadedMenu>(initial);
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ReadonlySet<TabletFilter>>(new Set());
-  const [open, setOpen] = useState<MenuItem | undefined>();
+  const [open, setOpen] = useState<
+    { readonly item: MenuItem; readonly recommendation?: RecommendationSource } | undefined
+  >();
   const [cartOpen, setCartOpen] = useState(false);
   // The cart and this table's orders survive a reload (kept in this browser only).
   const cart = useMemo(
@@ -114,9 +121,10 @@ function MenuPage({
     () => new Map(document.menu.items.map((item) => [item.id, item])),
     [document],
   );
+  const bestSellers = useMemo(() => qrBestSellers(document, new Date(now)), [document, now]);
   const shown = useMemo(
-    () => filterMenu(searchMenu(items, query), filters, new Set()),
-    [items, query, filters],
+    () => filterMenu(searchMenu(items, query), filters, bestSellers),
+    [items, query, filters, bestSellers],
   );
   // By menu section; a search's results stay in one list, best match first.
   const sections = useMemo(
@@ -196,10 +204,10 @@ function MenuPage({
   const add = (line: NewCartLine) => {
     changeLines(addLine(lines, line, newUuid));
     setOpen(undefined);
-    toast.show({ title: t('qrSite.added', { name: line.name }), tone: 'success' });
+    setAnnounced(t('qrSite.added', { name: line.name }));
   };
 
-  const quickAdd = (item: MenuItem) => {
+  const quickAdd = (item: MenuItem, recommendation?: RecommendationSource) => {
     const def = selectable(document.menu, item);
     add({
       itemId: item.id,
@@ -209,7 +217,15 @@ function MenuPage({
       selection: {},
       instructions: '',
       unitPrice: unitPriceOf(def, {}),
+      ...(recommendation !== undefined && { recommendation }),
     });
+  };
+
+  /** A suggestion pressed: added at once, or its options asked for first. */
+  const pick = (item: MenuItem, suggestion: Recommendation) => {
+    const recommendation = sourceOf(suggestion);
+    if (needsOptions(document.menu, item)) setOpen({ item, recommendation });
+    else quickAdd(item, recommendation);
   };
 
   const send = () => {
@@ -266,6 +282,17 @@ function MenuPage({
     const order = orders.get(id);
     return order === undefined ? [] : [order];
   });
+  // REC-005: nothing already ordered here (unless it may be had again), the veg filter honoured.
+  const { suggestions } = qrSuggestions(document, {
+    ordered: [
+      ...lines.map((line) => line.itemId),
+      ...shownOrders.flatMap((order) => order.lines.map((line) => line.itemId)),
+    ],
+    vegOnly: filters.has('veg'),
+    now: new Date(now),
+    limit: SUGGESTIONS,
+  });
+  const needsChoice = (item: MenuItem) => needsOptions(document.menu, item);
 
   return (
     <div className="qr-page">
@@ -296,7 +323,9 @@ function MenuPage({
         </label>
         <fieldset className="qr-filters">
           <legend className="qr-visually-hidden">{t('qrSite.filters.legend')}</legend>
-          {FILTERS.map((filter) => (
+          {FILTERS.filter(
+            (filter) => filter !== 'bestseller' || document.recommendations !== undefined,
+          ).map((filter) => (
             <label key={filter} className="qr-chip">
               <input
                 type="checkbox"
@@ -324,6 +353,16 @@ function MenuPage({
       </div>
 
       <main>
+        {query.trim() === '' ? (
+          <Suggestions
+            title={count === 0 ? t('reco.row.menu') : t('reco.row.cart')}
+            suggestions={suggestions}
+            items={byId}
+            readOnly={menu.readOnly}
+            needsChoice={needsChoice}
+            onPick={pick}
+          />
+        ) : null}
         {shown.length === 0 ? <p className="qr-muted qr-empty">{t('qrSite.noMatch')}</p> : null}
         {sections.map((section) => (
           <section
@@ -341,7 +380,7 @@ function MenuPage({
                   needsChoice={needsOptions(document.menu, item)}
                   readOnly={menu.readOnly}
                   onChoose={() => {
-                    setOpen(item);
+                    setOpen({ item });
                   }}
                   onAdd={() => {
                     quickAdd(item);
@@ -353,6 +392,9 @@ function MenuPage({
         ))}
       </main>
 
+      <p role="status" aria-live="polite" className="qr-visually-hidden">
+        {announced}
+      </p>
       {count === 0 ? null : (
         <div className="qr-cart-bar">
           <Button
@@ -370,7 +412,8 @@ function MenuPage({
       {open === undefined ? null : (
         <ItemSheet
           menu={document.menu}
-          item={open}
+          item={open.item}
+          recommendation={open.recommendation}
           instructionMaxLength={document.instructionMaxLength}
           onClose={() => {
             setOpen(undefined);

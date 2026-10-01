@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RELAY_MIGRATIONS_DIR, startRelay, SUPABASE_PRELUDE } from '@rp/relay/testing';
 import { startTestDatabase } from '@rp/test-postgres';
-import { menuDocument } from './fixture.js';
+import { bigMenuDocument, menuDocument } from './fixture.js';
 import { STATE_FILE } from './state.js';
 
 const SITE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -71,6 +71,41 @@ export default async function setup(): Promise<() => Promise<void>> {
     })),
   });
   await asServer('PUT', 'menu', { version: 1, document: menuDocument() });
+
+  // A second restaurant with a large menu, for the speed budget (QR-012).
+  const big = await relay.provision('Grand Thali House');
+  const bigToken = randomBytes(16).toString('base64url');
+  const asBig = async (method: string, path: string, body: unknown) => {
+    const response = await fetch(`${relay.baseUrl}/server/${path}`, {
+      method,
+      headers: { authorization: `Bearer ${big.credential}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok)
+      throw new Error(`${path}: ${String(response.status)} ${await response.text()}`);
+  };
+  await asBig('POST', 'presence', {
+    serverVersion: '1.0.0',
+    settings: {
+      submissionsPerWindow: 5,
+      rateLimitWindowMinutes: 10,
+      pickupTimeoutSeconds: 60,
+      presenceIntervalSeconds: 30,
+      readOnlyAfterSeconds: 120,
+    },
+  });
+  await asBig('PUT', 'tables', {
+    tables: [
+      {
+        tableId: randomUUID(),
+        label: 'G1',
+        tokenHash: createHash('sha256').update(bigToken, 'utf8').digest('hex'),
+        active: true,
+      },
+    ],
+  });
+  await asBig('PUT', 'menu', { version: 1, document: bigMenuDocument() });
+  tokens.BIG = bigToken;
 
   const port = await freePort();
   const site = `http://127.0.0.1:${String(port)}`;

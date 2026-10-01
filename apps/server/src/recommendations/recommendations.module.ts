@@ -35,6 +35,6 @@ import { RecommendationsService } from './recommendations.service.js';
     BestSellers,
     { provide: RECOMMENDATION_CLOCK, useValue: SYSTEM_RECOMMENDATION_CLOCK },
   ],
-  exports: [RecommendationsService, BestSellers],
+  exports: [RecommendationsService, BestSellers, RecommendationRulesService],
 })
 export class RecommendationsModule {}

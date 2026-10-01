@@ -39,6 +39,10 @@ async function relaySql(sql: string, params: unknown[] = []): Promise<void> {
   }
 }
 
+/** A dish's button in the menu itself (not in a suggestion row). */
+const inMenu = (page: Page, name: string, section = 'Main Course') =>
+  page.getByRole('region', { name: section }).getByRole('button', { name });
+
 const tablePage = (page: Page, table = 'T1') =>
   page.goto(`${state.site}/t/${state.tokens[table] ?? ''}`);
 
@@ -66,7 +70,7 @@ test.describe('[QR-002] [QR-006] [QR-007] ordering from the table', () => {
     await expectAccessible(page);
 
     await page.getByRole('searchbox', { name: s.search }).fill('dal');
-    await page.getByRole('button', { name: 'Add Dal Makhani' }).click();
+    await inMenu(page, 'Add Dal Makhani', s.search).click();
     await page.getByRole('button', { name: /Your order · 1 item/ }).click();
     const cart = page.getByRole('dialog', { name: s.cart.title });
     await cart.getByLabel(s.cart.name).fill('Asha');
@@ -91,7 +95,7 @@ test.describe('[QR-002] [QR-006] [QR-007] ordering from the table', () => {
 
   test('[MENU-012] a dish with sizes and extras is chosen as on every screen', async ({ page }) => {
     await tablePage(page, 'T2');
-    await page.getByRole('button', { name: 'Choose options for Paneer Tikka' }).click();
+    await inMenu(page, 'Choose options for Paneer Tikka', 'Starters').click();
     const sheet = page.getByRole('dialog', { name: 'Paneer Tikka' });
     await sheet.getByRole('button', { name: /Add to order/ }).click();
     // A size must be chosen first (MENU-003).
@@ -108,7 +112,7 @@ test.describe('[QR-002] [QR-006] [QR-007] ordering from the table', () => {
 
   test('[QR-007] an order nobody picks up in time says to call a waiter', async ({ page }) => {
     await tablePage(page, 'T2');
-    await page.getByRole('button', { name: 'Add Dal Makhani' }).click();
+    await inMenu(page, 'Add Dal Makhani').click();
     await page.getByRole('button', { name: /Your order/ }).click();
     await page
       .getByRole('dialog', { name: s.cart.title })
@@ -122,17 +126,75 @@ test.describe('[QR-002] [QR-006] [QR-007] ordering from the table', () => {
   });
 });
 
+test.describe('[QR-004] suggestions', () => {
+  test('suggests what goes with the cart, in the restaurant’s words, and counts it when ordered', async ({
+    page,
+  }) => {
+    await tablePage(page, 'T2');
+    await inMenu(page, 'Add Dal Makhani').click();
+    const row = page.getByRole('region', { name: en.reco.row.cart });
+    await expect(row.getByText('Sweet finish')).toBeVisible();
+    await row.getByRole('button', { name: 'Add Rasmalai' }).click();
+    await page.getByRole('button', { name: /Your order · 2 items/ }).click();
+    await page
+      .getByRole('dialog', { name: s.cart.title })
+      .getByRole('button', { name: s.cart.send })
+      .click();
+    await expect(page.getByText(s.orders.SUBMITTED)).toBeVisible();
+    const { orders } = await asServer<{
+      orders: {
+        lines: { itemId: string; recommendation?: { layer: string; ruleId: string | null } }[];
+      }[];
+    }>('GET', 'orders');
+    const lines = orders.at(-1)?.lines ?? [];
+    expect(lines.map((line) => line.recommendation?.layer ?? null)).toEqual([null, 'RULE']);
+  });
+});
+
+test.describe('[QR-012] [NFR-P12] speed on a mid-range phone over 4G', () => {
+  test('paints a 300-dish menu within 2.5 s', async ({ page, context }) => {
+    // Lighthouse's mobile profile: Slow 4G (150 ms, 1.6 Mbps down, 750 kbps up) and a CPU four
+    // times slower than this machine's.
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Network.enable');
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: 150,
+      downloadThroughput: (1.6 * 1024 * 1024) / 8,
+      uploadThroughput: (750 * 1024) / 8,
+    });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const response = await tablePage(page, 'BIG');
+    const html = (await response?.body())?.length ?? 0;
+    const lcp = await page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          new PerformanceObserver((list) => {
+            const entries = list.getEntries();
+            resolve(entries.at(-1)?.startTime ?? Number.POSITIVE_INFINITY);
+          }).observe({ type: 'largest-contentful-paint', buffered: true });
+        }),
+    );
+    await expect(page.getByText('House dish number 300')).toBeAttached();
+    // eslint-disable-next-line no-console -- the measured figures, for the CI log.
+    console.log(`LCP ${String(Math.round(lcp))} ms, page ${String(Math.round(html / 1024))} kB`);
+    expect(lcp).toBeLessThanOrEqual(2_500);
+  });
+});
+
 test.describe('[QR-008] when the restaurant cannot be reached', () => {
   test('the menu stays readable and ordering pauses, with a banner', async ({ page }) => {
     await relaySql("UPDATE relay.presence SET last_seen_at = now() - interval '10 minutes'");
     await tablePage(page);
     await expect(page.getByText(s.readOnly)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add Dal Makhani' })).toBeDisabled();
-    await expect(page.getByText('Dal Makhani', { exact: true })).toBeVisible();
+    await expect(inMenu(page, 'Add Dal Makhani')).toBeDisabled();
+    await expect(
+      page.getByRole('region', { name: 'Main Course' }).getByText('Dal Makhani', { exact: true }),
+    ).toBeVisible();
     await relaySql('UPDATE relay.presence SET last_seen_at = now()');
     await tablePage(page);
     await expect(page.getByText(s.readOnly)).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Add Dal Makhani' })).toBeEnabled();
+    await expect(inMenu(page, 'Add Dal Makhani')).toBeEnabled();
   });
 });
 

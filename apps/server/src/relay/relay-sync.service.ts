@@ -9,21 +9,25 @@ import {
 import type { DomainEvent } from '@rp/contracts';
 import type {
   QrMenuDocument,
+  QrRecommendations,
   QrRelaySettings,
   RelayTable,
   SyncRelayTablesResponse,
 } from '@rp/contracts/relay';
-import { canonicalJson } from '@rp/domain';
+import { canonicalJson, type DailyWindow } from '@rp/domain';
 import { qrChannelMenu } from '@rp/ordering';
 import { z } from 'zod';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
+import { currentBusinessDate } from '../common/business-dates.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { EventBus } from '../events/event-bus.js';
 import { tableTokenHash } from '../floor/table-qr.service.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
+import { BestSellers } from '../recommendations/best-sellers.js';
+import { RecommendationRulesService } from '../recommendations/recommendation-rules.service.js';
 import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
 import { PacedLoop } from './paced-loop.js';
 import { RelayClient, RelayError } from './relay-client.js';
@@ -97,7 +101,12 @@ export function concernsRelay(event: DomainEvent): boolean {
       return true;
     case 'SettingsChanged':
       return event.payload.keys.some(
-        (key) => key.startsWith('qr.') || key === 'orders.specialInstructionsMaxLength',
+        (key) =>
+          key.startsWith('qr.') ||
+          key.startsWith('reco.') ||
+          key === 'orders.specialInstructionsMaxLength' ||
+          key === 'billing.priceMode' ||
+          key === 'menu.bestSellerCount',
       );
     case 'RestaurantChanged':
       return event.payload.part === 'PROFILE' || event.payload.part === 'FLOOR';
@@ -135,6 +144,8 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly menus: MenuPublishService,
+    private readonly rules: RecommendationRulesService,
+    private readonly bestSellers: BestSellers,
     private readonly events: EventBus,
     @Inject(RELAY_SYNC_OPTIONS) private readonly options: RelaySyncOptions,
   ) {
@@ -198,7 +209,13 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     if (client === undefined) return this.options.retryMaxMs;
     const restaurant = await this.prisma.restaurant.findFirst({
       orderBy: { createdAt: 'asc' },
-      select: { id: true, displayName: true, accentColor: true, timeZone: true },
+      select: {
+        id: true,
+        displayName: true,
+        accentColor: true,
+        timeZone: true,
+        businessDayCutoff: true,
+      },
     });
     if (restaurant === null) {
       this.fail('NOT_SET_UP', 'The restaurant is not set up yet');
@@ -257,7 +274,13 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
   /** QR-003: the QR menu as a new version when anything the page shows has changed. */
   private async syncMenu(
     client: RelayClient,
-    restaurant: { id: string; displayName: string; accentColor: string | null; timeZone: string },
+    restaurant: {
+      id: string;
+      displayName: string;
+      accentColor: string | null;
+      timeZone: string;
+      businessDayCutoff: string;
+    },
     settings: SettingsSnapshot,
     saved: SyncState,
   ): Promise<SyncState> {
@@ -280,6 +303,7 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
       menu: qrChannelMenu(menu),
       // Photos are mirrored to the relay's Storage in P5-03c.
       photos: [],
+      recommendations: await this.recommendationsOf(restaurant, settings),
     };
     const hash = hashOf(document);
     if (hash === saved.menuHash) return saved;
@@ -304,6 +328,52 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     const next = { ...saved, menuVersion: version, menuHash: hash };
     await this.writeState(next);
     return next;
+  }
+
+  /**
+   * QR-004: what the QR page's suggestions run on, with the same engine as every surface. Best
+   * sellers go as rankings, so the menu is sent again when the order of dishes changes, not after
+   * every order. Learned pairings come with P6-02.
+   */
+  private async recommendationsOf(
+    restaurant: { id: string; timeZone: string; businessDayCutoff: string },
+    settings: SettingsSnapshot,
+  ): Promise<QrRecommendations> {
+    const businessDate = await currentBusinessDate(this.prisma, restaurant.id);
+    const days = settings.get('reco.bestSellerDays');
+    const count = settings.get('menu.bestSellerCount');
+    const dayparts = settings.get('reco.dayparts');
+    const rank = async (hours: DailyWindow | null) =>
+      (
+        await this.bestSellers.get({
+          restaurantId: restaurant.id,
+          businessDate,
+          days,
+          hours,
+          timeZone: restaurant.timeZone,
+        })
+      )
+        .toSorted((a, b) => b.quantity - a.quantity || (a.itemId < b.itemId ? -1 : 1))
+        .slice(0, count)
+        .map((entry) => entry.itemId);
+    const rules = await this.rules.active(restaurant.id);
+    return {
+      rules: rules
+        .filter((rule) => rule.channels.includes('QR'))
+        .map(({ channels: _channels, ...rule }) => rule),
+      bestSellers: {
+        ALL_DAY: await rank(null),
+        BREAKFAST: await rank(dayparts.BREAKFAST),
+        LUNCH: await rank(dayparts.LUNCH),
+        EVENING: await rank(dayparts.EVENING),
+        DINNER: await rank(dayparts.DINNER),
+      },
+      dayparts,
+      businessDayCutoff: restaurant.businessDayCutoff,
+      courseSequence: settings.get('reco.courseSequence'),
+      preferences: settings.get('reco.itemPreferences'),
+      learned: [],
+    };
   }
 
   private async readState(): Promise<SyncState> {

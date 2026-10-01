@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { Id, IdempotencyKey, OrderItemState, PriceMode, Timestamp } from '../common.js';
+import { Id, IdempotencyKey, IsoDate, OrderItemState, PriceMode, Timestamp } from '../common.js';
 import { MenuSnapshot } from '../menu.js';
 import { INSTRUCTION_HARD_MAX_LENGTH, OrderLineRequest, RejectedLine } from '../order.js';
+import { RecommendationTarget } from '../recommendations.js';
 import { AccentColor } from '../restaurant.js';
+import { ITEM_PREFERENCES_MAX, TimeOfDay, TimeWindow } from '../settings.js';
 
 /**
  * The QR relay's API (C8, ADR-0015): what diners' browsers send through the relay's edge
@@ -33,6 +35,54 @@ export const QrPhoto = z.strictObject({
   sizes: z.array(QrPhotoSize).min(1).max(6),
 });
 
+/** A restaurant's rule as the QR page runs it (REC-002), already limited to the QR channel. */
+export const QrRecommendationRule = z.strictObject({
+  id: Id,
+  priority: z.int().min(0).max(1_000),
+  when: RecommendationTarget,
+  suggest: RecommendationTarget,
+  timeWindow: TimeWindow.nullable(),
+  activeFrom: IsoDate.nullable(),
+  activeUntil: IsoDate.nullable(),
+  label: z.string().min(1).max(60).nullable(),
+});
+export type QrRecommendationRule = z.infer<typeof QrRecommendationRule>;
+
+const Ranking = z.array(Id).max(50);
+
+/**
+ * What the QR page's suggestions run on (QR-004, REC-001): the same engine as every surface, fed
+ * from the restaurant's rules, its best sellers by time of day (a ranking, not counts, so the menu
+ * is not sent again after every order), learned pairings (P6-02) and the manager's pins.
+ */
+export const QrRecommendations = z.strictObject({
+  rules: z.array(QrRecommendationRule).max(500),
+  /** Best first, for each time of day and the whole day (REC-004). */
+  bestSellers: z.strictObject({
+    ALL_DAY: Ranking,
+    BREAKFAST: Ranking,
+    LUNCH: Ranking,
+    EVENING: Ranking,
+    DINNER: Ranking,
+  }),
+  dayparts: z.strictObject({
+    BREAKFAST: TimeWindow,
+    LUNCH: TimeWindow,
+    EVENING: TimeWindow,
+    DINNER: TimeWindow,
+  }),
+  /** For the rules' business dates (BRD §9.4). */
+  businessDayCutoff: TimeOfDay,
+  courseSequence: z.array(z.string().min(1).max(30)).max(12),
+  preferences: z
+    .record(Id, z.enum(['PIN', 'BOOST', 'BLOCK']))
+    .refine((preferences) => Object.keys(preferences).length <= ITEM_PREFERENCES_MAX),
+  learned: z
+    .array(z.strictObject({ fromItemId: Id, toItemId: Id, score: z.number().nonnegative() }))
+    .max(5_000),
+});
+export type QrRecommendations = z.infer<typeof QrRecommendations>;
+
 /**
  * What a local server publishes for its QR menu (QR-002, QR-003, MENU-013): the menu the QR
  * channel offers, live availability included, and what the site needs to show and check it.
@@ -50,6 +100,8 @@ export const QrMenuDocument = z.strictObject({
   serviceRequests: z.boolean(),
   menu: MenuSnapshot,
   photos: z.array(QrPhoto).max(2000),
+  /** QR-004; absent from menus published before P5-05b. */
+  recommendations: QrRecommendations.optional(),
 });
 export type QrMenuDocument = z.infer<typeof QrMenuDocument>;
 
