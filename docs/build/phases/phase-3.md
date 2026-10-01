@@ -224,3 +224,9 @@ Depends on: P3-01 to P3-05.
 Deliverables: automated end-to-end test (API + Maestro where possible) and a manual checklist for
 the lab rig.
 Acceptance: passes; results recorded in PROGRESS.md.
+
+As built: `apps/server/test/integration/tablet-session.int.test.ts` runs S6 over the real API and
+live connection in every check: open, order, approval in the waiter app, kitchen status, approval at
+the table with the waiter's PIN, Water and Cancel, bill and feedback, payment and close, and the
+next guests with nothing carried over. The tablet's own wipe is tested in `apps/table-tablet`. The
+lab-rig checklist is in manual task 12, "S6 on the lab rig".

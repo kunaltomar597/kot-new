@@ -65,6 +65,24 @@ restaurant server running on this Mac.
     (MDM's kiosk launcher does this in production; with only `dpm` it may not).
 17. **To undo**, factory reset the tablet (a device owner can only be removed that way).
 
+## S6 on the lab rig (P3-06)
+
+The Phase 3 exit scenario, with every device of a real table: the tablet, the waiter's phone and
+pager, the kitchen screen and the POS. The same flow runs automatically on every build
+(`apps/server/test/integration/tablet-session.int.test.ts`); this checks it on the hardware.
+
+1. Open the tablet's table on the waiter phone. The tablet leaves the idle screen.
+2. On the tablet, order a dish. The waiter's phone and pager alert; approve it on the phone. The
+   kitchen screen shows the ticket and the tablet shows "Received".
+3. Start, ready and serve it on the kitchen screen and the phone. The tablet follows: Preparing,
+   Ready, Served.
+4. Order water on the tablet and approve it there with "Waiter: confirm here" and the waiter's PIN.
+5. Press Water: the phone and pager alert. Press Cancel: it clears on both.
+6. Print the bill at the POS. The tablet asks for feedback; give it.
+7. Take the payment at the POS. The table closes and the tablet shows the idle screen.
+8. Open the table again. The tablet shows an empty order, no requests, and asks for feedback again
+   after the next bill: nothing from the first guests is left.
+
 ## Results template
 
 Copy this, fill it in and paste it into a Claude session.
@@ -87,6 +105,7 @@ Wrong PIN refused:                    yes / no
 Battery alert at 15 %, cleared on charge: yes / no, after about ... minutes
 Offline alert after 2 min, cleared:   yes / no
 Locate flashes and sounds:            yes / no
+S6 on the lab rig, steps 1 to 8:      yes / no (which step failed: ...)
 App back after a restart:             yes / no
 Anything else odd:
 ```
