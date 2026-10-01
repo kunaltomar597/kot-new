@@ -25,7 +25,7 @@ const REQUEST_EVENTS = new Set([
  * waiter acknowledges ("on the way") and the request is cancelled or resolved. Cancel clears the
  * only open request, or asks which one. The server refuses a second request of the same kind.
  */
-export function ServiceButtons() {
+export function ServiceButtons({ disabled = false }: { disabled?: boolean }) {
   const t = useT();
   const session = useDeviceSession();
   const { colors } = useTheme();
@@ -94,7 +94,7 @@ export function ServiceButtons() {
                 fullWidth
                 variant={state.kind === 'idle' ? 'primary' : 'secondary'}
                 loading={busy === type}
-                disabled={state.kind !== 'idle' || busy !== null}
+                disabled={disabled || state.kind !== 'idle' || busy !== null}
                 accessibilityLabel={
                   shown === null
                     ? label(type)
@@ -127,7 +127,7 @@ export function ServiceButtons() {
             fullWidth
             variant="secondary"
             loading={busy === 'CANCEL'}
-            disabled={plan.kind === 'none' || busy !== null}
+            disabled={disabled || plan.kind === 'none' || busy !== null}
             onPress={() => {
               if (plan.kind === 'one') cancel(plan.request);
               else if (plan.kind === 'choose') setChoosing(true);

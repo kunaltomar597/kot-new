@@ -1,6 +1,7 @@
 import type { Translator } from '@rp/i18n';
 import type { DeviceSession } from '@rp/mobile-core';
 import { PairingScreen, ShellProvider, useSessionState } from '@rp/mobile-shell';
+import { ToastProvider } from '@rp/ui-native';
 import { StatusBar } from 'expo-status-bar';
 import { type TabletDevice, TabletHome } from './TabletHome';
 
@@ -26,8 +27,10 @@ export function App({
 }) {
   return (
     <ShellProvider session={session} translator={translator}>
-      <StatusBar hidden />
-      <Screens device={device} />
+      <ToastProvider>
+        <StatusBar hidden />
+        <Screens device={device} />
+      </ToastProvider>
     </ShellProvider>
   );
 }

@@ -128,7 +128,8 @@
                 "VOIDED"
               ]
             },
-            "instructions": { "type": ["string", "null"] }
+            "instructions": { "type": ["string", "null"] },
+            "endReason": { "type": ["string", "null"] }
           },
           "required": [
             "id",
@@ -321,7 +322,8 @@
                 "VOIDED"
               ]
             },
-            "instructions": { "type": ["string", "null"] }
+            "instructions": { "type": ["string", "null"] },
+            "endReason": { "type": ["string", "null"] }
           },
           "required": [
             "id",

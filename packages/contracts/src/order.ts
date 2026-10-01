@@ -157,6 +157,8 @@ export const OrderView = z.object({
       stationId: Id,
       state: OrderItemState,
       instructions: z.string().nullable(),
+      /** Why a line was rejected, cancelled or voided: the diner sees a rejection's (ORD-003). */
+      endReason: z.string().nullable().optional(),
     }),
   ),
   kots: z.array(

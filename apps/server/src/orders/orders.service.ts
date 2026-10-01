@@ -123,6 +123,7 @@ export function orderView(
       stationId: item.stationId,
       state: item.state,
       instructions: item.instructions,
+      endReason: item.endReason,
     })),
     kots: order.kots.map(({ id, kotNumber, stationId, station, kind, printStatus }) => ({
       id,

@@ -137,6 +137,7 @@ describe('[TAB-002] [TAB-003] [AUTH-009] the tablet’s own table', () => {
       session: null,
       // Archived and unavailable dishes are not promoted; the rest in menu order.
       promotions: { show: true, itemIds: [id('Biryani'), id('Lassi')] },
+      priceMode: 'TAX_EXCLUSIVE',
     });
     await setSetting('tablet.idleShowsPromotions', false);
     expect((await tableOf(id('tablet'))).promotions).toEqual({ show: false, itemIds: [] });

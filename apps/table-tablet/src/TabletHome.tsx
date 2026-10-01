@@ -92,6 +92,8 @@ export function TabletHome({ store, kiosk, health, appVersion }: TabletDevice) {
         restaurant={profile}
         table={table}
         menu={menu}
+        store={store}
+        guestEpoch={tablet.guestEpoch}
       />
     );
   }

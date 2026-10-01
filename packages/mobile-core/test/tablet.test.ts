@@ -45,6 +45,7 @@ function table(sessionId: string | null): TabletTableView {
         ? null
         : { id: sessionId, openedAt: '2026-10-02T07:00:00.000Z', covers: 2 },
     promotions: { show: true, itemIds: [] },
+    priceMode: 'TAX_EXCLUSIVE',
   };
 }
 

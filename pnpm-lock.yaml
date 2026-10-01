@@ -374,6 +374,9 @@ importers:
       '@rp/mobile-shell':
         specifier: workspace:*
         version: link:../../packages/mobile-shell
+      '@rp/ordering':
+        specifier: workspace:*
+        version: link:../../packages/ordering
       '@rp/ui-native':
         specifier: workspace:*
         version: link:../../packages/ui-native

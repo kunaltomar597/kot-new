@@ -4,6 +4,7 @@ import { fontSize, fontWeight, spacing } from '@rp/design-tokens';
 import { formatRupees } from '@rp/domain';
 import type { OrderDraft } from '@rp/mobile-core';
 import {
+  ItemSheet,
   messageOf,
   Note,
   OverrideCancelled,
@@ -39,7 +40,6 @@ import { BackHandler, StyleSheet, Text, View } from 'react-native';
 import { CartList } from './CartList';
 import { useCart } from './carts';
 import { EndItemSheet, type Ending } from './EndItemSheet';
-import { ItemSheet } from './ItemSheet';
 import { MenuBrowser } from './MenuBrowser';
 import { mayMove, MoveSheet } from './MoveSheet';
 import { SentOrders } from './SentOrders';

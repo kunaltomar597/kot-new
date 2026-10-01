@@ -172,7 +172,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-03c Ordering on the table tablet.
+- P3-05 Recommendation UI and feedback.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -264,7 +264,7 @@ Recommended next WPs (dependencies met):
 - [x] P3-02 Service requests on the tablet (server side in P2-06d)
 - [x] P3-03a Diners' orders and approval: server
 - [x] P3-03b Approvals in the waiter app and the POS
-- [ ] P3-03c Ordering on the table tablet
+- [x] P3-03c Ordering on the table tablet
 - [x] P3-04 Recommendation engine v1
 - [ ] P3-05 Recommendation UI and feedback
 - [ ] P3-06 Phase 3 exit test (S6)
@@ -571,6 +571,36 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-03c):
+
+306. Search on the tablet uses a small matcher in `@rp/ordering` rather than fuse.js: no new
+     dependency, predictable on Hermes, and tested with the BRD's own examples.
+     - It drops words that say nothing ("something", "dishes", "please"), matches each remaining
+       word exactly, by the start of a word, inside a word, or with one typo (two for long words),
+       over names, synonyms and tags.
+     - "Spicy"/"hot" also match spice level 2+, "veg" matches veg dishes.
+     - Every word must match; the best match comes first, menu order on a tie.
+307. The tablet's filters are Veg, Jain (dishes tagged Jain), Spicy (spice level 2+ or tagged
+     Spicy) and Bestsellers. The sorts are menu order, price low to high and price high to low.
+     The tax note follows `billing.priceMode`, which `TabletTableView` now carries.
+308. The cart is kept on the tablet (`rp.tablet.cart.v1`), so a restart loses nothing, and is
+     wiped with the guests' data.
+     - The review shows each dish, the subtotal, the estimated GST (on top, or included) and the
+       estimated total, worked out with `computeBill`. The bill has the exact amounts.
+     - One idempotency key goes with every retry of the same lines (ORD-013).
+     - Refused lines are marked to change or remove (ORD-017).
+309. "What we ordered" lists each order newest first, with "Waiting for waiter confirmation" while
+     it waits and each dish's status live: Received, Preparing, Ready, On its way, Served, or "Not
+     accepted" with the reason. It also gives the totals ordered and waiting.
+     - "Waiter: confirm here" approves at the table: the waiter, the cashier, a manager or the
+       Owner picks their name and enters their PIN.
+     - Order lines now carry their `endReason`, so the diner sees why a dish was refused.
+310. Without the server (connection not online), the dishes, "Send to the waiter" and the four
+     buttons are paused under "Please call a waiter", and come back with the connection
+     (TAB-013).
+311. The waiter app's item sheet moved to `@rp/mobile-shell` (`ItemSheet`, with an optional label
+     for its button), shared by the waiter app and the tablet.
 
 Decided 2026-10-02 (P3-03b):
 
@@ -1593,6 +1623,33 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-03c Ordering on the table tablet (P3-03 done)
+
+Built:
+
+- `@rp/ordering` `tablet-menu.ts`: `searchMenu`, `queryWords`, `filterMenu`, `sortMenu` and
+  `estimateCart`.
+- `ItemSheet` in `@rp/mobile-shell`.
+- The tablet:
+  - `MenuView`, `DishCard`, `CartView`, `MyOrders` (with approve at table), `use-cart.ts`, and
+    `OpenTableScreen` with tabs, the offline notice and the service buttons;
+  - `ToastProvider` in `App`; `@rp/ordering` as a dependency.
+- Contracts: `TabletTableView.priceMode`, and `endReason` on order lines.
+- Maestro `order-from-table.yaml` and manual task 12's ordering step.
+
+Tests:
+
+- ordering `tablet-menu.test.ts` 8 (the BRD's search examples, typos, filters, sorts, estimates).
+- Tablet `ordering.test.tsx` 6:
+  - the menu's marks, the bestseller badge, the tax note and sold out;
+  - search and the veg filter;
+  - add, review the estimate, send, then waiting and live status;
+  - approve at table with the PIN;
+  - a rejection's reason;
+  - offline and back.
+
+Decisions: 306 to 311.
 
 ### 2026-10-02: P3-03b Approvals in the waiter app and the POS
 

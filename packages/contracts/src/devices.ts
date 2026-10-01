@@ -244,6 +244,8 @@ export const TabletTableView = z.object({
   session: z.object({ id: Id, openedAt: Timestamp, covers: z.int().min(1).nullable() }).nullable(),
   /** The idle screen's promotions (`tablet.idleShowsPromotions`): the restaurant's pinned dishes. */
   promotions: z.object({ show: z.boolean(), itemIds: z.array(Id) }),
+  /** Whether menu prices include GST (`billing.priceMode`), for the tax note and estimate (TAB-005). */
+  priceMode: z.enum(['TAX_EXCLUSIVE', 'TAX_INCLUSIVE']),
 });
 export type TabletTableView = z.infer<typeof TabletTableView>;
 

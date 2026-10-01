@@ -15250,7 +15250,8 @@
                 "lineTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                 "stationId": { "$ref": "#/components/schemas/Id" },
                 "state": { "$ref": "#/components/schemas/OrderItemState" },
-                "instructions": { "type": ["string", "null"] }
+                "instructions": { "type": ["string", "null"] },
+                "endReason": { "type": ["string", "null"] }
               },
               "required": [
                 "id",
@@ -18699,9 +18700,10 @@
             },
             "required": ["show", "itemIds"],
             "additionalProperties": false
-          }
+          },
+          "priceMode": { "type": "string", "enum": ["TAX_EXCLUSIVE", "TAX_INCLUSIVE"] }
         },
-        "required": ["tableId", "label", "state", "session", "promotions"],
+        "required": ["tableId", "label", "state", "session", "promotions", "priceMode"],
         "additionalProperties": false
       },
       "TaxComponentCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{0,9}$" },
