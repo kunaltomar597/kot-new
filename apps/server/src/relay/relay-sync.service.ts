@@ -31,6 +31,7 @@ import { tableTokenHash } from '../floor/table-qr.service.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { PhotosService } from '../photos/photos.service.js';
 import { BestSellers } from '../recommendations/best-sellers.js';
+import { LearnedAssociations } from '../recommendations/learned-associations.service.js';
 import { RecommendationRulesService } from '../recommendations/recommendation-rules.service.js';
 import { SettingsService, type SettingsSnapshot } from '../settings/settings.service.js';
 import { PacedLoop } from './paced-loop.js';
@@ -83,6 +84,8 @@ const SyncState = z.object({
 });
 type SyncState = z.infer<typeof SyncState>;
 const STATE_KEY = 'relay.sync';
+/** The QR snapshot carries at most this many learned pairings (the contract's limit). */
+const QR_LEARNED_MAX = 5_000;
 
 /** Which photos reached the relay's Storage (each size's path there), and the last sweep. */
 const PhotoState = z.object({
@@ -176,6 +179,7 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly photos: PhotosService,
     private readonly rules: RecommendationRulesService,
     private readonly bestSellers: BestSellers,
+    private readonly learned: LearnedAssociations,
     private readonly events: EventBus,
     @Inject(RELAY_SYNC_OPTIONS) private readonly options: RelaySyncOptions,
   ) {
@@ -456,7 +460,7 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
   /**
    * QR-004: what the QR page's suggestions run on, with the same engine as every surface. Best
    * sellers go as rankings, so the menu is sent again when the order of dishes changes, not after
-   * every order. Learned pairings come with P6-02.
+   * every order. Learned pairings change once a night.
    */
   private async recommendationsOf(
     restaurant: { id: string; timeZone: string; businessDayCutoff: string },
@@ -495,7 +499,8 @@ export class RelaySyncService implements OnApplicationBootstrap, OnModuleDestroy
       businessDayCutoff: restaurant.businessDayCutoff,
       courseSequence: settings.get('reco.courseSequence'),
       preferences: settings.get('reco.itemPreferences'),
-      learned: [],
+      // QR-004: the pairings learned last night, as the other surfaces use them (P6-02).
+      learned: (await this.learned.pairs(restaurant.id)).slice(0, QR_LEARNED_MAX),
     };
   }
 

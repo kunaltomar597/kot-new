@@ -43,8 +43,37 @@ function recoServer(
     .on('PUT', PREFERENCES, (call) => ({
       status: 200,
       body: settingView('reco.itemPreferences', { value: (call.body as { value: object }).value }),
-    }));
+    }))
+    .on('GET', LEARNED, () => ({ status: 200, body: NOTHING_LEARNED }));
 }
+
+const LEARNED = '/api/v1/recommendations/learned';
+const NOTHING_LEARNED = { lastRun: null, minOrders: 300, associations: [] };
+const LEARNT = {
+  lastRun: {
+    at: '2026-10-02T23:15:00.000Z',
+    windowFrom: '2026-07-05',
+    windowTo: '2026-10-02',
+    orders: 4_210,
+    baskets: 3_100,
+    associations: 1,
+    active: true,
+    durationMs: 840,
+  },
+  minOrders: 300,
+  associations: [
+    {
+      fromItemId: IDS.tikka,
+      fromName: 'Paneer Tikka',
+      toItemId: IDS.dal,
+      toName: 'Dal Makhani',
+      pairCount: 620,
+      supportBp: 2_000,
+      confidenceBp: 6_150,
+      liftPercent: 184,
+    },
+  ],
+};
 
 const RULE_NAME = t('recoPage.rules.summary', { when: 'Paneer Tikka', suggest: 'Dal Makhani' });
 const actions = async () =>
@@ -232,5 +261,33 @@ describe('[REC-009] pinned, boosted and blocked dishes', () => {
         value: { [IDS.tikka]: 'BOOST' },
       });
     });
+  });
+});
+
+describe('[REC-003] what the restaurant’s orders taught the engine', () => {
+  it('says nothing is learned until there are enough orders', async () => {
+    await renderConsole({ fake: recoServer(), path: PATH, signedIn: 'MANAGER' });
+    expect(await screen.findByText(t('recoPage.learned.never', { minOrders: 300 }))).toBeVisible();
+  });
+
+  it('shows the strongest pairings in plain words, and learns again on request', async () => {
+    const fake = recoServer()
+      .on('GET', LEARNED, () => ({ status: 200, body: LEARNT }))
+      .on('POST', `${LEARNED}/run`, () => ({ status: 200, body: LEARNT }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const pairs = within(await screen.findByRole('list', { name: t('recoPage.learned.title') }));
+    expect(
+      pairs.getByText(t('recoPage.learned.pair', { from: 'Paneer Tikka', to: 'Dal Makhani' })),
+    ).toBeVisible();
+    expect(
+      pairs.getByText(t('recoPage.learned.strength', { confidence: 62, lift: '1.8' })),
+    ).toBeVisible();
+    expect(screen.getByText(/from 4,210 orders/)).toBeVisible();
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('button', { name: t('recoPage.learned.run') }));
+    await waitFor(() => {
+      expect(fake.callsTo('POST', `${LEARNED}/run`)).toHaveLength(1);
+    });
+    expect(await screen.findByText(t('recoPage.learned.ran'))).toBeVisible();
   });
 });

@@ -2368,6 +2368,21 @@ export const en = {
       gone: 'A dish no longer on the menu',
       saved: 'Saved.',
     },
+    learned: {
+      title: 'Learned from your orders',
+      hint: 'Every morning, the server looks at what your guests ordered together over the last days and suggests the same pairings. Nothing leaves this PC.',
+      never:
+        'Nothing learned yet. It starts once there are {minOrders, plural, one {# order} other {# orders}}.',
+      waiting:
+        'Last looked on {date} at {time}: {orders, plural, one {# order} other {# orders}} so far. It starts suggesting at {minOrders}.',
+      active:
+        'Learned on {date} at {time} from {orders, plural, one {# order} other {# orders}} ({from} to {to}): {count, plural, one {# pairing} other {# pairings}}.',
+      empty: 'No pairings strong enough yet',
+      pair: '{from} → {to}',
+      strength: 'Ordered together {confidence} % of the time, {lift}× more often than by chance',
+      run: 'Learn again now',
+      ran: 'Learned again.',
+    },
   },
   /** What each setting is called on the Settings page (P4-03a, MGR-007); keys match the catalogue. */
   settingLabels: {

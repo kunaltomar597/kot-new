@@ -225,6 +225,7 @@ import {
 } from './restaurant.js';
 import {
   RecommendationRuleListResponse,
+  LearnedRecommendationsResponse,
   RecommendationRuleParams,
   RecommendationRuleRequest,
   RecommendationRuleView,
@@ -2778,6 +2779,41 @@ export const ROUTES = [
       200: { description: 'Archived.', schema: RecommendationRuleView },
       ...standardErrors,
       404: { description: 'No such rule.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getLearnedRecommendations',
+    method: 'GET',
+    path: '/api/v1/recommendations/learned',
+    summary: 'What the restaurant’s orders taught the engine',
+    description:
+      'REC-003: the last run of the nightly learning job (the window, how many orders and visits, ' +
+      'whether there were enough) and its 50 strongest "frequently ordered together" rules.',
+    tags: ['recommendations'],
+    requirements: ['REC-003'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: {
+        description: 'The last run and its findings.',
+        schema: LearnedRecommendationsResponse,
+      },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'learnRecommendationsNow',
+    method: 'POST',
+    path: '/api/v1/recommendations/learned/run',
+    summary: 'Learn again now',
+    description:
+      'REC-003: runs the nightly learning job at once, for after a big menu change; the answer is ' +
+      'what it found.',
+    tags: ['recommendations'],
+    requirements: ['REC-003'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The run and its findings.', schema: LearnedRecommendationsResponse },
+      ...standardErrors,
     },
   },
   {

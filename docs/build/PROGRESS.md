@@ -192,8 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-02 learned recommendations, P6-04 AI menu import, P6-05 the should-have batch, then
-  Phase 7.
+- P6-04 AI menu import, P6-05 the should-have batch, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -331,7 +330,7 @@ Recommended next WPs (dependencies met):
 ### Phase 6: Advanced menu and intelligence
 
 - [x] P6-01 Combo and modifier parity on every surface
-- [ ] P6-02 Learned recommendations
+- [x] P6-02 Learned recommendations
 - [ ] P6-03 Voice search [H]
 - [ ] P6-04 AI-assisted menu import
 - [ ] P6-05 Should-have operations batch
@@ -599,6 +598,29 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-02):
+
+391. A basket is a table's visit (every order of its session, across rounds), or a takeaway or
+     counter order on its own. Dishes count once per basket when they reached the kitchen (as for
+     best sellers); a combo counts as itself, not its parts.
+392. Mining is co-occurrence with support, confidence and lift over pairs of dishes (rules are
+     pairs, so FP-Growth adds nothing), each direction its own rule, in integers (basis points
+     and percent). Score = confidence × lift / 100, so a strong and surprising pairing ranks
+     above a merely common one. At most 10 rules per dish and 5,000 in all (the QR snapshot's
+     limit).
+393. `reco.minOrders` counts orders in the window that reached the kitchen; below it nothing is
+     learned and the run says how many there are so far.
+394. "Nightly" is once per business day: an hourly check (from 5 minutes after start-up) runs a
+     restaurant whose last run ended before today's business date, so a PC switched off at night
+     learns soon after it starts. Managers can run it at once (`POST
+/recommendations/learned/run`, OPERATIONS_CONFIGURE).
+395. Each run replaces the rules (`learned_associations`: derived data, so rp_app may delete it)
+     and is recorded in `learning_runs`. The engine reads them from memory (NFR-P09), and the
+     QR snapshot carries them, republished when they change.
+396. The Suggestions page shows the last run (window, orders, active or not) and the 50
+     strongest pairings in words ("ordered together 62 % of the time, 1.8× more often than by
+     chance").
 
 Decided 2026-10-02 (P6-01):
 
@@ -2079,6 +2101,30 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-02 Learned recommendations
+
+Built:
+
+- `@rp/domain` `learnAssociations` (support, confidence, lift; thresholds, activation, limits).
+- Server: migration `20261002230000_learned_associations` (`learned_associations`,
+  `learning_runs`); `LearnedAssociations` (the daily job, `learn`, `learnWhereDue`, `pairs`
+  cached, `status`); routes `getLearnedRecommendations` and `learnRecommendationsNow`; the
+  engine's layer 2 fed; the QR snapshot's `learned` filled.
+- Console: "Learned from your orders" on the Suggestions page, with "Learn again now".
+
+Tests:
+
+- domain `associations.test.ts` 7: known pairings with exact support, confidence and lift; what
+  goes with everything (no lift) and the rare left out; each threshold; nothing below the
+  activation volume; once per basket and the caps; order-independent; 63,000 visits in well
+  under a second.
+- server `learned-recommendations.int.test.ts` 5: nothing learned under 300 orders (cancelled
+  lines not counted); learned and suggested with "Often ordered with Biryani"; rules, then
+  learned, then best sellers; a visit's rounds are one basket; once a business day by itself,
+  managers only. `relay-sync` +1 (the QR snapshot), the recommendations performance test learns
+  30 busy days first (p95 still within 200 ms; learning time checked).
+- console +2.
 
 ### 2026-10-02: P6-01 Combo and modifier parity on every surface
 
