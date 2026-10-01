@@ -7,7 +7,7 @@ import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { percent, type ReportRange, rupees } from './report-view.js';
 import {
-  ExportButton,
+  ExportButtons,
   moneyColumn,
   ReportBody,
   ReportSection,
@@ -36,7 +36,7 @@ function GstSummary({ range }: { range: ReportRange }) {
           <ReportSection
             id="report-gst"
             title={t('reportsPage.report.gst')}
-            action={<ExportButton report="GST" range={range} />}
+            action={<ExportButtons report="GST" range={range} />}
           >
             <StatTiles
               stats={[
@@ -96,7 +96,7 @@ function InvoiceRegister({ range }: { range: ReportRange }) {
           <ReportSection
             id="report-register"
             title={t('reportsPage.report.register')}
-            action={<ExportButton report="INVOICE_REGISTER" range={range} />}
+            action={<ExportButtons report="INVOICE_REGISTER" range={range} />}
           >
             <StatTiles
               stats={[

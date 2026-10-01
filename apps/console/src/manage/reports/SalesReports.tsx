@@ -9,7 +9,7 @@ import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import {
   BarChartFigure,
-  ExportButton,
+  ExportButtons,
   moneyColumn,
   numberColumn,
   ReportBody,
@@ -54,7 +54,7 @@ function SalesSummary({ range }: { range: ReportRange }) {
           <ReportSection
             id="report-sales"
             title={t('reportsPage.report.sales')}
-            action={<ExportButton report="SALES" range={range} />}
+            action={<ExportButtons report="SALES" range={range} />}
           >
             <StatTiles
               stats={[
@@ -142,7 +142,7 @@ function ItemSales({ range }: { range: ReportRange }) {
         <ReportSection
           id="report-items"
           title={t('reportsPage.report.items')}
-          action={<ExportButton report="ITEMS" range={range} />}
+          action={<ExportButtons report="ITEMS" range={range} />}
         >
           {items.items.length === 0 ? null : (
             <BarChartFigure
@@ -199,7 +199,11 @@ function SourceSales({ range }: { range: ReportRange }) {
         const netOf = (match: (row: SourceRow) => boolean) =>
           sources.rows.filter(match).reduce((total, row) => total + row.net, 0);
         return (
-          <ReportSection id="report-sources" title={t('reportsPage.report.sources')}>
+          <ReportSection
+            id="report-sources"
+            title={t('reportsPage.report.sources')}
+            action={<ExportButtons report="SOURCES" range={range} />}
+          >
             <StatTiles
               stats={[
                 { label: t('reportsPage.items.net'), value: rupees(sources.totals.net) },
@@ -259,7 +263,7 @@ function Payments({ range }: { range: ReportRange }) {
         <ReportSection
           id="report-payments"
           title={t('reportsPage.report.payments')}
-          action={<ExportButton report="PAYMENTS" range={range} />}
+          action={<ExportButtons report="PAYMENTS" range={range} />}
         >
           <StatTiles
             stats={[{ label: t('reportsPage.payments.total'), value: rupees(payments.total) }]}

@@ -1,4 +1,4 @@
-import type { ReportKind } from '@rp/contracts';
+import { EXPORT_FORMATS, type ExportFormat, type ReportKind } from '@rp/contracts';
 import { Button, ErrorState, LoadingState, type TableColumn, useToast } from '@rp/ui-web';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -180,44 +180,68 @@ export function BarChartFigure({
   );
 }
 
-/** Downloads a report as CSV, stamped and audited by the server (RPT-017). */
-export function ExportButton({ report, range }: { report: ReportKind; range: ReportRange }) {
+/** The file's bytes: CSV comes as text, Excel and PDF as base64. */
+function fileBytes(file: { content: string; encoding: 'utf-8' | 'base64' }): BlobPart {
+  if (file.encoding === 'utf-8') return file.content;
+  const binary = atob(file.content);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+/**
+ * Downloads a report as CSV, Excel or PDF, stamped and audited by the server (RPT-017, P4-06).
+ * One button per format, so the choice is one tap.
+ */
+export function ExportButtons({ report, range }: { report: ReportKind; range: ReportRange }) {
   const t = useT();
   const controller = useConsole();
   const toast = useToast();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<ExportFormat | undefined>();
   return (
-    <Button
-      variant="secondary"
-      loading={busy}
-      onClick={() => {
-        setBusy(true);
-        controller.api
-          .exportReport({ body: { report, from: range.from, to: range.to, format: 'CSV' } })
-          .then(
-            (file) => {
-              const url = URL.createObjectURL(new Blob([file.content], { type: file.contentType }));
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = file.filename;
-              link.click();
-              URL.revokeObjectURL(url);
-              toast.show({
-                title: t('reportsPage.exported', { file: file.filename }),
-                tone: 'success',
+    <div className="report-exports" role="group" aria-label={t('reportsPage.export')}>
+      <span className="report-exports__label" aria-hidden="true">
+        {t('reportsPage.export')}
+      </span>
+      {EXPORT_FORMATS.map((format) => (
+        <Button
+          key={format}
+          variant="secondary"
+          loading={busy === format}
+          disabled={busy !== undefined && busy !== format}
+          aria-label={t('reportsPage.exportAs', { format: t(`reportsPage.format.${format}`) })}
+          onClick={() => {
+            setBusy(format);
+            controller.api
+              .exportReport({ body: { report, from: range.from, to: range.to, format } })
+              .then(
+                (file) => {
+                  const url = URL.createObjectURL(
+                    new Blob([fileBytes(file)], { type: file.contentType }),
+                  );
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = file.filename;
+                  link.click();
+                  URL.revokeObjectURL(url);
+                  toast.show({
+                    title: t('reportsPage.exported', { file: file.filename }),
+                    tone: 'success',
+                  });
+                },
+                (failure: unknown) => {
+                  toast.show({ title: messageOf(failure, t), tone: 'danger' });
+                },
+              )
+              .finally(() => {
+                setBusy(undefined);
               });
-            },
-            (failure: unknown) => {
-              toast.show({ title: messageOf(failure, t), tone: 'danger' });
-            },
-          )
-          .finally(() => {
-            setBusy(false);
-          });
-      }}
-    >
-      {t('reportsPage.export')}
-    </Button>
+          }}
+        >
+          {t(`reportsPage.format.${format}`)}
+        </Button>
+      ))}
+    </div>
   );
 }
 
