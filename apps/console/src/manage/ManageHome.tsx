@@ -8,6 +8,7 @@ import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
 import { MenuEditor } from './menu/MenuEditor.js';
 import { PrintingScreen } from './printing/PrintingScreen.js';
+import { ReportsArea } from './reports/ReportsArea.js';
 import { RestaurantScreen } from './restaurant/RestaurantScreen.js';
 import { NotificationRulesScreen } from './settings/NotificationRulesScreen.js';
 import { RecommendationsScreen } from './settings/RecommendationsScreen.js';
@@ -22,7 +23,8 @@ import { SystemScreen } from './system/SystemScreen.js';
  * one at a time under `/manage`, then the setup pages: Staff for people who manage staff (people,
  * today's sections and pagers; P4-02a, P4-02b, MGR-004), the menu editor (P4-02d, MGR-005), Devices for people
  * who pair them (P4-02c, MGR-006), the restaurant's profile, tax groups and invoice series
- * (P4-03e, ONB-004), the kitchen stations and printers (P4-03d, KDS-008), the
+ * (P4-03e, ONB-004), the reports (P4-05d, RPT-016), the kitchen stations and printers (P4-03d,
+ * KDS-008), the
  * settings with their own pages (P4-03a to P4-03c, MGR-007), the System page (P4-04, MGR-010)
  * and the Owner's own sign-in security
  * (AUTH-006). The navigation sits beside them on a wide screen and above them on a phone
@@ -40,16 +42,19 @@ export function ManageHome() {
   const managesStaff = allows('STAFF_MANAGE');
   const pairsDevices = allows('DEVICE_PAIR');
   const managesMenu = allows('MENU_MANAGE');
+  const seesReports = allows('REPORTS_VIEW_EXPORT');
   const isOwner = person?.role === 'OWNER';
   const first = operates
     ? undefined
-    : managesMenu
-      ? 'menu'
-      : managesStaff
-        ? 'staff'
-        : pairsDevices
-          ? 'devices'
-          : undefined;
+    : seesReports
+      ? 'reports'
+      : managesMenu
+        ? 'menu'
+        : managesStaff
+          ? 'staff'
+          : pairsDevices
+            ? 'devices'
+            : undefined;
   return (
     <div className="dashboard">
       <nav aria-label={t('dashboard.navigation')} className="dashboard__nav">
@@ -65,6 +70,11 @@ export function ManageHome() {
               {t('dashboard.section.alerts')}
             </NavLink>
           </>
+        ) : null}
+        {seesReports ? (
+          <NavLink to="/manage/reports" className="dashboard__link">
+            {t('dashboard.section.reports')}
+          </NavLink>
         ) : null}
         {managesStaff ? (
           <NavLink to="/manage/staff" className="dashboard__link">
@@ -118,6 +128,7 @@ export function ManageHome() {
           ) : first === undefined ? null : (
             <Route index element={<Navigate to={`/manage/${first}`} replace />} />
           )}
+          {seesReports ? <Route path="reports/*" element={<ReportsArea />} /> : null}
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
