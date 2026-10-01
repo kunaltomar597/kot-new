@@ -238,9 +238,13 @@ export class RelayOrdersService implements OnModuleInit, OnApplicationBootstrap,
     return this.realtimeSubscribed ? this.options.pollWithRealtimeMs : this.options.pollMs;
   }
 
-  /** The inbox: one row per relay order, whatever happens next (ORD-013). */
+  /**
+   * The inbox: one row per relay order, whatever happens next (ORD-013). An order offered again
+   * after it was dealt with means the relay never heard "received" (an answer lost, a relay
+   * restored): what it was told is forgotten, so it is told again from the start.
+   */
   private async inbox(restaurantId: string, order: QrPickupOrder): Promise<void> {
-    await this.prisma.relayOrder.createMany({
+    const added = await this.prisma.relayOrder.createMany({
       data: [
         {
           relayOrderId: order.id,
@@ -252,6 +256,12 @@ export class RelayOrdersService implements OnModuleInit, OnApplicationBootstrap,
       ],
       skipDuplicates: true,
     });
+    if (added.count === 0) {
+      await this.prisma.relayOrder.updateMany({
+        where: { relayOrderId: order.id, restaurantId, outcome: { not: null } },
+        data: { pushedStatus: null, pushedHash: null },
+      });
+    }
   }
 
   /** Takes every inbox order not yet dealt with, oldest first. */

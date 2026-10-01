@@ -144,8 +144,12 @@ export interface TestRelay {
   readonly databaseUrl: string;
   /** Creates a restaurant with a credential, as the Control Plane's provisioning does. */
   provision(name: string): Promise<ProvisionedTenant>;
-  /** Cuts the internet: every request is dropped until `restore()`. */
-  cut(): void;
+  /**
+   * Cuts the internet until `restore()`: every request is dropped, or with `'restaurant'` only
+   * the local server's (its `server` calls and Realtime), while diners' phones still reach the
+   * relay.
+   */
+  cut(who?: 'everyone' | 'restaurant'): void;
   restore(): void;
   /** Requests the functions answered (not the dropped ones), by path. */
   readonly requests: string[];
@@ -221,14 +225,16 @@ export async function startRelay(options: {
         });
   const listener = nodeListener(FUNCTIONS, context);
   const requests: string[] = [];
-  let reachable = true;
+  let cutOff: 'everyone' | 'restaurant' | null = null;
+  const blocked = (url: string) =>
+    cutOff === 'everyone' || (cutOff === 'restaurant' && url.startsWith('/functions/v1/server'));
   const PUBLIC = '/storage/v1/object/public/menu-photos/';
   const http: Server = createServer((incoming, outgoing) => {
-    if (!reachable) {
+    const url = incoming.url ?? '';
+    if (blocked(url)) {
       incoming.socket.destroy();
       return;
     }
-    const url = incoming.url ?? '';
     // The bucket's public address, as the CDN serves it.
     if (url.startsWith(PUBLIC)) {
       const file = files.get(decodeURIComponent(url.slice(PUBLIC.length)));
@@ -240,7 +246,8 @@ export async function startRelay(options: {
     listener(incoming, outgoing);
   });
   http.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-    if (!reachable || realtime?.upgrade(request, socket, head) !== true) socket.destroy();
+    // Realtime is the local server's line.
+    if (cutOff !== null || realtime?.upgrade(request, socket, head) !== true) socket.destroy();
   });
   await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
   const address = http.address();
@@ -275,12 +282,12 @@ export async function startRelay(options: {
       }
       return { tenantId, credential };
     },
-    cut() {
-      reachable = false;
+    cut(who = 'everyone') {
+      cutOff = who;
       realtime?.dropAll();
     },
     restore() {
-      reachable = true;
+      cutOff = null;
     },
     async stop() {
       await realtime?.close();
