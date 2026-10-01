@@ -1021,6 +1021,32 @@ test.describe.serial('the web console', () => {
     await expect(page.getByText(/“Install now” pressed by Vikram/)).toBeVisible();
   });
 
+  test('[RPT-016] [RPT-007] [RPT-015] a manager reads today’s reports and opens a discounted order', async () => {
+    // Still the manager.
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.reports') }).click();
+    await expect(
+      page.getByRole('heading', { level: 3, name: t('reportsPage.report.sales') }),
+    ).toBeVisible();
+    await expect(page.getByRole('table', { name: t('reportsPage.sales.byDay') })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole('link', { name: t('reportsPage.report.discounts') }).click();
+    const discounts = page.getByRole('table', { name: t('reportsPage.discounts.table') });
+    const birthday = discounts.getByRole('row').filter({ hasText: 'Birthday' });
+    await expect(birthday).toHaveCount(1);
+    await birthday.getByRole('link', { name: t('reportsPage.openOrder') }).click();
+    await expect(page.getByRole('table', { name: t('reportsPage.order.items') })).toBeVisible();
+    await expect(page.getByRole('table', { name: t('reportsPage.order.invoices') })).toBeVisible();
+    // A 360 px phone: the Reports area fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await nav.getByRole('link', { name: t('dashboard.section.reports') }).click();
+    await expect(
+      page.getByRole('heading', { level: 3, name: t('reportsPage.report.sales') }),
+    ).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+  });
+
   test('[SEC-003] a cashier cannot open the Staff page', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();

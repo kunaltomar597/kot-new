@@ -265,7 +265,11 @@ export class ReportSuiteService {
       }[]
     >`
       SELECT d.id, i.business_date, i.id AS invoice_id, i.invoice_number,
-             coalesce(oi.order_id, i.order_id) AS order_id, oi.name AS item,
+             coalesce(oi.order_id, i.order_id, (
+               -- A table's bill: its first order, whose drill-down lists the table's bills.
+               SELECT o.id FROM orders o WHERE o.table_session_id = i.table_session_id
+               ORDER BY o.business_date, o.order_number LIMIT 1
+             )) AS order_id, oi.name AS item,
              d.kind::text AS kind, d.rate_bp, d.amount, d.reason, d.applied_by_id, d.approved_by_id
       FROM discounts d
       JOIN invoices i ON i.id = d.invoice_id
@@ -414,7 +418,11 @@ export class ReportSuiteService {
       SELECT a.id, a.occurred_at, a.business_date, a.action, a.entity_id, a.actor_id,
              a.approver_id, a.reason, a.before, a.after,
              k.kot_number, k.order_id AS kot_order_id,
-             i.invoice_number, i.order_id AS invoice_order_id
+             i.invoice_number,
+             coalesce(i.order_id, (
+               SELECT o.id FROM orders o WHERE o.table_session_id = i.table_session_id
+               ORDER BY o.business_date, o.order_number LIMIT 1
+             )) AS invoice_order_id
       FROM audit_log a
       LEFT JOIN kots k ON a.entity_type = 'kot' AND k.id = a.entity_id
       LEFT JOIN invoices i ON a.entity_type = 'invoice' AND i.id = a.entity_id

@@ -3,7 +3,15 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
-import { discountReport, ORDER_ID, orderDrillDown, salesReport } from './reports-fixture.js';
+import {
+  discountReport,
+  kitchenReport,
+  ORDER_ID,
+  orderDrillDown,
+  registerPage,
+  salesReport,
+  suggestionReport,
+} from './reports-fixture.js';
 import { profileView } from './restaurant-fixture.js';
 
 const TODAY = businessDateOf(new Date(), { cutoff: '04:00', timeZone: 'Asia/Kolkata' });
@@ -23,6 +31,19 @@ function reportsServer(): FakeServer {
     .on('GET', '/api/v1/reports/discounts', (call) => {
       const { from, to } = rangeOf(call.path);
       return { status: 200, body: discountReport(from, to) };
+    })
+    .on('GET', '/api/v1/reports/invoice-register', (call) => {
+      const { from, to } = rangeOf(call.path);
+      const offset = Number(new URL(`http://x${call.path}`).searchParams.get('offset') ?? 0);
+      return { status: 200, body: registerPage(from, to, offset) };
+    })
+    .on('GET', '/api/v1/reports/kitchen', (call) => {
+      const { from, to } = rangeOf(call.path);
+      return { status: 200, body: kitchenReport(from, to) };
+    })
+    .on('GET', '/api/v1/reports/recommendations', (call) => {
+      const { from, to } = rangeOf(call.path);
+      return { status: 200, body: suggestionReport(from, to) };
     })
     .on('GET', `/api/v1/reports/orders/${ORDER_ID}`, () => ({
       status: 200,
@@ -150,5 +171,59 @@ describe('[RPT-016] the Reports area', () => {
       format: 'CSV',
     });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('[RPT-006] [RPT-018] the invoice register', () => {
+  it('shows the whole range’s counts and reads more invoices a page at a time', async () => {
+    const fake = reportsServer();
+    const { user } = await renderConsole({
+      fake,
+      path: `/manage/reports/register?from=${TODAY}&to=${TODAY}`,
+      signedIn: 'MANAGER',
+    });
+    const table = await screen.findByRole('table', { name: t('reportsPage.register.table') });
+    expect(within(table).getAllByRole('row')).toHaveLength(201);
+    expect(screen.getByText('250')).toBeVisible();
+    expect(
+      screen.getByText(t('reportsPage.register.showing', { shown: 200, total: 250 })),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: t('reportsPage.register.more') }));
+    await waitFor(() => {
+      expect(within(table).getAllByRole('row')).toHaveLength(251);
+    });
+    expect(
+      fake.callsTo(
+        'GET',
+        `/api/v1/reports/invoice-register?from=${TODAY}&to=${TODAY}&offset=200&limit=200`,
+      ),
+    ).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: t('reportsPage.register.more') })).toBeNull();
+  });
+});
+
+describe('[RPT-010] [RPT-012] operations reports', () => {
+  it('shows kitchen times and suggestion figures', async () => {
+    const { user, container } = await renderConsole({
+      fake: reportsServer(),
+      path: `/manage/reports/kitchen?from=${TODAY}&to=${TODAY}`,
+      signedIn: 'MANAGER',
+    });
+    expect(
+      await screen.findByRole('table', { name: t('reportsPage.kitchen.stations') }),
+    ).toBeVisible();
+    expect(
+      screen.getAllByText(t('reportsPage.duration.minutesSeconds', { minutes: 12, seconds: 30 }))
+        .length,
+    ).toBeGreaterThan(0);
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('link', { name: t('reportsPage.report.suggestions') }));
+    expect(
+      await screen.findByRole('table', { name: t('reportsPage.suggestions.layers') }),
+    ).toBeVisible();
+    expect(screen.getAllByText('15%').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(t('reportsPage.suggestions.ordersValue', { withSuggestion: 5, orders: 30 })),
+    ).toBeVisible();
   });
 });

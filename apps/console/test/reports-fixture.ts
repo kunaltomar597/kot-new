@@ -1,6 +1,9 @@
 import type {
   DiscountReportResponse,
+  InvoiceRegisterResponse,
+  KitchenReportResponse,
   OrderDrillDownResponse,
+  RecommendationReportResponse,
   SalesSummaryResponse,
 } from '@rp/contracts';
 import { STAFF } from './fakes.js';
@@ -109,5 +112,97 @@ export function orderDrillDown(): OrderDrillDownResponse {
         voidReason: null,
       },
     ],
+  };
+}
+
+export function registerPage(from: string, to: string, offset: number): InvoiceRegisterResponse {
+  const invoice = (number: number) => ({
+    invoiceId: `0199a0e0-0000-7000-8000-${String(number).padStart(12, '0')}`,
+    invoiceNumber: `INV/26-27/${String(number).padStart(6, '0')}`,
+    invoiceDate: from,
+    businessDate: from,
+    series: 'Main',
+    status: 'SETTLED' as const,
+    customerName: null,
+    customerGstin: null,
+    taxableValue: 10_000,
+    taxTotal: 500,
+    grandTotal: 10_500,
+    voidReason: null,
+    replacesInvoiceNumber: null,
+  });
+  const count = offset === 0 ? 200 : 50;
+  return {
+    from,
+    to,
+    total: 250,
+    voided: 3,
+    offset,
+    nextOffset: offset === 0 ? 200 : null,
+    invoices: Array.from({ length: count }, (_, index) => invoice(offset + index + 1)),
+  };
+}
+
+export function kitchenReport(from: string, to: string): KitchenReportResponse {
+  const times = { lines: 4, quantity: 6, averagePrepSeconds: 750, averagePickupSeconds: 45 };
+  return {
+    from,
+    to,
+    stations: [
+      {
+        stationId: '0199a0e0-0000-7000-8000-0000000000c1',
+        name: 'Tandoor',
+        ...times,
+        notifyManager: 2,
+      },
+    ],
+    items: [
+      {
+        itemId: '0199a0e0-0000-7000-8000-0000000000d1',
+        name: 'Paneer Tikka',
+        station: 'Tandoor',
+        ...times,
+      },
+    ],
+    totals: { ...times, notifyManager: 2 },
+  };
+}
+
+export function suggestionReport(from: string, to: string): RecommendationReportResponse {
+  const none = {
+    impressions: 0,
+    taps: 0,
+    addedToCart: 0,
+    ordered: 0,
+    attachRateBp: null,
+    revenue: 0,
+  };
+  return {
+    from,
+    to,
+    layers: [
+      {
+        layer: 'RULE',
+        impressions: 40,
+        taps: 10,
+        addedToCart: 8,
+        ordered: 6,
+        attachRateBp: 1_500,
+        revenue: 120_000,
+      },
+      { layer: 'LEARNED', ...none },
+      { layer: 'BEST_SELLER', ...none },
+    ],
+    items: [],
+    totals: {
+      impressions: 40,
+      taps: 10,
+      addedToCart: 8,
+      ordered: 6,
+      attachRateBp: 1_500,
+      revenue: 120_000,
+      orders: 30,
+      ordersWithSuggestion: 5,
+    },
   };
 }
