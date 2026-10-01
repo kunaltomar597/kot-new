@@ -1,0 +1,17 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "seconds": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["seconds"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "seconds": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["seconds"],
+    "additionalProperties": false
+  }
+}

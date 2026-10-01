@@ -81,6 +81,7 @@ import {
   DeviceTokenResponse,
   KioskExitRequest,
   KioskExitResponse,
+  LocateDeviceResponse,
   PairDeviceRequest,
   PairedDevice,
   PairingCodeResponse,
@@ -1141,6 +1142,25 @@ export const ROUTES = [
     capability: 'DEVICE_PAIR',
     request: { params: z.object({ deviceId: Id }), body: RevokeDeviceRequest },
     responses: { 200: { description: 'Revoked.', schema: DeviceSummary }, ...standardErrors },
+  },
+  {
+    operationId: 'locateDevice',
+    method: 'POST',
+    path: '/api/v1/devices/:deviceId/locate',
+    summary: 'Ask a connected table tablet to show itself: it flashes and sounds',
+    description:
+      'MGR-006 "Locate". Only table tablets for now (pagers follow with their firmware, P2-05); ' +
+      'the tablet must be connected.',
+    tags: ['devices'],
+    requirements: ['MGR-006'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }) },
+    responses: {
+      200: { description: 'Sent to the device.', schema: LocateDeviceResponse },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+      409: { description: 'Not a tablet, unpaired, or not connected.', schema: ApiError },
+    },
   },
   {
     operationId: 'bindTabletTable',

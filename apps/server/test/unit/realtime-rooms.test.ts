@@ -338,6 +338,19 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     expect(targets).toContain(rooms.role(rid, 'CASHIER'));
   });
 
+  it('[MGR-006] sends "Locate" to the one device asked, and to managers', () => {
+    const tablet = device({ type: 'TABLE_TABLET', tableId: table1 });
+    const other = device({ type: 'TABLE_TABLET', tableId: table1, deviceId: randomUUID() });
+    const event = domainEvent('DeviceLocateRequested', rid, {
+      deviceId: tablet.deviceId,
+      seconds: 15,
+    });
+    const targets = roomsForEvent(event);
+    expect(reaches(targets, new Set(roomsForConnection({ device: tablet })))).toBe(true);
+    expect(reaches(targets, new Set(roomsForConnection({ device: other })))).toBe(false);
+    expect(targets).toContain(rooms.role(rid, 'MANAGER'));
+  });
+
   it('never crosses restaurants', () => {
     const tablet = device({ type: 'TABLE_TABLET', tableId: table1, restaurantId: other });
     const joined = new Set(roomsForConnection({ device: tablet }));
@@ -441,6 +454,8 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', online: true });
     case 'DeviceRevoked':
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', reason: 'Lost' });
+    case 'DeviceLocateRequested':
+      return domainEvent(type, rid, { deviceId: id(), seconds: 15 });
     case 'PrinterStatusChanged':
       return domainEvent(type, rid, {
         printerId: id(),

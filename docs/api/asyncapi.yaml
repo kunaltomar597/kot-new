@@ -141,6 +141,11 @@ channels:
     messages:
       DeviceRevoked:
         $ref: '#/components/messages/DeviceRevoked'
+  DeviceLocateRequested:
+    address: DeviceLocateRequested
+    messages:
+      DeviceLocateRequested:
+        $ref: '#/components/messages/DeviceLocateRequested'
   PrinterStatusChanged:
     address: PrinterStatusChanged
     messages:
@@ -346,6 +351,12 @@ operations:
       $ref: '#/channels/DeviceRevoked'
     messages:
       - $ref: '#/channels/DeviceRevoked/messages/DeviceRevoked'
+  receiveDeviceLocateRequested:
+    action: receive
+    channel:
+      $ref: '#/channels/DeviceLocateRequested'
+    messages:
+      - $ref: '#/channels/DeviceLocateRequested/messages/DeviceLocateRequested'
   receivePrinterStatusChanged:
     action: receive
     channel:
@@ -546,6 +557,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/DeviceRevoked'
+    DeviceLocateRequested:
+      name: DeviceLocateRequested
+      title: DeviceLocateRequested v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeviceLocateRequested'
     PrinterStatusChanged:
       name: PrinterStatusChanged
       title: PrinterStatusChanged v1
@@ -915,6 +932,50 @@ components:
           required:
             - invoiceId
             - grandTotal
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    DeviceLocateRequested:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: DeviceLocateRequested
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            deviceId:
+              $ref: '#/components/schemas/Id'
+            seconds:
+              type: integer
+              minimum: 1
+              maximum: 60
+          required:
+            - deviceId
+            - seconds
           additionalProperties: false
       required:
         - eventId

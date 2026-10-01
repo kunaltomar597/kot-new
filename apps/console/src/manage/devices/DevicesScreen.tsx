@@ -119,6 +119,19 @@ export function DevicesScreen() {
                     onMove={() => {
                       setOpen({ kind: 'MOVE', device });
                     }}
+                    onLocate={() => {
+                      controller.api.locateDevice({ params: { deviceId: device.id } }).then(
+                        ({ seconds }) => {
+                          toast.show({
+                            title: t('devices.locating', { name: device.name, seconds }),
+                            tone: 'success',
+                          });
+                        },
+                        (failure: unknown) => {
+                          toast.show({ title: messageOf(failure, t), tone: 'danger' });
+                        },
+                      );
+                    }}
                     onUnpair={() => {
                       setOpen({ kind: 'UNPAIR', device });
                     }}
@@ -256,6 +269,7 @@ function DeviceRow({
   isThisDevice,
   onRename,
   onMove,
+  onLocate,
   onUnpair,
 }: {
   device: DeviceView;
@@ -263,6 +277,7 @@ function DeviceRow({
   isThisDevice: boolean;
   onRename?: () => void;
   onMove?: () => void;
+  onLocate?: () => void;
   onUnpair?: () => void;
 }) {
   const t = useT();
@@ -330,6 +345,15 @@ function DeviceRow({
           {device.type === 'TABLE_TABLET' ? (
             <Button variant="secondary" onClick={onMove}>
               {t('devices.moveTable')}
+            </Button>
+          ) : null}
+          {device.type === 'TABLE_TABLET' && device.connected ? (
+            <Button
+              variant="secondary"
+              onClick={onLocate}
+              aria-label={t('devices.locateNamed', { name: device.name })}
+            >
+              {t('devices.locate')}
             </Button>
           ) : null}
           {isThisDevice ? null : (

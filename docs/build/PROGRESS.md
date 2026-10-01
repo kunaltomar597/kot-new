@@ -172,7 +172,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P3-01c Locate a tablet (small; the tablet's tone is built).
 - P3-02 Service requests on the tablet (the server side is built).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
@@ -261,7 +260,7 @@ Recommended next WPs (dependencies met):
 
 - [x] P3-01a Tablet server side: own table, health, offline, kiosk exit, accent colour
 - [x] P3-01b Table tablet app: kiosk, idle and session screens, wipe, health, staff exit
-- [ ] P3-01c Locate a tablet from the dashboard (MGR-006, Should)
+- [x] P3-01c Locate a tablet from the dashboard (MGR-006, Should)
 - [ ] P3-02 Service requests on the tablet (server side in P2-06d)
 - [ ] P3-03 Customer ordering and waiter approval
 - [x] P3-04 Recommendation engine v1
@@ -570,6 +569,16 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P3-01c):
+
+296. "Locate" (MGR-006) is for paired, connected table tablets (409 otherwise; pagers follow with
+     their firmware, P2-05).
+     - The tablet flashes its name in the accent colour for 15 s and sounds a 3 s tone on the
+       alarm stream.
+     - The request goes only to that device's room; managers see it too.
+     - It changes nothing, so it is not audited.
+     - A tablet ignores a request more than a minute old, e.g. one replayed after a reconnect.
 
 Decided 2026-10-02 (P3-01b):
 
@@ -1530,6 +1539,25 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P3-01c Locate a tablet (P3-01 done)
+
+Built:
+
+- Contracts: `DeviceLocateRequested`, `LocateDeviceResponse`, `LOCATE_SECONDS` and the
+  `locateDevice` route.
+- Server: `DevicesService.locate`, and room routing to the device's own room.
+- Console: "Locate" on a connected tablet's row on the Devices page.
+- Tablet: `LocateOverlay` with `locateRequest`.
+
+Tests:
+
+- Server: 2 in `tablet.int.test.ts` (only that tablet hears it; refused when not connected, for
+  other devices and for waiters) and 1 in `realtime-rooms.test.ts`.
+- Console: 1.
+- Tablet: 2 (overlay and tone; another tablet's or a stale request ignored).
+
+Decision: 296.
 
 ### 2026-10-02: P3-01b Table tablet app (kiosk, session, health, staff exit)
 

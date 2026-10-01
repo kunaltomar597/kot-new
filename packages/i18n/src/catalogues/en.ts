@@ -297,6 +297,7 @@ export const en = {
       cannotReach: 'This tablet cannot reach the restaurant server. It keeps trying.',
       unbound: 'This tablet has no table yet.',
       unboundHint: 'A manager chooses its table on the dashboard: Devices, then Move.',
+      locating: 'Here I am: {name}',
       staff: {
         title: 'Staff: leave the kiosk',
         chooseManager: 'Which manager is letting you out?',
@@ -644,6 +645,9 @@ export const en = {
     unpairedBadge: 'Unpaired',
     battery: 'Battery {percent}%',
     batteryCharging: 'Battery {percent}%, charging',
+    locate: 'Locate',
+    locateNamed: 'Locate {name}',
+    locating: '{name} is flashing and sounding for {seconds} seconds.',
     network: {
       WIFI: 'On Wi-Fi',
       ETHERNET: 'On a network cable',

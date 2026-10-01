@@ -79,7 +79,12 @@ describe('[MGR-006] the device list', () => {
       within(await actionsFor('Tablet T7'))
         .getAllByRole('button')
         .map((button) => button.textContent),
-    ).toEqual([t('devices.rename'), t('devices.moveTable'), t('devices.unpair')]);
+    ).toEqual([
+      t('devices.rename'),
+      t('devices.moveTable'),
+      t('devices.locate'),
+      t('devices.unpair'),
+    ]);
 
     const kds = await rowOf('Tandoor screen');
     expect(within(kds).getByText(t('devices.forStation', { station: 'Tandoor' }))).toBeVisible();
@@ -242,6 +247,29 @@ describe('[MGR-006] [AUTH-008] [AUTH-009] changing a device', () => {
     expect(fake.callsTo('PATCH', `${DEVICES}/${KDS_TANDOOR}`)[0]?.body).toEqual({
       name: 'Grill screen',
     });
+  });
+
+  it('[MGR-006] locates a connected table tablet', async () => {
+    const fake = devicesServer().on('POST', `${DEVICES}/${TABLET_T7}/locate`, () => ({
+      status: 200,
+      body: { seconds: 15 },
+    }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    await user.click(
+      within(await actionsFor('Tablet T7')).getByRole('button', {
+        name: t('devices.locateNamed', { name: 'Tablet T7' }),
+      }),
+    );
+    expect(
+      await screen.findByText(t('devices.locating', { name: 'Tablet T7', seconds: 15 })),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', `${DEVICES}/${TABLET_T7}/locate`)).toHaveLength(1);
+    // A kitchen screen that is not connected offers no Locate.
+    expect(
+      within(await actionsFor('Tandoor screen')).queryByRole('button', {
+        name: t('devices.locateNamed', { name: 'Tandoor screen' }),
+      }),
+    ).toBeNull();
   });
 
   it('moves a table tablet to another table', async () => {

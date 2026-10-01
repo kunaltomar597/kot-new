@@ -9,6 +9,8 @@ import {
   type DeviceTokenResponse,
   type DeviceView,
   deviceTokenMessage,
+  LOCATE_SECONDS,
+  type LocateDeviceResponse,
   NetworkKind,
   type PairDeviceRequest,
   type PairedDevice,
@@ -396,6 +398,55 @@ export class DevicesService {
       await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return summary(revoked);
     });
+  }
+
+  /**
+   * "Locate" (MGR-006, P3-01c): a connected table tablet flashes and sounds for a few seconds, so
+   * a manager finds it among the tables. Nothing changes, so nothing is audited.
+   */
+  async locate(principal: Principal, deviceId: string): Promise<LocateDeviceResponse> {
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, restaurantId: principal.restaurantId },
+      select: { id: true, type: true, status: true },
+    });
+    if (device === null) throw AppError.notFound('The device');
+    if (device.type !== 'TABLE_TABLET' || device.status !== 'ACTIVE') {
+      throw new AppError(
+        409,
+        'LOCATE_NOT_SUPPORTED',
+        'Only a paired table tablet can show itself (pagers follow with their firmware).',
+      );
+    }
+    if (!this.realtime.connectedDeviceIds(principal.restaurantId).has(device.id)) {
+      throw new AppError(
+        409,
+        'DEVICE_NOT_CONNECTED',
+        'This tablet is not connected. Check that it is switched on and on the Wi-Fi.',
+      );
+    }
+    const now = new Date();
+    await this.prisma.transaction(async (tx) => {
+      const restaurant = await tx.restaurant.findUniqueOrThrow({
+        where: { id: principal.restaurantId },
+      });
+      await appendEvent(
+        tx,
+        {
+          eventId: newId(),
+          type: 'DeviceLocateRequested',
+          version: 1,
+          occurredAt: now.toISOString(),
+          restaurantId: principal.restaurantId,
+          businessDate: businessDateOf(now, {
+            cutoff: restaurant.businessDayCutoff,
+            timeZone: restaurant.timeZone,
+          }),
+          payload: { deviceId: device.id, seconds: LOCATE_SECONDS },
+        },
+        { aggregate: { type: 'device', id: device.id } },
+      );
+    });
+    return { seconds: LOCATE_SECONDS };
   }
 
   /** Moves a table tablet to another table (AUTH-009); needs a manager. */

@@ -9,6 +9,7 @@ import {
   TABLET_GUEST_KEYS,
 } from '@rp/mobile-core';
 import {
+  DEVICE_ID,
   FakeKeys,
   fakeLocalServer,
   RESTAURANT_ID,
@@ -18,6 +19,7 @@ import {
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { App } from '../src/App';
 import { accentColorsOf, STAFF_TAPS } from '../src/branding';
+import { locateRequest } from '../src/LocateOverlay';
 import { orderableCount, type TabletDevice } from '../src/TabletHome';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
@@ -116,7 +118,9 @@ class FakeKiosk implements Kiosk {
     this.calls.push(`screen ${String(on)}`);
     return Promise.resolve();
   }
-  locateTone(): Promise<void> {
+  readonly tones: number[] = [];
+  locateTone(durationMs: number): Promise<void> {
+    this.tones.push(durationMs);
     return Promise.resolve();
   }
   readHealth(): DeviceHealthReading {
@@ -375,5 +379,45 @@ describe('[TAB-001] [TAB-003] [TAB-015] the tablet at its table', () => {
     expect(accentColorsOf('#F2C94C')).toEqual({ accent: '#F2C94C', onAccent: '#000000' });
     expect(accentColorsOf(null)).toBeUndefined();
     expect(accentColorsOf('red')).toBeUndefined();
+  });
+});
+
+describe('[MGR-006] locate', () => {
+  it('flashes its name and sounds when the manager locates this tablet', async () => {
+    const context = setup(false);
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await render(<App session={context.session} translator={translator} device={context.device} />);
+    await online(context.sockets);
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    await act(async () => {
+      context.sockets.last.fire('event', {
+        ...frame(1, 'DeviceLocateRequested', { deviceId: DEVICE_ID, seconds: 15 }),
+        event: {
+          ...frame(1, 'DeviceLocateRequested', { deviceId: DEVICE_ID, seconds: 15 }).event,
+          occurredAt: new Date().toISOString(),
+        },
+      });
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('locate-overlay')).toBeOnTheScreen();
+    expect(screen.getByText('Here I am: Table T4')).toBeOnTheScreen();
+    expect(context.kiosk.tones).toEqual([3_000]);
+  });
+
+  it('ignores a request for another tablet, or one replayed long after', () => {
+    const now = Date.parse('2026-09-26T08:41:00.000Z');
+    const event = {
+      eventId: '0199a0e0-0000-7000-8000-000000000091',
+      type: 'DeviceLocateRequested' as const,
+      version: 1 as const,
+      occurredAt: '2026-09-26T08:40:30.000Z',
+      restaurantId: RESTAURANT_ID,
+      businessDate: '2026-09-26',
+      payload: { deviceId: DEVICE_ID, seconds: 15 },
+    };
+    expect(locateRequest(event, DEVICE_ID, now)).toEqual({ seconds: 15 });
+    expect(locateRequest(event, '0199a0e0-0000-7000-8000-000000000092', now)).toBeUndefined();
+    expect(locateRequest(event, DEVICE_ID, now + 120_000)).toBeUndefined();
   });
 });

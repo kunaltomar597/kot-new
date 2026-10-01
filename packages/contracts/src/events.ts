@@ -220,6 +220,15 @@ export const DeviceRevoked = event(
 );
 
 /**
+ * A manager asks a device to show itself (MGR-006 "Locate", P3-01c): a table tablet flashes and
+ * sounds for `seconds`. Only that device hears it.
+ */
+export const DeviceLocateRequested = event(
+  'DeviceLocateRequested',
+  z.object({ deviceId: Id, seconds: z.int().min(1).max(60) }),
+);
+
+/**
  * Settings changed (P1-01a, MGR-007, UPD-010). Only the keys: every screen may hear it, and each
  * reads the values it is allowed to see again.
  */
@@ -282,6 +291,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   AlertCleared,
   DeviceStatusChanged,
   DeviceRevoked,
+  DeviceLocateRequested,
   PrinterStatusChanged,
   SettingsChanged,
   RestaurantChanged,
