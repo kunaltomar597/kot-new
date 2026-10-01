@@ -3,6 +3,7 @@ import {
   charactersPerLine,
   formatLocal,
   type KotTicket,
+  renderDrawerKick,
   renderKotTicket,
   renderNotice,
   renderTestPage,
@@ -219,5 +220,11 @@ describe('ESC/POS rendering', () => {
     expect(text).toContain('<TALL><BOLD>From T1 to T3\nOrders 4, 5\n');
     expect(text).toContain('26-09-2026 13:05');
     expect(text).not.toContain('KOT');
+  });
+});
+
+describe('[BILL-016] the cash drawer kick', () => {
+  it('pulses drawer pin 2 and prints nothing', () => {
+    expect([...renderDrawerKick()]).toEqual([0x1b, 0x70, 0x00, 0x19, 0xfa]);
   });
 });

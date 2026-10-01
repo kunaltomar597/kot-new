@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { ReportKind, ReportRangeQuery } from '@rp/contracts';
-import { columns, type ReportCell, type ReportTable } from '@rp/domain';
+import type { ReportKind, ReportRangeQuery, SuspiciousKind } from '@rp/contracts';
+import { columns, formatRupees, type ReportCell, type ReportTable } from '@rp/domain';
 import { AuditViewerService } from '../audit/audit-viewer.service.js';
 import { formatLocal } from '../printing/escpos.js';
 import { ReportSuiteService } from './report-suite.service.js';
 import { ReportsService } from './reports.service.js';
+import { SuspiciousActivityService } from './suspicious-activity.service.js';
 
 /** What each report is called at the top of its file (RPT-017). */
 export const REPORT_TITLES: Record<ReportKind, string> = {
@@ -23,6 +24,19 @@ export const REPORT_TITLES: Record<ReportKind, string> = {
   TABLES: 'Table metrics',
   RECOMMENDATIONS: 'Recommendation performance',
   AUDIT: 'Audit log',
+  SUSPICIOUS: 'Suspicious activity',
+};
+
+/** The patterns of the suspicious-activity report as its file names them (AUD-006). */
+export const SUSPICIOUS_LABELS: Record<SuspiciousKind, string> = {
+  VOID_AFTER_PRINT: 'Voided after the bill printed',
+  EDIT_AFTER_PRINT: 'Bill edited after printing',
+  DISCOUNT_OVER_LIMIT: 'Discount above the threshold',
+  REPEATED_REPRINT: 'Printed again repeatedly',
+  CASH_VARIANCE: 'Cash variance above the threshold',
+  CANCELLED_AFTER_PREP: 'Voided after cooking started',
+  SENT_NOT_BILLED: 'Sent to the kitchen, never billed',
+  NO_SALE_DRAWER: 'Drawer opened without a sale',
 };
 
 const SALES_COLUMNS = columns(
@@ -70,6 +84,7 @@ export class ReportDocumentsService {
     private readonly reports: ReportsService,
     private readonly suite: ReportSuiteService,
     private readonly audit: AuditViewerService,
+    private readonly suspicious: SuspiciousActivityService,
   ) {}
 
   /** `ownShiftsOf` limits a cashier's shift report to their own shifts. */
@@ -567,6 +582,70 @@ export class ReportDocumentsService {
             heading: 'Dishes',
             columns: [...columns(['Dish', 'text']), ...figures],
             rows: report.items.map((item) => [item.name, ...cells(item)]),
+          },
+        ];
+      }
+      case 'SUSPICIOUS': {
+        const report = await this.suspicious.report(restaurantId, range);
+        const { thresholds } = report;
+        return [
+          {
+            heading: 'Summary',
+            columns: columns(['Pattern', 'text'], ['Flags', 'number']),
+            rows: [
+              ...report.totals.map((total) => [SUSPICIOUS_LABELS[total.kind], total.count]),
+              ['Total', report.flags.length],
+            ],
+            totalRow: true,
+          },
+          {
+            heading: 'Thresholds',
+            columns: columns(['Setting', 'text'], ['Value', 'text']),
+            rows: [
+              ['Discounts above', `${(thresholds.discountFlagBp / 100).toFixed(2)} %`],
+              ['Cash variance above', formatRupees(thresholds.cashVarianceFlagPaise)],
+              ['Printed again', `${String(thresholds.reprintFlagCount)} times or more`],
+            ],
+          },
+          {
+            heading: 'Flags',
+            columns: columns(
+              ['When', 'text'],
+              ['Business date', 'date'],
+              ['Pattern', 'text'],
+              ['Bill', 'text'],
+              ['KOT', 'number'],
+              ['Item', 'text'],
+              ['Qty', 'number'],
+              ['Amount', 'money'],
+              ['Rate %', 'percent'],
+              ['Times', 'number'],
+              ['Person', 'text'],
+              ['Also', 'text'],
+              ['Approved by', 'text'],
+              ['Reason', 'text'],
+            ),
+            rows: report.flags.map((flag) => [
+              local(flag.at),
+              flag.businessDate,
+              SUSPICIOUS_LABELS[flag.kind],
+              flag.invoiceNumber,
+              flag.kotNumber,
+              flag.item,
+              flag.quantity,
+              flag.amount,
+              flag.rateBp,
+              flag.count,
+              name(flag.by),
+              flag.alsoBy.length === 0 ? null : flag.alsoBy.map((person) => person.name).join(', '),
+              name(flag.approvedBy),
+              flag.reason,
+            ]),
+          },
+          {
+            heading: 'People',
+            columns: columns(['Person', 'text'], ['Flags', 'number']),
+            rows: report.people.map((person) => [person.name, person.count]),
           },
         ];
       }

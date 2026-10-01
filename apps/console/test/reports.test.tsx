@@ -11,6 +11,7 @@ import {
   registerPage,
   salesReport,
   suggestionReport,
+  suspiciousReport,
 } from './reports-fixture.js';
 import { profileView } from './restaurant-fixture.js';
 
@@ -40,6 +41,10 @@ function reportsServer(): FakeServer {
     .on('GET', '/api/v1/reports/kitchen', (call) => {
       const { from, to } = rangeOf(call.path);
       return { status: 200, body: kitchenReport(from, to) };
+    })
+    .on('GET', '/api/v1/reports/suspicious', (call) => {
+      const { from, to } = rangeOf(call.path);
+      return { status: 200, body: suspiciousReport(from, to) };
     })
     .on('GET', '/api/v1/reports/recommendations', (call) => {
       const { from, to } = rangeOf(call.path);
@@ -253,5 +258,36 @@ describe('[RPT-010] [RPT-012] operations reports', () => {
     expect(
       screen.getByText(t('reportsPage.suggestions.ordersValue', { withSuggestion: 5, orders: 30 })),
     ).toBeVisible();
+  });
+});
+
+describe('[RPT-014] [AUD-006] suspicious activity', () => {
+  it('lists every flag with the person it is about, the others, and the counts', async () => {
+    const { container } = await renderConsole({
+      fake: reportsServer(),
+      path: `/manage/reports/suspicious?from=${TODAY}&to=${TODAY}`,
+      signedIn: 'MANAGER',
+    });
+    const table = within(
+      await screen.findByRole('table', { name: t('reportsPage.suspicious.table') }),
+    );
+    expect(table.getByText(t('reportsPage.suspicious.kinds.NO_SALE_DRAWER'))).toBeVisible();
+    expect(table.getByText('Change for a 500 note')).toBeVisible();
+    expect(table.getByText(t('reportsPage.suspicious.kot', { number: 7 }))).toBeVisible();
+    expect(table.getByText(t('reportsPage.suspicious.times', { count: 3 }))).toBeVisible();
+    expect(
+      table.getByText(t('reportsPage.suspicious.also', { names: 'Meera' }), {
+        exact: false,
+      }),
+    ).toBeVisible();
+    expect(table.getByText('-₹21.00')).toBeVisible();
+    const people = within(screen.getByRole('table', { name: t('reportsPage.suspicious.people') }));
+    expect(people.getAllByRole('row')).toHaveLength(3);
+    expect(
+      screen.getByText(
+        t('reportsPage.suspicious.thresholds', { discount: '20%', cash: '₹200.00', count: 2 }),
+      ),
+    ).toBeVisible();
+    await expectNoAxeViolations(container);
   });
 });

@@ -19,9 +19,10 @@ import {
   StatTiles,
   textColumn,
 } from './ReportParts.js';
+import { SuspiciousReport } from './SuspiciousReport.js';
 import { useReport } from './use-report.js';
 
-type Slug = 'discounts' | 'cancellations' | 'reprints';
+type Slug = 'discounts' | 'cancellations' | 'reprints' | 'suspicious';
 type DiscountRow = DiscountReportResponse['discounts'][number];
 type ItemEndRow = CancellationReportResponse['items'][number];
 type BillVoidRow = CancellationReportResponse['bills'][number];
@@ -260,5 +261,7 @@ export function ControlReport({ slug, range }: { slug: Slug; range: ReportRange 
       return <Cancellations range={range} />;
     case 'reprints':
       return <Reprints range={range} />;
+    case 'suspicious':
+      return <SuspiciousReport range={range} />;
   }
 }

@@ -72,6 +72,7 @@ export const en = {
       PRINTER_OFFLINE: 'Printer offline',
       DISK_OR_BACKUP: 'Disk or backup needs attention',
       LICENSE_STATE: 'Licence needs attention',
+      SUSPICIOUS_ACTIVITY: 'Suspicious activity to review',
     },
     orderFrom:
       'Order {number} from the {source, select, TABLE_TABLET {table tablet} QR {QR menu} WAITER_APP {waiter app} other {POS}}',
@@ -85,6 +86,8 @@ export const en = {
       '{type, select, PAGER {The pager} TABLE_TABLET {The table tablet} KDS {The kitchen screen} other {A device}}',
     deviceBattery: '{device}: {percent}% battery left. Charge it soon.',
     deviceOffline: '{device} is not connected. Check it is switched on and in Wi-Fi range.',
+    suspicious:
+      '{count, plural, one {# thing} other {# things}} to review from {date}. See Reports, Suspicious activity.',
     /** Android notifications on the waiter phone (P2-06b, WTR-005). */
     notification: {
       listeningTitle: 'Alerts for {name}',
@@ -1288,6 +1291,7 @@ export const en = {
       discounts: 'Discounts',
       cancellations: 'Cancellations and voids',
       reprints: 'Reprints and edits',
+      suspicious: 'Suspicious activity',
       kitchen: 'Kitchen',
       tables: 'Tables',
       suggestions: 'Suggestions',
@@ -1445,6 +1449,40 @@ export const en = {
       reference: 'Ticket or bill',
       change: 'Total',
       fromTo: '{before} → {after}',
+    },
+    /** RPT-014, AUD-006 (P4-07b). */
+    suspicious: {
+      thresholds:
+        'Flags discounts above {discount}, cash differences above {cash}, and tickets or bills printed again {count, plural, one {# time} other {# times}} or more. Change these in Settings, Audit.',
+      total: 'Flags',
+      table: 'Flagged activity',
+      people: 'Flags by person',
+      pattern: 'Pattern',
+      what: 'What',
+      detail: 'Detail',
+      person: 'Person',
+      flags: 'Flags',
+      also: 'Also {names}',
+      kinds: {
+        VOID_AFTER_PRINT: 'Voided after the bill printed',
+        EDIT_AFTER_PRINT: 'Bill edited after printing',
+        DISCOUNT_OVER_LIMIT: 'Discount above the limit',
+        REPEATED_REPRINT: 'Printed again repeatedly',
+        CASH_VARIANCE: 'Cash difference at shift close',
+        CANCELLED_AFTER_PREP: 'Voided after cooking started',
+        SENT_NOT_BILLED: 'Sent to the kitchen, never billed',
+        NO_SALE_DRAWER: 'Drawer opened without a sale',
+      },
+      bill: 'Bill {number}',
+      kot: 'KOT {number}',
+      item: '{item} × {quantity}',
+      itemOnBill: '{item} × {quantity}, bill {number}',
+      itemOnKot: '{item} × {quantity}, KOT {number}',
+      wholeBill: 'Whole bill {number}',
+      shift: 'Shift close',
+      drawer: 'Cash drawer',
+      times: '{count, plural, one {# time} other {# times}}',
+      none: 'Nothing suspicious in this period.',
     },
     kitchen: {
       prep: 'Average cooking time',
@@ -2027,6 +2065,7 @@ export const en = {
       headerLines: 'Bill header lines',
       footerLines: 'Bill footer lines',
       printerId: 'Bill printer',
+      cashDrawerKick: 'Open the cash drawer for cash payments',
       hostedCopyDays: 'Digital bill link lasts',
     },
     payments: {
@@ -2081,6 +2120,7 @@ export const en = {
       dailyReportEnabled: 'Daily suspicious-activity report',
       discountFlagBp: 'Report discounts above',
       cashVarianceFlagPaise: 'Report cash differences above',
+      reprintFlagCount: 'Report reprints from',
     },
     backups: {
       walMode: 'Incremental backup',
@@ -2164,6 +2204,8 @@ export const en = {
       footerLines: 'Lines printed at the foot of every bill, e.g. a thank-you note.',
       printerId:
         'The printer bills print on, usually the one at the cash counter (none: choose each time).',
+      cashDrawerKick:
+        'Open the cash drawer on the bill printer when cash is taken (a printer without one ignores it).',
       hostedCopyDays: 'How long a digital bill stays available on its link.',
     },
     payments: {
@@ -2232,6 +2274,8 @@ export const en = {
       discountFlagBp: 'Discounts above this rate appear in the daily report (our default: 20 %).',
       cashVarianceFlagPaise:
         'Cash variances above this appear in the daily report (our default: ₹200).',
+      reprintFlagCount:
+        'A kitchen ticket or bill printed again this many times or more appears in the daily report.',
     },
     backups: {
       walMode: 'Incremental backup of the database log: continuous or hourly.',
@@ -2639,6 +2683,13 @@ export const en = {
     close: 'Close shift',
     closed: 'Shift closed. Difference: {variance}',
     invalidAmount: 'Enter an amount in rupees, for example 1500 or 1500.50.',
+    /** BILL-016 (P4-07b). */
+    noSale: 'Open the drawer (no sale)',
+    noSaleNote: 'Every opening without a sale is recorded with your name and the reason.',
+    noSaleReason: 'Reason for opening',
+    noSaleOpen: 'Open drawer',
+    noSaleOpened: 'Drawer opened. The opening is recorded.',
+    noSaleFailed: 'The drawer did not open: {error}',
   },
   kds: {
     allStations: 'All stations',

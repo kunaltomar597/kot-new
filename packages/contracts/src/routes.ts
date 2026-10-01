@@ -133,6 +133,7 @@ import {
   ShiftReportResponse,
   SourceSalesResponse,
   StaffPerformanceResponse,
+  SuspiciousActivityResponse,
   TableReportResponse,
 } from './reports.js';
 import {
@@ -140,6 +141,8 @@ import {
   CloseShiftRequest,
   CurrentShiftResponse,
   InvoicePaymentsView,
+  OpenCashDrawerRequest,
+  OpenCashDrawerResponse,
   OpenShiftRequest,
   RecordPaymentsRequest,
   ShiftParams,
@@ -3119,6 +3122,27 @@ export const ROUTES = [
     },
   },
   {
+    operationId: 'openCashDrawer',
+    method: 'POST',
+    path: '/api/v1/cash-drawer/open',
+    summary: 'Open the cash drawer without a sale, with a reason',
+    description:
+      'BILL-016, AUD-006. The receipt printer kicks the drawer; an opening is audited ' +
+      '(CASH_DRAWER_OPENED) and appears in the suspicious-activity report.',
+    tags: ['payments'],
+    requirements: ['BILL-016', 'AUD-006', 'AUD-001'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { body: OpenCashDrawerRequest },
+    responses: {
+      200: {
+        description: 'Whether the printer took the kick (only an opening is audited).',
+        schema: OpenCashDrawerResponse,
+      },
+      ...standardErrors,
+      422: { description: 'No bill printer is set, or no such printer.', schema: ApiError },
+    },
+  },
+  {
     operationId: 'recordPayments',
     method: 'POST',
     path: '/api/v1/invoices/:id/payments',
@@ -3358,6 +3382,25 @@ export const ROUTES = [
     request: { query: ReportRangeQuery },
     responses: {
       200: { description: 'The report.', schema: ReprintReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getSuspiciousActivityReport',
+    method: 'GET',
+    path: '/api/v1/reports/suspicious',
+    summary: 'Suspicious activity: voids and edits after printing, big discounts, and more',
+    description:
+      'RPT-014, AUD-006. Voids after the bill printed, bill edits after printing, discounts ' +
+      'above the threshold, repeated reprints, cash variances above the threshold, items voided ' +
+      'after the kitchen started, items sent but never on a settled bill, and no-sale drawer ' +
+      'openings, each with the person it is about.',
+    tags: ['reports'],
+    requirements: ['RPT-014', 'AUD-006', 'RPT-018'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: SuspiciousActivityResponse },
       ...standardErrors,
     },
   },

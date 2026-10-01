@@ -37,7 +37,16 @@ the installer (task 14) and are tested there.
 8. **Printer offline:** unplug the printer's network cable, add one more dish and send it. Within
    a minute the POS and the dashboard show the printer as offline. Plug the cable back in: the
    waiting ticket prints by itself.
-9. Repeat steps 4 to 8 for each printer and paper width.
+9. **Cash drawer (P4-07b, BILL-016)**, if a cash drawer is plugged into the printer's drawer
+   port (RJ11/RJ12). Set this printer as the bill printer (Settings → Bills → Bill printer).
+   a. Take a payment in cash at the POS: the drawer opens on its own.
+   b. On the POS open Shift → "Open the drawer (no sale)", type a reason and press Open drawer:
+   the drawer opens and the screen says the opening is recorded.
+   c. On the dashboard open Reports → Suspicious activity for today: the opening is listed with
+   your name and the reason.
+   The kick uses drawer pin 2, which almost every drawer is wired to. If the drawer does not open,
+   note it: some drawers need pin 5 and Claude can add a setting for that.
+10. Repeat steps 4 to 9 for each printer and paper width.
 
 ## Results template
 
@@ -55,6 +64,8 @@ DUPLICATE on reprint:         yes / no
 Offline alert appeared:       yes / no, after about ... seconds
 Waiting ticket printed when back online: yes / no
 Paper cut at the end:         yes / no / printer has no cutter
+Drawer opened on cash payment: yes / no / no drawer
+Drawer opened on "no sale":    yes / no / no drawer
 Anything else odd:
 Photo of a KOT and a bill:    (attach if you can)
 ```

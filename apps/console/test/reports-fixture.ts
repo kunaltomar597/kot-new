@@ -5,6 +5,7 @@ import type {
   OrderDrillDownResponse,
   RecommendationReportResponse,
   SalesSummaryResponse,
+  SuspiciousActivityResponse,
 } from '@rp/contracts';
 import { STAFF } from './fakes.js';
 
@@ -204,5 +205,85 @@ export function suggestionReport(from: string, to: string): RecommendationReport
       orders: 30,
       ordersWithSuggestion: 5,
     },
+  };
+}
+
+const person = (role: 'CASHIER' | 'MANAGER' | 'WAITER') => ({
+  id: STAFF[role].staffId,
+  name: STAFF[role].displayName,
+});
+
+/** RPT-014: a reprinted ticket, a cut bill and a drawer opened without a sale. */
+export function suspiciousReport(from: string, to: string): SuspiciousActivityResponse {
+  const flag = {
+    approvedBy: null,
+    alsoBy: [],
+    reason: null,
+    orderId: null,
+    invoiceId: null,
+    invoiceNumber: null,
+    kotNumber: null,
+    item: null,
+    quantity: null,
+    amount: null,
+    rateBp: null,
+    count: null,
+  };
+  return {
+    from,
+    to,
+    thresholds: { discountFlagBp: 2_000, cashVarianceFlagPaise: 20_000, reprintFlagCount: 2 },
+    flags: [
+      {
+        ...flag,
+        flagId: 'EDIT_AFTER_PRINT:1',
+        kind: 'EDIT_AFTER_PRINT',
+        at: '2026-10-01T09:00:00.000Z',
+        businessDate: from,
+        by: person('CASHIER'),
+        approvedBy: person('MANAGER'),
+        reason: 'Guest sent the water back',
+        orderId: ORDER_ID,
+        invoiceId: INVOICE_ID,
+        invoiceNumber: 'INV/26-27/000012',
+        amount: -2_100,
+      },
+      {
+        ...flag,
+        flagId: 'REPEATED_REPRINT:kot:1',
+        kind: 'REPEATED_REPRINT',
+        at: '2026-10-01T09:30:00.000Z',
+        businessDate: from,
+        by: person('WAITER'),
+        alsoBy: [person('MANAGER')],
+        reason: 'Paper jam',
+        orderId: ORDER_ID,
+        kotNumber: 7,
+        count: 3,
+      },
+      {
+        ...flag,
+        flagId: 'NO_SALE_DRAWER:1',
+        kind: 'NO_SALE_DRAWER',
+        at: '2026-10-01T10:00:00.000Z',
+        businessDate: from,
+        by: person('CASHIER'),
+        reason: 'Change for a 500 note',
+      },
+    ],
+    totals: [
+      { kind: 'VOID_AFTER_PRINT', count: 0 },
+      { kind: 'EDIT_AFTER_PRINT', count: 1 },
+      { kind: 'DISCOUNT_OVER_LIMIT', count: 0 },
+      { kind: 'REPEATED_REPRINT', count: 1 },
+      { kind: 'CASH_VARIANCE', count: 0 },
+      { kind: 'CANCELLED_AFTER_PREP', count: 0 },
+      { kind: 'SENT_NOT_BILLED', count: 0 },
+      { kind: 'NO_SALE_DRAWER', count: 1 },
+    ],
+    people: [
+      { ...person('CASHIER'), count: 2 },
+      { ...person('WAITER'), count: 1 },
+    ],
   };
 }

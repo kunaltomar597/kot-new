@@ -332,4 +332,37 @@ describe('[BILL-013] the cashier’s shift', () => {
     await user.click(screen.getByRole('button', { name: t('shift.close') }));
     expect(await screen.findByText(t('shift.closed', { variance: '-₹4.00' }))).toBeInTheDocument();
   });
+  it('[BILL-016] [AUD-006] opens the drawer without a sale, with a reason', async () => {
+    const fake = cashier()
+      .on('GET', '/api/v1/shifts/current', () => ({ status: 200, body: { shift: shiftView() } }))
+      .on(
+        'POST',
+        '/api/v1/cash-drawer/open',
+        () => ({
+          status: 200,
+          body: {
+            opened: false,
+            error: 'No printer answers.',
+            printerId: B.printer,
+            shiftId: B.shift,
+          },
+        }),
+        () => ({
+          status: 200,
+          body: { opened: true, error: null, printerId: B.printer, shiftId: B.shift },
+        }),
+      );
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos/shift' });
+    expect(await screen.findByText(t('shift.noSaleNote'))).toBeVisible();
+    await user.type(screen.getByLabelText(t('shift.noSaleReason')), 'Change for a 500 note');
+    await user.click(screen.getByRole('button', { name: t('shift.noSaleOpen') }));
+    expect(
+      await screen.findByText(t('shift.noSaleFailed', { error: 'No printer answers.' })),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: t('shift.noSaleOpen') }));
+    expect(await screen.findByText(t('shift.noSaleOpened'))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/cash-drawer/open')[1]?.body).toEqual({
+      reason: 'Change for a 500 note',
+    });
+  });
 });

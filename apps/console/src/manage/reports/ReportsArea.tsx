@@ -19,7 +19,7 @@ export const REPORT_GROUPS = {
   sales: ['sales', 'items', 'sources', 'payments'],
   tax: ['gst', 'register'],
   people: ['staff', 'shifts'],
-  controls: ['discounts', 'cancellations', 'reprints'],
+  controls: ['discounts', 'cancellations', 'reprints', 'suspicious'],
   operations: ['kitchen', 'tables', 'suggestions'],
 } as const;
 export type ReportGroup = keyof typeof REPORT_GROUPS;

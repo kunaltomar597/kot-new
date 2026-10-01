@@ -365,6 +365,16 @@ export const SETTINGS = [
     requirements: ['BILL-014'],
   }),
   setting({
+    key: 'bills.cashDrawerKick',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Open the cash drawer on the bill printer when cash is taken (a printer without one ignores it).',
+    requirements: ['BILL-016'],
+  }),
+  setting({
     key: 'payments.otherModes',
     schema: z.array(z.string().trim().min(1).max(30)).min(1).max(5),
     defaultValue: ['Other'],
@@ -753,6 +763,16 @@ export const SETTINGS = [
     description: 'Cash variances above this appear in the daily report (our default: ₹200).',
     requirements: ['AUD-006'],
     unit: 'paise',
+  }),
+  setting({
+    key: 'audit.reprintFlagCount',
+    schema: int(1, 100),
+    defaultValue: 2,
+    scope: 'RESTAURANT',
+    capability: 'DATA_ADMIN',
+    description:
+      'A kitchen ticket or bill printed again this many times or more appears in the daily report.',
+    requirements: ['AUD-006'],
   }),
   setting({
     key: 'backups.walMode',

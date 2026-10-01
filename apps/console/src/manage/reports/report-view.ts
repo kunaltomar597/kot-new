@@ -1,3 +1,4 @@
+import type { SuspiciousActivityResponse } from '@rp/contracts';
 import { addDays, formatRupees, type IsoDate, parseIsoDate } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 
@@ -112,4 +113,53 @@ export function shortDate(date: IsoDate, t: Translator): string {
     day: String(day).padStart(2, '0'),
     month: t(`reportsPage.month.m${String(month)}` as 'reportsPage.month.m1'),
   });
+}
+
+type Flag = SuspiciousActivityResponse['flags'][number];
+
+/**
+ * What a suspicious-activity flag is about, in a few words (RPT-014): the dish and its bill or
+ * kitchen ticket, the bill, the ticket, the shift or the drawer.
+ */
+export function flagSubject(flag: Flag, t: Translator): string {
+  const item =
+    flag.item === null ? null : { item: flag.item, quantity: String(flag.quantity ?? 1) };
+  switch (flag.kind) {
+    case 'CASH_VARIANCE':
+      return t('reportsPage.suspicious.shift');
+    case 'NO_SALE_DRAWER':
+      return t('reportsPage.suspicious.drawer');
+    case 'REPEATED_REPRINT':
+      return flag.kotNumber !== null
+        ? t('reportsPage.suspicious.kot', { number: flag.kotNumber })
+        : t('reportsPage.suspicious.bill', { number: flag.invoiceNumber ?? '–' });
+    case 'DISCOUNT_OVER_LIMIT':
+      return item === null
+        ? t('reportsPage.suspicious.wholeBill', { number: flag.invoiceNumber ?? '–' })
+        : t('reportsPage.suspicious.itemOnBill', { ...item, number: flag.invoiceNumber ?? '–' });
+    default:
+      if (item === null) {
+        return t('reportsPage.suspicious.bill', { number: flag.invoiceNumber ?? '–' });
+      }
+      if (flag.invoiceNumber !== null) {
+        return t('reportsPage.suspicious.itemOnBill', { ...item, number: flag.invoiceNumber });
+      }
+      if (flag.kotNumber !== null) {
+        return t('reportsPage.suspicious.itemOnKot', { ...item, number: flag.kotNumber });
+      }
+      return t('reportsPage.suspicious.item', item);
+  }
+}
+
+/** The figure a flag turns on: the money (a shortfall or a cut bill is negative), the rate or the count. */
+export function flagFigure(flag: Flag, t: Translator): string {
+  if (flag.kind === 'REPEATED_REPRINT' && flag.count !== null) {
+    return t('reportsPage.suspicious.times', { count: flag.count });
+  }
+  if (flag.kind === 'DISCOUNT_OVER_LIMIT' && flag.rateBp !== null) {
+    return flag.amount === null
+      ? percent(flag.rateBp)
+      : `${percent(flag.rateBp)} · ${rupees(flag.amount)}`;
+  }
+  return flag.amount === null ? '–' : rupees(flag.amount);
 }

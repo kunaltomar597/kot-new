@@ -11,6 +11,7 @@ export const B = {
   invoice: uuid(705),
   shift: uuid(706),
   discount: uuid(707),
+  printer: uuid(708),
 } as const;
 
 export function billView(overrides: Partial<BillView> = {}): BillView {

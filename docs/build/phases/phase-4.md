@@ -289,4 +289,19 @@ Built in two parts:
 - P4-07a Audit viewer and chain verification (done): `/manage/audit` with period, action and person
   filters, paging, export (CSV, Excel, PDF) and "Check now" over the hash chain.
 - P4-07b Suspicious-activity report (RPT-014, AUD-006) with its thresholds, the daily job that
-  tells the Owner, a no-sale drawer action so such openings can be reported, and the S12 fixture.
+  tells the Owner, a no-sale drawer action so such openings can be reported, and the S12 fixture
+  (done).
+
+As built (P4-07b):
+
+- `GET /api/v1/reports/suspicious` flags eight patterns, each with the person it is about. The
+  patterns: voids after the bill printed, edits after printing, discounts above the threshold,
+  repeated reprints, cash variances, voids after cooking started, items sent but never on a
+  settled bill, and no-sale drawer openings. The report also gives totals per pattern and flags
+  per person, and exports as `SUSPICIOUS`.
+- `SuspiciousActivityJob` reports each finished business date once, audited as
+  `SUSPICIOUS_ACTIVITY_REPORTED`, and alerts the Owner (`SUSPICIOUS_ACTIVITY`) when anything is
+  flagged.
+- BILL-016 comes with it: the drawer kick on cash payments (`bills.cashDrawerKick`) and
+  `POST /api/v1/cash-drawer/open` with a reason (`CASH_DRAWER_OPENED`).
+- S12 is `apps/server/test/integration/suspicious-activity.int.test.ts`.

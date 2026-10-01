@@ -252,6 +252,7 @@ function OpenShiftView({ shift, onChanged }: { shift: ShiftView; onChanged: () =
             </Button>
           </form>
         </Card>
+        <NoSale />
         <Card title={t('shift.close')} headingLevel={3}>
           <form
             className="console-form"
@@ -275,5 +276,71 @@ function OpenShiftView({ shift, onChanged }: { shift: ShiftView; onChanged: () =
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * Opens the cash drawer without a sale (BILL-016): the reason is asked for, and the server records
+ * the opening for the suspicious-activity report (AUD-006).
+ */
+function NoSale() {
+  const t = useT();
+  const controller = useConsole();
+  const toast = useToast();
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+
+  const open = () => {
+    setBusy(true);
+    setError(undefined);
+    controller.api
+      .openCashDrawer({ body: { reason: reason.trim() } })
+      .then(
+        (outcome) => {
+          if (outcome.opened) {
+            toast.show({ title: t('shift.noSaleOpened'), tone: 'success' });
+            setReason('');
+          } else {
+            setError(t('shift.noSaleFailed', { error: outcome.error ?? '' }));
+          }
+        },
+        (failure: unknown) => {
+          setError(messageOf(failure, t));
+        },
+      )
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  return (
+    <Card title={t('shift.noSale')} headingLevel={3}>
+      <form
+        className="console-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          open();
+        }}
+      >
+        <p className="dashboard-section__hint">{t('shift.noSaleNote')}</p>
+        {error === undefined ? null : (
+          <p role="alert" className="console-notice console-notice--danger">
+            {error}
+          </p>
+        )}
+        <TextField
+          label={t('shift.noSaleReason')}
+          value={reason}
+          maxLength={200}
+          onChange={(event) => {
+            setReason(event.target.value);
+          }}
+        />
+        <Button type="submit" variant="secondary" loading={busy}>
+          {t('shift.noSaleOpen')}
+        </Button>
+      </form>
+    </Card>
   );
 }

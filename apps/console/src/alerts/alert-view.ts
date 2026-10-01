@@ -33,6 +33,7 @@ const GROUP_OF_TYPE: Readonly<
   PRINTER_OFFLINE: 'system',
   DISK_OR_BACKUP: 'system',
   LICENSE_STATE: 'system',
+  SUSPICIOUS_ACTIVITY: 'staff',
 };
 
 export function groupOf(alert: AlertView, staffId: string): AlertGroup {
