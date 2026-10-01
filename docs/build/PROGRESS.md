@@ -142,8 +142,9 @@ What exists:
   (P4-02a); the Staff area's Today's sections page (sections and single tables per person, the
   tables nobody looks after, the last day's sections given again) and Pagers page (register,
   give, take back, a new credential, connection and battery) (P4-02b); the Devices page (pair with
-  a QR code, the code, addresses and CA fingerprint; rename; move a tablet; unpair) (P4-02c).
-  187 tests, and 17 Playwright steps.
+  a QR code, the code, addresses and CA fingerprint; rename; move a tablet; unpair) (P4-02c); the
+  menu editor (dishes with photos, sizes, option groups, combos, stock; categories; option
+  groups; publish) (P4-02d). 209 tests, and 18 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -158,7 +159,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02d Menu editor, then P4-02e Custom roles (P4-02 is split in five, see phase-4.md).
+- P4-02e Custom roles (S), the last part of P4-02 (see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -262,7 +263,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02a Staff and the Owner's sign-in security
 - [x] P4-02b Sections and pagers
 - [x] P4-02c Devices
-- [ ] P4-02d Menu editor
+- [x] P4-02d Menu editor
 - [ ] P4-02e Custom roles (S)
 - [ ] P4-03 Configuration screens
 - [ ] P4-04 Alert centre and system screen
@@ -550,6 +551,28 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-01 (P4-02d):
+
+220. The menu editor is a dashboard page (`/manage/menu`) for MENU_MANAGE (Owner and Manager)
+     with three tabs: Dishes, Categories, Option groups. Edits are a draft that every device gets
+     only when the manager presses Publish (MENU-013); availability and stock apply at once
+     (MENU-006), as the server already did.
+221. The draft returns every combo's parts and each counted dish's stock (`MenuDraftResponse.combos`,
+     `ItemView.stockCount`). Stock is not part of a dish's audit snapshot: it moves with every
+     order and has its own entries.
+222. A dish that is a combo stays a combo (the API has no way back); archive it to stop selling
+     it. Its own price is the combo price.
+223. Prices are typed in rupees with up to two decimals and sent as paise. Changing a saved dish's
+     price offers an optional reason, kept with `ITEM_PRICE_CHANGED` (MENU-009). Archiving asks
+     for a reason of at least 3 characters.
+224. A new dish starts on every sales channel, with the restaurant's tax group and station when it
+     has only one, and the next display order in steps of 10 so others fit between.
+225. A photo (JPEG, PNG or WebP, at most 5 MB) uploads as soon as it is chosen; removing it only
+     unlinks it from the dish (unused renditions are purged later, DATA-007).
+226. The console's browser tests raise `auth.attemptsPerMinutePerDevice` to 100 for their single
+     browser, which stands in for a terminal many people sign in on within a minute; the
+     restaurant default stays 10 (SEC-009).
 
 Decided 2026-10-01 (P4-02c):
 
@@ -1164,6 +1187,33 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-01: P4-02d Menu editor
+
+Built: contracts `MenuDraftResponse.combos` and `ItemView.stockCount`, filled by
+`MenuAdminService.draft`; the console's menu editor (`src/manage/menu/`): `MenuEditor` (tabs and
+Publish), `ItemsTab` (category filter, search over names, short codes, tags and search words,
+archived dishes, stock), `ItemDialog` (every MENU-002 field in sections, photo upload, sizes, option
+groups, price-change reason, combo), `ComboFields` (set dishes and choices, dates and daily hours),
+`CategoriesTab`, `GroupsTab`, `ReasonDialog` and `menu-view.ts` with the server's checks.
+
+Tests: server (the draft holds combos and stock, stock leaves the dish's audit alone), console
+`menu-view.test.ts` 12 and `menu-editor.test.tsx` 10, and the 18th Playwright step: a manager
+adds Kulcha Platter with two sizes, Add-ons and a PNG photo, publishes, and the cashier opens it
+on the POS with its sizes and add-ons; axe on the editor and its dialog; the page fits 360 px.
+
+Gotchas:
+
+- The per-device sign-in limit (10 a minute) trips the browser tests once they sign people in
+  often; `e2e/global-setup.ts` raises it for the test browser.
+- Message keys must be names, not numbers (`menuEditor.item.spice.mild`, not `.1`): numeric keys
+  do not type as `MessageKey`.
+- `ReturnType<typeof within>` is `any` to the linter: give test helpers a structural type.
+
+Deferred: turning a combo back into a plain dish (decision 222); drag-and-drop ordering (display
+order numbers for now); time-based availability (MENU-007, S, P6-05).
+
+Decisions: 220 to 226.
 
 ### 2026-10-01: P4-02c Devices (first session on the local Mac)
 

@@ -193,18 +193,12 @@ export const ItemView = z.object({
   /** Availability and stock are set on their own (MENU-006, P1-03b). */
   available: z.boolean(),
   trackStock: z.boolean(),
+  /** Portions left while stock is counted (MENU-006), else null. */
+  stockCount: z.int().nonnegative().nullable(),
   archivedAt: Timestamp.nullable(),
   updatedAt: Timestamp,
 });
 export type ItemView = z.infer<typeof ItemView>;
-
-/** The whole draft menu for the editor, archived entries included. */
-export const MenuDraftResponse = z.object({
-  categories: z.array(CategoryView),
-  modifierGroups: z.array(ModifierGroupView),
-  items: z.array(ItemView),
-});
-export type MenuDraftResponse = z.infer<typeof MenuDraftResponse>;
 
 export const MenuArchiveRequest = z.strictObject({ reason: Reason });
 export type MenuArchiveRequest = z.infer<typeof MenuArchiveRequest>;
@@ -271,6 +265,15 @@ export const ComboView = z.object({
   timeWindow: z.object({ start: z.string(), end: z.string() }).nullable(),
 });
 export type ComboView = z.infer<typeof ComboView>;
+
+/** The whole draft menu for the editor, archived entries included, with every combo's parts. */
+export const MenuDraftResponse = z.object({
+  categories: z.array(CategoryView),
+  modifierGroups: z.array(ModifierGroupView),
+  items: z.array(ItemView),
+  combos: z.array(ComboView),
+});
+export type MenuDraftResponse = z.infer<typeof MenuDraftResponse>;
 
 // ---------------------------------------------------------------- availability (P1-03b)
 
