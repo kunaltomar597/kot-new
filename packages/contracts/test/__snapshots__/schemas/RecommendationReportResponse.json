@@ -1,0 +1,222 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "layers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "impressions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "taps": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "addedToCart": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "ordered": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "attachRateBp": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "revenue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] }
+          },
+          "required": [
+            "impressions",
+            "taps",
+            "addedToCart",
+            "ordered",
+            "attachRateBp",
+            "revenue",
+            "layer"
+          ]
+        }
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "impressions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "taps": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "addedToCart": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "ordered": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "attachRateBp": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "revenue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "itemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": { "type": "string" }
+          },
+          "required": [
+            "impressions",
+            "taps",
+            "addedToCart",
+            "ordered",
+            "attachRateBp",
+            "revenue",
+            "itemId",
+            "name"
+          ]
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "impressions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "taps": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "addedToCart": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "ordered": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "attachRateBp": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "revenue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "ordersWithSuggestion": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "impressions",
+          "taps",
+          "addedToCart",
+          "ordered",
+          "attachRateBp",
+          "revenue",
+          "orders",
+          "ordersWithSuggestion"
+        ]
+      }
+    },
+    "required": ["from", "to", "layers", "items", "totals"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "from": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "to": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+      },
+      "layers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "impressions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "taps": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "addedToCart": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "ordered": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "attachRateBp": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "revenue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] }
+          },
+          "required": [
+            "impressions",
+            "taps",
+            "addedToCart",
+            "ordered",
+            "attachRateBp",
+            "revenue",
+            "layer"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "impressions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "taps": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "addedToCart": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "ordered": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "attachRateBp": {
+              "anyOf": [
+                { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                { "type": "null" }
+              ]
+            },
+            "revenue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "itemId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": { "type": "string" }
+          },
+          "required": [
+            "impressions",
+            "taps",
+            "addedToCart",
+            "ordered",
+            "attachRateBp",
+            "revenue",
+            "itemId",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "totals": {
+        "type": "object",
+        "properties": {
+          "impressions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "taps": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "addedToCart": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "ordered": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "attachRateBp": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "revenue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "ordersWithSuggestion": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "impressions",
+          "taps",
+          "addedToCart",
+          "ordered",
+          "attachRateBp",
+          "revenue",
+          "orders",
+          "ordersWithSuggestion"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": ["from", "to", "layers", "items", "totals"],
+    "additionalProperties": false
+  }
+}

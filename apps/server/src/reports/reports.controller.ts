@@ -5,17 +5,20 @@ import {
   type GstSummaryResponse,
   type InvoiceRegisterResponse,
   type ItemSalesResponse,
+  type KitchenReportResponse,
   OrderDrillDownParams,
   type OrderDrillDownResponse,
   type PaymentModesResponse,
   ReportExportRequest,
   type ReportExportResponse,
+  type RecommendationReportResponse,
   ReportRangeQuery,
   type ReprintReportResponse,
   type SalesSummaryResponse,
   type ShiftReportResponse,
   type SourceSalesResponse,
   type StaffPerformanceResponse,
+  type TableReportResponse,
 } from '@rp/contracts';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireCapability } from '../auth/decorators.js';
@@ -83,6 +86,33 @@ export class ReportsController {
     @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
   ): Promise<CancellationReportResponse> {
     return this.suite.cancellations(restaurantOf(request), range);
+  }
+
+  @Get('kitchen')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  kitchen(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<KitchenReportResponse> {
+    return this.suite.kitchen(restaurantOf(request), range);
+  }
+
+  @Get('tables')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  tables(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<TableReportResponse> {
+    return this.suite.tables(restaurantOf(request), range);
+  }
+
+  @Get('recommendations')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  recommendations(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<RecommendationReportResponse> {
+    return this.suite.recommendations(restaurantOf(request), range);
   }
 
   @Get('reprints')

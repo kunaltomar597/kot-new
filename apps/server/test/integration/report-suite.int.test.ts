@@ -8,13 +8,16 @@ import {
   DayEndPreview,
   DiscountReportResponse,
   InvoiceView,
+  KitchenReportResponse,
   type LoginResponse,
   OverrideResponse,
   PrintInvoiceResponse,
+  RecommendationReportResponse,
   ReprintReportResponse,
   SourceSalesResponse,
   StaffPerformanceResponse,
   SubmitOrderResponse,
+  TableReportResponse,
   TableSessionView,
 } from '@rp/contracts';
 import request from 'supertest';
@@ -259,6 +262,7 @@ beforeAll(async () => {
 
   // T2: a complimentary item.
   const t2 = await openTable('T2');
+  ids.t2 = t2;
   const second = await order({
     source: 'WAITER_APP',
     orderType: 'DINE_IN',
@@ -268,6 +272,7 @@ beforeAll(async () => {
   const t2Bill = await bill({ tableSessionId: t2 });
   const freeToken = await overrideToken('DISCOUNT_ABOVE_LIMIT');
   const freeLassi = await itemOf(second, 'Lassi');
+  ids.freeLassi = freeLassi;
   const free = await server()
     .post(`/api/v1/bills/${t2Bill.id}/discounts`)
     .set({ ...as(cashier), 'x-override-token': freeToken })
@@ -338,6 +343,79 @@ beforeAll(async () => {
       acknowledgedAt: later(30),
       acknowledgedById: kit.staff.WAITER,
     },
+  });
+
+  // Kitchen times (P4-05b): the Paneer Tikka cooked 10 min and collected after 1 min; the free
+  // Lassi bumped straight to ready 2 min after sending and served 1 min later.
+  const paneer = await itemOf(ids.t1Order, 'Paneer Tikka');
+  ids.paneer = paneer;
+  await prisma.orderItem.update({
+    where: { id: paneer },
+    data: { preparingAt: raised, readyAt: later(600), pickedUpAt: later(660) },
+  });
+  await prisma.orderItem.update({
+    where: { id: freeLassi },
+    data: { sentAt: raised, preparingAt: null, readyAt: later(120), servedAt: later(180) },
+  });
+  // The kitchen pressed "Notify manager" once; the other uncollected-dish alert is the timer's.
+  await prisma.alert.createMany({
+    data: [
+      {
+        ...base,
+        businessDate: new Date(today),
+        type: 'READY_NOT_COLLECTED',
+        kotId: id('kot'),
+        raisedByDeviceId: kit.deviceId,
+      },
+      { ...base, businessDate: new Date(today), type: 'READY_NOT_COLLECTED', kotId: id('kot') },
+    ],
+  });
+  // Both tables served and left: T1 after an hour, T2 after half an hour. A third session, opened
+  // by mistake, does not count.
+  for (const [session, minutes] of [
+    [t1, 60],
+    [t2, 30],
+  ] as const) {
+    await prisma.tableSession.update({
+      where: { id: session },
+      data: { status: 'CLOSED', openedAt: raised, closedAt: later(minutes * 60) },
+    });
+  }
+  await prisma.tableSession.create({
+    data: {
+      ...base,
+      tableId: id('T2'),
+      businessDate: new Date(today),
+      status: 'CLOSED',
+      covers: 4,
+      openedAt: raised,
+      closedAt: later(60),
+      closeReason: 'Opened by mistake',
+    },
+  });
+  // Suggestions: the Paneer Tikka from a rule, shown twice, opened, added and ordered; the
+  // voided Water from best sellers, shown twice and ordered.
+  const event = (kind: string, layer: string, itemName: string, orderItemId?: string) => ({
+    ...base,
+    businessDate: new Date(today),
+    kind: kind as 'IMPRESSION',
+    layer: layer as 'RULE',
+    itemId: id(itemName),
+    channel: 'WAITER_APP' as const,
+    tableSessionId: t1,
+    ...(orderItemId !== undefined && { orderItemId }),
+  });
+  await prisma.recommendationEvent.createMany({
+    data: [
+      event('IMPRESSION', 'RULE', 'Paneer Tikka'),
+      event('IMPRESSION', 'RULE', 'Paneer Tikka'),
+      event('TAP', 'RULE', 'Paneer Tikka'),
+      event('ADD_TO_CART', 'RULE', 'Paneer Tikka'),
+      event('ORDERED', 'RULE', 'Paneer Tikka', paneer),
+      event('IMPRESSION', 'BEST_SELLER', 'Water'),
+      event('IMPRESSION', 'BEST_SELLER', 'Water'),
+      event('ORDERED', 'BEST_SELLER', 'Water', await itemOf(ids.t1Order, 'Water')),
+    ],
   });
 });
 
@@ -526,5 +604,137 @@ describe('[RPT-009] reprints and bill edits', () => {
       after: invoices.t1Edited?.grandTotal,
     });
     expect(report9.totals).toEqual({ kotReprints: 1, billReprints: 1, billEdits: 1 });
+  });
+});
+
+describe('[RPT-010] kitchen performance', () => {
+  it('averages prep and pickup times by station and dish, and counts Notify manager', async () => {
+    const response = await report('kitchen');
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const kitchen10 = KitchenReportResponse.parse(response.body);
+    expect(kitchen10.stations).toEqual([
+      expect.objectContaining({
+        name: 'Kitchen',
+        lines: 2,
+        quantity: 4,
+        averagePrepSeconds: 360,
+        averagePickupSeconds: 60,
+        notifyManager: 1,
+      }),
+    ]);
+    expect(kitchen10.items).toEqual([
+      {
+        itemId: id('Lassi'),
+        name: 'Lassi',
+        station: 'Kitchen',
+        lines: 1,
+        quantity: 2,
+        averagePrepSeconds: 120,
+        averagePickupSeconds: 60,
+      },
+      {
+        itemId: id('Paneer Tikka'),
+        name: 'Paneer Tikka',
+        station: 'Kitchen',
+        lines: 1,
+        quantity: 2,
+        averagePrepSeconds: 600,
+        averagePickupSeconds: 60,
+      },
+    ]);
+    expect(kitchen10.totals).toEqual({
+      lines: 2,
+      quantity: 4,
+      averagePrepSeconds: 360,
+      averagePickupSeconds: 60,
+      notifyManager: 1,
+    });
+  });
+});
+
+describe('[RPT-011] table metrics', () => {
+  it('gives covers, seated time, spend per cover and turnover of the tables served', async () => {
+    const tables11 = TableReportResponse.parse((await report('tables')).body);
+    const t1Spend = invoices.t1Edited?.grandTotal ?? 0;
+    const t2Spend = invoices.t2?.grandTotal ?? 0;
+    expect(tables11.tables).toEqual([
+      {
+        tableId: id('T1'),
+        label: 'T1',
+        sessions: 1,
+        covers: 2,
+        averageSeatedSeconds: 3_600,
+        spend: t1Spend,
+        spendPerCover: Math.round(t1Spend / 2),
+      },
+      {
+        tableId: id('T2'),
+        label: 'T2',
+        sessions: 1,
+        covers: 2,
+        averageSeatedSeconds: 1_800,
+        spend: t2Spend,
+        spendPerCover: Math.round(t2Spend / 2),
+      },
+    ]);
+    expect(tables11.totals).toMatchObject({
+      sessions: 2,
+      covers: 4,
+      averageSeatedSeconds: 2_700,
+      spend: t1Spend + t2Spend,
+      tableCount: 2,
+      days: 1,
+      // Two sessions on two tables in one day: one turn each.
+      turnoverBp: 10_000,
+    });
+  });
+});
+
+describe('[RPT-012] [REC-008] recommendation performance', () => {
+  it('counts each step per layer, with revenue only from lines that stayed', async () => {
+    const reco = RecommendationReportResponse.parse((await report('recommendations')).body);
+    expect(reco.layers).toEqual([
+      {
+        layer: 'RULE',
+        impressions: 2,
+        taps: 1,
+        addedToCart: 1,
+        ordered: 1,
+        attachRateBp: 5_000,
+        revenue: 56_000,
+      },
+      {
+        layer: 'LEARNED',
+        impressions: 0,
+        taps: 0,
+        addedToCart: 0,
+        ordered: 0,
+        attachRateBp: null,
+        revenue: 0,
+      },
+      {
+        layer: 'BEST_SELLER',
+        impressions: 2,
+        taps: 0,
+        addedToCart: 0,
+        ordered: 1,
+        attachRateBp: 5_000,
+        revenue: 0,
+      },
+    ]);
+    expect(reco.items.map((item) => [item.name, item.ordered, item.revenue])).toEqual([
+      ['Paneer Tikka', 1, 56_000],
+      ['Water', 1, 0],
+    ]);
+    expect(reco.totals).toEqual({
+      impressions: 4,
+      taps: 1,
+      addedToCart: 1,
+      ordered: 2,
+      attachRateBp: 5_000,
+      revenue: 56_000,
+      orders: 4,
+      ordersWithSuggestion: 1,
+    });
   });
 });

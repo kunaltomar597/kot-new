@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import type {
   CancellationReportResponse,
   DiscountReportResponse,
+  KitchenReportResponse,
+  RecommendationReportResponse,
   ReportRangeQuery,
   ReprintReportResponse,
   SourceSalesResponse,
   StaffPerformanceResponse,
+  TableReportResponse,
 } from '@rp/contracts';
-import { BASIS_POINTS_PER_WHOLE } from '@rp/domain';
+import { BASIS_POINTS_PER_WHOLE, divideRounded } from '@rp/domain';
 import { isoDateOf } from '../common/business-dates.js';
 import { PrismaService } from '../database/prisma.service.js';
 
@@ -15,6 +18,58 @@ type StaffRef = { id: string; name: string } | null;
 type OrderSource = SourceSalesResponse['rows'][number]['source'];
 type OrderType = SourceSalesResponse['rows'][number]['orderType'];
 type OrderItemState = NonNullable<CancellationReportResponse['items'][number]['stage']>;
+type Layer = RecommendationReportResponse['layers'][number]['layer'];
+
+/** Whole seconds of a sum over a count, or null without any. */
+function average(totalSeconds: number, count: number): number | null {
+  return count === 0 ? null : Math.max(0, Math.round(totalSeconds / count));
+}
+
+/** `part` of `whole` in basis points, or null when there is no whole. */
+function shareBp(part: number, whole: number): number | null {
+  return whole === 0 ? null : divideRounded(part * BASIS_POINTS_PER_WHOLE, whole);
+}
+
+/** Kitchen figures as PostgreSQL gives them: sums of seconds and their counts. */
+interface KitchenRow {
+  lines: bigint;
+  quantity: bigint | null;
+  prep_sum: number | null;
+  prep_count: bigint;
+  pickup_sum: number | null;
+  pickup_count: bigint;
+}
+
+function kitchenTimes(row: KitchenRow | undefined) {
+  return {
+    lines: num(row?.lines),
+    quantity: num(row?.quantity),
+    averagePrepSeconds: average(row?.prep_sum ?? 0, num(row?.prep_count)),
+    averagePickupSeconds: average(row?.pickup_sum ?? 0, num(row?.pickup_count)),
+  };
+}
+
+/** Suggestion counts as PostgreSQL gives them. */
+interface SuggestionRow {
+  impressions: bigint;
+  taps: bigint;
+  added: bigint;
+  ordered: bigint;
+  revenue: bigint;
+}
+
+function suggestionFigures(row: SuggestionRow | undefined) {
+  const impressions = num(row?.impressions);
+  const ordered = num(row?.ordered);
+  return {
+    impressions,
+    taps: num(row?.taps),
+    addedToCart: num(row?.added),
+    ordered,
+    attachRateBp: shareBp(ordered, impressions),
+    revenue: num(row?.revenue),
+  };
+}
 
 /** States after the kitchen started: a void from one of them is wastage (RPT-008). */
 const COOKED: ReadonlySet<string> = new Set(['PREPARING', 'READY', 'PICKED_UP', 'SERVED']);
@@ -401,6 +456,247 @@ export class ReportSuiteService {
         kotReprints: events.filter((event) => event.kind === 'KOT_REPRINT').length,
         billReprints: events.filter((event) => event.kind === 'BILL_REPRINT').length,
         billEdits: events.filter((event) => event.kind === 'BILL_EDIT').length,
+      },
+    };
+  }
+
+  /**
+   * RPT-010: average prep time (kitchen start, or sending for a dish bumped straight to ready, to
+   * ready) and ready-to-pickup time (to picked up, or served), by station and dish; combos are
+   * cooked as their parts. "Notify manager" presses are the kitchen's own uncollected-dish alerts.
+   */
+  async kitchen(restaurantId: string, range: ReportRangeQuery): Promise<KitchenReportResponse> {
+    const { from, to } = range;
+    const cooked = this.prisma.$queryRaw<(KitchenRow & { station_id: string })[]>`
+      SELECT oi.station_id, count(*) AS lines, sum(oi.quantity) AS quantity,
+             sum(t.prep) FILTER (WHERE t.prep >= 0)::float8 AS prep_sum,
+             count(t.prep) FILTER (WHERE t.prep >= 0) AS prep_count,
+             sum(t.pickup) FILTER (WHERE t.pickup >= 0)::float8 AS pickup_sum,
+             count(t.pickup) FILTER (WHERE t.pickup >= 0) AS pickup_count
+      FROM order_items oi
+      CROSS JOIN LATERAL (
+        SELECT extract(epoch FROM oi.ready_at - coalesce(oi.preparing_at, oi.sent_at)) AS prep,
+               extract(epoch FROM coalesce(oi.picked_up_at, oi.served_at) - oi.ready_at) AS pickup
+      ) t
+      WHERE oi.restaurant_id = ${restaurantId}::uuid AND oi.ready_at IS NOT NULL
+        AND oi.business_date BETWEEN ${from}::date AND ${to}::date
+        AND NOT EXISTS (SELECT 1 FROM combos c WHERE c.item_id = oi.item_id)
+      GROUP BY 1`;
+    const byItem = this.prisma.$queryRaw<
+      (KitchenRow & { item_id: string; name: string; station: string })[]
+    >`
+      SELECT oi.item_id, i.name, s.name AS station, count(*) AS lines,
+             sum(oi.quantity) AS quantity,
+             sum(t.prep) FILTER (WHERE t.prep >= 0)::float8 AS prep_sum,
+             count(t.prep) FILTER (WHERE t.prep >= 0) AS prep_count,
+             sum(t.pickup) FILTER (WHERE t.pickup >= 0)::float8 AS pickup_sum,
+             count(t.pickup) FILTER (WHERE t.pickup >= 0) AS pickup_count
+      FROM order_items oi
+      JOIN items i ON i.id = oi.item_id
+      JOIN stations s ON s.id = oi.station_id
+      CROSS JOIN LATERAL (
+        SELECT extract(epoch FROM oi.ready_at - coalesce(oi.preparing_at, oi.sent_at)) AS prep,
+               extract(epoch FROM coalesce(oi.picked_up_at, oi.served_at) - oi.ready_at) AS pickup
+      ) t
+      WHERE oi.restaurant_id = ${restaurantId}::uuid AND oi.ready_at IS NOT NULL
+        AND oi.business_date BETWEEN ${from}::date AND ${to}::date
+        AND NOT EXISTS (SELECT 1 FROM combos c WHERE c.item_id = oi.item_id)
+      GROUP BY 1, 2, 3
+      ORDER BY 2, 1`;
+    const presses = this.prisma.$queryRaw<{ station_id: string; n: bigint }[]>`
+      SELECT k.station_id, count(*) AS n
+      FROM alerts a JOIN kots k ON k.id = a.kot_id
+      WHERE a.restaurant_id = ${restaurantId}::uuid AND a.type = 'READY_NOT_COLLECTED'
+        AND a.raised_by_device_id IS NOT NULL
+        AND a.business_date BETWEEN ${from}::date AND ${to}::date
+      GROUP BY 1`;
+    const [stationRows, itemRows, pressRows, stations] = await Promise.all([
+      cooked,
+      byItem,
+      presses,
+      this.prisma.station.findMany({
+        where: { restaurantId },
+        select: { id: true, name: true, archivedAt: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    const used = new Set([...stationRows, ...pressRows].map((row) => row.station_id));
+    const shown = stations.filter((station) => station.archivedAt === null || used.has(station.id));
+    const pressesOf = (stationId: string) =>
+      num(pressRows.find((row) => row.station_id === stationId)?.n);
+    const sum = (field: keyof KitchenRow) =>
+      stationRows.reduce((total, row) => total + num(row[field]), 0);
+    return {
+      ...range,
+      stations: shown.map((station) => ({
+        stationId: station.id,
+        name: station.name,
+        ...kitchenTimes(stationRows.find((row) => row.station_id === station.id)),
+        notifyManager: pressesOf(station.id),
+      })),
+      items: itemRows.map((row) => ({
+        itemId: row.item_id,
+        name: row.name,
+        station: row.station,
+        ...kitchenTimes(row),
+      })),
+      totals: {
+        lines: sum('lines'),
+        quantity: sum('quantity'),
+        averagePrepSeconds: average(sum('prep_sum'), sum('prep_count')),
+        averagePickupSeconds: average(sum('pickup_sum'), sum('pickup_count')),
+        notifyManager: pressRows.reduce((total, row) => total + num(row.n), 0),
+      },
+    };
+  }
+
+  /**
+   * RPT-011: covers, seated time and spend of the tables served (closed sessions, not those closed
+   * as opened by mistake), by table; turnover is sessions per table per day.
+   */
+  async tables(restaurantId: string, range: ReportRangeQuery): Promise<TableReportResponse> {
+    const [rows, tableCount] = await Promise.all([
+      this.prisma.$queryRaw<
+        {
+          table_id: string;
+          label: string;
+          sessions: bigint;
+          covers: bigint;
+          seated_sum: number | null;
+          spend: bigint;
+        }[]
+      >`
+        WITH served AS (
+          SELECT id, table_id, coalesce(covers, 0) AS covers,
+                 extract(epoch FROM closed_at - opened_at) AS seated
+          FROM table_sessions
+          WHERE restaurant_id = ${restaurantId}::uuid AND status = 'CLOSED'
+            AND close_reason IS NULL AND closed_at IS NOT NULL
+            AND business_date BETWEEN ${range.from}::date AND ${range.to}::date
+        ), spend AS (
+          SELECT i.table_session_id, sum(i.grand_total) AS spend
+          FROM invoices i JOIN served s ON s.id = i.table_session_id
+          WHERE i.status <> 'VOIDED'
+          GROUP BY 1
+        )
+        SELECT s.table_id, t.label, count(*) AS sessions, sum(s.covers) AS covers,
+               sum(greatest(s.seated, 0))::float8 AS seated_sum,
+               coalesce(sum(sp.spend), 0) AS spend
+        FROM served s
+        JOIN tables t ON t.id = s.table_id
+        LEFT JOIN spend sp ON sp.table_session_id = s.id
+        GROUP BY 1, 2
+        ORDER BY 2`,
+      this.prisma.diningTable.count({ where: { restaurantId, archivedAt: null } }),
+    ]);
+    const figures = (sessions: number, covers: number, seated: number, spend: number) => ({
+      sessions,
+      covers,
+      averageSeatedSeconds: average(seated, sessions),
+      spend,
+      spendPerCover: covers === 0 ? null : divideRounded(spend, covers),
+    });
+    const tables = rows.map((row) => ({
+      tableId: row.table_id,
+      label: row.label,
+      ...figures(num(row.sessions), num(row.covers), row.seated_sum ?? 0, num(row.spend)),
+    }));
+    const total = (pick: (row: (typeof rows)[number]) => bigint | number | null) =>
+      rows.reduce((sum, row) => sum + num(pick(row)), 0);
+    const sessions = total((row) => row.sessions);
+    const days = Math.round((Date.parse(range.to) - Date.parse(range.from)) / 86_400_000) + 1;
+    return {
+      ...range,
+      tables,
+      totals: {
+        ...figures(
+          sessions,
+          total((row) => row.covers),
+          total((row) => row.seated_sum),
+          total((row) => row.spend),
+        ),
+        tableCount,
+        days,
+        turnoverBp: shareBp(sessions, tableCount * days) ?? 0,
+      },
+    };
+  }
+
+  /**
+   * RPT-012 (REC-008): suggestions shown, opened, added to a cart and ordered, per layer and dish.
+   * Revenue is the line total of suggested lines that were not rejected, cancelled or voided.
+   */
+  async recommendations(
+    restaurantId: string,
+    range: ReportRangeQuery,
+  ): Promise<RecommendationReportResponse> {
+    const { from, to } = range;
+    const [layerRows, itemRows, orderRow] = await Promise.all([
+      this.prisma.$queryRaw<(SuggestionRow & { layer: Layer })[]>`
+        SELECT e.layer::text AS layer,
+               count(*) FILTER (WHERE e.kind = 'IMPRESSION') AS impressions,
+               count(*) FILTER (WHERE e.kind = 'TAP') AS taps,
+               count(*) FILTER (WHERE e.kind = 'ADD_TO_CART') AS added,
+               count(*) FILTER (WHERE e.kind = 'ORDERED') AS ordered,
+               coalesce(sum(oi.line_total) FILTER (
+                 WHERE e.kind = 'ORDERED' AND oi.state NOT IN ('REJECTED', 'CANCELLED', 'VOIDED')
+               ), 0) AS revenue
+        FROM recommendation_events e
+        LEFT JOIN order_items oi ON oi.id = e.order_item_id
+        WHERE e.restaurant_id = ${restaurantId}::uuid
+          AND e.business_date BETWEEN ${from}::date AND ${to}::date
+        GROUP BY 1`,
+      this.prisma.$queryRaw<(SuggestionRow & { item_id: string; name: string })[]>`
+        SELECT e.item_id, i.name,
+               count(*) FILTER (WHERE e.kind = 'IMPRESSION') AS impressions,
+               count(*) FILTER (WHERE e.kind = 'TAP') AS taps,
+               count(*) FILTER (WHERE e.kind = 'ADD_TO_CART') AS added,
+               count(*) FILTER (WHERE e.kind = 'ORDERED') AS ordered,
+               coalesce(sum(oi.line_total) FILTER (
+                 WHERE e.kind = 'ORDERED' AND oi.state NOT IN ('REJECTED', 'CANCELLED', 'VOIDED')
+               ), 0) AS revenue
+        FROM recommendation_events e
+        JOIN items i ON i.id = e.item_id
+        LEFT JOIN order_items oi ON oi.id = e.order_item_id
+        WHERE e.restaurant_id = ${restaurantId}::uuid
+          AND e.business_date BETWEEN ${from}::date AND ${to}::date
+        GROUP BY 1, 2
+        ORDER BY ordered DESC, revenue DESC, 2`,
+      this.prisma.$queryRaw<{ orders: bigint; with_suggestion: bigint }[]>`
+        SELECT (SELECT count(*) FROM orders
+                WHERE restaurant_id = ${restaurantId}::uuid
+                  AND business_date BETWEEN ${from}::date AND ${to}::date) AS orders,
+               (SELECT count(DISTINCT oi.order_id)
+                FROM recommendation_events e JOIN order_items oi ON oi.id = e.order_item_id
+                WHERE e.restaurant_id = ${restaurantId}::uuid AND e.kind = 'ORDERED'
+                  AND oi.state NOT IN ('REJECTED', 'CANCELLED', 'VOIDED')
+                  AND e.business_date BETWEEN ${from}::date AND ${to}::date) AS with_suggestion`,
+    ]);
+    const layers = (['RULE', 'LEARNED', 'BEST_SELLER'] as const satisfies readonly Layer[]).map(
+      (layer) => ({ layer, ...suggestionFigures(layerRows.find((row) => row.layer === layer)) }),
+    );
+    const all = layerRows.reduce<SuggestionRow>(
+      (sum, row) => ({
+        impressions: sum.impressions + row.impressions,
+        taps: sum.taps + row.taps,
+        added: sum.added + row.added,
+        ordered: sum.ordered + row.ordered,
+        revenue: sum.revenue + row.revenue,
+      }),
+      { impressions: 0n, taps: 0n, added: 0n, ordered: 0n, revenue: 0n },
+    );
+    return {
+      ...range,
+      layers,
+      items: itemRows.map((row) => ({
+        itemId: row.item_id,
+        name: row.name,
+        ...suggestionFigures(row),
+      })),
+      totals: {
+        ...suggestionFigures(all),
+        orders: num(orderRow[0]?.orders),
+        ordersWithSuggestion: num(orderRow[0]?.with_suggestion),
       },
     };
   }

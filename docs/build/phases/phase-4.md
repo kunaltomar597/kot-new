@@ -241,16 +241,18 @@ design capacity (indexes, pre-aggregated daily tables if needed).
 Acceptance: fixture data with known answers for every report; performance test on a generated
 12-month dataset at §7.2 capacity.
 
-Built in three parts, each its own pull request:
+Built in four parts, each its own pull request:
 
 - P4-05a Report data I (done): sources and order types (RPT-004), each person's work (RPT-003),
   discounts and complimentary items (RPT-007), cancellations and voids with their stage and
   wastage (RPT-008), reprints and bill edits (RPT-009), aggregated in PostgreSQL; who, approver
   and reason come from the audit trail, money from live invoices at their current version.
-- P4-05b Report data II: kitchen performance (RPT-010), table metrics (RPT-011), recommendation
-  performance (RPT-012), the P1-13 reports moved to SQL aggregation, and the 12-month performance
-  test at §7.2 capacity (RPT-018).
-- P4-05c The Reports area in the console: a range picker, every report as charts (Recharts) and
+- P4-05b Report data II (done): kitchen performance by station and dish with "Notify manager"
+  presses (RPT-010), table metrics with turnover in basis points (RPT-011), recommendation
+  performance per layer and dish (RPT-012).
+- P4-05c Twelve months at design capacity (RPT-018): a generated year at §7.2 capacity, every
+  report timed against it, and the P1-13 reports moved to SQL aggregation where they are slow.
+- P4-05d The Reports area in the console: a range picker, every report as charts (Recharts) and
   tables, and drill-down to an order (RPT-015, RPT-016). Feedback (RPT-013, S) waits for the QR
   feedback data (P5).
 
