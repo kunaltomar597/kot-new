@@ -1,0 +1,20 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "channel": { "default": "STABLE", "type": "string", "enum": ["STABLE", "PILOT"] }
+    },
+    "required": ["name"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "channel": { "default": "STABLE", "type": "string", "enum": ["STABLE", "PILOT"] }
+    },
+    "required": ["name", "channel"],
+    "additionalProperties": false
+  }
+}
