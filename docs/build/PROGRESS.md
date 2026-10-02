@@ -348,6 +348,10 @@ Recommended next WPs (dependencies met):
 ### Phase 7: Commercial readiness
 
 - [ ] P7-01 Licensing module
+  - [x] P7-01a `@rp/licensing`: files, fingerprint, state, reactivation codes, clock guard
+  - [ ] P7-01b Control Plane: issuing and renewing licences
+  - [ ] P7-01c Local server: the licence agent and enforcement
+  - [ ] P7-01d Screens: reminders, banners, the Owner's licence page
 - [ ] P7-02 Control Plane: tenants, subscriptions, licences
 - [ ] P7-03 Fleet monitoring
 - [ ] P7-04 Release management and remote updates
@@ -608,6 +612,28 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-01a):
+
+434. P7-01 is split into four (phase-7.md). Security-sensitive: two human reviewers before
+     release, with the KMS signing key (manual task 23).
+435. A licence file is the payload's exact JSON text, the vendor's Ed25519 signature of it and the
+     key id (first 16 hex digits of the SHA-256 of the key), so nothing depends on how JSON is
+     re-serialised. Installations accept only keys in `VENDOR_LICENCE_KEYS` (several, to rotate).
+436. The fingerprint is five identifiers in a fixed order (machine id, board serial, BIOS UUID,
+     disk serial, CPU id), each kept only as SHA-256 of installation id, kind and value, so the
+     vendor never holds serial numbers; board placeholders ("To be filled by O.E.M.") count as
+     unread; unread never matches; three of five must match.
+437. Anything wrong (missing, unknown key, tampered, another installation or PC, run out, grace
+     over, vendor restriction) records RESTRICTED (or TERMINATED); it applies from the start of
+     the next business day after it was first decided, and until then the restaurant works as in
+     grace, with the banner and the days left.
+438. Offline reactivation codes are 16 Crockford base-32 characters (day of the new end, a
+     counter, 56 bits of HMAC-SHA256 with the installation's secret, which the Control Plane
+     derives from a master key). They lift EXPIRED, GRACE_ENDED and a vendor restriction until
+     their day, never a termination or a file not trusted. The server limits attempts.
+439. The clock guard judges by the later of the clock and the last time seen; a clock set back by
+     more than 5 minutes, or 10 minutes from the Control Plane's, is a tamper event.
 
 Decided 2026-10-03 (P6-05g):
 
@@ -2283,6 +2309,17 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-01a `@rp/licensing`
+
+Built: contracts `LicencePayload`, `SignedLicence`, `DeviceLimits`, `LicenceModule`,
+`LicenceState`, `ReactivationCode` (`@rp/contracts/control-plane`); the `@rp/licensing` package
+(signing and verification, fingerprint, `evaluateLicence`, reactivation codes, clock guard, the
+built-in vendor keys, empty until manual task 23); manual task 23 (KMS key, master secret, two
+reviewers).
+
+Tests: licensing 13 (files, fingerprint, every state and capability, next-business-day
+restriction, reactivation, clock guard); coverage 97 % lines.
 
 ### 2026-10-03: P6-05g Printer auto-discovery (P6-05 done)
 

@@ -319,6 +319,17 @@
         "required": ["name", "version"],
         "additionalProperties": false
       },
+      "DeviceLimits": {
+        "type": "object",
+        "properties": {
+          "TABLE_TABLET": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "PAGER": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "WAITER_PHONE": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "KDS": { "type": "integer", "minimum": 0, "maximum": 100 }
+        },
+        "required": ["TABLE_TABLET", "PAGER", "WAITER_PHONE", "KDS"],
+        "additionalProperties": false
+      },
       "EnrolRequest": {
         "type": "object",
         "properties": {
@@ -467,6 +478,97 @@
         },
         "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"],
         "additionalProperties": false
+      },
+      "LicenceModule": {
+        "type": "string",
+        "enum": [
+          "POS",
+          "KDS",
+          "WAITER_APP",
+          "TABLE_TABLET",
+          "QR_MENU",
+          "PAGERS",
+          "RECOMMENDATIONS",
+          "REPORTS"
+        ]
+      },
+      "LicencePayload": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "number", "const": 1 },
+          "licenceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "fingerprint": {
+            "minItems": 5,
+            "maxItems": 5,
+            "type": "array",
+            "items": { "anyOf": [{ "$ref": "#/components/schemas/Sha256Hex" }, { "type": "null" }] }
+          },
+          "plan": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "modules": {
+            "maxItems": 8,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LicenceModule" }
+          },
+          "deviceLimits": { "$ref": "#/components/schemas/DeviceLimits" },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "graceDays": { "type": "integer", "minimum": 0, "maximum": 90 },
+          "state": { "$ref": "#/components/schemas/LicenceState" },
+          "graceStartedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "reason": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] }
+        },
+        "required": [
+          "format",
+          "licenceId",
+          "tenantId",
+          "installationId",
+          "fingerprint",
+          "plan",
+          "modules",
+          "deviceLimits",
+          "issuedAt",
+          "validUntil",
+          "graceDays",
+          "state",
+          "graceStartedAt",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "LicenceState": {
+        "type": "string",
+        "enum": ["ACTIVE", "PAYMENT_DUE", "GRACE", "RESTRICTED", "TERMINATED"]
       },
       "MenuDraft": {
         "type": "object",
@@ -656,6 +758,10 @@
         "required": ["id", "status", "createdAt", "finishedAt", "error", "draft"],
         "additionalProperties": false
       },
+      "ReactivationCode": {
+        "type": "string",
+        "pattern": "^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$"
+      },
       "ReleaseChannel": { "type": "string", "enum": ["STABLE", "PILOT"] },
       "ReleaseComponent": { "type": "string", "enum": ["RESTAURANT_PC"] },
       "ReleaseInfo": {
@@ -692,6 +798,16 @@
         "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
       },
       "Sha256Hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+      "SignedLicence": {
+        "type": "object",
+        "properties": {
+          "payload": { "type": "string", "minLength": 2, "maxLength": 8000 },
+          "signature": { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+          "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+        },
+        "required": ["payload", "signature", "keyId"],
+        "additionalProperties": false
+      },
       "UpdatesQuery": {
         "type": "object",
         "properties": {

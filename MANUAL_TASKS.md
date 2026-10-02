@@ -36,6 +36,9 @@ code from going live:
 - [ ] AI provider account and its key in the Control Plane's secret manager (AI menu import):
       [`manual-tasks/22-ai-menu-import.md`](manual-tasks/22-ai-menu-import.md).
 - [ ] WhatsApp/SMS provider with DLT registration (digital bills).
+- [ ] Licensing: create the vendor licence-signing key in the cloud KMS, put its public key into
+      the software, and have two people review the licensing code (NFR-M05):
+      [`manual-tasks/23-licensing.md`](manual-tasks/23-licensing.md).
 
 ## 3. Hardware and on-site tests
 

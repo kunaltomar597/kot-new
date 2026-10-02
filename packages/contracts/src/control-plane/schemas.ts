@@ -1,3 +1,4 @@
+import { LICENSE_STATES } from '@rp/domain';
 import { z } from 'zod';
 import { Id, Paise, Timestamp } from '../common.js';
 
@@ -110,6 +111,87 @@ export const HeartbeatResponse = z.object({
   update: ReleaseInfo.nullable(),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
+
+// ---------------------------------------------------------------- licences (P7-01)
+
+/** The licence states of LIC-005 (`@rp/domain` `licenseMachine`). */
+export const LicenceState = z.enum(LICENSE_STATES);
+export type LicenceState = z.infer<typeof LicenceState>;
+
+/** Modules a licence entitles (LIC-001; every module in v1, LIC-010 sells them apart later). */
+export const LICENCE_MODULES = [
+  'POS',
+  'KDS',
+  'WAITER_APP',
+  'TABLE_TABLET',
+  'QR_MENU',
+  'PAGERS',
+  'RECOMMENDATIONS',
+  'REPORTS',
+] as const;
+export const LicenceModule = z.enum(LICENCE_MODULES);
+export type LicenceModule = z.infer<typeof LicenceModule>;
+
+/** How many of each device the restaurant may pair (LIC-001). */
+export const DeviceLimits = z.strictObject({
+  TABLE_TABLET: z.int().min(0).max(500),
+  PAGER: z.int().min(0).max(500),
+  WAITER_PHONE: z.int().min(0).max(500),
+  KDS: z.int().min(0).max(100),
+});
+export type DeviceLimits = z.infer<typeof DeviceLimits>;
+
+/** How many identifiers make a PC fingerprint, and how many must match (LIC-004). */
+export const FINGERPRINT_SIZE = 5;
+export const FINGERPRINT_MATCHES_NEEDED = 3;
+
+/**
+ * What a licence file says (LIC-001): whose it is and for which PC, what it entitles, until when,
+ * and the state the vendor set. Each fingerprint entry is the SHA-256 of one hardware identifier
+ * (never the identifier itself), in a fixed order; null when the PC could not read it.
+ */
+export const LicencePayload = z.strictObject({
+  format: z.literal(1),
+  licenceId: Id,
+  tenantId: Id,
+  installationId: Id,
+  fingerprint: z.array(Sha256Hex.nullable()).length(FINGERPRINT_SIZE),
+  plan: z.string().min(1).max(40),
+  modules: z.array(LicenceModule).max(LICENCE_MODULES.length),
+  deviceLimits: DeviceLimits,
+  issuedAt: Timestamp,
+  /** Rolling validity: 30 days from issue by default, renewed while online (LIC-002). */
+  validUntil: Timestamp,
+  graceDays: z.int().min(0).max(90),
+  state: LicenceState,
+  /** When the vendor moved the licence into grace; its days count from here. */
+  graceStartedAt: Timestamp.nullable(),
+  /** Why the vendor set this state, for the Owner (LIC-008). */
+  reason: z.string().max(200).nullable(),
+});
+export type LicencePayload = z.infer<typeof LicencePayload>;
+
+/**
+ * A licence file (LIC-001): the payload as the exact JSON text signed, the vendor's Ed25519
+ * signature of that text, and which vendor key signed it.
+ */
+export const SignedLicence = z.strictObject({
+  payload: z.string().min(2).max(8_000),
+  signature: Base64.max(100),
+  /** The first 16 hex digits of the SHA-256 of the signing key (SPKI DER). */
+  keyId: z.string().regex(/^[0-9a-f]{16}$/),
+});
+export type SignedLicence = z.infer<typeof SignedLicence>;
+
+/**
+ * An offline reactivation code (LIC-006), read out over the phone: 16 characters without
+ * look-alikes, XXXX-XXXX-XXXX-XXXX.
+ */
+export const ReactivationCode = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$/);
 
 /** `GET /v1/updates`: what the installation should move to from `version`. */
 export const UpdatesQuery = z.strictObject({

@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$" },
+  "output": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$" }
+}
