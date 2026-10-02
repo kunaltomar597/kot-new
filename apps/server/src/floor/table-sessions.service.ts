@@ -18,6 +18,7 @@ import {
   transition,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
+import { mayPrintBill } from '../billing/who-prints-bills.js';
 import type { Principal } from '../auth/principal.js';
 import { authErrors } from '../auth/auth-errors.js';
 import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
@@ -377,6 +378,11 @@ export class TableSessionsService {
       );
       return { tableId, state: to };
     });
+  }
+
+  /** Whether the person may print a table's bill, from the waiter app too (WTR-008). */
+  async mayPrintBill(principal: Principal): Promise<boolean> {
+    return mayPrintBill(principal, await this.settings.snapshot(principal.restaurantId));
   }
 
   /** The state of a table its guests have just left: free, or "Needs cleaning" (TBL-004). */

@@ -189,6 +189,9 @@ export const en = {
       all: 'All tables',
       noneMine: 'No tables are assigned to you today. Show all tables, or ask a manager.',
       requestBill: 'Request bill',
+      printBill: 'Print bill',
+      billPrinted: 'Bill {number} printed: {total}',
+      billNotPrinted: 'Bill {number} issued but not printed: {error}',
       billRequested: 'The cashier has been asked for the bill for {table}.',
       moveTo: 'Move {table} to',
       noFreeTables: 'There is no free table to move to.',
@@ -2545,6 +2548,8 @@ export const en = {
     bills: {
       headerLines: 'Bill header lines',
       footerLines: 'Bill footer lines',
+      amountInWords: 'Total in words',
+      waiterMayPrint: 'Waiters may print bills from the app',
       printerId: 'Bill printer',
       cashDrawerKick: 'Open the cash drawer for cash payments',
       hostedCopyDays: 'Digital bill link lasts',
@@ -2694,6 +2699,10 @@ export const en = {
       headerLines:
         'Lines printed on every bill under the restaurant particulars (48 characters each).',
       footerLines: 'Lines printed at the foot of every bill, e.g. a thank-you note.',
+      amountInWords:
+        'Bills also write the total in words, like “Rupees Six Hundred Seventy-Two Only”.',
+      waiterMayPrint:
+        'Waiters may print the bill of their own tables at the bill printer from the app. Off: they ask for the bill and the cashier prints it.',
       printerId:
         'The printer bills print on, usually the one at the cash counter (none: choose each time).',
       cashDrawerKick:

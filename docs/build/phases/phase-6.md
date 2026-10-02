@@ -90,4 +90,5 @@ Split (2026-10-02), after a survey of what P1 to P5 already built (KDS-010 was d
   Done: merge closes the joining table's session; dishes move as whole lines; cleaning is a
   setting, off by default.
 - **P6-05e Billing.** Amount in words (BILL-001), print the bill from the waiter app (WTR-008).
+  Done: printing from the app is a setting, off by default (the §4.2 matrix does not allow it).
 - **P6-05f Setup.** Drag-and-drop floor layout (ONB-004 step 5), printer auto-discovery (step 6).

@@ -75,6 +75,7 @@ describe('[BILL-001] [BILL-005] [AUTH-011] the bill', () => {
     expect(screen.getByText('Paneer Tikka (Full)')).toBeInTheDocument();
     expect(screen.getByText('CGST 2.5%')).toBeInTheDocument();
     expect(screen.getByText('₹704.00')).toBeInTheDocument();
+    expect(screen.getByText('Rupees Seven Hundred Four Only')).toBeInTheDocument();
     await expectNoAxeViolations(container);
 
     await user.click(screen.getByRole('button', { name: t('billing.addDiscount') }));

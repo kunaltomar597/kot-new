@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-05e and P6-05f, then Phase 7.
+- P6-05f, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -341,7 +341,7 @@ Recommended next WPs (dependencies met):
   - [x] P6-05b Hold and fire (ORD-016)
   - [x] P6-05c Ordering (WTR-013, MENU-007)
   - [x] P6-05d Tables (TBL-006, TBL-004)
-  - [ ] P6-05e Billing (BILL-001, WTR-008)
+  - [x] P6-05e Billing (BILL-001, WTR-008)
   - [ ] P6-05f Setup (ONB-004 steps 5 and 6)
 
 ### Phase 7: Commercial readiness
@@ -607,6 +607,25 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P6-05e):
+
+427. The amount in words (BILL-001, S) is `@rp/domain` `amountInWords`, Indian grouping (thousand,
+     lakh, crore; crores beyond 99 group again), English, "Rupees … and … Paise Only". Setting
+     `bills.amountInWords` (default on). Each invoice keeps whether it had words when issued
+     (`particulars.amountInWords`), so a reprint matches the original; invoices from before have
+     none. Shown under the total on the printed bill and on the POS bill preview.
+428. Printing the bill from the waiter app (WTR-008, S) contradicts the BRD §4.2 matrix (waiters:
+     "- (can request bill)"), so it is the setting `bills.waiterMayPrint`, off by default, changed
+     by those who manage staff. On, a waiter may print their own tables' bills: the server issues
+     the invoice as the POS would and prints it on the bill printer (audited as theirs); when it
+     cannot print, the bill stays issued and the app says why. Never a reprint (a printed bill is
+     refused: copies are the cashier's). The table overview says whether the person may print
+     (`mayPrintBill`), so the app shows Print bill only then.
+
+Question for the Business Owner (P6-05e): may waiters print bills from the app (WTR-008 S), which
+the §4.2 matrix does not allow? Built off by default (`bills.waiterMayPrint`); turning it on is
+one switch in Settings → Billing.
 
 Decided 2026-10-03 (P6-05d):
 
@@ -2236,6 +2255,17 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P6-05e Amount in words, print the bill from the waiter app
+
+Built: `@rp/domain` `amountInWords`; settings `bills.amountInWords`, `bills.waiterMayPrint`;
+contracts `BillView.amountInWords`, `InvoiceParticulars.amountInWords`,
+`TableOverviewResponse.mayPrintBill`, `PrintTableBillResponse`, route `printTableBill`; server
+words kept on each invoice and printed under the total, `InvoiceActionsService.printTableBill`,
+`who-prints-bills.ts`; the console bill preview shows the words; the waiter app's Print bill.
+
+Tests: domain +2, server +2 (printed words; a waiter prints their own table's bill only when
+allowed, never twice), console +1, waiter app +1.
 
 ### 2026-10-03: P6-05d Merge tables, move dishes, "Needs cleaning"
 

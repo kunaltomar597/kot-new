@@ -1,5 +1,5 @@
 import type { InvoiceView } from '@rp/contracts';
-import { formatRupees, toLocalDateTime } from '@rp/domain';
+import { amountInWords, formatRupees, toLocalDateTime } from '@rp/domain';
 
 /**
  * ESC/POS rendering for kitchen tickets and test pages (P1-07a, KDS-008). Pure: it turns a ticket
@@ -318,8 +318,8 @@ const money = (paise: number): string => formatRupees(paise, { symbol: false });
 /**
  * The printed bill: a GST tax invoice (BILL-002, BILL-014). The seller's particulars and header,
  * the invoice number, date and place of supply, the customer's GSTIN for B2B, the lines with any
- * discount, the tax per component and rate, the round-off and the total, the SAC codes and the
- * footer. A reprint says DUPLICATE in large letters (BILL-009). The logo is added when menu photos
+ * discount, the tax per component and rate, the round-off and the total (in words too, BILL-001),
+ * the SAC codes and the footer. A reprint says DUPLICATE in large letters (BILL-009). The logo is added when menu photos
  * exist (P1-04).
  */
 export function renderBill(
@@ -416,6 +416,7 @@ export function renderBill(
   receipt.command(SIZE_TALL).command(BOLD_ON);
   receipt.line(spread('TOTAL Rs', money(invoice.grandTotal), width));
   receipt.command(SIZE_NORMAL).command(BOLD_OFF);
+  if (particulars.amountInWords) receipt.lines(wrap(amountInWords(invoice.grandTotal), width));
   receipt.line('-'.repeat(width));
   const sacCodes = [
     ...new Set(invoice.lines.flatMap((line) => (line.sacCode === null ? [] : [line.sacCode]))),

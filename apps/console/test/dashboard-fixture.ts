@@ -95,6 +95,7 @@ function tableEntry(
 
 /** T1 and T3 seated (5 guests), T2 free; the tablet order at T3 waits for approval. */
 export const OVERVIEW: TableOverviewResponse = {
+  mayPrintBill: true,
   tables: [
     tableEntry(T1, 'T1', HALL, { covers: 3 }),
     tableEntry(T2, 'T2', HALL),

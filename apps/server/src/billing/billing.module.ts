@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { PrintingModule } from '../printing/printing.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
-import { BillsController, InvoicesController } from './billing.controller.js';
+import { BillsController, InvoicesController, TableBillsController } from './billing.controller.js';
 import { BillSplitService } from './bill-split.service.js';
 import { BillsService } from './bills.service.js';
 import { InvoiceActionsService } from './invoice-actions.service.js';
@@ -11,7 +11,7 @@ import { InvoicesService } from './invoices.service.js';
 /** Bills and GST invoices (P1-10). */
 @Module({
   imports: [AuthModule, SettingsModule, PrintingModule],
-  controllers: [BillsController, InvoicesController],
+  controllers: [BillsController, InvoicesController, TableBillsController],
   providers: [BillsService, InvoicesService, InvoiceActionsService, BillSplitService],
   exports: [BillsService, InvoicesService],
 })
