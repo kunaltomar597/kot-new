@@ -59,6 +59,42 @@ Run this once per environment, from a machine with the environment's `DATABASE_U
 After that, the Super Admin adds everyone else from the Staff page, which shows each new account's
 setup link once. The access policy (`vendor-access-policy.md`) says who gets which role.
 
+## Fleet monitoring and alerts (VCP-005)
+
+Every PC reports every 5 minutes: versions, disk, devices and how many are connected, server
+errors since the last report, backups (from P7-05), its opening hours and its audit chain head.
+The Control Plane opens one alert per PC and kind:
+
+| Alert                | When                                                                                                                                  | Closes                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Offline              | Silent for more than `CP_OFFLINE_ALERT_MINUTES` (30) of the restaurant's opening hours. A PC without opening hours counts every hour. | By itself, at the next heartbeat     |
+| Disk full            | Data drive more than `CP_DISK_ALERT_PERCENT` (90 %) full                                                                              | By itself, when space is freed       |
+| Backup failed        | The latest backup failed                                                                                                              | By itself, after a successful backup |
+| Audit chain mismatch | The PC's local audit log changed after it was reported (AUD-003)                                                                      | Only by a person, with a reason      |
+
+- **Webhook:** set `CP_ALERT_WEBHOOK_URL` (a Slack or Microsoft Teams incoming webhook, from the
+  secret manager). Each alert is then posted as it opens and as it closes. Posts that fail are
+  retried every minute.
+- **Where alerts show:** the web app's Fleet page lists open alerts whether or not a webhook is
+  set.
+
+### An audit chain mismatch
+
+The local audit log only grows. The Control Plane keeps every head a PC reported. It also asks
+the PC, at random, for the hash it holds for an earlier head, so a rewritten old entry is caught
+even when the newest one looks right. A mismatch means the restaurant's database changed outside
+the application, or was restored from a backup.
+
+1. Do not close the alert straight away. Call the Owner.
+2. Ask whether the PC was restored from a backup or replaced, and when.
+3. Ask the Owner to open "Check the trail" on the console's audit page, press "Check now" and read
+   out the result.
+4. Note what you found as a support note on the restaurant.
+5. A legitimate restore: close the alert with the reason, for example "Restored from the 1 Oct
+   backup after a disk failure". The chain then counts from the PC's current head.
+6. No explanation: escalate to the Super Admin and leave the alert open. The audit log may have
+   been tampered with (SEC-018).
+
 ## Connecting a restaurant PC
 
 1. `cli tenant:create --name "<restaurant>"` (once per restaurant business).

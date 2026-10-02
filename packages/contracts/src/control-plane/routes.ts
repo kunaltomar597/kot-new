@@ -53,6 +53,14 @@ import {
   VendorTenantView,
 } from './fleet-admin.js';
 import {
+  AuditHeadListResponse,
+  FleetAlertListResponse,
+  FleetAlertParams,
+  FleetAlertQuery,
+  FleetAlertView,
+  FleetResponse,
+} from './fleet.js';
+import {
   CreateVendorUserRequest,
   UpdateVendorUserRequest,
   VendorAccessReviewRequest,
@@ -806,6 +814,67 @@ export const CONTROL_PLANE_ROUTES = [
       ...vendorErrors,
       404: { description: 'No such tenant.', schema: ApiError },
       409: { description: 'The relay is not configured here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getFleet',
+    method: 'GET',
+    path: '/v1/vendor/fleet',
+    summary: 'Every PC’s health from its latest heartbeat, with its open alerts',
+    description:
+      'Online state and last seen, component versions, disk use, backups, devices, errors, the ' +
+      'licence state and the audit chain head (VCP-005, NFR-O03).',
+    tags: ['vendor'],
+    requirements: ['VCP-005', 'NFR-O03', 'AUD-003'],
+    capability: 'FLEET_VIEW',
+    responses: { 200: { description: 'The fleet.', schema: FleetResponse }, ...vendorErrors },
+  },
+  {
+    operationId: 'listFleetAlerts',
+    method: 'GET',
+    path: '/v1/vendor/fleet/alerts',
+    summary: 'Fleet alerts: offline in business hours, disk full, backup failed, chain mismatch',
+    tags: ['vendor'],
+    requirements: ['VCP-005', 'DATA-005', 'AUD-003'],
+    capability: 'FLEET_VIEW',
+    request: { query: FleetAlertQuery },
+    responses: {
+      200: { description: 'The alerts, newest first.', schema: FleetAlertListResponse },
+      ...vendorErrors,
+    },
+  },
+  {
+    operationId: 'resolveFleetAlert',
+    method: 'POST',
+    path: '/v1/vendor/fleet/alerts/:id/resolve',
+    summary: 'Close an audit chain alert after looking into it, with what was found',
+    description:
+      'Only chain alerts: the others close by themselves when the PC reports it is fixed. The ' +
+      'PC’s chain then counts from its current head (a restore from backup, say). Audited.',
+    tags: ['vendor'],
+    requirements: ['AUD-003', 'SEC-018'],
+    capability: 'SUPPORT_NOTES',
+    request: { params: FleetAlertParams, body: ReasonRequest },
+    responses: {
+      200: { description: 'The alert, closed.', schema: FleetAlertView },
+      ...vendorErrors,
+      404: { description: 'No such alert.', schema: ApiError },
+      409: { description: 'Already closed, or it closes by itself.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listAuditHeads',
+    method: 'GET',
+    path: '/v1/vendor/installations/:id/audit-heads',
+    summary: 'The audit chain heads a PC reported, newest first (the latest 100)',
+    tags: ['vendor'],
+    requirements: ['AUD-003'],
+    capability: 'FLEET_VIEW',
+    request: { params: VendorInstallationParams },
+    responses: {
+      200: { description: 'The heads.', schema: AuditHeadListResponse },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition<ControlPlaneAccess>[];

@@ -7,7 +7,8 @@ production (VCP-009).
 
 Built so far: P0-17a (ADR-0012) and P6-04a (AI menu import). Later: P7-01 to P7-04 and P7-08;
 the web app for vendor staff is `apps/control-plane-web` (P7-02e), served at `/` when
-`CP_WEB_DIR` is set.
+`CP_WEB_DIR` is set. Fleet monitoring (P7-03) is in `src/fleet/`: health and alerts from
+heartbeats, the audit chain checks, and the alert webhook.
 
 ## What exists (P0-17a)
 

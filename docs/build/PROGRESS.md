@@ -360,6 +360,8 @@ Recommended next WPs (dependencies met):
   - [x] P7-02e The web app: sign-in and restaurants
   - [x] P7-02f The web app: billing, releases, audit and staff
 - [ ] P7-03 Fleet monitoring
+  - [x] P7-03a Heartbeat health and alerts
+  - [ ] P7-03b Fleet dashboard
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
 - [ ] P7-06 Data lifecycle
@@ -618,6 +620,37 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-03a):
+
+484. P7-03 is split into two (phase-7.md): health and alerts (P7-03a), and the dashboard
+     (P7-03b).
+485. Offline means silent for more than 30 minutes (`CP_OFFLINE_ALERT_MINUTES`) of the
+     restaurant's opening hours. The opening hours come from the PC's own profile, sent in each
+     heartbeat. Silence before opening does not count: the minutes run from whichever is later,
+     the last heartbeat or the start of the current opening. A PC without opening hours (not set
+     up, or older than P7-03) counts every hour, so a silent PC is never missed.
+486. Disk full means more than 90 % used (`CP_DISK_ALERT_PERCENT`). Backup failed means the
+     latest backup failed; PCs send `backup: null` until P7-05.
+487. One open alert per PC and kind (a partial unique index). Offline, disk and backup alerts
+     close by themselves. An audit chain alert only closes by a person with SUPPORT_NOTES, with a
+     reason; the heads seen so far are then set aside, so the chain counts from the PC's current
+     head (a restore from backup, say). Opening and closing are audited as `system:fleet`.
+488. Audit chain checks (AUD-003):
+     - A head may never go back, change its hash at a sequence already seen, or disappear.
+     - Each heartbeat's answer also asks for the hash of a random earlier head. The PC answers
+       with its next heartbeat, so an old entry rewritten (with every hash after it recomputed)
+       is caught even when the newest head looks right.
+     - An entry missing because it was archived and purged (P7-06) is accepted: the PC reports
+       its oldest entry.
+489. Alerts go to an optional webhook (`CP_ALERT_WEBHOOK_URL`, Slack/Teams `{ text }`, https
+     outside development), as they open and as they close. A post that fails is retried every
+     minute; deliveries run one at a time, so an instance never sends an alert twice. Without a
+     webhook, alerts only show in the app. Email or SMS paging is left for later (no provider
+     yet).
+490. The heartbeat's error count is the server errors reported (the 500s the exception filter
+     reports) since the last heartbeat that reached the Control Plane. "Online" in the fleet
+     view means heard from within two heartbeat intervals and a minute.
 
 Decided 2026-10-03 (P7-02f):
 
@@ -2491,6 +2524,35 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-03a Heartbeat health and alerts
+
+Built:
+
+- `@rp/domain` fleet-health: `openSince`, `fleetAlertsDue`, `offlineMinutesDuringHours`,
+  `checkChainHead`, `checkCheckpoint`.
+- Contracts:
+  - the heartbeat's `devicesConnected`, `errorCount`, `backup`, `businessHours` and
+    `auditCheckpoint`, and the answer's `auditCheck`;
+  - `fleet.ts` and four vendor routes.
+- CP:
+  - migration `20261003060000_fleet_monitoring` (`audit_chain_heads`, `fleet_alerts`);
+  - config `CP_OFFLINE_ALERT_MINUTES`, `CP_DISK_ALERT_PERCENT`, `CP_FLEET_SWEEP_SECONDS` and
+    `CP_ALERT_WEBHOOK_URL`;
+  - `FleetService` (on each heartbeat, the minute sweep, delivery, the views, resolving),
+    `FleetController` and `WebhookAlertNotifier`.
+- Server:
+  - the heartbeat reports device health, the error count (`ErrorCounter` behind
+    `ERROR_REPORTER`), opening hours and the answer to the audit check;
+  - `AuditService.checkpoint`.
+- Runbook "Fleet monitoring and alerts".
+
+Tests: domain +10; CP integration +10 (disk, backup, offline in and out of hours, chain rolled
+back and resolved, a checkpoint catching a rewrite, purged entries accepted, closing by hand,
+the fleet view, webhook retries); server +1 unit, +1 acceptance (the real PC answers checks, and
+a rewritten local log is caught).
+
+Gotcha: JSONB does not keep object key order, so the fleet view sorts devices by type.
 
 ### 2026-10-03: P7-02f The vendor web app: billing, releases, audit and staff (P7-02 done)
 

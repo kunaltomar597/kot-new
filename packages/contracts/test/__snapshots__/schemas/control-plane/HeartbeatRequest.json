@@ -114,6 +114,83 @@
           }
         },
         "required": ["credentialDigest"]
+      },
+      "devicesConnected": {
+        "type": "object",
+        "propertyNames": { "type": "string", "pattern": "^[A-Z_]{1,40}$" },
+        "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+      },
+      "errorCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "backup": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "lastSuccessAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "lastFailureAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "lastError": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+            },
+            "required": ["lastSuccessAt", "lastFailureAt", "lastError"]
+          },
+          { "type": "null" }
+        ]
+      },
+      "businessHours": {
+        "type": "object",
+        "properties": {
+          "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "hours": {
+            "maxItems": 28,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+                },
+                "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+                "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+              },
+              "required": ["day", "start", "end"]
+            }
+          }
+        },
+        "required": ["timeZone", "hours"]
+      },
+      "auditCheckpoint": {
+        "type": "object",
+        "properties": {
+          "sequence": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "hash": {
+            "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{64}$" }, { "type": "null" }]
+          },
+          "oldestSequence": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["sequence", "hash", "oldestSequence"]
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -239,6 +316,87 @@
           }
         },
         "required": ["credentialDigest"],
+        "additionalProperties": false
+      },
+      "devicesConnected": {
+        "type": "object",
+        "propertyNames": { "type": "string", "pattern": "^[A-Z_]{1,40}$" },
+        "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+      },
+      "errorCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "backup": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "lastSuccessAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "lastFailureAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "lastError": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+            },
+            "required": ["lastSuccessAt", "lastFailureAt", "lastError"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "businessHours": {
+        "type": "object",
+        "properties": {
+          "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "hours": {
+            "maxItems": 28,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+                },
+                "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+                "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+              },
+              "required": ["day", "start", "end"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["timeZone", "hours"],
+        "additionalProperties": false
+      },
+      "auditCheckpoint": {
+        "type": "object",
+        "properties": {
+          "sequence": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "hash": {
+            "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{64}$" }, { "type": "null" }]
+          },
+          "oldestSequence": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["sequence", "hash", "oldestSequence"],
         "additionalProperties": false
       }
     },

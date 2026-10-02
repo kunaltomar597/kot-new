@@ -74,6 +74,7 @@ function answer(overrides: Partial<HeartbeatResponse> = {}): HeartbeatResponse {
     licence: null,
     reactivationSecret: null,
     relayCredential: null,
+    auditCheck: null,
     ...overrides,
   };
 }

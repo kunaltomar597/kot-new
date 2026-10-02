@@ -70,6 +70,17 @@ export const CpConfigSchema = z
       .string()
       .regex(/^postgres(ql)?:\/\//)
       .optional(),
+    /** Minutes of silence during business hours before a PC is reported offline (VCP-005 ⚙). */
+    offlineAlertMinutes: z.coerce.number().int().min(5).max(1_440).default(30),
+    /** Disk use above which a PC's data drive is reported full (VCP-005 ⚙ 90 %). */
+    diskAlertPercent: z.coerce.number().int().min(50).max(99).default(90),
+    /** How often silent PCs are looked for and alerts sent; 0 is off (tests). */
+    fleetSweepSeconds: z.coerce.number().int().min(0).max(3_600).default(60),
+    /**
+     * Where fleet alerts are posted as they open and close (`{ text, alert }`, which Slack and
+     * Teams incoming webhooks take), from the secret manager. Unset: alerts only show in the app.
+     */
+    alertWebhookUrl: z.url({ protocol: /^https?$/ }).optional(),
     /** Folder of the built vendor web app (`apps/control-plane-web/dist`), served at `/` when set. */
     webDir: z.string().min(1).optional(),
     /** Days a restaurant has to pay an invoice (LIC-009: as the subscription agreement says). */
@@ -106,6 +117,17 @@ export const CpConfigSchema = z
         path: ['relayDatabaseUrl'],
         message:
           'staging and production need sslmode=require (or stricter) in CP_RELAY_DATABASE_URL',
+      });
+    }
+    if (
+      config.env !== 'development' &&
+      config.alertWebhookUrl !== undefined &&
+      !config.alertWebhookUrl.startsWith('https://')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['alertWebhookUrl'],
+        message: 'staging and production need an https:// CP_ALERT_WEBHOOK_URL',
       });
     }
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
@@ -154,6 +176,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     billingGraceAfterDays: env.CP_BILLING_GRACE_AFTER_DAYS,
     billingIntervalMinutes: env.CP_BILLING_INTERVAL_MINUTES,
     webDir: env.CP_WEB_DIR === '' ? undefined : env.CP_WEB_DIR,
+    offlineAlertMinutes: env.CP_OFFLINE_ALERT_MINUTES,
+    diskAlertPercent: env.CP_DISK_ALERT_PERCENT,
+    fleetSweepSeconds: env.CP_FLEET_SWEEP_SECONDS,
+    alertWebhookUrl: env.CP_ALERT_WEBHOOK_URL === '' ? undefined : env.CP_ALERT_WEBHOOK_URL,
   });
   if (!result.success) {
     const problems = result.error.issues

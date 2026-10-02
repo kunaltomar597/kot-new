@@ -165,6 +165,27 @@ export class AuditService {
   }
 
   /**
+   * The answer to the Control Plane's audit check (AUD-003, P7-03): the hash this log holds for
+   * entry `sequence` now, and its oldest entry (those before were archived and purged, P7-06).
+   */
+  async checkpoint(
+    sequence: number,
+  ): Promise<{ sequence: number; hash: string | null; oldestSequence: number | null }> {
+    const [entry, oldest] = await Promise.all([
+      this.prisma.auditLog.findUnique({
+        where: { chainSeq: BigInt(sequence) },
+        select: { hash: true },
+      }),
+      this.prisma.auditLog.findFirst({ orderBy: { chainSeq: 'asc' }, select: { chainSeq: true } }),
+    ]);
+    return {
+      sequence,
+      hash: entry?.hash ?? null,
+      oldestSequence: oldest === null ? null : Number(oldest.chainSeq),
+    };
+  }
+
+  /**
    * Recomputes the whole chain in order and reports the first broken link (AUD-003). Entries
    * removed from the start by archive-and-purge (P7-06) are expected: verification starts at the
    * oldest remaining entry.

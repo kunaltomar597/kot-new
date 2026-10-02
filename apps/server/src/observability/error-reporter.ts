@@ -18,9 +18,43 @@ export class NoopErrorReporter implements ErrorReporter {
   }
 }
 
+/**
+ * Server errors reported since the process started, for the heartbeat's error count (VCP-005,
+ * NFR-O03): the Control Plane learns how many happened between two heartbeats.
+ */
+@Injectable()
+export class ErrorCounter {
+  private reported = 0;
+
+  record(): void {
+    this.reported += 1;
+  }
+
+  get total(): number {
+    return this.reported;
+  }
+}
+
+/** Counts every report, then hands it to the reporting service. */
+export function countingReporter(counter: ErrorCounter, inner: ErrorReporter): ErrorReporter {
+  return {
+    report(error, context) {
+      counter.record();
+      inner.report(error, context);
+    },
+  };
+}
+
 @Global()
 @Module({
-  providers: [{ provide: ERROR_REPORTER, useClass: NoopErrorReporter }],
-  exports: [ERROR_REPORTER],
+  providers: [
+    ErrorCounter,
+    {
+      provide: ERROR_REPORTER,
+      useFactory: (counter: ErrorCounter) => countingReporter(counter, new NoopErrorReporter()),
+      inject: [ErrorCounter],
+    },
+  ],
+  exports: [ERROR_REPORTER, ErrorCounter],
 })
 export class ObservabilityModule {}

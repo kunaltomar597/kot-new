@@ -6,12 +6,15 @@ import {
   CONTROL_PLANE_MIGRATIONS_DIR,
   CpConfigSchema,
   createControlPlaneApp,
+  FleetService,
   SupportService,
 } from '@rp/control-plane/testing';
 import { startRelay, type TestRelay } from '@rp/relay/testing';
 import { createMigratedDatabase, type TestDatabase } from '@rp/test-postgres';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import pg from 'pg';
+import { AuditService } from '../../src/audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../../src/auth/secret-store.js';
 import { readOfferedUpdate } from '../../src/cloud/control-plane-state.js';
 import { enrolInstallation } from '../../src/cloud/enrolment.js';
@@ -68,6 +71,7 @@ async function startControlPlane(port = 0): Promise<INestApplication> {
         .export({ format: 'der', type: 'pkcs8' })
         .toString('base64'),
       relayDatabaseUrl: relay.databaseUrl,
+      fleetSweepSeconds: 0,
     }),
   );
   await app.listen(port, '127.0.0.1');
@@ -202,6 +206,47 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     expect((await controlPlane.get(SupportService).relayProvisioning(tenantId)).delivered).toBe(
       true,
     );
+  });
+
+  it('[AUD-003] [VCP-005] answers audit checks with the hashes it holds; a rewritten log is caught', async () => {
+    const audit = server.get(AuditService);
+    const fleet = controlPlane.get(FleetService);
+    const record = (action: string) =>
+      prisma.transaction((tx) => audit.record(tx, { action, entityType: 'test', reason: 'P7-03' }));
+    await record('ACCEPTANCE_ONE');
+    await heartbeats.beat();
+    await record('ACCEPTANCE_TWO');
+    // The answer asks about an earlier head; the next heartbeat answers with the hash it holds.
+    await heartbeats.beat();
+    await heartbeats.beat();
+    const heads = await fleet.auditHeads(installationId);
+    expect(heads.some((head) => head.verifiedAt !== null)).toBe(true);
+    const view = (await fleet.fleet()).installations.find(
+      (entry) => entry.installationId === installationId,
+    );
+    expect(view).toMatchObject({ online: true, errorCount: 0, openAlerts: [], backup: null });
+    expect(view?.auditHead?.verifiedAt).not.toBeNull();
+
+    // Someone with access to the database rewrites every entry but the newest (and so every hash
+    // after the first change): the head still looks right, the answer to the check does not.
+    await record('ACCEPTANCE_THREE');
+    await heartbeats.beat();
+    const client = new pg.Client({ connectionString: serverDatabase.url });
+    await client.connect();
+    try {
+      await client.query('ALTER TABLE audit_log DISABLE TRIGGER audit_log_guard');
+      await client.query(
+        `UPDATE audit_log SET hash = encode(sha256(convert_to(hash, 'UTF8')), 'hex')
+         WHERE chain_seq < (SELECT max(chain_seq) FROM audit_log)`,
+      );
+      await client.query('ALTER TABLE audit_log ENABLE TRIGGER audit_log_guard');
+    } finally {
+      await client.end();
+    }
+    await heartbeats.beat();
+    const alerts = await fleet.alerts({ state: 'OPEN', installationId });
+    expect(alerts.map((alert) => alert.kind)).toEqual(['AUDIT_CHAIN_MISMATCH']);
+    expect(alerts[0]?.details).toMatchObject({ reason: 'REWRITTEN', byAuditCheck: true });
   });
 
   it('[NFR-A01] keeps working while the Control Plane is down and reports again when it is back', async () => {

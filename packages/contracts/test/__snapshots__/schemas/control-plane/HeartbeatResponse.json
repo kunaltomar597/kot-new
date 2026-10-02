@@ -83,6 +83,19 @@
       "relayCredential": {
         "default": null,
         "anyOf": [{ "type": "string", "pattern": "^[A-Za-z0-9_-]{43,200}$" }, { "type": "null" }]
+      },
+      "auditCheck": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "sequence": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["sequence"]
+          },
+          { "type": "null" }
+        ]
       }
     },
     "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
@@ -172,6 +185,20 @@
       "relayCredential": {
         "default": null,
         "anyOf": [{ "type": "string", "pattern": "^[A-Za-z0-9_-]{43,200}$" }, { "type": "null" }]
+      },
+      "auditCheck": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "sequence": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["sequence"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
       }
     },
     "required": [
@@ -181,7 +208,8 @@
       "update",
       "licence",
       "reactivationSecret",
-      "relayCredential"
+      "relayCredential",
+      "auditCheck"
     ],
     "additionalProperties": false
   }
