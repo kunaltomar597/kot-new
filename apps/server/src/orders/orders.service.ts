@@ -159,6 +159,15 @@ export class OrdersService {
       }),
     ]);
     const maxLength = settings.get('orders.specialInstructionsMaxLength');
+    // ORD-016: staff may hold lines for later, where the restaurant allows it.
+    if (request.lines.some((line) => line.hold === true)) {
+      if (initialOrderItemState(request.source) !== 'SENT') {
+        throw new AppError(422, 'HOLD_NOT_ALLOWED', 'Only staff orders can hold items.');
+      }
+      if (!settings.get('orders.holdAndFire')) {
+        throw new AppError(422, 'HOLD_NOT_ALLOWED', 'Holding items is turned off here.');
+      }
+    }
     if ((request.orderNote?.length ?? 0) > maxLength) {
       throw new AppError(
         422,
@@ -414,15 +423,17 @@ export class OrdersService {
     const partIds = new Map<string, string>();
     for (const line of lines) {
       const { item, request: lineRequest } = line;
+      // ORD-016: a held line waits for the waiter to fire it; it gets no ticket yet.
+      const held = itemState === 'SENT' && lineRequest.hold === true;
       const base = {
         restaurantId,
         orderId: order.id,
         businessDate: date,
         taxGroupId: item.taxGroupId,
         taxRates: taxRates.get(item.taxGroupId) ?? [],
-        state: itemState,
+        state: held ? ('HELD' as const) : itemState,
         createdById: actor.staffId,
-        sentAt,
+        sentAt: held ? null : sentAt,
       };
       const parent = await tx.orderItem.create({
         data: {
@@ -467,6 +478,7 @@ export class OrdersService {
         });
         partIds.set(`${parent.id}:${component.item.id}`, part.id);
       }
+      if (held) continue;
       kotInputs.push({
         orderItemId: parent.id,
         itemId: item.id,
@@ -539,8 +551,19 @@ export class OrdersService {
     );
 
     // Staff orders go to the kitchen now: one ticket per station, stock taken off (ORD-007).
+    // Held lines take their stock now too (they are ordered), but no ticket until fired.
     if (itemState === 'SENT') {
-      await this.sendToKitchen(tx, restaurantId, businessDate, order.id, kotInputs, partIds, menu);
+      if (kotInputs.length > 0) {
+        await this.sendToKitchen(
+          tx,
+          restaurantId,
+          businessDate,
+          order.id,
+          kotInputs,
+          partIds,
+          menu,
+        );
+      }
       for (const line of lines) {
         if (line.components.length === 0) {
           await this.menu.decrementStock(tx, restaurantId, line.item.id, line.request.quantity);
@@ -555,7 +578,14 @@ export class OrdersService {
         }
       }
     }
-    return { status: 'ACCEPTED', orderId: order.id, orderNumber, replayed: false, itemState };
+    const allHeld = itemState === 'SENT' && kotInputs.length === 0;
+    return {
+      status: 'ACCEPTED',
+      orderId: order.id,
+      orderNumber,
+      replayed: false,
+      itemState: allHeld ? 'HELD' : itemState,
+    };
   }
 
   /**

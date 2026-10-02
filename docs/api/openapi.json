@@ -5868,6 +5868,72 @@
         "x-requirements": ["ORD-003", "ORD-004", "WTR-004", "AUD-001"]
       }
     },
+    "/api/v1/orders/{orderId}/fire": {
+      "post": {
+        "operationId": "fireOrder",
+        "summary": "Send held items to the kitchen",
+        "description": "ORD-016: the order’s held items (or the ones named) go to the kitchen now, as a new ticket per station. Audited.",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/FireOrderRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The order, fired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/OrderView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such order.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Nothing on it is held.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["ORD-016", "ORD-007", "AUD-001"]
+      }
+    },
     "/api/v1/orders/{orderId}/reject": {
       "post": {
         "operationId": "rejectOrder",
@@ -13666,6 +13732,18 @@
         ],
         "additionalProperties": false
       },
+      "FireOrderRequest": {
+        "type": "object",
+        "properties": {
+          "orderItemIds": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          }
+        },
+        "additionalProperties": false
+      },
       "FloorArchiveRequest": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
@@ -16382,6 +16460,7 @@
         "type": "string",
         "enum": [
           "PENDING_APPROVAL",
+          "HELD",
           "SENT",
           "PREPARING",
           "READY",
@@ -16438,7 +16517,8 @@
             "items": { "$ref": "#/components/schemas/Id" }
           },
           "instructions": { "type": "string", "maxLength": 500 },
-          "recommendation": { "$ref": "#/components/schemas/RecommendationSource" }
+          "recommendation": { "$ref": "#/components/schemas/RecommendationSource" },
+          "hold": { "type": "boolean" }
         },
         "required": ["clientLineId", "itemId", "quantity", "modifiers"],
         "additionalProperties": false
@@ -16478,7 +16558,8 @@
             "items": { "$ref": "#/components/schemas/Id" }
           },
           "instructions": { "type": "string", "maxLength": 500 },
-          "recommendation": { "$ref": "#/components/schemas/RecommendationSource" }
+          "recommendation": { "$ref": "#/components/schemas/RecommendationSource" },
+          "hold": { "type": "boolean" }
         },
         "required": ["clientLineId", "itemId", "quantity"],
         "additionalProperties": false

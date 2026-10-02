@@ -8,6 +8,7 @@ import type {
 import {
   canTransition,
   type Capability,
+  type KotItemInput,
   actorGrant,
   type OrderItemEvent,
   type OrderItemState,
@@ -153,6 +154,101 @@ export class OrderItemsService {
         await this.follow(tx, principal, item.order, item.parentOrderItemId, now);
       }
       return item.orderId;
+    });
+    return this.orders.get(principal.restaurantId, orderId);
+  }
+
+  /**
+   * ORD-016 hold and fire: the order's held items (or the ones named) go to the kitchen now, as a
+   * new ticket per station, in the same way as a staff order's (ORD-007). Their stock was taken
+   * when they were ordered. Waiters fire their own tables.
+   */
+  async fire(
+    principal: Principal,
+    orderId: string,
+    orderItemIds: readonly string[] | undefined,
+    ownOnly: boolean,
+  ): Promise<OrderView> {
+    const menu = await this.menu.current(principal.restaurantId);
+    await this.prisma.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 AS locked FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const held = await tx.orderItem.findMany({
+        where: {
+          orderId,
+          restaurantId: principal.restaurantId,
+          state: 'HELD',
+          parentOrderItemId: null,
+          ...(orderItemIds !== undefined && { id: { in: [...orderItemIds] } }),
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (held.length === 0) {
+        const exists = await tx.order.count({
+          where: { id: orderId, restaurantId: principal.restaurantId },
+        });
+        if (exists === 0) throw new AppError(404, 'ORDER_NOT_FOUND', 'There is no such order.');
+        throw new AppError(409, 'NOTHING_HELD', 'Nothing on this order is held.');
+      }
+      const now = new Date();
+      const businessDate = await currentBusinessDate(tx, principal.restaurantId, now);
+      const inputs: KotItemInput[] = [];
+      const partIds = new Map<string, string>();
+      for (const { id } of held) {
+        const line = await this.lock(tx, principal.restaurantId, id);
+        if (ownOnly) this.assertOwn(principal, line);
+        for (const target of [line, ...line.components]) {
+          if (target.state !== 'HELD') continue;
+          const to = transition(orderItemMachine, target.state, 'FIRE').to;
+          await tx.orderItem.update({
+            where: { id: target.id },
+            data: { state: to, sentAt: now },
+          });
+          await this.changed(tx, principal, line.order, target, to, 'FIRE');
+        }
+        for (const part of line.components) partIds.set(`${line.id}:${part.itemId}`, part.id);
+        const modifiers = await tx.orderItemModifier.findMany({
+          where: { orderItemId: line.id },
+          orderBy: { createdAt: 'asc' },
+          select: { name: true },
+        });
+        inputs.push({
+          orderItemId: line.id,
+          itemId: line.itemId,
+          name: line.name,
+          quantity: line.quantity,
+          stationId: line.stationId,
+          ...(line.variantName !== null && { variantName: line.variantName }),
+          modifiers: modifiers.map((modifier) => modifier.name),
+          ...(line.instructions !== null && { instructions: line.instructions }),
+          comboComponents: line.components.map((part) => ({
+            itemId: part.itemId,
+            name: part.name,
+            quantity: part.quantity / line.quantity,
+            stationId: part.stationId,
+          })),
+        });
+      }
+      await this.orders.sendToKitchen(
+        tx,
+        principal.restaurantId,
+        businessDate,
+        orderId,
+        inputs,
+        partIds,
+        menu,
+      );
+      await this.audit.record(tx, {
+        action: 'ORDER_FIRED',
+        entityType: 'order',
+        entityId: orderId,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: null,
+        after: { orderItemIds: held.map((line) => line.id) },
+        reason: null,
+      });
     });
     return this.orders.get(principal.restaurantId, orderId);
   }

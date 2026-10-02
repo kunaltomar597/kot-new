@@ -29,8 +29,19 @@ export const OrderLineRequest = z.strictObject({
   instructions: Instructions.optional(),
   /** The suggestion the line was added from, counted as ORDERED for its layer (REC-008). */
   recommendation: RecommendationSource.optional(),
+  /**
+   * ORD-016: keep it from the kitchen until the waiter fires it (staff orders only, while
+   * `orders.holdAndFire` is on).
+   */
+  hold: z.boolean().optional(),
 });
 export type OrderLineRequest = z.infer<typeof OrderLineRequest>;
+
+/** ORD-016: send held items to the kitchen; all of the order's when none are named. */
+export const FireOrderRequest = z.strictObject({
+  orderItemIds: z.array(Id).min(1).max(100).optional(),
+});
+export type FireOrderRequest = z.infer<typeof FireOrderRequest>;
 
 /** ORD-001, ORD-013: submit an order from any surface. */
 export const SubmitOrderRequest = z

@@ -18,6 +18,8 @@ export interface CartLine {
   readonly error?: string;
   /** The suggestion it was added from, sent with the line so it counts as ordered (REC-008). */
   readonly recommendation?: RecommendationSource;
+  /** Kept from the kitchen until the waiter fires it (ORD-016; staff surfaces only). */
+  readonly hold?: boolean;
 }
 
 export type NewCartLine = Omit<CartLine, 'clientLineId' | 'error'>;
@@ -28,6 +30,7 @@ function sameChoice(a: NewCartLine, b: CartLine): boolean {
   return (
     a.itemId === b.itemId &&
     a.instructions === b.instructions &&
+    (a.hold ?? false) === (b.hold ?? false) &&
     JSON.stringify(a.selection) === JSON.stringify(b.selection) &&
     JSON.stringify(a.comboChoices ?? []) === JSON.stringify(b.comboChoices ?? [])
   );
@@ -59,7 +62,7 @@ export function addLine(
 export function updateLine(
   lines: readonly CartLine[],
   clientLineId: string,
-  change: Partial<Pick<CartLine, 'quantity' | 'instructions'>>,
+  change: Partial<Pick<CartLine, 'quantity' | 'instructions' | 'hold'>>,
 ): CartLine[] {
   return lines.map((line) =>
     line.clientLineId === clientLineId ? { ...line, ...change, error: undefined } : line,
@@ -100,5 +103,6 @@ export function requestLines(lines: readonly CartLine[]): OrderLineRequest[] {
     ...(line.comboChoices !== undefined && { comboChoices: [...line.comboChoices] }),
     ...(line.instructions.trim() !== '' && { instructions: line.instructions.trim() }),
     ...(line.recommendation !== undefined && { recommendation: { ...line.recommendation } }),
+    ...(line.hold === true && { hold: true }),
   }));
 }

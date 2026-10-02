@@ -68,6 +68,20 @@ export function CartList({
                 increaseLabel={t('pos.item.more')}
               />
               <Button
+                variant={line.hold === true ? 'primary' : 'secondary'}
+                accessibilityLabel={t(
+                  line.hold === true ? 'pos.cart.sendNowOf' : 'pos.cart.holdOf',
+                  {
+                    name: line.name,
+                  },
+                )}
+                onPress={() => {
+                  onChange(updateLine(lines, line.clientLineId, { hold: line.hold !== true }));
+                }}
+              >
+                {t(line.hold === true ? 'pos.cart.held' : 'pos.cart.hold')}
+              </Button>
+              <Button
                 variant="ghost"
                 accessibilityLabel={t('pos.cart.remove', { name: line.name })}
                 onPress={() => {

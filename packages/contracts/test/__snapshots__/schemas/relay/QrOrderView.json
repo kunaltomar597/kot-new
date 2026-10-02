@@ -95,7 +95,8 @@
               },
               "required": ["layer", "ruleId"],
               "additionalProperties": false
-            }
+            },
+            "hold": { "type": "boolean" }
           },
           "required": ["clientLineId", "itemId", "quantity"],
           "additionalProperties": false
@@ -122,6 +123,7 @@
                   "type": "string",
                   "enum": [
                     "PENDING_APPROVAL",
+                    "HELD",
                     "SENT",
                     "PREPARING",
                     "READY",
@@ -248,7 +250,8 @@
               },
               "required": ["layer", "ruleId"],
               "additionalProperties": false
-            }
+            },
+            "hold": { "type": "boolean" }
           },
           "required": ["clientLineId", "itemId", "quantity", "modifiers"],
           "additionalProperties": false
@@ -275,6 +278,7 @@
                   "type": "string",
                   "enum": [
                     "PENDING_APPROVAL",
+                    "HELD",
                     "SENT",
                     "PREPARING",
                     "READY",

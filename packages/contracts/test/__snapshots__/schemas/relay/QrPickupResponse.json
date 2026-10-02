@@ -96,7 +96,8 @@
                     },
                     "required": ["layer", "ruleId"],
                     "additionalProperties": false
-                  }
+                  },
+                  "hold": { "type": "boolean" }
                 },
                 "required": ["clientLineId", "itemId", "quantity"],
                 "additionalProperties": false
@@ -233,7 +234,8 @@
                     },
                     "required": ["layer", "ruleId"],
                     "additionalProperties": false
-                  }
+                  },
+                  "hold": { "type": "boolean" }
                 },
                 "required": ["clientLineId", "itemId", "quantity", "modifiers"],
                 "additionalProperties": false

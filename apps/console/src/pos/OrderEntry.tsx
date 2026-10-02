@@ -204,7 +204,7 @@ export function OrderEntry({ target, onBack }: { target: OrderTarget; onBack: ()
           >
             {t('pos.cart.send')}
           </Button>
-          <SentOrders target={target} data={orders.data} />
+          <SentOrders target={target} data={orders.data} onChanged={orders.reload} />
         </aside>
       </div>
       {choosing !== undefined && menu.data.status === 'ready' ? (
@@ -328,6 +328,19 @@ function Cart({
                 increaseLabel={t('pos.item.more')}
                 disabled={disabled}
               />
+              <Button
+                variant={line.hold === true ? 'primary' : 'secondary'}
+                aria-pressed={line.hold === true}
+                aria-label={t(line.hold === true ? 'pos.cart.sendNowOf' : 'pos.cart.holdOf', {
+                  name: line.name,
+                })}
+                disabled={disabled}
+                onClick={() => {
+                  onChange(updateLine(lines, line.clientLineId, { hold: line.hold !== true }));
+                }}
+              >
+                {t(line.hold === true ? 'pos.cart.held' : 'pos.cart.hold')}
+              </Button>
               <IconButton
                 label={t('pos.cart.remove', { name: line.name })}
                 icon={<Icon name="close" />}
@@ -384,12 +397,30 @@ function BillButton({ sessionId }: { sessionId: string }) {
 function SentOrders({
   target,
   data,
+  onChanged,
 }: {
   target: OrderTarget;
   data: ReturnType<typeof useLive<OrderView[]>>['data'];
+  onChanged: () => void;
 }) {
   const t = useT();
+  const controller = useConsole();
+  const toast = useToast();
   const { openBill, opening } = useOpenBill();
+  const [firing, setFiring] = useState<string | undefined>();
+  // ORD-016: an order's held items go to the kitchen now.
+  const fire = async (orderId: string) => {
+    setFiring(orderId);
+    try {
+      await controller.api.fireOrder({ params: { orderId }, body: {} });
+      toast.show({ title: t('pos.sent.fired'), tone: 'success' });
+      onChanged();
+    } catch (failure) {
+      toast.show({ title: messageOf(failure, t), tone: 'danger' });
+    } finally {
+      setFiring(undefined);
+    }
+  };
   if (data.status !== 'ready') return null;
   const heading = target.kind === 'table' ? t('pos.sent.title') : t('pos.sent.openTakeaway');
   return (
@@ -425,6 +456,16 @@ function SentOrders({
                 </li>
               ))}
           </ul>
+          {order.items.some((item) => item.state === 'HELD' && item.parentOrderItemId === null) ? (
+            <Button
+              loading={firing === order.id}
+              onClick={() => {
+                void fire(order.id);
+              }}
+            >
+              {t('pos.sent.fire')}
+            </Button>
+          ) : null}
           {target.kind === 'takeaway' ? (
             <Button
               variant="secondary"

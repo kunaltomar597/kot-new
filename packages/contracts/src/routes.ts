@@ -180,6 +180,7 @@ import {
 import {
   ApproveAtTableRequest,
   ApproveOrderRequest,
+  FireOrderRequest,
   BestSellersResponse,
   ModifyOrderItemRequest,
   OrderItemEndRequest,
@@ -383,6 +384,25 @@ export const ROUTES = [
     responses: {
       200: { description: 'The waiting orders.', schema: PendingApprovalsResponse },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'fireOrder',
+    method: 'POST',
+    path: '/api/v1/orders/:orderId/fire',
+    summary: 'Send held items to the kitchen',
+    description:
+      'ORD-016: the order’s held items (or the ones named) go to the kitchen now, as a new ticket ' +
+      'per station. Audited.',
+    tags: ['orders'],
+    requirements: ['ORD-016', 'ORD-007', 'AUD-001'],
+    capability: 'ORDER_CREATE',
+    request: { params: OrderParams, body: FireOrderRequest },
+    responses: {
+      200: { description: 'The order, fired.', schema: OrderView },
+      ...standardErrors,
+      404: { description: 'No such order.', schema: ApiError },
+      409: { description: 'Nothing on it is held.', schema: ApiError },
     },
   },
   {

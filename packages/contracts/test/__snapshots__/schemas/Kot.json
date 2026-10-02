@@ -59,6 +59,7 @@
               "type": "string",
               "enum": [
                 "PENDING_APPROVAL",
+                "HELD",
                 "SENT",
                 "PREPARING",
                 "READY",
@@ -147,6 +148,7 @@
               "type": "string",
               "enum": [
                 "PENDING_APPROVAL",
+                "HELD",
                 "SENT",
                 "PREPARING",
                 "READY",

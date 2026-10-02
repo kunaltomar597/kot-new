@@ -126,6 +126,8 @@ enum OrderStatus {
 /// @rp/domain ORDER_ITEM_STATES.
 enum OrderItemState {
   PENDING_APPROVAL
+  /// Ordered by staff and kept from the kitchen until fired (ORD-016).
+  HELD
   SENT
   PREPARING
   READY

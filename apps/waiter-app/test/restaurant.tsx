@@ -445,7 +445,7 @@ export class Restaurant {
         unitPrice: item?.basePrice ?? 0,
         lineTotal: (item?.basePrice ?? 0) * line.quantity,
         stationId: IDS.kitchen,
-        state: 'SENT',
+        state: line.hold === true ? 'HELD' : 'SENT',
         instructions: line.instructions ?? null,
       };
     });
@@ -612,6 +612,26 @@ export class Restaurant {
         const answer = this.submitOrder(call.body as SubmitOrderRequest);
         if (this.network === 'loseAnswers') throw new TypeError('Network request failed');
         return { status: 200, body: answer };
+      })
+      .on('POST', '/api/v1/orders/:orderId/fire', (call) => {
+        const order = [...this.orders.values()]
+          .flat()
+          .find((entry) => call.path.includes(entry.id));
+        if (order === undefined)
+          return { status: 404, body: { code: 'ORDER_NOT_FOUND', message: 'No' } };
+        const fired: OrderView = {
+          ...order,
+          items: order.items.map((item) =>
+            item.state === 'HELD' ? { ...item, state: 'SENT' as const } : item,
+          ),
+        };
+        for (const [sessionId, list] of this.orders) {
+          this.orders.set(
+            sessionId,
+            list.map((entry) => (entry.id === order.id ? fired : entry)),
+          );
+        }
+        return { status: 200, body: fired };
       })
       .on('POST', '/api/v1/order-items/:orderItemId/status', (call) => this.itemStep(call))
       .on('POST', '/api/v1/order-items/:orderItemId/cancel', (call) => this.endItem(call, 'CANCEL'))
