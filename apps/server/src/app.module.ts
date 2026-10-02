@@ -31,6 +31,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module.
 import { RestaurantModule } from './restaurant/restaurant.module.js';
 import { ServiceRequestsModule } from './service-requests/service-requests.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { LicensingModule } from './licensing/licensing.module.js';
 import { StaffModule } from './staff/staff.module.js';
 import { SystemModule } from './system/system.module.js';
 import { TlsModule } from './tls/tls.module.js';
@@ -52,6 +53,7 @@ export class AppModule {
         AuthModule,
         AuditModule,
         SettingsModule,
+        LicensingModule,
         RestaurantModule,
         FloorModule,
         MenuModule,

@@ -35,6 +35,7 @@ import { AppError } from '../errors/app-error.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { appendEvent, type EventAudience } from '../events/outbox.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 type Accepted = Extract<SubmitOrderResponse, { status: 'ACCEPTED' }>;
@@ -138,6 +139,7 @@ export class OrdersService {
     private readonly audit: AuditService,
     private readonly menu: MenuPublishService,
     private readonly settings: SettingsService,
+    private readonly licence: LicenceAgentService,
   ) {}
 
   /**
@@ -198,6 +200,8 @@ export class OrdersService {
         }
         return { ...(previous.response as Accepted), replayed: true };
       }
+      // LIC-005: a restricted licence takes no new orders (a retry above still gets its answer).
+      await this.licence.assert('createOrders');
 
       const now = new Date();
       const rejected: RejectedLine[] = [];

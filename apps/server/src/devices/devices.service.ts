@@ -35,6 +35,7 @@ import { newId } from '../common/ids.js';
 import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { appendEvent } from '../events/outbox.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { announceSetupChange } from '../restaurant/setup-changes.js';
@@ -44,6 +45,14 @@ import type { Prisma } from '../generated/prisma/client.js';
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const errors = {
+  /** LIC-001: the licence's device limit for this kind of device. */
+  deviceLimit: (type: string, limit: number) =>
+    new AppError(
+      409,
+      'DEVICE_LIMIT_REACHED',
+      `The licence allows ${String(limit)} paired ${type === 'KDS' ? 'kitchen screens' : type === 'PAGER' ? 'pagers' : type === 'WAITER_PHONE' ? 'waiter phones' : 'table tablets'}. Unpair one, or ask the vendor for more.`,
+      { type, limit },
+    ),
   codeInvalid: () =>
     new AppError(
       401,
@@ -170,13 +179,20 @@ export class DevicesService {
     private readonly limiter: RateLimiter,
     private readonly tls: TlsService,
     private readonly realtime: RealtimeGateway,
+    private readonly licence: LicenceAgentService,
   ) {}
 
   async createPairingCode(
     principal: Principal,
     request: CreatePairingCodeRequest,
   ): Promise<PairingCodeResponse> {
+    const limit = await this.licence.limitFor(request.type);
     return this.prisma.transaction(async (tx) => {
+      // Said at once, before anyone walks to the device; pairing checks again (LIC-001).
+      if (limit !== null) {
+        const paired = await tx.device.count({ where: { type: request.type, status: 'ACTIVE' } });
+        if (paired >= limit) throw errors.deviceLimit(request.type, limit);
+      }
       await this.checkBinding(tx, principal.restaurantId, request);
       return this.issueCode(
         tx,
@@ -225,6 +241,13 @@ export class DevicesService {
           request.proof,
         );
       if (key === undefined || !proofOk) return { error: errors.proofInvalid() };
+      // LIC-001: never more paired devices of a kind than the licence allows.
+      const limit = await this.licence.limitFor(code.type);
+      if (limit !== null) {
+        await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pair-limit:${code.type}`}, 0))`;
+        const paired = await tx.device.count({ where: { type: code.type, status: 'ACTIVE' } });
+        if (paired >= limit) return { error: errors.deviceLimit(code.type, limit) };
+      }
 
       const device = await tx.device.create({
         data: {

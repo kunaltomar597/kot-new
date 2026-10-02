@@ -1,0 +1,30 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "MISSING",
+      "UNKNOWN_KEY",
+      "TAMPERED",
+      "MALFORMED",
+      "OTHER_INSTALLATION",
+      "OTHER_PC",
+      "EXPIRED",
+      "GRACE_ENDED",
+      "VENDOR"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "MISSING",
+      "UNKNOWN_KEY",
+      "TAMPERED",
+      "MALFORMED",
+      "OTHER_INSTALLATION",
+      "OTHER_PC",
+      "EXPIRED",
+      "GRACE_ENDED",
+      "VENDOR"
+    ]
+  }
+}

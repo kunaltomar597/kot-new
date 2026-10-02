@@ -213,6 +213,7 @@ import {
   PrinterDiscoveryResponse,
   TestPrintResponse,
 } from './printing.js';
+import { LicenceView, ReactivateLicenceRequest } from './licence.js';
 import {
   AssignSessionWaiterRequest,
   CloseWithoutBillRequest,
@@ -1934,6 +1935,49 @@ export const ROUTES = [
       404: { description: 'No such open session.', schema: ApiError },
       409: { description: 'The bill is already printed, or cannot be issued.', schema: ApiError },
     },
+  },
+  {
+    operationId: 'getLicence',
+    method: 'GET',
+    path: '/api/v1/licence',
+    summary: 'The licence: its state, the days left and what the restaurant can do',
+    description:
+      'LIC-003, LIC-005, LIC-008. Every signed-in person, for the reminders and banners; the ' +
+      'Owner and managers also get the plan, device limits and reason.',
+    tags: ['licence'],
+    requirements: ['LIC-003', 'LIC-005', 'LIC-008'],
+    capability: 'SESSION',
+    responses: { 200: { description: 'The licence.', schema: LicenceView }, ...standardErrors },
+  },
+  {
+    operationId: 'reactivateLicence',
+    method: 'POST',
+    path: '/api/v1/licence/reactivate',
+    summary: 'Enter an offline reactivation code read out by the vendor',
+    description:
+      'LIC-006. The Owner only; a few tries an hour. The licence is active again until the end ' +
+      'of the code’s day. Audited.',
+    tags: ['licence'],
+    requirements: ['LIC-006', 'AUD-001'],
+    capability: 'LICENSE_MANAGE',
+    request: { body: ReactivateLicenceRequest },
+    responses: {
+      200: { description: 'The licence now.', schema: LicenceView },
+      ...standardErrors,
+      409: { description: 'Not this installation’s code, or one already used.', schema: ApiError },
+      429: { description: 'Too many tries: wait an hour.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'checkLicence',
+    method: 'POST',
+    path: '/api/v1/licence/check',
+    summary: 'Ask the Control Plane for the licence now',
+    description: 'LIC-006: after paying, the Owner need not wait for the next heartbeat.',
+    tags: ['licence'],
+    requirements: ['LIC-006'],
+    capability: 'LICENSE_MANAGE',
+    responses: { 200: { description: 'The licence now.', schema: LicenceView }, ...standardErrors },
   },
   {
     operationId: 'markTableClean',

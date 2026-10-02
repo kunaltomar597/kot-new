@@ -34,6 +34,7 @@ export function payload(overrides: Partial<LicencePayload> = {}): LicencePayload
     state: 'ACTIVE',
     graceStartedAt: null,
     reason: null,
+    reactivationCounter: 0,
     ...overrides,
   };
 }

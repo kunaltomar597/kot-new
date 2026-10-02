@@ -29,6 +29,7 @@ import { appendEvent } from '../events/outbox.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { openTableForOrder } from '../floor/open-for-order.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { ORDER_VIEW_INCLUDE, orderView, OrdersService } from './orders.service.js';
 
 /** Who approves or rejects: a signed-in person, or a waiter's PIN on the tablet (ORD-004). */
@@ -110,6 +111,7 @@ export class OrderApprovalsService {
     private readonly auth: AuthService,
     private readonly orders: OrdersService,
     private readonly menu: MenuPublishService,
+    private readonly licence: LicenceAgentService,
   ) {}
 
   // ---------------------------------------------------------------- the tablet
@@ -204,6 +206,8 @@ export class OrderApprovalsService {
     orderId: string,
     changes: readonly ApprovalChange[],
   ): Promise<OrderView> {
+    // LIC-005: no new kitchen tickets on a restricted licence.
+    await this.licence.assert('sendKots');
     const menu = await this.menu.current(approver.restaurantId);
     const now = new Date();
     await this.prisma.transaction(async (tx) => {

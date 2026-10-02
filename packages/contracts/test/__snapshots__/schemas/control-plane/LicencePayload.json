@@ -80,7 +80,8 @@
           { "type": "null" }
         ]
       },
-      "reason": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] }
+      "reason": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] },
+      "reactivationCounter": { "type": "integer", "minimum": 0, "maximum": 255 }
     },
     "required": [
       "format",
@@ -96,7 +97,8 @@
       "graceDays",
       "state",
       "graceStartedAt",
-      "reason"
+      "reason",
+      "reactivationCounter"
     ],
     "additionalProperties": false
   },
@@ -181,7 +183,8 @@
           { "type": "null" }
         ]
       },
-      "reason": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] }
+      "reason": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] },
+      "reactivationCounter": { "type": "integer", "minimum": 0, "maximum": 255 }
     },
     "required": [
       "format",
@@ -197,7 +200,8 @@
       "graceDays",
       "state",
       "graceStartedAt",
-      "reason"
+      "reason",
+      "reactivationCounter"
     ],
     "additionalProperties": false
   }

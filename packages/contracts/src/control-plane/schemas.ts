@@ -115,6 +115,11 @@ export const LicencePayload = z.strictObject({
   graceStartedAt: Timestamp.nullable(),
   /** Why the vendor set this state, for the Owner (LIC-008). */
   reason: z.string().max(200).nullable(),
+  /**
+   * The last offline reactivation code given (LIC-006): a code with this counter or lower is
+   * refused, even if the PC's own record of codes used was lost or edited.
+   */
+  reactivationCounter: z.int().min(0).max(255),
 });
 export type LicencePayload = z.infer<typeof LicencePayload>;
 
@@ -139,6 +144,17 @@ export const ReactivationCode = z
   .trim()
   .toUpperCase()
   .regex(/^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$/);
+
+/** Tamper events the PC reports (LIC-007): its clock set back or far off, records edited. */
+export const TAMPER_KINDS = [
+  'CLOCK_ROLLBACK',
+  'CLOCK_SKEW',
+  'LICENCE_TAMPERED',
+  'RECORD_TAMPERED',
+  'OTHER_PC',
+] as const;
+export const TamperEvent = z.object({ kind: z.enum(TAMPER_KINDS), at: Timestamp });
+export type TamperEvent = z.infer<typeof TamperEvent>;
 
 /** A component's installed version as a heartbeat reports it. */
 export const ComponentVersion = z.object({
@@ -178,6 +194,8 @@ export const HeartbeatRequest = z.looseObject({
       hasReactivationSecret: z.boolean(),
     })
     .optional(),
+  /** What looked like tampering since the last heartbeat delivered (LIC-007). */
+  tamper: z.array(TamperEvent).max(20).optional(),
 });
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
 

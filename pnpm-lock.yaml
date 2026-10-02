@@ -320,6 +320,9 @@ importers:
       '@rp/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@rp/licensing':
+        specifier: workspace:*
+        version: link:../../packages/licensing
       '@rp/ordering':
         specifier: workspace:*
         version: link:../../packages/ordering

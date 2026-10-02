@@ -197,13 +197,13 @@ Must: 230 / 287 covered. Should: 15 / 24. Could: 0 / 7.
 - DATA-006 (M): apps/console/test/system-view.test.ts, apps/console/test/system.test.tsx, apps/server/test/integration/system.int.test.ts, apps/server/test/unit/storage-usage.test.ts
 - DATA-007 (M): apps/server/test/integration/photos.int.test.ts
 - DATA-011 (M): apps/server/test/integration/feedback.int.test.ts
-- LIC-001 (M): apps/control-plane/test/integration/licences.int.test.ts, packages/licensing/test/licensing.test.ts
+- LIC-001 (M): apps/control-plane/test/integration/licences.int.test.ts, apps/server/test/integration/licence-agent.int.test.ts, packages/licensing/test/licensing.test.ts
 - LIC-002 (M): apps/control-plane/test/integration/licences.int.test.ts, packages/licensing/test/licensing.test.ts
-- LIC-003 (M): packages/licensing/test/licensing.test.ts
-- LIC-004 (M): apps/control-plane/test/integration/licences.int.test.ts, packages/licensing/test/licensing.test.ts
-- LIC-005 (M): apps/control-plane/test/integration/licences.int.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/state-machines.test.ts, packages/licensing/test/licensing.test.ts
-- LIC-006 (M): apps/control-plane/test/integration/licences.int.test.ts, packages/licensing/test/licensing.test.ts
-- LIC-007 (M): apps/control-plane/test/integration/signed-requests.int.test.ts, apps/server/test/unit/control-plane-client.test.ts, packages/licensing/test/licensing.test.ts
+- LIC-003 (M): apps/server/test/integration/licence-agent.int.test.ts, apps/server/test/unit/app-config.test.ts, packages/licensing/test/licensing.test.ts
+- LIC-004 (M): apps/control-plane/test/integration/licences.int.test.ts, apps/server/test/unit/pc-fingerprint.test.ts, packages/licensing/test/licensing.test.ts
+- LIC-005 (M): apps/control-plane/test/integration/licences.int.test.ts, apps/server/test/integration/licence-agent.int.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/state-machines.test.ts, packages/licensing/test/licensing.test.ts
+- LIC-006 (M): apps/control-plane/test/integration/licences.int.test.ts, apps/server/test/integration/licence-agent.int.test.ts, packages/licensing/test/licensing.test.ts
+- LIC-007 (M): apps/control-plane/test/integration/licences.int.test.ts, apps/control-plane/test/integration/signed-requests.int.test.ts, apps/server/test/integration/licence-agent.int.test.ts, apps/server/test/unit/control-plane-client.test.ts, packages/licensing/test/licensing.test.ts
 - UPD-002 (M): apps/control-plane/test/integration/admin.int.test.ts, apps/control-plane/test/integration/heartbeats.int.test.ts, apps/control-plane/test/unit/semver.test.ts, apps/server/test/integration/control-plane.int.test.ts, packages/contracts/test/control-plane.test.ts, packages/contracts/test/docs.test.ts
 - UPD-004 (M): apps/console/e2e/console.e2e.ts, apps/console/test/system.test.tsx, apps/server/test/integration/system.int.test.ts
 - UPD-006 (M): packages/contracts/test/snapshot.test.ts

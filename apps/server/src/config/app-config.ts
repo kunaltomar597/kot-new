@@ -91,6 +91,25 @@ export const AppConfigSchema = z.object({
   mqttPort: z.coerce.number().int().min(0).max(65_535).default(8883),
   /** Serve HTTPS/WSS with the installation's private CA (ADR-0011, SEC-001). */
   tls: booleanFlag,
+  /**
+   * Whether the licence restricts ordering (LIC-003, LIC-005). Always in production; elsewhere only
+   * when asked (`RP_LICENCE_ENFORCE`), though the licence is still read and shown.
+   */
+  licenceEnforce: booleanFlag,
+  /**
+   * Vendor licence keys besides those built in (SPKI DER, base64, comma-separated): development
+   * and tests only, never production (LIC-003).
+   */
+  licenceKeys: z
+    .string()
+    .optional()
+    .transform((value) =>
+      (value ?? '')
+        .split(',')
+        .map((key) => key.trim())
+        .filter((key) => key !== ''),
+    )
+    .pipe(z.array(z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, 'RP_LICENCE_KEYS must be base64'))),
   /** Extra host names for the server certificate, e.g. `pos.local` (comma-separated). */
   tlsHostnames: z
     .string()
@@ -144,6 +163,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,
     tlsHostnames: env.RP_TLS_HOSTNAMES,
+    licenceEnforce: env.RP_LICENCE_ENFORCE,
+    licenceKeys: env.RP_LICENCE_KEYS,
   });
   if (!result.success) {
     const problems = result.error.issues
@@ -165,6 +186,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (config.nodeEnv === 'production' && config.qrSiteUrl?.startsWith('https://') === false) {
     throw new ConfigError('In production RP_QR_SITE_URL must use https://');
+  }
+  // LIC-003: in production the licence always applies, checked only against the keys built in.
+  if (config.nodeEnv === 'production') {
+    if (env.RP_LICENCE_ENFORCE !== undefined && !config.licenceEnforce) {
+      throw new ConfigError('In production the licence cannot be switched off');
+    }
+    if (config.licenceKeys.length > 0) {
+      throw new ConfigError('In production only the licence keys built into the software count');
+    }
+    return Object.freeze({ ...config, licenceEnforce: true });
   }
   return Object.freeze(config);
 }

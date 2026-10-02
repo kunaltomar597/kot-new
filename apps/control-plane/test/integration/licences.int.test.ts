@@ -236,6 +236,19 @@ describe('[LIC-004] the PC the licence is bound to', () => {
     expect(await prisma.auditEntry.count({ where: { action: 'licence.rebound' } })).toBe(1);
   });
 
+  it('[LIC-007] records what the PC reports as tampering, once per heartbeat', async () => {
+    const body = heartbeatBody({
+      licence: report(null),
+      tamper: [{ kind: 'CLOCK_ROLLBACK', at: '2026-10-03T10:00:00.000Z' }],
+    });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      expect((await signedPost(app, pc, '/v1/heartbeats', body)).status).toBe(200);
+    }
+    expect(await prisma.auditEntry.findMany({ where: { action: 'licence.tamper' } })).toMatchObject(
+      [{ details: { kind: 'CLOCK_ROLLBACK' } }],
+    );
+  });
+
   it('sends no licence to an installation too old to report one', async () => {
     const answer = await beat(undefined as unknown as object);
     expect(answer.licence).toBeNull();

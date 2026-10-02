@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LicensingModule } from '../licensing/licensing.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { MenuModule } from '../menu/menu.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -19,7 +20,7 @@ import { OrdersService } from './orders.service.js';
  * diners' orders with their approval (P3-03a).
  */
 @Module({
-  imports: [AuthModule, MenuModule, SettingsModule],
+  imports: [AuthModule, MenuModule, SettingsModule, LicensingModule],
   controllers: [
     OrdersController,
     SessionOrdersController,

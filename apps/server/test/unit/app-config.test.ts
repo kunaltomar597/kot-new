@@ -56,4 +56,20 @@ describe('server configuration', () => {
       loadConfig({ NODE_ENV: 'development', DATABASE_URL: 'postgresql://u@10.0.0.5/rp' }),
     ).not.toThrow();
   });
+
+  it('[LIC-003] always applies the licence in production, with only the keys built in', () => {
+    expect(loadConfig({ ...base, NODE_ENV: 'production' }).licenceEnforce).toBe(true);
+    expect(loadConfig({ ...base, NODE_ENV: 'development' }).licenceEnforce).toBe(false);
+    expect(loadConfig({ ...base, RP_LICENCE_ENFORCE: 'true' }).licenceEnforce).toBe(true);
+    expect(() =>
+      loadConfig({ ...base, NODE_ENV: 'production', RP_LICENCE_ENFORCE: 'false' }),
+    ).toThrow(ConfigError);
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', RP_LICENCE_KEYS: 'QUJD' })).toThrow(
+      ConfigError,
+    );
+    expect(loadConfig({ ...base, RP_LICENCE_KEYS: 'QUJD, REVG' }).licenceKeys).toEqual([
+      'QUJD',
+      'REVG',
+    ]);
+  });
 });
