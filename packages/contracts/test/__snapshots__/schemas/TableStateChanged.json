@@ -35,7 +35,7 @@
           },
           "state": {
             "type": "string",
-            "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"]
+            "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED", "NEEDS_CLEANING"]
           }
         },
         "required": ["tableId", "state"]
@@ -87,7 +87,7 @@
           },
           "state": {
             "type": "string",
-            "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"]
+            "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED", "NEEDS_CLEANING"]
           }
         },
         "required": ["tableId", "state"],

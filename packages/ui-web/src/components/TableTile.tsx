@@ -15,6 +15,7 @@ export const TABLE_STATE_STYLES: Readonly<
   OCCUPIED: { tone: 'info', icon: 'users' },
   BILL_REQUESTED: { tone: 'warning', icon: 'bell' },
   BILL_PRINTED: { tone: 'neutral', icon: 'receipt' },
+  NEEDS_CLEANING: { tone: 'danger', icon: 'sparkle' },
 };
 
 export interface TableTileProps {

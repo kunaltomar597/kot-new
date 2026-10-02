@@ -226,7 +226,7 @@ export class FloorService {
       await tx.$queryRaw`SELECT 1 AS locked FROM tables WHERE id = ${tableId}::uuid FOR UPDATE`;
       const existing = await this.findTable(tx, principal.restaurantId, tableId);
       if (existing.archivedAt !== null) return { changed: false, result: toTableView(existing) };
-      if (existing.state !== 'FREE') {
+      if (existing.state !== 'FREE' && existing.state !== 'NEEDS_CLEANING') {
         throw new AppError(
           409,
           'TABLE_IN_USE',

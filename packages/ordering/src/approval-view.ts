@@ -5,7 +5,7 @@ type Item = OrderView['items'][number];
 
 /** Events after which the approvals inbox is read again (WTR-004). */
 export const affectsApprovals = (eventType: string) =>
-  /^(OrderSubmitted|OrderApproved|OrderRejected|TableMoved|TableClosed|TableWaiterChanged)$/.test(
+  /^(OrderSubmitted|OrderApproved|OrderRejected|TableMoved|OrdersMoved|TableClosed|TableWaiterChanged)$/.test(
     eventType,
   );
 

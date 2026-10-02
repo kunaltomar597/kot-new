@@ -133,7 +133,8 @@
                       },
                       { "type": "null" }
                     ]
-                  }
+                  },
+                  "movedTo": { "default": null, "type": ["string", "null"] }
                 },
                 "required": [
                   "orderItemId",
@@ -267,7 +268,8 @@
                       },
                       { "type": "null" }
                     ]
-                  }
+                  },
+                  "movedTo": { "default": null, "type": ["string", "null"] }
                 },
                 "required": [
                   "orderItemId",
@@ -474,7 +476,8 @@
                       },
                       { "type": "null" }
                     ]
-                  }
+                  },
+                  "movedTo": { "default": null, "type": ["string", "null"] }
                 },
                 "required": [
                   "orderItemId",
@@ -485,7 +488,8 @@
                   "instructions",
                   "comboName",
                   "state",
-                  "readyAt"
+                  "readyAt",
+                  "movedTo"
                 ],
                 "additionalProperties": false
               }
@@ -610,7 +614,8 @@
                       },
                       { "type": "null" }
                     ]
-                  }
+                  },
+                  "movedTo": { "default": null, "type": ["string", "null"] }
                 },
                 "required": [
                   "orderItemId",
@@ -621,7 +626,8 @@
                   "instructions",
                   "comboName",
                   "state",
-                  "readyAt"
+                  "readyAt",
+                  "movedTo"
                 ],
                 "additionalProperties": false
               }

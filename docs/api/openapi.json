@@ -10175,6 +10175,72 @@
         "x-requirements": ["TBL-004", "AUD-001"]
       }
     },
+    "/api/v1/table-sessions/{sessionId}/merge": {
+      "post": {
+        "operationId": "mergeTables",
+        "summary": "Merge this table into another open table, for one bill",
+        "description": "Its orders, tickets and open requests go to the other table, its guests are added to the other table's, and its session closes: its tablet resets and the table is free (or needs cleaning). Not while either bill is printed, nor with discounts on this one. Waiters may merge only their own tables. Audited (TBL-006).",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/MergeTablesRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The table merged into.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableSessionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The same table, a bill is printed, or this bill has discounts.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TABLE_MOVE_MERGE",
+        "x-requirements": ["TBL-006", "AUD-001"]
+      }
+    },
     "/api/v1/table-sessions/{sessionId}/move": {
       "post": {
         "operationId": "moveTable",
@@ -10351,6 +10417,76 @@
         },
         "x-capability": "BILL_REQUEST",
         "x-requirements": ["TBL-004", "WTR-008"]
+      }
+    },
+    "/api/v1/table-sessions/{sessionId}/transfer": {
+      "post": {
+        "operationId": "transferItems",
+        "summary": "Move dishes to another open table's bill",
+        "description": "Whole lines, a combo with its parts; not dishes waiting for approval, ended or with a discount, nor while either bill is printed. Kitchen tickets stay as they are and show where each moved dish now goes. Waiters may move dishes only between their own tables. Audited (TBL-006).",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TransferItemsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Both tables after the move.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TransferItemsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open session or dish.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "A dish cannot move, or a bill is printed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TABLE_MOVE_MERGE",
+        "x-requirements": ["TBL-006", "AUD-001"]
       }
     },
     "/api/v1/table-sessions/{sessionId}/waiter": {
@@ -10608,6 +10744,66 @@
         },
         "x-capability": "STAFF_MANAGE",
         "x-requirements": ["TBL-001", "AUD-001"]
+      }
+    },
+    "/api/v1/tables/{tableId}/clean": {
+      "post": {
+        "operationId": "markTableClean",
+        "summary": "Mark a table clean, ready for the next guests",
+        "description": "Only a table that needs cleaning (setting `tables.needsCleaning`, TBL-004); it becomes free.",
+        "tags": ["tables"],
+        "parameters": [
+          {
+            "name": "tableId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The table, now free.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TableStateView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such active table.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The table does not need cleaning.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "ORDER_CREATE",
+        "x-requirements": ["TBL-004"]
       }
     },
     "/api/v1/tables/{tableId}/open": {
@@ -13629,6 +13825,7 @@
           { "$ref": "#/components/schemas/TableOpened" },
           { "$ref": "#/components/schemas/TableMoved" },
           { "$ref": "#/components/schemas/TableClosed" },
+          { "$ref": "#/components/schemas/OrdersMoved" },
           { "$ref": "#/components/schemas/TableStateChanged" },
           { "$ref": "#/components/schemas/TableWaiterChanged" },
           { "$ref": "#/components/schemas/OrderSubmitted" },
@@ -14685,6 +14882,55 @@
         ],
         "additionalProperties": false
       },
+      "KdsTicketInput": {
+        "type": "object",
+        "properties": {
+          "kotId": { "$ref": "#/components/schemas/Id" },
+          "kotNumber": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "kind": { "type": "string", "enum": ["NEW", "MODIFIED", "CANCELLED"] },
+          "stationId": { "$ref": "#/components/schemas/Id" },
+          "stationName": { "type": "string" },
+          "orderId": { "$ref": "#/components/schemas/Id" },
+          "orderNumber": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "tableLabel": { "type": ["string", "null"] },
+          "takeawayToken": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "movedFrom": { "type": ["string", "null"] },
+          "waiterName": { "type": ["string", "null"] },
+          "source": { "$ref": "#/components/schemas/OrderSource" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "bumpedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "managerNotified": { "type": "boolean" },
+          "lines": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/KdsTicketLineInput" }
+          }
+        },
+        "required": [
+          "kotId",
+          "kotNumber",
+          "kind",
+          "stationId",
+          "stationName",
+          "orderId",
+          "orderNumber",
+          "tableLabel",
+          "takeawayToken",
+          "movedFrom",
+          "waiterName",
+          "source",
+          "createdAt",
+          "bumpedAt",
+          "managerNotified",
+          "lines"
+        ]
+      },
       "KdsTicketLine": {
         "type": "object",
         "properties": {
@@ -14700,7 +14946,44 @@
           "instructions": { "type": ["string", "null"] },
           "comboName": { "type": ["string", "null"] },
           "state": { "$ref": "#/components/schemas/OrderItemState" },
-          "readyAt": { "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }] }
+          "readyAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "movedTo": { "default": null, "type": ["string", "null"] }
+        },
+        "required": [
+          "orderItemId",
+          "quantity",
+          "name",
+          "variantName",
+          "modifiers",
+          "instructions",
+          "comboName",
+          "state",
+          "readyAt",
+          "movedTo"
+        ],
+        "additionalProperties": false
+      },
+      "KdsTicketLineInput": {
+        "type": "object",
+        "properties": {
+          "orderItemId": { "$ref": "#/components/schemas/Id" },
+          "quantity": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "name": { "type": "string" },
+          "variantName": { "type": ["string", "null"] },
+          "modifiers": { "type": "array", "items": { "type": "string" } },
+          "instructions": { "type": ["string", "null"] },
+          "comboName": { "type": ["string", "null"] },
+          "state": { "$ref": "#/components/schemas/OrderItemState" },
+          "readyAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "movedTo": { "default": null, "type": ["string", "null"] }
         },
         "required": [
           "orderItemId",
@@ -14712,8 +14995,7 @@
           "comboName",
           "state",
           "readyAt"
-        ],
-        "additionalProperties": false
+        ]
       },
       "KdsTicketParams": {
         "type": "object",
@@ -14795,10 +15077,13 @@
               "required": ["id", "name"]
             }
           },
-          "tickets": { "type": "array", "items": { "$ref": "#/components/schemas/KdsTicket" } },
+          "tickets": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/KdsTicketInput" }
+          },
           "recentlyBumped": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/KdsTicket" }
+            "items": { "$ref": "#/components/schemas/KdsTicketInput" }
           },
           "settings": { "$ref": "#/components/schemas/KdsSettings" },
           "serverTime": { "$ref": "#/components/schemas/Timestamp" }
@@ -15694,6 +15979,12 @@
           "contentBase64": { "type": "string" }
         },
         "required": ["filename", "contentType", "contentBase64"],
+        "additionalProperties": false
+      },
+      "MergeTablesRequest": {
+        "type": "object",
+        "properties": { "intoTableSessionId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["intoTableSessionId"],
         "additionalProperties": false
       },
       "ModifierGroup": {
@@ -16921,6 +17212,52 @@
           "note",
           "items",
           "kots"
+        ],
+        "additionalProperties": false
+      },
+      "OrdersMoved": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": { "type": "string", "const": "OrdersMoved" },
+          "version": { "type": "number", "const": 1 },
+          "occurredAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "businessDate": { "$ref": "#/components/schemas/IsoDate" },
+          "correlationId": { "type": "string", "maxLength": 64 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "enum": ["MERGE", "TRANSFER"] },
+              "fromTableSessionId": { "$ref": "#/components/schemas/Id" },
+              "toTableSessionId": { "$ref": "#/components/schemas/Id" },
+              "fromTableId": { "$ref": "#/components/schemas/Id" },
+              "toTableId": { "$ref": "#/components/schemas/Id" },
+              "orderIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
+            },
+            "required": [
+              "kind",
+              "fromTableSessionId",
+              "toTableSessionId",
+              "fromTableId",
+              "toTableId",
+              "orderIds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "version",
+          "occurredAt",
+          "restaurantId",
+          "businessDate",
+          "payload"
         ],
         "additionalProperties": false
       },
@@ -20237,7 +20574,7 @@
       },
       "TableState": {
         "type": "string",
-        "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"]
+        "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED", "NEEDS_CLEANING"]
       },
       "TableStateChanged": {
         "type": "object",
@@ -20272,6 +20609,15 @@
           "businessDate",
           "payload"
         ],
+        "additionalProperties": false
+      },
+      "TableStateView": {
+        "type": "object",
+        "properties": {
+          "tableId": { "$ref": "#/components/schemas/Id" },
+          "state": { "$ref": "#/components/schemas/TableState" }
+        },
+        "required": ["tableId", "state"],
         "additionalProperties": false
       },
       "TableTentSize": { "type": "string", "enum": ["A6", "A5"] },
@@ -20445,10 +20791,7 @@
         "properties": {
           "tableId": { "$ref": "#/components/schemas/Id" },
           "label": { "type": "string" },
-          "state": {
-            "type": "string",
-            "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED"]
-          },
+          "state": { "$ref": "#/components/schemas/TableState" },
           "session": {
             "anyOf": [
               {
@@ -20656,6 +20999,31 @@
           }
         },
         "required": ["secret", "otpauthUri"],
+        "additionalProperties": false
+      },
+      "TransferItemsRequest": {
+        "type": "object",
+        "properties": {
+          "toTableSessionId": { "$ref": "#/components/schemas/Id" },
+          "orderItemIds": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["toTableSessionId", "orderItemIds"],
+        "additionalProperties": false
+      },
+      "TransferItemsResponse": {
+        "type": "object",
+        "properties": {
+          "from": { "$ref": "#/components/schemas/TableSessionView" },
+          "to": { "$ref": "#/components/schemas/TableSessionView" },
+          "orderItemIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
+        },
+        "required": ["from", "to", "orderItemIds"],
         "additionalProperties": false
       },
       "UnlockStaffRequest": {

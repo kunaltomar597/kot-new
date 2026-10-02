@@ -26,6 +26,8 @@ export const KdsTicketLine = z.object({
   /** The item's state now (it moves on after the ticket was raised). */
   state: OrderItemState,
   readyAt: Timestamp.nullable(),
+  /** The table the dish now goes to, when it was moved to another table's bill (TBL-006). */
+  movedTo: z.string().nullable().default(null),
 });
 export type KdsTicketLine = z.infer<typeof KdsTicketLine>;
 

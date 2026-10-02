@@ -250,7 +250,13 @@ describe('[BILL-008] recording payments', () => {
     expect([again.status, codeOf(again)]).toEqual([409, 'INVOICE_SETTLED']);
   });
 
-  it('takes a bill in steps; cash needs an open shift', async () => {
+  it('takes a bill in steps; cash needs an open shift; [TBL-004] then the table needs cleaning', async () => {
+    const cleaning = (value: boolean) =>
+      server()
+        .put('/api/v1/settings/tables.needsCleaning')
+        .set(as(manager))
+        .send({ value, reason: 'Cleaning round' });
+    expect((await cleaning(true)).status).toBe(200);
     const second = await invoiceFor('T2', [['Lassi', 2]]);
     expect(second.grandTotal).toBe(16_800);
     const part = InvoicePaymentsView.parse(
@@ -271,6 +277,9 @@ describe('[BILL-008] recording payments', () => {
     );
     expect(rest).toMatchObject({ status: 'SETTLED', remaining: 0, tableClosed: true });
     expect(rest.payments[1]).toMatchObject({ mode: 'OTHER', modeLabel: 'Other' });
+    const table = await prisma.diningTable.findUniqueOrThrow({ where: { id: id('T2') } });
+    expect(table.state).toBe('NEEDS_CLEANING');
+    expect((await cleaning(false)).status).toBe(200);
 
     const fetched = InvoicePaymentsView.parse(
       (await server().get(`/api/v1/invoices/${second.id}/payments`).set(as(cashier))).body,

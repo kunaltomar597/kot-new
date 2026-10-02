@@ -46,6 +46,21 @@ export const TableMoved = event(
   z.object({ tableSessionId: Id, fromTableId: Id, toTableId: Id }),
 );
 export const TableClosed = event('TableClosed', z.object({ tableId: Id, tableSessionId: Id }));
+/**
+ * Orders or dishes now at another open table (TBL-006): its guests merged into that table
+ * (MERGE), or some dishes moved to its bill (TRANSFER). `orderIds` are the orders now there.
+ */
+export const OrdersMoved = event(
+  'OrdersMoved',
+  z.object({
+    kind: z.enum(['MERGE', 'TRANSFER']),
+    fromTableSessionId: Id,
+    toTableSessionId: Id,
+    fromTableId: Id,
+    toTableId: Id,
+    orderIds: z.array(Id),
+  }),
+);
 /** Another waiter now looks after an open table (TBL-002 per-session override, P1-02b). */
 export const TableWaiterChanged = event(
   'TableWaiterChanged',
@@ -271,6 +286,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   TableOpened,
   TableMoved,
   TableClosed,
+  OrdersMoved,
   TableStateChanged,
   TableWaiterChanged,
   OrderSubmitted,

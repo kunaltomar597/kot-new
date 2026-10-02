@@ -85,6 +85,23 @@ describe('[TBL-003] opening a table', () => {
   });
 });
 
+describe('[TBL-004] a table that needs cleaning', () => {
+  it('is marked clean first, then opened like a free one', async () => {
+    const restaurant = new Restaurant();
+    restaurant.table('T1').state = 'NEEDS_CLEANING';
+    const { server } = await signedInApp(restaurant);
+    await fireEvent.press(await tile('T1, Needs cleaning'));
+    expect(screen.getByText(en.pos.table.needsCleaning)).toBeOnTheScreen();
+    expect(screen.queryByTestId('open-table')).toBeNull();
+    await fireEvent.press(screen.getByTestId('mark-clean'));
+    await fireEvent.press(await screen.findByTestId('open-table'));
+    expect(await screen.findByText('T1 is open')).toBeOnTheScreen();
+    expect(
+      server.callsTo('POST', `/api/v1/tables/${restaurant.table('T1').id}/clean`),
+    ).toHaveLength(1);
+  });
+});
+
 describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
   it('moves the waiter’s table to a free one and stays on it', async () => {
     const { server, restaurant } = await signedInApp();

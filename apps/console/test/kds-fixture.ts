@@ -17,6 +17,7 @@ export function line(n: number, overrides: Partial<KdsTicketLine> = {}): KdsTick
     comboName: null,
     state: 'SENT',
     readyAt: null,
+    movedTo: null,
     ...overrides,
   };
 }

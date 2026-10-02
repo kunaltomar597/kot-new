@@ -18,6 +18,7 @@ const FEED_EVENTS: ReadonlySet<string> = new Set([
   'KotCreated',
   'ItemStatusChanged',
   'TableMoved',
+  'OrdersMoved',
   'TableClosed',
   'TableWaiterChanged',
   'MenuPublished',

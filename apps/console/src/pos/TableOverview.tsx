@@ -1,28 +1,42 @@
 import { grantOf } from '../app/modes.js';
 import type { TableOverviewEntry } from '@rp/contracts';
-import { Button, Dialog, EmptyState, ErrorState, LoadingState, Money, TableTile } from '@rp/ui-web';
+import {
+  Button,
+  Dialog,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Money,
+  TableTile,
+  useToast,
+} from '@rp/ui-web';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useConsoleState } from '../app/console-context.js';
+import { useConsole, useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
 import { useOpenBill } from '../billing/use-open-bill.js';
 import { floorSections, tileAlert, tileDetails } from '@rp/ordering';
 import { Approvals } from './Approvals.js';
+import { MergeTablesDialog } from './MergeTablesDialog.js';
 import { MoveTableDialog } from './MoveTableDialog.js';
 import { OpenTableDialog } from './OpenTableDialog.js';
+import { TransferItemsDialog } from './TransferItemsDialog.js';
 import { useFloor } from './use-floor.js';
 
 type Panel =
   | { readonly kind: 'open'; readonly tableId: string }
   | { readonly kind: 'details'; readonly tableId: string }
-  | { readonly kind: 'move'; readonly tableId: string };
+  | { readonly kind: 'move'; readonly tableId: string }
+  | { readonly kind: 'merge'; readonly tableId: string }
+  | { readonly kind: 'transfer'; readonly tableId: string };
 
 /**
  * The POS floor (TBL-007): every table by section with its state, guests, time seated, waiter and
  * amount so far, kept live by events. A free table opens (TBL-003); an occupied one shows its
- * details and can move to a free table (TBL-005).
+ * details and can move to a free table (TBL-005), merge into another open table or move some of
+ * its dishes to one (TBL-006); one waiting to be cleaned can be marked clean (TBL-004).
  */
 export function TableOverview() {
   const t = useT();
@@ -46,6 +60,13 @@ export function TableOverview() {
   const tables = sections.flatMap((section) => section.tables);
   const free = tables.filter((table) => table.state === 'FREE');
   const selected = tables.find((table) => table.tableId === panel?.tableId);
+  // Tables a merge or a dish can go to: open, without a printed bill, not this one.
+  const others = tables.filter(
+    (table) =>
+      table.session !== null &&
+      table.state !== 'BILL_PRINTED' &&
+      table.tableId !== selected?.tableId,
+  );
   const canMove = person !== undefined && grantOf(person, 'TABLE_MOVE_MERGE') !== 'DENY';
   const canCloseDay = person !== undefined && grantOf(person, 'DAY_END_CLOSE') !== 'DENY';
   const close = () => {
@@ -134,6 +155,13 @@ export function TableOverview() {
           onMove={() => {
             setPanel({ kind: 'move', tableId: selected.tableId });
           }}
+          onMerge={() => {
+            setPanel({ kind: 'merge', tableId: selected.tableId });
+          }}
+          onTransfer={() => {
+            setPanel({ kind: 'transfer', tableId: selected.tableId });
+          }}
+          onCleaned={done}
           onTakeOrder={(sessionId) => {
             void navigate(`table/${sessionId}?label=${encodeURIComponent(selected.label)}`);
           }}
@@ -141,6 +169,12 @@ export function TableOverview() {
       ) : null}
       {selected !== undefined && panel?.kind === 'move' ? (
         <MoveTableDialog table={selected} freeTables={free} onClose={close} onMoved={done} />
+      ) : null}
+      {selected !== undefined && panel?.kind === 'merge' ? (
+        <MergeTablesDialog table={selected} openTables={others} onClose={close} onMerged={done} />
+      ) : null}
+      {selected !== undefined && panel?.kind === 'transfer' ? (
+        <TransferItemsDialog table={selected} openTables={others} onClose={close} onMoved={done} />
       ) : null}
     </div>
   );
@@ -152,6 +186,9 @@ function TableDetails({
   canMove,
   onClose,
   onMove,
+  onMerge,
+  onTransfer,
+  onCleaned,
   onTakeOrder,
 }: {
   table: TableOverviewEntry;
@@ -159,11 +196,79 @@ function TableDetails({
   canMove: boolean;
   onClose: () => void;
   onMove: () => void;
+  onMerge: () => void;
+  onTransfer: () => void;
+  onCleaned: () => void;
   onTakeOrder: (sessionId: string) => void;
 }) {
   const t = useT();
+  const controller = useConsole();
+  const toast = useToast();
   const session = table.session;
   const { openBill, opening } = useOpenBill();
+  const [cleaning, setCleaning] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const clean = async () => {
+    setCleaning(true);
+    setError(undefined);
+    try {
+      await controller.api.markTableClean({ params: { tableId: table.tableId } });
+      toast.show({ title: t('pos.table.cleaned', { table: table.label }), tone: 'success' });
+      onCleaned();
+    } catch (failure) {
+      setError(messageOf(failure, t));
+      setCleaning(false);
+    }
+  };
+
+  let footer = null;
+  if (session === null && table.state === 'NEEDS_CLEANING') {
+    footer = (
+      <Button
+        loading={cleaning}
+        onClick={() => {
+          void clean();
+        }}
+      >
+        {t('pos.table.clean')}
+      </Button>
+    );
+  } else if (session !== null) {
+    footer = (
+      <>
+        {canMove ? (
+          <>
+            <Button variant="secondary" onClick={onMove}>
+              {t('pos.table.move')}
+            </Button>
+            <Button variant="secondary" onClick={onMerge}>
+              {t('pos.table.merge')}
+            </Button>
+            <Button variant="secondary" onClick={onTransfer}>
+              {t('pos.table.transfer')}
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="secondary"
+          loading={opening}
+          onClick={() => {
+            openBill({ tableSessionId: session.id });
+          }}
+        >
+          {t('pos.billTable')}
+        </Button>
+        <Button
+          onClick={() => {
+            onTakeOrder(session.id);
+          }}
+        >
+          {t('pos.table.takeOrder')}
+        </Button>
+      </>
+    );
+  }
   return (
     <Dialog
       open
@@ -171,35 +276,15 @@ function TableDetails({
       side="end"
       onClose={onClose}
       title={t('pos.table.title', { table: table.label })}
-      footer={
-        session === null ? null : (
-          <>
-            {canMove ? (
-              <Button variant="secondary" onClick={onMove}>
-                {t('pos.table.move')}
-              </Button>
-            ) : null}
-            <Button
-              variant="secondary"
-              loading={opening}
-              onClick={() => {
-                openBill({ tableSessionId: session.id });
-              }}
-            >
-              {t('pos.billTable')}
-            </Button>
-            <Button
-              onClick={() => {
-                onTakeOrder(session.id);
-              }}
-            >
-              {t('pos.table.takeOrder')}
-            </Button>
-          </>
-        )
-      }
+      footer={footer}
     >
+      {error === undefined ? null : (
+        <p role="alert" className="console-notice console-notice--danger">
+          {error}
+        </p>
+      )}
       <p>{t(`pos.tableState.${table.state}`)}</p>
+      {table.state === 'NEEDS_CLEANING' ? <p>{t('pos.table.needsCleaning')}</p> : null}
       {session === null ? null : (
         <>
           <p>{tileDetails(table, now, t).slice(0, 2).join(' · ')}</p>

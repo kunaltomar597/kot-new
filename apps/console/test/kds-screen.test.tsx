@@ -100,6 +100,8 @@ describe('[KDS-001] [KDS-002] [KDS-003] [KDS-004] the station board', () => {
           }),
           line(12, { name: 'Dal Makhani', comboName: 'Veg Thali' }),
           line(13, { name: 'Rasmalai', comboName: 'Veg Thali', state: 'PREPARING' }),
+          // [TBL-006] moved to another table's bill after the ticket.
+          line(14, { name: 'Lassi', movedTo: 'T6' }),
         ],
       }),
       ticket(2, {
@@ -121,6 +123,7 @@ describe('[KDS-001] [KDS-002] [KDS-003] [KDS-004] the station board', () => {
     expect(within(first).getByText('Veg Thali')).toBeInTheDocument();
     expect(within(first).getByText('Extra butter')).toBeInTheDocument();
     expect(within(first).getByText('less oil')).toBeInTheDocument();
+    expect(within(first).getByText(t('kds.movedTo', { table: 'T6' }))).toBeInTheDocument();
     expect(
       within(first).getByRole('button', { name: t('kds.bumpFor', { number: 1 }) }),
     ).toBeDisabled();

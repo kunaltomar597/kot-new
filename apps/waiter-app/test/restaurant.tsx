@@ -706,6 +706,12 @@ export class Restaurant {
         status: 200,
         body: { pager: this.pager, lowBatteryPercent: 15 } satisfies MyPagerResponse,
       }))
+      .on('POST', '/api/v1/tables/:tableId/clean', (call) => {
+        const table = this.tables.find((candidate) => call.path.includes(candidate.id));
+        if (table?.state !== 'NEEDS_CLEANING') return { status: 409, body: {} };
+        table.state = 'FREE';
+        return { status: 200, body: { tableId: table.id, state: 'FREE' } };
+      })
       .on('POST', '/api/v1/tables/:tableId/open', (call) => {
         const table = this.tables.find((candidate) => call.path.includes(candidate.id));
         if (table?.state !== 'FREE') {

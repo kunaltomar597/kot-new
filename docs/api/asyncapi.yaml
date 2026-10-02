@@ -31,6 +31,11 @@ channels:
     messages:
       TableClosed:
         $ref: '#/components/messages/TableClosed'
+  OrdersMoved:
+    address: OrdersMoved
+    messages:
+      OrdersMoved:
+        $ref: '#/components/messages/OrdersMoved'
   TableStateChanged:
     address: TableStateChanged
     messages:
@@ -219,6 +224,12 @@ operations:
       $ref: '#/channels/TableClosed'
     messages:
       - $ref: '#/channels/TableClosed/messages/TableClosed'
+  receiveOrdersMoved:
+    action: receive
+    channel:
+      $ref: '#/channels/OrdersMoved'
+    messages:
+      - $ref: '#/channels/OrdersMoved/messages/OrdersMoved'
   receiveTableStateChanged:
     action: receive
     channel:
@@ -425,6 +436,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/TableClosed'
+    OrdersMoved:
+      name: OrdersMoved
+      title: OrdersMoved v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrdersMoved'
     TableStateChanged:
       name: TableStateChanged
       title: TableStateChanged v1
@@ -1581,6 +1598,65 @@ components:
         - businessDate
         - payload
       additionalProperties: false
+    OrdersMoved:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: OrdersMoved
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            kind:
+              type: string
+              enum:
+                - MERGE
+                - TRANSFER
+            fromTableSessionId:
+              $ref: '#/components/schemas/Id'
+            toTableSessionId:
+              $ref: '#/components/schemas/Id'
+            fromTableId:
+              $ref: '#/components/schemas/Id'
+            toTableId:
+              $ref: '#/components/schemas/Id'
+            orderIds:
+              type: array
+              items:
+                $ref: '#/components/schemas/Id'
+          required:
+            - kind
+            - fromTableSessionId
+            - toTableSessionId
+            - fromTableId
+            - toTableId
+            - orderIds
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
     PagerAckMessage:
       type: object
       properties:
@@ -2126,6 +2202,7 @@ components:
         - OCCUPIED
         - BILL_REQUESTED
         - BILL_PRINTED
+        - NEEDS_CLEANING
     TableStateChanged:
       type: object
       properties:

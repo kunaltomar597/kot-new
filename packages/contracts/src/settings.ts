@@ -305,6 +305,16 @@ export const SETTINGS = [
     requirements: ['ORD-016'],
   }),
   setting({
+    key: 'tables.needsCleaning',
+    schema: z.boolean(),
+    defaultValue: false,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'A table the guests have left shows "Needs cleaning" until someone marks it clean.',
+    requirements: ['TBL-004'],
+  }),
+  setting({
     key: 'billing.priceMode',
     schema: z.enum(['TAX_EXCLUSIVE', 'TAX_INCLUSIVE']),
     defaultValue: 'TAX_EXCLUSIVE',

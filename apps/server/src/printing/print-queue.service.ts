@@ -55,7 +55,7 @@ export interface DrainResult {
   readonly failed: number;
 }
 
-const KOT_TRIGGERS = new Set(['KotCreated', 'TableMoved']);
+const KOT_TRIGGERS = new Set(['KotCreated', 'TableMoved', 'OrdersMoved']);
 
 /**
  * The print queue (P1-07b, KDS-008, NFR-P02, NTF-003). Tickets and notes for printing stations
