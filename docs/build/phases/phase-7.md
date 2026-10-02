@@ -171,11 +171,13 @@ Split (2026-10-03):
 - **P7-08b Support asks for diagnostics.** Support requests a bundle with a reason; the request
   reaches the PC in a heartbeat answer; a manager allows it (the bundle is sent) or declines it;
   both are audited on both sides.
-- **P7-08c Remote configuration, support screen and error reporting.**
-  - Vendor settings and feature flags pushed from the Control Plane, visible to managers and
-    audited (UPD-010).
-  - The support screen completed (NFR-I03).
-  - Error reporting to a Sentry-compatible service with scrubbing (NFR-O02).
+- **P7-08c Remote configuration.** Vendor settings and feature flags (`features.*`), set for
+  the fleet and per PC by the Super Admin in the web app. They are pushed in heartbeat answers
+  until the PC reports holding them, applied as vendor-controlled settings (read-only for
+  managers) and audited (UPD-010). The System page is the support screen (NFR-I03).
+- **P7-08d Error reporting.** Errors from the local server, the Control Plane and the console
+  go to a Sentry-compatible service, scrubbed of secrets and personal data (NFR-O02). The
+  console's errors pass through the local server, so no key reaches a browser.
 
 ## P7-09 Digital bills (WhatsApp/SMS)
 

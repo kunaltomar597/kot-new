@@ -81,7 +81,8 @@
             "SUPPORT_NOTES",
             "RELEASES_MANAGE",
             "USERS_MANAGE",
-            "AUDIT_VIEW"
+            "AUDIT_VIEW",
+            "REMOTE_CONFIG"
           ]
         }
       },
@@ -176,7 +177,8 @@
             "SUPPORT_NOTES",
             "RELEASES_MANAGE",
             "USERS_MANAGE",
-            "AUDIT_VIEW"
+            "AUDIT_VIEW",
+            "REMOTE_CONFIG"
           ]
         }
       },

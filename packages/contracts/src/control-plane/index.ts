@@ -3,6 +3,7 @@ export * from './billing.js';
 export * from './diagnostics.js';
 export * from './fleet-admin.js';
 export * from './fleet.js';
+export * from './remote-settings.js';
 export * from './routes.js';
 export * from './schemas.js';
 export * from './signing.js';

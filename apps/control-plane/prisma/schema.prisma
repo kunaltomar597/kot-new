@@ -276,6 +276,8 @@ model Installation {
   lastSeenAt             DateTime?          @map("last_seen_at") @db.Timestamptz(3)
   /// The latest heartbeat's payload, for fleet views (VCP-005, P7-03).
   lastHeartbeat          Json?              @map("last_heartbeat")
+  /// The digest of the vendor settings the PC reported holding (UPD-010, P7-08c).
+  settingsDigest         String?            @map("settings_digest")
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -546,4 +548,14 @@ model DiagnosticsRequest {
 
   @@index([installationId, requestedAt])
   @@map("diagnostics_requests")
+}
+
+/// Vendor settings and feature flags pushed to PCs (UPD-010, P7-08c): 'fleet' or an installation.
+model RemoteSettings {
+  scope     String   @id
+  values    Json
+  updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
+  updatedBy String   @map("updated_by")
+
+  @@map("remote_settings")
 }

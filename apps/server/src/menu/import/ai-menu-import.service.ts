@@ -14,6 +14,7 @@ import {
 import { reviewedMenuSheets, uncheckedDishes } from '@rp/domain';
 import sharp from 'sharp';
 import { AuditService } from '../../audit/audit.service.js';
+import { SettingsService } from '../../settings/settings.service.js';
 import type { Principal } from '../../auth/principal.js';
 import { ControlPlaneError } from '../../cloud/control-plane-client.js';
 import { HeartbeatService } from '../../cloud/heartbeat.service.js';
@@ -77,9 +78,19 @@ export class AiMenuImportService {
     private readonly cloud: HeartbeatService,
     private readonly imports: MenuImportService,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
   ) {}
 
   async start(principal: Principal, request: AiMenuImportRequest): Promise<AiMenuImportView> {
+    // A feature flag the vendor controls (UPD-010): off while its AI service is down, say.
+    const settings = await this.settings.snapshot(principal.restaurantId);
+    if (!settings.get('features.aiMenuImport')) {
+      throw new AppError(
+        409,
+        'FEATURE_OFF',
+        'Reading menus from photos is switched off by the vendor for now. Use the Excel template instead.',
+      );
+    }
     const connection = await this.connection();
     const files = await Promise.all(request.files.map((file) => this.prepare(file)));
     const bytes = files.reduce((total, file) => total + approxBytes(file.contentBase64), 0);

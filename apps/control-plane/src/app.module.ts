@@ -23,6 +23,8 @@ import { DiagnosticsController } from './diagnostics/diagnostics.controller.js';
 import { DiagnosticsService } from './diagnostics/diagnostics.service.js';
 import { FleetController } from './fleet/fleet.controller.js';
 import { FleetService } from './fleet/fleet.service.js';
+import { RemoteSettingsController } from './remote-settings/remote-settings.controller.js';
+import { RemoteSettingsService } from './remote-settings/remote-settings.service.js';
 import { PgRelayProvisioner, RELAY_PROVISIONER } from './support/relay-provisioner.js';
 import { SupportController } from './support/support.controller.js';
 import { SupportService } from './support/support.service.js';
@@ -108,6 +110,7 @@ export class ControlPlaneModule {
         SupportController,
         FleetController,
         DiagnosticsController,
+        RemoteSettingsController,
       ],
       providers: [
         { provide: CP_CONFIG, useValue: config },
@@ -125,6 +128,7 @@ export class ControlPlaneModule {
         SupportService,
         FleetService,
         DiagnosticsService,
+        RemoteSettingsService,
         { provide: ALERT_NOTIFIER, useValue: alertNotifierFor(config) },
         { provide: RELAY_PROVISIONER, useClass: PgRelayProvisioner },
         ReleasesService,

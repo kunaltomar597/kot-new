@@ -11,6 +11,7 @@ type Client = PrismaService | TransactionClient;
 const ENROLMENT_KEY = 'control_plane.enrolment';
 const OFFERED_UPDATE_KEY = 'control_plane.offered_update';
 const DIAGNOSTICS_REQUESTS_KEY = 'control_plane.diagnostics_requests';
+const VENDOR_SETTINGS_KEY = 'control_plane.vendor_settings_digest';
 
 /** This PC's identity at the Control Plane, saved when it enrolled (ADR-0012). */
 export const Enrolment = z.object({
@@ -81,4 +82,13 @@ export function saveDiagnosticsRequests(
   requests: readonly PendingDiagnosticsRequest[],
 ): Promise<void> {
   return writeJson(prisma, DIAGNOSTICS_REQUESTS_KEY, requests);
+}
+
+/** The digest of the vendor settings this PC applied (UPD-010, P7-08c); null before any. */
+export async function readVendorSettingsDigest(prisma: Client): Promise<string | null> {
+  return (await readJson(prisma, VENDOR_SETTINGS_KEY, z.string().nullable())) ?? null;
+}
+
+export function saveVendorSettingsDigest(prisma: Client, digest: string): Promise<void> {
+  return writeJson(prisma, VENDOR_SETTINGS_KEY, digest);
 }

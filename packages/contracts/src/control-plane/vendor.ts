@@ -38,6 +38,8 @@ export const VENDOR_CAPABILITIES = [
   'USERS_MANAGE',
   /** The Control Plane's audit trail. */
   'AUDIT_VIEW',
+  /** Vendor settings and feature flags pushed to restaurant PCs (UPD-010). Super Admin only. */
+  'REMOTE_CONFIG',
 ] as const;
 export const VendorCapability = z.enum(VENDOR_CAPABILITIES);
 export type VendorCapability = z.infer<typeof VendorCapability>;

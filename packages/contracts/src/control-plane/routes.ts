@@ -73,6 +73,11 @@ import {
   FleetResponse,
 } from './fleet.js';
 import {
+  FleetRemoteSettingsView,
+  InstallationRemoteSettingsView,
+  UpdateRemoteSettingsRequest,
+} from './remote-settings.js';
+import {
   CreateVendorUserRequest,
   UpdateVendorUserRequest,
   VendorAccessReviewRequest,
@@ -987,6 +992,74 @@ export const CONTROL_PLANE_ROUTES = [
       ...signedErrors,
       404: { description: 'No such request for this PC.', schema: ApiError },
       409: { description: 'Already answered, or lapsed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getFleetRemoteSettings',
+    method: 'GET',
+    path: '/v1/vendor/remote-settings',
+    summary: 'The vendor settings and feature flags every PC gets, and what may be set',
+    tags: ['vendor'],
+    requirements: ['UPD-010'],
+    capability: 'FLEET_VIEW',
+    responses: {
+      200: { description: 'The fleet’s settings.', schema: FleetRemoteSettingsView },
+      ...vendorErrors,
+    },
+  },
+  {
+    operationId: 'setFleetRemoteSettings',
+    method: 'PUT',
+    path: '/v1/vendor/remote-settings',
+    summary: 'Set the vendor settings and feature flags for every PC, with a reason',
+    description:
+      'Keys left out keep their default. Each PC gets the new values in its next heartbeat ' +
+      'answer; its managers see them and the change is audited on both sides.',
+    tags: ['vendor'],
+    requirements: ['UPD-010', 'SEC-018'],
+    capability: 'REMOTE_CONFIG',
+    request: { body: UpdateRemoteSettingsRequest },
+    responses: {
+      200: { description: 'The fleet’s settings.', schema: FleetRemoteSettingsView },
+      ...vendorErrors,
+      422: {
+        description: 'A key that cannot be pushed, or a value not allowed.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getInstallationRemoteSettings',
+    method: 'GET',
+    path: '/v1/vendor/installations/:id/remote-settings',
+    summary: 'A PC’s vendor settings: the fleet’s, its own, and whether it holds them',
+    tags: ['vendor'],
+    requirements: ['UPD-010'],
+    capability: 'FLEET_VIEW',
+    request: { params: VendorInstallationParams },
+    responses: {
+      200: { description: 'The PC’s settings.', schema: InstallationRemoteSettingsView },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'setInstallationRemoteSettings',
+    method: 'PUT',
+    path: '/v1/vendor/installations/:id/remote-settings',
+    summary: 'Set a PC’s own vendor settings and feature flags, over the fleet’s, with a reason',
+    tags: ['vendor'],
+    requirements: ['UPD-010', 'SEC-018'],
+    capability: 'REMOTE_CONFIG',
+    request: { params: VendorInstallationParams, body: UpdateRemoteSettingsRequest },
+    responses: {
+      200: { description: 'The PC’s settings.', schema: InstallationRemoteSettingsView },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
+      422: {
+        description: 'A key that cannot be pushed, or a value not allowed.',
+        schema: ApiError,
+      },
     },
   },
 ] as const satisfies readonly RouteDefinition<ControlPlaneAccess>[];

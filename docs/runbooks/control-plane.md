@@ -111,6 +111,24 @@ Run `cli` as `pnpm --filter @rp/control-plane cli ...` from an operator host or 
 with that environment's `DATABASE_URL` and `CP_ACTOR` set to who is acting (`cli:<name>` or
 `ci:<pipeline>`). Every command is in the audit log.
 
+## Remote settings and feature flags (UPD-010)
+
+The Super Admin sets them on the web app's Remote settings page, for every PC or for one PC
+(that PC's page, "Change for this PC"):
+
+- QR ordering limits and timings, how often pagers report, and feature flags such as
+  `features.aiMenuImport`.
+- A value left empty keeps the default, or, for one PC, follows the value for every PC.
+
+Each PC gets the values with its next heartbeat (within 5 minutes) and applies them as settings
+its managers see but cannot change. A PC's page shows "The PC holds these settings" once it
+reports them. Every change needs a reason and is audited in the Control Plane and on the PC
+(`VENDOR_SETTINGS_APPLIED`).
+
+To switch AI menu import off for one restaurant while the AI provider has trouble, set
+`features.aiMenuImport` to Off on that PC. Its managers then see "Reading menus from photos is
+switched off by the vendor for now" and can still use the Excel template.
+
 ## Publishing a release
 
 The release pipeline (P7-04) publishes signed installers. By hand:

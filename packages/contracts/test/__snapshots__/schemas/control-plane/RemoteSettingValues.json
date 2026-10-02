@@ -1,0 +1,12 @@
+{
+  "input": {
+    "type": "object",
+    "propertyNames": { "type": "string", "maxLength": 80 },
+    "additionalProperties": {}
+  },
+  "output": {
+    "type": "object",
+    "propertyNames": { "type": "string", "maxLength": 80 },
+    "additionalProperties": {}
+  }
+}

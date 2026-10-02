@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 export { AdminService } from './admin/admin.service.js';
 export { DiagnosticsService } from './diagnostics/diagnostics.service.js';
 export { FleetService } from './fleet/fleet.service.js';
+export { RemoteSettingsService } from './remote-settings/remote-settings.service.js';
 export { SupportService } from './support/support.service.js';
 export { createControlPlaneApp } from './app.factory.js';
 export { type CpConfig, CpConfigSchema } from './config/cp-config.js';
