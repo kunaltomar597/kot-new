@@ -8,6 +8,7 @@ import { InactivityTracker } from '../app/inactivity.js';
 import { modeOfPath, modesFor, type Person } from '../app/modes.js';
 import { AlertPanels, AlertsButton } from '../alerts/AlertCentre.js';
 import { AlertsProvider } from '../alerts/alerts-context.js';
+import { LicenceBanner } from '../licence/LicenceBanner.js';
 
 /** Warn this long before signing an idle person out. */
 const WARN_MS = 30_000;
@@ -25,8 +26,8 @@ function bannerStatus(
 
 /**
  * The frame of every mode: who is signed in, the modes they may open, sign-out, the connection
- * banner (NFR-P11), the inactivity sign-out (AUTH-005) and, on the POS and the dashboard, the
- * person's alerts (P2-06c, MGR-008).
+ * banner (NFR-P11), the licence's reminder or banner (LIC-005), the inactivity sign-out (AUTH-005)
+ * and, on the POS and the dashboard, the person's alerts (P2-06c, MGR-008).
  */
 export function ModeLayout() {
   const t = useT();
@@ -66,6 +67,9 @@ export function ModeLayout() {
         status={status}
         message={status === 'offline' ? t('connection.offline') : t('connection.connecting')}
       />
+      {person === undefined ? null : (
+        <LicenceBanner paymentReminder={mode === 'pos' || mode === 'manage'} />
+      )}
       {person !== undefined && session !== undefined ? (
         <InactivityGuard key={session.id} timeoutSeconds={session.inactivityTimeoutSeconds} />
       ) : null}

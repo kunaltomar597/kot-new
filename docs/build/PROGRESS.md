@@ -347,11 +347,11 @@ Recommended next WPs (dependencies met):
 
 ### Phase 7: Commercial readiness
 
-- [ ] P7-01 Licensing module
+- [x] P7-01 Licensing module (two-person review pending, manual task 23)
   - [x] P7-01a `@rp/licensing`: files, fingerprint, state, reactivation codes, clock guard
   - [x] P7-01b Control Plane: issuing and renewing licences
   - [x] P7-01c Local server: the licence agent and enforcement
-  - [ ] P7-01d Screens: reminders, banners, the Owner's licence page
+  - [x] P7-01d Screens: reminders, banners, the Owner's licence page
 - [ ] P7-02 Control Plane: tenants, subscriptions, licences
 - [ ] P7-03 Fleet monitoring
 - [ ] P7-04 Release management and remote updates
@@ -612,6 +612,18 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-01d):
+
+451. Staff screens show the licence only where it applies (production): the payment reminder on
+     the POS and the dashboard, put off until the next day with one tap (remembered in the
+     browser only); the grace days left, the day and time a restriction starts, and the
+     restricted or ended notice on every staff screen (POS, dashboard, kitchen screens, waiter
+     phones), never on a table tablet or the QR page. They read it again on `LicenceChanged`.
+452. Manage → Licence (Owner and managers, LIC-008) shows the state, why, until when, the plan,
+     modules and devices against their limits; the Owner also has "Check now" and the
+     reactivation code (with the second factor), and the page says when the licence does not
+     apply on this PC (development).
 
 Decided 2026-10-03 (P7-01c):
 
@@ -2351,6 +2363,15 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-01d Licence screens (P7-01 done)
+
+Built: `@rp/ordering` `licenceNotice`; console `LicenceBanner` in every mode and Manage →
+Licence (`manage/licence`); `@rp/mobile-shell` `LicenceBanner` in every staff `Screen`; strings
+`licence.*`; the console test harness answers a quiet licence by default.
+
+Tests: ordering +3, console +7 (grace, pending, reminder put off, nothing in development; the
+Owner's page, reactivation and check now, managers without the Owner's actions), waiter app +2.
 
 ### 2026-10-03: P7-01c Local server: the licence agent
 

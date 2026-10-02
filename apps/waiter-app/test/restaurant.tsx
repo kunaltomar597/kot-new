@@ -97,6 +97,29 @@ export class Restaurant {
       session: session(9005, KIRAN, 4),
     },
   ];
+  /** The licence as the server answers it (LIC-005); active and not applied by default. */
+  licence: Record<string, unknown> = {
+    state: 'ACTIVE',
+    recorded: 'ACTIVE',
+    problem: null,
+    restrictedFrom: null,
+    daysLeft: null,
+    validUntil: null,
+    enforced: false,
+    capabilities: {
+      openNewTableSessions: true,
+      createOrders: true,
+      sendKots: true,
+      billOpenTables: true,
+      print: true,
+      viewReports: true,
+      exportData: true,
+      backups: true,
+      showPaymentReminder: false,
+      showGraceBanner: false,
+    },
+    details: null,
+  };
   /** The restaurant lets waiters print bills from the app (WTR-008, `bills.waiterMayPrint`). */
   waiterMayPrint = false;
   /** Open takeaway orders (TBL-008, WTR-013). */
@@ -607,6 +630,7 @@ export class Restaurant {
   server(): FakeServer {
     return fakeLocalServer()
       .on('GET', '/api/v1/tables/overview', () => ({ status: 200, body: this.overview() }))
+      .on('GET', '/api/v1/licence', () => ({ status: 200, body: this.licence }))
       .on('GET', '/api/v1/floor', () => ({ status: 200, body: this.floor() }))
       .on('GET', '/api/v1/waiter-assignments', () => ({
         status: 200,

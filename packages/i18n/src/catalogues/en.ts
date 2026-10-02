@@ -35,6 +35,79 @@ export const en = {
       dismiss: 'Dismiss notification',
     },
   },
+  licence: {
+    banner: {
+      paymentDue:
+        'A subscription payment is due. Please arrange it with your vendor; nothing changes here.',
+      remindTomorrow: 'Remind me tomorrow',
+      grace:
+        '{count, plural, =0 {The subscription’s grace period ends today.} one {# day left to renew the subscription.} other {# days left to renew the subscription.}} After that, new tables and orders pause.',
+      pending:
+        'New tables and orders will pause from {date} at {time}. Ask the owner to contact the vendor.',
+      restricted:
+        'New tables and orders are paused: the licence is restricted. Open tables can still be billed, and printing, reports and exports work.',
+      terminated:
+        'The subscription has ended. New tables and orders are off; bills, reports and exports still work.',
+    },
+    page: {
+      title: 'Licence',
+      intro:
+        'Your subscription as this restaurant PC knows it. It is renewed automatically while the PC is online; nothing is ever deleted or withheld in any state.',
+      loadFailed: 'The licence could not be read.',
+      state: {
+        ACTIVE: 'Active',
+        PAYMENT_DUE: 'Payment due',
+        GRACE: 'Grace period',
+        RESTRICTED: 'Restricted',
+        TERMINATED: 'Ended',
+      },
+      pendingRestriction: 'Restricted from {date} at {time}, the start of a business day.',
+      daysLeft: '{count, plural, one {# day left} other {# days left}}',
+      validUntil: 'Valid until {date} {time}; renewed daily while online.',
+      notEnforced: 'On this PC (development) the licence is shown but restricts nothing.',
+      plan: 'Plan',
+      modules: 'Modules',
+      devices: 'Devices',
+      deviceUse: '{used} of {limit}',
+      device: {
+        TABLE_TABLET: 'Table tablets',
+        PAGER: 'Pagers',
+        WAITER_PHONE: 'Waiter phones',
+        KDS: 'Kitchen screens',
+      },
+      module: {
+        POS: 'POS',
+        KDS: 'Kitchen screens',
+        WAITER_APP: 'Waiter app',
+        TABLE_TABLET: 'Table tablets',
+        QR_MENU: 'QR menu',
+        PAGERS: 'Pagers',
+        RECOMMENDATIONS: 'Suggestions',
+        REPORTS: 'Reports',
+      },
+      reason: 'From the vendor: {reason}',
+      reactivatedUntil: 'Reactivated with a code until {date} {time}.',
+      problem: {
+        MISSING: 'This PC has no licence yet. Connect it to the internet so it can fetch one.',
+        UNKNOWN_KEY: 'The licence file was not issued by your vendor.',
+        TAMPERED: 'The licence file has been changed and is no longer valid.',
+        MALFORMED: 'The licence file cannot be read.',
+        OTHER_INSTALLATION: 'The licence belongs to another installation.',
+        OTHER_PC: 'The licence is for another PC. Ask the vendor to move it to this one.',
+        EXPIRED:
+          'The licence ran out: this PC has not been online to renew it. Connect it to the internet, or ask the vendor for a reactivation code.',
+        GRACE_ENDED: 'The grace period has ended.',
+        VENDOR: 'The vendor has restricted the licence.',
+      },
+      check: 'Check now',
+      checked: 'Licence checked with the vendor',
+      code: 'Reactivation code',
+      codeHint:
+        'From the vendor, by phone, when this PC cannot go online. Like ABCD-EFGH-JKMN-PQRS.',
+      reactivate: 'Reactivate',
+      reactivated: 'The licence is active again',
+    },
+  },
   connection: {
     online: 'Connected to the restaurant server',
     connecting: 'Connecting to the restaurant server…',
@@ -478,6 +551,7 @@ export const en = {
       system: 'System',
       settings: 'Settings',
       security: 'Security',
+      licence: 'Licence',
       qrCodes: 'QR codes',
       floor: 'Floor',
     },

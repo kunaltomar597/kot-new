@@ -13,3 +13,4 @@ export * from './line-check.js';
 export * from './qr-menu.js';
 export * from './relay-status.js';
 export * from './qr-suggestions.js';
+export * from './licence-notice.js';

@@ -17,6 +17,7 @@ import { NotificationRulesScreen } from './settings/NotificationRulesScreen.js';
 import { RecommendationsScreen } from './settings/RecommendationsScreen.js';
 import { SettingsScreen } from './settings/SettingsScreen.js';
 import { FloorScreen } from './floor/FloorScreen.js';
+import { LicenceScreen } from './licence/LicenceScreen.js';
 import { QrCodesScreen } from './qr/QrCodesScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
@@ -50,6 +51,8 @@ export function ManageHome() {
   const seesReports = allows('REPORTS_VIEW_EXPORT');
   const viewsAudit = allows('AUDIT_VIEW');
   const isOwner = person?.role === 'OWNER';
+  const viewsLicence = person !== undefined && grantOf(person, 'LICENSE_VIEW') !== 'DENY';
+  const managesLicence = person !== undefined && grantOf(person, 'LICENSE_MANAGE') !== 'DENY';
   const first = operates
     ? undefined
     : seesReports
@@ -132,6 +135,11 @@ export function ManageHome() {
             {t('dashboard.section.system')}
           </NavLink>
         ) : null}
+        {viewsLicence ? (
+          <NavLink to="/manage/licence" className="dashboard__link">
+            {t('dashboard.section.licence')}
+          </NavLink>
+        ) : null}
         {isOwner ? (
           <NavLink to="/manage/security" className="dashboard__link">
             {t('dashboard.section.security')}
@@ -167,6 +175,9 @@ export function ManageHome() {
           ) : null}
           {operates ? (
             <Route path="settings/recommendations" element={<RecommendationsScreen />} />
+          ) : null}
+          {viewsLicence ? (
+            <Route path="licence" element={<LicenceScreen owner={managesLicence} />} />
           ) : null}
           {isOwner ? <Route path="security" element={<OwnerSecurityScreen />} /> : null}
           <Route path="*" element={<Navigate to="/manage" replace />} />
