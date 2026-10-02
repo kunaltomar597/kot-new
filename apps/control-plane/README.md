@@ -5,8 +5,8 @@ fleet health, release channels and rollouts, support diagnostics and AI menu imp
 NestJS API on managed PostgreSQL in an India region, with separate development, staging and
 production (VCP-009).
 
-Built so far: P0-17a (ADR-0012). Later: P7-01 to P7-04, P7-08 and P6-04; the web app for vendor
-staff comes in P7-02.
+Built so far: P0-17a (ADR-0012) and P6-04a (AI menu import). Later: P7-01 to P7-04 and P7-08;
+the web app for vendor staff comes in P7-02.
 
 ## What exists (P0-17a)
 
@@ -44,6 +44,26 @@ staff comes in P7-02.
 - Health: `GET /v1/health` (public), for the load balancer.
 - Contracts: `@rp/contracts/control-plane`. The generated document is
   `docs/api/control-plane.openapi.json`.
+
+## AI menu import (P6-04a)
+
+- `POST /v1/menu-extractions` (signed): a restaurant's server sends up to 10 photos (JPEG, PNG,
+  WebP, at most 5 MB each) or PDFs, 20 MB together. The answer (202) is the job; `GET
+/v1/menu-extractions/:id` gives its status and, once `DONE`, the draft (`MenuDraft`: sections,
+  dishes with prices in paise, sizes, veg marks, spice, tags, add-ons and what the reader was
+  unsure of). A job belongs to the restaurant (tenant) that sent it.
+- A worker in the service reads queued jobs two at a time through `MenuExtractor`. In production
+  that is `AnthropicMenuExtractor`: one Messages API call with every file and a forced
+  `record_menu` tool call, so the answer is structured; prices come back as printed text and are
+  turned into paise with integer arithmetic. Tests use a scripted reader; CI never calls the
+  provider.
+- A busy provider is tried three times, 30 seconds apart; a job cut off by a restart is read
+  again. The files are deleted as soon as a job is done or failed; drafts are dropped after 30
+  days, while the job's record (model, tokens) stays for the costs. Every request and result is
+  audited.
+- Without `CP_AI_API_KEY`, `POST` answers 503 `AI_IMPORT_UNAVAILABLE`. Each restaurant may read
+  `CP_AI_DAILY_LIMIT` menus in 24 hours (429 `AI_IMPORT_LIMIT`). Setting up the key is
+  [manual task 22](../../manual-tasks/22-ai-menu-import.md).
 
 ## Configuration
 

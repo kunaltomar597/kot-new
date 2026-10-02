@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, Timestamp } from '../common.js';
+import { Id, Paise, Timestamp } from '../common.js';
 
 /**
  * Contracts of the Vendor Control Plane API (ADR-0012): installation enrolment, heartbeats
@@ -124,6 +124,117 @@ export const UpdatesResponse = z.object({
 });
 export type UpdatesResponse = z.infer<typeof UpdatesResponse>;
 
+// ---------------------------------------------------------------- AI menu import (P6-04a)
+
+/** At most this many photos or PDFs per menu (ONB-006). */
+export const MENU_EXTRACTION_MAX_FILES = 10;
+/** All files together, before base64. */
+export const MENU_EXTRACTION_MAX_BYTES = 20 * 1024 * 1024;
+/** One photo: the AI provider takes no larger image. */
+export const MENU_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+export const MENU_EXTRACTION_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+] as const;
+
+const FileBase64 = z
+  .string()
+  .min(4)
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Base64 without line breaks');
+const base64Bytes = (text: string) =>
+  Math.floor((text.length * 3) / 4) - (text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0);
+
+/** A photo or PDF of the printed menu. */
+export const MenuExtractionFile = z
+  .strictObject({
+    name: z.string().min(1).max(200),
+    contentType: z.enum(MENU_EXTRACTION_TYPES),
+    contentBase64: FileBase64,
+  })
+  .refine(
+    (file) =>
+      file.contentType === 'application/pdf' ||
+      base64Bytes(file.contentBase64) <= MENU_IMAGE_MAX_BYTES,
+    { message: 'A photo may be at most 5 MB', path: ['contentBase64'] },
+  );
+export type MenuExtractionFile = z.infer<typeof MenuExtractionFile>;
+
+/** ONB-006: read a printed menu into the import template's structure. */
+export const MenuExtractionRequest = z
+  .strictObject({ files: z.array(MenuExtractionFile).min(1).max(MENU_EXTRACTION_MAX_FILES) })
+  .refine(
+    (request) =>
+      request.files.reduce((total, file) => total + base64Bytes(file.contentBase64), 0) <=
+      MENU_EXTRACTION_MAX_BYTES,
+    { message: 'The files may be at most 20 MB together', path: ['files'] },
+  );
+export type MenuExtractionRequest = z.infer<typeof MenuExtractionRequest>;
+
+/** A dish as read from the printed menu; everything the restaurant must still set is left out. */
+export const MenuDraftItem = z.strictObject({
+  name: z.string().min(1).max(80),
+  description: z.string().min(1).max(500).nullable(),
+  /** Null when only its sizes carry prices. */
+  price: Paise.nullable(),
+  /** Sizes or portions, e.g. Half and Full, each with its price. */
+  variants: z.array(z.strictObject({ name: z.string().min(1).max(40), price: Paise })).max(10),
+  /** As marked on the menu (the green and red symbols, or words); null when not marked. */
+  foodType: z.enum(['VEG', 'NON_VEG', 'EGG']).nullable(),
+  spiceLevel: z.int().min(0).max(3).nullable(),
+  tags: z.array(z.string().min(1).max(30)).max(10),
+  /** What the reader was unsure of, for the person who checks it (ONB-006). */
+  note: z.string().min(1).max(200).nullable(),
+});
+export type MenuDraftItem = z.infer<typeof MenuDraftItem>;
+
+/** A printed menu as read: its sections and dishes, and add-ons offered with them. */
+export const MenuDraft = z.strictObject({
+  categories: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1).max(60),
+        items: z.array(MenuDraftItem).min(1).max(500),
+      }),
+    )
+    .max(60),
+  /** "Add extra cheese ₹40": priced extras that become modifier groups. */
+  addOns: z
+    .array(
+      z.strictObject({
+        group: z.string().min(1).max(60),
+        options: z
+          .array(z.strictObject({ name: z.string().min(1).max(60), price: Paise }))
+          .min(1)
+          .max(30),
+      }),
+    )
+    .max(30),
+  /** Remarks for the whole menu, e.g. "Prices on page 2 were cut off". */
+  notes: z.array(z.string().min(1).max(300)).max(20),
+});
+export type MenuDraft = z.infer<typeof MenuDraft>;
+
+export const MenuExtractionStatus = z.enum(['QUEUED', 'RUNNING', 'DONE', 'FAILED']);
+export type MenuExtractionStatus = z.infer<typeof MenuExtractionStatus>;
+
+export const MenuExtractionView = z.object({
+  id: Id,
+  status: MenuExtractionStatus,
+  createdAt: Timestamp,
+  finishedAt: Timestamp.nullable(),
+  /** Why it failed, in words a manager can act on. */
+  error: z.object({ code: z.string(), message: z.string() }).nullable(),
+  /** The menu as read, once DONE: a draft for a person to check (ONB-006). */
+  draft: MenuDraft.nullable(),
+});
+export type MenuExtractionView = z.infer<typeof MenuExtractionView>;
+
+export const MenuExtractionParams = z.strictObject({ extractionId: Id });
+export type MenuExtractionParams = z.infer<typeof MenuExtractionParams>;
+
 /** Error codes of the Control Plane API (in `ApiError.code`). */
 export const CONTROL_PLANE_ERRORS = {
   /** Missing or malformed signature headers, unknown installation or a signature that fails. */
@@ -137,4 +248,12 @@ export const CONTROL_PLANE_ERRORS = {
   /** Unknown, used or expired enrolment code, or a proof that does not match the key. */
   enrolmentInvalid: 'ENROLMENT_INVALID',
   tooManyAttempts: 'TOO_MANY_ATTEMPTS',
+  /** The vendor has not set up the AI provider (ONB-006). */
+  aiImportUnavailable: 'AI_IMPORT_UNAVAILABLE',
+  /** This restaurant read its daily number of menus already. */
+  aiImportLimit: 'AI_IMPORT_LIMIT',
+  menuExtractionNotFound: 'MENU_EXTRACTION_NOT_FOUND',
+  /** Why an extraction failed (in `MenuExtractionView.error.code`). */
+  aiProviderFailed: 'AI_PROVIDER_FAILED',
+  aiNoMenuFound: 'AI_NO_MENU_FOUND',
 } as const;

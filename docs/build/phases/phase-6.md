@@ -53,6 +53,19 @@ bulk photo upload matched by file name or item code with manual correction.
 Acceptance: pipeline test with a fixture menu (provider call mocked in CI); review screen blocks
 commit until reviewed.
 
+Split in three (2026-10-02):
+
+- **P6-04a Control Plane reading service.** Signed job API (`/v1/menu-extractions`), files held
+  only until read, a worker calling the AI provider (Anthropic Messages API, forced tool call) with
+  the key from the Control Plane's secret store, retries, a daily limit per restaurant, audit; the
+  provider mocked in CI.
+- **P6-04b Review and import on the restaurant PC.** The local server sends the photos (resized
+  first) to the Control Plane and fetches the draft; the console's review screen shows every dish,
+  lets the manager correct it and set what a printed menu cannot say (tax group, station), blocks
+  the import until each dish is checked, then imports through the P1-05 template path.
+- **P6-04c Bulk photo upload (ONB-007).** Many photos at once, matched to dishes by file name or
+  short code, with a table to correct the matches before upload.
+
 ## P6-05 Should-have operations batch
 
 Requirements: ORD-016 (hold and fire), TBL-006 (merge tables, transfer items), MENU-007

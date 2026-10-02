@@ -6,6 +6,9 @@ import {
   EnrolResponse,
   HeartbeatRequest,
   HeartbeatResponse,
+  MenuExtractionParams,
+  MenuExtractionRequest,
+  MenuExtractionView,
   UpdatesQuery,
   UpdatesResponse,
 } from './schemas.js';
@@ -96,6 +99,42 @@ export const CONTROL_PLANE_ROUTES = [
     responses: {
       200: { description: 'The update, or null when up to date.', schema: UpdatesResponse },
       ...signedErrors,
+    },
+  },
+  {
+    operationId: 'createMenuExtraction',
+    method: 'POST',
+    path: '/v1/menu-extractions',
+    summary: 'Read a printed menu from photos or a PDF (AI-assisted import)',
+    description:
+      'ONB-006, VCP-008: the files are read by the AI provider, whose key only the Control Plane ' +
+      'holds (SEC-002). The answer comes at once with the job; ask for it until it is DONE or ' +
+      'FAILED (a menu takes about a minute). The files are deleted once read. What comes back is ' +
+      'a draft that a person must check before anything is imported.',
+    tags: ['onboarding'],
+    requirements: ['ONB-006', 'VCP-008', 'SEC-002'],
+    capability: 'INSTALLATION',
+    request: { body: MenuExtractionRequest },
+    responses: {
+      202: { description: 'Queued.', schema: MenuExtractionView },
+      ...signedErrors,
+      429: { description: 'The daily number of menus is used up.', schema: ApiError },
+      503: { description: 'AI import is not set up.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getMenuExtraction',
+    method: 'GET',
+    path: '/v1/menu-extractions/:extractionId',
+    summary: 'How reading a menu is going, and the draft once done',
+    tags: ['onboarding'],
+    requirements: ['ONB-006', 'VCP-008'],
+    capability: 'INSTALLATION',
+    request: { params: MenuExtractionParams },
+    responses: {
+      200: { description: 'The job.', schema: MenuExtractionView },
+      ...signedErrors,
+      404: { description: 'No such job for this restaurant.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition<ControlPlaneAccess>[];

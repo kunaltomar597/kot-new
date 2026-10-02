@@ -33,8 +33,9 @@ code from going live:
 - [ ] Expo account + Android app-signing keystore (signed APKs, OTA updates).
 - [ ] MDM subscription (kiosk tablets, APK distribution).
 - [ ] Backup storage in India (S3-compatible), error monitoring (Sentry), transactional e-mail.
-- [ ] AI provider account (AI menu import), WhatsApp/SMS provider with DLT registration (digital
-      bills).
+- [ ] AI provider account and its key in the Control Plane's secret manager (AI menu import):
+      [`manual-tasks/22-ai-menu-import.md`](manual-tasks/22-ai-menu-import.md).
+- [ ] WhatsApp/SMS provider with DLT registration (digital bills).
 
 ## 3. Hardware and on-site tests
 

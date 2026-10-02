@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-04 AI menu import, P6-05 the should-have batch, then Phase 7.
+- P6-04b review and import, P6-04c bulk photos, P6-05 the should-have batch, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -333,6 +333,9 @@ Recommended next WPs (dependencies met):
 - [x] P6-02 Learned recommendations
 - [ ] P6-03 Voice search [H]
 - [ ] P6-04 AI-assisted menu import
+  - [x] P6-04a Control Plane reading service
+  - [ ] P6-04b Review and import on the restaurant PC
+  - [ ] P6-04c Bulk photo upload (ONB-007)
 - [ ] P6-05 Should-have operations batch
 
 ### Phase 7: Commercial readiness
@@ -598,6 +601,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-04a):
+
+397. P6-04 is built in three parts: a, the Control Plane's reading service; b, review and import
+     on the restaurant PC; c, bulk photo upload (ONB-007).
+398. The AI provider is Anthropic's Claude (Messages API), model `claude-sonnet-5-5` by default
+     (`CP_AI_MODEL`): it reads photos and PDFs, and a forced tool call returns the menu as
+     structured data. The key is only in the Control Plane's environment (`CP_AI_API_KEY`, from
+     the secret manager; SEC-002); without it AI import is off and the Excel template stays.
+399. Reading is a job, not one long request: `POST /v1/menu-extractions` answers 202 at once and
+     the restaurant's server asks for the result (a menu takes about a minute). Files wait in the
+     Control Plane's database and are deleted once read; drafts are dropped after 30 days; the job
+     record keeps the model and tokens for costs. Up to 10 files, photos ≤ 5 MB (the provider's
+     limit), 20 MB together.
+400. The draft holds only what a printed menu can say: sections, dishes, descriptions, prices
+     (paise, from the printed text with integer arithmetic), sizes, veg / non-veg / egg marks,
+     spice, tags, add-ons, and what the reader was unsure of. Tax group, station and the rest are
+     set by the manager at review (P6-04b).
+401. Each restaurant may have 20 menus read in 24 hours (`CP_AI_DAILY_LIMIT`; the vendor pays per
+     menu). A busy provider (429, 5xx, 529, timeout) is tried 3 times, 30 s apart.
 
 Decided 2026-10-02 (P6-02):
 
@@ -2101,6 +2124,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-04a AI menu import: the Control Plane's reading service
+
+Built:
+
+- Contracts (`@rp/contracts/control-plane`): `MenuExtractionRequest`, `MenuDraft`,
+  `MenuExtractionView`, routes `createMenuExtraction` and `getMenuExtraction`, error codes.
+- Control Plane: migration `20261002235900_menu_extractions` (jobs and files);
+  `menu-import/` with `menu-reading.ts` (the tool schema and prompt, `draftFromReading`,
+  `paiseOf`), `AnthropicMenuExtractor`, `MenuExtractionsService` (worker, retries, restart,
+  purge, daily limit, audit) and the controller; config `CP_AI_*`; a 28 MB body limit on this
+  route only; `x-api-key` redacted from logs.
+- Manual task 22 (the key), CP README, phase-6 split.
+
+Tests: CP unit `menu-reading.test.ts` 6 (rupees to paise, the draft as printed, no menu, limits,
+the request sent with the key in a header only, busy / refused / too long / no menu / offline);
+integration `menu-extractions.int.test.ts` 6 (read in the background, files deleted, costs and
+audit; another restaurant cannot see it; types, sizes and counts refused; a busy reader retried
+later and a failure explained; a job cut off by a restart read again; the daily limit per
+restaurant; off without a key). The real provider is checked by manual task 22.
 
 ### 2026-10-02: P6-02 Learned recommendations
 

@@ -83,7 +83,9 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
       version: '0.0.0-test',
     }) as unknown as Doc;
     for (const registered of controlPlane.CONTROL_PLANE_ROUTES) {
-      expect(document.paths[registered.path]?.[registered.method.toLowerCase()]).toBeDefined();
+      // OpenAPI writes Express-style `:param` as `{param}`.
+      const path = registered.path.replace(/:([A-Za-z0-9_]+)/g, '{$1}');
+      expect(document.paths[path]?.[registered.method.toLowerCase()], path).toBeDefined();
     }
     for (const name of collectSchemas(controlPlane).keys()) {
       expect(document.components.schemas).toHaveProperty([name]);

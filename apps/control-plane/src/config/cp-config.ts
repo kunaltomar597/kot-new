@@ -36,6 +36,16 @@ export const CpConfigSchema = z
     heartbeatSeconds: z.coerce.number().int().min(60).max(3_600).default(300),
     /** Reverse proxies in front of the service, so rate limits see the real client address. */
     trustProxy: z.coerce.number().int().min(0).max(5).default(0),
+    /**
+     * The AI provider's key for menu import (ONB-006), from the secret manager only (SEC-002).
+     * Without it, AI import is off and restaurants use the Excel template.
+     */
+    aiApiKey: z.string().min(1).optional(),
+    aiModel: z.string().min(1).default('claude-sonnet-5-5'),
+    aiBaseUrl: z.url({ protocol: /^https?$/ }).default('https://api.anthropic.com'),
+    aiTimeoutSeconds: z.coerce.number().int().min(30).max(900).default(300),
+    /** Menus each restaurant may have read in 24 hours (the vendor pays per menu). */
+    aiDailyLimit: z.coerce.number().int().min(1).max(500).default(20),
   })
   .superRefine((config, context) => {
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
@@ -67,6 +77,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     logPretty: env.LOG_PRETTY,
     heartbeatSeconds: env.CP_HEARTBEAT_SECONDS,
     trustProxy: env.CP_TRUST_PROXY,
+    aiApiKey: env.CP_AI_API_KEY === '' ? undefined : env.CP_AI_API_KEY,
+    aiModel: env.CP_AI_MODEL,
+    aiBaseUrl: env.CP_AI_BASE_URL,
+    aiTimeoutSeconds: env.CP_AI_TIMEOUT_SECONDS,
+    aiDailyLimit: env.CP_AI_DAILY_LIMIT,
   });
   if (!result.success) {
     const problems = result.error.issues
