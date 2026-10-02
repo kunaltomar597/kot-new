@@ -166,3 +166,17 @@ export const LocalDiagnosticsRequestList = z.object({
   requests: z.array(PendingDiagnosticsRequestSchema),
 });
 export type LocalDiagnosticsRequestList = z.infer<typeof LocalDiagnosticsRequestList>;
+
+/**
+ * An error in an app on this restaurant's network (NFR-O02, P7-08d): the server reports it to the
+ * vendor's error service, scrubbed, so no app holds the service's key.
+ */
+export const ClientErrorReport = z.strictObject({
+  component: z.enum(['console', 'waiter-app', 'table-tablet']),
+  message: z.string().max(1_000),
+  stack: z.string().max(8_000).nullable(),
+  /** Where in the app it happened (a route, without its query). */
+  path: z.string().max(200).nullable(),
+  appVersion: z.string().max(64).nullable(),
+});
+export type ClientErrorReport = z.infer<typeof ClientErrorReport>;

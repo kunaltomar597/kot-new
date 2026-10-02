@@ -366,11 +366,11 @@ Recommended next WPs (dependencies met):
 - [ ] P7-05 Backup and restore
 - [ ] P7-06 Data lifecycle
 - [ ] P7-07 Onboarding wizard completion
-- [ ] P7-08 Diagnostics, support screen, remote config
+- [x] P7-08 Diagnostics, support screen, remote config
   - [x] P7-08a Diagnostics bundle
   - [x] P7-08b Support asks for diagnostics
   - [x] P7-08c Remote configuration
-  - [ ] P7-08d Error reporting
+  - [x] P7-08d Error reporting
 - [ ] P7-09 Digital bills
 - [ ] P7-10 Phase 7 exit test
 
@@ -624,6 +624,23 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-08d):
+
+506. Error reporting (NFR-O02) uses the Sentry envelope format, so any Sentry-compatible service
+     works (manual task 24 suggests one in India). The new `@rp/error-reporting` package is
+     shared by the server and the CP. Each report is scrubbed: messages and context through
+     `@rp/domain` scrub, and user folders taken out of file paths. At most 60 reports an hour per
+     machine and the same error once a minute; a report never blocks or throws.
+507. The DSN is configuration (`RP_ERROR_DSN` written by the installer, `CP_ERROR_DSN` from the
+     secret manager). Without one, nothing leaves the machine.
+508. Apps never hold the DSN (SEC-002). The console, the waiter app and the table tablet post to
+     the PC (`POST /api/v1/client-errors`, a paired device only), which reports with its key,
+     tagged with the component and device type.
+     - Limits: at most 20 an hour per device on the server, and 10 a minute in each app.
+     - These are not counted in the heartbeat's server error count.
+509. A crash (uncaught exception) of the server or the CP is reported, then the process exits
+     within 2 seconds as before; the watchdog restarts it.
 
 Decided 2026-10-03 (P7-08c):
 
@@ -2603,6 +2620,27 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-08d Error reporting (P7-08 done)
+
+Built:
+
+- `packages/error-reporting` (`parseDsn`, `buildEvent`, `envelopeOf`, `SentryReporter`);
+- server: `RP_ERROR_DSN`, the reporter behind `ERROR_REPORTER` (still counted for heartbeats),
+  `ClientErrorsController` (`POST /api/v1/client-errors`), and crash reporting in `main.ts`;
+- CP: `CP_ERROR_DSN`, `CP_ERROR_REPORTER`, the exception filter reporting unexpected errors, and
+  crash reporting;
+- console: `createErrorReporting` and `watchPageErrors`;
+- mobile-core: `createDeviceErrorReporting` and `watchUncaughtErrors` (React Native's global
+  handler), wired in the waiter app and the table tablet;
+- manual task 24 and the runbook section.
+
+Tests: error-reporting +5; server +2 integration (a stand-in service: scrubbed server error,
+counted; app errors with device type, rate limit, 401); CP +1 integration; console +2;
+mobile-core +2.
+
+Gotcha: the observability module and its controller share tokens through
+`observability/tokens.ts`; importing them from the module file was circular.
 
 ### 2026-10-03: P7-08c Remote configuration
 

@@ -34,6 +34,7 @@
     "@prisma/client": "7.10.0",
     "@rp/contracts": "workspace:*",
     "@rp/domain": "workspace:*",
+    "@rp/error-reporting": "workspace:*",
     "@rp/licensing": "workspace:*",
     "@rp/totp": "workspace:*",
     "express": "^5.2.1",

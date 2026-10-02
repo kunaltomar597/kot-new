@@ -85,6 +85,11 @@ export const AppConfigSchema = z.object({
    * (P0-16); the server's own version when unset.
    */
   productVersion: z.string().min(1).max(64).optional(),
+  /**
+   * The vendor's error service (NFR-O02, P7-08d), a Sentry DSN, set by the installer. Unset: no
+   * reports leave the PC.
+   */
+  errorDsn: z.url({ protocol: /^https?$/ }).optional(),
   /** The pagers' MQTT broker (P2-04, PGR-005): on by default; over TLS when `tls` is on. */
   mqtt: z.enum(['on', 'off']).default('on'),
   /** MQTT port; 8883 is MQTTS. 0 picks a free port (tests). */
@@ -159,6 +164,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     relayUrl: env.RP_RELAY_URL,
     qrSiteUrl: env.RP_QR_SITE_URL,
     productVersion: env.RP_PRODUCT_VERSION,
+    errorDsn: env.RP_ERROR_DSN === '' ? undefined : env.RP_ERROR_DSN,
     mqtt: env.RP_MQTT,
     mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,

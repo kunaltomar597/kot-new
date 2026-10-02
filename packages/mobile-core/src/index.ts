@@ -9,3 +9,4 @@ export * from './server-url.js';
 export * from './storage.js';
 export * from './tablet.js';
 export * from './suggestions.js';
+export { createDeviceErrorReporting, watchUncaughtErrors } from './error-reporting.js';

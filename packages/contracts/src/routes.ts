@@ -277,6 +277,7 @@ import {
 import { DiagnosticsBundle, DiagnosticsRequestParams } from './control-plane/diagnostics.js';
 import {
   ApproveUpdateRequest,
+  ClientErrorReport,
   HealthResponse,
   LocalDiagnosticsRequestList,
   SendDiagnosticsRequest,
@@ -718,6 +719,24 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such open request.', schema: ApiError },
       503: { description: 'The Control Plane could not be reached.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'reportClientError',
+    method: 'POST',
+    path: '/api/v1/client-errors',
+    summary: 'An app’s error, for the vendor’s error service',
+    description:
+      'NFR-O02: the server scrubs it and reports it with its own key, so apps carry none ' +
+      '(SEC-002). At most 20 an hour from a device; the rest are dropped quietly.',
+    tags: ['system'],
+    requirements: ['NFR-O02'],
+    capability: 'DEVICE',
+    request: { body: ClientErrorReport },
+    responses: {
+      204: { description: 'Taken.' },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      401: { description: 'Unknown or unpaired device.', schema: ApiError },
     },
   },
   {

@@ -159,6 +159,9 @@ importers:
       '@rp/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@rp/error-reporting':
+        specifier: workspace:*
+        version: link:../../packages/error-reporting
       '@rp/licensing':
         specifier: workspace:*
         version: link:../../packages/licensing
@@ -396,6 +399,9 @@ importers:
       '@rp/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@rp/error-reporting':
+        specifier: workspace:*
+        version: link:../../packages/error-reporting
       '@rp/licensing':
         specifier: workspace:*
         version: link:../../packages/licensing
@@ -771,6 +777,12 @@ importers:
   packages/design-tokens: {}
 
   packages/domain: {}
+
+  packages/error-reporting:
+    dependencies:
+      '@rp/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/i18n: {}
 

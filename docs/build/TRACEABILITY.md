@@ -237,7 +237,7 @@ Must: 237 / 287 covered. Should: 15 / 24. Could: 0 / 7.
 - NFR-M06 (M): packages/contracts/test/docs.test.ts
 - NFR-M07 (M): infra/ci/check-licenses.test.mjs
 - NFR-O01 (M): apps/server/test/integration/health.int.test.ts, apps/server/test/unit/correlation-and-validation.test.ts
-- NFR-O02 (M): packages/domain/test/scrub.test.ts
+- NFR-O02 (M): apps/console/test/error-reporting.test.ts, apps/control-plane/test/integration/error-reporting.int.test.ts, apps/server/test/integration/error-reporting.int.test.ts, packages/domain/test/scrub.test.ts, packages/error-reporting/test/reporter.test.ts, packages/mobile-core/test/error-reporting.test.ts
 - NFR-O03 (M): apps/control-plane-web/test/fleet.test.tsx, apps/control-plane/test/integration/fleet.int.test.ts, apps/control-plane/test/integration/heartbeats.int.test.ts, apps/server/test/unit/error-counter.test.ts, packages/contracts/test/control-plane.test.ts
 - NFR-O04 (M): apps/server/test/integration/database.int.test.ts
 - NFR-I03 (M): apps/console/test/system-view.test.ts, apps/console/test/system.test.tsx, apps/server/test/integration/system.int.test.ts
@@ -251,7 +251,7 @@ Must: 237 / 287 covered. Should: 15 / 24. Could: 0 / 7.
 - SEC-009 (M): apps/control-plane/test/integration/enrolment.int.test.ts, apps/control-plane/test/unit/rate-limiter.test.ts, apps/server/test/integration/auth-login.int.test.ts, apps/server/test/integration/devices.int.test.ts, apps/server/test/integration/service-requests.int.test.ts, apps/server/test/unit/auth-primitives.test.ts
 - SEC-010 (M): apps/server/test/integration/tls.int.test.ts, packages/contracts/test/devices.test.ts, packages/mobile-core/test/device-session.test.ts, packages/mobile-core/test/mobile-core.test.ts, packages/mobile-native/test/keystore.test.ts, packages/mobile-native/test/lan-trust.test.ts, packages/mobile-native/test/stores.test.ts, packages/mobile-shell/test/pairing.test.tsx
 - SEC-012 (M): apps/console/test/pagers.test.tsx, apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts
-- SEC-015 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/diagnostics.int.test.ts, apps/server/test/unit/correlation-and-validation.test.ts, packages/domain/test/scrub.test.ts
+- SEC-015 (M): apps/server/test/integration/auth-guard.int.test.ts, apps/server/test/integration/diagnostics.int.test.ts, apps/server/test/unit/correlation-and-validation.test.ts, packages/domain/test/scrub.test.ts, packages/error-reporting/test/reporter.test.ts
 - SEC-018 (M): apps/control-plane-web/e2e/vendor-web.e2e.ts, apps/control-plane-web/test/admin.test.tsx, apps/control-plane-web/test/roles.test.tsx, apps/control-plane-web/test/setup.test.tsx, apps/control-plane-web/test/sign-in.test.tsx, apps/control-plane/test/integration/vendor-staff.int.test.ts, packages/contracts/test/control-plane.test.ts
 - SEC-019 (M): apps/server/test/integration/feedback.int.test.ts
 - NFR-P02 (M): apps/server/test/integration/print-queue.int.test.ts

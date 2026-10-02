@@ -3,12 +3,16 @@ import {
   Catch,
   type ExceptionFilter,
   HttpException,
+  Inject,
   Logger,
+  Optional,
 } from '@nestjs/common';
+import type { SentryReporter } from '@rp/error-reporting';
 import type { ApiError } from '@rp/contracts/control-plane';
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { CpError } from './cp-error.js';
+import { CP_ERROR_REPORTER } from './error-reporting.js';
 
 export interface MappedError {
   readonly status: number;
@@ -107,6 +111,10 @@ export function mapError(error: unknown, correlationId?: string): MappedError {
 export class CpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(CpExceptionFilter.name);
 
+  constructor(
+    @Optional() @Inject(CP_ERROR_REPORTER) private readonly reporter: SentryReporter | null = null,
+  ) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const request = http.getRequest<Request & { id?: unknown }>();
@@ -115,6 +123,12 @@ export class CpExceptionFilter implements ExceptionFilter {
     const mapped = mapError(exception, correlationId);
     if (mapped.unexpected) {
       this.logger.error({ err: exception, correlationId, path: request.path }, 'Unhandled error');
+      // NFR-O02: scrubbed in @rp/error-reporting before it leaves.
+      this.reporter?.report(exception, {
+        correlationId,
+        method: request.method,
+        path: request.path,
+      });
     }
     response.status(mapped.status).json(mapped.body);
   }

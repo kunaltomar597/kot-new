@@ -1,5 +1,10 @@
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession, type KeyValueStore } from '@rp/mobile-core';
+import {
+  createDeviceErrorReporting,
+  DeviceSession,
+  type KeyValueStore,
+  watchUncaughtErrors,
+} from '@rp/mobile-core';
 import {
   AndroidKiosk,
   AndroidServerTrust,
@@ -33,6 +38,8 @@ async function createSession(): Promise<{ session: DeviceSession; device: Tablet
     trust: new AndroidServerTrust(),
     ...(appVersion !== undefined && { appVersion }),
   });
+  // NFR-O02: uncaught errors reach the vendor through the restaurant's server, scrubbed.
+  watchUncaughtErrors(createDeviceErrorReporting(session, 'table-tablet', appVersion ?? null));
   return {
     session,
     device: {
