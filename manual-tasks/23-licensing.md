@@ -16,13 +16,16 @@ Never paste the private key, or anything that unlocks it, into a Claude session 
    `packages/licensing/src/vendor-keys.ts`. Installations accept only licences signed by a key
    listed there; a new key is added next to the old one, and the old one is removed a release
    later.
-5. Set the Control Plane's signer to the KMS key (`CP_LICENCE_SIGNER=kms`,
-   `CP_LICENCE_KMS_KEY=<key resource name>`).
+5. Give the Control Plane the key. The signer (`apps/control-plane/src/licences/licence-signer.ts`)
+   reads it from `CP_LICENCE_SIGNING_KEY` (PKCS#8 DER, base64) today. Best: once the cloud
+   provider is chosen, ask Claude for a KMS adapter there, so the key never leaves the KMS. Until
+   then, keep the key in the secret manager and inject it as `CP_LICENCE_SIGNING_KEY` only into
+   the Control Plane's service.
 
 ## 2. The reactivation master key (vendor, once)
 
 Create a 32-byte random secret in the secret manager, `rp-licence-reactivation-master`, readable
-only by the Control Plane. It derives each installation's offline reactivation secret (LIC-006).
+only by the Control Plane, injected as `CP_LICENCE_REACTIVATION_KEY` (base64). It derives each installation's offline reactivation secret (LIC-006).
 Losing it means old installations cannot take offline codes until they come online once.
 
 ## 3. Review (two people)
@@ -37,3 +40,19 @@ Check in particular: a file signed by another key, edited, from another installa
 PC is refused; a restriction never starts mid-service; nothing deletes, encrypts or withholds the
 restaurant's data in any state; reactivation codes cannot be reused or guessed (attempts are
 limited). Record the reviewers' names and the commit reviewed in the pull request.
+
+## 4. Day-to-day (vendor staff, until the web app in P7-02)
+
+From the operator host, with the environment's `DATABASE_URL`:
+
+```
+pnpm --filter @rp/control-plane cli licence:show --installation <id>
+pnpm --filter @rp/control-plane cli licence:set --installation <id> --state GRACE --reason "Invoice 42 overdue"
+pnpm --filter @rp/control-plane cli licence:set --installation <id> --state ACTIVE --reason "Paid by UPI"
+pnpm --filter @rp/control-plane cli licence:rebind --installation <id> --reason "Motherboard replaced"
+pnpm --filter @rp/control-plane cli licence:code --installation <id> --until 2026-11-15
+```
+
+A state change reaches an online restaurant within a minute while its licence is not active
+(within five minutes otherwise). Read a reactivation code to the Owner only after checking who is
+calling; it is shown once.

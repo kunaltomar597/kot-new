@@ -3,11 +3,17 @@ import { userInfo } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { NestFactory } from '@nestjs/core';
-import { RELEASE_CHANNELS, type ReleaseChannel } from '@rp/contracts/control-plane';
+import {
+  DeviceLimits,
+  LicenceState,
+  RELEASE_CHANNELS,
+  type ReleaseChannel,
+} from '@rp/contracts/control-plane';
 import { AdminService } from './admin/admin.service.js';
 import { ControlPlaneModule } from './app.module.js';
 import { loadConfig } from './config/cp-config.js';
 import { CpError } from './errors/cp-error.js';
+import { type LicenceSummary, LicencesService } from './licences/licences.service.js';
 
 /**
  * Admin CLI for vendor staff until the web app (VCP-001, P7-02). It talks to the database of the
@@ -26,6 +32,12 @@ Commands:
   installations:list
   release:publish --channel STABLE|PILOT --version <x.y.z> --url <https url>
                   --sha256 <hex> --size <bytes> [--notes <text>]
+  licence:show --installation <id>
+  licence:set --installation <id> --reason <text> [--state ACTIVE|PAYMENT_DUE|GRACE|RESTRICTED|TERMINATED]
+              [--plan <name>] [--limits TABLE_TABLET=30,PAGER=15,WAITER_PHONE=15,KDS=6]
+              [--validity-days <n>] [--grace-days <n>]
+  licence:rebind --installation <id> --reason <text>   move the licence to a new PC
+  licence:code --installation <id> --until <YYYY-MM-DD>  offline reactivation code (shown once)
 
 The actor recorded in the audit log is CP_ACTOR (cli:<name> or ci:<pipeline>), by default
 cli:<operating-system user>.`;
@@ -41,6 +53,12 @@ const OPTIONS = {
   sha256: { type: 'string' },
   size: { type: 'string' },
   notes: { type: 'string' },
+  state: { type: 'string' },
+  plan: { type: 'string' },
+  limits: { type: 'string' },
+  'validity-days': { type: 'string' },
+  'grace-days': { type: 'string' },
+  until: { type: 'string' },
   help: { type: 'boolean' },
 } as const;
 
@@ -75,8 +93,53 @@ function channelOf(value: unknown): ReleaseChannel | undefined {
   );
 }
 
+/** `TABLE_TABLET=30,PAGER=15,...` as device limits. */
+function limitsOf(text: string): DeviceLimits {
+  const entries = text.split(',').map((pair) => {
+    const [key = '', value = ''] = pair.split('=');
+    return [key.trim(), Number(value)] as const;
+  });
+  const parsed = DeviceLimits.safeParse(Object.fromEntries(entries));
+  if (!parsed.success) {
+    throw new CpError(
+      400,
+      'VALIDATION_FAILED',
+      '--limits must give TABLE_TABLET, PAGER, WAITER_PHONE and KDS, like TABLE_TABLET=30,PAGER=15,WAITER_PHONE=15,KDS=6.',
+    );
+  }
+  return parsed.data;
+}
+
+function daysOf(value: unknown, name: string): number | undefined {
+  if (value === undefined) return undefined;
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 0 || days > 365) {
+    throw new CpError(400, 'VALIDATION_FAILED', `--${name} must be a whole number of days.`);
+  }
+  return days;
+}
+
+function printLicence(summary: LicenceSummary, out: (line: string) => void): void {
+  out(`Installation ${summary.installationId}: ${summary.state}, plan ${summary.plan}`);
+  if (summary.reason !== null) out(`Reason: ${summary.reason}`);
+  out(
+    `Devices: ${Object.entries(summary.deviceLimits)
+      .map(([type, limit]) => `${type}=${String(limit)}`)
+      .join(', ')}`,
+  );
+  out(`Valid ${String(summary.validityDays)} days, ${String(summary.graceDays)} days of grace`);
+  out(`Bound to a PC: ${summary.boundAt?.toISOString() ?? 'not yet'}`);
+  out(
+    summary.latest === null
+      ? 'No licence issued yet.'
+      : `Latest licence ${summary.latest.id}, issued ${summary.latest.issuedAt.toISOString()}, valid until ${summary.latest.validUntil.toISOString()}`,
+  );
+}
+
 export interface CliContext {
   readonly admin: AdminService;
+  /** Licences (P7-01b); commands about them need it. */
+  readonly licences?: LicencesService;
   readonly actor: string;
   readonly out: (line: string) => void;
 }
@@ -160,6 +223,44 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       out(`Published ${release.component} ${release.version} on ${release.channel}.`);
       return 0;
     }
+    case 'licence:show':
+    case 'licence:set':
+    case 'licence:rebind':
+    case 'licence:code': {
+      const { licences } = context;
+      if (licences === undefined) throw new Error('Licences are not available here');
+      const id = required(values, 'installation');
+      if (command === 'licence:show') {
+        printLicence(await licences.summary(id), out);
+      } else if (command === 'licence:rebind') {
+        printLicence(await licences.rebind(id, required(values, 'reason'), actor), out);
+        out('The next licence binds the PC that asks for it.');
+      } else if (command === 'licence:code') {
+        const issued = await licences.reactivationCode(id, required(values, 'until'), actor);
+        out(`Reactivation code (shown once, read it to the Owner): ${issued.code}`);
+        out(`Active until the end of ${issued.validUntil} (code ${String(issued.counter)}).`);
+      } else {
+        const state = values.state === undefined ? undefined : LicenceState.parse(values.state);
+        const validityDays = daysOf(values['validity-days'], 'validity-days');
+        const graceDays = daysOf(values['grace-days'], 'grace-days');
+        printLicence(
+          await licences.change(
+            id,
+            {
+              reason: required(values, 'reason'),
+              ...(state !== undefined && { state }),
+              ...(typeof values.plan === 'string' && { plan: values.plan }),
+              ...(typeof values.limits === 'string' && { deviceLimits: limitsOf(values.limits) }),
+              ...(validityDays !== undefined && { validityDays }),
+              ...(graceDays !== undefined && { graceDays }),
+            },
+            actor,
+          ),
+          out,
+        );
+      }
+      return 0;
+    }
     default:
       out(`Unknown command: ${command}\n\n${USAGE}`);
       return 1;
@@ -174,6 +275,7 @@ async function main(): Promise<number> {
   try {
     return await runCli(process.argv.slice(2), {
       admin: app.get(AdminService),
+      licences: app.get(LicencesService),
       actor: actorFrom(),
       out: (line) => process.stdout.write(`${line}\n`),
     });

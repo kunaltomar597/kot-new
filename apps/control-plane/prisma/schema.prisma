@@ -33,6 +33,15 @@ enum ReleaseComponent {
   RESTAURANT_PC
 }
 
+/// The licence states of LIC-005 (`@rp/domain` `licenseMachine`).
+enum LicenceState {
+  ACTIVE
+  PAYMENT_DUE
+  GRACE
+  RESTRICTED
+  TERMINATED
+}
+
 /// A restaurant business, the vendor's customer (VCP-002 grows it in P7-02).
 model Tenant {
   id        String   @id @db.Uuid
@@ -70,9 +79,58 @@ model Installation {
   heartbeats      Heartbeat[]
   nonces          RequestNonce[]
   menuExtractions MenuExtraction[]
+  licence         InstallationLicence?
+  licenceFiles    LicenceFile[]
 
   @@index([tenantId])
   @@map("installations")
+}
+
+/// An installation's licence terms (LIC-001, VCP-003); every file issued from them is a LicenceFile.
+model InstallationLicence {
+  installationId      String       @id @map("installation_id") @db.Uuid
+  plan                String
+  /// LicenceModule codes.
+  modules             String[]
+  /// DeviceLimits: { TABLE_TABLET, PAGER, WAITER_PHONE, KDS }.
+  deviceLimits        Json         @map("device_limits")
+  validityDays        Int          @map("validity_days")
+  graceDays           Int          @map("grace_days")
+  state               LicenceState @default(ACTIVE)
+  graceStartedAt      DateTime?    @map("grace_started_at") @db.Timestamptz(3)
+  reason              String?
+  /// The PC fingerprint bound at the first licence (LIC-004): five SHA-256 hex strings or nulls.
+  fingerprint         Json?
+  boundAt             DateTime?    @map("bound_at") @db.Timestamptz(3)
+  /// Bumped on every change of terms, so the next heartbeat carries a new file at once.
+  revision            Int          @default(1)
+  /// The last offline reactivation code's counter (LIC-006).
+  reactivationCounter Int          @default(0) @map("reactivation_counter")
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@map("installation_licences")
+}
+
+/// Every licence file issued (LIC-001): the exact text signed, kept for support and audit.
+model LicenceFile {
+  id             String   @id @db.Uuid
+  installationId String   @map("installation_id") @db.Uuid
+  /// The terms' revision it was issued from.
+  revision       Int
+  state          LicenceState
+  issuedAt       DateTime @map("issued_at") @db.Timestamptz(3)
+  validUntil     DateTime @map("valid_until") @db.Timestamptz(3)
+  payload        String
+  signature      String
+  keyId          String   @map("key_id")
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, issuedAt])
+  @@map("licence_files")
 }
 
 /// Every heartbeat an installation sent (VCP-005). Retention and fleet views come in P7-03.

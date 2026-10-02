@@ -32,6 +32,8 @@
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@rp/contracts": "workspace:*",
+    "@rp/domain": "workspace:*",
+    "@rp/licensing": "workspace:*",
     "express": "^5.2.1",
     "nestjs-pino": "^5.2.1",
     "pg": "^8.23.0",

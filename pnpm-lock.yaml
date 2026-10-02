@@ -153,6 +153,12 @@ importers:
       '@rp/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@rp/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@rp/licensing':
+        specifier: workspace:*
+        version: link:../../packages/licensing
       express:
         specifier: ^5.2.1
         version: 5.2.1

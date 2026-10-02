@@ -52,6 +52,33 @@
           },
           { "type": "null" }
         ]
+      },
+      "licence": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "payload": { "type": "string", "minLength": 2, "maxLength": 8000 },
+              "signature": {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+              },
+              "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+            },
+            "required": ["payload", "signature", "keyId"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "reactivationSecret": {
+        "default": null,
+        "anyOf": [
+          { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+          { "type": "null" }
+        ]
       }
     },
     "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
@@ -110,9 +137,43 @@
           },
           { "type": "null" }
         ]
+      },
+      "licence": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "payload": { "type": "string", "minLength": 2, "maxLength": 8000 },
+              "signature": {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+              },
+              "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+            },
+            "required": ["payload", "signature", "keyId"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "reactivationSecret": {
+        "default": null,
+        "anyOf": [
+          { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+          { "type": "null" }
+        ]
       }
     },
-    "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"],
+    "required": [
+      "receivedAt",
+      "serverTime",
+      "nextHeartbeatSeconds",
+      "update",
+      "licence",
+      "reactivationSecret"
+    ],
     "additionalProperties": false
   }
 }
