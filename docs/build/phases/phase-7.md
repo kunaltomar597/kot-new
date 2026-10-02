@@ -65,8 +65,15 @@ Split (2026-10-03):
 - **P7-02d Support and QR provisioning.** Support notes per restaurant, provisioning the
   restaurant in the QR relay with its scoped credential delivered to the PC, and the documented
   access policy (no business data except diagnostics or backups).
-- **P7-02e The web app.** React web app for vendor staff on the API above, with UI tests per
-  role.
+- **P7-02e The web app: sign-in and restaurants.** `apps/control-plane-web`, served by the
+  Control Plane on its own origin (`CP_WEB_DIR`). It covers signing in with MFA, account setup
+  from the one-time link, and sections by role. Restaurants: the list, details, PCs and
+  activation codes, support notes, QR ordering. One PC: moving, disconnecting, and its licence
+  (changes, re-binding, reactivation codes). UI tests per role.
+- **P7-02f The web app: billing, releases, audit and staff.** Plans, a restaurant's
+  subscription, invoices, payments, voiding and the billing run; releases and publishing; the
+  audit trail; staff accounts, resets and the quarterly access review. UI tests per role, and an
+  end-to-end test against a real Control Plane (sign-in with a real authenticator code).
 
 ## P7-03 Fleet monitoring and alerts
 

@@ -33,6 +33,32 @@ For staging and production:
 3. Start `node apps/control-plane/dist/main.js` (for example in a container) and wait for the
    health check.
 
+## The web app for vendor staff
+
+The Control Plane serves the web app (`apps/control-plane-web`) at `/`, on the same host as the
+API.
+
+1. Build it in CI with the service: `pnpm --filter @rp/control-plane-web build`.
+2. Ship `apps/control-plane-web/dist` with the service and set `CP_WEB_DIR` to that folder. The
+   service refuses to start if the folder has no `index.html`.
+
+The pages carry a strict Content-Security-Policy (same-origin only, no framing) and are never
+indexed by search engines.
+
+### The first Super Admin
+
+Run this once per environment, from a machine with the environment's `DATABASE_URL`:
+
+1. Create the account:
+   `pnpm --filter @rp/control-plane cli vendor-user:create --email <email> --name "<name>" --role SUPER_ADMIN`
+2. The command prints a setup token once. Give the person the link
+   `https://<control-plane host>/setup#<token>` directly, by phone or in person. The link works for
+   72 hours.
+3. On that page they choose a password and add an authenticator app.
+
+After that, the Super Admin adds everyone else from the Staff page, which shows each new account's
+setup link once. The access policy (`vendor-access-policy.md`) says who gets which role.
+
 ## Connecting a restaurant PC
 
 1. `cli tenant:create --name "<restaurant>"` (once per restaurant business).

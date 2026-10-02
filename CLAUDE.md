@@ -87,7 +87,8 @@ apps/
   waiter-app/      React Native (Expo) waiter app                                         [P2-01c, P2-02a, P2]
   table-tablet/    React Native (Expo) kiosk table tablet                                  [P2-01c, P3]
   qr-menu/         Next.js public QR menu                                                  [P5]
-  control-plane/   Vendor Control Plane (NestJS API + React web)                          [P0-17, P7]
+  control-plane/   Vendor Control Plane API (NestJS)                                      [P0-17, P7]
+  control-plane-web/ Vendor web app (React), served by the Control Plane                 [P7-02e+]
 packages/
   domain/          Framework-free business logic (money, tax, bill, dates, state machines) [done]
   contracts/       Zod schemas for APIs and domain events                                  [done, grows]

@@ -244,7 +244,8 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       );
       out(`Account ${created.user.id} created for ${created.user.email} (${created.user.role}).`);
       out(`Setup token (shown once; give it to the person directly): ${created.setupToken}`);
-      out(`They set a password and an authenticator before ${created.setupExpiresAt}.`);
+      out(`They open <Control Plane address>/setup#${created.setupToken} in a browser and set a`);
+      out(`password and an authenticator before ${created.setupExpiresAt}.`);
       return 0;
     }
     case 'licence:show':
