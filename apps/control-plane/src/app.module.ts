@@ -10,6 +10,7 @@ import { RateLimiter } from './auth/rate-limiter.js';
 import { CP_CONFIG, type CpConfig } from './config/cp-config.js';
 import { PrismaService } from './database/prisma.service.js';
 import { CpExceptionFilter } from './errors/cp-exception.filter.js';
+import { CP_ERROR_REPORTER, errorReporterFor } from './errors/error-reporting.js';
 import { HealthController } from './health/health.controller.js';
 import { HeartbeatsController } from './heartbeats/heartbeats.controller.js';
 import { HeartbeatsService } from './heartbeats/heartbeats.service.js';
@@ -137,6 +138,7 @@ export class ControlPlaneModule {
         { provide: MENU_EXTRACTOR, useValue: menuExtractorFor(config) },
         { provide: APP_GUARD, useClass: InstallationGuard },
         { provide: APP_GUARD, useClass: VendorGuard },
+        { provide: CP_ERROR_REPORTER, useValue: errorReporterFor(config) },
         { provide: APP_FILTER, useClass: CpExceptionFilter },
       ],
     };

@@ -1,0 +1,26 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "component": { "type": "string", "enum": ["console", "waiter-app", "table-tablet"] },
+      "message": { "type": "string", "maxLength": 1000 },
+      "stack": { "anyOf": [{ "type": "string", "maxLength": 8000 }, { "type": "null" }] },
+      "path": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] },
+      "appVersion": { "anyOf": [{ "type": "string", "maxLength": 64 }, { "type": "null" }] }
+    },
+    "required": ["component", "message", "stack", "path", "appVersion"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "component": { "type": "string", "enum": ["console", "waiter-app", "table-tablet"] },
+      "message": { "type": "string", "maxLength": 1000 },
+      "stack": { "anyOf": [{ "type": "string", "maxLength": 8000 }, { "type": "null" }] },
+      "path": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] },
+      "appVersion": { "anyOf": [{ "type": "string", "maxLength": 64 }, { "type": "null" }] }
+    },
+    "required": ["component", "message", "stack", "path", "appVersion"],
+    "additionalProperties": false
+  }
+}

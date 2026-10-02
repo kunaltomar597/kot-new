@@ -39,6 +39,9 @@ code from going live:
 - [ ] Licensing: create the vendor licence-signing key in the cloud KMS, put its public key into
       the software, and have two people review the licensing code (NFR-M05):
       [`manual-tasks/23-licensing.md`](manual-tasks/23-licensing.md).
+- [ ] Error reporting: a Sentry-compatible service (best in India), two projects and their DSNs in
+      the Control Plane's secret manager and the installer's CI secret:
+      [`manual-tasks/24-error-reporting.md`](manual-tasks/24-error-reporting.md).
 
 ## 3. Hardware and on-site tests
 

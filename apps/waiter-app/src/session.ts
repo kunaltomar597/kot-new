@@ -1,5 +1,5 @@
 import { createTranslator } from '@rp/i18n';
-import { DeviceSession } from '@rp/mobile-core';
+import { createDeviceErrorReporting, DeviceSession, watchUncaughtErrors } from '@rp/mobile-core';
 import {
   AndroidAlertNotifier,
   AndroidServerTrust,
@@ -27,7 +27,7 @@ export const notifier = new AndroidAlertNotifier(alertNotificationText(translato
  */
 async function createSession(): Promise<DeviceSession> {
   await installRandomValues();
-  return new DeviceSession({
+  const session = new DeviceSession({
     secureStore: await secureStore(),
     plainStore: await plainStore(),
     keys: new KeystoreDeviceKeys(),
@@ -40,6 +40,11 @@ async function createSession(): Promise<DeviceSession> {
       appVersion: Constants.expoConfig.version,
     }),
   });
+  // NFR-O02: uncaught errors reach the vendor through the restaurant's server, scrubbed.
+  watchUncaughtErrors(
+    createDeviceErrorReporting(session, 'waiter-app', Constants.expoConfig?.version ?? null),
+  );
+  return session;
 }
 
 let created: Promise<DeviceSession> | undefined;

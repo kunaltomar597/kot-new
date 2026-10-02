@@ -111,6 +111,14 @@ Run `cli` as `pnpm --filter @rp/control-plane cli ...` from an operator host or 
 with that environment's `DATABASE_URL` and `CP_ACTOR` set to who is acting (`cli:<name>` or
 `ci:<pipeline>`). Every command is in the audit log.
 
+## Error reporting (NFR-O02)
+
+With `CP_ERROR_DSN` set (a Sentry-compatible DSN, from the secret manager), unexpected errors and
+crashes of the Control Plane are reported, scrubbed of secrets and personal data, at most 60 an
+hour. Restaurant PCs report with their own DSN (`RP_ERROR_DSN`, set by the installer); their
+console, waiter phones and table tablets send errors through the PC, so no app carries a DSN.
+Setting it up: `manual-tasks/24-error-reporting.md`.
+
 ## Remote settings and feature flags (UPD-010)
 
 The Super Admin sets them on the web app's Remote settings page, for every PC or for one PC

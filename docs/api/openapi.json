@@ -1419,6 +1419,37 @@
         "x-requirements": ["BILL-016", "AUD-006", "AUD-001"]
       }
     },
+    "/api/v1/client-errors": {
+      "post": {
+        "operationId": "reportClientError",
+        "summary": "An app’s error, for the vendor’s error service",
+        "description": "NFR-O02: the server scrubs it and reports it with its own key, so apps carry none (SEC-002). At most 20 an hour from a device; the rest are dropped quietly.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ClientErrorReport" } }
+          }
+        },
+        "responses": {
+          "204": { "description": "Taken." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Unknown or unpaired device.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE",
+        "x-requirements": ["NFR-O02"]
+      }
+    },
     "/api/v1/day-end": {
       "get": {
         "operationId": "previewDayEnd",
@@ -13411,6 +13442,18 @@
           }
         },
         "required": ["id", "name", "parentId", "displayOrder", "archivedAt"],
+        "additionalProperties": false
+      },
+      "ClientErrorReport": {
+        "type": "object",
+        "properties": {
+          "component": { "type": "string", "enum": ["console", "waiter-app", "table-tablet"] },
+          "message": { "type": "string", "maxLength": 1000 },
+          "stack": { "anyOf": [{ "type": "string", "maxLength": 8000 }, { "type": "null" }] },
+          "path": { "anyOf": [{ "type": "string", "maxLength": 200 }, { "type": "null" }] },
+          "appVersion": { "anyOf": [{ "type": "string", "maxLength": 64 }, { "type": "null" }] }
+        },
+        "required": ["component", "message", "stack", "path", "appVersion"],
         "additionalProperties": false
       },
       "CloseDayRequest": {

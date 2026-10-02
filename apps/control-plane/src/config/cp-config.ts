@@ -81,6 +81,8 @@ export const CpConfigSchema = z
      * Teams incoming webhooks take), from the secret manager. Unset: alerts only show in the app.
      */
     alertWebhookUrl: z.url({ protocol: /^https?$/ }).optional(),
+    /** The vendor's error service (NFR-O02, P7-08d), a Sentry DSN; unset: errors are only logged. */
+    errorDsn: z.url({ protocol: /^https?$/ }).optional(),
     /** Folder of the built vendor web app (`apps/control-plane-web/dist`), served at `/` when set. */
     webDir: z.string().min(1).optional(),
     /** Days a restaurant has to pay an invoice (LIC-009: as the subscription agreement says). */
@@ -180,6 +182,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     diskAlertPercent: env.CP_DISK_ALERT_PERCENT,
     fleetSweepSeconds: env.CP_FLEET_SWEEP_SECONDS,
     alertWebhookUrl: env.CP_ALERT_WEBHOOK_URL === '' ? undefined : env.CP_ALERT_WEBHOOK_URL,
+    errorDsn: env.CP_ERROR_DSN === '' ? undefined : env.CP_ERROR_DSN,
   });
   if (!result.success) {
     const problems = result.error.issues
