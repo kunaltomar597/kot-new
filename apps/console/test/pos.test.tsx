@@ -24,6 +24,7 @@ function floorTable(id: string, label: string, sectionId: string, order: number)
     state: 'FREE' as const,
     displayOrder: order,
     tabletDeviceIds: [],
+    layout: null,
     archivedAt: null,
     updatedAt: NOW,
   };
@@ -374,6 +375,49 @@ describe('[TBL-006] merging tables and moving dishes', () => {
       toTableSessionId: SESSION_2,
       orderItemIds: [IDS.orderItem],
     });
+  });
+});
+
+describe('[ONB-004] [TBL-007] the floor plan on the POS', () => {
+  it('shows the tables where they stand once a manager has placed them', async () => {
+    const placed: FloorResponse = {
+      sections: FLOOR.sections.map((section) => ({
+        ...section,
+        tables: section.tables.map((table) =>
+          table.id === T1
+            ? { ...table, layout: { x: 2, y: 2, w: 4, h: 3, shape: 'ROUND' } }
+            : table,
+        ),
+      })),
+    };
+    const fake = signsInAs(server(), 'CASHIER')
+      .on('GET', '/api/v1/floor', () => ({ status: 200, body: placed }))
+      .on('GET', '/api/v1/tables/overview', () => ({
+        status: 200,
+        body: overview(entry(T1, 'T1', HALL, {}), entry(T2, 'T2', HALL), entry(T3, 'T3', TERRACE)),
+      }));
+    const { user, container } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos' });
+    await user.click(await screen.findByRole('button', { name: t('floorPage.plan') }));
+    const hall = screen.getByRole('group', { name: 'Hall' });
+    const t1 = within(hall).getByRole('button', { name: /^T1, Occupied/ });
+    expect(t1).toHaveStyle({ left: '5%', top: `${String((2 / 24) * 100)}%` });
+    // T2 was never placed: it gets a free spot.
+    expect(within(hall).getByRole('button', { name: 'T2, Free' })).toBeVisible();
+    await expectNoAxeViolations(container);
+    await user.click(t1);
+    expect(
+      await screen.findByRole('dialog', { name: t('pos.table.title', { table: 'T1' }) }),
+    ).toBeVisible();
+  });
+
+  it('is not offered before any table is placed', async () => {
+    await renderConsole({
+      fake: posServer(overview(entry(T1, 'T1', HALL))),
+      signedIn: 'CASHIER',
+      path: '/pos',
+    });
+    expect(await tile(/^T1, Free/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: t('floorPage.plan') })).toBeNull();
   });
 });
 

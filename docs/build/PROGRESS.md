@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-05f, then Phase 7.
+- P6-05g, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -342,7 +342,8 @@ Recommended next WPs (dependencies met):
   - [x] P6-05c Ordering (WTR-013, MENU-007)
   - [x] P6-05d Tables (TBL-006, TBL-004)
   - [x] P6-05e Billing (BILL-001, WTR-008)
-  - [ ] P6-05f Setup (ONB-004 steps 5 and 6)
+  - [x] P6-05f Setup: Manage → Floor with the drag-and-drop plan (ONB-004 step 5)
+  - [ ] P6-05g Printer auto-discovery (ONB-004 step 6)
 
 ### Phase 7: Commercial readiness
 
@@ -607,6 +608,22 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P6-05f):
+
+429. P6-05f found the floor had an API (P1-02a) but no console page: the POS pointed managers to
+     "Manage → Floor", which did not exist. P6-05f builds it (sections and tables: add, change,
+     archive with a reason, restore; managers and the Owner), and the plan on it. Printer
+     auto-discovery moves to P6-05g.
+430. The floor plan (ONB-004 step 5, S) is a grid of 40 × 24 cells per section; a table is a
+     rectangle or round table 2 to 10 cells a side (`tables.layout`, `@rp/domain` floor-plan).
+     Tables of one section may not overlap (`LAYOUT_OVERLAP`); a table moved to another section
+     is taken off the plan. Tables not placed yet are drawn in the first free spot, sized for
+     their seats, and saved with the plan. Saved with `PUT /floor/layout`, audited
+     FLOOR_LAYOUT_CHANGED.
+431. Dragging works with a pointer and with the keyboard (arrows move, Shift+arrows resize, R
+     round or square), announced to screen readers. The POS offers a Plan view of the floor once
+     a table has been placed; the tiles stay the default. The phones keep their list.
 
 Decided 2026-10-03 (P6-05e):
 
@@ -2255,6 +2272,18 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P6-05f Manage → Floor and the floor plan
+
+Built: `@rp/domain` floor-plan (grid, overlaps, placing, moving, resizing); contracts
+`TableLayout`, `TableView.layout`, `FloorLayoutRequest`, route `saveFloorLayout`; server
+`FloorService.saveLayout`, layouts on the floor, taken off on a section change; console Manage →
+Floor (`manage/floor`: sections and tables, archive and restore, the plan editor) and the POS
+Plan view.
+
+Tests: domain +5, server +2 (layouts saved, overlaps and unknown tables refused, audited once;
+taken off on a section change), console +5 (floor page: list, add, archive; the plan with the
+keyboard and save; the menu link; the POS plan and when it is offered).
 
 ### 2026-10-03: P6-05e Amount in words, print the bill from the waiter app
 

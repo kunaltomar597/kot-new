@@ -1,3 +1,4 @@
+import { fitsPlan, PLAN_COLUMNS, PLAN_ROWS, TABLE_SHAPES, TABLE_SIZE } from '@rp/domain';
 import { z } from 'zod';
 import { Id, IsoDate, TableState, Timestamp } from './common.js';
 
@@ -33,6 +34,24 @@ export type TableRequest = z.infer<typeof TableRequest>;
 export const TableParams = z.strictObject({ tableId: Id });
 export type TableParams = z.infer<typeof TableParams>;
 
+/** Where a table sits on its section's floor plan, in grid cells (ONB-004 step 5, S). */
+export const TableLayout = z
+  .strictObject({
+    x: z
+      .int()
+      .min(0)
+      .max(PLAN_COLUMNS - TABLE_SIZE.min),
+    y: z
+      .int()
+      .min(0)
+      .max(PLAN_ROWS - TABLE_SIZE.min),
+    w: z.int().min(TABLE_SIZE.min).max(TABLE_SIZE.max),
+    h: z.int().min(TABLE_SIZE.min).max(TABLE_SIZE.max),
+    shape: z.enum(TABLE_SHAPES),
+  })
+  .refine(fitsPlan, { message: 'The table must fit on the plan' });
+export type TableLayout = z.infer<typeof TableLayout>;
+
 export const TableView = z.object({
   id: Id,
   label: z.string(),
@@ -42,6 +61,8 @@ export const TableView = z.object({
   displayOrder: z.int().nonnegative(),
   /** Active table tablets bound to the table (TBL-001, AUTH-009). */
   tabletDeviceIds: z.array(Id),
+  /** Its place on the section's floor plan; null until someone places it. */
+  layout: TableLayout.nullable().default(null),
   archivedAt: Timestamp.nullable(),
   updatedAt: Timestamp,
 });
@@ -61,6 +82,18 @@ export type SectionView = z.infer<typeof SectionView>;
 /** The whole floor in display order, archived sections and tables included (clients filter). */
 export const FloorResponse = z.object({ sections: z.array(SectionView) });
 export type FloorResponse = z.infer<typeof FloorResponse>;
+
+/**
+ * The floor plan as dragged (ONB-004 step 5, S): the tables whose place changed, each with its
+ * new place or null to take it off the plan. Tables of one section may not overlap.
+ */
+export const FloorLayoutRequest = z.strictObject({
+  tables: z
+    .array(z.strictObject({ tableId: Id, layout: TableLayout.nullable() }))
+    .min(1)
+    .max(500),
+});
+export type FloorLayoutRequest = z.infer<typeof FloorLayoutRequest>;
 
 /** Archived sections and tables are hidden, never deleted (BRD §9.4). */
 export const FloorArchiveRequest = z.strictObject({ reason: Reason });

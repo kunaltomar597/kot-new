@@ -41,6 +41,7 @@ function table(id: string, label: string, sectionId: string, archived = false) {
     state: 'FREE' as const,
     displayOrder: 0,
     tabletDeviceIds: [],
+    layout: null,
     archivedAt: archived ? AT : null,
     updatedAt: AT,
   };

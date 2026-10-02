@@ -1766,3 +1766,76 @@ body {
   margin: 0;
   font-weight: var(--rp-font-weight-semibold);
 }
+
+/* The floor plan (ONB-004 step 5): a 40 × 24 grid, tables placed in cells. */
+.floor-plan {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 40 / 24;
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-md);
+  background-color: var(--rp-color-surface-sunken);
+  background-image:
+    linear-gradient(to right, var(--rp-color-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rp-color-border) 1px, transparent 1px);
+  background-size: calc(100% / 40) calc(100% / 24);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.floor-plan__table {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px;
+  border: 2px solid var(--rp-color-border-strong);
+  border-radius: 6px;
+  background: var(--rp-color-surface);
+  color: var(--rp-color-text);
+  font: inherit;
+  font-weight: 600;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+}
+
+.floor-plan__table:active {
+  cursor: grabbing;
+}
+
+.floor-plan__table:focus-visible {
+  outline: 3px solid var(--rp-color-focus-ring);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.floor-plan__table--round {
+  border-radius: 50%;
+}
+
+.floor-plan__state {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.floor-plan__table[data-tone='success'] {
+  border-color: var(--rp-color-success-text);
+}
+
+.floor-plan__table[data-tone='info'] {
+  border-color: var(--rp-color-info-text);
+  background: var(--rp-color-info-subtle);
+}
+
+.floor-plan__table[data-tone='warning'] {
+  border-color: var(--rp-color-warning-text);
+  background: var(--rp-color-warning-subtle);
+}
+
+.floor-plan__table[data-tone='danger'] {
+  border-color: var(--rp-color-danger-text);
+  background: var(--rp-color-danger-subtle);
+}

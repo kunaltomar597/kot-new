@@ -1,5 +1,6 @@
 import { grantOf } from '../app/modes.js';
 import type { TableOverviewEntry } from '@rp/contracts';
+import { formatRupees } from '@rp/domain';
 import {
   Button,
   Dialog,
@@ -7,6 +8,7 @@ import {
   ErrorState,
   LoadingState,
   Money,
+  TABLE_STATE_STYLES,
   TableTile,
   useToast,
 } from '@rp/ui-web';
@@ -17,6 +19,8 @@ import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
 import { useOpenBill } from '../billing/use-open-bill.js';
+import { PlanBoard } from '../manage/floor/FloorPlan.js';
+import { planOf } from '../manage/floor/floor-view.js';
 import { floorSections, tileAlert, tileDetails } from '@rp/ordering';
 import { Approvals } from './Approvals.js';
 import { MergeTablesDialog } from './MergeTablesDialog.js';
@@ -44,6 +48,7 @@ export function TableOverview() {
   const { data, reload } = useFloor();
   const now = useNow(30_000);
   const [panel, setPanel] = useState<Panel | undefined>();
+  const [plan, setPlan] = useState(false);
   const navigate = useNavigate();
 
   if (data.status === 'loading') return <LoadingState title={t('states.loading')} />;
@@ -78,6 +83,17 @@ export function TableOverview() {
   };
 
   if (tables.length === 0) return <EmptyState title={t('pos.noTables')} />;
+  // The plan is offered once a manager has placed tables on it (ONB-004 step 5).
+  const hasPlan = data.value.floor.sections.some((section) =>
+    section.tables.some((table) => table.archivedAt === null && table.layout !== null),
+  );
+  const showPlan = plan && hasPlan;
+  const select = (table: TableOverviewEntry) => {
+    setPanel({
+      kind: table.state === 'FREE' ? 'open' : 'details',
+      tableId: table.tableId,
+    });
+  };
 
   return (
     <div className="pos-floor">
@@ -112,6 +128,17 @@ export function TableOverview() {
           >
             {t('pos.takeaway')}
           </Button>
+          {hasPlan ? (
+            <Button
+              variant="secondary"
+              aria-pressed={showPlan}
+              onClick={() => {
+                setPlan(!showPlan);
+              }}
+            >
+              {t('floorPage.plan')}
+            </Button>
+          ) : null}
         </div>
       </div>
       <Approvals />
@@ -122,25 +149,67 @@ export function TableOverview() {
           aria-label={section.name === '' ? t('pos.tables') : section.name}
         >
           {section.name === '' ? null : <h2 className="pos-floor__heading">{section.name}</h2>}
-          <div className="pos-floor__tables">
-            {section.tables.map((table) => (
-              <TableTile
-                key={table.tableId}
-                label={table.label}
-                state={table.state}
-                stateLabel={t(`pos.tableState.${table.state}`)}
-                details={tileDetails(table, now, t)}
-                {...(table.session !== null && { amountSoFar: table.session.amountSoFar })}
-                {...(tileAlert(table, t) !== undefined && { alert: tileAlert(table, t) })}
-                onSelect={() => {
-                  setPanel({
-                    kind: table.state === 'FREE' ? 'open' : 'details',
-                    tableId: table.tableId,
-                  });
-                }}
-              />
-            ))}
-          </div>
+          {showPlan ? (
+            <PlanBoard
+              label={section.name === '' ? t('pos.tables') : section.name}
+              tables={
+                data.value.floor.sections.find((entry) => entry.id === section.id)?.tables ?? []
+              }
+              places={(() => {
+                const view = data.value.floor.sections.find((entry) => entry.id === section.id);
+                return view === undefined ? new Map() : planOf(view).places;
+              })()}
+              render={(view, place, style) => {
+                const table = section.tables.find((entry) => entry.tableId === view.id);
+                if (table === undefined) return null;
+                const alert = tileAlert(table, t);
+                const spoken = [
+                  table.label,
+                  t(`pos.tableState.${table.state}`),
+                  ...tileDetails(table, now, t),
+                  ...(table.session === null ? [] : [formatRupees(table.session.amountSoFar)]),
+                  ...(alert === undefined ? [] : [alert]),
+                ];
+                return (
+                  <button
+                    key={table.tableId}
+                    type="button"
+                    className={
+                      place.shape === 'ROUND'
+                        ? 'floor-plan__table floor-plan__table--round'
+                        : 'floor-plan__table'
+                    }
+                    data-tone={TABLE_STATE_STYLES[table.state].tone}
+                    style={style}
+                    aria-label={spoken.join(', ')}
+                    onClick={() => {
+                      select(table);
+                    }}
+                  >
+                    {table.label}
+                    <span className="floor-plan__state">{t(`pos.tableState.${table.state}`)}</span>
+                  </button>
+                );
+              }}
+            />
+          ) : (
+            <div className="pos-floor__tables">
+              {section.tables.map((table) => (
+                <TableTile
+                  key={table.tableId}
+                  label={table.label}
+                  state={table.state}
+                  stateLabel={t(`pos.tableState.${table.state}`)}
+                  details={tileDetails(table, now, t)}
+                  {...(table.session !== null && { amountSoFar: table.session.amountSoFar })}
+                  {...(tileAlert(table, t) !== undefined && { alert: tileAlert(table, t) })}
+                  onSelect={() => {
+                    select(table);
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </section>
       ))}
       {selected !== undefined && panel?.kind === 'open' && selected.state === 'FREE' ? (
