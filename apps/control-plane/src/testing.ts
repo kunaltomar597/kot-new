@@ -3,6 +3,7 @@
 import { fileURLToPath } from 'node:url';
 
 export { AdminService } from './admin/admin.service.js';
+export { SupportService } from './support/support.service.js';
 export { createControlPlaneApp } from './app.factory.js';
 export { type CpConfig, CpConfigSchema } from './config/cp-config.js';
 

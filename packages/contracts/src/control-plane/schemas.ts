@@ -145,6 +145,9 @@ export const ReactivationCode = z
   .toUpperCase()
   .regex(/^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$/);
 
+/** The first 16 hex digits of a relay credential's SHA-256: what the PC says it holds. */
+export const RELAY_DIGEST = z.string().regex(/^[0-9a-f]{16}$/);
+
 /** Tamper events the PC reports (LIC-007): its clock set back or far off, records edited. */
 export const TAMPER_KINDS = [
   'CLOCK_ROLLBACK',
@@ -196,6 +199,8 @@ export const HeartbeatRequest = z.looseObject({
     .optional(),
   /** What looked like tampering since the last heartbeat delivered (LIC-007). */
   tamper: z.array(TamperEvent).max(20).optional(),
+  /** Which QR relay credential the PC holds (VCP-002), so a new one is sent until it does. */
+  relay: z.object({ credentialDigest: RELAY_DIGEST.nullable() }).optional(),
 });
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
 
@@ -224,6 +229,12 @@ export const HeartbeatResponse = z.object({
   licence: SignedLicence.nullable().default(null),
   /** The installation's offline reactivation secret, base64, when it said it lacks it. */
   reactivationSecret: Base64.max(100).nullable().default(null),
+  /** The restaurant's QR relay credential (VCP-002), while the PC does not hold it yet. */
+  relayCredential: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{43,200}$/)
+    .nullable()
+    .default(null),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
 

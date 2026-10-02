@@ -1,11 +1,14 @@
 import type { Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
+import { generateKeyPairSync } from 'node:crypto';
 import {
   AdminService,
   CONTROL_PLANE_MIGRATIONS_DIR,
   CpConfigSchema,
   createControlPlaneApp,
+  SupportService,
 } from '@rp/control-plane/testing';
+import { startRelay, type TestRelay } from '@rp/relay/testing';
 import { createMigratedDatabase, type TestDatabase } from '@rp/test-postgres';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -20,6 +23,8 @@ import {
 import { installationKey } from '../../src/cloud/installation-key.js';
 import { APP_CONFIG, type AppConfig } from '../../src/config/app-config.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import { LicenceAgentService } from '../../src/licensing/licence-agent.service.js';
+import { readRelayCredential } from '../../src/relay/relay-credential.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, testAdminUrl } from '../helpers/test-database.js';
 import { until } from '../helpers/wait.js';
@@ -47,10 +52,23 @@ let heartbeats: HeartbeatService;
 let prisma: PrismaService;
 let code: string;
 let installationId: string;
+let tenantId: string;
+let relay: TestRelay;
+/** The vendor's licence key for this test; production keeps it in the cloud KMS. */
+const vendor = generateKeyPairSync('ed25519');
+const VENDOR_KEY = vendor.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
 
 async function startControlPlane(port = 0): Promise<INestApplication> {
   const app = await createControlPlaneApp(
-    CpConfigSchema.parse({ databaseUrl: cpDatabase.url, logLevel: 'silent' }),
+    CpConfigSchema.parse({
+      databaseUrl: cpDatabase.url,
+      logLevel: 'silent',
+      billingIntervalMinutes: 0,
+      licenceSigningKey: vendor.privateKey
+        .export({ format: 'der', type: 'pkcs8' })
+        .toString('base64'),
+      relayDatabaseUrl: relay.databaseUrl,
+    }),
   );
   await app.listen(port, '127.0.0.1');
   return app;
@@ -70,18 +88,24 @@ beforeAll(async () => {
     prefix: 'rp',
     migrationsDir: CONTROL_PLANE_MIGRATIONS_DIR,
   });
+  relay = await startRelay({ adminUrl: testAdminUrl(), runId: inject('pgRunId') });
   controlPlane = await startControlPlane();
   cpPort = portOf(controlPlane);
 
   const admin = controlPlane.get(AdminService);
   const tenant = await admin.createTenant('Acceptance Dhaba', ACTOR);
+  tenantId = tenant.id;
   const issued = await admin.createInstallation({ tenantId: tenant.id, name: 'Counter PC' }, ACTOR);
   code = issued.code;
   installationId = issued.installationId;
 
   server = await createTestApp({
     databaseUrl: serverDatabase.url,
-    config: { controlPlaneUrl: `http://127.0.0.1:${String(cpPort)}`, productVersion: '1.0.0' },
+    config: {
+      controlPlaneUrl: `http://127.0.0.1:${String(cpPort)}`,
+      productVersion: '1.0.0',
+      licenceKeys: [VENDOR_KEY],
+    },
     overrides: [{ provide: CONTROL_PLANE_OPTIONS, useValue: OPTIONS }],
   });
   heartbeats = server.get(HeartbeatService);
@@ -92,6 +116,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await server.close();
   await controlPlane.close();
+  await relay.stop();
   await serverDatabase.drop();
   await cpDatabase.drop();
 });
@@ -156,6 +181,27 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     const status = await heartbeats.beat();
     expect(status.offeredUpdate).toMatchObject({ version: '1.1.0', channel: 'STABLE' });
     expect(await readOfferedUpdate(prisma)).toMatchObject({ version: '1.1.0' });
+  });
+
+  it('[LIC-001] [VCP-002] receives its signed licence and its QR relay credential in heartbeats', async () => {
+    await controlPlane.get(SupportService).provisionRelay(tenantId, ACTOR);
+    expect((await heartbeats.beat()).lastError).toBeNull();
+    const licence = await server.get(LicenceAgentService).view(true);
+    expect(licence).toMatchObject({ state: 'ACTIVE', problem: null, details: { installationId } });
+    const secrets = server.get<SecretStore>(SECRET_STORE);
+    const credential = await readRelayCredential(prisma, secrets);
+    expect(credential).toMatch(/^[A-Za-z0-9_-]{43,}$/);
+    // The relay knows the restaurant by it.
+    const known = await relay.admin.query<{ tenant_id: string }>(
+      'SELECT tenant_id FROM relay.verify_credential($1)',
+      [credential],
+    );
+    expect(known.rows[0]?.tenant_id).toBe(tenantId);
+    // The next heartbeat says the PC holds it: delivered, and not sent again.
+    await heartbeats.beat();
+    expect((await controlPlane.get(SupportService).relayProvisioning(tenantId)).delivered).toBe(
+      true,
+    );
   });
 
   it('[NFR-A01] keeps working while the Control Plane is down and reports again when it is back', async () => {

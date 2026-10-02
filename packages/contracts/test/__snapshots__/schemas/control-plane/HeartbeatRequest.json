@@ -105,6 +105,15 @@
           },
           "required": ["kind", "at"]
         }
+      },
+      "relay": {
+        "type": "object",
+        "properties": {
+          "credentialDigest": {
+            "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{16}$" }, { "type": "null" }]
+          }
+        },
+        "required": ["credentialDigest"]
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -221,6 +230,16 @@
           "required": ["kind", "at"],
           "additionalProperties": false
         }
+      },
+      "relay": {
+        "type": "object",
+        "properties": {
+          "credentialDigest": {
+            "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{16}$" }, { "type": "null" }]
+          }
+        },
+        "required": ["credentialDigest"],
+        "additionalProperties": false
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],

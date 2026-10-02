@@ -10,3 +10,6 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `waiter-phone.md`: setting a waiter phone up so alerts ring with the screen off or the app
   closed (notifications, battery settings by phone maker, Do Not Disturb), checking it and fixing
   a phone that does not ring (P2-06b).
+- `vendor-access-policy.md`: what vendor staff may see and do: no standing access to a restaurant,
+  business data only through diagnostics or backups, roles, MFA, quarterly access reviews and
+  auditing (P7-02d).
