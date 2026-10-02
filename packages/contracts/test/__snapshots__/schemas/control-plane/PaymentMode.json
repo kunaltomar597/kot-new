@@ -1,0 +1,10 @@
+{
+  "input": {
+    "type": "string",
+    "enum": ["UPI", "BANK_TRANSFER", "CHEQUE", "CASH", "CARD", "OTHER"]
+  },
+  "output": {
+    "type": "string",
+    "enum": ["UPI", "BANK_TRANSFER", "CHEQUE", "CASH", "CARD", "OTHER"]
+  }
+}

@@ -403,6 +403,41 @@
         "x-requirements": ["VCP-001", "SEC-018"]
       }
     },
+    "/v1/vendor/billing/run": {
+      "post": {
+        "operationId": "runBilling",
+        "summary": "Issue due invoices and follow up overdue ones now (it also runs every hour)",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "What it did.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BillingRunView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILLING_MANAGE",
+        "x-requirements": ["VCP-003", "LIC-005"]
+      }
+    },
     "/v1/vendor/installations/{id}": {
       "get": {
         "operationId": "getVendorInstallation",
@@ -894,6 +929,194 @@
         "x-requirements": ["VCP-002"]
       }
     },
+    "/v1/vendor/invoices": {
+      "get": {
+        "operationId": "listVendorInvoices",
+        "summary": "The vendor’s invoices to restaurants, by tenant or status",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["ISSUED", "PAID", "VOID", "OVERDUE"] }
+          },
+          {
+            "name": "tenantId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoices.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorInvoiceListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-003"]
+      }
+    },
+    "/v1/vendor/invoices/{id}/payments": {
+      "post": {
+        "operationId": "recordVendorPayment",
+        "summary": "Record a payment received (v1: by hand)",
+        "description": "Once nothing is overdue, the restaurant’s licences become active again: within a minute while online (LIC-006). Audited.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RecordPaymentRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorInvoiceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The invoice is paid or void, or the amount is more than due.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILLING_MANAGE",
+        "x-requirements": ["VCP-003", "LIC-006"]
+      }
+    },
+    "/v1/vendor/invoices/{id}/void": {
+      "post": {
+        "operationId": "voidVendorInvoice",
+        "summary": "Void an invoice issued in error, with a reason",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VoidInvoiceRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorInvoiceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Paid, or already void.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILLING_MANAGE",
+        "x-requirements": ["VCP-003"]
+      }
+    },
     "/v1/vendor/me": {
       "get": {
         "operationId": "vendorMe",
@@ -927,6 +1150,205 @@
         },
         "x-capability": "VENDOR",
         "x-requirements": ["VCP-001"]
+      }
+    },
+    "/v1/vendor/plans": {
+      "get": {
+        "operationId": "listPlans",
+        "summary": "The plan catalogue",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "The plans.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PlanListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-003"]
+      },
+      "post": {
+        "operationId": "createPlan",
+        "summary": "Add a plan: prices per billing cycle, device limits, modules",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PlanRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The plan.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PlanView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "A plan has that code.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILLING_MANAGE",
+        "x-requirements": ["VCP-003", "LIC-001"]
+      }
+    },
+    "/v1/vendor/plans/{id}": {
+      "put": {
+        "operationId": "updatePlan",
+        "summary": "Change a plan; its restaurants’ licences take the new limits",
+        "description": "Prices apply to invoices issued from now on; device limits and modules reach every subscriber’s licence at its next heartbeat. Audited.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PlanRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PlanView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILLING_MANAGE",
+        "x-requirements": ["VCP-003"]
+      }
+    },
+    "/v1/vendor/plans/{id}/archive": {
+      "post": {
+        "operationId": "archivePlan",
+        "summary": "Stop offering a plan (its restaurants keep it)",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VoidInvoiceRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PlanView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILLING_MANAGE",
+        "x-requirements": ["VCP-003"]
       }
     },
     "/v1/vendor/releases": {
@@ -1418,6 +1840,122 @@
         "x-requirements": ["VCP-002", "ONB-003"]
       }
     },
+    "/v1/vendor/tenants/{id}/subscription": {
+      "get": {
+        "operationId": "getSubscription",
+        "summary": "A restaurant’s plan and billing cycle",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The subscription.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant, or no subscription yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-003"]
+      },
+      "put": {
+        "operationId": "setSubscription",
+        "summary": "Put a restaurant on a plan and cycle, with a reason",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscription.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or plan.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The plan is archived or not offered on that cycle.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILLING_MANAGE",
+        "x-requirements": ["VCP-003"]
+      }
+    },
     "/v1/vendor/users": {
       "get": {
         "operationId": "listVendorUsers",
@@ -1719,6 +2257,18 @@
         },
         "additionalProperties": false
       },
+      "BillingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "YEARLY"] },
+      "BillingRunView": {
+        "type": "object",
+        "properties": {
+          "issued": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "paymentDue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "grace": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "restricted": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["issued", "paymentDue", "grace", "restricted"],
+        "additionalProperties": false
+      },
       "ComponentVersion": {
         "type": "object",
         "properties": {
@@ -2010,6 +2560,18 @@
           }
         },
         "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
+      },
+      "InvoiceQuery": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": { "type": "string", "enum": ["ISSUED", "PAID", "VOID", "OVERDUE"] }
+        },
+        "additionalProperties": false
       },
       "LicenceChangeRequest": {
         "type": "object",
@@ -2305,6 +2867,112 @@
         "required": ["id", "status", "createdAt", "finishedAt", "error", "draft"],
         "additionalProperties": false
       },
+      "PaymentMode": {
+        "type": "string",
+        "enum": ["UPI", "BANK_TRANSFER", "CHEQUE", "CASH", "CARD", "OTHER"]
+      },
+      "PlanListResponse": {
+        "type": "object",
+        "properties": {
+          "plans": { "type": "array", "items": { "$ref": "#/components/schemas/PlanView" } }
+        },
+        "required": ["plans"],
+        "additionalProperties": false
+      },
+      "PlanParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "PlanPrices": {
+        "type": "object",
+        "properties": {
+          "MONTHLY": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "QUARTERLY": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "YEARLY": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["MONTHLY", "QUARTERLY", "YEARLY"],
+        "additionalProperties": false
+      },
+      "PlanRequest": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,23}$" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "prices": { "$ref": "#/components/schemas/PlanPrices" },
+          "deviceLimits": { "$ref": "#/components/schemas/DeviceLimits" },
+          "modules": {
+            "minItems": 1,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LicenceModule" }
+          }
+        },
+        "required": ["code", "name", "prices", "deviceLimits", "modules"],
+        "additionalProperties": false
+      },
+      "PlanView": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,23}$" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "prices": { "$ref": "#/components/schemas/PlanPrices" },
+          "deviceLimits": { "$ref": "#/components/schemas/DeviceLimits" },
+          "modules": {
+            "minItems": 1,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LicenceModule" }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "subscribers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "code",
+          "name",
+          "prices",
+          "deviceLimits",
+          "modules",
+          "id",
+          "archivedAt",
+          "subscribers"
+        ],
+        "additionalProperties": false
+      },
       "PublishReleaseRequest": {
         "type": "object",
         "properties": {
@@ -2381,6 +3049,23 @@
         "required": ["reason"],
         "additionalProperties": false
       },
+      "RecordPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "amount": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+          "mode": { "$ref": "#/components/schemas/PaymentMode" },
+          "reference": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 100 }, { "type": "null" }]
+          },
+          "receivedOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": ["amount", "mode", "reference", "receivedOn"],
+        "additionalProperties": false
+      },
       "ReleaseChannel": { "type": "string", "enum": ["STABLE", "PILOT"] },
       "ReleaseComponent": { "type": "string", "enum": ["RESTAURANT_PC"] },
       "ReleaseInfo": {
@@ -2425,6 +3110,74 @@
           "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
         },
         "required": ["payload", "signature", "keyId"],
+        "additionalProperties": false
+      },
+      "SubscriptionRequest": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "cycle": { "$ref": "#/components/schemas/BillingCycle" },
+          "startsOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["planId", "cycle", "startsOn", "reason"],
+        "additionalProperties": false
+      },
+      "SubscriptionView": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "planName": { "type": "string" },
+          "cycle": { "$ref": "#/components/schemas/BillingCycle" },
+          "price": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "startedOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "nextInvoiceOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "cancelledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "tenantId",
+          "planId",
+          "planName",
+          "cycle",
+          "price",
+          "startedOn",
+          "nextInvoiceOn",
+          "cancelledAt"
+        ],
         "additionalProperties": false
       },
       "TamperEvent": {
@@ -2655,6 +3408,98 @@
           "lastSeenAt",
           "version",
           "licenceState"
+        ],
+        "additionalProperties": false
+      },
+      "VendorInvoiceListResponse": {
+        "type": "object",
+        "properties": {
+          "invoices": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorInvoiceView" }
+          }
+        },
+        "required": ["invoices"],
+        "additionalProperties": false
+      },
+      "VendorInvoiceParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "VendorInvoiceView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantName": { "type": "string" },
+          "number": { "type": "string" },
+          "periodStart": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "amount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "paid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "dueOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "status": { "type": "string", "enum": ["ISSUED", "PAID", "VOID"] },
+          "daysOverdue": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "paidAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "voidReason": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "tenantName",
+          "number",
+          "periodStart",
+          "periodEnd",
+          "amount",
+          "paid",
+          "dueOn",
+          "status",
+          "daysOverdue",
+          "issuedAt",
+          "paidAt",
+          "voidReason"
         ],
         "additionalProperties": false
       },
@@ -3175,6 +4020,12 @@
           "reviewedAt",
           "createdAt"
         ],
+        "additionalProperties": false
+      },
+      "VoidInvoiceRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
         "additionalProperties": false
       }
     }

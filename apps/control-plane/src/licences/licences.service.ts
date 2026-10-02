@@ -213,6 +213,7 @@ export class LicencesService {
     change: LicenceChange,
     actor: string,
     now = new Date(),
+    options: { readonly byBilling?: boolean } = {},
   ): Promise<LicenceSummary> {
     const reason = change.reason.trim();
     if (reason.length < 3 || reason.length > 200) {
@@ -246,6 +247,9 @@ export class LicencesService {
         ...(change.deviceLimits !== undefined && { deviceLimits: { ...change.deviceLimits } }),
         ...(change.validityDays !== undefined && { validityDays: change.validityDays }),
         ...(change.graceDays !== undefined && { graceDays: change.graceDays }),
+        // A state set by a person stays until a person changes it; billing lifts only its own.
+        ...(change.state !== undefined &&
+          change.state !== terms.state && { setByBilling: options.byBilling === true }),
         revision: terms.revision + 1,
       };
       await tx.installationLicence.update({ where: { installationId }, data });

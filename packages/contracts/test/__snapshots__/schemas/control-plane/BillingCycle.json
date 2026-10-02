@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "YEARLY"] },
+  "output": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "YEARLY"] }
+}

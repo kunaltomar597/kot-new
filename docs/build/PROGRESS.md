@@ -354,8 +354,8 @@ Recommended next WPs (dependencies met):
   - [x] P7-01d Screens: reminders, banners, the Owner's licence page
 - [ ] P7-02 Control Plane: tenants, subscriptions, licences
   - [x] P7-02a Vendor staff: accounts, MFA, roles, sessions, access reviews
-  - [ ] P7-02b Vendor API for the fleet
-  - [ ] P7-02c Subscriptions and payments
+  - [x] P7-02b Vendor API for the fleet
+  - [x] P7-02c Subscriptions and payments
   - [ ] P7-02d Support notes, QR provisioning, access policy
   - [ ] P7-02e The Control Plane web app
 - [ ] P7-03 Fleet monitoring
@@ -617,6 +617,40 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-02c):
+
+462. Plans have a price per billing cycle (monthly, quarterly, yearly; a cycle without a price is
+     not offered), device limits and modules. A restaurant's subscription keeps the price it was
+     put on; changing the plan applies the new price from the next invoice and the plan's limits
+     and modules to its licences at once (next heartbeat).
+463. The billing run (hourly, and on demand) issues each invoice on the first day of its period,
+     catching up any missed, numbered `SUB/<financial year>/00001`; due after
+     `CP_BILLING_PAYMENT_TERMS_DAYS` (7). An invoice is never deleted: voided with a reason.
+464. Overdue follow-up (LIC-005): the oldest unpaid invoice past due moves an active licence to
+     payment due; more than `CP_BILLING_GRACE_AFTER_DAYS` (15) past due, to grace; grace over, to
+     restricted (the PC also restricts by itself from the next business day). Payments are
+     recorded by hand (v1); a payment that leaves nothing overdue makes the licences active
+     again at once (LIC-006: within a minute online); paying down to a newer invoice only just
+     past due goes back to payment due. Billing only lifts what it set itself, never a vendor's
+     own restriction or grace (`set_by_billing`).
+465. The vendor's own GST invoices and collection through a payment gateway (VCP-004, S) are left
+     for later: v1 invoices are for tracking what is owed.
+
+Question for the Business Owner (P7-02c, LIC-009): the subscription agreement's days to pay
+(default 7) and days past due before grace (default 15), with the licence's 7 days of grace,
+before new orders pause. All three are settings; tell us the agreed numbers.
+
+Decided 2026-10-03 (P7-02b):
+
+459. A tenant keeps its name, legal name, GSTIN (checked with its check character), GST state,
+     contact name, email and phone. The tenant list shows each restaurant's most severe licence.
+460. Moving an installation to a new PC (VCP-002 "re-bind", LIC-004) issues an activation code for
+     the active installation: the old PC keeps working until the new one activates; then the old
+     key is refused, the licence binds the new PC at its first heartbeat, audited
+     installation.moved. Support and the Super Admin may move (LICENCE_REBIND).
+461. Every fleet endpoint names the vendor capability it needs, the same matrix as P7-02a; the
+     audit trail is paged by entry id, filtered by target or action.
 
 Decided 2026-10-03 (P7-02a):
 
@@ -2389,6 +2423,29 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-02c Subscriptions and payments
+
+Built: `@rp/domain` subscription-billing (months, periods, overdue stage, the licence state
+billing moves to); contracts `billing.ts` and 10 vendor routes; CP migration
+`20261003040000_subscriptions` (plans, subscriptions, invoices, payments, `set_by_billing`);
+config `CP_BILLING_*`; `BillingService` (plans, subscriptions, invoices, payments, the hourly run
+and follow-up) and `BillingController`; `LicencesService.change` marks what billing set.
+
+Tests: domain +3, CP integration +6 (plans by role, subscribing applies limits, issuing and
+catching up, payment due to grace to restricted, payments lifting it step by step, a vendor's
+restriction kept, voiding).
+
+### 2026-10-03: P7-02b Vendor API for the fleet
+
+Built: contracts `fleet-admin.ts` and 16 vendor routes; CP migration
+`20261003030000_tenant_details`; `FleetAdminService` (tenants, installations, moving a PC, the
+audit trail) and `FleetAdminController` over the admin, licence and release services; enrolment
+accepts a move code for an active installation; `ReleasesService.list`. (Its PROGRESS entry was
+written with P7-02c.)
+
+Tests: CP integration +7 (tenants by role, activation, moving a PC, licences by role, codes and
+re-binding, releases, the audit trail).
 
 ### 2026-10-03: P7-02a Vendor staff accounts with mandatory MFA
 
