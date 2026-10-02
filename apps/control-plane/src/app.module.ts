@@ -18,6 +18,9 @@ import { LicencesService } from './licences/licences.service.js';
 import { FleetAdminController } from './admin/fleet-admin.controller.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillingService } from './billing/billing.service.js';
+import { PgRelayProvisioner, RELAY_PROVISIONER } from './support/relay-provisioner.js';
+import { SupportController } from './support/support.controller.js';
+import { SupportService } from './support/support.service.js';
 import { FleetAdminService } from './admin/fleet-admin.service.js';
 import { VendorAuthService } from './vendor/vendor-auth.service.js';
 import { VendorController } from './vendor/vendor.controller.js';
@@ -97,6 +100,7 @@ export class ControlPlaneModule {
         VendorController,
         FleetAdminController,
         BillingController,
+        SupportController,
       ],
       providers: [
         { provide: CP_CONFIG, useValue: config },
@@ -111,6 +115,8 @@ export class ControlPlaneModule {
         VendorAuthService,
         FleetAdminService,
         BillingService,
+        SupportService,
+        { provide: RELAY_PROVISIONER, useClass: PgRelayProvisioner },
         ReleasesService,
         AdminService,
         MenuExtractionsService,

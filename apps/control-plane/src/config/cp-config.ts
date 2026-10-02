@@ -62,6 +62,14 @@ export const CpConfigSchema = z
     licenceGraceDays: z.coerce.number().int().min(0).max(90).default(7),
     /** Heartbeats asked of an installation whose licence is not active (LIC-006: within 1 min). */
     licenceHeartbeatSeconds: z.coerce.number().int().min(60).max(600).default(60),
+    /**
+     * The QR relay's database, as a login allowed the `relay_provisioner` role only (VCP-002), from
+     * the secret manager. Unset: restaurants cannot be provisioned for QR ordering from here.
+     */
+    relayDatabaseUrl: z
+      .string()
+      .regex(/^postgres(ql)?:\/\//)
+      .optional(),
     /** Days a restaurant has to pay an invoice (LIC-009: as the subscription agreement says). */
     billingPaymentTermsDays: z.coerce.number().int().min(0).max(90).default(7),
     /** Days past due before grace starts (LIC-005 ⚙ "overdue beyond N days"). */
@@ -84,6 +92,18 @@ export const CpConfigSchema = z
         code: 'custom',
         path: ['secretKey'],
         message: 'staging and production need CP_SECRET_KEY from the secret manager',
+      });
+    }
+    if (
+      config.env !== 'development' &&
+      config.relayDatabaseUrl !== undefined &&
+      !databaseUsesTls(config.relayDatabaseUrl)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['relayDatabaseUrl'],
+        message:
+          'staging and production need sslmode=require (or stricter) in CP_RELAY_DATABASE_URL',
       });
     }
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
@@ -127,6 +147,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     licenceGraceDays: env.CP_LICENCE_GRACE_DAYS,
     licenceHeartbeatSeconds: env.CP_LICENCE_HEARTBEAT_SECONDS,
     secretKey: env.CP_SECRET_KEY === '' ? undefined : env.CP_SECRET_KEY,
+    relayDatabaseUrl: env.CP_RELAY_DATABASE_URL === '' ? undefined : env.CP_RELAY_DATABASE_URL,
     billingPaymentTermsDays: env.CP_BILLING_PAYMENT_TERMS_DAYS,
     billingGraceAfterDays: env.CP_BILLING_GRACE_AFTER_DAYS,
     billingIntervalMinutes: env.CP_BILLING_INTERVAL_MINUTES,

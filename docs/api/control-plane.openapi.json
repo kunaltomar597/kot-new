@@ -1840,6 +1840,233 @@
         "x-requirements": ["VCP-002", "ONB-003"]
       }
     },
+    "/v1/vendor/tenants/{id}/notes": {
+      "get": {
+        "operationId": "listSupportNotes",
+        "summary": "The support team’s notes about a restaurant, newest first",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The notes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SupportNoteListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-007"]
+      },
+      "post": {
+        "operationId": "addSupportNote",
+        "summary": "Add a note about a restaurant; notes are never changed or deleted",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SupportNoteRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The note.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SupportNoteView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SUPPORT_NOTES",
+        "x-requirements": ["VCP-007"]
+      }
+    },
+    "/v1/vendor/tenants/{id}/relay": {
+      "get": {
+        "operationId": "getRelayProvisioning",
+        "summary": "Whether the restaurant is in the QR relay and its PC holds the credential",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The provisioning.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RelayProvisioningView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant, or not provisioned yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-002", "VCP-008"]
+      },
+      "post": {
+        "operationId": "provisionRelay",
+        "summary": "Provision the restaurant in the QR relay, or give it a new credential",
+        "description": "The relay keeps only the credential’s hash; the credential reaches the restaurant’s PC in its next heartbeat answer and is resent until the PC holds it. A new credential replaces the old one at once. Audited.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The provisioning.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RelayProvisioningView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The relay is not configured here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TENANTS_MANAGE",
+        "x-requirements": ["VCP-002", "VCP-008"]
+      }
+    },
     "/v1/vendor/tenants/{id}/subscription": {
       "get": {
         "operationId": "getSubscription",
@@ -2486,6 +2713,16 @@
             "maxItems": 20,
             "type": "array",
             "items": { "$ref": "#/components/schemas/TamperEvent" }
+          },
+          "relay": {
+            "type": "object",
+            "properties": {
+              "credentialDigest": {
+                "anyOf": [{ "$ref": "#/components/schemas/RELAY_DIGEST" }, { "type": "null" }]
+              }
+            },
+            "required": ["credentialDigest"],
+            "additionalProperties": false
           }
         },
         "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -2518,6 +2755,13 @@
               { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
               { "type": "null" }
             ]
+          },
+          "relayCredential": {
+            "default": null,
+            "anyOf": [
+              { "type": "string", "pattern": "^[A-Za-z0-9_-]{43,200}$" },
+              { "type": "null" }
+            ]
           }
         },
         "required": [
@@ -2526,7 +2770,8 @@
           "nextHeartbeatSeconds",
           "update",
           "licence",
-          "reactivationSecret"
+          "reactivationSecret",
+          "relayCredential"
         ],
         "additionalProperties": false
       },
@@ -2555,6 +2800,13 @@
             "default": null,
             "anyOf": [
               { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
+              { "type": "null" }
+            ]
+          },
+          "relayCredential": {
+            "default": null,
+            "anyOf": [
+              { "type": "string", "pattern": "^[A-Za-z0-9_-]{43,200}$" },
               { "type": "null" }
             ]
           }
@@ -3013,6 +3265,7 @@
         "required": ["channel", "version", "url", "sha256", "sizeBytes"],
         "additionalProperties": false
       },
+      "RELAY_DIGEST": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
       "ReactivationCode": {
         "type": "string",
         "pattern": "^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$"
@@ -3064,6 +3317,39 @@
           }
         },
         "required": ["amount", "mode", "reference", "receivedOn"],
+        "additionalProperties": false
+      },
+      "RelayProvisioningView": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "provisionedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "credentialIssuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "delivered": { "type": "boolean" },
+          "deliveredAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["tenantId", "provisionedAt", "credentialIssuedAt", "delivered", "deliveredAt"],
         "additionalProperties": false
       },
       "ReleaseChannel": { "type": "string", "enum": ["STABLE", "PILOT"] },
@@ -3178,6 +3464,45 @@
           "nextInvoiceOn",
           "cancelledAt"
         ],
+        "additionalProperties": false
+      },
+      "SupportNoteListResponse": {
+        "type": "object",
+        "properties": {
+          "notes": { "type": "array", "items": { "$ref": "#/components/schemas/SupportNoteView" } }
+        },
+        "required": ["notes"],
+        "additionalProperties": false
+      },
+      "SupportNoteRequest": {
+        "type": "object",
+        "properties": { "body": { "type": "string", "minLength": 1, "maxLength": 2000 } },
+        "required": ["body"],
+        "additionalProperties": false
+      },
+      "SupportNoteView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "author": { "type": "string" },
+          "authorName": { "type": ["string", "null"] },
+          "body": { "type": "string" },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["id", "tenantId", "author", "authorName", "body", "createdAt"],
         "additionalProperties": false
       },
       "TamperEvent": {

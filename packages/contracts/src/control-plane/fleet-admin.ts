@@ -175,3 +175,34 @@ export type AuditEntryView = z.infer<typeof AuditEntryView>;
 
 export const AuditListResponse = z.object({ entries: z.array(AuditEntryView) });
 export type AuditListResponse = z.infer<typeof AuditListResponse>;
+
+/** A note about a restaurant for the support team (VCP-007): kept, never edited or deleted. */
+export const SupportNoteRequest = z.strictObject({ body: z.string().trim().min(1).max(2_000) });
+export type SupportNoteRequest = z.infer<typeof SupportNoteRequest>;
+
+export const SupportNoteView = z.object({
+  id: Id,
+  tenantId: Id,
+  /** `vendor:<id>` of who wrote it, and their name. */
+  author: z.string(),
+  authorName: z.string().nullable(),
+  body: z.string(),
+  createdAt: Timestamp,
+});
+export type SupportNoteView = z.infer<typeof SupportNoteView>;
+
+export const SupportNoteListResponse = z.object({ notes: z.array(SupportNoteView) });
+export type SupportNoteListResponse = z.infer<typeof SupportNoteListResponse>;
+
+/**
+ * The restaurant in the QR relay (VCP-002, VCP-008): provisioned with its own scoped credential,
+ * which reaches its PC in a heartbeat answer; `delivered` once the PC reports holding it.
+ */
+export const RelayProvisioningView = z.object({
+  tenantId: Id,
+  provisionedAt: Timestamp,
+  credentialIssuedAt: Timestamp,
+  delivered: z.boolean(),
+  deliveredAt: Timestamp.nullable(),
+});
+export type RelayProvisioningView = z.infer<typeof RelayProvisioningView>;

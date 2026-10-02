@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { LicencesService } from '../licences/licences.service.js';
 import { ReleasesService } from '../releases/releases.service.js';
+import { SupportService } from '../support/support.service.js';
 
 /** The component whose version releases are compared with. */
 const INSTALLER_COMPONENT = 'RESTAURANT_PC';
@@ -20,6 +21,7 @@ export class HeartbeatsService {
     private readonly releases: ReleasesService,
     private readonly licences: LicencesService,
     private readonly audit: AuditService,
+    private readonly support: SupportService,
   ) {}
 
   async record(
@@ -72,6 +74,11 @@ export class HeartbeatsService {
           );
     // A new licence when one is due (LIC-002), and every minute while it is not active (LIC-006).
     const licence = await this.licences.forHeartbeat(installation, heartbeat.licence, receivedAt);
+    // The QR relay credential, until the PC holds it (VCP-002).
+    const relayCredential = await this.support.relayCredentialFor(
+      installation.tenantId,
+      heartbeat.relay?.credentialDigest,
+    );
     return {
       receivedAt: receivedAt.toISOString(),
       serverTime: new Date().toISOString(),
@@ -79,6 +86,7 @@ export class HeartbeatsService {
       update,
       licence: licence.licence,
       reactivationSecret: licence.reactivationSecret,
+      relayCredential,
     };
   }
 }

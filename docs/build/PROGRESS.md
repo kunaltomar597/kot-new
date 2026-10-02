@@ -356,7 +356,7 @@ Recommended next WPs (dependencies met):
   - [x] P7-02a Vendor staff: accounts, MFA, roles, sessions, access reviews
   - [x] P7-02b Vendor API for the fleet
   - [x] P7-02c Subscriptions and payments
-  - [ ] P7-02d Support notes, QR provisioning, access policy
+  - [x] P7-02d Support notes, QR provisioning, access policy
   - [ ] P7-02e The Control Plane web app
 - [ ] P7-03 Fleet monitoring
 - [ ] P7-04 Release management and remote updates
@@ -617,6 +617,28 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-02d):
+
+466. Support notes (VCP-007) are written by Support, Onboarding and the Super Admin, read by every
+     vendor role, and never changed: a database trigger refuses updates and deletes, and a
+     correction is a new note. Each note is audited (`support.note_added`).
+467. Provisioning a restaurant in the QR relay (VCP-002, VCP-008) is Onboarding's (the
+     `TENANTS_MANAGE` capability). The Control Plane talks to the relay database as its own login
+     (`CP_RELAY_DATABASE_URL`, TLS outside development) through `relay_provisioner`'s functions
+     only. It creates the tenant and a credential the relay keeps only as a hash.
+468. The credential reaches the restaurant's PC in a heartbeat answer. It is sealed at rest on
+     both sides (`CP_SECRET_KEY` in the Control Plane, the SecretStore key on the PC). The PC reports the first 16 hex digits of its SHA-256; the
+     Control Plane sends the credential again until the digest matches, then marks it delivered.
+     The PC's relay sync reads the credential on every cycle, so no restart is needed. The manual
+     `pnpm relay:credential` route stays for a PC without the Control Plane.
+469. Provisioning again rotates the credential: a new one is issued and the old one is revoked in
+     the relay at once. Delivery starts again, so QR ordering pauses until the PC's next heartbeat
+     (at most 5 minutes). Use this when a credential may have leaked.
+470. The vendor access policy is `docs/runbooks/vendor-access-policy.md`. It covers no standing
+     access, business data only through diagnostics (with the manager's consent) or backups
+     (only on the Owner's restore request), least privilege by role, MFA, quarterly access reviews
+     and auditing. It is reviewed with each quarterly access review.
 
 Decided 2026-10-03 (P7-02c):
 
@@ -2423,6 +2445,22 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-02d Support notes, QR provisioning, access policy
+
+Built: contracts for support notes and relay provisioning (4 vendor routes), plus heartbeat
+`relay.credentialDigest` and the answer's `relayCredential`; CP migration
+`20261003050000_support_and_relay` (append-only `support_notes`, `relay_provisioning`); config
+`CP_RELAY_DATABASE_URL`; `SupportService`, `SupportController` and `PgRelayProvisioner`. The
+local server reports its credential's digest and saves a delivered credential. The access policy
+is `docs/runbooks/vendor-access-policy.md`.
+
+Tests: CP integration +3 (notes by role and append-only; provisioning by role, delivery until
+held, sealed at rest; rotation revokes the old credential). Server acceptance +1 (the real PC
+receives its signed licence and its relay credential in heartbeats).
+
+Gotchas: `relay.verify_credential` returns a table, so select `tenant_id` from it. The CP's tests
+use `@rp/relay/testing` (dev dependency) for a stand-in relay in the same cluster.
 
 ### 2026-10-03: P7-02c Subscriptions and payments
 

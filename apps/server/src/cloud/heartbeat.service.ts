@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { statfs } from 'node:fs/promises';
 import {
   Inject,
@@ -16,6 +17,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { ControlPlaneClient, ControlPlaneError } from './control-plane-client.js';
 import { readEnrolment, readOfferedUpdate, saveOfferedUpdate } from './control-plane-state.js';
 import { LicenceAgentService } from '../licensing/licence-agent.service.js';
+import { readRelayCredential, saveRelayCredential } from '../relay/relay-credential.js';
 import { installationKey } from './installation-key.js';
 
 export const CONTROL_PLANE_OPTIONS = Symbol('CONTROL_PLANE_OPTIONS');
@@ -139,6 +141,11 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       await this.offer(answer.update);
       // A renewed licence, the reactivation secret and the clock check (LIC-002, LIC-007).
       await this.licence.accept(answer, heartbeat.tamper ?? []);
+      // The QR relay credential the vendor provisioned (VCP-002), kept sealed.
+      if (answer.relayCredential !== null) {
+        await saveRelayCredential(this.prisma, this.secrets, answer.relayCredential);
+        this.logger.log('The QR relay credential arrived from the Control Plane');
+      }
       if (this.state.lastError !== null) {
         this.logger.log('Reporting to the Control Plane again');
       }
@@ -201,12 +208,13 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
   }
 
   private async collect(): Promise<HeartbeatRequest> {
-    const [head, devices, disk, postgres, licence] = await Promise.all([
+    const [head, devices, disk, postgres, licence, relayCredential] = await Promise.all([
       this.audit.chainHead(),
       this.deviceCounts(),
       this.disk(),
       this.postgresVersion(),
       this.licence.heartbeatReport(),
+      readRelayCredential(this.prisma, this.secrets).catch(() => undefined),
     ]);
     return {
       heartbeatId: newId(),
@@ -221,6 +229,12 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       auditChainHead: head === null ? null : { sequence: head.seq, hash: head.hash },
       devices,
       ...licence,
+      relay: {
+        credentialDigest:
+          relayCredential === undefined
+            ? null
+            : createHash('sha256').update(relayCredential, 'utf8').digest('hex').slice(0, 16),
+      },
     };
   }
 

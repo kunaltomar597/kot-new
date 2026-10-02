@@ -201,6 +201,39 @@ model VendorPayment {
   @@map("vendor_payments")
 }
 
+/// A support note about a restaurant (VCP-007): append-only.
+model SupportNote {
+  id        String   @id @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  /// `vendor:<user id>` or `cli:<name>`.
+  author    String
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("support_notes")
+}
+
+/// The restaurant in the QR relay (VCP-002): its credential, sealed, until its PC holds it.
+model RelayProvisioning {
+  tenantId           String    @id @map("tenant_id") @db.Uuid
+  /// The relay's id of the current credential (to revoke it on rotation).
+  credentialId       String    @map("credential_id") @db.Uuid
+  /// The credential sealed with the Control Plane's secret key, to deliver (and deliver again).
+  credentialSealed   String    @map("credential_sealed")
+  /// First 16 hex digits of its SHA-256: what the PC reports holding.
+  credentialDigest   String    @map("credential_digest")
+  provisionedAt      DateTime  @map("provisioned_at") @db.Timestamptz(3)
+  credentialIssuedAt DateTime  @map("credential_issued_at") @db.Timestamptz(3)
+  deliveredAt        DateTime? @map("delivered_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("relay_provisioning")
+}
+
 /// A restaurant business, the vendor's customer (VCP-002 grows it in P7-02).
 model Tenant {
   id           String   @id @db.Uuid
@@ -220,6 +253,8 @@ model Tenant {
   menuExtractions MenuExtraction[]
   subscription    Subscription?
   invoices        VendorInvoice[]
+  notes           SupportNote[]
+  relay           RelayProvisioning?
 
   @@map("tenants")
 }
