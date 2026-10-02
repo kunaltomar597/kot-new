@@ -109,6 +109,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   const [moving, setMoving] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const [asking, setAsking] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [busyLines, setBusyLines] = useState<ReadonlySet<string>>(new Set());
   const [ending, setEnding] = useState<{ line: SentLine; ending: Ending } | undefined>();
   const { withOverride, sheet: approval } = useOverride();
@@ -389,10 +390,43 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
     );
   };
 
+  // WTR-008 (S): print the bill at the bill printer, when the restaurant lets waiters.
+  const printBill = () => {
+    setPrinting(true);
+    setNotice(undefined);
+    session.api.printTableBill({ params: { sessionId } }).then(
+      (result) => {
+        setPrinting(false);
+        if (result.printed) {
+          toast.show({
+            title: t('mobile.tables.billPrinted', {
+              number: result.invoiceNumber,
+              total: formatRupees(result.grandTotal),
+            }),
+            tone: 'success',
+          });
+        } else {
+          setNotice(
+            t('mobile.tables.billNotPrinted', {
+              number: result.invoiceNumber,
+              error: result.error ?? '',
+            }),
+          );
+        }
+        tables.reload();
+      },
+      (failure: unknown) => {
+        setPrinting(false);
+        setNotice(messageOf(failure, t));
+      },
+    );
+  };
+
   const count = cart.reduce((total, line) => total + line.quantity, 0);
   const blocked = problems.size > 0;
   const alert = table === undefined ? undefined : tileAlert(table, t);
   const ownTable = table?.session?.waiterId === person.id;
+  const mayPrint = tables.data.status === 'ready' && tables.data.value.mayPrintBill;
 
   return (
     <Screen
@@ -459,6 +493,17 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
                 onPress={requestBill}
               >
                 {t('mobile.tables.requestBill')}
+              </Button>
+            ) : null}
+            {mayPrint && ownTable && table.state !== 'BILL_PRINTED' ? (
+              <Button
+                variant="secondary"
+                style={styles.grow}
+                loading={printing}
+                testID="print-bill"
+                onPress={printBill}
+              >
+                {t('mobile.tables.printBill')}
               </Button>
             ) : null}
           </View>

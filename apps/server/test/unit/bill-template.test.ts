@@ -23,6 +23,7 @@ const INVOICE: InvoiceView = {
     phone: '020 1234 5678',
     headerLines: ['Pure veg since 1990'],
     footerLines: ['Thank you, visit again'],
+    amountInWords: true,
   },
   customer: { name: null, phone: null, phoneConsent: false, gstin: null },
   priceMode: 'TAX_EXCLUSIVE',
@@ -106,6 +107,18 @@ describe('[BILL-014] the printed bill', () => {
     }
     expect(printed).toMatch(/TOTAL Rs\s+378\.00/);
     expect(printed).not.toContain('DUPLICATE');
+  });
+
+  it('[BILL-001] writes the total in words when the invoice was issued with them', () => {
+    const render = (amountInWords: boolean) =>
+      text(
+        renderBill(
+          { ...INVOICE, particulars: { ...INVOICE.particulars, amountInWords } },
+          { paperWidthMm: 80, duplicate: false, timeZone: 'Asia/Kolkata' },
+        ),
+      );
+    expect(render(true)).toContain('Rupees Three Hundred Seventy-Eight Only');
+    expect(render(false)).not.toContain('Rupees');
   });
 
   it('[BILL-009] marks a reprint DUPLICATE and a voided invoice VOID', () => {

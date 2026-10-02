@@ -72,6 +72,17 @@ export const TransferItemsResponse = z.object({
 });
 export type TransferItemsResponse = z.infer<typeof TransferItemsResponse>;
 
+/** A table's bill printed from the waiter app (WTR-008): issued, and printed if it could be. */
+export const PrintTableBillResponse = z.object({
+  invoiceId: Id,
+  invoiceNumber: z.string(),
+  grandTotal: Paise,
+  printed: z.boolean(),
+  /** Why it did not print, in plain words; the bill is issued all the same. */
+  error: z.string().nullable(),
+});
+export type PrintTableBillResponse = z.infer<typeof PrintTableBillResponse>;
+
 /** A table's state after it was marked clean (TBL-004). */
 export const TableStateView = z.object({ tableId: Id, state: TableState });
 export type TableStateView = z.infer<typeof TableStateView>;
@@ -110,5 +121,12 @@ export const TableOverviewEntry = z.object({
 });
 export type TableOverviewEntry = z.infer<typeof TableOverviewEntry>;
 
-export const TableOverviewResponse = z.object({ tables: z.array(TableOverviewEntry) });
+export const TableOverviewResponse = z.object({
+  tables: z.array(TableOverviewEntry),
+  /**
+   * Whether the person asking may print a table's bill (WTR-008): the POS roles always; waiters,
+   * for their own tables, only when the restaurant allows it (`bills.waiterMayPrint`).
+   */
+  mayPrintBill: z.boolean().default(false),
+});
 export type TableOverviewResponse = z.infer<typeof TableOverviewResponse>;

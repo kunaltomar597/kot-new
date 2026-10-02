@@ -97,7 +97,10 @@ function sessionView(tableId: string, label: string) {
   };
 }
 
-const overview = (...tables: TableOverviewEntry[]): TableOverviewResponse => ({ tables });
+const overview = (...tables: TableOverviewEntry[]): TableOverviewResponse => ({
+  tables,
+  mayPrintBill: true,
+});
 
 function posServer(...overviews: TableOverviewResponse[]): FakeServer {
   return signsInAs(server(), 'CASHIER')

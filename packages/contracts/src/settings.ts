@@ -385,6 +385,25 @@ export const SETTINGS = [
     requirements: ['ONB-004', 'BILL-002'],
   }),
   setting({
+    key: 'bills.amountInWords',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'TAX_AND_INVOICE_SETTINGS',
+    description: 'Bills also write the total in words ("Rupees Six Hundred Seventy-Two Only").',
+    requirements: ['BILL-001'],
+  }),
+  setting({
+    key: 'bills.waiterMayPrint',
+    schema: z.boolean(),
+    defaultValue: false,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Waiters may print the bill of their own tables from the app (the BRD default: they only ask for it).',
+    requirements: ['WTR-008'],
+  }),
+  setting({
     key: 'bills.printerId',
     schema: z.uuid().nullable(),
     defaultValue: null,

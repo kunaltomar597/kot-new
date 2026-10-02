@@ -50,6 +50,8 @@ export interface BillContext {
   readonly settings: BillSettings & {
     readonly serviceChargeEnabled: boolean;
     readonly rateBp: number;
+    /** BILL-001: show the total in words. */
+    readonly amountInWords: boolean;
   };
   readonly taxGroups: ReadonlyMap<string, { name: string; sacCode: string | null }>;
   readonly calculated: CalculatedBill;
@@ -381,6 +383,7 @@ export class BillsService {
           : null,
       serviceChargeEnabled,
       rateBp,
+      amountInWords: snapshot.get('bills.amountInWords'),
     };
     const items: BillableItem[] = billable.map((item) => ({
       id: item.id,
@@ -501,6 +504,7 @@ export class BillsService {
       },
       invoiceIds: [...invoiceIds],
       editingInvoiceId: bill.editingInvoiceId,
+      amountInWords: settings.amountInWords,
     };
   }
 

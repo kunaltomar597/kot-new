@@ -1,4 +1,5 @@
 import type { BillView, InvoiceView } from '@rp/contracts';
+import { amountInWords } from '@rp/domain';
 import { Badge, Button, Card, ErrorState, Icon, LoadingState, Money, useToast } from '@rp/ui-web';
 import { useState } from 'react';
 import { useConsole } from '../app/console-context.js';
@@ -464,6 +465,9 @@ function BillPreview({ bill }: { bill: BillView }) {
           <Money paise={bill.grandTotal} size="lg" strong />
         </dd>
       </dl>
+      {bill.amountInWords ? (
+        <p className="dashboard-section__hint">{amountInWords(bill.grandTotal)}</p>
+      ) : null}
     </Card>
   );
 }

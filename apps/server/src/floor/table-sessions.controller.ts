@@ -36,7 +36,12 @@ export class TableSessionsController {
   @Get('tables/overview')
   @RequireSession()
   async overview(@Req() request: AuthenticatedRequest): Promise<TableOverviewResponse> {
-    return { tables: await this.sessions.overview(principalOf(request).restaurantId) };
+    const principal = principalOf(request);
+    const [tables, mayPrintBill] = await Promise.all([
+      this.sessions.overview(principal.restaurantId),
+      this.sessions.mayPrintBill(principal),
+    ]);
+    return { tables, mayPrintBill };
   }
 
   @Post('tables/:tableId/open')

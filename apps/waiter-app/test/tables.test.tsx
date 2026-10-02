@@ -102,6 +102,26 @@ describe('[TBL-004] a table that needs cleaning', () => {
   });
 });
 
+describe('[WTR-008] printing the bill from the app', () => {
+  it('is offered on the waiter’s own tables only when the restaurant allows it', async () => {
+    const restaurant = new Restaurant();
+    const { server } = await signedInApp(restaurant);
+    await fireEvent.press(await tile(/^T2, Occupied/));
+    expect(await screen.findByRole('header', { name: 'Table T2' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('print-bill')).toBeNull();
+
+    restaurant.waiterMayPrint = true;
+    await fireEvent.press(screen.getByRole('button', { name: 'Back to tables' }));
+    await fireEvent.press(await tile(/^T2, Occupied/));
+    await fireEvent.press(await screen.findByTestId('print-bill'));
+    expect(await screen.findByText('Bill INV/26-27/000042 printed: ₹640.00')).toBeOnTheScreen();
+    const sessionId = restaurant.table('T2').session?.id ?? '';
+    expect(server.callsTo('POST', `/api/v1/table-sessions/${sessionId}/print-bill`)).toHaveLength(
+      1,
+    );
+  });
+});
+
 describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
   it('moves the waiter’s table to a free one and stays on it', async () => {
     const { server, restaurant } = await signedInApp();

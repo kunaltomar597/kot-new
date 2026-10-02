@@ -40,6 +40,7 @@ export function particularsOf(
     phone: restaurant.phone,
     headerLines: snapshot.get('bills.headerLines'),
     footerLines: snapshot.get('bills.footerLines'),
+    amountInWords: snapshot.get('bills.amountInWords'),
   };
 }
 
@@ -66,6 +67,8 @@ function toParticulars(value: unknown): InvoiceParticulars {
     phone: text(stored.phone),
     headerLines: lines(stored.headerLines),
     footerLines: lines(stored.footerLines),
+    // Invoices issued before BILL-001's words were added have none.
+    amountInWords: stored.amountInWords === true,
   };
 }
 

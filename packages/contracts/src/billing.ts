@@ -149,6 +149,8 @@ export const BillView = z.object({
   invoiceIds: z.array(Id),
   /** The printed invoice this bill was reopened to edit; printing it again keeps its number. */
   editingInvoiceId: Id.nullable(),
+  /** Show the total in words under it (`bills.amountInWords`, BILL-001). */
+  amountInWords: z.boolean().default(false),
 });
 export type BillView = z.infer<typeof BillView>;
 
@@ -164,6 +166,8 @@ export const InvoiceParticulars = z.object({
   phone: z.string().nullable(),
   headerLines: z.array(z.string()),
   footerLines: z.array(z.string()),
+  /** The total is also written in words (BILL-001), as set when the invoice was issued. */
+  amountInWords: z.boolean().default(false),
 });
 export type InvoiceParticulars = z.infer<typeof InvoiceParticulars>;
 

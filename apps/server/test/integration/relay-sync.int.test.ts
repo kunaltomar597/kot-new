@@ -477,6 +477,10 @@ describe('without a credential or an address', () => {
     await prisma.systemMeta.delete({ where: { key: 'relay.credential' } });
     const before = relay.requests.length;
     expect(await sync.sync()).toMatchObject({ credential: false, lastError: 'NO_CREDENTIAL' });
-    expect(relay.requests.length).toBe(before);
+    // The order pick-up loop runs on its own clock; the sync itself sends nothing.
+    const fromSync = relay.requests
+      .slice(before)
+      .filter((entry) => !/\/server\/(orders|service-requests)/.test(entry));
+    expect(fromSync).toEqual([]);
   });
 });

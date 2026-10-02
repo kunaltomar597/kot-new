@@ -87,7 +87,8 @@
             "activeServiceRequests"
           ]
         }
-      }
+      },
+      "mayPrintBill": { "default": false, "type": "boolean" }
     },
     "required": ["tables"]
   },
@@ -181,9 +182,10 @@
           ],
           "additionalProperties": false
         }
-      }
+      },
+      "mayPrintBill": { "default": false, "type": "boolean" }
     },
-    "required": ["tables"],
+    "required": ["tables", "mayPrintBill"],
     "additionalProperties": false
   }
 }

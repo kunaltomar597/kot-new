@@ -220,6 +220,7 @@ import {
   TableOverviewResponse,
   TableSessionParams,
   TableSessionView,
+  PrintTableBillResponse,
   TableStateView,
   TransferItemsRequest,
   TransferItemsResponse,
@@ -1890,6 +1891,27 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such open session or dish.', schema: ApiError },
       409: { description: 'A dish cannot move, or a bill is printed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'printTableBill',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/print-bill',
+    summary: "Print a table's bill at the bill printer, from the waiter app",
+    description:
+      'WTR-008 (S). Issues the invoice as the POS would and prints it on the bill printer; when it ' +
+      'cannot print, the bill is issued all the same and the answer says why. Waiters may do it ' +
+      'only for their own tables, and only when the restaurant allows it (`bills.waiterMayPrint`; ' +
+      'the BRD lets waiters only ask for the bill). A printed bill is not printed again from here.',
+    tags: ['billing'],
+    requirements: ['WTR-008', 'BILL-014', 'AUD-001'],
+    capability: 'BILL_REQUEST',
+    request: { params: TableSessionParams },
+    responses: {
+      200: { description: 'The invoice, and whether it printed.', schema: PrintTableBillResponse },
+      ...standardErrors,
+      404: { description: 'No such open session.', schema: ApiError },
+      409: { description: 'The bill is already printed, or cannot be issued.', schema: ApiError },
     },
   },
   {

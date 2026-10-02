@@ -72,6 +72,7 @@ export function billView(overrides: Partial<BillView> = {}): BillView {
     customer: { name: null, phone: null, phoneConsent: false, gstin: null },
     invoiceIds: [],
     editingInvoiceId: null,
+    amountInWords: true,
     ...overrides,
   };
 }
@@ -98,6 +99,7 @@ export function invoiceView(overrides: Partial<InvoiceView> = {}): InvoiceView {
       phone: null,
       headerLines: [],
       footerLines: [],
+      amountInWords: true,
     },
     customer: { name: null, phone: null, phoneConsent: false, gstin: null },
     priceMode: 'TAX_EXCLUSIVE',

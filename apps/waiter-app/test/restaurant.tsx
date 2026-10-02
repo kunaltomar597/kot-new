@@ -97,6 +97,8 @@ export class Restaurant {
       session: session(9005, KIRAN, 4),
     },
   ];
+  /** The restaurant lets waiters print bills from the app (WTR-008, `bills.waiterMayPrint`). */
+  waiterMayPrint = false;
   /** Open takeaway orders (TBL-008, WTR-013). */
   readonly takeaway: OrderView[] = [];
   /** When the signed-in waiter went on break, or null (NTF-009). */
@@ -191,8 +193,9 @@ export class Restaurant {
     return found;
   }
 
-  overview(): { tables: TableOverviewEntry[] } {
+  overview(): { tables: TableOverviewEntry[]; mayPrintBill: boolean } {
     return {
+      mayPrintBill: this.waiterMayPrint,
       tables: this.tables.map((table) => ({
         tableId: table.id,
         label: table.label,
@@ -706,6 +709,23 @@ export class Restaurant {
         status: 200,
         body: { pager: this.pager, lowBatteryPercent: 15 } satisfies MyPagerResponse,
       }))
+      .on('POST', '/api/v1/table-sessions/:sessionId/print-bill', (call) => {
+        const table = this.tables.find(
+          (candidate) => candidate.session !== null && call.path.includes(candidate.session.id),
+        );
+        if (table === undefined || !this.waiterMayPrint) return { status: 403, body: {} };
+        table.state = 'BILL_PRINTED';
+        return {
+          status: 200,
+          body: {
+            invoiceId: id(9900),
+            invoiceNumber: 'INV/26-27/000042',
+            grandTotal: 64_000,
+            printed: true,
+            error: null,
+          },
+        };
+      })
       .on('POST', '/api/v1/tables/:tableId/clean', (call) => {
         const table = this.tables.find((candidate) => call.path.includes(candidate.id));
         if (table?.state !== 'NEEDS_CLEANING') return { status: 409, body: {} };
