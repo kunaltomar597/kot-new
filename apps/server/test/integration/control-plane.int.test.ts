@@ -6,6 +6,7 @@ import {
   CONTROL_PLANE_MIGRATIONS_DIR,
   CpConfigSchema,
   createControlPlaneApp,
+  DiagnosticsService as CpDiagnosticsService,
   FleetService,
   SupportService,
 } from '@rp/control-plane/testing';
@@ -13,6 +14,7 @@ import { startRelay, type TestRelay } from '@rp/relay/testing';
 import { createMigratedDatabase, type TestDatabase } from '@rp/test-postgres';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { SendDiagnosticsResponse } from '@rp/contracts';
 import pg from 'pg';
 import { AuditService } from '../../src/audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../../src/auth/secret-store.js';
@@ -28,6 +30,7 @@ import { APP_CONFIG, type AppConfig } from '../../src/config/app-config.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { LicenceAgentService } from '../../src/licensing/licence-agent.service.js';
 import { readRelayCredential } from '../../src/relay/relay-credential.js';
+import { authHeaders, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, testAdminUrl } from '../helpers/test-database.js';
 import { until } from '../helpers/wait.js';
@@ -247,6 +250,33 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     const alerts = await fleet.alerts({ state: 'OPEN', installationId });
     expect(alerts.map((alert) => alert.kind)).toEqual(['AUDIT_CHAIN_MISMATCH']);
     expect(alerts[0]?.details).toMatchObject({ reason: 'REWRITTEN', byAuditCheck: true });
+  });
+
+  it('[UPD-008] [VCP-007] sends a manager’s diagnostics to support, who can open them', async () => {
+    const restaurant = await prisma.restaurant.findFirstOrThrow();
+    const kit = await createAuthKit(server, { restaurantId: restaurant.id });
+    const manager = await signIn(server, kit, 'MANAGER');
+    const sent = await request(httpServer(server))
+      .post('/api/v1/system/diagnostics')
+      .set(authHeaders(kit.deviceId, manager.accessToken))
+      .send({ note: 'The kitchen printer stops at night' });
+    expect(sent.status, JSON.stringify(sent.body)).toBe(200);
+    const { id } = SendDiagnosticsResponse.parse(sent.body);
+    const diagnostics = controlPlane.get(CpDiagnosticsService);
+    const [listed] = await diagnostics.list(installationId);
+    expect(listed).toMatchObject({
+      id,
+      note: 'The kitchen printer stops at night',
+      sentBy: { name: 'Test manager', role: 'MANAGER' },
+    });
+    const opened = await diagnostics.open(id, 'vendor:acceptance');
+    expect(opened.bundle).toMatchObject({
+      installationId,
+      configuration: { productVersion: '1.0.0' },
+    });
+    expect(
+      await prisma.auditLog.count({ where: { action: 'DIAGNOSTICS_SENT', entityId: id } }),
+    ).toBe(1);
   });
 
   it('[NFR-A01] keeps working while the Control Plane is down and reports again when it is back', async () => {

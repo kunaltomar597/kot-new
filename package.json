@@ -10,8 +10,8 @@
   "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test",
-    "test:coverage": "turbo run test:coverage",
+    "test": "turbo run test --concurrency=4",
+    "test:coverage": "turbo run test:coverage --concurrency=4",
     "typecheck": "turbo run typecheck",
     "lint": "node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js . --fix",

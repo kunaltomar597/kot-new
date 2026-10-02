@@ -307,3 +307,25 @@
   font-size: var(--rp-font-size-sm);
   word-break: break-all;
 }
+
+.cp-diagnostics {
+  display: grid;
+  gap: var(--rp-space-3);
+}
+
+.cp-pre {
+  margin: 0;
+  padding: var(--rp-space-3);
+  max-height: 20rem;
+  overflow: auto;
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface-sunken);
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cp-pre--log {
+  max-height: 30rem;
+}

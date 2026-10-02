@@ -274,9 +274,12 @@ import {
   RoleRequest,
   RoleView,
 } from './roles.js';
+import { DiagnosticsBundle } from './control-plane/diagnostics.js';
 import {
   ApproveUpdateRequest,
   HealthResponse,
+  SendDiagnosticsRequest,
+  SendDiagnosticsResponse,
   SystemStatusResponse,
   TlsCaResponse,
   VersionResponse,
@@ -635,6 +638,39 @@ export const ROUTES = [
       200: { description: 'The status with the approval.', schema: SystemStatusResponse },
       ...standardErrors,
       409: { description: 'That version is not on offer.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'previewDiagnostics',
+    method: 'GET',
+    path: '/api/v1/system/diagnostics',
+    summary: 'What "Send diagnostics to support" would send, as it would send it',
+    description:
+      'UPD-008: versions, configuration without secrets, devices, status and the tail of the ' +
+      'logs, scrubbed of secrets and personal data, so a manager can see it first.',
+    tags: ['system'],
+    requirements: ['UPD-008'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The bundle.', schema: DiagnosticsBundle },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'sendDiagnostics',
+    method: 'POST',
+    path: '/api/v1/system/diagnostics',
+    summary: 'Send diagnostics to support',
+    description: 'UPD-008: makes the bundle and sends it to the Control Plane. Audited.',
+    tags: ['system'],
+    requirements: ['UPD-008', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { body: SendDiagnosticsRequest },
+    responses: {
+      200: { description: 'Sent.', schema: SendDiagnosticsResponse },
+      ...standardErrors,
+      409: { description: 'This PC is not connected to the Control Plane.', schema: ApiError },
+      503: { description: 'The Control Plane could not be reached.', schema: ApiError },
     },
   },
   {

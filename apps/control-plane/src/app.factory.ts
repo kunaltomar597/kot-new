@@ -18,6 +18,8 @@ export const API_PREFIX = 'v1';
 const JSON_BODY_LIMIT = '64kb';
 /** 20 MB of files in base64, with room for the JSON around them. */
 const MENU_BODY_LIMIT = '28mb';
+/** A 4 MB diagnostics bundle (UPD-008) with room for the request around it. */
+const DIAGNOSTICS_BODY_LIMIT = '5mb';
 
 /** Nest's own body parser is off: `configureControlPlaneApp` installs the pipeline in order. */
 export const NEST_APP_OPTIONS: NestApplicationOptions = { bufferLogs: true, bodyParser: false };
@@ -38,6 +40,10 @@ export function configureControlPlaneApp(app: INestApplication): void {
   express.use(
     `/${API_PREFIX}/menu-extractions`,
     json({ limit: MENU_BODY_LIMIT, verify: keepRawBody }),
+  );
+  express.use(
+    `/${API_PREFIX}/diagnostics`,
+    json({ limit: DIAGNOSTICS_BODY_LIMIT, verify: keepRawBody }),
   );
   express.use(json({ limit: JSON_BODY_LIMIT, verify: keepRawBody }));
   express.use(bodyParserErrorHandler);

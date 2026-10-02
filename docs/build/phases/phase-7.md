@@ -162,6 +162,21 @@ reporting wired to the vendor service (Sentry or equivalent) with PII and secret
 shell.
 Acceptance: diagnostics bundle contains no secrets (test scans for known secret patterns).
 
+Split (2026-10-03):
+
+- **P7-08a Diagnostics bundle.** The bundle: versions, configuration without secrets, the device
+  list, system status and the tail of the logs, all scrubbed of secrets and personal data. A
+  manager previews and sends it from the System page; the Control Plane stores it; Support opens
+  it in the web app, audited.
+- **P7-08b Support asks for diagnostics.** Support requests a bundle with a reason; the request
+  reaches the PC in a heartbeat answer; a manager allows it (the bundle is sent) or declines it;
+  both are audited on both sides.
+- **P7-08c Remote configuration, support screen and error reporting.**
+  - Vendor settings and feature flags pushed from the Control Plane, visible to managers and
+    audited (UPD-010).
+  - The support screen completed (NFR-I03).
+  - Error reporting to a Sentry-compatible service with scrubbing (NFR-O02).
+
 ## P7-09 Digital bills (WhatsApp/SMS)
 
 Requirements: BILL-012 (S), BILL-011 (consent), OI-06, BRD §12 (TRAI DLT, WhatsApp templates).

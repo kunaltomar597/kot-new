@@ -1,6 +1,8 @@
 import { createHash, randomBytes, sign } from 'node:crypto';
 import { ApiError } from '@rp/contracts';
 import {
+  type DiagnosticsUploadRequest,
+  DiagnosticsUploadResponse,
   CONTROL_PLANE_ERRORS,
   EnrolResponse,
   enrolmentProofMessage,
@@ -95,6 +97,21 @@ export class ControlPlaneClient {
       '/v1/menu-extractions',
       JSON.stringify(request),
       MenuExtractionView,
+      UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  /** UPD-008: a diagnostics bundle the manager allowed to send (P7-08a). */
+  uploadDiagnostics(
+    installationId: string,
+    upload: DiagnosticsUploadRequest,
+  ): Promise<DiagnosticsUploadResponse> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/diagnostics',
+      JSON.stringify(upload),
+      DiagnosticsUploadResponse,
       UPLOAD_TIMEOUT_MS,
     );
   }

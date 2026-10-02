@@ -132,5 +132,7 @@ describe('[REC-003] learning what is ordered together', () => {
     expect(rule(result, 'dish-1', 'dish-2')).toBeDefined();
     expect(result.associations.length).toBeLessThanOrEqual(5_000);
     expect(elapsed).toBeLessThan(20_000);
-  });
+    // The budget above is the test; the timeout only stops a run that hangs (the default 5 s cut
+    // it off on a busy machine before the budget could be checked).
+  }, 30_000);
 });

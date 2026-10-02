@@ -15,6 +15,7 @@ import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { grantOf } from '../../app/modes.js';
 import { useLive } from '../../app/use-live.js';
+import { DiagnosticsPanel } from './DiagnosticsPanel.js';
 import { bytesParts, uptimeParts } from './system-view.js';
 
 /** Disk, connections and the vendor link are not announced, so read them again. */
@@ -84,8 +85,8 @@ function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) 
 /**
  * The System page (P4-04, MGR-010, NFR-I03, DATA-006): the services, the data drive by kind of
  * data with its warning levels, the devices connected, the update on offer with "Install now"
- * (UPD-004), backups, the licence and the versions. Backups, the licence and sending diagnostics
- * show what they will once their modules exist (P7-05, P7-01, P7-08). Read again every half minute.
+ * (UPD-004), backups, the licence, the versions and "Send diagnostics to support" (UPD-008).
+ * Backups show what they will once their module exists (P7-05). Read again every half minute.
  */
 export function SystemScreen() {
   const t = useT();
@@ -332,19 +333,7 @@ export function SystemScreen() {
           <Facts facts={system.versions.map((entry) => [entry.name, entry.version] as const)} />
         </section>
 
-        <section className="device-group" aria-labelledby="system-support">
-          <h3 id="system-support" className="device-group__heading">
-            {t('systemPage.diagnostics.title')}
-          </h3>
-          <div className="staff-row__actions">
-            <Button variant="secondary" disabled aria-describedby="system-diagnostics-hint">
-              {t('systemPage.diagnostics.send')}
-            </Button>
-          </div>
-          <p id="system-diagnostics-hint" className="dashboard-section__hint">
-            {t('systemPage.diagnostics.unavailable')}
-          </p>
-        </section>
+        <DiagnosticsPanel connected={system.controlPlane.enrolled} />
       </>
     );
   }

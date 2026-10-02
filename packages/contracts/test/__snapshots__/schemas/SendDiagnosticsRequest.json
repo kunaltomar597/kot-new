@@ -1,0 +1,18 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "note": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+    },
+    "required": ["note"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "note": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+    },
+    "required": ["note"],
+    "additionalProperties": false
+  }
+}

@@ -367,6 +367,9 @@ Recommended next WPs (dependencies met):
 - [ ] P7-06 Data lifecycle
 - [ ] P7-07 Onboarding wizard completion
 - [ ] P7-08 Diagnostics, support screen, remote config
+  - [x] P7-08a Diagnostics bundle
+  - [ ] P7-08b Support asks for diagnostics
+  - [ ] P7-08c Remote configuration, support screen, error reporting
 - [ ] P7-09 Digital bills
 - [ ] P7-10 Phase 7 exit test
 
@@ -620,6 +623,30 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-08a):
+
+494. P7-08 is split into three (phase-7.md): the bundle (P7-08a), support's requests (P7-08b),
+     and remote configuration, the support screen and error reporting (P7-08c).
+495. The diagnostics bundle (UPD-008) is JSON:
+     - versions and the platform;
+     - an allow-list of configuration (origins only, never the database address or keys);
+     - settings changed from the default;
+     - the System page's status and the device list;
+     - the end of the newest three log files in `<data>/logs` (at most 1 MB and 2,000 lines
+       each).
+       Everything except the allow-listed configuration goes through `scrubValue`/`scrubText` in
+       `@rp/domain`, which removes PEM keys, URL credentials, Bearer/Basic tokens, JWTs, values
+       under secret-named fields, long random strings (40+ characters, unless it is a "/" path),
+       email addresses and Indian phone numbers. Each log file is scrubbed as a whole, so a
+       multi-line key is caught.
+496. A manager (OPERATIONS_CONFIGURE) can save the exact bundle from the System page ("See what
+     is sent") before or instead of sending it. When the PC is not connected to the vendor,
+     sending is disabled and the page says to email the saved file.
+497. The Control Plane takes bundles up to 4 MB (`POST /v1/diagnostics`, signed by the PC) and
+     keeps them as sent. Every role sees the list. Only roles with SUPPORT_NOTES can open a
+     bundle, every opening is audited (`diagnostics.opened`), and the web app offers no
+     download, as the access policy asks.
 
 Decided 2026-10-03 (P7-03b):
 
@@ -2535,6 +2562,30 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-08a Diagnostics bundle
+
+Built:
+
+- `@rp/domain` scrub (`scrubText`, `scrubValue`);
+- contracts `control-plane/diagnostics.ts`, three CP routes and two local routes;
+- CP migration `20261003070000_diagnostics`, `DiagnosticsService` and `DiagnosticsController`,
+  with a 5 MB body limit on `/v1/diagnostics`;
+- server `log-tail.ts`, `DiagnosticsService` (bundle, send) and
+  `ControlPlaneClient.uploadDiagnostics`;
+- the console's System page `DiagnosticsPanel`;
+- the web app's `DiagnosticsCard` on a PC's page.
+
+Tests: domain +3; CP integration +3; server +2 integration (the secret scan: planted and real
+secrets, patterns) and +1 acceptance (a manager sends, the real CP lists and opens it); console
++2; web +3.
+
+Gotcha: the secret scan first caught a PEM key split across log lines; logs are now scrubbed
+per file, not per line.
+
+Also: `pnpm test` runs at most 4 packages at once (`--concurrency=4`). Ten at a time, each with
+a vitest worker per core, made fast tests hit the 5 s timeout on this Mac. The 90-day learning
+test now has a 30 s timeout above its own 20 s budget.
 
 ### 2026-10-03: P7-03b Fleet dashboard (P7-03 done)
 

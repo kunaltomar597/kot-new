@@ -53,6 +53,13 @@ import {
   VendorTenantView,
 } from './fleet-admin.js';
 import {
+  DiagnosticsParams,
+  DiagnosticsUploadRequest,
+  DiagnosticsUploadResponse,
+  VendorDiagnosticsDetail,
+  VendorDiagnosticsListResponse,
+} from './diagnostics.js';
+import {
   AuditHeadListResponse,
   FleetAlertListResponse,
   FleetAlertParams,
@@ -875,6 +882,56 @@ export const CONTROL_PLANE_ROUTES = [
       200: { description: 'The heads.', schema: AuditHeadListResponse },
       ...vendorErrors,
       404: { description: 'No such installation.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'uploadDiagnostics',
+    method: 'POST',
+    path: '/v1/diagnostics',
+    summary: 'A diagnostics bundle a manager allowed the PC to send to support',
+    description:
+      'Scrubbed of secrets and personal data on the PC (UPD-008). At most 4 MB. Audited.',
+    tags: ['diagnostics'],
+    requirements: ['UPD-008', 'VCP-007'],
+    capability: 'INSTALLATION',
+    request: { body: DiagnosticsUploadRequest },
+    responses: {
+      201: { description: 'Stored.', schema: DiagnosticsUploadResponse },
+      ...signedErrors,
+      413: { description: 'Larger than 4 MB.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listVendorDiagnostics',
+    method: 'GET',
+    path: '/v1/vendor/installations/:id/diagnostics',
+    summary: 'The diagnostics bundles a PC sent, newest first (without their contents)',
+    tags: ['vendor'],
+    requirements: ['UPD-008', 'VCP-007'],
+    capability: 'FLEET_VIEW',
+    request: { params: VendorInstallationParams },
+    responses: {
+      200: { description: 'The bundles.', schema: VendorDiagnosticsListResponse },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getVendorDiagnostics',
+    method: 'GET',
+    path: '/v1/vendor/diagnostics/:id',
+    summary: 'Open a diagnostics bundle',
+    description:
+      'Support’s only way into a restaurant’s logs (VCP-007, the vendor access policy); every ' +
+      'opening is audited.',
+    tags: ['vendor'],
+    requirements: ['UPD-008', 'VCP-007', 'SEC-018'],
+    capability: 'SUPPORT_NOTES',
+    request: { params: DiagnosticsParams },
+    responses: {
+      200: { description: 'The bundle.', schema: VendorDiagnosticsDetail },
+      ...vendorErrors,
+      404: { description: 'No such bundle.', schema: ApiError },
     },
   },
 ] as const satisfies readonly RouteDefinition<ControlPlaneAccess>[];

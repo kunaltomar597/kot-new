@@ -19,6 +19,8 @@ import { FleetAdminController } from './admin/fleet-admin.controller.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillingService } from './billing/billing.service.js';
 import { ALERT_NOTIFIER, alertNotifierFor } from './fleet/alert-notifier.js';
+import { DiagnosticsController } from './diagnostics/diagnostics.controller.js';
+import { DiagnosticsService } from './diagnostics/diagnostics.service.js';
 import { FleetController } from './fleet/fleet.controller.js';
 import { FleetService } from './fleet/fleet.service.js';
 import { PgRelayProvisioner, RELAY_PROVISIONER } from './support/relay-provisioner.js';
@@ -105,6 +107,7 @@ export class ControlPlaneModule {
         BillingController,
         SupportController,
         FleetController,
+        DiagnosticsController,
       ],
       providers: [
         { provide: CP_CONFIG, useValue: config },
@@ -121,6 +124,7 @@ export class ControlPlaneModule {
         BillingService,
         SupportService,
         FleetService,
+        DiagnosticsService,
         { provide: ALERT_NOTIFIER, useValue: alertNotifierFor(config) },
         { provide: RELAY_PROVISIONER, useClass: PgRelayProvisioner },
         ReleasesService,
