@@ -278,6 +278,9 @@ import { DiagnosticsBundle, DiagnosticsRequestParams } from './control-plane/dia
 import {
   ActivateRequest,
   ActivateResponse,
+  FirstRunRequest,
+  FirstRunResponse,
+  FirstRunStatus,
   MarkOnboardingStepRequest,
   OnboardingResponse,
   OnboardingStepParams,
@@ -744,6 +747,39 @@ export const ROUTES = [
       204: { description: 'Taken.' },
       400: { description: 'The request does not match the contract.', schema: ApiError },
       401: { description: 'Unknown or unpaired device.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getFirstRun',
+    method: 'GET',
+    path: '/api/v1/first-run',
+    summary: 'Whether this server still needs its restaurant and Owner (a fresh install)',
+    description:
+      'Public because nothing exists yet to sign in with; it reveals only whether a restaurant ' +
+      'exists (ONB-001).',
+    tags: ['onboarding'],
+    requirements: ['ONB-001', 'ONB-004'],
+    capability: 'PUBLIC',
+    responses: { 200: { description: 'Whether setup is needed.', schema: FirstRunStatus } },
+  },
+  {
+    operationId: 'completeFirstRun',
+    method: 'POST',
+    path: '/api/v1/first-run',
+    summary: 'Create the restaurant and its Owner on a fresh install',
+    description:
+      'Public because nothing exists yet; only from the server PC itself and only while no ' +
+      'restaurant exists (ONB-001). Creates the built-in roles, a default invoice series and ' +
+      'the Owner with their PIN; the Owner sets a password and authenticator next (AUTH-006). ' +
+      'Audited.',
+    tags: ['onboarding'],
+    requirements: ['ONB-001', 'ONB-004', 'AUD-001'],
+    capability: 'PUBLIC',
+    request: { body: FirstRunRequest },
+    responses: {
+      201: { description: 'Created.', schema: FirstRunResponse },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      403: { description: 'Not from the server PC, or already set up.', schema: ApiError },
     },
   },
   {

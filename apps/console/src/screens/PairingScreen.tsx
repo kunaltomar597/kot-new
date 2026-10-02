@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 import { useConsole, useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { canCreateDeviceKey, formatPairingCode, messageOf } from '../app/messages.js';
+import { onServerPc, ThisPcSetup } from './ThisPcSetup.js';
 
 /**
  * Pairs this browser with a manager's one-time code (AUTH-007). The browser creates a device key
@@ -38,6 +39,7 @@ export function PairingScreen() {
 
   return (
     <main className="console-center">
+      {secure && onServerPc() ? <ThisPcSetup /> : null}
       <Card title={t('pairing.title')} headingLevel={2} variant="raised" className="console-panel">
         {notice === 'revoked' ? (
           <p className="console-notice" role="status">

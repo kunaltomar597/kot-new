@@ -1,5 +1,6 @@
 import { ONBOARDING_STEPS } from '@rp/domain';
 import { z } from 'zod';
+import { Pin } from './auth.js';
 import { Id } from './common.js';
 
 /**
@@ -52,3 +53,21 @@ export const ActivateResponse = z.object({
   installationName: z.string(),
 });
 export type ActivateResponse = z.infer<typeof ActivateResponse>;
+
+/**
+ * Whether this server has no restaurant yet (a fresh install, ONB-001), and how many digits the
+ * Owner's PIN has (`auth.pinLength`, 4 until the Owner changes it); nothing else.
+ */
+export const FirstRunStatus = z.object({ needed: z.boolean(), pinLength: z.int().min(4).max(8) });
+export type FirstRunStatus = z.infer<typeof FirstRunStatus>;
+
+/** The restaurant's name and its Owner, entered on the restaurant PC itself (P7-07b). */
+export const FirstRunRequest = z.strictObject({
+  restaurantName: z.string().trim().min(1).max(60),
+  ownerName: z.string().trim().min(1).max(80),
+  ownerPin: Pin,
+});
+export type FirstRunRequest = z.infer<typeof FirstRunRequest>;
+
+export const FirstRunResponse = z.object({ restaurantId: Id, ownerId: Id });
+export type FirstRunResponse = z.infer<typeof FirstRunResponse>;

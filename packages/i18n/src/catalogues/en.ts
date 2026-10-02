@@ -205,6 +205,22 @@ export const en = {
       sent: '{count, plural, one {Sent to {name}} other {Sent to # waiters}}',
     },
   },
+  firstRun: {
+    title: 'Set up this restaurant PC',
+    intro:
+      'This is a new installation. Enter the restaurant’s name and the Owner’s, and choose the Owner’s PIN. Everything else comes next, step by step.',
+    restaurantName: 'Restaurant name',
+    restaurantNameHint: 'As guests know it; the legal name comes later.',
+    ownerName: 'Owner’s name',
+    pin: 'Owner’s PIN',
+    pinHint:
+      '{digits} digits, used to sign in on the POS. The Owner sets a password and authenticator next.',
+    repeatPin: 'PIN again',
+    pinMismatch: 'The two PINs are not the same.',
+    create: 'Create and continue',
+    pairIntro: 'This is the restaurant PC. Pair it as the first POS to sign in.',
+    pair: 'Pair this PC',
+  },
   pairing: {
     title: 'Pair this device',
     intro: 'Ask a manager for a pairing code (Manage → Devices → Pair a device) and enter it here.',
