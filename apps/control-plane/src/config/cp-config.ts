@@ -46,6 +46,22 @@ export const CpConfigSchema = z
     aiTimeoutSeconds: z.coerce.number().int().min(30).max(900).default(300),
     /** Menus each restaurant may have read in 24 hours (the vendor pays per menu). */
     aiDailyLimit: z.coerce.number().int().min(1).max(500).default(20),
+    /**
+     * The vendor's Ed25519 licence-signing key, PKCS#8 DER in base64, from the secret manager only
+     * (LIC-001, SEC-002). Without it no licence is issued. Production keeps it in the cloud KMS
+     * (manual task 23).
+     */
+    licenceSigningKey: z.string().min(40).optional(),
+    /** The master secret installations' reactivation secrets derive from, base64 (LIC-006). */
+    licenceReactivationKey: z
+      .string()
+      .refine((value) => Buffer.from(value, 'base64').length >= 32, 'at least 32 bytes')
+      .optional(),
+    /** A new installation's licence terms (LIC-002 ⚙ 30 days; LIC-005 ⚙ 7 days of grace). */
+    licenceValidityDays: z.coerce.number().int().min(1).max(365).default(30),
+    licenceGraceDays: z.coerce.number().int().min(0).max(90).default(7),
+    /** Heartbeats asked of an installation whose licence is not active (LIC-006: within 1 min). */
+    licenceHeartbeatSeconds: z.coerce.number().int().min(60).max(600).default(60),
   })
   .superRefine((config, context) => {
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
@@ -82,6 +98,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     aiBaseUrl: env.CP_AI_BASE_URL,
     aiTimeoutSeconds: env.CP_AI_TIMEOUT_SECONDS,
     aiDailyLimit: env.CP_AI_DAILY_LIMIT,
+    licenceSigningKey: env.CP_LICENCE_SIGNING_KEY === '' ? undefined : env.CP_LICENCE_SIGNING_KEY,
+    licenceReactivationKey:
+      env.CP_LICENCE_REACTIVATION_KEY === '' ? undefined : env.CP_LICENCE_REACTIVATION_KEY,
+    licenceValidityDays: env.CP_LICENCE_VALIDITY_DAYS,
+    licenceGraceDays: env.CP_LICENCE_GRACE_DAYS,
+    licenceHeartbeatSeconds: env.CP_LICENCE_HEARTBEAT_SECONDS,
   });
   if (!result.success) {
     const problems = result.error.issues

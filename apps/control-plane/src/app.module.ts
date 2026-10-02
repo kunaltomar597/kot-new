@@ -13,6 +13,8 @@ import { CpExceptionFilter } from './errors/cp-exception.filter.js';
 import { HealthController } from './health/health.controller.js';
 import { HeartbeatsController } from './heartbeats/heartbeats.controller.js';
 import { HeartbeatsService } from './heartbeats/heartbeats.service.js';
+import { LicenceSigner } from './licences/licence-signer.js';
+import { LicencesService } from './licences/licences.service.js';
 import { EnrolmentController } from './installations/enrolment.controller.js';
 import { InstallationsService } from './installations/installations.service.js';
 import { MenuExtractionsController } from './menu-import/menu-extractions.controller.js';
@@ -94,6 +96,8 @@ export class ControlPlaneModule {
         NonceStore,
         InstallationsService,
         HeartbeatsService,
+        LicenceSigner,
+        LicencesService,
         ReleasesService,
         AdminService,
         MenuExtractionsService,

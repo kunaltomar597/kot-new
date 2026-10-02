@@ -349,7 +349,7 @@ Recommended next WPs (dependencies met):
 
 - [ ] P7-01 Licensing module
   - [x] P7-01a `@rp/licensing`: files, fingerprint, state, reactivation codes, clock guard
-  - [ ] P7-01b Control Plane: issuing and renewing licences
+  - [x] P7-01b Control Plane: issuing and renewing licences
   - [ ] P7-01c Local server: the licence agent and enforcement
   - [ ] P7-01d Screens: reminders, banners, the Owner's licence page
 - [ ] P7-02 Control Plane: tenants, subscriptions, licences
@@ -612,6 +612,24 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-01b):
+
+440. Activation (ONB-003) is the enrolment of P0-17: the first heartbeat after it carries the
+     first licence, with default terms (plan Standard, every module, 30 tablets, 15 pagers, 15
+     waiter phones, 6 kitchen screens, 30 days, 7 days of grace) until the vendor sets the plan.
+441. Licences travel in heartbeat answers: a new file when none is current (daily renewal, a
+     change of terms, a lost file gets the current one again), and heartbeats every 60 s while
+     the licence is not ACTIVE, so a payment recorded reactivates a site within a minute (LIC-006).
+442. The fingerprint is bound by the first licence. Three of five identifiers matching keeps the
+     PC, and the bound fingerprint follows the change (a disk replaced, then later a network
+     card, stays the same PC); fewer gets no licence until support re-binds it (audited).
+443. Vendor state changes follow `licenseMachine` (never out of TERMINATED), always with a reason,
+     audited with before and after. Entering GRACE starts its days; leaving it clears them.
+444. Until a KMS adapter exists for the chosen cloud, the signing key is injected from the secret
+     manager (`CP_LICENCE_SIGNING_KEY`); without it no licence is issued. Each installation's
+     reactivation secret is HMAC(master, installation id), sent once to the PC that lacks it;
+     codes reach at most 60 days ahead, counters 1 to 255, shown once, audited without the code.
 
 Decided 2026-10-03 (P7-01a):
 
@@ -2309,6 +2327,17 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-01b Control Plane: issuing and renewing licences
+
+Built: CP migration `20261003010000_licences` (`installation_licences`, `licence_files`); config
+`CP_LICENCE_*`; `LicenceSigner`, `LicencesService` (issue and renew in heartbeats, fingerprint
+binding, vendor changes, re-binding, reactivation codes); heartbeat contract fields `licence`
+(request and answer) and `reactivationSecret`; CLI `licence:show|set|rebind|code`.
+
+Tests: CP integration +9 (issue, current, lost, daily renewal; state change at the next heartbeat
+and every minute; transitions and reasons; plan and limits; reactivation codes; following a part
+change, refusing another PC, re-binding; older installations).
 
 ### 2026-10-03: P7-01a `@rp/licensing`
 

@@ -55,6 +55,31 @@
         "type": "object",
         "propertyNames": { "type": "string", "pattern": "^[A-Z_]{1,40}$" },
         "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+      },
+      "licence": {
+        "type": "object",
+        "properties": {
+          "licenceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "fingerprint": {
+            "minItems": 5,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{64}$" }, { "type": "null" }]
+            }
+          },
+          "hasReactivationSecret": { "type": "boolean" }
+        },
+        "required": ["licenceId", "fingerprint", "hasReactivationSecret"]
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -119,6 +144,32 @@
         "type": "object",
         "propertyNames": { "type": "string", "pattern": "^[A-Z_]{1,40}$" },
         "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+      },
+      "licence": {
+        "type": "object",
+        "properties": {
+          "licenceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "fingerprint": {
+            "minItems": 5,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{64}$" }, { "type": "null" }]
+            }
+          },
+          "hasReactivationSecret": { "type": "boolean" }
+        },
+        "required": ["licenceId", "fingerprint", "hasReactivationSecret"],
+        "additionalProperties": false
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],

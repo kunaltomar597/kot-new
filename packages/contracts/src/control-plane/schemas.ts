@@ -59,59 +59,6 @@ export const EnrolResponse = z.object({
 });
 export type EnrolResponse = z.infer<typeof EnrolResponse>;
 
-/** A component's installed version as a heartbeat reports it. */
-export const ComponentVersion = z.object({
-  /** `RESTAURANT_PC` (what releases are compared with), or informational: `server`, `node`, ... */
-  name: z.string().regex(/^[A-Za-z0-9_.-]{1,40}$/),
-  version: z.string().min(1).max(64),
-});
-export type ComponentVersion = z.infer<typeof ComponentVersion>;
-
-/**
- * An installation's periodic report (VCP-005, NFR-O03). Fields later work packages add (backup
- * status, error counts, licence state) are kept even when this Control Plane does not know them
- * yet, so a newer installation is never refused.
- */
-export const HeartbeatRequest = z.looseObject({
-  /** Chosen by the installation; sending the same heartbeat again is harmless. */
-  heartbeatId: Id,
-  sentAt: Timestamp,
-  components: z.array(ComponentVersion).min(1).max(30),
-  /** The data drive (ONB-002). */
-  disk: z
-    .object({ totalBytes: z.int().nonnegative(), freeBytes: z.int().nonnegative() })
-    .nullable(),
-  /** The latest local audit entry (AUD-003), so tampering can be detected later. */
-  auditChainHead: z.object({ sequence: z.int().positive(), hash: Sha256Hex }).nullable(),
-  /** Active paired devices by type, e.g. `{ "POS": 1, "KDS": 2 }`. */
-  devices: z.record(z.string().regex(/^[A-Z_]{1,40}$/), z.int().nonnegative()),
-});
-export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
-
-/** A published release (UPD-002, UPD-007): the artefact is Authenticode-signed; check its SHA-256. */
-export const ReleaseInfo = z.object({
-  component: ReleaseComponent,
-  channel: ReleaseChannel,
-  version: SemVer,
-  url: z.url({ protocol: /^https$/ }),
-  sha256: Sha256Hex,
-  sizeBytes: z.int().positive(),
-  notes: z.string().max(2_000).nullable(),
-  publishedAt: Timestamp,
-});
-export type ReleaseInfo = z.infer<typeof ReleaseInfo>;
-
-export const HeartbeatResponse = z.object({
-  receivedAt: Timestamp,
-  /** The Control Plane's clock, for clock checks on the PC (LIC-007). */
-  serverTime: Timestamp,
-  /** When to send the next heartbeat: a fleet setting, 300 s by default (VCP-005, UPD-010). */
-  nextHeartbeatSeconds: z.int().min(60).max(3_600),
-  /** The release this installation should move to, or null when it is up to date (UPD-002). */
-  update: ReleaseInfo.nullable(),
-});
-export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
-
 // ---------------------------------------------------------------- licences (P7-01)
 
 /** The licence states of LIC-005 (`@rp/domain` `licenseMachine`). */
@@ -192,6 +139,75 @@ export const ReactivationCode = z
   .trim()
   .toUpperCase()
   .regex(/^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$/);
+
+/** A component's installed version as a heartbeat reports it. */
+export const ComponentVersion = z.object({
+  /** `RESTAURANT_PC` (what releases are compared with), or informational: `server`, `node`, ... */
+  name: z.string().regex(/^[A-Za-z0-9_.-]{1,40}$/),
+  version: z.string().min(1).max(64),
+});
+export type ComponentVersion = z.infer<typeof ComponentVersion>;
+
+/**
+ * An installation's periodic report (VCP-005, NFR-O03). Fields later work packages add (backup
+ * status, error counts, licence state) are kept even when this Control Plane does not know them
+ * yet, so a newer installation is never refused.
+ */
+export const HeartbeatRequest = z.looseObject({
+  /** Chosen by the installation; sending the same heartbeat again is harmless. */
+  heartbeatId: Id,
+  sentAt: Timestamp,
+  components: z.array(ComponentVersion).min(1).max(30),
+  /** The data drive (ONB-002). */
+  disk: z
+    .object({ totalBytes: z.int().nonnegative(), freeBytes: z.int().nonnegative() })
+    .nullable(),
+  /** The latest local audit entry (AUD-003), so tampering can be detected later. */
+  auditChainHead: z.object({ sequence: z.int().positive(), hash: Sha256Hex }).nullable(),
+  /** Active paired devices by type, e.g. `{ "POS": 1, "KDS": 2 }`. */
+  devices: z.record(z.string().regex(/^[A-Z_]{1,40}$/), z.int().nonnegative()),
+  /**
+   * The licence this PC holds and its fingerprint now (LIC-002, LIC-004): the answer carries a
+   * new licence when it is due. Absent from installations older than P7-01.
+   */
+  licence: z
+    .object({
+      licenceId: Id.nullable(),
+      fingerprint: z.array(Sha256Hex.nullable()).length(FINGERPRINT_SIZE),
+      /** Whether it holds its offline reactivation secret (LIC-006). */
+      hasReactivationSecret: z.boolean(),
+    })
+    .optional(),
+});
+export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
+
+/** A published release (UPD-002, UPD-007): the artefact is Authenticode-signed; check its SHA-256. */
+export const ReleaseInfo = z.object({
+  component: ReleaseComponent,
+  channel: ReleaseChannel,
+  version: SemVer,
+  url: z.url({ protocol: /^https$/ }),
+  sha256: Sha256Hex,
+  sizeBytes: z.int().positive(),
+  notes: z.string().max(2_000).nullable(),
+  publishedAt: Timestamp,
+});
+export type ReleaseInfo = z.infer<typeof ReleaseInfo>;
+
+export const HeartbeatResponse = z.object({
+  receivedAt: Timestamp,
+  /** The Control Plane's clock, for clock checks on the PC (LIC-007). */
+  serverTime: Timestamp,
+  /** When to send the next heartbeat: a fleet setting, 300 s by default (VCP-005, UPD-010). */
+  nextHeartbeatSeconds: z.int().min(60).max(3_600),
+  /** The release this installation should move to, or null when it is up to date (UPD-002). */
+  update: ReleaseInfo.nullable(),
+  /** A new licence file when one is due (renewal, a change of terms); null otherwise. */
+  licence: SignedLicence.nullable().default(null),
+  /** The installation's offline reactivation secret, base64, when it said it lacks it. */
+  reactivationSecret: Base64.max(100).nullable().default(null),
+});
+export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
 
 /** `GET /v1/updates`: what the installation should move to from `version`. */
 export const UpdatesQuery = z.strictObject({

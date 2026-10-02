@@ -4,6 +4,7 @@ import type { AuthenticatedInstallation } from '../auth/installation.guard.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { LicencesService } from '../licences/licences.service.js';
 import { ReleasesService } from '../releases/releases.service.js';
 
 /** The component whose version releases are compared with. */
@@ -16,6 +17,7 @@ export class HeartbeatsService {
     @Inject(CP_CONFIG) private readonly config: CpConfig,
     private readonly prisma: PrismaService,
     private readonly releases: ReleasesService,
+    private readonly licences: LicencesService,
   ) {}
 
   async record(
@@ -54,11 +56,15 @@ export class HeartbeatsService {
             installation.channel,
             installed.version,
           );
+    // A new licence when one is due (LIC-002), and every minute while it is not active (LIC-006).
+    const licence = await this.licences.forHeartbeat(installation, heartbeat.licence, receivedAt);
     return {
       receivedAt: receivedAt.toISOString(),
       serverTime: new Date().toISOString(),
-      nextHeartbeatSeconds: this.config.heartbeatSeconds,
+      nextHeartbeatSeconds: licence.heartbeatSeconds ?? this.config.heartbeatSeconds,
       update,
+      licence: licence.licence,
+      reactivationSecret: licence.reactivationSecret,
     };
   }
 }
