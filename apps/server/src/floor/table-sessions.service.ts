@@ -27,6 +27,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import { appendEvent, type EventAudience } from '../events/outbox.js';
 import type { DiningTable, TableSession } from '../generated/prisma/client.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WaiterAssignmentsService } from './waiter-assignments.service.js';
 
@@ -57,6 +58,7 @@ export class TableSessionsService {
     private readonly audit: AuditService,
     private readonly assignments: WaiterAssignmentsService,
     private readonly settings: SettingsService,
+    private readonly licence: LicenceAgentService,
   ) {}
 
   /**
@@ -138,11 +140,13 @@ export class TableSessionsService {
     });
   }
 
-  open(
+  async open(
     principal: Principal,
     tableId: string,
     request: OpenTableRequest,
   ): Promise<TableSessionView> {
+    // LIC-005: a restricted licence opens no new tables; open ones are finished and billed.
+    await this.licence.assert('openNewTableSessions');
     return this.prisma.transaction(async (tx) => {
       const table = await this.lockTable(tx, principal.restaurantId, tableId);
       if (table === null) {

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { HeartbeatRequest, HeartbeatResponse } from '@rp/contracts/control-plane';
+import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedInstallation } from '../auth/installation.guard.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -18,6 +19,7 @@ export class HeartbeatsService {
     private readonly prisma: PrismaService,
     private readonly releases: ReleasesService,
     private readonly licences: LicencesService,
+    private readonly audit: AuditService,
   ) {}
 
   async record(
@@ -44,6 +46,18 @@ export class HeartbeatsService {
         where: { id: installation.id },
         data: { lastSeenAt: receivedAt, ...(count === 1 && { lastHeartbeat: payload }) },
       });
+      // LIC-007: what looked like tampering on the PC, once per heartbeat delivered.
+      if (count === 1) {
+        for (const event of heartbeat.tamper ?? []) {
+          await this.audit.record(tx, {
+            actor: `installation:${installation.id}`,
+            action: 'licence.tamper',
+            targetType: 'installation',
+            targetId: installation.id,
+            details: { kind: event.kind, at: event.at },
+          });
+        }
+      }
     });
     const installed = heartbeat.components.find(
       (component) => component.name === INSTALLER_COMPONENT,

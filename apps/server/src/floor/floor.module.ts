@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LicensingModule } from '../licensing/licensing.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import {
   FloorController,
@@ -16,7 +17,7 @@ import { WaiterAssignmentsService } from './waiter-assignments.service.js';
 
 /** The floor (P1-02a): sections, tables and the day's waiter assignment. */
 @Module({
-  imports: [SettingsModule],
+  imports: [SettingsModule, LicensingModule],
   controllers: [
     FloorController,
     SectionsController,

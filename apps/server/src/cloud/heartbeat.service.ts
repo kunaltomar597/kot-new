@@ -15,6 +15,7 @@ import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { ControlPlaneClient, ControlPlaneError } from './control-plane-client.js';
 import { readEnrolment, readOfferedUpdate, saveOfferedUpdate } from './control-plane-state.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { installationKey } from './installation-key.js';
 
 export const CONTROL_PLANE_OPTIONS = Symbol('CONTROL_PLANE_OPTIONS');
@@ -76,12 +77,15 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(CONTROL_PLANE_OPTIONS) private readonly options: ControlPlaneOptions,
+    private readonly licence: LicenceAgentService,
   ) {
     this.intervalMs = options.defaultIntervalMs;
   }
 
   onApplicationBootstrap(): void {
     if (this.config.controlPlaneUrl === undefined) return;
+    // "Check now" on the Owner's licence page sends a heartbeat at once (LIC-006).
+    this.licence.onCheckRequested(() => this.beat());
     this.schedule(this.options.firstHeartbeatDelayMs);
   }
 
@@ -129,9 +133,12 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
         timeoutMs: this.options.requestTimeoutMs,
         ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
       });
-      const answer = await this.client.heartbeat(enrolment.installationId, await this.collect());
+      const heartbeat = await this.collect();
+      const answer = await this.client.heartbeat(enrolment.installationId, heartbeat);
       this.intervalMs = answer.nextHeartbeatSeconds * 1_000;
       await this.offer(answer.update);
+      // A renewed licence, the reactivation secret and the clock check (LIC-002, LIC-007).
+      await this.licence.accept(answer, heartbeat.tamper ?? []);
       if (this.state.lastError !== null) {
         this.logger.log('Reporting to the Control Plane again');
       }
@@ -194,11 +201,12 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
   }
 
   private async collect(): Promise<HeartbeatRequest> {
-    const [head, devices, disk, postgres] = await Promise.all([
+    const [head, devices, disk, postgres, licence] = await Promise.all([
       this.audit.chainHead(),
       this.deviceCounts(),
       this.disk(),
       this.postgresVersion(),
+      this.licence.heartbeatReport(),
     ]);
     return {
       heartbeatId: newId(),
@@ -212,6 +220,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       disk,
       auditChainHead: head === null ? null : { sequence: head.seq, hash: head.hash },
       devices,
+      ...licence,
     };
   }
 

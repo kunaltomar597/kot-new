@@ -411,6 +411,7 @@ export class LicencesService {
       state: terms.state,
       graceStartedAt: terms.graceStartedAt?.toISOString() ?? null,
       reason: terms.reason,
+      reactivationCounter: terms.reactivationCounter,
     };
     const signed = this.signer.sign(payload);
     await tx.licenceFile.create({

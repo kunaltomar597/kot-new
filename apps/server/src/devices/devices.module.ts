@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LicensingModule } from '../licensing/licensing.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { RealtimeModule } from '../realtime/realtime.module.js';
@@ -20,7 +21,7 @@ import { TabletService } from './tablet.service.js';
  * whether they are connected (TAB-015), and the table tablet's own table and kiosk exit (P3-01a).
  */
 @Module({
-  imports: [AuthModule, TlsModule, RealtimeModule, SettingsModule],
+  imports: [AuthModule, TlsModule, RealtimeModule, SettingsModule, LicensingModule],
   controllers: [DevicesController, TabletController],
   providers: [
     DevicesService,

@@ -389,6 +389,8 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { tableSessionId: id(), fromTableId: id(), toTableId: id() });
     case 'TableClosed':
       return domainEvent(type, rid, { tableId: id(), tableSessionId: id() });
+    case 'LicenceChanged':
+      return domainEvent(type, rid, { state: 'GRACE', restrictedFrom: null });
     case 'OrdersMoved':
       return domainEvent(type, rid, {
         kind: 'MERGE',

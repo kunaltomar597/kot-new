@@ -27,6 +27,7 @@ import { appendEvent, type EventAudience } from '../events/outbox.js';
 import type { OrderItem, Prisma } from '../generated/prisma/client.js';
 import { MenuPublishService } from '../menu/menu-publish.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { OrdersService } from './orders.service.js';
 
 /** The grant each floor or kitchen step needs (BRD §4.2). */
@@ -106,6 +107,7 @@ export class OrderItemsService {
     private readonly menu: MenuPublishService,
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
+    private readonly licence: LicenceAgentService,
   ) {}
 
   /**
@@ -169,6 +171,8 @@ export class OrderItemsService {
     orderItemIds: readonly string[] | undefined,
     ownOnly: boolean,
   ): Promise<OrderView> {
+    // LIC-005: no new kitchen tickets on a restricted licence.
+    await this.licence.assert('sendKots');
     const menu = await this.menu.current(principal.restaurantId);
     await this.prisma.transaction(async (tx) => {
       await tx.$queryRaw`SELECT 1 AS locked FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;

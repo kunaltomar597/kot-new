@@ -350,7 +350,7 @@ Recommended next WPs (dependencies met):
 - [ ] P7-01 Licensing module
   - [x] P7-01a `@rp/licensing`: files, fingerprint, state, reactivation codes, clock guard
   - [x] P7-01b Control Plane: issuing and renewing licences
-  - [ ] P7-01c Local server: the licence agent and enforcement
+  - [x] P7-01c Local server: the licence agent and enforcement
   - [ ] P7-01d Screens: reminders, banners, the Owner's licence page
 - [ ] P7-02 Control Plane: tenants, subscriptions, licences
 - [ ] P7-03 Fleet monitoring
@@ -612,6 +612,30 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-01c):
+
+445. The licence applies (restricts) only in production, where it cannot be switched off and only
+     the built-in vendor keys count; development and tests show it without restricting unless
+     `RP_LICENCE_ENFORCE=true`, and may add keys with `RP_LICENCE_KEYS`.
+446. A restricted licence refuses with 423 LICENCE_RESTRICTED: opening a table, submitting any
+     order (staff, tablet, QR; a retried submission still gets its first answer), approving a
+     diner's order and firing held items. Nothing else: bills, payments, printing, reports,
+     exports, backups and closing tables work in every state.
+447. The agent judges the licence at start-up and every minute (so a restriction applies at the
+     business day's cut-off), by the later of the clock and the last time seen. Its record (last
+     time seen, when a restriction was decided, a reactivation, codes used, tamper reports) is
+     sealed with a local secret; an edited or missing record (while a licence is kept) is
+     reported and makes a restriction apply at once. Each tamper kind is reported once a day.
+448. Every licence carries the Control Plane's last reactivation counter, so an old code is
+     refused even after the PC's record is lost. Reactivation is the Owner's (LICENSE_MANAGE,
+     with the second factor), five tries an hour, active until the end of the code's business
+     day; audited.
+449. Device limits apply when a pairing code is made (said at once) and when the device pairs
+     (decided under a lock), for table tablets, pagers, waiter phones and kitchen screens.
+450. The fingerprint is read with one PowerShell/WMI call on Windows (machine GUID, board serial,
+     BIOS UUID, first disk serial, CPU id), and from what a Mac or Linux gives without
+     privileges in development; read again every six hours.
 
 Decided 2026-10-03 (P7-01b):
 
@@ -2327,6 +2351,21 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-01c Local server: the licence agent
+
+Built: config `licenceEnforce`, `licenceKeys`; secret `licence-record-key`; contracts
+`LicenceView`, `ReactivateLicenceRequest`, routes `getLicence`, `reactivateLicence`,
+`checkLicence`, event `LicenceChanged`, heartbeat `tamper` and the licence's
+`reactivationCounter`; server `src/licensing/` (fingerprint reader, `LicenceAgentService`,
+controller, module), the heartbeat reporting and taking licences, enforcement on tables, orders,
+approvals, firing and device pairing; the Control Plane audits tamper reports.
+
+Tests: server integration +6 (missing licence, a valid one and details, device limits,
+restriction from the next business day, offline reactivation and attempts, clock rollback and an
+edited record), unit +3 (config, fingerprint parsing); CP +1.
+
+Next: P7-01d, the screens (reminder, grace banner, restricted notice, the Owner's licence page).
 
 ### 2026-10-03: P7-01b Control Plane: issuing and renewing licences
 

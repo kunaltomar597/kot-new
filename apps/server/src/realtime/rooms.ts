@@ -83,6 +83,8 @@ const VISIBLE_WITH: Readonly<Record<DomainEvent['type'], Capability | 'EVERYONE'
   TableMoved: 'ORDER_CREATE',
   TableClosed: 'ORDER_CREATE',
   OrdersMoved: 'ORDER_CREATE',
+  // Every screen shows the licence's reminder or banner (LIC-005).
+  LicenceChanged: 'EVERYONE',
   TableStateChanged: 'ORDER_CREATE',
   TableWaiterChanged: 'ORDER_CREATE',
   OrderSubmitted: 'ORDER_CREATE',

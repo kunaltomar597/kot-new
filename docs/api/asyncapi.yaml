@@ -36,6 +36,11 @@ channels:
     messages:
       OrdersMoved:
         $ref: '#/components/messages/OrdersMoved'
+  LicenceChanged:
+    address: LicenceChanged
+    messages:
+      LicenceChanged:
+        $ref: '#/components/messages/LicenceChanged'
   TableStateChanged:
     address: TableStateChanged
     messages:
@@ -230,6 +235,12 @@ operations:
       $ref: '#/channels/OrdersMoved'
     messages:
       - $ref: '#/channels/OrdersMoved/messages/OrdersMoved'
+  receiveLicenceChanged:
+    action: receive
+    channel:
+      $ref: '#/channels/LicenceChanged'
+    messages:
+      - $ref: '#/channels/LicenceChanged/messages/LicenceChanged'
   receiveTableStateChanged:
     action: receive
     channel:
@@ -442,6 +453,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/OrdersMoved'
+    LicenceChanged:
+      name: LicenceChanged
+      title: LicenceChanged v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/LicenceChanged'
     TableStateChanged:
       name: TableStateChanged
       title: TableStateChanged v1
@@ -1367,6 +1384,56 @@ components:
             - orderId
             - stationId
             - printStatus
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    LicenceChanged:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: LicenceChanged
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            state:
+              type: string
+              enum:
+                - ACTIVE
+                - PAYMENT_DUE
+                - GRACE
+                - RESTRICTED
+                - TERMINATED
+            restrictedFrom:
+              anyOf:
+                - $ref: '#/components/schemas/Timestamp'
+                - type: 'null'
+          required:
+            - state
+            - restrictedFrom
           additionalProperties: false
       required:
         - eventId

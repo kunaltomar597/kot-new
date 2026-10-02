@@ -1,0 +1,57 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "openNewTableSessions": { "type": "boolean" },
+      "createOrders": { "type": "boolean" },
+      "sendKots": { "type": "boolean" },
+      "billOpenTables": { "type": "boolean" },
+      "print": { "type": "boolean" },
+      "viewReports": { "type": "boolean" },
+      "exportData": { "type": "boolean" },
+      "backups": { "type": "boolean" },
+      "showPaymentReminder": { "type": "boolean" },
+      "showGraceBanner": { "type": "boolean" }
+    },
+    "required": [
+      "openNewTableSessions",
+      "createOrders",
+      "sendKots",
+      "billOpenTables",
+      "print",
+      "viewReports",
+      "exportData",
+      "backups",
+      "showPaymentReminder",
+      "showGraceBanner"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "openNewTableSessions": { "type": "boolean" },
+      "createOrders": { "type": "boolean" },
+      "sendKots": { "type": "boolean" },
+      "billOpenTables": { "type": "boolean" },
+      "print": { "type": "boolean" },
+      "viewReports": { "type": "boolean" },
+      "exportData": { "type": "boolean" },
+      "backups": { "type": "boolean" },
+      "showPaymentReminder": { "type": "boolean" },
+      "showGraceBanner": { "type": "boolean" }
+    },
+    "required": [
+      "openNewTableSessions",
+      "createOrders",
+      "sendKots",
+      "billOpenTables",
+      "print",
+      "viewReports",
+      "exportData",
+      "backups",
+      "showPaymentReminder",
+      "showGraceBanner"
+    ],
+    "additionalProperties": false
+  }
+}

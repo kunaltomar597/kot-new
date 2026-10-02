@@ -17,6 +17,11 @@ export const SECRET_NAMES = [
   'installation-signing-key',
   /** Seals the QR relay credential the Control Plane issues, stored in the database (P5-03a). */
   'relay-credential-key',
+  /**
+   * Seals the licence agent's record (last time seen, restriction, reactivation) and the
+   * reactivation secret, so they cannot be edited in the database unnoticed (LIC-007, P7-01c).
+   */
+  'licence-record-key',
 ] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 

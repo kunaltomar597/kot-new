@@ -1,3 +1,4 @@
+import { LICENSE_STATES } from '@rp/domain';
 import { z } from 'zod';
 import {
   DeviceType,
@@ -46,6 +47,14 @@ export const TableMoved = event(
   z.object({ tableSessionId: Id, fromTableId: Id, toTableId: Id }),
 );
 export const TableClosed = event('TableClosed', z.object({ tableId: Id, tableSessionId: Id }));
+/**
+ * The licence state the restaurant experiences changed, or a restriction was decided (LIC-005,
+ * P7-01c): every screen reads the licence again for its reminder or banner.
+ */
+export const LicenceChanged = event(
+  'LicenceChanged',
+  z.object({ state: z.enum(LICENSE_STATES), restrictedFrom: Timestamp.nullable() }),
+);
 /**
  * Orders or dishes now at another open table (TBL-006): its guests merged into that table
  * (MERGE), or some dishes moved to its bill (TRANSFER). `orderIds` are the orders now there.
@@ -287,6 +296,7 @@ export const DomainEvent = z.discriminatedUnion('type', [
   TableMoved,
   TableClosed,
   OrdersMoved,
+  LicenceChanged,
   TableStateChanged,
   TableWaiterChanged,
   OrderSubmitted,

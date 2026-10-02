@@ -80,6 +80,31 @@
           "hasReactivationSecret": { "type": "boolean" }
         },
         "required": ["licenceId", "fingerprint", "hasReactivationSecret"]
+      },
+      "tamper": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "CLOCK_ROLLBACK",
+                "CLOCK_SKEW",
+                "LICENCE_TAMPERED",
+                "RECORD_TAMPERED",
+                "OTHER_PC"
+              ]
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": ["kind", "at"]
+        }
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -170,6 +195,32 @@
         },
         "required": ["licenceId", "fingerprint", "hasReactivationSecret"],
         "additionalProperties": false
+      },
+      "tamper": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "CLOCK_ROLLBACK",
+                "CLOCK_SKEW",
+                "LICENCE_TAMPERED",
+                "RECORD_TAMPERED",
+                "OTHER_PC"
+              ]
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": ["kind", "at"],
+          "additionalProperties": false
+        }
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
