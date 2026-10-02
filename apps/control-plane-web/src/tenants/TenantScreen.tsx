@@ -8,6 +8,7 @@ import { useLoad } from '../app/use-load.js';
 import { LicenceBadge } from '../components/LicenceBadge.js';
 import { LoadView } from '../components/LoadView.js';
 import { Page } from '../components/Page.js';
+import { SubscriptionPanel } from '../billing/SubscriptionPanel.js';
 import { InstallationsPanel } from './InstallationsPanel.js';
 import { NotesPanel } from './NotesPanel.js';
 import { RelayPanel } from './RelayPanel.js';
@@ -85,6 +86,11 @@ export function TenantScreen() {
                 id: 'pcs',
                 label: t('vendorApp.tenant.tab.pcs'),
                 content: <InstallationsPanel tenant={tenant} onChange={reload} />,
+              },
+              {
+                id: 'subscription',
+                label: t('vendorApp.tenant.tab.subscription'),
+                content: <SubscriptionPanel tenantId={tenant.id} />,
               },
               {
                 id: 'notes',

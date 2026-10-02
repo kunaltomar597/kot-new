@@ -352,13 +352,13 @@ Recommended next WPs (dependencies met):
   - [x] P7-01b Control Plane: issuing and renewing licences
   - [x] P7-01c Local server: the licence agent and enforcement
   - [x] P7-01d Screens: reminders, banners, the Owner's licence page
-- [ ] P7-02 Control Plane: tenants, subscriptions, licences
+- [x] P7-02 Control Plane: tenants, subscriptions, licences
   - [x] P7-02a Vendor staff: accounts, MFA, roles, sessions, access reviews
   - [x] P7-02b Vendor API for the fleet
   - [x] P7-02c Subscriptions and payments
   - [x] P7-02d Support notes, QR provisioning, access policy
   - [x] P7-02e The web app: sign-in and restaurants
-  - [ ] P7-02f The web app: billing, releases, audit and staff
+  - [x] P7-02f The web app: billing, releases, audit and staff
 - [ ] P7-03 Fleet monitoring
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
@@ -618,6 +618,31 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-02f):
+
+478. Every role sees Restaurants, Invoices, Plans and Releases; Finance and the Super Admin also
+     see the Audit log; only the Super Admin sees Staff. Opening a page the role may not use
+     says so and calls nothing.
+479. Plans:
+     - prices are typed in rupees and sent as paise;
+     - an empty price means the cycle is not offered;
+     - an archived plan stays visible but cannot be chosen;
+     - choosing a plan offers only the cycles it has prices for.
+480. Invoices:
+     - the restaurant and status filters are kept in the address, so a link from a restaurant's
+       Subscription tab opens its invoices;
+     - a payment defaults to what is still owed and can never be more;
+     - voiding needs a reason.
+481. Releases are published to Pilot by default, and only by the Super Admin.
+482. Staff:
+     - a setup link is the app's own address plus `/setup#<token>`, shown once, to be given in
+       person or by phone;
+     - the reviewer's own account is not on the access-review list, so it is always kept;
+     - nobody changes or resets their own account from this page.
+483. The vendor web app's end-to-end test runs in CI's e2e job, against the built Control Plane.
+     It creates the first Super Admin with the CLI and uses real authenticator codes. Any
+     browser console error, such as a CSP violation, fails it.
 
 Decided 2026-10-03 (P7-02e):
 
@@ -2466,6 +2491,27 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-02f The vendor web app: billing, releases, audit and staff (P7-02 done)
+
+Built in `apps/control-plane-web`:
+
+- Plans: list, add, edit, archive.
+- A restaurant's Subscription tab: put on a plan or change it.
+- Invoices: filters, recording payments, voiding, the billing run.
+- Releases: list and publish.
+- The audit log: filters and older pages.
+- Staff: add with a setup link, change role or access, reset, the quarterly access review.
+
+Also: the nav by capability with a route table; the `vendorApp` strings for all of the above;
+Playwright e2e (`e2e/`) against the built CP and its CLI; the CI e2e step.
+
+Tests: web +21 (per-role sections, plans, subscription, invoices and payments, releases, audit,
+staff, review), e2e 2 (setup, MFA with code replay refused, restaurant, PC, note, staff, audit,
+sign-out, CSP headers).
+
+Gotcha: the TOTP window accepts the next step, so a test can sign in right after setup with
+`hotp(secret, step + 1)`. The step used at setup is refused, as intended.
 
 ### 2026-10-03: P7-02e The vendor web app: sign-in and restaurants
 

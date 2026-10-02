@@ -1,7 +1,14 @@
 import type { Translator } from '@rp/i18n';
 import { LoadingState, ToastProvider } from '@rp/ui-web';
+import type { VendorCapability } from '@rp/contracts/control-plane';
+import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import { I18nProvider, useT } from './app/i18n.js';
+import { AuditScreen } from './audit/AuditScreen.js';
+import { InvoicesScreen } from './billing/InvoicesScreen.js';
+import { PlansScreen } from './billing/PlansScreen.js';
+import { ReleasesScreen } from './releases/ReleasesScreen.js';
+import { StaffScreen } from './staff/StaffScreen.js';
 import { type Services, ServicesProvider, useSession } from './app/services.js';
 import { Layout, RequireCapability } from './screens/Layout.js';
 import { SetupScreen } from './screens/SetupScreen.js';
@@ -11,6 +18,18 @@ import { TenantScreen } from './tenants/TenantScreen.js';
 import { TenantsScreen } from './tenants/TenantsScreen.js';
 
 const HOME = '/restaurants';
+
+/** The signed-in pages and the capability each needs (the server checks every call again). */
+const PAGES: readonly { path: string; capability: VendorCapability; element: ReactNode }[] = [
+  { path: '/restaurants', capability: 'FLEET_VIEW', element: <TenantsScreen /> },
+  { path: '/restaurants/:id', capability: 'FLEET_VIEW', element: <TenantScreen /> },
+  { path: '/installations/:id', capability: 'FLEET_VIEW', element: <InstallationScreen /> },
+  { path: '/invoices', capability: 'FLEET_VIEW', element: <InvoicesScreen /> },
+  { path: '/plans', capability: 'FLEET_VIEW', element: <PlansScreen /> },
+  { path: '/releases', capability: 'FLEET_VIEW', element: <ReleasesScreen /> },
+  { path: '/audit', capability: 'AUDIT_VIEW', element: <AuditScreen /> },
+  { path: '/staff', capability: 'USERS_MANAGE', element: <StaffScreen /> },
+];
 
 export function AppRoutes() {
   const t = useT();
@@ -32,30 +51,15 @@ export function AppRoutes() {
       />
       {signedIn ? (
         <Route element={<Layout />}>
-          <Route
-            path="/restaurants"
-            element={
-              <RequireCapability capability="FLEET_VIEW">
-                <TenantsScreen />
-              </RequireCapability>
-            }
-          />
-          <Route
-            path="/restaurants/:id"
-            element={
-              <RequireCapability capability="FLEET_VIEW">
-                <TenantScreen />
-              </RequireCapability>
-            }
-          />
-          <Route
-            path="/installations/:id"
-            element={
-              <RequireCapability capability="FLEET_VIEW">
-                <InstallationScreen />
-              </RequireCapability>
-            }
-          />
+          {PAGES.map((page) => (
+            <Route
+              key={page.path}
+              path={page.path}
+              element={
+                <RequireCapability capability={page.capability}>{page.element}</RequireCapability>
+              }
+            />
+          ))}
         </Route>
       ) : null}
       <Route path="*" element={<Navigate to={signedIn ? HOME : '/sign-in'} replace />} />

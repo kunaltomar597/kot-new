@@ -31,6 +31,10 @@ The web app vendor staff use to run the fleet, on the Vendor Control Plane's API
 | `src/components/` | Page frame, loading/error view, licence badge, one-time secret, reason dialog                            |
 | `src/screens/`    | Sign-in, account setup, the layout with the role's sections                                              |
 | `src/tenants/`    | Restaurants: the list, one restaurant (details, PCs, support notes, QR ordering), one PC and its licence |
+| `src/billing/`    | Plans, a restaurant's subscription, invoices and payments, the billing run                               |
+| `src/releases/`   | Releases by channel, publishing                                                                          |
+| `src/audit/`      | The Control Plane's audit log                                                                            |
+| `src/staff/`      | Staff accounts, setup links, resets and the quarterly access review                                      |
 
 ## Commands
 
@@ -38,7 +42,19 @@ The web app vendor staff use to run the fleet, on the Vendor Control Plane's API
 pnpm --filter @rp/control-plane-web dev     # Vite on :5173, API calls forwarded to CP_URL (default :8090)
 pnpm --filter @rp/control-plane-web build   # dist/, for CP_WEB_DIR
 pnpm --filter @rp/control-plane-web test    # UI tests per role against a fake Control Plane
+pnpm --filter @rp/control-plane-web e2e     # after pnpm build: Chromium against the real Control Plane
 ```
+
+The end-to-end test (`e2e/`) starts the built Control Plane with a throwaway database and
+`CP_WEB_DIR` set. It creates the first Super Admin with the CLI, as the runbook says, then the
+browser does the rest:
+
+- sets up the password and authenticator, computing real TOTP codes;
+- checks that a used code is refused;
+- adds a restaurant, a PC and a note, and a second staff member;
+- finds all of it in the audit log, and signs out.
+
+Any browser console error (a CSP violation, for example) fails the test.
 
 The tests (`test/`) run the whole app in jsdom against `FakeControlPlane`. The fake matches
 routes from the contract registry and refuses with 403 whatever the signed-in role may not do,

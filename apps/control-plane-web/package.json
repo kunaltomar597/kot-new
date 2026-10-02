@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "clean": "rm -rf dist coverage"
+    "e2e": "playwright test",
+    "clean": "rm -rf dist coverage test-results playwright-report"
   },
   "dependencies": {
     "@rp/contracts": "workspace:*",
@@ -25,6 +26,9 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@rp/test-postgres": "workspace:*",
+    "@rp/totp": "workspace:*",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

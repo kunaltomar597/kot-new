@@ -11,7 +11,14 @@ export const NAV: readonly {
   readonly path: string;
   readonly label: MessageKey;
   readonly capability: VendorCapability;
-}[] = [{ path: '/restaurants', label: 'vendorApp.nav.restaurants', capability: 'FLEET_VIEW' }];
+}[] = [
+  { path: '/restaurants', label: 'vendorApp.nav.restaurants', capability: 'FLEET_VIEW' },
+  { path: '/invoices', label: 'vendorApp.nav.invoices', capability: 'FLEET_VIEW' },
+  { path: '/plans', label: 'vendorApp.nav.plans', capability: 'FLEET_VIEW' },
+  { path: '/releases', label: 'vendorApp.nav.releases', capability: 'FLEET_VIEW' },
+  { path: '/audit', label: 'vendorApp.nav.audit', capability: 'AUDIT_VIEW' },
+  { path: '/staff', label: 'vendorApp.nav.staff', capability: 'USERS_MANAGE' },
+];
 
 /** Header with the sections this role may open, who is signed in, and signing out. */
 export function Layout() {
