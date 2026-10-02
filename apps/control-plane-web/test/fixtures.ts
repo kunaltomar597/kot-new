@@ -1,4 +1,6 @@
 import {
+  type FleetAlertView,
+  type FleetInstallationView,
   type PlanView,
   type VendorInstallationView,
   type VendorInvoiceView,
@@ -143,6 +145,55 @@ export function invoice(overrides: Partial<VendorInvoiceView> = {}): VendorInvoi
     issuedAt: '2026-09-01T06:30:00.000Z',
     paidAt: null,
     voidReason: null,
+    ...overrides,
+  };
+}
+
+export function fleetPc(overrides: Partial<FleetInstallationView> = {}): FleetInstallationView {
+  return {
+    installationId: INSTALLATION_ID,
+    installationName: 'Main counter PC',
+    tenantId: TENANT_ID,
+    tenantName: 'Spice Route',
+    status: 'ACTIVE',
+    channel: 'STABLE',
+    online: true,
+    lastSeenAt: '2026-10-02T03:55:00.000Z',
+    components: [
+      { name: 'RESTAURANT_PC', version: '1.4.0' },
+      { name: 'postgres', version: '16.4' },
+    ],
+    disk: { totalBytes: 500_000_000_000, freeBytes: 190_000_000_000, usedPercent: 62 },
+    backup: null,
+    devices: [
+      { type: 'KDS', paired: 2, connected: 1 },
+      { type: 'WAITER_PHONE', paired: 4, connected: 4 },
+    ],
+    errorCount: 0,
+    licenceState: 'ACTIVE',
+    auditHead: {
+      sequence: 4_120,
+      hash: 'a'.repeat(64),
+      verifiedAt: '2026-10-02T03:50:00.000Z',
+    },
+    openAlerts: [],
+    ...overrides,
+  };
+}
+
+export function fleetAlert(overrides: Partial<FleetAlertView> = {}): FleetAlertView {
+  return {
+    id: '0190a1b2-0000-7000-8000-0000000000d1',
+    installationId: INSTALLATION_ID,
+    installationName: 'Main counter PC',
+    tenantId: TENANT_ID,
+    tenantName: 'Spice Route',
+    kind: 'AUDIT_CHAIN_MISMATCH',
+    openedAt: '2026-10-02T03:00:00.000Z',
+    resolvedAt: null,
+    details: { reason: 'REWRITTEN', sequence: 3_900, byAuditCheck: true },
+    resolvedBy: null,
+    resolution: null,
     ...overrides,
   };
 }

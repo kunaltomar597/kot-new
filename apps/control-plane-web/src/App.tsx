@@ -8,6 +8,7 @@ import { AuditScreen } from './audit/AuditScreen.js';
 import { InvoicesScreen } from './billing/InvoicesScreen.js';
 import { PlansScreen } from './billing/PlansScreen.js';
 import { ReleasesScreen } from './releases/ReleasesScreen.js';
+import { FleetScreen } from './fleet/FleetScreen.js';
 import { StaffScreen } from './staff/StaffScreen.js';
 import { type Services, ServicesProvider, useSession } from './app/services.js';
 import { Layout, RequireCapability } from './screens/Layout.js';
@@ -24,6 +25,7 @@ const PAGES: readonly { path: string; capability: VendorCapability; element: Rea
   { path: '/restaurants', capability: 'FLEET_VIEW', element: <TenantsScreen /> },
   { path: '/restaurants/:id', capability: 'FLEET_VIEW', element: <TenantScreen /> },
   { path: '/installations/:id', capability: 'FLEET_VIEW', element: <InstallationScreen /> },
+  { path: '/fleet', capability: 'FLEET_VIEW', element: <FleetScreen /> },
   { path: '/invoices', capability: 'FLEET_VIEW', element: <InvoicesScreen /> },
   { path: '/plans', capability: 'FLEET_VIEW', element: <PlansScreen /> },
   { path: '/releases', capability: 'FLEET_VIEW', element: <ReleasesScreen /> },

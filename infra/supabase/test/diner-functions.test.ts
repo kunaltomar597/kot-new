@@ -269,6 +269,7 @@ describe('[QR-006] submitting an order', () => {
     const thali = (choices: string[]) =>
       dal({ itemId: IDS.thali, quantity: 1, comboChoices: choices });
     const answer = await submit(order([thali([IDS.rasmalai])]));
+    expect(answer.status, JSON.stringify(answer.body)).toBe(200);
     expect(QrSubmitOrderResponse.parse(answer.body).status).toBe('ACCEPTED');
     const wrong = QrSubmitOrderResponse.parse((await submit(order([thali([IDS.tikka])]))).body);
     expect(wrong.status).toBe('REJECTED');

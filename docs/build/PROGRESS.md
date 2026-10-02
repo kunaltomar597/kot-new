@@ -359,9 +359,9 @@ Recommended next WPs (dependencies met):
   - [x] P7-02d Support notes, QR provisioning, access policy
   - [x] P7-02e The web app: sign-in and restaurants
   - [x] P7-02f The web app: billing, releases, audit and staff
-- [ ] P7-03 Fleet monitoring
+- [x] P7-03 Fleet monitoring
   - [x] P7-03a Heartbeat health and alerts
-  - [ ] P7-03b Fleet dashboard
+  - [x] P7-03b Fleet dashboard
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
 - [ ] P7-06 Data lifecycle
@@ -620,6 +620,17 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-03b):
+
+491. Fleet is in the web app's sections for every role, after Restaurants.
+     - The page shows open alerts first, then every PC: online state and last heard from,
+       version, disk, backups, devices connected out of paired, errors, licence and audit log.
+     - It refreshes every minute and can be filtered to PCs with alerts or offline ones.
+492. A PC's page adds its health, every alert (open and closed, with who closed it and why) and
+     the audit log fingerprints it reported, with when each was checked again or set aside.
+493. Only an audit log alert has a Close button, for roles with SUPPORT_NOTES. The dialog points
+     to the runbook (check with the Owner first).
 
 Decided 2026-10-03 (P7-03a):
 
@@ -2524,6 +2535,24 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-03b Fleet dashboard (P7-03 done)
+
+Built in `apps/control-plane-web`:
+
+- the Fleet page (`src/fleet/`): open alerts with closing chain alerts, and the PC table with a
+  filter and minute refresh;
+- on a PC's page, its health card, alert history and audit log fingerprints;
+- `vendorApp.fleet` strings.
+
+Tests: web +7 (fleet page for Read-only and Support, a PC's health, helpers, alert texts; nav
+lists Fleet); e2e +1 step (the new PC is listed and no alerts are open).
+
+Gotcha: plain ICU number arguments are grouped ("Entry 3,900").
+
+Gotcha: `pnpm check` on this Mac runs every package's tests at once. Under that load the
+REC-011 p95 test can reach about 220 ms, and a relay diner test once got an error response; both
+pass when run alone. The relay test now prints the response body when it fails.
 
 ### 2026-10-03: P7-03a Heartbeat health and alerts
 

@@ -9,7 +9,7 @@ import { App } from '../src/App.js';
 import { createServices, type Services } from '../src/app/services.js';
 import type { TokenStorage } from '../src/app/session.js';
 import { FakeControlPlane, FakeRefusal } from './fake-cp.js';
-import { licence, meView, tenantDetail } from './fixtures.js';
+import { fleetPc, licence, meView, tenantDetail } from './fixtures.js';
 
 /** Session storage for a test: starts with a token when someone is signed in. */
 export function memoryStorage(token?: string): TokenStorage & { value: string | undefined } {
@@ -46,7 +46,10 @@ export function controlPlane(role?: VendorRole): FakeControlPlane {
     .on('listSupportNotes', () => ({ notes: [] }))
     .on('getRelayProvisioning', () => {
       throw new FakeRefusal(404, 'NOT_FOUND', 'Not provisioned in the QR relay yet.');
-    });
+    })
+    .on('getFleet', () => ({ installations: [fleetPc()], generatedAt: '2026-10-02T04:00:00.000Z' }))
+    .on('listFleetAlerts', () => ({ alerts: [] }))
+    .on('listAuditHeads', () => ({ heads: [] }));
   return cp;
 }
 
