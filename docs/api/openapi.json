@@ -6846,6 +6846,44 @@
         "x-requirements": ["KDS-008", "ONB-004"]
       }
     },
+    "/api/v1/printers/discover": {
+      "post": {
+        "operationId": "discoverPrinters",
+        "summary": "Find receipt printers on the restaurant's network",
+        "description": "ONB-004 step 6 (S). Looks at every address of the PC's own networks (one /24 each at most) for a printer port (`printers.discoveryPorts`), for a few seconds, and says which printers are already added. Nothing is added or printed.",
+        "tags": ["printing"],
+        "responses": {
+          "200": {
+            "description": "What answered.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PrinterDiscoveryResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-004", "KDS-008"]
+      }
+    },
     "/api/v1/recommendation-rules": {
       "get": {
         "operationId": "listRecommendationRules",
@@ -18090,6 +18128,30 @@
         "additionalProperties": false
       },
       "PrinterConnection": { "type": "string", "enum": ["NETWORK", "USB"] },
+      "PrinterDiscoveryResponse": {
+        "type": "object",
+        "properties": {
+          "networks": { "type": "array", "items": { "type": "string" } },
+          "printers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "host": { "type": "string" },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "printerId": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+                },
+                "printerName": { "type": ["string", "null"] }
+              },
+              "required": ["host", "port", "printerId", "printerName"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["networks", "printers"],
+        "additionalProperties": false
+      },
       "PrinterListResponse": {
         "type": "object",
         "properties": {

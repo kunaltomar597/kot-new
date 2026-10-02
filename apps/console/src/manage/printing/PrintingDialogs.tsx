@@ -1,5 +1,11 @@
-import type { PrinterRequest, PrinterView, StationRequest, StationView } from '@rp/contracts';
-import { Button, ChoiceGroup, Dialog, Select, TextField } from '@rp/ui-web';
+import type {
+  PrinterDiscoveryResponse,
+  PrinterRequest,
+  PrinterView,
+  StationRequest,
+  StationView,
+} from '@rp/contracts';
+import { Button, ChoiceGroup, Dialog, Select, Spinner, TextField } from '@rp/ui-web';
 import { useId, useState } from 'react';
 import { useT } from '../../app/i18n.js';
 import { ReasonDialog } from '../menu/ReasonDialog.js';
@@ -35,17 +41,20 @@ function ErrorNotice({ error }: { error: string | undefined }) {
 /** Adds a printer, or changes one (KDS-008): network with address and port, or USB by share name. */
 export function PrinterDialog({
   printer,
+  found,
   busy,
   error,
   onSave,
   onClose,
 }: DialogState & {
   printer: PrinterView | undefined;
+  /** A printer found on the network (ONB-004 step 6): its address, and a name to start from. */
+  found?: { readonly name: string; readonly host: string; readonly port: number };
   onSave: (request: PrinterRequest) => void;
 }) {
   const t = useT();
   const formId = useId();
-  const [draft, setDraft] = useState<PrinterDraft>(() => printerDraftOf(printer));
+  const [draft, setDraft] = useState<PrinterDraft>(() => printerDraftOf(printer, found));
   const [submitted, setSubmitted] = useState(false);
   const problems = checkPrinterDraft(draft);
   const problemText = (problem: PrinterProblem) => {
@@ -306,5 +315,87 @@ export function RedirectDialog({
         />
       )}
     </ReasonDialog>
+  );
+}
+
+/**
+ * Receipt printers found on the restaurant's network (ONB-004 step 6, S): what answered on a
+ * printer port, which are already added, and Add for the others.
+ */
+export function DiscoveryDialog({
+  result,
+  onAdd,
+  onAgain,
+  onClose,
+}: {
+  /** Undefined while looking. */
+  result: PrinterDiscoveryResponse | undefined;
+  onAdd: (found: { host: string; port: number }) => void;
+  onAgain: () => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={t('printing.discover.title')}
+      description={t('printing.discover.description')}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onAgain} disabled={result === undefined}>
+            {t('printing.discover.again')}
+          </Button>
+          <Button onClick={onClose}>{t('printing.discover.close')}</Button>
+        </>
+      }
+    >
+      {result === undefined ? (
+        <Spinner />
+      ) : (
+        <>
+          <p className="dashboard-section__hint">
+            {t('printing.discover.looked', { list: result.networks.join(', ') })}
+          </p>
+          {result.printers.length === 0 ? (
+            <p role="status">{t('printing.discover.none')}</p>
+          ) : (
+            <ul className="staff-list" aria-label={t('printing.discover.title')}>
+              {result.printers.map((found) => (
+                <li key={`${found.host}:${String(found.port)}`} className="staff-row">
+                  <div className="staff-row__who">
+                    <span className="staff-row__name">
+                      {t('printing.discover.address', { host: found.host, port: found.port })}
+                    </span>
+                    {found.printerName === null ? null : (
+                      <p className="staff-row__contact">
+                        {t('printing.discover.addedAs', { name: found.printerName })}
+                      </p>
+                    )}
+                  </div>
+                  {found.printerId === null ? (
+                    <Button
+                      variant="secondary"
+                      aria-label={`${t('printing.discover.add')} ${t('printing.discover.address', {
+                        host: found.host,
+                        port: found.port,
+                      })}`}
+                      onClick={() => {
+                        onAdd({ host: found.host, port: found.port });
+                      }}
+                    >
+                      {t('printing.discover.add')}
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      <p className="rp-visually-hidden" aria-live="polite">
+        {result === undefined ? t('printing.discover.searching') : ''}
+      </p>
+    </Dialog>
   );
 }

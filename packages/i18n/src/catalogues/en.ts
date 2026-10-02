@@ -1286,6 +1286,7 @@ export const en = {
       devices: 'Devices',
       orders: 'Orders',
       tables: 'Tables',
+      printers: 'Printers',
       billing: 'Billing',
       bills: 'Bills',
       payments: 'Payments',
@@ -2394,6 +2395,21 @@ export const en = {
       redirectedDone: 'Tickets for {name} now go to {target}.',
       redirectStopped: '{name} prints its own tickets again.',
       archived: '{name} is archived.',
+      find: 'Find printers',
+    },
+    discover: {
+      title: 'Printers on the network',
+      description:
+        'Receipt printers this PC can reach on its network, answering on a printer port. Add one, then print a test page to check it is the one you think.',
+      searching: 'Looking on the network…',
+      looked: 'Looked at {list}.',
+      none: 'No printer answered. Check that it is switched on and on the same network, or add it by its address.',
+      address: '{host}, port {port}',
+      addedAs: 'Added as {name}',
+      add: 'Add',
+      again: 'Look again',
+      close: 'Close',
+      newName: 'Printer {host}',
     },
     stations: {
       title: 'Stations',
@@ -2621,6 +2637,9 @@ export const en = {
     tables: {
       needsCleaning: '“Needs cleaning” after guests leave',
     },
+    printers: {
+      discoveryPorts: 'Printer ports to look for',
+    },
     billing: {
       priceMode: 'Menu prices',
       roundingUnitPaise: 'Round bills to the nearest',
@@ -2758,6 +2777,10 @@ export const en = {
         'Battery level at or below which a table tablet or kitchen screen raises a low-battery alert.',
       offlineAlertSeconds:
         'A table tablet or kitchen screen not connected for this long alerts the managers (0: never; our default).',
+    },
+    printers: {
+      discoveryPorts:
+        'Ports a network receipt printer answers on, looked for by Find printers. 9100 suits most.',
     },
     tables: {
       needsCleaning:

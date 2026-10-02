@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-05g, then Phase 7.
+- Phase 7 (P7-01 onwards).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -336,14 +336,14 @@ Recommended next WPs (dependencies met):
   - [x] P6-04a Control Plane reading service
   - [x] P6-04b Review and import on the restaurant PC
   - [x] P6-04c Bulk photo upload (ONB-007)
-- [ ] P6-05 Should-have operations batch
+- [x] P6-05 Should-have operations batch
   - [x] P6-05a Finishing what was half built (KDS-002, KDS-006, NTF-009, BILL-013)
   - [x] P6-05b Hold and fire (ORD-016)
   - [x] P6-05c Ordering (WTR-013, MENU-007)
   - [x] P6-05d Tables (TBL-006, TBL-004)
   - [x] P6-05e Billing (BILL-001, WTR-008)
   - [x] P6-05f Setup: Manage → Floor with the drag-and-drop plan (ONB-004 step 5)
-  - [ ] P6-05g Printer auto-discovery (ONB-004 step 6)
+  - [x] P6-05g Printer auto-discovery (ONB-004 step 6)
 
 ### Phase 7: Commercial readiness
 
@@ -608,6 +608,17 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P6-05g):
+
+432. Printer auto-discovery (ONB-004 step 6, S) looks for receipt printers by their raw-print
+     port, not by mDNS: almost every ESC/POS network printer answers on 9100, and a TCP look needs
+     no library and works on any LAN. The server looks at its own private IPv4 networks only
+     (RFC 1918; a wider network is cut to its own /24; a public address is never scanned), 64
+     addresses at a time, 400 ms each, so a /24 takes about two seconds. Ports are the setting
+     `printers.discoveryPorts` (default 9100). Only when a manager presses Find printers; nothing
+     is added or printed; a printer already added says so; Add opens the usual dialog filled in.
+433. The settings page edits a list of whole numbers (one per line) as it edits text lists.
 
 Decided 2026-10-03 (P6-05f):
 
@@ -2272,6 +2283,16 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P6-05g Printer auto-discovery (P6-05 done)
+
+Built: setting `printers.discoveryPorts`; contracts `PrinterDiscoveryResponse`, route
+`discoverPrinters`; server `printer-discovery.ts` (`networksOf`, `findOpenPorts`,
+`PrinterDiscoveryService`, the `PRINTER_NETWORKS` token); console Find printers on Kitchen and
+printers, with Add filling in the printer dialog; number lists in the settings editor.
+
+Tests: server unit +3 (networks looked at; open ports found 64 at a time), integration +1 (two
+stand-in printers found, one already added), console +1.
 
 ### 2026-10-03: P6-05f Manage → Floor and the floor plan
 
