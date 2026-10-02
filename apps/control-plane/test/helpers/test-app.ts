@@ -19,8 +19,13 @@ export function createTestDatabase(): Promise<TestDatabase> {
 
 export function testConfig(databaseUrl: string, overrides: Partial<CpConfig> = {}): CpConfig {
   return Object.freeze({
-    // No billing timer in tests: they run billing themselves.
-    ...CpConfigSchema.parse({ databaseUrl, logLevel: 'silent', billingIntervalMinutes: 0 }),
+    // No billing or fleet timers in tests: they run them themselves.
+    ...CpConfigSchema.parse({
+      databaseUrl,
+      logLevel: 'silent',
+      billingIntervalMinutes: 0,
+      fleetSweepSeconds: 0,
+    }),
     ...overrides,
   });
 }

@@ -438,6 +438,163 @@
         "x-requirements": ["VCP-003", "LIC-005"]
       }
     },
+    "/v1/vendor/fleet": {
+      "get": {
+        "operationId": "getFleet",
+        "summary": "Every PC’s health from its latest heartbeat, with its open alerts",
+        "description": "Online state and last seen, component versions, disk use, backups, devices, errors, the licence state and the audit chain head (VCP-005, NFR-O03).",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "The fleet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FleetResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-005", "NFR-O03", "AUD-003"]
+      }
+    },
+    "/v1/vendor/fleet/alerts": {
+      "get": {
+        "operationId": "listFleetAlerts",
+        "summary": "Fleet alerts: offline in business hours, disk full, backup failed, chain mismatch",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "installationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": { "default": "OPEN", "type": "string", "enum": ["OPEN", "ALL"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The alerts, newest first.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FleetAlertListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-005", "DATA-005", "AUD-003"]
+      }
+    },
+    "/v1/vendor/fleet/alerts/{id}/resolve": {
+      "post": {
+        "operationId": "resolveFleetAlert",
+        "summary": "Close an audit chain alert after looking into it, with what was found",
+        "description": "Only chain alerts: the others close by themselves when the PC reports it is fixed. The PC’s chain then counts from its current head (a restore from backup, say). Audited.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ReasonRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The alert, closed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FleetAlertView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such alert.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Already closed, or it closes by itself.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SUPPORT_NOTES",
+        "x-requirements": ["AUD-003", "SEC-018"]
+      }
+    },
     "/v1/vendor/installations/{id}": {
       "get": {
         "operationId": "getVendorInstallation",
@@ -491,6 +648,61 @@
         },
         "x-capability": "FLEET_VIEW",
         "x-requirements": ["VCP-002"]
+      }
+    },
+    "/v1/vendor/installations/{id}/audit-heads": {
+      "get": {
+        "operationId": "listAuditHeads",
+        "summary": "The audit chain heads a PC reported, newest first (the latest 100)",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The heads.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuditHeadListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["AUD-003"]
       }
     },
     "/v1/vendor/installations/{id}/code": {
@@ -2429,6 +2641,21 @@
         "required": ["code", "message"],
         "additionalProperties": false
       },
+      "AuditCheckpoint": {
+        "type": "object",
+        "properties": {
+          "sequence": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "hash": { "anyOf": [{ "$ref": "#/components/schemas/Sha256Hex" }, { "type": "null" }] },
+          "oldestSequence": {
+            "anyOf": [
+              { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["sequence", "hash", "oldestSequence"],
+        "additionalProperties": false
+      },
       "AuditEntryView": {
         "type": "object",
         "properties": {
@@ -2445,6 +2672,39 @@
           "details": { "anyOf": [{}, { "type": "null" }] }
         },
         "required": ["id", "at", "actor", "action", "targetType", "targetId", "details"],
+        "additionalProperties": false
+      },
+      "AuditHeadListResponse": {
+        "type": "object",
+        "properties": {
+          "heads": { "type": "array", "items": { "$ref": "#/components/schemas/AuditHeadView" } }
+        },
+        "required": ["heads"],
+        "additionalProperties": false
+      },
+      "AuditHeadView": {
+        "type": "object",
+        "properties": {
+          "sequence": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "hash": { "$ref": "#/components/schemas/Sha256Hex" },
+          "firstSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "verifiedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "superseded": { "type": "boolean" }
+        },
+        "required": ["sequence", "hash", "firstSeenAt", "verifiedAt", "superseded"],
         "additionalProperties": false
       },
       "AuditListResponse": {
@@ -2597,6 +2857,270 @@
         "type": "string",
         "pattern": "^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$"
       },
+      "FleetAlertKind": {
+        "type": "string",
+        "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+      },
+      "FleetAlertListResponse": {
+        "type": "object",
+        "properties": {
+          "alerts": { "type": "array", "items": { "$ref": "#/components/schemas/FleetAlertView" } }
+        },
+        "required": ["alerts"],
+        "additionalProperties": false
+      },
+      "FleetAlertParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "FleetAlertQuery": {
+        "type": "object",
+        "properties": {
+          "state": { "default": "OPEN", "type": "string", "enum": ["OPEN", "ALL"] },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "FleetAlertQueryInput": {
+        "type": "object",
+        "properties": {
+          "state": { "default": "OPEN", "type": "string", "enum": ["OPEN", "ALL"] },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FleetAlertView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationName": { "type": "string" },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantName": { "type": "string" },
+          "kind": { "$ref": "#/components/schemas/FleetAlertKind" },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "resolvedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": { "type": "string" },
+                "additionalProperties": {}
+              },
+              { "type": "null" }
+            ]
+          },
+          "resolvedBy": { "type": ["string", "null"] },
+          "resolution": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "installationId",
+          "installationName",
+          "tenantId",
+          "tenantName",
+          "kind",
+          "openedAt",
+          "resolvedAt",
+          "details",
+          "resolvedBy",
+          "resolution"
+        ],
+        "additionalProperties": false
+      },
+      "FleetInstallationView": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationName": { "type": "string" },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantName": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "ACTIVE", "REVOKED"] },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "online": { "type": "boolean" },
+          "lastSeenAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "components": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ComponentVersion" }
+          },
+          "disk": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "totalBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "freeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "usedPercent": {
+                    "anyOf": [
+                      { "type": "integer", "minimum": 0, "maximum": 100 },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["totalBytes", "freeBytes", "usedPercent"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "backup": {
+            "anyOf": [{ "$ref": "#/components/schemas/HeartbeatBackup" }, { "type": "null" }]
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "paired": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "connected": {
+                  "anyOf": [
+                    { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": ["type", "paired", "connected"],
+              "additionalProperties": false
+            }
+          },
+          "errorCount": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "licenceState": {
+            "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          },
+          "auditHead": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sequence": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "hash": { "$ref": "#/components/schemas/Sha256Hex" },
+                  "verifiedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["sequence", "hash", "verifiedAt"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "openAlerts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/FleetAlertKind" }
+          }
+        },
+        "required": [
+          "installationId",
+          "installationName",
+          "tenantId",
+          "tenantName",
+          "status",
+          "channel",
+          "online",
+          "lastSeenAt",
+          "components",
+          "disk",
+          "backup",
+          "devices",
+          "errorCount",
+          "licenceState",
+          "auditHead",
+          "openAlerts"
+        ],
+        "additionalProperties": false
+      },
+      "FleetResponse": {
+        "type": "object",
+        "properties": {
+          "installations": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/FleetInstallationView" }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["installations", "generatedAt"],
+        "additionalProperties": false
+      },
       "HealthResponse": {
         "type": "object",
         "properties": {
@@ -2625,6 +3149,44 @@
           }
         },
         "required": ["status", "time", "uptimeSeconds", "checks"],
+        "additionalProperties": false
+      },
+      "HeartbeatBackup": {
+        "type": "object",
+        "properties": {
+          "lastSuccessAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "lastFailureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "lastError": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+        },
+        "required": ["lastSuccessAt", "lastFailureAt", "lastError"],
+        "additionalProperties": false
+      },
+      "HeartbeatOpeningWindow": {
+        "type": "object",
+        "properties": {
+          "day": { "type": "string", "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] },
+          "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+          "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+        },
+        "required": ["day", "start", "end"],
         "additionalProperties": false
       },
       "HeartbeatRequest": {
@@ -2723,7 +3285,30 @@
             },
             "required": ["credentialDigest"],
             "additionalProperties": false
-          }
+          },
+          "devicesConnected": {
+            "type": "object",
+            "propertyNames": { "type": "string", "pattern": "^[A-Z_]{1,40}$" },
+            "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "errorCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "backup": {
+            "anyOf": [{ "$ref": "#/components/schemas/HeartbeatBackup" }, { "type": "null" }]
+          },
+          "businessHours": {
+            "type": "object",
+            "properties": {
+              "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "hours": {
+                "maxItems": 28,
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/HeartbeatOpeningWindow" }
+              }
+            },
+            "required": ["timeZone", "hours"],
+            "additionalProperties": false
+          },
+          "auditCheckpoint": { "$ref": "#/components/schemas/AuditCheckpoint" }
         },
         "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
         "additionalProperties": {}
@@ -2762,6 +3347,24 @@
               { "type": "string", "pattern": "^[A-Za-z0-9_-]{43,200}$" },
               { "type": "null" }
             ]
+          },
+          "auditCheck": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sequence": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["sequence"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
           }
         },
         "required": [
@@ -2771,7 +3374,8 @@
           "update",
           "licence",
           "reactivationSecret",
-          "relayCredential"
+          "relayCredential",
+          "auditCheck"
         ],
         "additionalProperties": false
       },
@@ -2807,6 +3411,23 @@
             "default": null,
             "anyOf": [
               { "type": "string", "pattern": "^[A-Za-z0-9_-]{43,200}$" },
+              { "type": "null" }
+            ]
+          },
+          "auditCheck": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sequence": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["sequence"]
+              },
               { "type": "null" }
             ]
           }

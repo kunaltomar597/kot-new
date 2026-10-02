@@ -1,0 +1,10 @@
+{
+  "input": {
+    "type": "string",
+    "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+  },
+  "output": {
+    "type": "string",
+    "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+  }
+}

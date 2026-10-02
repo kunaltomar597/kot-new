@@ -85,6 +85,20 @@ dashboard; alerts for offline > 30 min during business hours, backup failure, di
 history to detect local tampering.
 Acceptance: tests for alert rules; a tampered local chain is detected by comparing heads.
 
+Split (2026-10-03):
+
+- **P7-03a Heartbeat health and alerts.** The heartbeat gains the restaurant's business hours,
+  connected devices, the error count, the backup status (null until P7-05) and an answer to the
+  Control Plane's audit check.
+  - Alert rules (pure, in `@rp/domain`): offline more than 30 minutes of business hours, disk
+    over 90 %, backup failed.
+  - Chain-head history and checks: a head that goes back or changes at the same sequence, and
+    random checkpoints the PC must answer with the hash it holds for an earlier sequence.
+  - Alerts are opened and resolved by the Control Plane (once per kind), sent to an optional
+    webhook, and listed for vendor staff. A chain alert is closed by a person, with a reason.
+- **P7-03b Fleet dashboard.** The web app's Fleet page (every PC's health and open alerts), the
+  alerts list with resolving, and a PC's health and chain-head history.
+
 ## P7-04 Release management and remote updates
 
 Requirements: UPD-001 to UPD-007, VCP-006, PGR-011 (distribution), R-07.

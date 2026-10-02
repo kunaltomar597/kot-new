@@ -7,6 +7,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { BusinessHours } from '@rp/contracts';
 import type { HeartbeatRequest, ReleaseInfo } from '@rp/contracts/control-plane';
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
@@ -17,6 +18,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import { ControlPlaneClient, ControlPlaneError } from './control-plane-client.js';
 import { readEnrolment, readOfferedUpdate, saveOfferedUpdate } from './control-plane-state.js';
 import { LicenceAgentService } from '../licensing/licence-agent.service.js';
+import { ErrorCounter } from '../observability/error-reporter.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { readRelayCredential, saveRelayCredential } from '../relay/relay-credential.js';
 import { installationKey } from './installation-key.js';
 
@@ -72,6 +75,10 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     offeredUpdate: null,
     clockOffsetMs: null,
   };
+  /** The Control Plane's last audit check, answered with the next heartbeat (AUD-003). */
+  private auditCheck: { sequence: number } | null = null;
+  /** The error count at the last heartbeat delivered: the next one reports those since. */
+  private errorsDelivered = 0;
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -80,6 +87,8 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly audit: AuditService,
     @Inject(CONTROL_PLANE_OPTIONS) private readonly options: ControlPlaneOptions,
     private readonly licence: LicenceAgentService,
+    private readonly errors: ErrorCounter,
+    private readonly realtime: RealtimeGateway,
   ) {
     this.intervalMs = options.defaultIntervalMs;
   }
@@ -135,9 +144,12 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
         timeoutMs: this.options.requestTimeoutMs,
         ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
       });
-      const heartbeat = await this.collect();
+      const errorsNow = this.errors.total;
+      const heartbeat = await this.collect(errorsNow);
       const answer = await this.client.heartbeat(enrolment.installationId, heartbeat);
       this.intervalMs = answer.nextHeartbeatSeconds * 1_000;
+      this.errorsDelivered = errorsNow;
+      this.auditCheck = answer.auditCheck;
       await this.offer(answer.update);
       // A renewed licence, the reactivation secret and the clock check (LIC-002, LIC-007).
       await this.licence.accept(answer, heartbeat.tamper ?? []);
@@ -207,15 +219,20 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     }
   }
 
-  private async collect(): Promise<HeartbeatRequest> {
-    const [head, devices, disk, postgres, licence, relayCredential] = await Promise.all([
-      this.audit.chainHead(),
-      this.deviceCounts(),
-      this.disk(),
-      this.postgresVersion(),
-      this.licence.heartbeatReport(),
-      readRelayCredential(this.prisma, this.secrets).catch(() => undefined),
-    ]);
+  private async collect(errorsNow: number): Promise<HeartbeatRequest> {
+    const check = this.auditCheck;
+    const [head, devices, disk, postgres, licence, relayCredential, restaurant, checkpoint] =
+      await Promise.all([
+        this.audit.chainHead(),
+        this.deviceHealth(),
+        this.disk(),
+        this.postgresVersion(),
+        this.licence.heartbeatReport(),
+        readRelayCredential(this.prisma, this.secrets).catch(() => undefined),
+        this.prisma.restaurant.findFirst({ select: { businessHours: true, timeZone: true } }),
+        check === null ? undefined : this.audit.checkpoint(check.sequence),
+      ]);
+    const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
       heartbeatId: newId(),
       sentAt: new Date().toISOString(),
@@ -227,7 +244,16 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       ],
       disk,
       auditChainHead: head === null ? null : { sequence: head.seq, hash: head.hash },
-      devices,
+      devices: devices.paired,
+      // Fleet health (VCP-005, NFR-O03, P7-03). Backups report here once they exist (P7-05).
+      devicesConnected: devices.connected,
+      errorCount: Math.max(0, errorsNow - this.errorsDelivered),
+      backup: null,
+      ...(restaurant !== null &&
+        hours.success && {
+          businessHours: { timeZone: restaurant.timeZone, hours: hours.data },
+        }),
+      ...(checkpoint !== undefined && { auditCheckpoint: checkpoint }),
       ...licence,
       relay: {
         credentialDigest:
@@ -238,13 +264,32 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     };
   }
 
-  private async deviceCounts(): Promise<Record<string, number>> {
-    const groups = await this.prisma.device.groupBy({
-      by: ['type'],
+  /**
+   * Paired devices by type, and how many are connected now: a pager by its heartbeats, an app by
+   * its socket (as on the Devices page).
+   */
+  private async deviceHealth(): Promise<{
+    paired: Record<string, number>;
+    connected: Record<string, number>;
+  }> {
+    const rows = await this.prisma.device.findMany({
       where: { status: 'ACTIVE' },
-      _count: { _all: true },
+      select: { id: true, type: true, online: true, restaurantId: true },
     });
-    return Object.fromEntries(groups.map((group) => [group.type, group._count._all]));
+    const paired: Record<string, number> = {};
+    const connected: Record<string, number> = {};
+    const sockets = new Map<string, ReadonlySet<string>>();
+    for (const row of rows) {
+      let ids = sockets.get(row.restaurantId);
+      if (ids === undefined) {
+        ids = this.realtime.connectedDeviceIds(row.restaurantId);
+        sockets.set(row.restaurantId, ids);
+      }
+      paired[row.type] = (paired[row.type] ?? 0) + 1;
+      const isConnected = row.type === 'PAGER' ? row.online : ids.has(row.id);
+      connected[row.type] = (connected[row.type] ?? 0) + (isConnected ? 1 : 0);
+    }
+    return { paired, connected };
   }
 
   /** Size and free space of the data drive (ONB-002); null when it cannot be read. */

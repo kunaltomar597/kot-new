@@ -1,4 +1,4 @@
-import { LICENSE_STATES } from '@rp/domain';
+import { LICENSE_STATES, WEEKDAYS } from '@rp/domain';
 import { z } from 'zod';
 import { Id, Paise, Timestamp } from '../common.js';
 
@@ -172,6 +172,34 @@ export type ComponentVersion = z.infer<typeof ComponentVersion>;
  * status, error counts, licence state) are kept even when this Control Plane does not know them
  * yet, so a newer installation is never refused.
  */
+const HhMm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+/** One opening window of the restaurant's week (ONB-004); `end` before `start` runs past midnight. */
+export const HeartbeatOpeningWindow = z.object({
+  day: z.enum(WEEKDAYS),
+  start: HhMm,
+  end: HhMm,
+});
+
+/** The latest backups (DATA-005): null until backups are set up (P7-05). */
+export const HeartbeatBackup = z.object({
+  lastSuccessAt: Timestamp.nullable(),
+  lastFailureAt: Timestamp.nullable(),
+  /** What went wrong, in plain words, without paths or secrets. */
+  lastError: z.string().max(500).nullable(),
+});
+export type HeartbeatBackup = z.infer<typeof HeartbeatBackup>;
+
+/** The PC's answer to the Control Plane's audit check (AUD-003): the hash it holds for entry N. */
+export const AuditCheckpoint = z.object({
+  sequence: z.int().positive(),
+  /** Null when the entry is no longer in the log. */
+  hash: Sha256Hex.nullable(),
+  /** The oldest entry it still holds (entries before it were archived and purged, P7-06). */
+  oldestSequence: z.int().positive().nullable(),
+});
+export type AuditCheckpoint = z.infer<typeof AuditCheckpoint>;
+
 export const HeartbeatRequest = z.looseObject({
   /** Chosen by the installation; sending the same heartbeat again is harmless. */
   heartbeatId: Id,
@@ -201,6 +229,21 @@ export const HeartbeatRequest = z.looseObject({
   tamper: z.array(TamperEvent).max(20).optional(),
   /** Which QR relay credential the PC holds (VCP-002), so a new one is sent until it does. */
   relay: z.object({ credentialDigest: RELAY_DIGEST.nullable() }).optional(),
+  /*
+   * Health for fleet monitoring (VCP-005, NFR-O03, P7-03). Each is absent from PCs older than
+   * P7-03; the Control Plane then treats every hour as a business hour.
+   */
+  /** Paired devices connected now, by type (a pager by its heartbeats, an app by its socket). */
+  devicesConnected: z.record(z.string().regex(/^[A-Z_]{1,40}$/), z.int().nonnegative()).optional(),
+  /** Server errors since the previous heartbeat that reached the Control Plane. */
+  errorCount: z.int().nonnegative().optional(),
+  backup: HeartbeatBackup.nullable().optional(),
+  /** The restaurant's opening hours, for "offline during business hours" (VCP-005). */
+  businessHours: z
+    .object({ timeZone: z.string().min(1).max(64), hours: z.array(HeartbeatOpeningWindow).max(28) })
+    .optional(),
+  /** The answer to the last heartbeat's `auditCheck`. */
+  auditCheckpoint: AuditCheckpoint.optional(),
 });
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
 
@@ -235,6 +278,11 @@ export const HeartbeatResponse = z.object({
     .regex(/^[A-Za-z0-9_-]{43,200}$/)
     .nullable()
     .default(null),
+  /**
+   * An earlier audit entry whose hash the PC sends with its next heartbeat (AUD-003): rewriting an
+   * old entry changes every hash after it, so this catches tampering a head alone cannot.
+   */
+  auditCheck: z.object({ sequence: z.int().positive() }).nullable().default(null),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
 

@@ -6,6 +6,7 @@ import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { LicencesService } from '../licences/licences.service.js';
+import { FleetService } from '../fleet/fleet.service.js';
 import { ReleasesService } from '../releases/releases.service.js';
 import { SupportService } from '../support/support.service.js';
 
@@ -22,6 +23,7 @@ export class HeartbeatsService {
     private readonly licences: LicencesService,
     private readonly audit: AuditService,
     private readonly support: SupportService,
+    private readonly fleet: FleetService,
   ) {}
 
   async record(
@@ -30,7 +32,7 @@ export class HeartbeatsService {
   ): Promise<HeartbeatResponse> {
     const receivedAt = new Date();
     const payload = heartbeat as Prisma.InputJsonObject;
-    await this.prisma.transaction(async (tx) => {
+    const { auditCheck } = await this.prisma.transaction(async (tx) => {
       // The installation chooses the id: a retried heartbeat is stored once.
       const { count } = await tx.heartbeat.createMany({
         data: [
@@ -60,7 +62,11 @@ export class HeartbeatsService {
           });
         }
       }
+      // VCP-005, AUD-003: the chain head and audit check, and the alerts the report calls for.
+      return this.fleet.onHeartbeat(tx, installation.id, heartbeat, receivedAt);
     });
+    // Alerts opened or closed just now go out at once, not at the next sweep.
+    void this.fleet.deliver().catch(() => undefined);
     const installed = heartbeat.components.find(
       (component) => component.name === INSTALLER_COMPONENT,
     );
@@ -87,6 +93,7 @@ export class HeartbeatsService {
       licence: licence.licence,
       reactivationSecret: licence.reactivationSecret,
       relayCredential,
+      auditCheck,
     };
   }
 }

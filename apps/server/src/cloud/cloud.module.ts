@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { LicensingModule } from '../licensing/licensing.module.js';
+import { RealtimeModule } from '../realtime/realtime.module.js';
 import {
   CONTROL_PLANE_OPTIONS,
   DEFAULT_CONTROL_PLANE_OPTIONS,
@@ -9,7 +10,7 @@ import {
 
 /** The local server's link to the Vendor Control Plane (P0-17b, ADR-0012). */
 @Module({
-  imports: [AuthModule, LicensingModule],
+  imports: [AuthModule, LicensingModule, RealtimeModule],
   providers: [
     { provide: CONTROL_PLANE_OPTIONS, useValue: DEFAULT_CONTROL_PLANE_OPTIONS },
     HeartbeatService,

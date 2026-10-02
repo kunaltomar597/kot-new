@@ -285,6 +285,8 @@ model Installation {
   menuExtractions MenuExtraction[]
   licence         InstallationLicence?
   licenceFiles    LicenceFile[]
+  auditChainHeads AuditChainHead[]
+  fleetAlerts     FleetAlert[]
 
   @@index([tenantId])
   @@map("installations")
@@ -455,4 +457,48 @@ model MenuExtractionFile {
 
   @@unique([extractionId, position])
   @@map("menu_extraction_files")
+}
+
+/// An audit chain head a PC reported (AUD-003, P7-03): heads only move forward.
+model AuditChainHead {
+  id             String    @id @db.Uuid
+  installationId String    @map("installation_id") @db.Uuid
+  sequence       BigInt
+  hash           String
+  firstSeenAt    DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  /// The last time an answered audit check found the PC still holding this hash.
+  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz(3)
+  /// Set aside when a person closed a chain alert.
+  supersededAt   DateTime? @map("superseded_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, firstSeenAt])
+  @@map("audit_chain_heads")
+}
+
+enum FleetAlertKind {
+  OFFLINE
+  DISK_FULL
+  BACKUP_FAILED
+  AUDIT_CHAIN_MISMATCH
+}
+
+/// A fleet alert (VCP-005): at most one open per PC and kind (a partial unique index).
+model FleetAlert {
+  id                   String         @id @db.Uuid
+  installationId       String         @map("installation_id") @db.Uuid
+  kind                 FleetAlertKind
+  openedAt             DateTime       @map("opened_at") @db.Timestamptz(3)
+  resolvedAt           DateTime?      @map("resolved_at") @db.Timestamptz(3)
+  details              Json?
+  resolvedBy           String?        @map("resolved_by")
+  resolution           String?
+  notifiedAt           DateTime?      @map("notified_at") @db.Timestamptz(3)
+  resolutionNotifiedAt DateTime?      @map("resolution_notified_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([openedAt])
+  @@map("fleet_alerts")
 }
