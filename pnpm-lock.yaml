@@ -686,6 +686,15 @@ importers:
 
   packages/i18n: {}
 
+  packages/licensing:
+    dependencies:
+      '@rp/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@rp/domain':
+        specifier: workspace:*
+        version: link:../domain
+
   packages/mobile-core:
     dependencies:
       '@rp/api-client':

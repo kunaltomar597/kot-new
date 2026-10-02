@@ -20,6 +20,24 @@ enforcement at pairing; tamper events reported. The signing key lives only in th
 Acceptance: tests for every state transition and capability, tampered file, expired offline,
 clock rollback, next-business-day restriction, offline reactivation code.
 
+Split (2026-10-03):
+
+- **P7-01a `@rp/licensing`.** Licence file contracts; Ed25519 verification against the built-in
+  vendor keys; the PC fingerprint (hashed identifiers, 3 of 5); `evaluateLicence` (the state the
+  restaurant experiences, restriction from the next business day); offline reactivation codes;
+  the clock guard.
+- **P7-01b Control Plane: issuing licences.** The signer (a key from configuration for
+  development, the cloud KMS in production), licences per installation with the fingerprint
+  bound at first issue, renewal in the heartbeat answer (daily, and at once on a state change),
+  heartbeats every minute while a licence is not active (reactivation within a minute, LIC-006),
+  reactivation secrets and codes, vendor commands to set a state with a reason.
+- **P7-01c Local server: the licence agent.** Reading the PC fingerprint; keeping the licence and
+  the restriction decision; checking at start-up and every minute; the clock guard with the last
+  time seen signed; restricting new tables, orders and tickets; device limits at pairing; the
+  licence for every screen and the Owner's reactivation code; tamper events in heartbeats.
+- **P7-01d Screens.** The payment reminder, the grace banner and the restricted notice on staff
+  screens; the Owner's licence page (LIC-008).
+
 ## P7-02 Control Plane: tenants, subscriptions, licences, vendor access
 
 Requirements: VCP-001, VCP-002, VCP-003, VCP-004 (S), VCP-007, VCP-008, VCP-009, AUTH-014, SEC-018.

@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "POS",
+      "KDS",
+      "WAITER_APP",
+      "TABLE_TABLET",
+      "QR_MENU",
+      "PAGERS",
+      "RECOMMENDATIONS",
+      "REPORTS"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "POS",
+      "KDS",
+      "WAITER_APP",
+      "TABLE_TABLET",
+      "QR_MENU",
+      "PAGERS",
+      "RECOMMENDATIONS",
+      "REPORTS"
+    ]
+  }
+}
