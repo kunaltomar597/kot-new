@@ -11,6 +11,7 @@ import {
   hstsMiddleware,
   keepRawBody,
 } from './http/pipeline.js';
+import { webMiddleware } from './http/web-static.js';
 
 export const API_PREFIX = 'v1';
 /** Heartbeats are small; anything larger is refused before it is parsed. */
@@ -31,6 +32,8 @@ export function configureControlPlaneApp(app: INestApplication): void {
   express.set('trust proxy', config.trustProxy);
   express.use(correlationMiddleware);
   if (config.env !== 'development') express.use(hstsMiddleware);
+  // The vendor web app (P7-02e) on the same origin as the API; never for `/v1/...`.
+  if (config.webDir !== undefined) express.use(webMiddleware(config.webDir));
   // Menu photos and PDFs (ONB-006) are the only large bodies; everything else stays small.
   express.use(
     `/${API_PREFIX}/menu-extractions`,

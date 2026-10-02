@@ -357,7 +357,8 @@ Recommended next WPs (dependencies met):
   - [x] P7-02b Vendor API for the fleet
   - [x] P7-02c Subscriptions and payments
   - [x] P7-02d Support notes, QR provisioning, access policy
-  - [ ] P7-02e The Control Plane web app
+  - [x] P7-02e The web app: sign-in and restaurants
+  - [ ] P7-02f The web app: billing, releases, audit and staff
 - [ ] P7-03 Fleet monitoring
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
@@ -617,6 +618,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-02e):
+
+471. P7-02e is split into two (phase-7.md). P7-02e covers sign-in, setup and restaurants;
+     P7-02f covers billing, releases, audit and staff, plus an end-to-end test.
+472. The vendor web app is its own package, `apps/control-plane-web` (React, Vite and
+     `@rp/ui-web`, like the console). The Control Plane serves it at `/` when `CP_WEB_DIR` is set.
+     Same origin as the API means no CORS. The pages carry a strict CSP and `noindex`.
+473. The session token is kept in the tab's session storage, not a cookie: it is gone when the tab
+     closes and needs no CSRF defence. The server's 8-hour and 30-minute idle limits are the real
+     session end. Any 401 brings the person back to signing in, with a note that the session ended.
+474. Setup links are `/setup#<token>`. The token stays in the URL fragment, so it never reaches a
+     server or proxy log, and it is removed from the address bar once the account is ready. The
+     CLI prints the link.
+475. Buttons show only when the role allows them (`vendorMay`). The server enforces every call
+     anyway. The UI tests use a fake Control Plane that answers 403 exactly as the server does.
+476. The licence form offers only the states LIC-005 allows from the current one, and sends only
+     what changed, with the reason. An activation code, reactivation code or setup link is shown
+     once, with Copy. Disconnecting a PC and replacing the QR credential ask first.
+477. A restaurant's GST state code is taken from its GSTIN when left empty.
 
 Decided 2026-10-03 (P7-02d):
 
@@ -2445,6 +2466,35 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-02e The vendor web app: sign-in and restaurants
+
+Built: `apps/control-plane-web` (`@rp/control-plane-web`), with:
+
+- a typed client over `CONTROL_PLANE_ROUTES`;
+- the session store, sign-in (MFA) and account setup (QR code and typed key);
+- a layout with the role's sections;
+- the restaurant list with search and adding;
+- one restaurant: details and editing, PCs and activation codes, support notes, QR ordering
+  (set up and rotate);
+- one PC: a new code, moving, disconnecting, and its licence (change, re-bind, reactivation
+  code).
+
+Also: the `vendorApp` strings in `@rp/i18n`; CP `CP_WEB_DIR` with `webMiddleware` (CSP,
+caching, app shell, never for `/v1`); the CLI prints the setup link; runbook "The web app for
+vendor staff" and "The first Super Admin".
+
+Tests: web +27 (client, sign-in and session end, setup, per role for Read-only, Onboarding,
+Support, Finance and the Super Admin, form logic, axe on each screen); CP integration +3
+(serving the app).
+
+Gotchas:
+
+- `VendorTenantView` is strict (it extends `TenantRequest`), so a fake answer with extra keys
+  fails to parse.
+- `@testing-library/user-event` is a named import (`{ userEvent }`).
+
+Next: P7-02f.
 
 ### 2026-10-03: P7-02d Support notes, QR provisioning, access policy
 

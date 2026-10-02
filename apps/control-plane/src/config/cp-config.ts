@@ -70,6 +70,8 @@ export const CpConfigSchema = z
       .string()
       .regex(/^postgres(ql)?:\/\//)
       .optional(),
+    /** Folder of the built vendor web app (`apps/control-plane-web/dist`), served at `/` when set. */
+    webDir: z.string().min(1).optional(),
     /** Days a restaurant has to pay an invoice (LIC-009: as the subscription agreement says). */
     billingPaymentTermsDays: z.coerce.number().int().min(0).max(90).default(7),
     /** Days past due before grace starts (LIC-005 ⚙ "overdue beyond N days"). */
@@ -151,6 +153,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     billingPaymentTermsDays: env.CP_BILLING_PAYMENT_TERMS_DAYS,
     billingGraceAfterDays: env.CP_BILLING_GRACE_AFTER_DAYS,
     billingIntervalMinutes: env.CP_BILLING_INTERVAL_MINUTES,
+    webDir: env.CP_WEB_DIR === '' ? undefined : env.CP_WEB_DIR,
   });
   if (!result.success) {
     const problems = result.error.issues
