@@ -56,7 +56,15 @@ import {
   KdsTicketsResponse,
   NotifyManagerResponse,
 } from './kds.js';
-import { MenuImportReport, MenuImportRequest, MenuTemplateResponse } from './menu-import.js';
+import {
+  AiMenuImportParams,
+  AiMenuImportRequest,
+  AiMenuImportView,
+  MenuImportReport,
+  MenuImportRequest,
+  MenuReviewRequest,
+  MenuTemplateResponse,
+} from './menu-import.js';
 import {
   AssignPagerRequest,
   CreatePagerRequest,
@@ -2187,6 +2195,68 @@ export const ROUTES = [
         schema: MenuImportReport,
       },
       ...standardErrors,
+    },
+  },
+  {
+    operationId: 'startAiMenuImport',
+    method: 'POST',
+    path: '/api/v1/menu/ai-imports',
+    summary: 'Read a printed menu from photos or a PDF',
+    description:
+      'ONB-006: the photos are made smaller here, then read by the vendor’s AI service (the ' +
+      'Control Plane holds the AI key, SEC-002). The answer comes at once; ask for the import ' +
+      'until it is DONE or FAILED. Needs the internet and this PC enrolled with the vendor.',
+    tags: ['menu'],
+    requirements: ['ONB-006', 'VCP-008', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { body: AiMenuImportRequest },
+    responses: {
+      202: { description: 'Queued at the vendor.', schema: AiMenuImportView },
+      ...standardErrors,
+      429: { description: 'Today’s number of menus is used up.', schema: ApiError },
+      503: {
+        description:
+          'Not available: no vendor connection, not enrolled, offline, or AI import not set up.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'getAiMenuImport',
+    method: 'GET',
+    path: '/api/v1/menu/ai-imports/:importId',
+    summary: 'How reading the menu is going, and the draft to check',
+    tags: ['menu'],
+    requirements: ['ONB-006'],
+    capability: 'MENU_MANAGE',
+    request: { params: AiMenuImportParams },
+    responses: {
+      200: { description: 'The import, with its draft once DONE.', schema: AiMenuImportView },
+      ...standardErrors,
+      404: { description: 'No such import.', schema: ApiError },
+      503: { description: 'The vendor cannot be reached.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'commitAiMenuImport',
+    method: 'POST',
+    path: '/api/v1/menu/ai-imports/:importId/commit',
+    summary: 'Import the checked draft and publish it',
+    description:
+      'ONB-006: refused until every dish is marked checked by the manager. Then the draft goes ' +
+      'through the template import (ONB-005): every problem is listed, or the menu is added in ' +
+      'one transaction, audited, and published.',
+    tags: ['menu'],
+    requirements: ['ONB-006', 'ONB-005', 'MENU-013', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { params: AiMenuImportParams, body: MenuReviewRequest },
+    responses: {
+      200: {
+        description: 'The report; `committed` says whether it was imported.',
+        schema: MenuImportReport,
+      },
+      ...standardErrors,
+      422: { description: 'Some dishes are not checked yet.', schema: ApiError },
     },
   },
   {

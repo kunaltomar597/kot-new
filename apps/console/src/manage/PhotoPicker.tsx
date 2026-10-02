@@ -6,7 +6,7 @@ import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 
 /** Reads a chosen file as base64 without the `data:` prefix. */
-function base64Of(file: File): Promise<string> {
+export function base64Of(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {

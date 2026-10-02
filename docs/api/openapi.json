@@ -3906,6 +3906,179 @@
         "x-requirements": ["MENU-012", "MENU-013", "MENU-006"]
       }
     },
+    "/api/v1/menu/ai-imports": {
+      "post": {
+        "operationId": "startAiMenuImport",
+        "summary": "Read a printed menu from photos or a PDF",
+        "description": "ONB-006: the photos are made smaller here, then read by the vendor’s AI service (the Control Plane holds the AI key, SEC-002). The answer comes at once; ask for the import until it is DONE or FAILED. Needs the internet and this PC enrolled with the vendor.",
+        "tags": ["menu"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AiMenuImportRequest" } }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued at the vendor.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AiMenuImportView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Today’s number of menus is used up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "Not available: no vendor connection, not enrolled, offline, or AI import not set up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["ONB-006", "VCP-008", "AUD-001"]
+      }
+    },
+    "/api/v1/menu/ai-imports/{importId}": {
+      "get": {
+        "operationId": "getAiMenuImport",
+        "summary": "How reading the menu is going, and the draft to check",
+        "tags": ["menu"],
+        "parameters": [
+          {
+            "name": "importId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The import, with its draft once DONE.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AiMenuImportView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such import.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "The vendor cannot be reached.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["ONB-006"]
+      }
+    },
+    "/api/v1/menu/ai-imports/{importId}/commit": {
+      "post": {
+        "operationId": "commitAiMenuImport",
+        "summary": "Import the checked draft and publish it",
+        "description": "ONB-006: refused until every dish is marked checked by the manager. Then the draft goes through the template import (ONB-005): every problem is listed, or the menu is added in one transaction, audited, and published.",
+        "tags": ["menu"],
+        "parameters": [
+          {
+            "name": "importId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/MenuReviewRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The report; `committed` says whether it was imported.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MenuImportReport" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "Some dishes are not checked yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "MENU_MANAGE",
+        "x-requirements": ["ONB-006", "ONB-005", "MENU-013", "AUD-001"]
+      }
+    },
     "/api/v1/menu/bestsellers": {
       "get": {
         "operationId": "listBestSellers",
@@ -10907,6 +11080,190 @@
         "required": ["line1", "city", "pincode"],
         "additionalProperties": false
       },
+      "AiMenuImportParams": {
+        "type": "object",
+        "properties": { "importId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["importId"],
+        "additionalProperties": false
+      },
+      "AiMenuImportRequest": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "contentType": {
+                  "type": "string",
+                  "enum": ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+                },
+                "contentBase64": {
+                  "type": "string",
+                  "minLength": 4,
+                  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+                }
+              },
+              "required": ["name", "contentType", "contentBase64"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["files"],
+        "additionalProperties": false
+      },
+      "AiMenuImportView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "status": { "type": "string", "enum": ["QUEUED", "RUNNING", "DONE", "FAILED"] },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "finishedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": { "code": { "type": "string" }, "message": { "type": "string" } },
+                "required": ["code", "message"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "categories": {
+                    "maxItems": 60,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                        "items": {
+                          "minItems": 1,
+                          "maxItems": 500,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+                              "description": {
+                                "anyOf": [
+                                  { "type": "string", "minLength": 1, "maxLength": 500 },
+                                  { "type": "null" }
+                                ]
+                              },
+                              "price": {
+                                "anyOf": [
+                                  { "$ref": "#/components/schemas/Paise" },
+                                  { "type": "null" }
+                                ]
+                              },
+                              "variants": {
+                                "maxItems": 10,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+                                    "price": { "$ref": "#/components/schemas/Paise" }
+                                  },
+                                  "required": ["name", "price"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "foodType": {
+                                "anyOf": [
+                                  { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] },
+                                  { "type": "null" }
+                                ]
+                              },
+                              "spiceLevel": {
+                                "anyOf": [
+                                  { "type": "integer", "minimum": 0, "maximum": 3 },
+                                  { "type": "null" }
+                                ]
+                              },
+                              "tags": {
+                                "maxItems": 10,
+                                "type": "array",
+                                "items": { "type": "string", "minLength": 1, "maxLength": 30 }
+                              },
+                              "note": {
+                                "anyOf": [
+                                  { "type": "string", "minLength": 1, "maxLength": 200 },
+                                  { "type": "null" }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "description",
+                              "price",
+                              "variants",
+                              "foodType",
+                              "spiceLevel",
+                              "tags",
+                              "note"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["name", "items"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "addOns": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "group": { "type": "string", "minLength": 1, "maxLength": 60 },
+                        "options": {
+                          "minItems": 1,
+                          "maxItems": 30,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                              "price": { "$ref": "#/components/schemas/Paise" }
+                            },
+                            "required": ["name", "price"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["group", "options"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "notes": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+                  }
+                },
+                "required": ["categories", "addOns", "notes"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["id", "status", "createdAt", "finishedAt", "error", "draft"],
+        "additionalProperties": false
+      },
       "AlertAcknowledged": {
         "type": "object",
         "properties": {
@@ -14609,6 +14966,108 @@
           "businessDate",
           "payload"
         ],
+        "additionalProperties": false
+      },
+      "MenuReviewDish": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "description": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] },
+          "price": { "anyOf": [{ "$ref": "#/components/schemas/Paise" }, { "type": "null" }] },
+          "variants": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "price": { "$ref": "#/components/schemas/Paise" }
+              },
+              "required": ["name", "price"],
+              "additionalProperties": false
+            }
+          },
+          "foodType": { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] },
+          "spiceLevel": { "type": "integer", "minimum": 0, "maximum": 3 },
+          "tags": {
+            "maxItems": 10,
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 30 }
+          },
+          "taxGroupId": { "$ref": "#/components/schemas/Id" },
+          "stationId": { "$ref": "#/components/schemas/Id" },
+          "checked": { "type": "boolean" }
+        },
+        "required": [
+          "name",
+          "description",
+          "price",
+          "variants",
+          "foodType",
+          "spiceLevel",
+          "tags",
+          "taxGroupId",
+          "stationId",
+          "checked"
+        ],
+        "additionalProperties": false
+      },
+      "MenuReviewRequest": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "minItems": 1,
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                "items": {
+                  "minItems": 1,
+                  "maxItems": 500,
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/MenuReviewDish" }
+                }
+              },
+              "required": ["name", "items"],
+              "additionalProperties": false
+            }
+          },
+          "addOns": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": { "type": "string", "minLength": 1, "maxLength": 60 },
+                "minSelections": { "type": "integer", "minimum": 0, "maximum": 20 },
+                "maxSelections": { "type": "integer", "minimum": 1, "maximum": 20 },
+                "options": {
+                  "minItems": 1,
+                  "maxItems": 30,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                      "priceDelta": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["name", "priceDelta"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["group", "minSelections", "maxSelections", "options"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["categories", "addOns"],
         "additionalProperties": false
       },
       "MenuSnapshot": {

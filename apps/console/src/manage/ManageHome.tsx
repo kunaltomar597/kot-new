@@ -6,6 +6,7 @@ import { useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
 import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
+import { AiImportScreen } from './menu/AiImportScreen.js';
 import { MenuEditor } from './menu/MenuEditor.js';
 import { PrintingScreen } from './printing/PrintingScreen.js';
 import { AuditScreen } from './audit/AuditScreen.js';
@@ -146,6 +147,7 @@ export function ManageHome() {
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {managesStaff ? <Route path="qr-codes" element={<QrCodesScreen />} /> : null}
           {managesMenu ? <Route path="menu" element={<MenuEditor />} /> : null}
+          {managesMenu ? <Route path="menu/ai-import" element={<AiImportScreen />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
           {operates ? <Route path="restaurant" element={<RestaurantScreen />} /> : null}
           {operates ? <Route path="printing" element={<PrintingScreen />} /> : null}

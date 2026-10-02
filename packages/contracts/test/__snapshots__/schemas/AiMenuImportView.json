@@ -1,0 +1,336 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "status": { "type": "string", "enum": ["QUEUED", "RUNNING", "DONE", "FAILED"] },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "finishedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "error": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": { "code": { "type": "string" }, "message": { "type": "string" } },
+            "required": ["code", "message"]
+          },
+          { "type": "null" }
+        ]
+      },
+      "draft": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "categories": {
+                "maxItems": 60,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                    "items": {
+                      "minItems": 1,
+                      "maxItems": 500,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+                          "description": {
+                            "anyOf": [
+                              { "type": "string", "minLength": 1, "maxLength": 500 },
+                              { "type": "null" }
+                            ]
+                          },
+                          "price": {
+                            "anyOf": [
+                              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                              { "type": "null" }
+                            ]
+                          },
+                          "variants": {
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+                                "price": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["name", "price"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "foodType": {
+                            "anyOf": [
+                              { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] },
+                              { "type": "null" }
+                            ]
+                          },
+                          "spiceLevel": {
+                            "anyOf": [
+                              { "type": "integer", "minimum": 0, "maximum": 3 },
+                              { "type": "null" }
+                            ]
+                          },
+                          "tags": {
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": { "type": "string", "minLength": 1, "maxLength": 30 }
+                          },
+                          "note": {
+                            "anyOf": [
+                              { "type": "string", "minLength": 1, "maxLength": 200 },
+                              { "type": "null" }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "price",
+                          "variants",
+                          "foodType",
+                          "spiceLevel",
+                          "tags",
+                          "note"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["name", "items"],
+                  "additionalProperties": false
+                }
+              },
+              "addOns": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": { "type": "string", "minLength": 1, "maxLength": 60 },
+                    "options": {
+                      "minItems": 1,
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                          "price": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                        },
+                        "required": ["name", "price"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["group", "options"],
+                  "additionalProperties": false
+                }
+              },
+              "notes": {
+                "maxItems": 20,
+                "type": "array",
+                "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+              }
+            },
+            "required": ["categories", "addOns", "notes"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["id", "status", "createdAt", "finishedAt", "error", "draft"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "status": { "type": "string", "enum": ["QUEUED", "RUNNING", "DONE", "FAILED"] },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "finishedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "error": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": { "code": { "type": "string" }, "message": { "type": "string" } },
+            "required": ["code", "message"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "draft": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "categories": {
+                "maxItems": 60,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                    "items": {
+                      "minItems": 1,
+                      "maxItems": 500,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+                          "description": {
+                            "anyOf": [
+                              { "type": "string", "minLength": 1, "maxLength": 500 },
+                              { "type": "null" }
+                            ]
+                          },
+                          "price": {
+                            "anyOf": [
+                              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                              { "type": "null" }
+                            ]
+                          },
+                          "variants": {
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+                                "price": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["name", "price"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "foodType": {
+                            "anyOf": [
+                              { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] },
+                              { "type": "null" }
+                            ]
+                          },
+                          "spiceLevel": {
+                            "anyOf": [
+                              { "type": "integer", "minimum": 0, "maximum": 3 },
+                              { "type": "null" }
+                            ]
+                          },
+                          "tags": {
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": { "type": "string", "minLength": 1, "maxLength": 30 }
+                          },
+                          "note": {
+                            "anyOf": [
+                              { "type": "string", "minLength": 1, "maxLength": 200 },
+                              { "type": "null" }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "price",
+                          "variants",
+                          "foodType",
+                          "spiceLevel",
+                          "tags",
+                          "note"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["name", "items"],
+                  "additionalProperties": false
+                }
+              },
+              "addOns": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": { "type": "string", "minLength": 1, "maxLength": 60 },
+                    "options": {
+                      "minItems": 1,
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+                          "price": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                        },
+                        "required": ["name", "price"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["group", "options"],
+                  "additionalProperties": false
+                }
+              },
+              "notes": {
+                "maxItems": 20,
+                "type": "array",
+                "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+              }
+            },
+            "required": ["categories", "addOns", "notes"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["id", "status", "createdAt", "finishedAt", "error", "draft"],
+    "additionalProperties": false
+  }
+}

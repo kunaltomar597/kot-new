@@ -7,6 +7,8 @@ import {
   type HeartbeatRequest,
   HeartbeatResponse,
   INSTALLATION_HEADERS,
+  type MenuExtractionRequest,
+  MenuExtractionView,
   signedRequestMessage,
   UpdatesResponse,
 } from '@rp/contracts/control-plane';
@@ -14,6 +16,8 @@ import type { z } from 'zod';
 import type { InstallationKey } from './installation-key.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+/** Up to 20 MB of menu photos over a restaurant's connection. */
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 /** A failed call to the Control Plane; `code` is its `ApiError.code` or `UNREACHABLE`. */
 export class ControlPlaneError extends Error {
@@ -80,6 +84,31 @@ export class ControlPlaneClient {
     return this.signed(installationId, 'GET', path, undefined, UpdatesResponse);
   }
 
+  /** ONB-006: photos or PDFs of the printed menu, to be read by the AI provider (P6-04). */
+  createMenuExtraction(
+    installationId: string,
+    request: MenuExtractionRequest,
+  ): Promise<MenuExtractionView> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/menu-extractions',
+      JSON.stringify(request),
+      MenuExtractionView,
+      UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  getMenuExtraction(installationId: string, extractionId: string): Promise<MenuExtractionView> {
+    return this.signed(
+      installationId,
+      'GET',
+      `/v1/menu-extractions/${encodeURIComponent(extractionId)}`,
+      undefined,
+      MenuExtractionView,
+    );
+  }
+
   /** A signed request; after `CLOCK_SKEW` it corrects the clock offset and tries once more. */
   private async signed<S extends z.ZodType>(
     installationId: string,
@@ -87,6 +116,7 @@ export class ControlPlaneClient {
     path: string,
     body: string | undefined,
     schema: S,
+    timeoutMs?: number,
   ): Promise<z.output<S>> {
     try {
       return await this.send(
@@ -95,6 +125,7 @@ export class ControlPlaneClient {
         body,
         this.headers(installationId, method, path, body),
         schema,
+        timeoutMs,
       );
     } catch (error) {
       const serverTime =
@@ -109,6 +140,7 @@ export class ControlPlaneClient {
         body,
         this.headers(installationId, method, path, body),
         schema,
+        timeoutMs,
       );
     }
   }
@@ -148,6 +180,7 @@ export class ControlPlaneClient {
     body: string | undefined,
     headers: Record<string, string>,
     schema: S,
+    timeoutMs?: number,
   ): Promise<z.output<S>> {
     let response: Response;
     try {
@@ -160,7 +193,7 @@ export class ControlPlaneClient {
         },
         ...(body !== undefined && { body }),
         redirect: 'error',
-        signal: AbortSignal.timeout(this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs ?? this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
     } catch (error) {
       throw new ControlPlaneError(
