@@ -32,6 +32,8 @@ export async function enrolInstallation(options: {
   readonly code: string;
   readonly fetch?: typeof fetch;
   readonly logger?: Pick<Logger, 'log'>;
+  /** Who activated it from the console (P7-07a); absent from the installer's CLI. */
+  readonly actor?: { readonly staffId: string; readonly deviceId: string };
 }): Promise<Enrolment> {
   const { config, prisma, secrets } = options;
   if (config.controlPlaneUrl === undefined) {
@@ -57,6 +59,10 @@ export async function enrolInstallation(options: {
         action: 'INSTALLATION_ENROLLED',
         entityType: 'installation',
         entityId: enrolment.installationId,
+        ...(options.actor !== undefined && {
+          actorId: options.actor.staffId,
+          deviceId: options.actor.deviceId,
+        }),
         after: {
           tenantId: enrolment.tenantId,
           channel: enrolment.channel,

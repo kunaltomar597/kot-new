@@ -1,0 +1,48 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "step": {
+        "type": "string",
+        "enum": [
+          "PROFILE",
+          "TAX",
+          "INVOICE",
+          "ACCOUNTS",
+          "FLOOR",
+          "STATIONS",
+          "MENU",
+          "STAFF",
+          "DEVICES",
+          "QR",
+          "GO_LIVE"
+        ]
+      }
+    },
+    "required": ["step"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "step": {
+        "type": "string",
+        "enum": [
+          "PROFILE",
+          "TAX",
+          "INVOICE",
+          "ACCOUNTS",
+          "FLOOR",
+          "STATIONS",
+          "MENU",
+          "STAFF",
+          "DEVICES",
+          "QR",
+          "GO_LIVE"
+        ]
+      }
+    },
+    "required": ["step"],
+    "additionalProperties": false
+  }
+}

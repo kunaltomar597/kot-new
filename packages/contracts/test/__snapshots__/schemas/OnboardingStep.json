@@ -1,0 +1,34 @@
+{
+  "input": {
+    "type": "string",
+    "enum": [
+      "PROFILE",
+      "TAX",
+      "INVOICE",
+      "ACCOUNTS",
+      "FLOOR",
+      "STATIONS",
+      "MENU",
+      "STAFF",
+      "DEVICES",
+      "QR",
+      "GO_LIVE"
+    ]
+  },
+  "output": {
+    "type": "string",
+    "enum": [
+      "PROFILE",
+      "TAX",
+      "INVOICE",
+      "ACCOUNTS",
+      "FLOOR",
+      "STATIONS",
+      "MENU",
+      "STAFF",
+      "DEVICES",
+      "QR",
+      "GO_LIVE"
+    ]
+  }
+}

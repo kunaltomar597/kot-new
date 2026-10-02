@@ -1,0 +1,55 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "step": {
+        "type": "string",
+        "enum": [
+          "PROFILE",
+          "TAX",
+          "INVOICE",
+          "ACCOUNTS",
+          "FLOOR",
+          "STATIONS",
+          "MENU",
+          "STAFF",
+          "DEVICES",
+          "QR",
+          "GO_LIVE"
+        ]
+      },
+      "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] },
+      "ready": { "type": "boolean" },
+      "confirmable": { "type": "boolean" },
+      "skippable": { "type": "boolean" }
+    },
+    "required": ["step", "status", "ready", "confirmable", "skippable"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "step": {
+        "type": "string",
+        "enum": [
+          "PROFILE",
+          "TAX",
+          "INVOICE",
+          "ACCOUNTS",
+          "FLOOR",
+          "STATIONS",
+          "MENU",
+          "STAFF",
+          "DEVICES",
+          "QR",
+          "GO_LIVE"
+        ]
+      },
+      "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] },
+      "ready": { "type": "boolean" },
+      "confirmable": { "type": "boolean" },
+      "skippable": { "type": "boolean" }
+    },
+    "required": ["step", "status", "ready", "confirmable", "skippable"],
+    "additionalProperties": false
+  }
+}

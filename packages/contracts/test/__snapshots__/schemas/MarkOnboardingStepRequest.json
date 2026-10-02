@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] } },
+    "required": ["status"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] } },
+    "required": ["status"],
+    "additionalProperties": false
+  }
+}
