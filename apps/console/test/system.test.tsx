@@ -144,3 +144,78 @@ describe('[UPD-004] "Install now"', () => {
     expect(screen.queryByRole('button', { name: t('systemPage.update.installNow') })).toBeNull();
   });
 });
+
+const BUNDLE = {
+  format: 1,
+  generatedAt: '2026-10-02T09:30:00.000Z',
+  installationId: null,
+  versions: [{ name: 'Server', version: '0.1.0' }],
+  platform: {
+    os: 'win32',
+    release: '10.0.26100',
+    arch: 'x64',
+    cpus: 4,
+    memoryMb: 8_192,
+    uptimeSeconds: 100,
+    serverUptimeSeconds: 50,
+  },
+  configuration: {},
+  settings: {},
+  status: {},
+  devices: [],
+  logs: { files: [], truncated: false },
+};
+
+describe('[UPD-008] sending diagnostics to support', () => {
+  it('saves what would be sent even before the vendor link exists', async () => {
+    const createObjectURL = vi.fn((_file: Blob) => 'blob:diagnostics');
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const fake = systemServer().on('GET', '/api/v1/system/diagnostics', () => ({
+      status: 200,
+      body: BUNDLE,
+    }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const support = await section(t('systemPage.diagnostics.title'));
+    expect(support.getByRole('button', { name: t('systemPage.diagnostics.send') })).toBeDisabled();
+    expect(support.getByText(t('systemPage.diagnostics.unavailable'))).toBeVisible();
+    await user.click(support.getByRole('button', { name: t('systemPage.diagnostics.preview') }));
+    await vi.waitFor(() => {
+      expect(createObjectURL).toHaveBeenCalledOnce();
+    });
+    const file = createObjectURL.mock.calls[0]![0];
+    expect(JSON.parse(await file.text())).toMatchObject({ format: 1 });
+  });
+
+  it('sends them with a note and gives the reference to quote', async () => {
+    const connected = systemStatus({
+      controlPlane: {
+        configured: true,
+        enrolled: true,
+        lastContactAt: '2026-10-02T09:29:00.000Z',
+        lastError: null,
+      },
+    });
+    const fake = systemServer(connected).on('POST', '/api/v1/system/diagnostics', () => ({
+      status: 200,
+      body: { id: '0190a1b2-c3d4-7000-8000-000000000001', sentAt: '2026-10-02T09:31:00.000Z' },
+    }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const support = await section(t('systemPage.diagnostics.title'));
+    await user.click(support.getByRole('button', { name: t('systemPage.diagnostics.send') }));
+    const dialog = await screen.findByRole('dialog', { name: t('systemPage.diagnostics.send') });
+    await user.type(
+      within(dialog).getByLabelText(new RegExp(t('systemPage.diagnostics.note'))),
+      'Kitchen printer stops at 8',
+    );
+    await expectNoAxeViolations(container);
+    await user.click(
+      within(dialog).getByRole('button', { name: t('systemPage.diagnostics.confirm') }),
+    );
+    expect(
+      await support.findByText(t('systemPage.diagnostics.sent', { reference: '0190A1B2' })),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/system/diagnostics')[0]?.body).toEqual({
+      note: 'Kitchen printer stops at 8',
+    });
+  });
+});

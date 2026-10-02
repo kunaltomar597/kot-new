@@ -12,6 +12,7 @@
     }
   ],
   "tags": [
+    { "name": "diagnostics" },
     { "name": "installations" },
     { "name": "onboarding" },
     { "name": "releases" },
@@ -19,6 +20,58 @@
     { "name": "vendor" }
   ],
   "paths": {
+    "/v1/diagnostics": {
+      "post": {
+        "operationId": "uploadDiagnostics",
+        "summary": "A diagnostics bundle a manager allowed the PC to send to support",
+        "description": "Scrubbed of secrets and personal data on the PC (UPD-008). At most 4 MB. Audited.",
+        "tags": ["diagnostics"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DiagnosticsUploadRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DiagnosticsUploadResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "413": {
+            "description": "Larger than 4 MB.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["UPD-008", "VCP-007"]
+      }
+    },
     "/v1/enrolments": {
       "post": {
         "operationId": "enrolInstallation",
@@ -438,6 +491,62 @@
         "x-requirements": ["VCP-003", "LIC-005"]
       }
     },
+    "/v1/vendor/diagnostics/{id}": {
+      "get": {
+        "operationId": "getVendorDiagnostics",
+        "summary": "Open a diagnostics bundle",
+        "description": "Support’s only way into a restaurant’s logs (VCP-007, the vendor access policy); every opening is audited.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bundle.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorDiagnosticsDetail" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such bundle.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SUPPORT_NOTES",
+        "x-requirements": ["UPD-008", "VCP-007", "SEC-018"]
+      }
+    },
     "/v1/vendor/fleet": {
       "get": {
         "operationId": "getFleet",
@@ -764,6 +873,61 @@
         },
         "x-capability": "TENANTS_MANAGE",
         "x-requirements": ["VCP-002", "ONB-003"]
+      }
+    },
+    "/v1/vendor/installations/{id}/diagnostics": {
+      "get": {
+        "operationId": "listVendorDiagnostics",
+        "summary": "The diagnostics bundles a PC sent, newest first (without their contents)",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bundles.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorDiagnosticsListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["UPD-008", "VCP-007"]
       }
     },
     "/v1/vendor/installations/{id}/licence": {
@@ -2819,6 +2983,224 @@
         "required": ["TABLE_TABLET", "PAGER", "WAITER_PHONE", "KDS"],
         "additionalProperties": false
       },
+      "DiagnosticsBundle": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "number", "const": 1 },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "installationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "versions": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "maxLength": 60 },
+                "version": { "type": "string", "maxLength": 64 }
+              },
+              "required": ["name", "version"],
+              "additionalProperties": false
+            }
+          },
+          "platform": {
+            "type": "object",
+            "properties": {
+              "os": { "type": "string", "maxLength": 60 },
+              "release": { "type": "string", "maxLength": 120 },
+              "arch": { "type": "string", "maxLength": 30 },
+              "cpus": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "memoryMb": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "serverUptimeSeconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "os",
+              "release",
+              "arch",
+              "cpus",
+              "memoryMb",
+              "uptimeSeconds",
+              "serverUptimeSeconds"
+            ],
+            "additionalProperties": false
+          },
+          "configuration": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+          },
+          "settings": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "devices": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "online": { "type": "boolean" },
+                "lastSeenAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "appVersion": { "type": ["string", "null"] }
+              },
+              "required": ["type", "name", "status", "online", "lastSeenAt", "appVersion"],
+              "additionalProperties": false
+            }
+          },
+          "logs": {
+            "type": "object",
+            "properties": {
+              "files": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "maxLength": 200 },
+                    "lines": { "type": "array", "items": { "type": "string" } }
+                  },
+                  "required": ["name", "lines"],
+                  "additionalProperties": false
+                }
+              },
+              "truncated": { "type": "boolean" }
+            },
+            "required": ["files", "truncated"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "format",
+          "generatedAt",
+          "installationId",
+          "versions",
+          "platform",
+          "configuration",
+          "settings",
+          "status",
+          "devices",
+          "logs"
+        ],
+        "additionalProperties": false
+      },
+      "DiagnosticsParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "DiagnosticsSender": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 120 },
+          "role": { "type": "string", "maxLength": 40 }
+        },
+        "required": ["name", "role"],
+        "additionalProperties": false
+      },
+      "DiagnosticsUploadRequest": {
+        "type": "object",
+        "properties": {
+          "bundle": { "$ref": "#/components/schemas/DiagnosticsBundle" },
+          "note": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] },
+          "sentBy": {
+            "anyOf": [{ "$ref": "#/components/schemas/DiagnosticsSender" }, { "type": "null" }]
+          },
+          "requestId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["bundle", "note", "sentBy", "requestId"],
+        "additionalProperties": false
+      },
+      "DiagnosticsUploadRequestInput": {
+        "type": "object",
+        "properties": {
+          "bundle": { "$ref": "#/components/schemas/DiagnosticsBundle" },
+          "note": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] },
+          "sentBy": {
+            "anyOf": [{ "$ref": "#/components/schemas/DiagnosticsSender" }, { "type": "null" }]
+          },
+          "requestId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["bundle", "note", "sentBy"]
+      },
+      "DiagnosticsUploadResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["id", "receivedAt"],
+        "additionalProperties": false
+      },
       "EnrolRequest": {
         "type": "object",
         "properties": {
@@ -4290,6 +4672,109 @@
           "USERS_MANAGE",
           "AUDIT_VIEW"
         ]
+      },
+      "VendorDiagnosticsDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "note": { "type": ["string", "null"] },
+          "sentBy": {
+            "anyOf": [{ "$ref": "#/components/schemas/DiagnosticsSender" }, { "type": "null" }]
+          },
+          "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "bundle": { "$ref": "#/components/schemas/DiagnosticsBundle" }
+        },
+        "required": [
+          "id",
+          "installationId",
+          "receivedAt",
+          "note",
+          "sentBy",
+          "sizeBytes",
+          "requestId",
+          "bundle"
+        ],
+        "additionalProperties": false
+      },
+      "VendorDiagnosticsListResponse": {
+        "type": "object",
+        "properties": {
+          "bundles": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorDiagnosticsView" }
+          }
+        },
+        "required": ["bundles"],
+        "additionalProperties": false
+      },
+      "VendorDiagnosticsView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "note": { "type": ["string", "null"] },
+          "sentBy": {
+            "anyOf": [{ "$ref": "#/components/schemas/DiagnosticsSender" }, { "type": "null" }]
+          },
+          "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "installationId",
+          "receivedAt",
+          "note",
+          "sentBy",
+          "sizeBytes",
+          "requestId"
+        ],
+        "additionalProperties": false
       },
       "VendorInstallationParams": {
         "type": "object",

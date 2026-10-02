@@ -1,5 +1,6 @@
 // `@rp/contracts/control-plane`: the Vendor Control Plane API (ADR-0012).
 export * from './billing.js';
+export * from './diagnostics.js';
 export * from './fleet-admin.js';
 export * from './fleet.js';
 export * from './routes.js';

@@ -10276,6 +10276,98 @@
         "x-requirements": ["MGR-010", "NFR-I03", "DATA-006", "UPD-004"]
       }
     },
+    "/api/v1/system/diagnostics": {
+      "get": {
+        "operationId": "previewDiagnostics",
+        "summary": "What \"Send diagnostics to support\" would send, as it would send it",
+        "description": "UPD-008: versions, configuration without secrets, devices, status and the tail of the logs, scrubbed of secrets and personal data, so a manager can see it first.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The bundle.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DiagnosticsBundle" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["UPD-008"]
+      },
+      "post": {
+        "operationId": "sendDiagnostics",
+        "summary": "Send diagnostics to support",
+        "description": "UPD-008: makes the bundle and sends it to the Control Plane. Audited.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendDiagnosticsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sent.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SendDiagnosticsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "This PC is not connected to the Control Plane.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "The Control Plane could not be reached.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["UPD-008", "AUD-001"]
+      }
+    },
     "/api/v1/system/update/approve": {
       "post": {
         "operationId": "approveUpdateInstall",
@@ -14027,6 +14119,123 @@
           "serial",
           "revokedAt"
         ]
+      },
+      "DiagnosticsBundle": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "number", "const": 1 },
+          "generatedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "installationId": {
+            "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }]
+          },
+          "versions": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "maxLength": 60 },
+                "version": { "type": "string", "maxLength": 64 }
+              },
+              "required": ["name", "version"],
+              "additionalProperties": false
+            }
+          },
+          "platform": {
+            "type": "object",
+            "properties": {
+              "os": { "type": "string", "maxLength": 60 },
+              "release": { "type": "string", "maxLength": 120 },
+              "arch": { "type": "string", "maxLength": 30 },
+              "cpus": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "memoryMb": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "serverUptimeSeconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "os",
+              "release",
+              "arch",
+              "cpus",
+              "memoryMb",
+              "uptimeSeconds",
+              "serverUptimeSeconds"
+            ],
+            "additionalProperties": false
+          },
+          "configuration": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+          },
+          "settings": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "devices": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "online": { "type": "boolean" },
+                "lastSeenAt": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                },
+                "appVersion": { "type": ["string", "null"] }
+              },
+              "required": ["type", "name", "status", "online", "lastSeenAt", "appVersion"],
+              "additionalProperties": false
+            }
+          },
+          "logs": {
+            "type": "object",
+            "properties": {
+              "files": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "maxLength": 200 },
+                    "lines": { "type": "array", "items": { "type": "string" } }
+                  },
+                  "required": ["name", "lines"],
+                  "additionalProperties": false
+                }
+              },
+              "truncated": { "type": "boolean" }
+            },
+            "required": ["files", "truncated"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "format",
+          "generatedAt",
+          "installationId",
+          "versions",
+          "platform",
+          "configuration",
+          "settings",
+          "status",
+          "devices",
+          "logs"
+        ],
+        "additionalProperties": false
       },
       "DiscountReportResponse": {
         "type": "object",
@@ -19683,6 +19892,23 @@
           "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
         },
         "required": ["id", "name", "displayOrder", "archivedAt", "tables", "updatedAt"]
+      },
+      "SendDiagnosticsRequest": {
+        "type": "object",
+        "properties": {
+          "note": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+        },
+        "required": ["note"],
+        "additionalProperties": false
+      },
+      "SendDiagnosticsResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "sentAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["id", "sentAt"],
+        "additionalProperties": false
       },
       "ServerUrl": { "type": "string", "maxLength": 200, "format": "uri" },
       "ServiceChargeRequest": {

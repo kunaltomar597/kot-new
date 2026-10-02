@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DeviceType, IsoDate, Timestamp } from './common.js';
+import { DeviceType, Id, IsoDate, Timestamp } from './common.js';
 
 /** GET /api/v1/health: liveness and database status, used by the watchdog and support screen. */
 export const HealthResponse = z.object({
@@ -139,3 +139,19 @@ export const ApproveUpdateRequest = z.strictObject({
   reason: z.string().trim().min(3).max(200).optional(),
 });
 export type ApproveUpdateRequest = z.infer<typeof ApproveUpdateRequest>;
+
+/** The bundle a manager can see and send (UPD-008); the Control Plane keeps the same shape. */
+export { DiagnosticsBundle } from './control-plane/diagnostics.js';
+
+/** "Send diagnostics to support" (UPD-008): an optional note for support. */
+export const SendDiagnosticsRequest = z.strictObject({
+  note: z.string().trim().max(500).nullable(),
+});
+export type SendDiagnosticsRequest = z.infer<typeof SendDiagnosticsRequest>;
+
+export const SendDiagnosticsResponse = z.object({
+  /** Support's reference for the bundle. */
+  id: Id,
+  sentAt: Timestamp,
+});
+export type SendDiagnosticsResponse = z.infer<typeof SendDiagnosticsResponse>;

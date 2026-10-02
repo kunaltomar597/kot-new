@@ -287,6 +287,7 @@ model Installation {
   licenceFiles    LicenceFile[]
   auditChainHeads AuditChainHead[]
   fleetAlerts     FleetAlert[]
+  diagnostics     DiagnosticsBundle[]
 
   @@index([tenantId])
   @@map("installations")
@@ -501,4 +502,21 @@ model FleetAlert {
 
   @@index([openedAt])
   @@map("fleet_alerts")
+}
+
+/// A diagnostics bundle a manager sent to support (UPD-008, P7-08a), scrubbed on the PC.
+model DiagnosticsBundle {
+  id             String   @id @db.Uuid
+  installationId String   @map("installation_id") @db.Uuid
+  receivedAt     DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
+  note           String?
+  sentBy         Json?    @map("sent_by")
+  requestId      String?  @map("request_id") @db.Uuid
+  sizeBytes      Int      @map("size_bytes")
+  bundle         Json
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, receivedAt])
+  @@map("diagnostics_bundles")
 }
