@@ -338,6 +338,562 @@
         "x-requirements": ["SEC-018"]
       }
     },
+    "/v1/vendor/audit": {
+      "get": {
+        "operationId": "listVendorAudit",
+        "summary": "The Control Plane’s audit trail, newest first",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "pattern": "^[a-z_.]{1,60}$" }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 }
+          },
+          {
+            "name": "targetId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entries.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/AuditListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "AUDIT_VIEW",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      }
+    },
+    "/v1/vendor/installations/{id}": {
+      "get": {
+        "operationId": "getVendorInstallation",
+        "summary": "An installation",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The installation.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorInstallationView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-002"]
+      }
+    },
+    "/v1/vendor/installations/{id}/code": {
+      "post": {
+        "operationId": "issueActivationCode",
+        "summary": "A new activation code for an installation not activated yet",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The activation code.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivationCodeView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Already activated: move it instead.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TENANTS_MANAGE",
+        "x-requirements": ["VCP-002", "ONB-003"]
+      }
+    },
+    "/v1/vendor/installations/{id}/licence": {
+      "get": {
+        "operationId": "getVendorLicence",
+        "summary": "An installation’s licence terms and its latest file",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The licence.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorLicenceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-003", "LIC-001"]
+      },
+      "patch": {
+        "operationId": "changeVendorLicence",
+        "summary": "Change a licence: state along LIC-005, plan, limits or days, with a reason",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LicenceChangeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The licence.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorLicenceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Not a change LIC-005 allows.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "LICENCES_MANAGE",
+        "x-requirements": ["VCP-003", "LIC-005"]
+      }
+    },
+    "/v1/vendor/installations/{id}/licence/codes": {
+      "post": {
+        "operationId": "createReactivationCode",
+        "summary": "An offline reactivation code, shown once",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReactivationCodeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The code.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReactivationCodeView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Ended contract, or no master key configured.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REACTIVATION_CODES",
+        "x-requirements": ["LIC-006", "VCP-003"]
+      }
+    },
+    "/v1/vendor/installations/{id}/licence/rebind": {
+      "post": {
+        "operationId": "rebindVendorLicence",
+        "summary": "Let the licence bind the next PC that asks",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ReasonRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The licence.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorLicenceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "LICENCE_REBIND",
+        "x-requirements": ["LIC-004"]
+      }
+    },
+    "/v1/vendor/installations/{id}/move": {
+      "post": {
+        "operationId": "moveInstallation",
+        "summary": "Move an installation to a new PC: a code the new PC activates with",
+        "description": "The old PC keeps working until the new one activates; then the old key is refused and the licence binds the new PC. Audited.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ReasonRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The activation code for the new PC.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivationCodeView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Revoked, or not activated yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "LICENCE_REBIND",
+        "x-requirements": ["VCP-002", "LIC-004"]
+      }
+    },
+    "/v1/vendor/installations/{id}/revoke": {
+      "post": {
+        "operationId": "revokeVendorInstallation",
+        "summary": "Disconnect an installation for good",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ReasonRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The installation.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorInstallationView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TENANTS_MANAGE",
+        "x-requirements": ["VCP-002"]
+      }
+    },
     "/v1/vendor/me": {
       "get": {
         "operationId": "vendorMe",
@@ -371,6 +927,90 @@
         },
         "x-capability": "VENDOR",
         "x-requirements": ["VCP-001"]
+      }
+    },
+    "/v1/vendor/releases": {
+      "get": {
+        "operationId": "listVendorReleases",
+        "summary": "Published releases, newest first",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "The releases.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorReleaseListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-006"]
+      },
+      "post": {
+        "operationId": "publishVendorRelease",
+        "summary": "Publish a release CI built and signed",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PublishReleaseRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The release.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ReleaseInfo" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "That version is already published.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "RELEASES_MANAGE",
+        "x-requirements": ["VCP-006", "UPD-002"]
       }
     },
     "/v1/vendor/session": {
@@ -525,6 +1165,257 @@
         },
         "x-capability": "PUBLIC",
         "x-requirements": ["VCP-001", "SEC-018"]
+      }
+    },
+    "/v1/vendor/tenants": {
+      "get": {
+        "operationId": "listVendorTenants",
+        "summary": "Tenants with their installations and licence state",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "The tenants.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorTenantListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-002"]
+      },
+      "post": {
+        "operationId": "createVendorTenant",
+        "summary": "Add a restaurant: contacts, GSTIN, state",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TenantRequestInput" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The tenant.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorTenantView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TENANTS_MANAGE",
+        "x-requirements": ["VCP-002"]
+      }
+    },
+    "/v1/vendor/tenants/{id}": {
+      "get": {
+        "operationId": "getVendorTenant",
+        "summary": "A tenant with its installations",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tenant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorTenantDetail" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["VCP-002"]
+      },
+      "put": {
+        "operationId": "updateVendorTenant",
+        "summary": "Change a tenant’s name, contacts or GSTIN",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TenantRequestInput" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The tenant.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorTenantView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TENANTS_MANAGE",
+        "x-requirements": ["VCP-002"]
+      }
+    },
+    "/v1/vendor/tenants/{id}/installations": {
+      "post": {
+        "operationId": "createVendorInstallation",
+        "summary": "Add an installation and its activation code (shown once)",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateInstallationRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The activation code.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActivationCodeView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such tenant or installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "TENANTS_MANAGE",
+        "x-requirements": ["VCP-002", "ONB-003"]
       }
     },
     "/v1/vendor/users": {
@@ -740,6 +1631,24 @@
   },
   "components": {
     "schemas": {
+      "ActivationCodeView": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "code": { "type": "string" },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["installationId", "code", "expiresAt"],
+        "additionalProperties": false
+      },
       "ApiError": {
         "type": "object",
         "properties": {
@@ -755,6 +1664,61 @@
         "required": ["code", "message"],
         "additionalProperties": false
       },
+      "AuditEntryView": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "actor": { "type": "string" },
+          "action": { "type": "string" },
+          "targetType": { "type": "string" },
+          "targetId": { "type": ["string", "null"] },
+          "details": { "anyOf": [{}, { "type": "null" }] }
+        },
+        "required": ["id", "at", "actor", "action", "targetType", "targetId", "details"],
+        "additionalProperties": false
+      },
+      "AuditListResponse": {
+        "type": "object",
+        "properties": {
+          "entries": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEntryView" } }
+        },
+        "required": ["entries"],
+        "additionalProperties": false
+      },
+      "AuditQuery": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "action": { "type": "string", "pattern": "^[a-z_.]{1,60}$" },
+          "before": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "limit": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 }
+        },
+        "required": ["limit"],
+        "additionalProperties": false
+      },
+      "AuditQueryInput": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "action": { "type": "string", "pattern": "^[a-z_.]{1,60}$" },
+          "before": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "limit": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 }
+        },
+        "additionalProperties": false
+      },
       "ComponentVersion": {
         "type": "object",
         "properties": {
@@ -762,6 +1726,24 @@
           "version": { "type": "string", "minLength": 1, "maxLength": 64 }
         },
         "required": ["name", "version"],
+        "additionalProperties": false
+      },
+      "CreateInstallationRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "channel": { "default": "STABLE", "$ref": "#/components/schemas/ReleaseChannel" }
+        },
+        "required": ["name", "channel"],
+        "additionalProperties": false
+      },
+      "CreateInstallationRequestInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "channel": { "default": "STABLE", "$ref": "#/components/schemas/ReleaseChannel" }
+        },
+        "required": ["name"],
         "additionalProperties": false
       },
       "CreateVendorUserRequest": {
@@ -1028,6 +2010,19 @@
           }
         },
         "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
+      },
+      "LicenceChangeRequest": {
+        "type": "object",
+        "properties": {
+          "state": { "$ref": "#/components/schemas/LicenceState" },
+          "plan": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "deviceLimits": { "$ref": "#/components/schemas/DeviceLimits" },
+          "validityDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+          "graceDays": { "type": "integer", "minimum": 0, "maximum": 90 },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
       },
       "LicenceModule": {
         "type": "string",
@@ -1310,9 +2305,81 @@
         "required": ["id", "status", "createdAt", "finishedAt", "error", "draft"],
         "additionalProperties": false
       },
+      "PublishReleaseRequest": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "default": "RESTAURANT_PC",
+            "$ref": "#/components/schemas/ReleaseComponent"
+          },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "version": { "$ref": "#/components/schemas/SemVer" },
+          "url": { "type": "string", "format": "uri" },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "notes": {
+            "default": null,
+            "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }]
+          }
+        },
+        "required": ["component", "channel", "version", "url", "sha256", "sizeBytes", "notes"],
+        "additionalProperties": false
+      },
+      "PublishReleaseRequestInput": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "default": "RESTAURANT_PC",
+            "$ref": "#/components/schemas/ReleaseComponent"
+          },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "version": { "$ref": "#/components/schemas/SemVer" },
+          "url": { "type": "string", "format": "uri" },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "notes": {
+            "default": null,
+            "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }]
+          }
+        },
+        "required": ["channel", "version", "url", "sha256", "sizeBytes"],
+        "additionalProperties": false
+      },
       "ReactivationCode": {
         "type": "string",
         "pattern": "^[0-9A-HJKMNP-TV-Z]{4}(-?[0-9A-HJKMNP-TV-Z]{4}){3}$"
+      },
+      "ReactivationCodeRequest": {
+        "type": "object",
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": ["until"],
+        "additionalProperties": false
+      },
+      "ReactivationCodeView": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "validUntil": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "counter": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["code", "validUntil", "counter"],
+        "additionalProperties": false
+      },
+      "ReasonRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
       },
       "ReleaseChannel": { "type": "string", "enum": ["STABLE", "PILOT"] },
       "ReleaseComponent": { "type": "string", "enum": ["RESTAURANT_PC"] },
@@ -1380,6 +2447,72 @@
           }
         },
         "required": ["kind", "at"],
+        "additionalProperties": false
+      },
+      "TenantRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "legalName": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }]
+          },
+          "gstin": { "type": ["string", "null"] },
+          "stateCode": {
+            "anyOf": [{ "type": "string", "pattern": "^\\d{2}$" }, { "type": "null" }]
+          },
+          "contactName": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "contactEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "contactPhone": {
+            "anyOf": [{ "type": "string", "pattern": "^\\+?[0-9 ()-]{6,20}$" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "name",
+          "legalName",
+          "gstin",
+          "stateCode",
+          "contactName",
+          "contactEmail",
+          "contactPhone"
+        ],
+        "additionalProperties": false
+      },
+      "TenantRequestInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "legalName": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }]
+          },
+          "gstin": { "type": ["string", "null"] },
+          "stateCode": {
+            "anyOf": [{ "type": "string", "pattern": "^\\d{2}$" }, { "type": "null" }]
+          },
+          "contactName": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "contactEmail": { "type": ["string", "null"] },
+          "contactPhone": {
+            "anyOf": [{ "type": "string", "pattern": "^\\+?[0-9 ()-]{6,20}$" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "name",
+          "legalName",
+          "gstin",
+          "stateCode",
+          "contactName",
+          "contactEmail",
+          "contactPhone"
+        ],
         "additionalProperties": false
       },
       "UpdateVendorUserRequest": {
@@ -1459,6 +2592,151 @@
           "AUDIT_VIEW"
         ]
       },
+      "VendorInstallationParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "VendorInstallationView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "ACTIVE", "REVOKED"] },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "enrolledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "lastSeenAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "version": { "type": ["string", "null"] },
+          "licenceState": {
+            "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "status",
+          "channel",
+          "enrolledAt",
+          "lastSeenAt",
+          "version",
+          "licenceState"
+        ],
+        "additionalProperties": false
+      },
+      "VendorLicenceView": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state": { "$ref": "#/components/schemas/LicenceState" },
+          "reason": { "type": ["string", "null"] },
+          "plan": { "type": "string" },
+          "modules": { "type": "array", "items": { "$ref": "#/components/schemas/LicenceModule" } },
+          "deviceLimits": { "$ref": "#/components/schemas/DeviceLimits" },
+          "validityDays": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "graceDays": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "graceStartedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "boundAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "issuedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "state": { "$ref": "#/components/schemas/LicenceState" }
+                },
+                "required": ["id", "issuedAt", "validUntil", "state"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "installationId",
+          "state",
+          "reason",
+          "plan",
+          "modules",
+          "deviceLimits",
+          "validityDays",
+          "graceDays",
+          "graceStartedAt",
+          "boundAt",
+          "latest"
+        ],
+        "additionalProperties": false
+      },
       "VendorMeView": {
         "type": "object",
         "properties": {
@@ -1474,6 +2752,14 @@
           }
         },
         "required": ["user", "capabilities", "expiresAt"],
+        "additionalProperties": false
+      },
+      "VendorReleaseListResponse": {
+        "type": "object",
+        "properties": {
+          "releases": { "type": "array", "items": { "$ref": "#/components/schemas/ReleaseInfo" } }
+        },
+        "required": ["releases"],
         "additionalProperties": false
       },
       "VendorRole": {
@@ -1559,6 +2845,253 @@
           "code": { "type": "string", "pattern": "^\\d{6}$" }
         },
         "required": ["email", "password", "code"],
+        "additionalProperties": false
+      },
+      "VendorTenantDetail": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "legalName": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }]
+          },
+          "gstin": { "type": ["string", "null"] },
+          "stateCode": {
+            "anyOf": [{ "type": "string", "pattern": "^\\d{2}$" }, { "type": "null" }]
+          },
+          "contactName": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "contactEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "contactPhone": {
+            "anyOf": [{ "type": "string", "pattern": "^\\+?[0-9 ()-]{6,20}$" }, { "type": "null" }]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "licenceState": {
+            "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "installationList": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorInstallationView" }
+          }
+        },
+        "required": [
+          "name",
+          "legalName",
+          "gstin",
+          "stateCode",
+          "contactName",
+          "contactEmail",
+          "contactPhone",
+          "id",
+          "installations",
+          "licenceState",
+          "createdAt",
+          "installationList"
+        ],
+        "additionalProperties": false
+      },
+      "VendorTenantDetailInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "legalName": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }]
+          },
+          "gstin": { "type": ["string", "null"] },
+          "stateCode": {
+            "anyOf": [{ "type": "string", "pattern": "^\\d{2}$" }, { "type": "null" }]
+          },
+          "contactName": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "contactEmail": { "type": ["string", "null"] },
+          "contactPhone": {
+            "anyOf": [{ "type": "string", "pattern": "^\\+?[0-9 ()-]{6,20}$" }, { "type": "null" }]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "licenceState": {
+            "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "installationList": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorInstallationView" }
+          }
+        },
+        "required": [
+          "name",
+          "legalName",
+          "gstin",
+          "stateCode",
+          "contactName",
+          "contactEmail",
+          "contactPhone",
+          "id",
+          "installations",
+          "licenceState",
+          "createdAt",
+          "installationList"
+        ],
+        "additionalProperties": false
+      },
+      "VendorTenantListResponse": {
+        "type": "object",
+        "properties": {
+          "tenants": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorTenantView" }
+          }
+        },
+        "required": ["tenants"],
+        "additionalProperties": false
+      },
+      "VendorTenantListResponseInput": {
+        "type": "object",
+        "properties": {
+          "tenants": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorTenantViewInput" }
+          }
+        },
+        "required": ["tenants"]
+      },
+      "VendorTenantParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "VendorTenantView": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "legalName": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }]
+          },
+          "gstin": { "type": ["string", "null"] },
+          "stateCode": {
+            "anyOf": [{ "type": "string", "pattern": "^\\d{2}$" }, { "type": "null" }]
+          },
+          "contactName": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "contactEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "format": "email",
+                "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "contactPhone": {
+            "anyOf": [{ "type": "string", "pattern": "^\\+?[0-9 ()-]{6,20}$" }, { "type": "null" }]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "licenceState": {
+            "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "name",
+          "legalName",
+          "gstin",
+          "stateCode",
+          "contactName",
+          "contactEmail",
+          "contactPhone",
+          "id",
+          "installations",
+          "licenceState",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "VendorTenantViewInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "legalName": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 200 }, { "type": "null" }]
+          },
+          "gstin": { "type": ["string", "null"] },
+          "stateCode": {
+            "anyOf": [{ "type": "string", "pattern": "^\\d{2}$" }, { "type": "null" }]
+          },
+          "contactName": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "contactEmail": { "type": ["string", "null"] },
+          "contactPhone": {
+            "anyOf": [{ "type": "string", "pattern": "^\\+?[0-9 ()-]{6,20}$" }, { "type": "null" }]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "licenceState": {
+            "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "name",
+          "legalName",
+          "gstin",
+          "stateCode",
+          "contactName",
+          "contactEmail",
+          "contactPhone",
+          "id",
+          "installations",
+          "licenceState",
+          "createdAt"
+        ],
         "additionalProperties": false
       },
       "VendorUserListResponse": {

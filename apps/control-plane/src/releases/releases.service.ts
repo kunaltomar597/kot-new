@@ -39,6 +39,12 @@ export class ReleasesService {
     private readonly audit: AuditService,
   ) {}
 
+  /** Every release, newest first (the vendor's view, VCP-006). */
+  async list(): Promise<ReleaseInfo[]> {
+    const releases = await this.prisma.release.findMany({ orderBy: { publishedAt: 'desc' } });
+    return releases.map(toInfo);
+  }
+
   async publish(input: PublishRelease, actor: string): Promise<ReleaseInfo> {
     const release = PublishRelease.parse(input);
     const existing = await this.prisma.release.findUnique({

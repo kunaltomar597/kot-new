@@ -102,9 +102,17 @@ model VendorSession {
 
 /// A restaurant business, the vendor's customer (VCP-002 grows it in P7-02).
 model Tenant {
-  id        String   @id @db.Uuid
-  name      String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id           String   @id @db.Uuid
+  name         String
+  legalName    String?  @map("legal_name")
+  /// Upper case (BILL-002).
+  gstin        String?
+  /// GST state code, two digits.
+  stateCode    String?  @map("state_code")
+  contactName  String?  @map("contact_name")
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   installations   Installation[]
@@ -242,7 +250,7 @@ model Release {
 model AuditEntry {
   id         BigInt   @id @default(autoincrement())
   occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(3)
-  /// `cli:<user>`, `ci:<pipeline>` or `installation:<id>`.
+  /// `cli:<user>`, `ci:<pipeline>`, `vendor:<user id>` or `installation:<id>`.
   actor      String
   action     String
   targetType String   @map("target_type")
