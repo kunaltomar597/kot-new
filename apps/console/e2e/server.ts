@@ -43,9 +43,12 @@ async function waitUntilHealthy(url: string, child: ChildProcess): Promise<void>
  * database and data folder prepared by the global setup. Pass the port again to restart it where
  * browsers expect it.
  */
-export async function startServer(port?: number): Promise<RunningServer> {
-  const databaseUrl = process.env.RP_E2E_DATABASE_URL;
-  const dataDir = process.env.RP_E2E_DATA_DIR;
+export async function startServer(
+  port?: number,
+  install: { readonly databaseUrl?: string; readonly dataDir?: string } = {},
+): Promise<RunningServer> {
+  const databaseUrl = install.databaseUrl ?? process.env.RP_E2E_DATABASE_URL;
+  const dataDir = install.dataDir ?? process.env.RP_E2E_DATA_DIR;
   if (databaseUrl === undefined || dataDir === undefined) {
     throw new Error('Run the e2e tests through Playwright (global setup prepares the database)');
   }

@@ -66,7 +66,16 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   }
   process.env.RP_E2E_DATABASE_URL = database.url;
   process.env.RP_E2E_DATA_DIR = dataDir;
+  // A second, empty database and data folder: a fresh install for the first-run test (P7-07b).
+  const fresh = await cloneTemplateDatabase(
+    cluster.adminUrl,
+    cluster.templateDatabase,
+    cluster.runId,
+  );
+  process.env.RP_E2E_FRESH_DATABASE_URL = fresh.url;
+  process.env.RP_E2E_FRESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'rp-e2e-fresh-'));
   return async () => {
+    await fresh.drop().catch(() => undefined);
     await database.drop().catch(() => undefined);
     await cluster.stop();
   };

@@ -159,11 +159,15 @@ Split (2026-10-03):
   - A resumable "Set up" page covers the 11 steps (ONB-004). Each step's status comes from what
     is set up, plus a person's confirmation of the invoice look and skips for phones and QR. It
     links to the page that does the step and shows on the Manage home until done.
-- **P7-07b Go-live check, settings export and readiness checklist.**
-  - A guided test order through every path, ticked as each is seen.
+- **P7-07b First run on a fresh install.** On the restaurant PC itself (loopback only, and only
+  while no restaurant exists), the console creates the restaurant and the Owner (name and PIN)
+  with the built-in roles and a default invoice series. It then pairs itself with the bootstrap
+  code (ONB-001), so the Owner signs in and continues with the set-up page. A Playwright run
+  goes from an empty database to the set-up page, with timing notes (ONB-009).
+- **P7-07c Go-live check, settings export and readiness checklist.**
+  - A guided test order through every path the restaurant uses, ticked as each is seen.
   - Settings export and import (ONB-010, S).
   - The printable site-readiness checklist (ONB-011).
-  - A Playwright run through the whole set-up on a fresh install, with timing notes (ONB-009).
 
 ## P7-08 Diagnostics, support screen and remote configuration
 

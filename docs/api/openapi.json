@@ -3009,6 +3009,58 @@
         "x-requirements": ["DATA-011", "SEC-019", "AUD-001"]
       }
     },
+    "/api/v1/first-run": {
+      "get": {
+        "operationId": "getFirstRun",
+        "summary": "Whether this server still needs its restaurant and Owner (a fresh install)",
+        "description": "Public because nothing exists yet to sign in with; it reveals only whether a restaurant exists (ONB-001).",
+        "tags": ["onboarding"],
+        "responses": {
+          "200": {
+            "description": "Whether setup is needed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FirstRunStatus" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["ONB-001", "ONB-004"]
+      },
+      "post": {
+        "operationId": "completeFirstRun",
+        "summary": "Create the restaurant and its Owner on a fresh install",
+        "description": "Public because nothing exists yet; only from the server PC itself and only while no restaurant exists (ONB-001). Creates the built-in roles, a default invoice series and the Owner with their PIN; the Owner sets a password and authenticator next (AUTH-006). Audited.",
+        "tags": ["onboarding"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/FirstRunRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/FirstRunResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not from the server PC, or already set up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["ONB-001", "ONB-004", "AUD-001"]
+      }
+    },
     "/api/v1/floor": {
       "get": {
         "operationId": "getFloor",
@@ -14898,6 +14950,34 @@
             "items": { "$ref": "#/components/schemas/Id" }
           }
         },
+        "additionalProperties": false
+      },
+      "FirstRunRequest": {
+        "type": "object",
+        "properties": {
+          "restaurantName": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "ownerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "ownerPin": { "$ref": "#/components/schemas/Pin" }
+        },
+        "required": ["restaurantName", "ownerName", "ownerPin"],
+        "additionalProperties": false
+      },
+      "FirstRunResponse": {
+        "type": "object",
+        "properties": {
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "ownerId": { "$ref": "#/components/schemas/Id" }
+        },
+        "required": ["restaurantId", "ownerId"],
+        "additionalProperties": false
+      },
+      "FirstRunStatus": {
+        "type": "object",
+        "properties": {
+          "needed": { "type": "boolean" },
+          "pinLength": { "type": "integer", "minimum": 4, "maximum": 8 }
+        },
+        "required": ["needed", "pinLength"],
         "additionalProperties": false
       },
       "FloorArchiveRequest": {

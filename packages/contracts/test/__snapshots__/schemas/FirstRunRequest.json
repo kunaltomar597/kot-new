@@ -1,0 +1,22 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "restaurantName": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "ownerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+      "ownerPin": { "type": "string", "pattern": "^\\d{4,8}$" }
+    },
+    "required": ["restaurantName", "ownerName", "ownerPin"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "restaurantName": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "ownerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+      "ownerPin": { "type": "string", "pattern": "^\\d{4,8}$" }
+    },
+    "required": ["restaurantName", "ownerName", "ownerPin"],
+    "additionalProperties": false
+  }
+}

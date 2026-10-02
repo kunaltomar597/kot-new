@@ -367,7 +367,8 @@ Recommended next WPs (dependencies met):
 - [ ] P7-06 Data lifecycle
 - [ ] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
-  - [ ] P7-07b Go-live check, settings export, readiness checklist
+  - [x] P7-07b First run on a fresh install
+  - [ ] P7-07c Go-live check, settings export, readiness checklist
 - [x] P7-08 Diagnostics, support screen, remote config
   - [x] P7-08a Diagnostics bundle
   - [x] P7-08b Support asks for diagnostics
@@ -626,6 +627,22 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-07b):
+
+515. A fresh install had no way to create its restaurant and Owner; only the development seed
+     did. This is now the first run.
+     - It happens on the restaurant PC itself (loopback only, like the bootstrap pairing code),
+       and only while no restaurant exists. It asks for the restaurant's name and the Owner's
+       name and PIN.
+     - It creates the built-in roles and a default invoice series ("Tax invoice", prefix INV),
+       audited as `RESTAURANT_CREATED` with the Owner as actor.
+     - The console then pairs the PC with the bootstrap code, and the Owner signs in and carries
+       on with the set-up page. A password and authenticator are step 4 (AUTH-006).
+516. The first run's PIN has the restaurant's PIN length (`auth.pinLength`, 4 by default), so it
+     works on the PIN pad at once.
+517. P7-07 is now in three (phase-7.md). The go-live test, settings export and the readiness
+     checklist are P7-07c.
 
 Decided 2026-10-03 (P7-07a):
 
@@ -2643,6 +2660,24 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-07b First run on a fresh install
+
+Built:
+
+- contracts: `FirstRunStatus`, `FirstRunRequest`, `FirstRunResponse` and two public routes;
+- server: `FirstRunService` and `FirstRunController` (loopback only, once, advisory-locked);
+- console: `ThisPcSetup` on the pairing screen (create, then pair this PC; or just pair it);
+- e2e: a second empty database in the console's global setup, `startServer(port, install)`, and
+  `e2e/first-run.e2e.ts`;
+- `docs/build/onboarding-timing.md` (ONB-009 timing notes).
+
+Tests: server +2 integration (creates once, roles, series, Owner PIN hashed, audit, PIN length,
+then bootstrap pairing works; refused off the PC); console +3; e2e +1 (empty database to the
+Owner on the set-up page: 0.4 s to signed in).
+
+Gotcha: the login PIN pad uses `auth.pinLength`; a 6-digit first-run PIN could not sign in. The
+first run now asks for that many digits.
 
 ### 2026-10-03: P7-07a Activation and the set-up checklist
 
