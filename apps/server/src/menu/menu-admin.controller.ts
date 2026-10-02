@@ -4,6 +4,7 @@ import {
   type CategoryView,
   ItemRequest,
   type ItemView,
+  ItemPhotoRequest,
   MenuArchiveRequest,
   type MenuDraftResponse,
   MenuEntityParams,
@@ -122,6 +123,15 @@ export class MenuAdminController {
     @Body(new ZodValidationPipe(ItemRequest)) body: ItemRequest,
   ): Promise<ItemView> {
     return this.menu.updateItem(principalOf(request), id, body);
+  }
+
+  @Put('items/:id/photo')
+  setItemPhoto(
+    @Req() request: AuthenticatedRequest,
+    @Param(params) { id }: MenuEntityParams,
+    @Body(new ZodValidationPipe(ItemPhotoRequest)) body: ItemPhotoRequest,
+  ): Promise<ItemView> {
+    return this.menu.setItemPhoto(principalOf(request), id, body.photoId);
   }
 
   @Post('items/:id/archive')

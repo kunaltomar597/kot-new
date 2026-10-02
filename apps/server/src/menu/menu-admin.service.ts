@@ -492,6 +492,39 @@ export class MenuAdminService {
     });
   }
 
+  /**
+   * Gives a dish its photo, or takes it away (P6-04c, ONB-007: bulk photo upload), as a draft
+   * change like any other edit, audited with before and after.
+   */
+  setItemPhoto(principal: Principal, id: string, photoId: string | null): Promise<ItemView> {
+    return this.change(async (tx) => {
+      const existing = await this.findItem(tx, principal.restaurantId, id);
+      if (existing.archivedAt !== null) {
+        throw conflict('ITEM_ARCHIVED', 'This item is archived. Restore it first.');
+      }
+      if (photoId !== null) {
+        const photo = await tx.photo.findFirst({
+          where: { id: photoId, restaurantId: principal.restaurantId },
+          select: { id: true },
+        });
+        if (photo === null) {
+          throw invalid('MENU_REFERENCE_NOT_FOUND', 'Not found or archived: photoId.', {
+            fields: ['photoId'],
+          });
+        }
+      }
+      if (existing.photoId === photoId) return toItemView(existing);
+      await tx.item.update({ where: { id }, data: { photoId } });
+      const after = toItemView(await this.findItem(tx, principal.restaurantId, id));
+      await this.record(tx, principal, 'MENU_ITEM_CHANGED', 'menu_item', id, {
+        before: { photoId: existing.photoId },
+        after: { photoId },
+        reason: null,
+      });
+      return after;
+    });
+  }
+
   archiveItem(principal: Principal, id: string, reason: string): Promise<ItemView> {
     return this.change(async (tx) => {
       const existing = await this.findItem(tx, principal.restaurantId, id);

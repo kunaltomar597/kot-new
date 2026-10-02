@@ -115,9 +115,15 @@ export function MenuEditor() {
       </div>
       <p className="dashboard-section__hint">{t('menuEditor.intro')}</p>
       {/* ONB-006: a printed menu read into a draft to check (P6-04b). */}
-      <Link to="/manage/menu/ai-import" className="staff-pages__link">
-        {t('aiImport.open')}
-      </Link>
+      <p className="staff-pages__links">
+        <Link to="/manage/menu/ai-import" className="staff-pages__link">
+          {t('aiImport.open')}
+        </Link>{' '}
+        {/* ONB-007: many dish photos at once (P6-04c). */}
+        <Link to="/manage/menu/photos" className="staff-pages__link">
+          {t('bulkPhotos.open')}
+        </Link>
+      </p>
       {content}
     </section>
   );

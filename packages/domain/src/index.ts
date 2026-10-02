@@ -24,6 +24,7 @@ export * from './gstin.js';
 export * from './floor.js';
 export * from './menu-import.js';
 export * from './menu-review.js';
+export * from './photo-matching.js';
 export * from './notifications.js';
 export * from './pager.js';
 export * from './associations.js';

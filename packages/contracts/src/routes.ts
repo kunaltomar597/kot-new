@@ -127,6 +127,7 @@ import {
   ItemView,
   MenuArchiveRequest,
   MenuDraftResponse,
+  ItemPhotoRequest,
   MenuEntityParams,
   MenuPublishResponse,
   ModifierGroupRequest,
@@ -2042,6 +2043,26 @@ export const ROUTES = [
         description: 'Something it refers to does not exist or is archived.',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'setItemPhoto',
+    method: 'PUT',
+    path: '/api/v1/menu/items/:id/photo',
+    summary: 'Give a dish its photo, or take it away',
+    description:
+      'ONB-007: for bulk photo upload, after each photo is uploaded. A draft change, published ' +
+      'with the menu; audited with before and after.',
+    tags: ['menu'],
+    requirements: ['ONB-007', 'MENU-008', 'AUD-001'],
+    capability: 'MENU_MANAGE',
+    request: { params: MenuEntityParams, body: ItemPhotoRequest },
+    responses: {
+      200: { description: 'The dish.', schema: ItemView },
+      ...standardErrors,
+      404: { description: 'No such dish.', schema: ApiError },
+      409: { description: 'The dish is archived.', schema: ApiError },
+      422: { description: 'No such photo here.', schema: ApiError },
     },
   },
   {

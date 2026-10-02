@@ -203,6 +203,10 @@ export type ItemView = z.infer<typeof ItemView>;
 export const MenuArchiveRequest = z.strictObject({ reason: Reason });
 export type MenuArchiveRequest = z.infer<typeof MenuArchiveRequest>;
 
+/** A dish's photo set or taken away on its own (P6-04c, ONB-007: bulk photo upload). */
+export const ItemPhotoRequest = z.strictObject({ photoId: Id.nullable() });
+export type ItemPhotoRequest = z.infer<typeof ItemPhotoRequest>;
+
 export const MenuEntityParams = z.strictObject({ id: Id });
 export type MenuEntityParams = z.infer<typeof MenuEntityParams>;
 

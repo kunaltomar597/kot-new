@@ -182,7 +182,10 @@ describe('[QR-008] [QR-003] keeping the relay in step', () => {
   it('sends nothing again while nothing changed', async () => {
     const before = relay.requests.length;
     await sync.sync();
-    expect(relay.requests.slice(before)).toEqual(['POST /functions/v1/server/presence']);
+    // Presence only (a sync an event brought forward may add another): no menu, no tables.
+    expect(new Set(relay.requests.slice(before))).toEqual(
+      new Set(['POST /functions/v1/server/presence']),
+    );
   });
 
   it('[MENU-006] follows a dish running out within seconds, as a new version', async () => {
@@ -403,7 +406,9 @@ describe('[MENU-008] [QR-012] the dishes’ photos', () => {
 
     const before = relay.requests.length;
     await sync.sync();
-    expect(relay.requests.slice(before)).toEqual(['POST /functions/v1/server/presence']);
+    expect(new Set(relay.requests.slice(before))).toEqual(
+      new Set(['POST /functions/v1/server/presence']),
+    );
   });
 
   it('lists each real width once for a photo narrower than the largest size', async () => {
