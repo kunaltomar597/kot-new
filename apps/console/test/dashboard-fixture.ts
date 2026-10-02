@@ -36,6 +36,7 @@ function floorTable(id: string, label: string, sectionId: string, displayOrder: 
     state: 'FREE' as const,
     displayOrder,
     tabletDeviceIds: [],
+    layout: null,
     archivedAt: null,
     updatedAt: NOW,
   };

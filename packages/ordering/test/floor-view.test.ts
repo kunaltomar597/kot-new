@@ -25,6 +25,7 @@ function table(n: number, sectionId: string, archived = false) {
     state: 'FREE' as const,
     displayOrder: n,
     tabletDeviceIds: [],
+    layout: null,
     archivedAt: archived ? '2026-09-01T00:00:00.000Z' : null,
     updatedAt: '2026-09-01T00:00:00.000Z',
   };

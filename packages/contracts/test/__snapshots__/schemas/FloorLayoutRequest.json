@@ -1,0 +1,84 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "tables": {
+        "minItems": 1,
+        "maxItems": 500,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tableId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "layout": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "x": { "type": "integer", "minimum": 0, "maximum": 38 },
+                    "y": { "type": "integer", "minimum": 0, "maximum": 22 },
+                    "w": { "type": "integer", "minimum": 2, "maximum": 10 },
+                    "h": { "type": "integer", "minimum": 2, "maximum": 10 },
+                    "shape": { "type": "string", "enum": ["RECT", "ROUND"] }
+                  },
+                  "required": ["x", "y", "w", "h", "shape"],
+                  "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["tableId", "layout"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["tables"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "tables": {
+        "minItems": 1,
+        "maxItems": 500,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tableId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "layout": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "x": { "type": "integer", "minimum": 0, "maximum": 38 },
+                    "y": { "type": "integer", "minimum": 0, "maximum": 22 },
+                    "w": { "type": "integer", "minimum": 2, "maximum": 10 },
+                    "h": { "type": "integer", "minimum": 2, "maximum": 10 },
+                    "shape": { "type": "string", "enum": ["RECT", "ROUND"] }
+                  },
+                  "required": ["x", "y", "w", "h", "shape"],
+                  "additionalProperties": false
+                },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["tableId", "layout"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["tables"],
+    "additionalProperties": false
+  }
+}

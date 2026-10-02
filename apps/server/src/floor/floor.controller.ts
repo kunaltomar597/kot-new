@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/common';
 import {
   FloorArchiveRequest,
+  FloorLayoutRequest,
   type FloorResponse,
   SectionParams,
   SectionRequest,
@@ -32,6 +33,15 @@ export class FloorController {
   @RequireSession()
   async get(@Req() request: AuthenticatedRequest): Promise<FloorResponse> {
     return { sections: await this.floor.floor(principalOf(request).restaurantId) };
+  }
+
+  @Put('layout')
+  @RequireCapability('STAFF_MANAGE')
+  async saveLayout(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(FloorLayoutRequest)) body: FloorLayoutRequest,
+  ): Promise<FloorResponse> {
+    return { sections: await this.floor.saveLayout(principalOf(request), body) };
   }
 }
 

@@ -100,6 +100,7 @@ import {
 } from './devices.js';
 import {
   FloorArchiveRequest,
+  FloorLayoutRequest,
   FloorResponse,
   SectionParams,
   SectionRequest,
@@ -1523,6 +1524,25 @@ export const ROUTES = [
     requirements: ['TBL-001', 'TBL-004'],
     capability: 'SESSION',
     responses: { 200: { description: 'The floor.', schema: FloorResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'saveFloorLayout',
+    method: 'PUT',
+    path: '/api/v1/floor/layout',
+    summary: 'Save where tables sit on the floor plan',
+    description:
+      'ONB-004 step 5 (S): the tables dragged to a new place, or taken off the plan. Tables of one ' +
+      'section may not overlap. Audited; every screen hears the floor changed.',
+    tags: ['floor'],
+    requirements: ['ONB-004', 'TBL-001', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { body: FloorLayoutRequest },
+    responses: {
+      200: { description: 'The floor.', schema: FloorResponse },
+      ...standardErrors,
+      404: { description: 'No such table.', schema: ApiError },
+      422: { description: 'Two tables overlap.', schema: ApiError },
+    },
   },
   {
     operationId: 'createSection',

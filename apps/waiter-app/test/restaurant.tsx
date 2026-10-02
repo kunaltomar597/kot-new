@@ -382,6 +382,7 @@ export class Restaurant {
             state: table.state,
             displayOrder: order,
             tabletDeviceIds: [],
+            layout: null,
             archivedAt: null,
             updatedAt: AT,
           })),
