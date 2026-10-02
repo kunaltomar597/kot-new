@@ -50,6 +50,24 @@ offline reactivation codes; support notes; documented access policy (no business
 diagnostics or backups).
 Acceptance: API and UI tests per role; MFA enforced; every action audited.
 
+Split (2026-10-03):
+
+- **P7-02a Vendor staff.** Accounts with a one-time setup token, password and authenticator
+  (MFA mandatory), five roles with a capability matrix shared with the web app, sessions,
+  lockout, account changes and resets, the quarterly access review; the first Super Admin from
+  the CLI. TOTP moves to `@rp/totp`, shared with the restaurant PC.
+- **P7-02b Vendor API for the fleet.** Tenants (contacts, GSTIN), installations and activation
+  codes, revoking, licences (state with a reason, plan and limits, re-binding, reactivation
+  codes), releases, the audit trail, by role.
+- **P7-02c Subscriptions.** Plans, billing cycles, the vendor's invoices to restaurants, manual
+  payments, overdue tracking that moves licences along LIC-005 (payment due, grace, restricted)
+  and back on payment; the gateway and GST invoices (VCP-004, S) noted for later.
+- **P7-02d Support and QR provisioning.** Support notes per restaurant, provisioning the
+  restaurant in the QR relay with its scoped credential delivered to the PC, and the documented
+  access policy (no business data except diagnostics or backups).
+- **P7-02e The web app.** React web app for vendor staff on the API above, with UI tests per
+  role.
+
 ## P7-03 Fleet monitoring and alerts
 
 Requirements: VCP-005, NFR-O03, AUD-003 (chain head in heartbeats), DATA-005.

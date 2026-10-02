@@ -10,7 +10,7 @@ import {
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AuthSettingsService } from '../../src/auth/auth-settings.js';
-import { base32Decode, hotp, totpStep } from '../../src/auth/totp.js';
+import { base32Decode, hotp, totpStep } from '@rp/totp';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';

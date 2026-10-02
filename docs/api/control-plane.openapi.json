@@ -15,7 +15,8 @@
     { "name": "installations" },
     { "name": "onboarding" },
     { "name": "releases" },
-    { "name": "system" }
+    { "name": "system" },
+    { "name": "vendor" }
   ],
   "paths": {
     "/v1/enrolments": {
@@ -291,6 +292,450 @@
         "x-capability": "INSTALLATION",
         "x-requirements": ["UPD-002", "UPD-007"]
       }
+    },
+    "/v1/vendor/access-reviews": {
+      "post": {
+        "operationId": "recordVendorAccessReview",
+        "summary": "Record the quarterly access review: the accounts kept; the others are disabled",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VendorAccessReviewRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The accounts after the review.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorUserListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "USERS_MANAGE",
+        "x-requirements": ["SEC-018"]
+      }
+    },
+    "/v1/vendor/me": {
+      "get": {
+        "operationId": "vendorMe",
+        "summary": "Who is signed in and what their role allows",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "The person.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorMeView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "VENDOR",
+        "x-requirements": ["VCP-001"]
+      }
+    },
+    "/v1/vendor/session": {
+      "delete": {
+        "operationId": "vendorSignOut",
+        "summary": "End this session",
+        "tags": ["vendor"],
+        "responses": {
+          "204": { "description": "Signed out." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "VENDOR",
+        "x-requirements": ["VCP-001"]
+      },
+      "post": {
+        "operationId": "vendorSignIn",
+        "summary": "Vendor staff sign in: email, password and the authenticator’s code together",
+        "description": "Public because it is how a session starts. MFA is mandatory (VCP-001); five failures lock the account for 15 minutes and every attempt is audited (SEC-018).",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VendorSignInRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The session.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorSessionView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Wrong email, password or code.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "423": {
+            "description": "Locked after too many failures, or disabled.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many attempts from this address.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      }
+    },
+    "/v1/vendor/setup": {
+      "post": {
+        "operationId": "vendorSetup",
+        "summary": "Set up an account (step 1): the password; answers the authenticator to add",
+        "description": "Public because the one-time setup token is the credential (valid 72 hours).",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VendorSetupRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The authenticator to add.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorSetupResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "The setup token is not valid.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      }
+    },
+    "/v1/vendor/setup/confirm": {
+      "post": {
+        "operationId": "vendorSetupConfirm",
+        "summary": "Set up an account (step 2): a code from the authenticator; the account is active",
+        "description": "Public because the one-time setup token is the credential.",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VendorSetupConfirmRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The active account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorUserView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "The setup token or the code is not valid.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      }
+    },
+    "/v1/vendor/users": {
+      "get": {
+        "operationId": "listVendorUsers",
+        "summary": "Vendor staff accounts, with last sign-in and last review",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "The accounts.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorUserListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "USERS_MANAGE",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      },
+      "post": {
+        "operationId": "createVendorUser",
+        "summary": "Add a vendor staff account; its setup token is shown once",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateVendorUserRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The account and its setup token.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorSetupTokenView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "An account has that email.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "USERS_MANAGE",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      }
+    },
+    "/v1/vendor/users/{id}": {
+      "patch": {
+        "operationId": "updateVendorUser",
+        "summary": "Change a vendor staff member’s role, or disable or enable the account",
+        "description": "With a reason. Disabling ends their sessions; nobody can disable themselves.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateVendorUserRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorUserView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The last active Super Admin, or oneself.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "USERS_MANAGE",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      }
+    },
+    "/v1/vendor/users/{id}/reset": {
+      "post": {
+        "operationId": "resetVendorUser",
+        "summary": "Reset a lost password or authenticator: a new setup token, shown once",
+        "description": "The account signs in again only after setting a new password and authenticator.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account and its new setup token.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorSetupTokenView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "USERS_MANAGE",
+        "x-requirements": ["VCP-001", "SEC-018"]
+      }
     }
   },
   "components": {
@@ -317,6 +762,31 @@
           "version": { "type": "string", "minLength": 1, "maxLength": 64 }
         },
         "required": ["name", "version"],
+        "additionalProperties": false
+      },
+      "CreateVendorUserRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 200,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "role": { "$ref": "#/components/schemas/VendorRole" }
+        },
+        "required": ["email", "name", "role"],
+        "additionalProperties": false
+      },
+      "CreateVendorUserRequestInput": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "role": { "$ref": "#/components/schemas/VendorRole" }
+        },
+        "required": ["email", "name", "role"],
         "additionalProperties": false
       },
       "DeviceLimits": {
@@ -912,6 +1382,16 @@
         "required": ["kind", "at"],
         "additionalProperties": false
       },
+      "UpdateVendorUserRequest": {
+        "type": "object",
+        "properties": {
+          "role": { "$ref": "#/components/schemas/VendorRole" },
+          "disabled": { "type": "boolean" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "UpdatesQuery": {
         "type": "object",
         "properties": {
@@ -945,6 +1425,223 @@
           }
         },
         "required": ["channel", "update"],
+        "additionalProperties": false
+      },
+      "VendorAccessReviewRequest": {
+        "type": "object",
+        "properties": {
+          "keep": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "note": { "type": "string", "minLength": 3, "maxLength": 500 }
+        },
+        "required": ["keep", "note"],
+        "additionalProperties": false
+      },
+      "VendorCapability": {
+        "type": "string",
+        "enum": [
+          "FLEET_VIEW",
+          "TENANTS_MANAGE",
+          "LICENCE_REBIND",
+          "LICENCES_MANAGE",
+          "REACTIVATION_CODES",
+          "BILLING_MANAGE",
+          "SUPPORT_NOTES",
+          "RELEASES_MANAGE",
+          "USERS_MANAGE",
+          "AUDIT_VIEW"
+        ]
+      },
+      "VendorMeView": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/VendorUserView" },
+          "capabilities": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorCapability" }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["user", "capabilities", "expiresAt"],
+        "additionalProperties": false
+      },
+      "VendorRole": {
+        "type": "string",
+        "enum": ["SUPER_ADMIN", "ONBOARDING", "SUPPORT", "FINANCE", "READ_ONLY"]
+      },
+      "VendorSessionView": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "user": { "$ref": "#/components/schemas/VendorUserView" },
+          "capabilities": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorCapability" }
+          }
+        },
+        "required": ["token", "expiresAt", "user", "capabilities"],
+        "additionalProperties": false
+      },
+      "VendorSetupConfirmRequest": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+          "code": { "type": "string", "pattern": "^\\d{6}$" }
+        },
+        "required": ["token", "code"],
+        "additionalProperties": false
+      },
+      "VendorSetupRequest": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+          "password": { "type": "string", "minLength": 12, "maxLength": 200 }
+        },
+        "required": ["token", "password"],
+        "additionalProperties": false
+      },
+      "VendorSetupResponse": {
+        "type": "object",
+        "properties": { "otpauthUri": { "type": "string" }, "secret": { "type": "string" } },
+        "required": ["otpauthUri", "secret"],
+        "additionalProperties": false
+      },
+      "VendorSetupTokenView": {
+        "type": "object",
+        "properties": {
+          "user": { "$ref": "#/components/schemas/VendorUserView" },
+          "setupToken": { "type": "string" },
+          "setupExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["user", "setupToken", "setupExpiresAt"],
+        "additionalProperties": false
+      },
+      "VendorSignInRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 200,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "password": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "code": { "type": "string", "pattern": "^\\d{6}$" }
+        },
+        "required": ["email", "password", "code"],
+        "additionalProperties": false
+      },
+      "VendorSignInRequestInput": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "code": { "type": "string", "pattern": "^\\d{6}$" }
+        },
+        "required": ["email", "password", "code"],
+        "additionalProperties": false
+      },
+      "VendorUserListResponse": {
+        "type": "object",
+        "properties": {
+          "users": { "type": "array", "items": { "$ref": "#/components/schemas/VendorUserView" } }
+        },
+        "required": ["users"],
+        "additionalProperties": false
+      },
+      "VendorUserParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "VendorUserView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "email": { "type": "string" },
+          "name": { "type": "string" },
+          "role": { "$ref": "#/components/schemas/VendorRole" },
+          "active": { "type": "boolean" },
+          "disabled": { "type": "boolean" },
+          "lockedUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "lastSignInAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "reviewedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "active",
+          "disabled",
+          "lockedUntil",
+          "lastSignInAt",
+          "reviewedAt",
+          "createdAt"
+        ],
         "additionalProperties": false
       }
     }

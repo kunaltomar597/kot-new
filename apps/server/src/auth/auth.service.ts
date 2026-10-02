@@ -32,7 +32,7 @@ import { open, seal } from './secret-box.js';
 import { SECRET_STORE, type SecretStore } from './secret-store.js';
 import { roleCapabilities, SessionService, type SessionStaff } from './session.service.js';
 import { randomToken, sha256Hex } from './tokens.js';
-import { base32Encode, generateTotpSecret, otpauthUri, verifyTotp } from './totp.js';
+import { base32Encode, generateTotpSecret, otpauthUri, verifyTotp } from '@rp/totp';
 
 const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const RECOVERY_CODES = 10;

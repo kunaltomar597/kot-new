@@ -12,7 +12,7 @@ import {
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AuthSettingsService } from '../../src/auth/auth-settings.js';
-import { base32Decode, hotp, totpStep } from '../../src/auth/totp.js';
+import { base32Decode, hotp, totpStep } from '@rp/totp';
 import { currentBusinessDate, dbDate } from '../../src/common/business-dates.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { DEFAULT_REALTIME_OPTIONS, REALTIME_OPTIONS } from '../../src/realtime/realtime.gateway.js';

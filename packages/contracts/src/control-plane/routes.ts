@@ -12,13 +12,37 @@ import {
   UpdatesQuery,
   UpdatesResponse,
 } from './schemas.js';
+import {
+  CreateVendorUserRequest,
+  UpdateVendorUserRequest,
+  VendorAccessReviewRequest,
+  type VendorCapability,
+  VendorMeView,
+  VendorSessionView,
+  VendorSetupConfirmRequest,
+  VendorSetupRequest,
+  VendorSetupResponse,
+  VendorSetupTokenView,
+  VendorSignInRequest,
+  VendorUserListResponse,
+  VendorUserParams,
+  VendorUserView,
+} from './vendor.js';
 
 /**
  * Who may call a Control Plane endpoint: `INSTALLATION` needs a request signed by an enrolled
- * installation (ADR-0012); `PUBLIC` endpoints need no credential and say why. Vendor staff use
- * the admin CLI until the web app (VCP-001, P7-02).
+ * installation (ADR-0012); `PUBLIC` endpoints need no credential and say why; `VENDOR` needs a
+ * signed-in vendor staff member (password and authenticator, VCP-001), and a vendor capability
+ * names what their role must allow (P7-02).
  */
-export type ControlPlaneAccess = 'INSTALLATION' | 'PUBLIC';
+export type ControlPlaneAccess = 'INSTALLATION' | 'PUBLIC' | 'VENDOR' | VendorCapability;
+
+/** Errors of every vendor staff endpoint. */
+const vendorErrors = {
+  400: { description: 'The request does not match the contract.', schema: ApiError },
+  401: { description: 'Not signed in, or the session ended.', schema: ApiError },
+  403: { description: 'The role does not allow this.', schema: ApiError },
+} as const satisfies Readonly<Record<number, RouteResponse>>;
 
 /** Errors of every signed endpoint. */
 const signedErrors = {
@@ -135,6 +159,153 @@ export const CONTROL_PLANE_ROUTES = [
       200: { description: 'The job.', schema: MenuExtractionView },
       ...signedErrors,
       404: { description: 'No such job for this restaurant.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'vendorSignIn',
+    method: 'POST',
+    path: '/v1/vendor/session',
+    summary: 'Vendor staff sign in: email, password and the authenticator’s code together',
+    description:
+      'Public because it is how a session starts. MFA is mandatory (VCP-001); five failures lock ' +
+      'the account for 15 minutes and every attempt is audited (SEC-018).',
+    tags: ['vendor'],
+    requirements: ['VCP-001', 'SEC-018'],
+    capability: 'PUBLIC',
+    request: { body: VendorSignInRequest },
+    responses: {
+      201: { description: 'The session.', schema: VendorSessionView },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      401: { description: 'Wrong email, password or code.', schema: ApiError },
+      423: { description: 'Locked after too many failures, or disabled.', schema: ApiError },
+      429: { description: 'Too many attempts from this address.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'vendorSignOut',
+    method: 'DELETE',
+    path: '/v1/vendor/session',
+    summary: 'End this session',
+    tags: ['vendor'],
+    requirements: ['VCP-001'],
+    capability: 'VENDOR',
+    responses: { 204: { description: 'Signed out.' }, ...vendorErrors },
+  },
+  {
+    operationId: 'vendorMe',
+    method: 'GET',
+    path: '/v1/vendor/me',
+    summary: 'Who is signed in and what their role allows',
+    tags: ['vendor'],
+    requirements: ['VCP-001'],
+    capability: 'VENDOR',
+    responses: { 200: { description: 'The person.', schema: VendorMeView }, ...vendorErrors },
+  },
+  {
+    operationId: 'vendorSetup',
+    method: 'POST',
+    path: '/v1/vendor/setup',
+    summary: 'Set up an account (step 1): the password; answers the authenticator to add',
+    description: 'Public because the one-time setup token is the credential (valid 72 hours).',
+    tags: ['vendor'],
+    requirements: ['VCP-001', 'SEC-018'],
+    capability: 'PUBLIC',
+    request: { body: VendorSetupRequest },
+    responses: {
+      200: { description: 'The authenticator to add.', schema: VendorSetupResponse },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      401: { description: 'The setup token is not valid.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'vendorSetupConfirm',
+    method: 'POST',
+    path: '/v1/vendor/setup/confirm',
+    summary: 'Set up an account (step 2): a code from the authenticator; the account is active',
+    description: 'Public because the one-time setup token is the credential.',
+    tags: ['vendor'],
+    requirements: ['VCP-001', 'SEC-018'],
+    capability: 'PUBLIC',
+    request: { body: VendorSetupConfirmRequest },
+    responses: {
+      200: { description: 'The active account.', schema: VendorUserView },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      401: { description: 'The setup token or the code is not valid.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listVendorUsers',
+    method: 'GET',
+    path: '/v1/vendor/users',
+    summary: 'Vendor staff accounts, with last sign-in and last review',
+    tags: ['vendor'],
+    requirements: ['VCP-001', 'SEC-018'],
+    capability: 'USERS_MANAGE',
+    responses: {
+      200: { description: 'The accounts.', schema: VendorUserListResponse },
+      ...vendorErrors,
+    },
+  },
+  {
+    operationId: 'createVendorUser',
+    method: 'POST',
+    path: '/v1/vendor/users',
+    summary: 'Add a vendor staff account; its setup token is shown once',
+    tags: ['vendor'],
+    requirements: ['VCP-001', 'SEC-018'],
+    capability: 'USERS_MANAGE',
+    request: { body: CreateVendorUserRequest },
+    responses: {
+      201: { description: 'The account and its setup token.', schema: VendorSetupTokenView },
+      ...vendorErrors,
+      409: { description: 'An account has that email.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateVendorUser',
+    method: 'PATCH',
+    path: '/v1/vendor/users/:id',
+    summary: 'Change a vendor staff member’s role, or disable or enable the account',
+    description: 'With a reason. Disabling ends their sessions; nobody can disable themselves.',
+    tags: ['vendor'],
+    requirements: ['VCP-001', 'SEC-018'],
+    capability: 'USERS_MANAGE',
+    request: { params: VendorUserParams, body: UpdateVendorUserRequest },
+    responses: {
+      200: { description: 'The account.', schema: VendorUserView },
+      ...vendorErrors,
+      404: { description: 'No such account.', schema: ApiError },
+      409: { description: 'The last active Super Admin, or oneself.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'resetVendorUser',
+    method: 'POST',
+    path: '/v1/vendor/users/:id/reset',
+    summary: 'Reset a lost password or authenticator: a new setup token, shown once',
+    description: 'The account signs in again only after setting a new password and authenticator.',
+    tags: ['vendor'],
+    requirements: ['VCP-001', 'SEC-018'],
+    capability: 'USERS_MANAGE',
+    request: { params: VendorUserParams },
+    responses: {
+      200: { description: 'The account and its new setup token.', schema: VendorSetupTokenView },
+      ...vendorErrors,
+      404: { description: 'No such account.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'recordVendorAccessReview',
+    method: 'POST',
+    path: '/v1/vendor/access-reviews',
+    summary: 'Record the quarterly access review: the accounts kept; the others are disabled',
+    tags: ['vendor'],
+    requirements: ['SEC-018'],
+    capability: 'USERS_MANAGE',
+    request: { body: VendorAccessReviewRequest },
+    responses: {
+      200: { description: 'The accounts after the review.', schema: VendorUserListResponse },
+      ...vendorErrors,
     },
   },
 ] as const satisfies readonly RouteDefinition<ControlPlaneAccess>[];

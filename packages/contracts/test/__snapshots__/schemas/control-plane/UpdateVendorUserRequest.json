@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "role": {
+        "type": "string",
+        "enum": ["SUPER_ADMIN", "ONBOARDING", "SUPPORT", "FINANCE", "READ_ONLY"]
+      },
+      "disabled": { "type": "boolean" },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["reason"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "role": {
+        "type": "string",
+        "enum": ["SUPER_ADMIN", "ONBOARDING", "SUPPORT", "FINANCE", "READ_ONLY"]
+      },
+      "disabled": { "type": "boolean" },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["reason"],
+    "additionalProperties": false
+  }
+}

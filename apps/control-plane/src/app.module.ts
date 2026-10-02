@@ -15,6 +15,9 @@ import { HeartbeatsController } from './heartbeats/heartbeats.controller.js';
 import { HeartbeatsService } from './heartbeats/heartbeats.service.js';
 import { LicenceSigner } from './licences/licence-signer.js';
 import { LicencesService } from './licences/licences.service.js';
+import { VendorAuthService } from './vendor/vendor-auth.service.js';
+import { VendorController } from './vendor/vendor.controller.js';
+import { VendorGuard } from './vendor/vendor.guard.js';
 import { EnrolmentController } from './installations/enrolment.controller.js';
 import { InstallationsService } from './installations/installations.service.js';
 import { MenuExtractionsController } from './menu-import/menu-extractions.controller.js';
@@ -87,6 +90,7 @@ export class ControlPlaneModule {
         HeartbeatsController,
         UpdatesController,
         MenuExtractionsController,
+        VendorController,
       ],
       providers: [
         { provide: CP_CONFIG, useValue: config },
@@ -98,11 +102,13 @@ export class ControlPlaneModule {
         HeartbeatsService,
         LicenceSigner,
         LicencesService,
+        VendorAuthService,
         ReleasesService,
         AdminService,
         MenuExtractionsService,
         { provide: MENU_EXTRACTOR, useValue: menuExtractorFor(config) },
         { provide: APP_GUARD, useClass: InstallationGuard },
+        { provide: APP_GUARD, useClass: VendorGuard },
         { provide: APP_FILTER, useClass: CpExceptionFilter },
       ],
     };
