@@ -97,6 +97,8 @@ export class Restaurant {
       session: session(9005, KIRAN, 4),
     },
   ];
+  /** Open takeaway orders (TBL-008, WTR-013). */
+  readonly takeaway: OrderView[] = [];
   /** When the signed-in waiter went on break, or null (NTF-009). */
   breakSince: string | null = null;
   pager: PagerView | null = {
@@ -449,16 +451,18 @@ export class Restaurant {
         instructions: line.instructions ?? null,
       };
     });
+    const takeaway = request.orderType === 'TAKEAWAY';
     const order: OrderView = {
       id: orderId,
       orderNumber: this.nextOrder,
-      orderType: 'DINE_IN',
+      orderType: request.orderType,
       source: request.source,
       status: 'OPEN',
-      tableSessionId: sessionId,
+      tableSessionId: takeaway ? null : sessionId,
       tableId: null,
-      takeawayToken: null,
-      customerName: null,
+      // TBL-008: takeaway orders get the next token of the day.
+      takeawayToken: takeaway ? 40 + this.nextOrder : null,
+      customerName: request.customerName ?? null,
       businessDate: '2026-09-26',
       createdAt: AT,
       note: null,
@@ -475,6 +479,7 @@ export class Restaurant {
       ],
     };
     this.orders.set(sessionId, [...(this.orders.get(sessionId) ?? []), order]);
+    if (takeaway) this.takeaway.push(order);
     const answer: SubmitOrderResponse = {
       status: 'ACCEPTED',
       orderId,
@@ -612,6 +617,18 @@ export class Restaurant {
         const answer = this.submitOrder(call.body as SubmitOrderRequest);
         if (this.network === 'loseAnswers') throw new TypeError('Network request failed');
         return { status: 200, body: answer };
+      })
+      .on('GET', '/api/v1/orders/takeaway', () => ({
+        status: 200,
+        body: { orders: this.takeaway },
+      }))
+      .on('GET', '/api/v1/orders/:orderId', (call) => {
+        const order = [...this.orders.values()]
+          .flat()
+          .find((entry) => call.path.endsWith(entry.id));
+        return order === undefined
+          ? { status: 404, body: { code: 'ORDER_NOT_FOUND', message: 'No such order.' } }
+          : { status: 200, body: order };
       })
       .on('POST', '/api/v1/orders/:orderId/fire', (call) => {
         const order = [...this.orders.values()]

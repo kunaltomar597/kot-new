@@ -85,7 +85,7 @@ Split (2026-10-02), after a survey of what P1 to P5 already built (KDS-010 was d
   "On break" in the waiter app (NTF-009), the denomination count at shift close (BILL-013).
 - **P6-05b Hold and fire** (ORD-016).
 - **P6-05c Ordering.** Takeaway from the waiter app (WTR-013), time-based item availability
-  (MENU-007).
+  (MENU-007). Done: per-dish daily hours, checked like a combo's hours on every surface.
 - **P6-05d Tables.** Merge tables and transfer items (TBL-006), "Needs cleaning" (TBL-004).
 - **P6-05e Billing.** Amount in words (BILL-001), print the bill from the waiter app (WTR-008).
 - **P6-05f Setup.** Drag-and-drop floor layout (ONB-004 step 5), printer auto-discovery (step 6).

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   comboOnNow,
   isRejectedLine,
+  itemsOffNow,
   type LineCheckContext,
   resolveOrderLine,
 } from '../src/line-check.js';
@@ -119,5 +120,51 @@ describe('[MENU-005] combos', () => {
         now: new Date('2026-10-02T11:00:00.000Z'),
       }),
     ).toBe('NOT_AVAILABLE_NOW');
+  });
+});
+
+describe('[MENU-007] a dish served at some hours only', () => {
+  // Dal for breakfast only, 07:00 to 11:00; 08:00 UTC is 13:30 in Kolkata.
+  const breakfast: MenuSnapshot = {
+    ...MENU,
+    items: MENU.items.map((item) =>
+      item.id === IDS.dal ? { ...item, timeWindow: { start: '07:00', end: '11:00' } } : item,
+    ),
+  };
+  const morning = { ...CONTEXT, now: new Date('2026-10-02T03:30:00.000Z') };
+
+  it('is refused outside its hours, alone or as part of a combo', () => {
+    expect(codeOf(breakfast, line(), morning)).toBe('OK');
+    const refused = resolveOrderLine(breakfast, line(), CONTEXT);
+    expect(refused).toMatchObject({
+      code: 'NOT_AVAILABLE_NOW',
+      message: 'Dal Makhani is served 07:00–11:00 only.',
+    });
+    // The thali's dal is breakfast only too.
+    expect(codeOf(breakfast, line({ itemId: IDS.thali, comboChoices: [IDS.rasmalai] }))).toBe(
+      'NOT_AVAILABLE_NOW',
+    );
+    expect(
+      codeOf(breakfast, line({ itemId: IDS.thali, comboChoices: [IDS.rasmalai] }), morning),
+    ).toBe('OK');
+  });
+
+  it('runs past midnight when it ends before it starts', () => {
+    const late = {
+      ...MENU,
+      items: MENU.items.map((item) =>
+        item.id === IDS.dal ? { ...item, timeWindow: { start: '22:00', end: '02:00' } } : item,
+      ),
+    };
+    // 01:00 IST and 13:30 IST.
+    expect(codeOf(late, line(), { ...CONTEXT, now: new Date('2026-10-01T19:30:00.000Z') })).toBe(
+      'OK',
+    );
+    expect(codeOf(late, line())).toBe('NOT_AVAILABLE_NOW');
+  });
+
+  it('is left out of suggestions outside its hours', () => {
+    expect(itemsOffNow(breakfast, CONTEXT.now, CONTEXT.timeZone)).toEqual(new Set([IDS.dal]));
+    expect(itemsOffNow(breakfast, morning.now, CONTEXT.timeZone).size).toBe(0);
   });
 });

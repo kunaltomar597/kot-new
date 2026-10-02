@@ -292,6 +292,26 @@ export function ItemDialog({
               set('prepTime', event.target.value);
             }}
           />
+          <p className="menu-form__hint">{t('menuEditor.item.hoursHint')}</p>
+          <div className="menu-form__row">
+            <TextField
+              label={t('menuEditor.item.servedFrom')}
+              type="time"
+              value={form.servedFrom}
+              onChange={(event) => {
+                set('servedFrom', event.target.value);
+              }}
+            />
+            <TextField
+              label={t('menuEditor.item.servedUntil')}
+              type="time"
+              value={form.servedUntil}
+              error={problemOf('hours')}
+              onChange={(event) => {
+                set('servedUntil', event.target.value);
+              }}
+            />
+          </div>
           <TextField
             label={t('menuEditor.item.shortCode')}
             hint={t('menuEditor.item.shortCodeHint')}

@@ -185,6 +185,34 @@ describe('[MGR-005] [MENU-002] [MENU-006] the dishes', () => {
     });
   });
 
+  it('[MENU-007] serves a dish at some hours only, both hours or neither', async () => {
+    const fake = menuServer().on('PUT', `${ITEMS}/${NAAN}`, () => ({
+      status: 200,
+      body: item({ timeWindow: { start: '07:00', end: '11:00' } }),
+    }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    await user.click(
+      within(await actionsFor('Butter Naan')).getByRole('button', { name: t('menuEditor.edit') }),
+    );
+    const dialog = within(
+      await screen.findByRole('dialog', {
+        name: t('menuEditor.item.editTitle', { name: 'Butter Naan' }),
+      }),
+    );
+    await user.type(field(dialog, t('menuEditor.item.servedFrom')), '07:00');
+    await user.click(dialog.getByRole('button', { name: t('menuEditor.item.save') }));
+    expect(dialog.getByText(t('menuEditor.item.problems.hoursIncomplete'))).toBeVisible();
+    expect(fake.callsTo('PUT', `${ITEMS}/${NAAN}`)).toHaveLength(0);
+    await user.type(field(dialog, t('menuEditor.item.servedUntil')), '11:00');
+    await user.click(dialog.getByRole('button', { name: t('menuEditor.item.save') }));
+    expect(
+      await screen.findByText(t('menuEditor.items.saved', { name: 'Butter Naan' })),
+    ).toBeVisible();
+    expect(fake.callsTo('PUT', `${ITEMS}/${NAAN}`)[0]?.body).toMatchObject({
+      timeWindow: { start: '07:00', end: '11:00' },
+    });
+  });
+
   it('[MENU-005] makes a new dish a combo of other dishes', async () => {
     const created: ItemView = item({
       id: '0199a0e0-0000-7000-8000-000000001097',

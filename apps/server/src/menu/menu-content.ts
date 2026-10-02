@@ -105,6 +105,10 @@ export async function buildMenuContent(tx: MenuContentClient, restaurantId: stri
       tags: item.tags.map((link) => link.tag.name),
       stationId: item.stationId,
       ...(item.prepTimeMinutes !== null && { prepTimeMinutes: item.prepTimeMinutes }),
+      ...(item.windowStart !== null &&
+        item.windowEnd !== null && {
+          timeWindow: { start: item.windowStart, end: item.windowEnd },
+        }),
       available: item.available,
       stockCount: item.trackStock ? (item.stockLevel?.quantity ?? 0) : null,
       displayOrder: item.displayOrder,

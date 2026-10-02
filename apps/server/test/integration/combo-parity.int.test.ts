@@ -281,6 +281,7 @@ beforeAll(async () => {
     ['Chaas', 6_000, bar.id],
     ['Thali', 34_900, kitchen.id],
     ['Lunch Thali', 29_900, kitchen.id],
+    ['Poha', 8_000, kitchen.id],
   ] as const) {
     ids[name] = (
       await prisma.item.create({
@@ -326,6 +327,11 @@ beforeAll(async () => {
     data: { ...base, itemId: id('Paneer Tikka'), groupId: extras.id },
   });
   const window = closedWindow();
+  // MENU-007: a dish served at hours that are not now.
+  await prisma.item.update({
+    where: { id: id('Poha') },
+    data: { windowStart: window.start, windowEnd: window.end },
+  });
   for (const [name, hours] of [
     ['Thali', null],
     ['Lunch Thali', window],
@@ -527,5 +533,23 @@ describe('[MENU-004] [MENU-005] [MENU-012] the same order on every surface', () 
     expect(refusals[0]).toEqual([
       { code: 'NOT_AVAILABLE_NOW', message: 'Lunch Thali is not offered at this time.' },
     ]);
+  });
+
+  it('[MENU-007] shows a dish outside its hours as such, and every surface is refused', async () => {
+    const poha = menu.items.find((item) => item.id === id('Poha'));
+    if (poha === undefined) throw new Error('No Poha');
+    expect(unavailableReason(poha, { menu, now: Date.now() })).toBe('NOT_NOW');
+    const hours = `${poha.timeWindow?.start ?? ''}–${poha.timeWindow?.end ?? ''}`;
+    for (const surface of SURFACES) {
+      const answer = await place(surface, [
+        { clientLineId: randomUUID(), itemId: poha.id, quantity: 1, modifiers: [] },
+      ]);
+      const parsed =
+        surface === 'QR' ? QrSubmitOrderResponse.parse(answer) : SubmitOrderResponse.parse(answer);
+      if (!('rejectedLines' in parsed)) throw new Error(`${surface}: ${JSON.stringify(parsed)}`);
+      expect(parsed.rejectedLines.map(({ code, message }) => ({ code, message }))).toEqual([
+        { code: 'NOT_AVAILABLE_NOW', message: `Poha is served ${hours} only.` },
+      ]);
+    }
   });
 });

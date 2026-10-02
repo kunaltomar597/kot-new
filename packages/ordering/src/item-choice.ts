@@ -6,7 +6,7 @@ import {
   type SelectionIssue,
 } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
-import { comboOnNow } from './line-check.js';
+import { comboOnNow, hoursOf, itemHoursOnNow } from './line-check.js';
 import { comboOf, comboSlots, needsOptions, selectable } from './menu-view.js';
 
 /** A modifier group's rule in words: "Up to 2", "Choose 1", "Choose 1 to 3". */
@@ -70,8 +70,9 @@ export type UnavailableReason = 'SOLD_OUT' | 'NOT_AVAILABLE' | 'NOT_NOW';
 
 /**
  * Why an item cannot be ordered right now, or undefined when it can: sold out or switched off
- * (MENU-006, WTR-010), or, given the menu and the time, a combo outside its dates or hours
- * (MENU-005, NOT_NOW). Every surface asks this, and the server checks the same (`comboOnNow`).
+ * (MENU-006, WTR-010), or, given the menu and the time, outside its hours (MENU-007) or a combo
+ * outside its dates or hours (MENU-005), both NOT_NOW. Every surface asks this, and the server
+ * checks the same (`resolveOrderLine`).
  */
 export function unavailableReason(
   item: MenuItem,
@@ -82,17 +83,11 @@ export function unavailableReason(
   if (at !== undefined) {
     const combo = comboOf(at.menu, item);
     const now = new Date(at.now);
-    if (combo !== undefined && !comboOnNow(combo, now, at.menu.timeZone ?? DEFAULT_TIME_ZONE)) {
-      return 'NOT_NOW';
-    }
+    const timeZone = at.menu.timeZone ?? DEFAULT_TIME_ZONE;
+    if (!itemHoursOnNow(item, now, timeZone)) return 'NOT_NOW';
+    if (combo !== undefined && !comboOnNow(combo, now, timeZone)) return 'NOT_NOW';
   }
   return undefined;
-}
-
-/** A combo's hours as the menu shows them ("12:00–15:00"), or undefined when it has none. */
-export function comboHours(menu: MenuSnapshot, item: MenuItem): string | undefined {
-  const window = comboOf(menu, item)?.timeWindow;
-  return window === undefined ? undefined : `${window.start.slice(0, 5)}–${window.end.slice(0, 5)}`;
 }
 
 /** What to say about an item that cannot be ordered now. */
@@ -103,14 +98,14 @@ export function unavailableText(
   t: Translator,
 ): string {
   if (reason === 'SOLD_OUT') return t('pos.menu.soldOut');
-  const hours = reason === 'NOT_NOW' ? comboHours(menu, item) : undefined;
+  const hours = reason === 'NOT_NOW' ? hoursOf(menu, item) : undefined;
   return hours === undefined ? t('pos.menu.notAvailable') : t('pos.menu.onlyAt', { hours });
 }
 
 /**
  * What a menu card says under the name: sold out, not available or only at its hours (the card
- * cannot be chosen), how many are left, or that it is a combo or has options. Pass `now` so a
- * combo outside its hours shows as such.
+ * cannot be chosen), how many are left, or that it is a combo or has options. Pass `now` so an
+ * item or combo outside its hours shows as such.
  */
 export function menuNote(
   menu: MenuSnapshot,

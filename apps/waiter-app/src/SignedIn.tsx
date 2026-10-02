@@ -4,9 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { CartsProvider } from './carts';
 import { TableScreen } from './TableScreen';
 import { TablesScreen } from './TablesScreen';
+import { TakeawayScreen } from './TakeawayScreen';
 
 type Place =
-  { readonly screen: 'tables' } | { readonly screen: 'table'; readonly sessionId: string };
+  | { readonly screen: 'tables' }
+  | { readonly screen: 'table'; readonly sessionId: string }
+  | { readonly screen: 'takeaway' };
 
 /** Says so when an order kept on the phone reaches the kitchen later, wherever the waiter is. */
 function useOrdersSentLater() {
@@ -38,11 +41,16 @@ export function SignedIn() {
   const back = useCallback(() => {
     setPlace({ screen: 'tables' });
   }, []);
+  const takeaway = useCallback(() => {
+    setPlace({ screen: 'takeaway' });
+  }, []);
   useOrdersSentLater();
   return (
     <CartsProvider>
       {place.screen === 'tables' ? (
-        <TablesScreen onOpenTable={openTable} />
+        <TablesScreen onOpenTable={openTable} onTakeaway={takeaway} />
+      ) : place.screen === 'takeaway' ? (
+        <TakeawayScreen onBack={back} />
       ) : (
         <TableScreen key={place.sessionId} sessionId={place.sessionId} onBack={back} />
       )}
