@@ -69,6 +69,14 @@ test('[VCP-001] [SEC-018] the first Super Admin sets up MFA, signs in and runs t
   await page.getByRole('button', { name: 'Add note' }).click();
   await expect(page.getByText('Onboarding call booked for Monday.')).toBeVisible();
 
+  // The fleet: the new PC is waiting for its installer, and nothing needs looking at.
+  await page
+    .getByRole('navigation', { name: 'Sections' })
+    .getByRole('link', { name: 'Fleet' })
+    .click();
+  await expect(page.getByText('No open alerts. Every PC looks fine.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Spice Route: Main counter PC' })).toBeVisible();
+
   // A second staff member gets a one-time setup link.
   await page
     .getByRole('navigation', { name: 'Sections' })

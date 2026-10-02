@@ -284,3 +284,26 @@
     gap: 0;
   }
 }
+
+.cp-section {
+  display: grid;
+  gap: var(--rp-space-3);
+}
+
+.cp-section__title {
+  margin: 0;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.cp-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-1);
+}
+
+.cp-code {
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-sm);
+  word-break: break-all;
+}

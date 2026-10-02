@@ -13,6 +13,7 @@ export const NAV: readonly {
   readonly capability: VendorCapability;
 }[] = [
   { path: '/restaurants', label: 'vendorApp.nav.restaurants', capability: 'FLEET_VIEW' },
+  { path: '/fleet', label: 'vendorApp.nav.fleet', capability: 'FLEET_VIEW' },
   { path: '/invoices', label: 'vendorApp.nav.invoices', capability: 'FLEET_VIEW' },
   { path: '/plans', label: 'vendorApp.nav.plans', capability: 'FLEET_VIEW' },
   { path: '/releases', label: 'vendorApp.nav.releases', capability: 'FLEET_VIEW' },
