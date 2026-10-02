@@ -1,0 +1,33 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "tableId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "state": {
+        "type": "string",
+        "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED", "NEEDS_CLEANING"]
+      }
+    },
+    "required": ["tableId", "state"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "tableId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "state": {
+        "type": "string",
+        "enum": ["FREE", "OCCUPIED", "BILL_REQUESTED", "BILL_PRINTED", "NEEDS_CLEANING"]
+      }
+    },
+    "required": ["tableId", "state"],
+    "additionalProperties": false
+  }
+}

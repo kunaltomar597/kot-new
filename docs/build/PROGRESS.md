@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-05c to P6-05f, then Phase 7.
+- P6-05e and P6-05f, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -340,7 +340,7 @@ Recommended next WPs (dependencies met):
   - [x] P6-05a Finishing what was half built (KDS-002, KDS-006, NTF-009, BILL-013)
   - [x] P6-05b Hold and fire (ORD-016)
   - [x] P6-05c Ordering (WTR-013, MENU-007)
-  - [ ] P6-05d Tables (TBL-006, TBL-004)
+  - [x] P6-05d Tables (TBL-006, TBL-004)
   - [ ] P6-05e Billing (BILL-001, WTR-008)
   - [ ] P6-05f Setup (ONB-004 steps 5 and 6)
 
@@ -607,6 +607,32 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P6-05d):
+
+422. Merging tables (TBL-006) is "these guests join that table": the chosen table's orders,
+     kitchen tickets, open requests and guests go to the other open table's session, and its own
+     session closes ("Merged into T1", `merged_into_session_id`); its tablet resets and the table
+     is free (or needs cleaning). Not while either table's bill is printed, nor when the merged
+     table has an invoice or discounts (take them back first). One bill follows naturally.
+423. Moving dishes (TBL-006) is whole lines, a combo with its parts, never a part or part of a
+     quantity (the bill split does that within a table). Dishes waiting for approval, ended, on
+     a printed bill or with a discount do not move; nor while either bill is printed. An order
+     whose every dish moves goes over whole; otherwise the moved dishes go to a new order at the
+     other table, made by the same person from the same source ("Moved from T5"), so sales stay
+     with whoever took them.
+424. Kitchen tickets are never printed again: a merged order's ticket shows its new table with
+     "Moved from"; a moved dish shows "Now for T6" on its line; printing stations still cooking
+     get a MERGED or MOVED note. Screens hear the new event `OrdersMoved`.
+425. Merge and move need TABLE_MOVE_MERGE (waiters: both tables theirs), audited as
+     TABLES_MERGED and ITEMS_TRANSFERRED. Built on the POS (Merge into…, Move dishes…); the
+     waiter app keeps Move table only (WTR-008 does not ask for more).
+426. "Needs cleaning" (TBL-004, S) is the setting `tables.needsCleaning` (restaurant, default
+     off). On, a table the guests left (settled, closed without a bill, moved or merged away)
+     shows "Needs cleaning" and cannot be opened or moved to until someone who takes orders
+     marks it clean (`POST /tables/:id/clean`, audited TABLE_CLEANED); the POS and the waiter app
+     offer Mark clean on its tile. Approving a QR order at such a table opens it anyway: the
+     diners are evidently seated there.
 
 Decided 2026-10-02 (P6-05c):
 
@@ -2210,6 +2236,21 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P6-05d Merge tables, move dishes, "Needs cleaning"
+
+Built: `@rp/domain` NEEDS_CLEANING, GUESTS_LEFT, CLEANED and `tableAfterGuestsLeft`; migration
+`20261003001000_merge_and_cleaning`; setting `tables.needsCleaning`; contracts
+`MergeTablesRequest`, `TransferItemsRequest`/`Response`, `TableStateView`, event `OrdersMoved`,
+`KdsTicketLine.movedTo`, routes `mergeTables`, `transferItems`, `markTableClean`; server
+`TableTransfersService` (merge, transfer, printer notes), cleaning after settle, close, move and
+merge, Mark clean, the KDS "Moved from" for merged orders and "Now for" per moved dish; console
+POS Merge into… and Move dishes… dialogs and Mark clean; the waiter app's Mark clean before
+opening; ui-web and ui-native styles for the new state.
+
+Tests: domain +1, server +6 (merge with tickets, audit and event; waiter's own tables only;
+move dishes with combo parts and KDS notes; whole order and refusals; needs cleaning after close
+and merge, mark clean; settle with cleaning on), console +4, waiter app +1.
 
 ### 2026-10-02: P6-05c Takeaway from the waiter app and time-based availability
 

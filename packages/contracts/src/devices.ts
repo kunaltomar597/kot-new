@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Pin } from './auth.js';
-import { DeviceType, Id, Timestamp } from './common.js';
+import { DeviceType, Id, TableState, Timestamp } from './common.js';
 import { CaFingerprint } from './system.js';
 
 /** Header carrying the device token on every request of a paired device (AUTH-007). */
@@ -255,7 +255,7 @@ export const TabletTableView = z.object({
   tableId: Id,
   /** The table's label, e.g. "T4". */
   label: z.string(),
-  state: z.enum(['FREE', 'OCCUPIED', 'BILL_REQUESTED', 'BILL_PRINTED']),
+  state: TableState,
   /** The open session, or null: the tablet shows its idle screen. */
   session: z.object({ id: Id, openedAt: Timestamp, covers: z.int().min(1).nullable() }).nullable(),
   /** The idle screen's promotions (`tablet.idleShowsPromotions`): the restaurant's pinned dishes. */

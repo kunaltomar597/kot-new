@@ -33,10 +33,12 @@ export async function openTableForOrder(
     where: { id: tableId, restaurantId, archivedAt: null },
   });
   if (table === null) throw new AppError(404, 'TABLE_NOT_FOUND', 'There is no such active table.');
-  if (table.state !== 'FREE') {
+  // Diners ordering at a table waiting to be cleaned are evidently seated there (TBL-004).
+  const from = table.state === 'NEEDS_CLEANING' ? 'FREE' : table.state;
+  if (from !== 'FREE') {
     throw new AppError(409, 'TABLE_NOT_FREE', `Table ${table.label} is already in use.`);
   }
-  const to = transition(tableMachine, table.state, 'OPEN').to;
+  const to = transition(tableMachine, from, 'OPEN').to;
   const assignments = await tx.shiftAssignment.findMany({
     where: { restaurantId, businessDate: dbDate(businessDate) },
     orderBy: { id: 'asc' },

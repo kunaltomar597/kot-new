@@ -21,6 +21,7 @@ import {
   SERVICE_REQUEST_ALERTS,
   serviceRequestMachine,
   type ServiceRequestState,
+  tableAfterGuestsLeft,
   tableMachine,
   transition,
 } from '../src/index.js';
@@ -141,6 +142,15 @@ describe('[TBL-004] table state machine', () => {
     expect(canTransition(tableMachine, 'FREE', 'PRINT_BILL')).toBe(false);
     expect(canTransition(tableMachine, 'OCCUPIED', 'SETTLE_AND_CLOSE')).toBe(false);
     expect(transition(tableMachine, 'OCCUPIED', 'CLOSE_WITHOUT_BILL').requiresReason).toBe(true);
+  });
+
+  it('"Needs cleaning", when on, comes after the guests leave and before the next ones', () => {
+    expect(tableAfterGuestsLeft(false)).toBe('FREE');
+    expect(tableAfterGuestsLeft(true)).toBe('NEEDS_CLEANING');
+    expect(transition(tableMachine, 'FREE', 'GUESTS_LEFT').to).toBe('NEEDS_CLEANING');
+    expect(transition(tableMachine, 'NEEDS_CLEANING', 'CLEANED').to).toBe('FREE');
+    expect(canTransition(tableMachine, 'NEEDS_CLEANING', 'OPEN')).toBe(false);
+    expect(canTransition(tableMachine, 'OCCUPIED', 'CLEANED')).toBe(false);
   });
 });
 

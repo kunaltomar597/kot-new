@@ -139,6 +139,7 @@ const TABLE_EVENTS = new Set([
   'TableClosed',
   'TableStateChanged',
   'TableMoved',
+  'OrdersMoved',
   'TableWaiterChanged',
 ]);
 

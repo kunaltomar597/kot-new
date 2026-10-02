@@ -389,6 +389,15 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { tableSessionId: id(), fromTableId: id(), toTableId: id() });
     case 'TableClosed':
       return domainEvent(type, rid, { tableId: id(), tableSessionId: id() });
+    case 'OrdersMoved':
+      return domainEvent(type, rid, {
+        kind: 'MERGE',
+        fromTableSessionId: id(),
+        toTableSessionId: id(),
+        fromTableId: id(),
+        toTableId: id(),
+        orderIds: [id()],
+      });
     case 'TableStateChanged':
       return domainEvent(type, rid, { tableId: id(), state: 'OCCUPIED' });
     case 'OrderSubmitted':

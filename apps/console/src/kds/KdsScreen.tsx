@@ -48,7 +48,9 @@ const AGE_BADGE: Readonly<Record<AgeTone, 'success' | 'warning' | 'danger'>> = {
 };
 
 const affectsKds = (type: string) =>
-  /^(KotCreated|KotBumped|ItemStatusChanged|TableMoved|OrderApproved|SettingsChanged)$/.test(type);
+  /^(KotCreated|KotBumped|ItemStatusChanged|TableMoved|OrdersMoved|OrderApproved|SettingsChanged)$/.test(
+    type,
+  );
 
 /**
  * The kitchen display (P1-09b, KDS-001 to KDS-012): a station's tickets oldest first with their
@@ -461,6 +463,11 @@ function TicketCard({
                       )}
                       {line.instructions === null ? null : (
                         <span className="kds-line__note">{line.instructions}</span>
+                      )}
+                      {line.movedTo === null ? null : (
+                        <span className="kds-line__note">
+                          {t('kds.movedTo', { table: line.movedTo })}
+                        </span>
                       )}
                     </div>
                     <StatusChip state={line.state} label={t(`pos.itemState.${line.state}`)} />

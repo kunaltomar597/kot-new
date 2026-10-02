@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { InvoicePaymentsView, RecordPaymentsRequest } from '@rp/contracts';
-import { applyPayments, canonicalJson, tableMachine, transition } from '@rp/domain';
+import {
+  applyPayments,
+  canonicalJson,
+  tableAfterGuestsLeft,
+  tableMachine,
+  transition,
+} from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate } from '../common/business-dates.js';
@@ -271,7 +277,10 @@ export class PaymentsService {
     const table = await tx.diningTable.findUniqueOrThrow({ where: { id: session.tableId } });
     // Items ordered after the bill was printed keep the table open for another bill.
     if (table.state !== 'BILL_PRINTED') return false;
-    const to = transition(tableMachine, table.state, 'SETTLE_AND_CLOSE').to;
+    transition(tableMachine, table.state, 'SETTLE_AND_CLOSE');
+    // Free, or "Needs cleaning" when that is on (TBL-004).
+    const settings = await this.settings.snapshot(principal.restaurantId);
+    const to = tableAfterGuestsLeft(settings.get('tables.needsCleaning'));
     await tx.tableSession.update({
       where: { id: session.id },
       data: { status: 'CLOSED', closedAt: new Date(envelope.occurredAt) },

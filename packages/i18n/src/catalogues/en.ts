@@ -1281,6 +1281,7 @@ export const en = {
       stock: 'Stock',
       devices: 'Devices',
       orders: 'Orders',
+      tables: 'Tables',
       billing: 'Billing',
       bills: 'Bills',
       payments: 'Payments',
@@ -2531,6 +2532,9 @@ export const en = {
       holdAndFire: 'Hold and fire',
       specialInstructionsMaxLength: 'Longest special instruction',
     },
+    tables: {
+      needsCleaning: '“Needs cleaning” after guests leave',
+    },
     billing: {
       priceMode: 'Menu prices',
       roundingUnitPaise: 'Round bills to the nearest',
@@ -2666,6 +2670,10 @@ export const en = {
         'Battery level at or below which a table tablet or kitchen screen raises a low-battery alert.',
       offlineAlertSeconds:
         'A table tablet or kitchen screen not connected for this long alerts the managers (0: never; our default).',
+    },
+    tables: {
+      needsCleaning:
+        'A table the guests have left (paid, closed, moved or merged) shows “Needs cleaning” and cannot be opened until someone marks it clean.',
     },
     orders: {
       holdAndFire: 'Waiters may hold items, such as the mains, and fire them to the kitchen later.',
@@ -2885,6 +2893,7 @@ export const en = {
       OCCUPIED: 'Occupied',
       BILL_REQUESTED: 'Bill asked',
       BILL_PRINTED: 'Bill printed',
+      NEEDS_CLEANING: 'Needs cleaning',
     },
     guests: '{count, plural, one {# guest} other {# guests}}',
     seatedMinutes: '{minutes} min',
@@ -2908,7 +2917,13 @@ export const en = {
       title: 'Table {table}',
       waiter: 'Waiter: {name}',
       move: 'Move table',
+      merge: 'Merge into…',
+      transfer: 'Move dishes…',
       takeOrder: 'Take order',
+      clean: 'Mark clean',
+      cleaned: '{table} is clean',
+      needsCleaning:
+        'The guests have left. Mark the table clean when it is ready for the next ones.',
     },
     takeaway: 'Takeaway',
     shift: 'Shift',
@@ -3010,6 +3025,24 @@ export const en = {
       description: 'Choose a free table. Kitchen tickets follow the guests.',
       noFreeTable: 'There is no free table to move to.',
       moved: 'Moved {from} to {to}',
+    },
+    merge: {
+      title: 'Merge {table} into another table',
+      description:
+        'Choose the table its guests join: one bill for both. Orders and kitchen tickets go with them, and {table} is then free.',
+      noTable: 'There is no other open table without a printed bill.',
+      merged: '{from} merged into {to}',
+    },
+    transfer: {
+      title: 'Move dishes from {table}',
+      description:
+        'Choose the dishes and the table whose bill they go on. Kitchen tickets stay as they are and show where each dish goes now.',
+      dishes: 'Dishes',
+      noDishes: 'There are no dishes to move.',
+      to: 'To table',
+      noTable: 'There is no other open table without a printed bill.',
+      submit: '{count, plural, one {Move # dish} other {Move # dishes}}',
+      moved: '{count, plural, one {# dish moved} other {# dishes moved}} to {to}',
     },
   },
   billing: {
@@ -3248,6 +3281,7 @@ export const en = {
       TABLE_TABLET: 'Table tablet',
       QR: 'QR order',
     },
+    movedTo: 'Now for {table}',
     badge: {
       moved: 'Moved from {table}',
       MODIFIED: 'Changed',

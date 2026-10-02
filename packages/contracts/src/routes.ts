@@ -214,11 +214,15 @@ import {
 import {
   AssignSessionWaiterRequest,
   CloseWithoutBillRequest,
+  MergeTablesRequest,
   MoveTableRequest,
   OpenTableRequest,
   TableOverviewResponse,
   TableSessionParams,
   TableSessionView,
+  TableStateView,
+  TransferItemsRequest,
+  TransferItemsResponse,
 } from './table-sessions.js';
 import {
   ArchiveRequest,
@@ -1841,6 +1845,69 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such open session or active table.', schema: ApiError },
       409: { description: 'The new table is not free.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'mergeTables',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/merge',
+    summary: 'Merge this table into another open table, for one bill',
+    description:
+      'Its orders, tickets and open requests go to the other table, its guests are added to the ' +
+      "other table's, and its session closes: its tablet resets and the table is free (or needs " +
+      'cleaning). Not while either bill is printed, nor with discounts on this one. Waiters may ' +
+      'merge only their own tables. Audited (TBL-006).',
+    tags: ['tables'],
+    requirements: ['TBL-006', 'AUD-001'],
+    capability: 'TABLE_MOVE_MERGE',
+    request: { params: TableSessionParams, body: MergeTablesRequest },
+    responses: {
+      200: { description: 'The table merged into.', schema: TableSessionView },
+      ...standardErrors,
+      404: { description: 'No such open session.', schema: ApiError },
+      409: {
+        description: 'The same table, a bill is printed, or this bill has discounts.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'transferItems',
+    method: 'POST',
+    path: '/api/v1/table-sessions/:sessionId/transfer',
+    summary: "Move dishes to another open table's bill",
+    description:
+      'Whole lines, a combo with its parts; not dishes waiting for approval, ended or with a ' +
+      'discount, nor while either bill is printed. Kitchen tickets stay as they are and show ' +
+      'where each moved dish now goes. Waiters may move dishes only between their own tables. ' +
+      'Audited (TBL-006).',
+    tags: ['tables'],
+    requirements: ['TBL-006', 'AUD-001'],
+    capability: 'TABLE_MOVE_MERGE',
+    request: { params: TableSessionParams, body: TransferItemsRequest },
+    responses: {
+      200: { description: 'Both tables after the move.', schema: TransferItemsResponse },
+      ...standardErrors,
+      404: { description: 'No such open session or dish.', schema: ApiError },
+      409: { description: 'A dish cannot move, or a bill is printed.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'markTableClean',
+    method: 'POST',
+    path: '/api/v1/tables/:tableId/clean',
+    summary: 'Mark a table clean, ready for the next guests',
+    description:
+      'Only a table that needs cleaning (setting `tables.needsCleaning`, TBL-004); it becomes free.',
+    tags: ['tables'],
+    requirements: ['TBL-004'],
+    capability: 'ORDER_CREATE',
+    request: { params: z.object({ tableId: Id }) },
+    responses: {
+      200: { description: 'The table, now free.', schema: TableStateView },
+      ...standardErrors,
+      404: { description: 'No such active table.', schema: ApiError },
+      409: { description: 'The table does not need cleaning.', schema: ApiError },
     },
   },
   {

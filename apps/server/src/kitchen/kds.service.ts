@@ -12,6 +12,7 @@ import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
+import { ORDERS_MOVED_ACTIONS } from '../floor/table-transfers.service.js';
 import { appendEvent } from '../events/outbox.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -55,6 +56,8 @@ const TICKET_INCLUDE = {
           readyAt: true,
           modifiers: { orderBy: { createdAt: 'asc' }, select: { name: true, quantity: true } },
           parent: { select: { name: true } },
+          // Where the dish goes now, when it moved to another table's bill (TBL-006).
+          order: { select: { table: { select: { label: true } } } },
         },
       },
     },
@@ -306,7 +309,8 @@ export class KdsService {
       if (waiterId !== null) staffIds.add(waiterId);
       if (row.order.tableSessionId !== null) sessionIds.add(row.order.tableSessionId);
     }
-    const [staff, moves, alerts] = await Promise.all([
+    const oldest = new Date(Math.min(...rows.map((row) => row.createdAt.getTime())));
+    const [staff, moves, merges, alerts] = await Promise.all([
       this.prisma.staff.findMany({
         where: { restaurantId, id: { in: [...staffIds] } },
         select: { id: true, displayName: true },
@@ -321,6 +325,16 @@ export class KdsService {
         select: { entityId: true, occurredAt: true, before: true },
         orderBy: { occurredAt: 'asc' },
       }),
+      // Orders that went to another table whole: merged tables, or all their dishes moved.
+      this.prisma.auditLog.findMany({
+        where: {
+          restaurantId,
+          action: { in: [...ORDERS_MOVED_ACTIONS] },
+          occurredAt: { gte: oldest },
+        },
+        select: { occurredAt: true, before: true, after: true },
+        orderBy: { occurredAt: 'asc' },
+      }),
       this.prisma.alert.findMany({
         where: {
           restaurantId,
@@ -333,14 +347,33 @@ export class KdsService {
     ]);
     const names = new Map(staff.map((person) => [person.id, person.displayName]));
     const notified = new Set(alerts.map((alert) => alert.kotId));
+    const labelOf = (before: unknown): string | null =>
+      typeof before === 'object' &&
+      before !== null &&
+      'tableLabel' in before &&
+      typeof before.tableLabel === 'string'
+        ? before.tableLabel
+        : null;
+    const ordersOf = (after: unknown): readonly unknown[] =>
+      typeof after === 'object' &&
+      after !== null &&
+      'orderIds' in after &&
+      Array.isArray(after.orderIds)
+        ? after.orderIds
+        : [];
     const movedFrom = (row: TicketRow): string | null => {
       // The first move after the ticket was raised: the kitchen knew the table by that label.
-      const move = moves.find(
-        (entry) => entry.entityId === row.order.tableSessionId && entry.occurredAt >= row.createdAt,
-      );
-      const before = move?.before;
-      if (typeof before !== 'object' || before === null || !('tableLabel' in before)) return null;
-      return typeof before.tableLabel === 'string' ? before.tableLabel : null;
+      const candidates = [
+        ...moves.filter(
+          (entry) =>
+            entry.entityId === row.order.tableSessionId && entry.occurredAt >= row.createdAt,
+        ),
+        ...merges.filter(
+          (entry) =>
+            entry.occurredAt >= row.createdAt && ordersOf(entry.after).includes(row.orderId),
+        ),
+      ].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+      return labelOf(candidates[0]?.before);
     };
     return rows.map((row) => {
       const waiterId = row.order.tableSession?.waiterId ?? row.order.createdById;
@@ -374,6 +407,11 @@ export class KdsService {
           comboName: line.orderItem.parent?.name ?? null,
           state: line.orderItem.state,
           readyAt: line.orderItem.readyAt?.toISOString() ?? null,
+          movedTo:
+            line.orderItem.order.table !== null &&
+            line.orderItem.order.table.label !== row.order.table?.label
+              ? line.orderItem.order.table.label
+              : null,
         })),
       };
     });
