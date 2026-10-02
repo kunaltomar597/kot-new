@@ -391,9 +391,11 @@ model Device {
   /// Table a table tablet is bound to (AUTH-009).
   tableId                String?      @map("table_id") @db.Uuid
   table                  DiningTable? @relation(fields: [tableId], references: [id])
-  /// Station a kitchen screen shows (KDS-002).
+  /// Station a kitchen screen shows (KDS-002); its first, when it shows several.
   stationId              String?      @map("station_id") @db.Uuid
   station                Station?     @relation(fields: [stationId], references: [id])
+  /// The screen's other stations (KDS-002: one or more), after `stationId`.
+  extraStationIds        String[]     @default([]) @map("extra_station_ids") @db.Uuid
   /// Person wearing a pager, or holding a waiter phone: whom it alerts (P2-06a).
   staffId                String?      @map("staff_id") @db.Uuid
   /// Serial printed (and in the QR code) on a pager (PGR-012).
@@ -488,22 +490,24 @@ model OverrideGrant {
 
 /// A manager's one-time code for pairing one device (AUTH-007).
 model PairingCode {
-  id           String     @id @default(uuid(7)) @db.Uuid
-  restaurantId String     @map("restaurant_id") @db.Uuid
+  id              String     @id @default(uuid(7)) @db.Uuid
+  restaurantId    String     @map("restaurant_id") @db.Uuid
   /// SHA-256 of the code; the code itself is shown once and never stored.
-  codeHash     String     @unique @map("code_hash")
-  type         DeviceType
-  name         String
-  tableId      String?    @map("table_id") @db.Uuid
-  stationId    String?    @map("station_id") @db.Uuid
-  staffId      String?    @map("staff_id") @db.Uuid
+  codeHash        String     @unique @map("code_hash")
+  type            DeviceType
+  name            String
+  tableId         String?    @map("table_id") @db.Uuid
+  stationId       String?    @map("station_id") @db.Uuid
+  /// A kitchen screen's other stations (KDS-002).
+  extraStationIds String[]   @default([]) @map("extra_station_ids") @db.Uuid
+  staffId         String?    @map("staff_id") @db.Uuid
   /// Manager who created the code; null for the installer's bootstrap code.
-  createdById  String?    @map("created_by_id") @db.Uuid
-  expiresAt    DateTime   @map("expires_at") @db.Timestamptz(3)
-  usedAt       DateTime?  @map("used_at") @db.Timestamptz(3)
-  deviceId     String?    @map("device_id") @db.Uuid
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById     String?    @map("created_by_id") @db.Uuid
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(3)
+  usedAt          DateTime?  @map("used_at") @db.Timestamptz(3)
+  deviceId        String?    @map("device_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId])
   @@index([expiresAt])

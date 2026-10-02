@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { RESTAURANT_ID } from './fakes.js';
 import { expectNoAxeViolations, renderConsole, server, t } from './harness.js';
-import { board, line, minutesAgo, NOW, ticket } from './kds-fixture.js';
+import { board, KDS_IDS, line, minutesAgo, NOW, ticket } from './kds-fixture.js';
 
 /** Records the notes the kitchen sounds play (Web Audio is not in jsdom). */
 class FakeAudioContext {
@@ -300,5 +300,43 @@ describe('[KDS-009] [KDS-012] sounds and reconnecting', () => {
     expect(await card(/^KOT 2/)).toBeInTheDocument();
     expect(screen.queryByText(t('kds.disconnectedTitle'))).toBeNull();
     expect(screen.getAllByRole('article')).toHaveLength(2);
+  });
+});
+
+describe('[KDS-002] a screen of several stations', () => {
+  it('names its stations, marks each ticket’s, and shows whole orders for the pass', async () => {
+    const kitchen = ticket(1, { lines: [line(11, { state: 'READY' })] });
+    const bar = ticket(2, { stationName: 'Bar', lines: [line(21, { state: 'READY' })] });
+    const view = board([kitchen, bar], {
+      station: null,
+      stations: [
+        { id: KDS_IDS.station, name: 'Kitchen' },
+        { id: '0199a0e0-0000-7000-8000-000000000902', name: 'Bar' },
+      ],
+    });
+    const fake = kdsServer(view, view, view)
+      .on('POST', `/api/v1/order-items/${line(11).orderItemId}/status`, () => ({
+        status: 200,
+        body: {},
+      }))
+      .on('POST', `/api/v1/order-items/${line(21).orderItemId}/status`, () => ({
+        status: 200,
+        body: {},
+      }));
+    const { user } = await renderConsole({ fake, path: '/kds' });
+    expect(await screen.findByRole('heading', { level: 2, name: 'Kitchen + Bar' })).toBeVisible();
+    const barTicket = screen.getByRole('article', { name: /^KOT 2/ });
+    expect(within(barTicket).getByText(/^Bar · /)).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: t('kds.viewOrders') }));
+    const order = screen.getByRole('article', { name: /^Order 3/ });
+    expect(within(order).getByText(t('kds.orderReady'))).toBeVisible();
+    await user.click(within(order).getByRole('button', { name: /^Picked up: / }));
+    await waitFor(() => {
+      expect(postsTo(fake, `/api/v1/order-items/${line(21).orderItemId}/status`)).toHaveLength(1);
+    });
+    expect(postsTo(fake, `/api/v1/order-items/${line(11).orderItemId}/status`)[0]?.body).toEqual({
+      event: 'PICK_UP',
+    });
   });
 });

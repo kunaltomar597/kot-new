@@ -29,6 +29,8 @@ export interface StationActor {
   readonly deviceId: string;
   /** The station the screen shows; null shows every station. */
   readonly stationId: string | null;
+  /** Every station the screen shows; empty for all of them (KDS-002). */
+  readonly stationIds: readonly string[];
 }
 
 /** Whoever performs a kitchen or floor step: a signed-in person or a kitchen screen. */
@@ -42,6 +44,8 @@ export interface Actor {
   readonly capabilities?: readonly Capability[];
   /** Set in station mode when the screen is bound to one station. */
   readonly stationId?: string | null;
+  /** In station mode, every station the screen shows; empty or absent for all (KDS-002). */
+  readonly stationIds?: readonly string[];
 }
 
 /** A manager's approval consumed for this request (AUTH-011). */

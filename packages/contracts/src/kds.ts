@@ -61,8 +61,10 @@ export const KdsSettings = z.object({
 export type KdsSettings = z.infer<typeof KdsSettings>;
 
 export const KdsTicketsResponse = z.object({
-  /** The station shown; null for all stations. */
+  /** The station shown; null for all stations, or for several (see `stations`). */
   station: z.object({ id: Id, name: z.string() }).nullable(),
+  /** Every station shown; empty for all stations, the Expo/Pass view (KDS-002). */
+  stations: z.array(z.object({ id: Id, name: z.string() })).default([]),
   /** Open tickets, oldest first. */
   tickets: z.array(KdsTicket),
   /** Tickets bumped in the last hour, newest first, for Recall (KDS-005). */

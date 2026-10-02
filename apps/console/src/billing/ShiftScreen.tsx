@@ -1,5 +1,5 @@
 import type { ShiftView } from '@rp/contracts';
-import { formatRupees } from '@rp/domain';
+import { countDenominations, formatRupees } from '@rp/domain';
 import {
   Button,
   Card,
@@ -17,6 +17,35 @@ import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useLive } from '../app/use-live.js';
 import { paiseFromInput } from './money-input.js';
+
+/** Indian notes and coins, largest first; the same value as note or coin is one count. */
+export const DENOMINATIONS = [
+  '2000',
+  '500',
+  '200',
+  '100',
+  '50',
+  '20',
+  '10',
+  '5',
+  '2',
+  '1',
+] as const;
+
+/** The counts typed, without blanks and zeros, or undefined when one is not a whole number. */
+export function denominationCounts(
+  typed: Readonly<Record<string, string>>,
+): Record<string, number> | undefined {
+  const counts: Record<string, number> = {};
+  for (const [note, text] of Object.entries(typed)) {
+    const trimmed = text.trim();
+    if (trimmed === '') continue;
+    if (!/^\d{1,6}$/.test(trimmed)) return undefined;
+    const count = Number(trimmed);
+    if (count > 0) counts[note] = count;
+  }
+  return counts;
+}
 
 const never = () => false;
 
@@ -117,6 +146,11 @@ function OpenShiftView({ shift, onChanged }: { shift: ShiftView; onChanged: () =
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [counted, setCounted] = useState('');
+  // BILL-013 S: the drawer counted note by note, which the server totals.
+  const [byNotes, setByNotes] = useState(false);
+  const [notes, setNotes] = useState<Readonly<Record<string, string>>>({});
+  const noteCounts = denominationCounts(notes);
+  const notesTotal = noteCounts === undefined ? undefined : countDenominations(noteCounts);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
@@ -152,14 +186,17 @@ function OpenShiftView({ shift, onChanged }: { shift: ShiftView; onChanged: () =
 
   const close = () => {
     const paise = counted.trim() === '0' ? 0 : paiseFromInput(counted);
-    if (paise === undefined) {
-      setError(t('shift.invalidAmount'));
+    if (byNotes ? noteCounts === undefined : paise === undefined) {
+      setError(t(byNotes ? 'shift.invalidCount' : 'shift.invalidAmount'));
       return;
     }
     setBusy(true);
     setError(undefined);
     controller.api
-      .closeShift({ params: { id: shift.id }, body: { countedCash: paise } })
+      .closeShift({
+        params: { id: shift.id },
+        body: byNotes ? { denominations: noteCounts ?? {} } : { countedCash: paise ?? 0 },
+      })
       .then(
         (closed) => {
           toast.show({
@@ -261,14 +298,46 @@ function OpenShiftView({ shift, onChanged }: { shift: ShiftView; onChanged: () =
               close();
             }}
           >
-            <TextField
-              label={t('shift.counted')}
-              inputMode="decimal"
-              value={counted}
-              onChange={(event) => {
-                setCounted(event.target.value);
-              }}
-            />
+            <label className="console-check">
+              <input
+                type="checkbox"
+                checked={byNotes}
+                onChange={(event) => {
+                  setByNotes(event.target.checked);
+                }}
+              />
+              {t('shift.byNotes')}
+            </label>
+            {byNotes ? (
+              <fieldset className="shift-notes">
+                <legend>{t('shift.notesLegend')}</legend>
+                {DENOMINATIONS.map((note) => (
+                  <TextField
+                    key={note}
+                    label={t('shift.noteCount', { note })}
+                    inputMode="numeric"
+                    value={notes[note] ?? ''}
+                    onChange={(event) => {
+                      setNotes({ ...notes, [note]: event.target.value });
+                    }}
+                  />
+                ))}
+                <p className="shift-notes__total" role="status">
+                  {notesTotal === undefined
+                    ? t('shift.invalidCount')
+                    : t('shift.notesTotal', { total: formatRupees(notesTotal) })}
+                </p>
+              </fieldset>
+            ) : (
+              <TextField
+                label={t('shift.counted')}
+                inputMode="decimal"
+                value={counted}
+                onChange={(event) => {
+                  setCounted(event.target.value);
+                }}
+              />
+            )}
             <Button type="submit" variant="danger" loading={busy}>
               {t('shift.close')}
             </Button>

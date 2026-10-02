@@ -122,6 +122,9 @@ describe('[NTF-009] on break', () => {
       onBreak: true,
       since: now.toISOString(),
     });
+    // The app reads it back when it starts (P6-05a).
+    const read = await server().get('/api/v1/staff/me/break').set(as(waiter));
+    expect(BreakView.parse(read.body)).toEqual(BreakView.parse(started.body));
     const session = TableSessionView.parse(
       (
         await server()

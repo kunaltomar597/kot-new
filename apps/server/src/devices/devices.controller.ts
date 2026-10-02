@@ -24,6 +24,7 @@ import {
   type PairedDevice,
   type PairingCodeResponse,
   RenameDeviceRequest,
+  SetDeviceStationsRequest,
   RevokeDeviceRequest,
 } from '@rp/contracts';
 import type { Request } from 'express';
@@ -125,6 +126,16 @@ export class DevicesController {
     @Body(new ZodValidationPipe(RenameDeviceRequest)) body: RenameDeviceRequest,
   ): Promise<DeviceSummary> {
     return this.devices.rename(principalOf(request), deviceId, body.name);
+  }
+
+  @Put(':deviceId/stations')
+  @RequireCapability('DEVICE_PAIR')
+  setStations(
+    @Req() request: AuthenticatedRequest,
+    @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
+    @Body(new ZodValidationPipe(SetDeviceStationsRequest)) body: SetDeviceStationsRequest,
+  ): Promise<DeviceSummary> {
+    return this.devices.setStations(principalOf(request), deviceId, body.stationIds);
   }
 
   @Post(':deviceId/revoke')

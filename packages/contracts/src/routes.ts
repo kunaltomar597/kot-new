@@ -94,6 +94,7 @@ import {
   PairedDevice,
   PairingCodeResponse,
   RenameDeviceRequest,
+  SetDeviceStationsRequest,
   RevokeDeviceRequest,
   TabletTableView,
 } from './devices.js';
@@ -1217,6 +1218,26 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such device.', schema: ApiError },
       409: { description: 'The device is unpaired.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'setDeviceStations',
+    method: 'PUT',
+    path: '/api/v1/devices/:deviceId/stations',
+    summary: 'Choose the stations a kitchen screen shows',
+    description:
+      'KDS-002: one or more stations, or none for every station (the Expo/Pass view). The screen ' +
+      'reconnects at once to show them. Audited, and announced as `RestaurantChanged` `DEVICES`.',
+    tags: ['devices'],
+    requirements: ['KDS-002', 'MGR-006', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }), body: SetDeviceStationsRequest },
+    responses: {
+      200: { description: 'Changed.', schema: DeviceSummary },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+      409: { description: 'Not a kitchen screen, or unpaired.', schema: ApiError },
+      422: { description: 'A station that is not here, or archived.', schema: ApiError },
     },
   },
   {
@@ -2564,6 +2585,19 @@ export const ROUTES = [
       201: { description: 'The alerts, one per person.', schema: NudgeResponse },
       ...standardErrors,
       422: { description: 'Someone chosen is not active staff here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getMyBreak',
+    method: 'GET',
+    path: '/api/v1/staff/me/break',
+    summary: 'Whether the signed-in person is on break',
+    tags: ['notifications'],
+    requirements: ['NTF-009'],
+    capability: 'SESSION',
+    responses: {
+      200: { description: 'The break state.', schema: BreakView },
+      ...standardErrors,
     },
   },
   {

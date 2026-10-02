@@ -28,6 +28,7 @@ function server(): FakeServer {
         name: 'Counter POS',
         tableId: null,
         stationId: null,
+        stationIds: [],
         staffId: null,
       },
     }))

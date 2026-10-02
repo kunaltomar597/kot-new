@@ -1744,3 +1744,25 @@ body {
   align-items: center;
   gap: var(--rp-space-3);
 }
+
+/* KDS-002: the Tickets / Orders (Expo) switch on a screen of several stations. */
+.kds-board__views {
+  display: flex;
+  gap: var(--rp-space-2);
+}
+
+/* BILL-013 S: the denomination count when closing a shift. */
+.shift-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--rp-space-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.shift-notes__total {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-weight: var(--rp-font-weight-semibold);
+}

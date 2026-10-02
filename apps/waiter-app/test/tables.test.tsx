@@ -1,3 +1,4 @@
+import { en } from '@rp/i18n';
 import { eventFrame } from '@rp/mobile-core/testing';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
@@ -260,5 +261,19 @@ describe('[WTR-014] the waiter’s pager', () => {
     }));
     await signedInApp(broken, server);
     expect(await screen.findByText('Your pager status could not be read.')).toBeOnTheScreen();
+  });
+});
+
+describe('[NTF-009] on break', () => {
+  it('goes on break, says where the alerts go, and comes back', async () => {
+    const restaurant = new Restaurant();
+    await signedInApp(restaurant);
+    const card = await screen.findByTestId('break-card');
+    await fireEvent.press(within(card).getByText(en.mobile.break.start));
+    expect(await within(card).findByText(/^On break since .*manager on duty\.$/)).toBeOnTheScreen();
+    expect(restaurant.breakSince).not.toBeNull();
+    await fireEvent.press(within(card).getByText(en.mobile.break.end));
+    expect(await within(card).findByText(en.mobile.break.hint)).toBeOnTheScreen();
+    expect(restaurant.breakSince).toBeNull();
   });
 });

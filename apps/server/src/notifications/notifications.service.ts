@@ -348,6 +348,19 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** NTF-009: while on break, the person's alerts go to the managers on duty. */
+  /** NTF-009: whether the signed-in person is on break, and since when. */
+  async breakOf(principal: Principal): Promise<BreakView> {
+    const current = await this.prisma.staff.findFirstOrThrow({
+      where: { id: principal.staffId, restaurantId: principal.restaurantId },
+      select: { onBreakSince: true },
+    });
+    return {
+      staffId: principal.staffId,
+      onBreak: current.onBreakSince !== null,
+      since: iso(current.onBreakSince),
+    };
+  }
+
   async setBreak(principal: Principal, onBreak: boolean): Promise<BreakView> {
     const current = await this.prisma.staff.findFirstOrThrow({
       where: { id: principal.staffId, restaurantId: principal.restaurantId },

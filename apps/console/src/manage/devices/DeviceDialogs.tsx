@@ -5,7 +5,7 @@ import type {
   StaffView,
   StationView,
 } from '@rp/contracts';
-import { Button, ConfirmDialog, Dialog, QrCode, Select, TextField } from '@rp/ui-web';
+import { Button, ChoiceGroup, ConfirmDialog, Dialog, QrCode, Select, TextField } from '@rp/ui-web';
 import { useId, useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
@@ -53,7 +53,7 @@ export function PairDeviceDialog({
     type: 'TABLE_TABLET',
     name: nameFor('TABLE_TABLET'),
     tableId: '',
-    stationId: '',
+    stationIds: [],
     staffId: '',
   }));
   // The suggested name follows the type until the manager types their own.
@@ -170,13 +170,17 @@ export function PairDeviceDialog({
           />
         ) : null}
         {form.type === 'KDS' ? (
-          <Select
-            label={t('devices.pairForm.station')}
-            hint={t('devices.pairForm.stationHint')}
-            value={form.stationId}
-            options={[{ value: '', label: t('devices.allStations') }, ...stationChoices(stations)]}
-            onChange={(event) => {
-              setForm((current) => ({ ...current, stationId: event.target.value }));
+          <ChoiceGroup
+            legend={t('devices.pairForm.stations')}
+            hint={t('devices.pairForm.stationsHint')}
+            mode="multiple"
+            options={stationChoices(stations).map((choice) => ({
+              id: choice.value,
+              label: choice.label,
+            }))}
+            value={form.stationIds}
+            onChange={(stationIds) => {
+              setForm((current) => ({ ...current, stationIds }));
             }}
           />
         ) : null}
@@ -416,6 +420,72 @@ export function MoveTabletDialog({
           onChange={(event) => {
             setTableId(event.target.value);
           }}
+        />
+        {error === undefined ? null : (
+          <p role="alert" className="console-notice console-notice--danger">
+            {error}
+          </p>
+        )}
+      </form>
+    </Dialog>
+  );
+}
+
+/** KDS-002: the stations a kitchen screen shows; none for every station (Expo/Pass). */
+export function DeviceStationsDialog({
+  device,
+  stations,
+  busy,
+  error,
+  onSave,
+  onClose,
+}: {
+  device: DeviceView;
+  stations: readonly StationView[];
+  busy: boolean;
+  error: string | undefined;
+  onSave: (stationIds: string[]) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const formId = useId();
+  const [stationIds, setStationIds] = useState<string[]>([...device.stationIds]);
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      dismissible={!busy}
+      title={t('devices.stationsDialog.title', { name: device.name })}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            {t('devices.moveDialog.cancel')}
+          </Button>
+          <Button type="submit" form={formId} loading={busy}>
+            {t('devices.stationsDialog.save')}
+          </Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        className="console-form"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(stationIds);
+        }}
+      >
+        <ChoiceGroup
+          legend={t('devices.pairForm.stations')}
+          hint={t('devices.pairForm.stationsHint')}
+          mode="multiple"
+          options={stationChoices(stations).map((choice) => ({
+            id: choice.value,
+            label: choice.label,
+          }))}
+          value={stationIds}
+          onChange={setStationIds}
         />
         {error === undefined ? null : (
           <p role="alert" className="console-notice console-notice--danger">

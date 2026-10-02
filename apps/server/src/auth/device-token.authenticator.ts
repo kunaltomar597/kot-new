@@ -53,6 +53,7 @@ export class DeviceTokenAuthenticator implements DeviceAuthenticator {
       type: device.type,
       tableId: device.tableId,
       stationId: device.stationId,
+      stationIds: device.stationId === null ? [] : [device.stationId, ...device.extraStationIds],
       staffId: device.staffId,
     };
   }

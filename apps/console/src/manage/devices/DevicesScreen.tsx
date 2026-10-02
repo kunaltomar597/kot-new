@@ -7,6 +7,7 @@ import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { useLive } from '../../app/use-live.js';
 import {
+  DeviceStationsDialog,
   MoveTabletDialog,
   PairDeviceDialog,
   RenameDeviceDialog,
@@ -19,7 +20,7 @@ export const DEVICE_REFRESH_MS = 30_000;
 
 type Open =
   | { readonly kind: 'PAIR' }
-  | { readonly kind: 'RENAME' | 'MOVE' | 'UNPAIR'; readonly device: DeviceView };
+  | { readonly kind: 'RENAME' | 'MOVE' | 'STATIONS' | 'UNPAIR'; readonly device: DeviceView };
 
 /**
  * The paired devices (P4-02c, MGR-006): each screen, phone, tablet and pager with what it is bound
@@ -118,6 +119,9 @@ export function DevicesScreen() {
                     }}
                     onMove={() => {
                       setOpen({ kind: 'MOVE', device });
+                    }}
+                    onStations={() => {
+                      setOpen({ kind: 'STATIONS', device });
                     }}
                     onLocate={() => {
                       controller.api.locateDevice({ params: { deviceId: device.id } }).then(
@@ -225,6 +229,25 @@ export function DevicesScreen() {
           onClose={close}
         />
       ) : null}
+      {open?.kind === 'STATIONS' && data.status === 'ready' ? (
+        <DeviceStationsDialog
+          device={open.device}
+          stations={data.value.stations}
+          busy={busy}
+          error={error}
+          onSave={(stationIds) => {
+            void change(
+              () =>
+                controller.api.setDeviceStations({
+                  params: { deviceId: open.device.id },
+                  body: { stationIds },
+                }),
+              t('devices.stationsChanged', { name: open.device.name }),
+            );
+          }}
+          onClose={close}
+        />
+      ) : null}
       {open?.kind === 'UNPAIR' ? (
         <UnpairDeviceDialog
           device={open.device}
@@ -269,6 +292,7 @@ function DeviceRow({
   isThisDevice,
   onRename,
   onMove,
+  onStations,
   onLocate,
   onUnpair,
 }: {
@@ -277,6 +301,7 @@ function DeviceRow({
   isThisDevice: boolean;
   onRename?: () => void;
   onMove?: () => void;
+  onStations?: () => void;
   onLocate?: () => void;
   onUnpair?: () => void;
 }) {
@@ -345,6 +370,11 @@ function DeviceRow({
           {device.type === 'TABLE_TABLET' ? (
             <Button variant="secondary" onClick={onMove}>
               {t('devices.moveTable')}
+            </Button>
+          ) : null}
+          {device.type === 'KDS' ? (
+            <Button variant="secondary" onClick={onStations}>
+              {t('devices.stations')}
             </Button>
           ) : null}
           {device.type === 'TABLE_TABLET' && device.connected ? (

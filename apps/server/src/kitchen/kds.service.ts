@@ -68,6 +68,12 @@ type TicketRow = Prisma.KotGetPayload<{ include: typeof TICKET_INCLUDE }>;
  * each item's live state, bump and recall, and "Notify manager". A kitchen screen in station mode
  * (AUTH-005) is held to its own station; its actions are attributed to the device.
  */
+/** The stations a station-mode screen is bound to; none for all (or for a person). */
+function boundStations(actor: Actor): readonly string[] {
+  if (actor.stationIds !== undefined) return actor.stationIds;
+  return actor.stationId === undefined || actor.stationId === null ? [] : [actor.stationId];
+}
+
 @Injectable()
 export class KdsService {
   constructor(
@@ -77,22 +83,25 @@ export class KdsService {
   ) {}
 
   async tickets(actor: Actor, query: KdsTicketsQuery): Promise<KdsTicketsResponse> {
-    const stationId = this.stationFor(actor, query.stationId);
-    const station =
-      stationId === null
-        ? null
-        : await this.prisma.station.findFirst({
-            where: { id: stationId, restaurantId: actor.restaurantId },
+    const stationIds = this.stationsFor(actor, query.stationId);
+    const found =
+      stationIds === null
+        ? []
+        : await this.prisma.station.findMany({
+            where: { id: { in: [...stationIds] }, restaurantId: actor.restaurantId },
             select: { id: true, name: true },
           });
-    if (stationId !== null && station === null) {
+    if (stationIds !== null && found.length !== stationIds.length) {
       throw new AppError(404, 'STATION_NOT_FOUND', 'There is no such station.');
     }
+    const stations = (stationIds ?? []).flatMap(
+      (id) => found.find((station) => station.id === id) ?? [],
+    );
     const now = new Date();
     const businessDate = await currentBusinessDate(this.prisma, actor.restaurantId, now);
     const scope = {
       restaurantId: actor.restaurantId,
-      ...(stationId !== null && { stationId }),
+      ...(stationIds !== null && { stationId: { in: [...stationIds] } }),
     };
     const [open, bumped, snapshot] = await Promise.all([
       this.prisma.kot.findMany({
@@ -117,7 +126,8 @@ export class KdsService {
     );
     const views = await this.views(actor.restaurantId, [...showing, ...bumped]);
     return {
-      station,
+      station: stations.length === 1 ? (stations[0] ?? null) : null,
+      stations,
       tickets: views.slice(0, showing.length),
       recentlyBumped: views.slice(showing.length),
       settings: {
@@ -182,56 +192,91 @@ export class KdsService {
   async notifyManager(actor: Actor, kotId: string): Promise<NotifyManagerResponse> {
     return this.prisma.transaction(async (tx) => {
       const kot = await this.lockedTicket(tx, actor, kotId);
-      const waiting = kot.lines.filter((line) => line.orderItem.state === 'READY');
-      if (waiting.length === 0) {
+      const raised = await this.raiseNotCollected(tx, kot, {
+        staffId: actor.staffId ?? null,
+        deviceId: actor.deviceId,
+      });
+      if (raised === undefined) {
         throw new AppError(
           409,
           'NOTHING_WAITING',
           'Nothing on this ticket is ready and waiting to be collected.',
         );
       }
-      // The notification engine delivers it to the managers on duty until acknowledged (P2-03).
-      return this.notifications.raise(tx, {
-        restaurantId: actor.restaurantId,
-        type: READY_NOT_COLLECTED,
-        kotId: kot.id,
-        tableId: kot.order.tableId,
-        tableSessionId: kot.order.tableSessionId,
-        orderId: kot.orderId,
-        dedupeKey: `collect:${kot.id}`,
-        raisedById: actor.staffId ?? null,
-        raisedByDeviceId: actor.deviceId,
-        payload: {
-          kotNumber: kot.kotNumber,
-          stationName: kot.station.name,
-          tableLabel: kot.order.table?.label ?? null,
-          takeawayToken: kot.order.takeawayToken,
-          items: waiting.map((line) => line.orderItem.name),
-        },
-      });
+      return raised;
     });
   }
 
-  /** A station-mode screen sees only its station; a person may choose one or see all. */
-  private stationFor(actor: Actor, requested: string | undefined): string | null {
-    const bound = actor.stationId ?? null;
-    if (bound !== null) {
-      if (requested !== undefined && requested !== bound) {
-        throw new AppError(403, 'FORBIDDEN', 'This screen shows its own station only.');
+  /**
+   * KDS-006 S: the same alert, raised by the server itself (P6-05a); false when nothing on the
+   * ticket is ready any more.
+   */
+  async escalateNotCollected(restaurantId: string, kotId: string): Promise<boolean> {
+    return this.prisma.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 AS locked FROM kots WHERE id = ${kotId}::uuid FOR UPDATE`;
+      const kot = await tx.kot.findFirst({
+        where: { id: kotId, restaurantId, bumpedAt: null },
+        include: TICKET_INCLUDE,
+      });
+      if (kot === null) return false;
+      const raised = await this.raiseNotCollected(tx, kot, { staffId: null, deviceId: null });
+      return raised !== undefined && !raised.alreadyOpen;
+    });
+  }
+
+  /** The managers on duty are alerted until one acknowledges (P2-03); undefined: none ready. */
+  private async raiseNotCollected(
+    tx: TransactionClient,
+    kot: TicketRow,
+    by: { readonly staffId: string | null; readonly deviceId: string | null },
+  ): Promise<NotifyManagerResponse | undefined> {
+    const waiting = kot.lines.filter((line) => line.orderItem.state === 'READY');
+    if (waiting.length === 0) return undefined;
+    return this.notifications.raise(tx, {
+      restaurantId: kot.restaurantId,
+      type: READY_NOT_COLLECTED,
+      kotId: kot.id,
+      tableId: kot.order.tableId,
+      tableSessionId: kot.order.tableSessionId,
+      orderId: kot.orderId,
+      dedupeKey: `collect:${kot.id}`,
+      raisedById: by.staffId,
+      raisedByDeviceId: by.deviceId,
+      payload: {
+        kotNumber: kot.kotNumber,
+        stationName: kot.station.name,
+        tableLabel: kot.order.table?.label ?? null,
+        takeawayToken: kot.order.takeawayToken,
+        items: waiting.map((line) => line.orderItem.name),
+        automatic: by.deviceId === null,
+      },
+    });
+  }
+
+  /**
+   * The stations to show, or null for all: a station-mode screen sees only its own (one or
+   * more, KDS-002), and may narrow to one of them; a person may choose one or see all.
+   */
+  private stationsFor(actor: Actor, requested: string | undefined): readonly string[] | null {
+    const bound = boundStations(actor);
+    if (bound.length > 0) {
+      if (requested === undefined) return bound;
+      if (!bound.includes(requested)) {
+        throw new AppError(403, 'FORBIDDEN', 'This screen shows its own stations only.');
       }
-      return bound;
+      return [requested];
     }
-    return requested ?? null;
+    return requested === undefined ? null : [requested];
   }
 
   private async lockedTicket(tx: TransactionClient, actor: Actor, kotId: string) {
     await tx.$queryRaw`SELECT 1 AS locked FROM kots WHERE id = ${kotId}::uuid FOR UPDATE`;
-    const bound = actor.stationId ?? null;
+    const bound = boundStations(actor);
     const kot = await tx.kot.findFirst({
       where: {
         id: kotId,
         restaurantId: actor.restaurantId,
-        ...(bound !== null && { stationId: bound }),
+        ...(bound.length > 0 && { stationId: { in: [...bound] } }),
       },
       include: TICKET_INCLUDE,
     });

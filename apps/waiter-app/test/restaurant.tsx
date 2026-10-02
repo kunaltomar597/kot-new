@@ -97,6 +97,8 @@ export class Restaurant {
       session: session(9005, KIRAN, 4),
     },
   ];
+  /** When the signed-in waiter went on break, or null (NTF-009). */
+  breakSince: string | null = null;
   pager: PagerView | null = {
     deviceId: PAGER_ID,
     name: 'Pager 3',
@@ -652,6 +654,17 @@ export class Restaurant {
       }))
       .on('POST', '/api/v1/orders/:orderId/approve', (call) => this.decide(call, 'approve'))
       .on('POST', '/api/v1/orders/:orderId/reject', (call) => this.decide(call, 'reject'))
+      .on('GET', '/api/v1/staff/me/break', () => ({
+        status: 200,
+        body: { staffId: RAVI, onBreak: this.breakSince !== null, since: this.breakSince },
+      }))
+      .on('POST', '/api/v1/staff/me/break', (call) => {
+        this.breakSince = (call.body as { onBreak: boolean }).onBreak ? AT : null;
+        return {
+          status: 200,
+          body: { staffId: RAVI, onBreak: this.breakSince !== null, since: this.breakSince },
+        };
+      })
       .on('GET', '/api/v1/pagers/mine', () => ({
         status: 200,
         body: { pager: this.pager, lowBatteryPercent: 15 } satisfies MyPagerResponse,

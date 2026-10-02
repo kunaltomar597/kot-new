@@ -71,6 +71,8 @@ export type TestDeviceType =
 export interface TestDeviceBinding {
   readonly tableId?: string;
   readonly stationId?: string;
+  /** A kitchen screen's other stations (KDS-002). */
+  readonly extraStationIds?: readonly string[];
   readonly staffId?: string;
 }
 
@@ -92,6 +94,7 @@ export async function registerDevice(
       keyAlgorithm: 'Ed25519',
       tableId: binding.tableId ?? null,
       stationId: binding.stationId ?? null,
+      extraStationIds: [...(binding.extraStationIds ?? [])],
       staffId: binding.staffId ?? null,
     },
   });

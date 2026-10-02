@@ -82,7 +82,7 @@ describe('[AUTH-007] pairing a device', () => {
       type: 'TABLE_TABLET' as const,
       name: ' ',
       tableId: '',
-      stationId: '',
+      stationIds: [] as string[],
       staffId: '',
     };
     expect(checkPairing(form)).toEqual({ name: 'nameRequired', tableId: 'tableRequired' });
@@ -91,11 +91,16 @@ describe('[AUTH-007] pairing a device', () => {
   });
 
   it('sends only the binding the type uses', () => {
-    const form = { name: ' Screen ', tableId: T7, stationId: TANDOOR, staffId: RAVI };
+    const form = { name: ' Screen ', tableId: T7, stationIds: [TANDOOR], staffId: RAVI };
     expect(pairingRequestOf({ ...form, type: 'KDS' })).toEqual({
       type: 'KDS',
       name: 'Screen',
-      stationId: TANDOOR,
+      stationIds: [TANDOOR],
+    });
+    // KDS-002: no station is every station.
+    expect(pairingRequestOf({ ...form, stationIds: [], type: 'KDS' })).toEqual({
+      type: 'KDS',
+      name: 'Screen',
     });
     expect(pairingRequestOf({ ...form, type: 'TABLE_TABLET' })).toEqual({
       type: 'TABLE_TABLET',

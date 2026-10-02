@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEVICE_REFRESH_MS } from '../src/manage/devices/DevicesScreen.js';
 import {
+  BAR,
   deviceList,
   deviceView,
   KDS_TANDOOR,
@@ -174,10 +175,11 @@ describe('[AUTH-007] [AUTH-009] pairing a device', () => {
       'Kitchen screen 1',
     );
     expect(form.queryByLabelText(new RegExp(`^${t('devices.pairForm.table')}`))).toBeNull();
-    await user.selectOptions(
-      form.getByLabelText(new RegExp(`^${t('devices.pairForm.station')}`)),
-      'Tandoor',
-    );
+    // KDS-002: one or more stations; the archived grill is not offered.
+    const stations = within(form.getByRole('group', { name: t('devices.pairForm.stations') }));
+    expect(stations.queryByLabelText('Grill')).toBeNull();
+    await user.click(stations.getByLabelText('Tandoor'));
+    await user.click(stations.getByLabelText('Bar'));
     await user.click(form.getByRole('button', { name: t('devices.pairForm.create') }));
 
     const shown = within(
@@ -188,7 +190,7 @@ describe('[AUTH-007] [AUTH-009] pairing a device', () => {
     expect(fake.callsTo('POST', '/api/v1/devices/pairing-codes')[0]?.body).toEqual({
       type: 'KDS',
       name: 'Kitchen screen 1',
-      stationId: TANDOOR,
+      stationIds: [TANDOOR, BAR],
     });
     expect(shown.getByText('ABCD-EFGH')).toBeVisible();
     expect(shown.getByText('https://192.168.1.20:8443')).toBeVisible();
@@ -246,6 +248,40 @@ describe('[MGR-006] [AUTH-008] [AUTH-009] changing a device', () => {
     expect(await screen.findByText(t('devices.renamed', { name: 'Grill screen' }))).toBeVisible();
     expect(fake.callsTo('PATCH', `${DEVICES}/${KDS_TANDOOR}`)[0]?.body).toEqual({
       name: 'Grill screen',
+    });
+  });
+
+  it('[KDS-002] gives a kitchen screen more stations', async () => {
+    const fake = devicesServer().on('PUT', `${DEVICES}/${KDS_TANDOOR}/stations`, () => ({
+      status: 200,
+      body: deviceView({
+        id: KDS_TANDOOR,
+        type: 'KDS',
+        name: 'Tandoor screen',
+        tableId: null,
+        stationId: TANDOOR,
+        stationIds: [TANDOOR, BAR],
+      }),
+    }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    await user.click(
+      within(await actionsFor('Tandoor screen')).getByRole('button', {
+        name: t('devices.stations'),
+      }),
+    );
+    const dialog = within(
+      await screen.findByRole('dialog', {
+        name: t('devices.stationsDialog.title', { name: 'Tandoor screen' }),
+      }),
+    );
+    expect(dialog.getByLabelText('Tandoor')).toBeChecked();
+    await user.click(dialog.getByLabelText('Bar'));
+    await user.click(dialog.getByRole('button', { name: t('devices.stationsDialog.save') }));
+    expect(
+      await screen.findByText(t('devices.stationsChanged', { name: 'Tandoor screen' })),
+    ).toBeVisible();
+    expect(fake.callsTo('PUT', `${DEVICES}/${KDS_TANDOOR}/stations`)[0]?.body).toEqual({
+      stationIds: [TANDOOR, BAR],
     });
   });
 

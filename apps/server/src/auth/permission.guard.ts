@@ -83,6 +83,7 @@ export class PermissionGuard implements CanActivate {
       restaurantId: device.restaurantId,
       deviceId: device.deviceId,
       stationId: device.stationId,
+      stationIds: device.stationIds,
     };
     return true;
   }

@@ -16,6 +16,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NotificationsOff } from './notifications';
 import { OpenTableSheet } from './OpenTableSheet';
+import { BreakCard } from './BreakCard';
 import { PagerCard } from './PagerCard';
 import { Approvals } from './Approvals';
 import { ServiceRequests } from './ServiceRequests';
@@ -98,6 +99,7 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
       <NotificationsOff />
       <UnsentHome onOpen={onOpenTable} />
       <PagerCard />
+      <BreakCard />
       <SegmentedControl
         label={t('mobile.tables.view')}
         options={[

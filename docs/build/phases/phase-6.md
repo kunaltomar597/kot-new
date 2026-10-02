@@ -77,3 +77,14 @@ Depends on: Phase 1 to 3 WPs for each feature.
 Notes: split into P6-05a, P6-05b, ... per feature group when started. Each feature ships behind a
 setting where it changes workflow.
 Acceptance: per feature, tests and a short PROGRESS.md entry.
+
+Split (2026-10-02), after a survey of what P1 to P5 already built (KDS-010 was done):
+
+- **P6-05a Finishing what was half built.** Kitchen screens with one or more stations and the
+  Expo/Pass view (KDS-002, the M part too), automatic escalation of uncollected food (KDS-006),
+  "On break" in the waiter app (NTF-009), the denomination count at shift close (BILL-013).
+- **P6-05b Ordering.** Hold and fire (ORD-016), takeaway from the waiter app (WTR-013), time-based
+  item availability (MENU-007).
+- **P6-05c Tables.** Merge tables and transfer items (TBL-006), "Needs cleaning" (TBL-004).
+- **P6-05d Billing.** Amount in words (BILL-001), print the bill from the waiter app (WTR-008).
+- **P6-05e Setup.** Drag-and-drop floor layout (ONB-004 step 5), printer auto-discovery (step 6).

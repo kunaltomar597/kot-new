@@ -15,12 +15,14 @@ const section = randomUUID();
 const waiter = randomUUID();
 
 function device(overrides: Partial<AuthenticatedDevice>): AuthenticatedDevice {
+  const stationId = overrides.stationId ?? null;
   return {
     deviceId: randomUUID(),
     restaurantId: rid,
     type: 'POS',
     tableId: null,
-    stationId: null,
+    stationId,
+    stationIds: stationId === null ? [] : [stationId],
     staffId: null,
     ...overrides,
   };
@@ -56,6 +58,16 @@ describe('[AUTH-009] [SEC-003] rooms a connection joins', () => {
       rooms.station(rid, stationA),
       rooms.role(rid, 'KITCHEN'),
     ]);
+  });
+
+  it('[KDS-002] puts a screen with several stations in each of their rooms', () => {
+    const stationB = randomUUID();
+    const kds = device({ type: 'KDS', stationId: stationA, stationIds: [stationA, stationB] });
+    const joined = roomsForConnection({ device: kds });
+    expect(joined).toEqual(
+      expect.arrayContaining([rooms.station(rid, stationA), rooms.station(rid, stationB)]),
+    );
+    expect(joined).not.toContain(rooms.allStations(rid));
   });
 
   it('puts a kitchen screen without a station in the all-stations room', () => {
