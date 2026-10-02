@@ -1738,3 +1738,9 @@ body {
   color: var(--rp-color-warning-text, var(--rp-color-text-muted));
   font-size: var(--rp-font-size-sm);
 }
+
+/* Bulk photo upload (P6-04c): a preview beside each match. */
+.bulk-photos__row {
+  align-items: center;
+  gap: var(--rp-space-3);
+}

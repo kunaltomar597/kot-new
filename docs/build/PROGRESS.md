@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-04c bulk photos, P6-05 the should-have batch, then Phase 7.
+- P6-05 the should-have batch, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -332,10 +332,10 @@ Recommended next WPs (dependencies met):
 - [x] P6-01 Combo and modifier parity on every surface
 - [x] P6-02 Learned recommendations
 - [ ] P6-03 Voice search [H]
-- [ ] P6-04 AI-assisted menu import
+- [x] P6-04 AI-assisted menu import
   - [x] P6-04a Control Plane reading service
   - [x] P6-04b Review and import on the restaurant PC
-  - [ ] P6-04c Bulk photo upload (ONB-007)
+  - [x] P6-04c Bulk photo upload (ONB-007)
 - [ ] P6-05 Should-have operations batch
 
 ### Phase 7: Commercial readiness
@@ -601,6 +601,17 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-04c):
+
+407. Bulk photos are matched in the browser (`matchPhotos` in `@rp/domain`): a short code first
+     (the whole file name, or its first word), then the dish's exact name, then the longest dish
+     name inside the file name; ties and a dish already taken by an earlier photo are left for
+     the person. Archived dishes are not offered.
+408. Each photo is uploaded like a single one (checked and re-encoded, P1-04), then set on its
+     dish by a new `PUT /menu/items/:id/photo` (a draft change, audited as MENU_ITEM_CHANGED with
+     the photo before and after), so nothing else about the dish is sent again. The page says to
+     publish afterwards.
 
 Decided 2026-10-02 (P6-04b):
 
@@ -2143,6 +2154,16 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-04c Bulk photo upload (P6-04 done)
+
+Built: `@rp/domain` `matchPhotos`, `photoWords`; contract `ItemPhotoRequest` and route
+`setItemPhoto`; `MenuAdminService.setItemPhoto`; console **Manage → Menu → Add photos in bulk**
+(`BulkPhotosScreen`: previews, the match and how it was made, a dish list per photo, duplicates
+flagged, upload with each photo's result).
+
+Tests: domain `photo-matching.test.ts` 4; server `photos.int.test.ts` +1 (set, unchanged,
+unknown photo, cleared, archived dish, managers only, audit); console `bulk-photos.test.tsx` 1.
 
 ### 2026-10-02: P6-04b AI menu import: review and import on the restaurant PC
 

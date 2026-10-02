@@ -111,6 +111,53 @@ describe('[MENU-008] [SEC-004] photo upload', () => {
   });
 });
 
+describe('[ONB-007] [MENU-008] a dish’s photo on its own (bulk upload)', () => {
+  it('sets and clears a dish’s photo as a draft change, audited, for menu managers only', async () => {
+    const base = { restaurantId: kit.restaurantId };
+    const station = await prisma.station.create({ data: { ...base, name: 'Photo kitchen' } });
+    const tax = await prisma.taxGroup.create({
+      data: { ...base, name: 'Photo GST', sacCode: '996331' },
+    });
+    const category = await prisma.category.create({ data: { ...base, name: 'Photo dishes' } });
+    const dish = await prisma.item.create({
+      data: {
+        ...base,
+        categoryId: category.id,
+        name: 'Photo Naan',
+        basePrice: 5_000,
+        taxGroupId: tax.id,
+        foodType: 'VEG',
+        stationId: station.id,
+      },
+    });
+    const photo = PhotoView.parse((await upload(await jpeg(400, 300))).body);
+    const set = (photoId: string | null, login = manager) =>
+      server().put(`/api/v1/menu/items/${dish.id}/photo`).set(as(login)).send({ photoId });
+    expect((await set(photo.id, waiter)).status).toBe(403);
+    const response = await set(photo.id);
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect((response.body as { photoId: string }).photoId).toBe(photo.id);
+    expect((await prisma.item.findUniqueOrThrow({ where: { id: dish.id } })).photoId).toBe(
+      photo.id,
+    );
+    const audit = await prisma.auditLog.findMany({
+      where: { action: 'MENU_ITEM_CHANGED', entityId: dish.id },
+    });
+    expect(audit.map((entry) => [entry.before, entry.after])).toEqual([
+      [{ photoId: null }, { photoId: photo.id }],
+    ]);
+    // The same again changes nothing.
+    expect((await set(photo.id)).status).toBe(200);
+    const unknown = await set('0199a0e0-0000-7000-8000-00000000dead');
+    expect(unknown.status).toBe(422);
+    expect(codeOf(unknown)).toBe('MENU_REFERENCE_NOT_FOUND');
+    expect((await set(null)).status).toBe(200);
+    expect((await prisma.item.findUniqueOrThrow({ where: { id: dish.id } })).photoId).toBeNull();
+    await prisma.item.update({ where: { id: dish.id }, data: { archivedAt: new Date() } });
+    expect((await set(photo.id)).status).toBe(409);
+  });
+});
+
 describe('[DATA-007] clean-up of unused photos', () => {
   it('removes old photos nothing uses and stray folders, and keeps the rest', async () => {
     const make = async () => PhotoView.parse((await upload(await jpeg(300, 200))).body).id;
