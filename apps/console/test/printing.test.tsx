@@ -128,6 +128,54 @@ describe('[KDS-008] [ONB-004] stations and printers', () => {
     });
   });
 
+  it('[ONB-004] finds printers on the network and adds one in a tap', async () => {
+    const fake = printingServer().on('POST', '/api/v1/printers/discover', () => ({
+      status: 200,
+      body: {
+        networks: ['192.168.1.0/24'],
+        printers: [
+          {
+            host: '192.168.1.50',
+            port: 9100,
+            printerId: KITCHEN_PRINTER,
+            printerName: 'Kitchen printer',
+          },
+          { host: '192.168.1.61', port: 9100, printerId: null, printerName: null },
+        ],
+      },
+    }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    await user.click(await screen.findByRole('button', { name: t('printing.printers.find') }));
+    const found = within(await screen.findByRole('dialog', { name: t('printing.discover.title') }));
+    expect(
+      await found.findByText(t('printing.discover.looked', { list: '192.168.1.0/24' })),
+    ).toBeVisible();
+    expect(
+      found.getByText(t('printing.discover.addedAs', { name: 'Kitchen printer' })),
+    ).toBeVisible();
+    // Only the one not added yet can be added.
+    expect(found.getAllByRole('button', { name: /^Add / })).toHaveLength(1);
+    await expectNoAxeViolations(container);
+    await user.click(found.getByRole('button', { name: /^Add 192\.168\.1\.61/ }));
+
+    const dialog = within(
+      await screen.findByRole('dialog', { name: t('printing.printerDialog.addTitle') }),
+    );
+    expect(dialog.getByRole('textbox', { name: t('printing.printerDialog.host') })).toHaveValue(
+      '192.168.1.61',
+    );
+    await user.click(dialog.getByRole('button', { name: t('printing.printerDialog.save') }));
+    await waitFor(() => {
+      expect(fake.callsTo('POST', '/api/v1/printers')[0]?.body).toEqual({
+        name: 'Printer 192.168.1.61',
+        connection: 'NETWORK',
+        host: '192.168.1.61',
+        port: 9100,
+        paperWidthMm: 80,
+      });
+    });
+  });
+
   it('prints a test page and says whether it printed', async () => {
     const { user } = await renderConsole({
       fake: printingServer(),

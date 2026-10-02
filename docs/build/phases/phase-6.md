@@ -94,4 +94,5 @@ Split (2026-10-02), after a survey of what P1 to P5 already built (KDS-010 was d
 - **P6-05f Setup: the floor.** Manage → Floor (sections and tables; the API existed, the page did
   not) with the drag-and-drop floor plan (ONB-004 step 5), shown on the POS too. Done.
 - **P6-05g Printer auto-discovery** (ONB-004 step 6): find network receipt printers on the
-  restaurant's network from Manage → Kitchen and printers, and add one in a tap.
+  restaurant's network from Manage → Kitchen and printers, and add one in a tap. Done (port 9100
+  on the PC's own private /24).

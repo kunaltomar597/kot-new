@@ -404,6 +404,16 @@ export const SETTINGS = [
     requirements: ['WTR-008'],
   }),
   setting({
+    key: 'printers.discoveryPorts',
+    schema: z.array(z.int().min(1).max(65_535)).min(1).max(4),
+    defaultValue: [9100],
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Ports a network receipt printer answers on, looked for when finding printers (9100 for most).',
+    requirements: ['ONB-004'],
+  }),
+  setting({
     key: 'bills.printerId',
     schema: z.uuid().nullable(),
     defaultValue: null,

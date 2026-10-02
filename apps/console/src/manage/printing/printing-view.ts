@@ -29,9 +29,18 @@ export interface PrinterDraft {
   readonly paperWidthMm: (typeof PAPER_WIDTHS)[number];
 }
 
-export function printerDraftOf(printer?: PrinterView): PrinterDraft {
+export function printerDraftOf(
+  printer?: PrinterView,
+  found?: { readonly name: string; readonly host: string; readonly port: number },
+): PrinterDraft {
   if (printer === undefined) {
-    return { name: '', connection: 'NETWORK', host: '', port: DEFAULT_PORT, paperWidthMm: '80' };
+    return {
+      name: found?.name ?? '',
+      connection: 'NETWORK',
+      host: found?.host ?? '',
+      port: found === undefined ? DEFAULT_PORT : String(found.port),
+      paperWidthMm: '80',
+    };
   }
   return {
     name: printer.name,

@@ -108,6 +108,25 @@ export const TestPrintResponse = z.object({
 });
 export type TestPrintResponse = z.infer<typeof TestPrintResponse>;
 
+/**
+ * Receipt printers found on the restaurant's network (ONB-004 step 6, S): every address on the
+ * PC's own networks that answers on a printer port (`printers.discoveryPorts`, 9100 by default).
+ */
+export const PrinterDiscoveryResponse = z.object({
+  /** The networks looked at, like "192.168.1.0/24". */
+  networks: z.array(z.string()),
+  printers: z.array(
+    z.object({
+      host: z.string(),
+      port: z.int().min(1).max(65_535),
+      /** The printer already added with this address, if any. */
+      printerId: Id.nullable(),
+      printerName: z.string().nullable(),
+    }),
+  ),
+});
+export type PrinterDiscoveryResponse = z.infer<typeof PrinterDiscoveryResponse>;
+
 /** Send one printer's jobs to another until cleared (KDS-008); `toPrinterId: null` clears it. */
 export const PrinterRedirectRequest = z.strictObject({
   toPrinterId: Id.nullable(),

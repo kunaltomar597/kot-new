@@ -1,4 +1,4 @@
-import type { PrinterView, StationView } from '@rp/contracts';
+import type { PrinterDiscoveryResponse, PrinterView, StationView } from '@rp/contracts';
 import { displayDateTime } from '@rp/domain';
 import { Badge, Button, EmptyState, ErrorState, LoadingState, useToast } from '@rp/ui-web';
 import { type ReactNode, useCallback, useState } from 'react';
@@ -7,7 +7,12 @@ import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { useLive } from '../../app/use-live.js';
 import { ReasonDialog } from '../menu/ReasonDialog.js';
-import { PrinterDialog, RedirectDialog, StationDialog } from './PrintingDialogs.js';
+import {
+  DiscoveryDialog,
+  PrinterDialog,
+  RedirectDialog,
+  StationDialog,
+} from './PrintingDialogs.js';
 import {
   activePrinters,
   activeStations,
@@ -18,7 +23,8 @@ import {
 } from './printing-view.js';
 
 type Open =
-  | { readonly kind: 'ADD_PRINTER' | 'ADD_STATION' }
+  | { readonly kind: 'ADD_PRINTER' | 'ADD_STATION' | 'DISCOVER' }
+  | { readonly kind: 'ADD_FOUND'; readonly host: string; readonly port: number }
   | {
       readonly kind: 'EDIT_PRINTER' | 'REDIRECT' | 'STOP_REDIRECT' | 'ARCHIVE_PRINTER';
       readonly printer: PrinterView;
@@ -52,6 +58,19 @@ export function PrintingScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [testing, setTesting] = useState<string | undefined>();
+  const [found, setFound] = useState<PrinterDiscoveryResponse | undefined>();
+
+  /** ONB-004 step 6 (S): what answers on a printer port on the PC's network. */
+  const discover = async () => {
+    setFound(undefined);
+    setOpen({ kind: 'DISCOVER' });
+    try {
+      setFound(await controller.api.discoverPrinters());
+    } catch (failure) {
+      setOpen(undefined);
+      toast.show({ title: messageOf(failure, t), tone: 'danger' });
+    }
+  };
 
   const close = useCallback(() => {
     setOpen(undefined);
@@ -124,13 +143,23 @@ export function PrintingScreen() {
             <h3 id="printing-printers" className="device-group__heading">
               {t('printing.printers.title')}
             </h3>
-            <Button
-              onClick={() => {
-                setOpen({ kind: 'ADD_PRINTER' });
-              }}
-            >
-              {t('printing.printers.add')}
-            </Button>
+            <div className="bill__actions">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void discover();
+                }}
+              >
+                {t('printing.printers.find')}
+              </Button>
+              <Button
+                onClick={() => {
+                  setOpen({ kind: 'ADD_PRINTER' });
+                }}
+              >
+                {t('printing.printers.add')}
+              </Button>
+            </div>
           </div>
           {printers.length === 0 ? (
             <EmptyState
@@ -308,13 +337,35 @@ export function PrintingScreen() {
   if (open !== undefined && ready !== undefined) {
     const state = { busy, error, onClose: close };
     switch (open.kind) {
+      case 'DISCOVER':
+        dialog = (
+          <DiscoveryDialog
+            result={found}
+            onAdd={({ host, port }) => {
+              setOpen({ kind: 'ADD_FOUND', host, port });
+            }}
+            onAgain={() => {
+              void discover();
+            }}
+            onClose={close}
+          />
+        );
+        break;
       case 'ADD_PRINTER':
+      case 'ADD_FOUND':
       case 'EDIT_PRINTER': {
         const printer = open.kind === 'EDIT_PRINTER' ? open.printer : undefined;
         dialog = (
           <PrinterDialog
             {...state}
             printer={printer}
+            {...(open.kind === 'ADD_FOUND' && {
+              found: {
+                name: t('printing.discover.newName', { host: open.host }),
+                host: open.host,
+                port: open.port,
+              },
+            })}
             onSave={(body) => {
               void change(
                 () =>

@@ -210,6 +210,7 @@ import {
   StationListResponse,
   StationRequest,
   StationView,
+  PrinterDiscoveryResponse,
   TestPrintResponse,
 } from './printing.js';
 import {
@@ -3380,6 +3381,23 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such printer.', schema: ApiError },
       409: { description: 'Still in use.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'discoverPrinters',
+    method: 'POST',
+    path: '/api/v1/printers/discover',
+    summary: "Find receipt printers on the restaurant's network",
+    description:
+      "ONB-004 step 6 (S). Looks at every address of the PC's own networks (one /24 each at " +
+      'most) for a printer port (`printers.discoveryPorts`), for a few seconds, and says which ' +
+      'printers are already added. Nothing is added or printed.',
+    tags: ['printing'],
+    requirements: ['ONB-004', 'KDS-008'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'What answered.', schema: PrinterDiscoveryResponse },
+      ...standardErrors,
     },
   },
   {

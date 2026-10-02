@@ -19,7 +19,7 @@ export type Editor =
       readonly scale: NumberScale;
     }
   | { readonly kind: 'CHOICE'; readonly options: readonly (string | number)[] }
-  | { readonly kind: 'LIST' }
+  | { readonly kind: 'LIST'; readonly numbers?: boolean }
   | { readonly kind: 'TEXT'; readonly nullable: boolean }
   | { readonly kind: 'PRINTER' }
   | { readonly kind: 'WINDOW' }
@@ -85,10 +85,12 @@ export function editorOfSchema(schema: z.ZodType, unit?: string): Editor | undef
         scale: unit === 'basis points' ? 'BP' : unit === 'paise' ? 'PAISE' : 'PLAIN',
       };
     }
-    case 'array':
-      return def.element !== undefined && defOf(def.element).type === 'string'
-        ? { kind: 'LIST' }
-        : undefined;
+    case 'array': {
+      const element = def.element === undefined ? undefined : defOf(def.element).type;
+      if (element === 'string') return { kind: 'LIST' };
+      // Whole numbers one per line, such as printer ports.
+      return element === 'number' ? { kind: 'LIST', numbers: true } : undefined;
+    }
     case 'string':
       return { kind: 'TEXT', nullable: false };
     case 'nullable': {
@@ -223,14 +225,16 @@ export function valueOf(editor: Editor, draft: Draft): Parsed {
       const chosen = editor.options.find((option) => String(option) === draft);
       return chosen === undefined ? { ok: false } : { ok: true, value: chosen };
     }
-    case 'LIST':
-      return {
-        ok: true,
-        value: (typeof draft === 'string' ? draft : '')
-          .split('\n')
-          .map((line) => line.trim())
-          .filter((line) => line !== ''),
-      };
+    case 'LIST': {
+      const lines = (typeof draft === 'string' ? draft : '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line !== '');
+      if (editor.numbers !== true) return { ok: true, value: lines };
+      return lines.every((line) => /^\d{1,9}$/.test(line))
+        ? { ok: true, value: lines.map(Number) }
+        : { ok: false };
+    }
     case 'TEXT': {
       const text = typeof draft === 'string' ? draft.trim() : '';
       return { ok: true, value: editor.nullable && text === '' ? null : text };
