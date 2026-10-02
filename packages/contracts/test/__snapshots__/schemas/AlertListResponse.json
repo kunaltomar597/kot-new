@@ -28,7 +28,8 @@
                 "PRINTER_OFFLINE",
                 "DISK_OR_BACKUP",
                 "LICENSE_STATE",
-                "SUSPICIOUS_ACTIVITY"
+                "SUSPICIOUS_ACTIVITY",
+                "SUPPORT_REQUEST"
               ]
             },
             "status": { "type": "string", "enum": ["OPEN", "ACKNOWLEDGED", "CLEARED"] },
@@ -189,7 +190,8 @@
                 "PRINTER_OFFLINE",
                 "DISK_OR_BACKUP",
                 "LICENSE_STATE",
-                "SUSPICIOUS_ACTIVITY"
+                "SUSPICIOUS_ACTIVITY",
+                "SUPPORT_REQUEST"
               ]
             },
             "status": { "type": "string", "enum": ["OPEN", "ACKNOWLEDGED", "CLEARED"] },

@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import {
   AdminService,
   CONTROL_PLANE_MIGRATIONS_DIR,
@@ -119,6 +119,18 @@ beforeAll(async () => {
   prisma = server.get(PrismaService);
   await prisma.restaurant.create({ data: { displayName: 'Acceptance Dhaba' } });
 });
+
+let managerHeaders: Record<string, string> | undefined;
+/** A manager signed in on a console of this PC's restaurant (made once). */
+async function asManager(): Promise<Record<string, string>> {
+  if (managerHeaders === undefined) {
+    const restaurant = await prisma.restaurant.findFirstOrThrow();
+    const kit = await createAuthKit(server, { restaurantId: restaurant.id });
+    const manager = await signIn(server, kit, 'MANAGER');
+    managerHeaders = authHeaders(kit.deviceId, manager.accessToken);
+  }
+  return managerHeaders;
+}
 
 afterAll(async () => {
   await server.close();
@@ -253,12 +265,9 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
   });
 
   it('[UPD-008] [VCP-007] sends a manager’s diagnostics to support, who can open them', async () => {
-    const restaurant = await prisma.restaurant.findFirstOrThrow();
-    const kit = await createAuthKit(server, { restaurantId: restaurant.id });
-    const manager = await signIn(server, kit, 'MANAGER');
     const sent = await request(httpServer(server))
       .post('/api/v1/system/diagnostics')
-      .set(authHeaders(kit.deviceId, manager.accessToken))
+      .set(await asManager())
       .send({ note: 'The kitchen printer stops at night' });
     expect(sent.status, JSON.stringify(sent.body)).toBe(200);
     const { id } = SendDiagnosticsResponse.parse(sent.body);
@@ -277,6 +286,56 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     expect(
       await prisma.auditLog.count({ where: { action: 'DIAGNOSTICS_SENT', entityId: id } }),
     ).toBe(1);
+  });
+
+  it('[UPD-008] lets a manager answer support’s requests: one allowed, one declined', async () => {
+    const diagnostics = controlPlane.get(CpDiagnosticsService);
+    const support = { userId: randomUUID(), actor: 'vendor:support' };
+    const first = await diagnostics.request(installationId, 'Bills print twice', support);
+    await heartbeats.beat();
+    const headers = await asManager();
+    const listed = await request(httpServer(server))
+      .get('/api/v1/system/diagnostics/requests')
+      .set(headers);
+    expect(listed.body).toMatchObject({
+      requests: [{ id: first.id, reason: 'Bills print twice' }],
+    });
+    // The Owner and the managers on duty are alerted.
+    const alert = await prisma.alert.findFirstOrThrow({
+      where: { type: 'SUPPORT_REQUEST', status: 'OPEN' },
+    });
+    expect(alert.payload).toMatchObject({ requestId: first.id, reason: 'Bills print twice' });
+
+    const allowed = await request(httpServer(server))
+      .post(`/api/v1/system/diagnostics/requests/${first.id}/allow`)
+      .set(headers);
+    expect(allowed.status, JSON.stringify(allowed.body)).toBe(200);
+    const [answered] = await diagnostics.requests(installationId);
+    expect(answered).toMatchObject({
+      id: first.id,
+      state: 'FULFILLED',
+      bundleId: (allowed.body as { id: string }).id,
+      answeredBy: { name: 'Test manager', role: 'MANAGER' },
+    });
+    expect(await prisma.alert.count({ where: { type: 'SUPPORT_REQUEST', status: 'OPEN' } })).toBe(
+      0,
+    );
+
+    const second = await diagnostics.request(installationId, 'Just checking', support);
+    await heartbeats.beat();
+    const declined = await request(httpServer(server))
+      .post(`/api/v1/system/diagnostics/requests/${second.id}/decline`)
+      .set(headers);
+    expect(declined.status, JSON.stringify(declined.body)).toBe(204);
+    const [latest] = await diagnostics.requests(installationId);
+    expect(latest).toMatchObject({ id: second.id, state: 'DECLINED', bundleId: null });
+    expect(
+      (await request(httpServer(server)).get('/api/v1/system/diagnostics/requests').set(headers))
+        .body,
+    ).toEqual({ requests: [] });
+    expect(await prisma.auditLog.count({ where: { action: 'DIAGNOSTICS_REQUEST_DECLINED' } })).toBe(
+      1,
+    );
   });
 
   it('[NFR-A01] keeps working while the Control Plane is down and reports again when it is back', async () => {

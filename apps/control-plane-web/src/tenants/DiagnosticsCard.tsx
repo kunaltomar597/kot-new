@@ -1,5 +1,5 @@
-import type { VendorDiagnosticsDetail } from '@rp/contracts/control-plane';
-import { Button, Card, Dialog, Table } from '@rp/ui-web';
+import type { DiagnosticsRequestView, VendorDiagnosticsDetail } from '@rp/contracts/control-plane';
+import { Badge, Button, Card, Dialog, Table, useToast } from '@rp/ui-web';
 import { useState } from 'react';
 import { when } from '../app/format.js';
 import { useT } from '../app/i18n.js';
@@ -7,6 +7,53 @@ import { messageOf } from '../app/messages.js';
 import { useApi, useMay } from '../app/services.js';
 import { useLoad } from '../app/use-load.js';
 import { LoadView } from '../components/LoadView.js';
+import { ReasonDialog } from '../components/ReasonDialog.js';
+
+const REQUEST_TONE = {
+  PENDING: 'info',
+  FULFILLED: 'success',
+  DECLINED: 'neutral',
+  EXPIRED: 'neutral',
+} as const;
+
+function RequestsTable({ requests }: { requests: readonly DiagnosticsRequestView[] }) {
+  const t = useT();
+  return (
+    <Table
+      caption={t('vendorApp.diagnostics.requests')}
+      rows={requests}
+      rowKey={(request) => request.id}
+      empty={t('vendorApp.diagnostics.noRequests')}
+      columns={[
+        {
+          key: 'at',
+          header: t('vendorApp.diagnostics.asked'),
+          cell: (request) => when(request.requestedAt),
+        },
+        {
+          key: 'by',
+          header: t('vendorApp.diagnostics.askedBy'),
+          cell: (request) => request.requestedBy,
+        },
+        { key: 'reason', header: t('vendorApp.reason.label'), cell: (request) => request.reason },
+        {
+          key: 'state',
+          header: t('vendorApp.fleet.state'),
+          cell: (request) => (
+            <Badge tone={REQUEST_TONE[request.state]}>
+              {request.answeredBy === null
+                ? t(`vendorApp.diagnostics.requestState.${request.state}`)
+                : t('vendorApp.diagnostics.answered', {
+                    state: t(`vendorApp.diagnostics.requestState.${request.state}`),
+                    name: request.answeredBy.name,
+                  })}
+            </Badge>
+          ),
+        },
+      ]}
+    />
+  );
+}
 
 /** Bytes as kilobytes, for the list. */
 export function kilobytes(bytes: number): string {
@@ -109,9 +156,30 @@ export function DiagnosticsCard({ installationId }: { installationId: string }) 
   const [opening, setOpening] = useState<string | undefined>();
   const [detail, setDetail] = useState<VendorDiagnosticsDetail | undefined>();
   const [error, setError] = useState<string | undefined>();
+  const toast = useToast();
+  const requests = useLoad(
+    (signal) => api.listVendorDiagnosticsRequests({ params: { id: installationId }, signal }),
+    `diagnostics-requests:${installationId}`,
+  );
+  const [asking, setAsking] = useState(false);
 
   return (
-    <Card title={t('vendorApp.diagnostics.title')} headingLevel={2}>
+    <Card
+      title={t('vendorApp.diagnostics.title')}
+      headingLevel={2}
+      actions={
+        may('SUPPORT_NOTES') ? (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setAsking(true);
+            }}
+          >
+            {t('vendorApp.diagnostics.ask')}
+          </Button>
+        ) : undefined
+      }
+    >
       <p className="cp-hint">{t('vendorApp.diagnostics.intro')}</p>
       <LoadView data={data} reload={reload} failed={t('vendorApp.diagnostics.loadFailed')}>
         {({ bundles }) => (
@@ -192,6 +260,28 @@ export function DiagnosticsCard({ installationId }: { installationId: string }) 
           {error}
         </p>
       )}
+      <LoadView
+        data={requests.data}
+        reload={requests.reload}
+        failed={t('vendorApp.diagnostics.requestsFailed')}
+      >
+        {({ requests: list }) => <RequestsTable requests={list} />}
+      </LoadView>
+      <ReasonDialog
+        open={asking}
+        title={t('vendorApp.diagnostics.askTitle')}
+        description={t('vendorApp.diagnostics.askIntro')}
+        confirmLabel={t('vendorApp.diagnostics.ask')}
+        onClose={() => {
+          setAsking(false);
+        }}
+        onConfirm={async (reason) => {
+          await api.requestVendorDiagnostics({ params: { id: installationId }, body: { reason } });
+          setAsking(false);
+          toast.show({ title: t('vendorApp.diagnostics.askSent'), tone: 'success' });
+          requests.reload();
+        }}
+      />
       <Dialog
         open={detail !== undefined}
         size="lg"

@@ -21,6 +21,7 @@ export const NotificationEventType = z.enum([
   'DISK_OR_BACKUP',
   'LICENSE_STATE',
   'SUSPICIOUS_ACTIVITY',
+  'SUPPORT_REQUEST',
 ]);
 export type NotificationEventType = z.infer<typeof NotificationEventType>;
 

@@ -1,0 +1,32 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "by": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 120 },
+          "role": { "type": "string", "maxLength": 40 }
+        },
+        "required": ["name", "role"]
+      }
+    },
+    "required": ["by"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "by": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 120 },
+          "role": { "type": "string", "maxLength": 40 }
+        },
+        "required": ["name", "role"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["by"],
+    "additionalProperties": false
+  }
+}

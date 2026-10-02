@@ -8,7 +8,7 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common';
 import { BusinessHours } from '@rp/contracts';
-import type { HeartbeatRequest, ReleaseInfo } from '@rp/contracts/control-plane';
+import type { HeartbeatRequest, HeartbeatResponse, ReleaseInfo } from '@rp/contracts/control-plane';
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { newId } from '../common/ids.js';
@@ -79,6 +79,8 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
   private auditCheck: { sequence: number } | null = null;
   /** The error count at the last heartbeat delivered: the next one reports those since. */
   private errorsDelivered = 0;
+  /** Services that act on each answer (support's diagnostics requests, P7-08b). */
+  private readonly answerListeners: ((answer: HeartbeatResponse) => Promise<void>)[] = [];
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -104,6 +106,11 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     this.stopped = true;
     clearTimeout(this.timer);
     await this.running;
+  }
+
+  /** Calls `listener` with every answer received; its failures are logged, never thrown. */
+  onAnswer(listener: (answer: HeartbeatResponse) => Promise<void>): void {
+    this.answerListeners.push(listener);
   }
 
   status(): ControlPlaneStatus {
@@ -157,6 +164,11 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       if (answer.relayCredential !== null) {
         await saveRelayCredential(this.prisma, this.secrets, answer.relayCredential);
         this.logger.log('The QR relay credential arrived from the Control Plane');
+      }
+      for (const listener of this.answerListeners) {
+        await listener(answer).catch((error: unknown) => {
+          this.logger.warn({ err: error }, 'Acting on the Control Plane’s answer failed');
+        });
       }
       if (this.state.lastError !== null) {
         this.logger.log('Reporting to the Control Plane again');

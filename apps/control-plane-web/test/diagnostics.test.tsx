@@ -91,3 +91,66 @@ describe('[UPD-008] [VCP-007] diagnostics in the web app', () => {
     expect(kilobytes(48_000)).toBe('47');
   });
 });
+
+describe('[UPD-008] asking a restaurant for diagnostics', () => {
+  const request = (overrides: Record<string, unknown> = {}) => ({
+    id: '0190a1b2-0000-7000-8000-0000000000f8',
+    installationId: INSTALLATION_ID,
+    requestedBy: 'Asha Rao',
+    reason: 'Bills print twice',
+    requestedAt: '2026-10-02T09:00:00.000Z',
+    expiresAt: '2026-10-09T09:00:00.000Z',
+    state: 'PENDING',
+    answeredAt: null,
+    answeredBy: null,
+    bundleId: null,
+    ...overrides,
+  });
+
+  it('lets Support ask with a reason, and shows how the restaurant answered', async () => {
+    const asked: unknown[] = [];
+    const cp = controlPlane('SUPPORT')
+      .on('listVendorDiagnosticsRequests', () => ({
+        requests: [
+          ...asked,
+          request({
+            id: '0190a1b2-0000-7000-8000-0000000000f9',
+            reason: 'Printer stops',
+            state: 'DECLINED',
+            answeredAt: '2026-10-01T10:00:00.000Z',
+            answeredBy: { name: 'Meena', role: 'MANAGER' },
+          }),
+        ],
+      }))
+      .on('requestVendorDiagnostics', ({ body }) => {
+        const created = request({ reason: (body as { reason: string }).reason });
+        asked.unshift(created);
+        return created;
+      });
+    const { user, container } = renderApp({ cp, path: `/installations/${INSTALLATION_ID}` });
+    const table = await screen.findByRole('table', { name: 'Requests to the restaurant' });
+    expect(within(table).getByText('Declined by Meena')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Ask for diagnostics' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Ask the restaurant for diagnostics',
+    });
+    await user.type(within(dialog).getByLabelText(/^Reason/), 'Bills print twice');
+    await user.click(within(dialog).getByRole('button', { name: 'Ask for diagnostics' }));
+    expect(
+      await screen.findByText('Request sent. The restaurant sees it within 5 minutes.'),
+    ).toBeVisible();
+    expect(await within(table).findByText('Waiting for the restaurant')).toBeVisible();
+    expect(cp.callsOf('requestVendorDiagnostics')[0]).toMatchObject({
+      params: { id: INSTALLATION_ID },
+      body: { reason: 'Bills print twice' },
+    });
+    await expectNoAxeViolations(container);
+  });
+
+  it('shows Read-only the requests but no way to ask', async () => {
+    const cp = controlPlane('READ_ONLY');
+    renderApp({ cp, path: `/installations/${INSTALLATION_ID}` });
+    expect(await screen.findByText('No requests yet.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Ask for diagnostics' })).toBeNull();
+  });
+});

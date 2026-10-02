@@ -1,5 +1,7 @@
+import type { PendingDiagnosticsRequest } from '@rp/contracts';
+import { displayDateTime } from '@rp/domain';
 import { Button, Dialog, TextArea, useToast } from '@rp/ui-web';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
 import { downloadFile } from '../../app/download.js';
 import { useT } from '../../app/i18n.js';
@@ -24,6 +26,47 @@ export function DiagnosticsPanel({ connected }: { connected: boolean }) {
   const [busy, setBusy] = useState<'preview' | 'send' | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [sent, setSent] = useState<string | undefined>();
+  const [requests, setRequests] = useState<readonly PendingDiagnosticsRequest[]>([]);
+  const [answering, setAnswering] = useState<string | undefined>();
+
+  const loadRequests = useCallback(() => {
+    if (!connected) return;
+    controller.api.listDiagnosticsRequests().then(
+      (list) => {
+        setRequests(list.requests);
+      },
+      () => {
+        setRequests([]);
+      },
+    );
+  }, [connected, controller]);
+  useEffect(loadRequests, [loadRequests]);
+
+  const answer = (request: PendingDiagnosticsRequest, allow: boolean) => {
+    setAnswering(request.id);
+    const params = { params: { id: request.id } };
+    const work = allow
+      ? controller.api.allowDiagnosticsRequest(params).then((result) => {
+          const reference = diagnosticsReference(result.id);
+          setSent(reference);
+          return t('systemPage.diagnostics.sent', { reference });
+        })
+      : controller.api
+          .declineDiagnosticsRequest(params)
+          .then(() => t('systemPage.diagnostics.declined'));
+    work.then(
+      (title) => {
+        setAnswering(undefined);
+        toast.show({ title, tone: 'success' });
+        loadRequests();
+      },
+      (failure: unknown) => {
+        setAnswering(undefined);
+        toast.show({ title: messageOf(failure, t), tone: 'danger' });
+        loadRequests();
+      },
+    );
+  };
 
   const close = () => {
     setOpen(false);
@@ -37,6 +80,41 @@ export function DiagnosticsPanel({ connected }: { connected: boolean }) {
         {t('systemPage.diagnostics.title')}
       </h3>
       <p className="dashboard-section__hint">{t('systemPage.diagnostics.intro')}</p>
+      {requests.length === 0 ? null : (
+        <ul className="diagnostics-requests" aria-label={t('systemPage.diagnostics.requests')}>
+          {requests.map((request) => (
+            <li key={request.id} className="console-notice console-notice--warning">
+              <p>
+                {t('systemPage.diagnostics.request', {
+                  name: request.requestedBy,
+                  reason: request.reason,
+                  until: displayDateTime(new Date(request.expiresAt)).date,
+                })}
+              </p>
+              <div className="staff-row__actions">
+                <Button
+                  loading={answering === request.id}
+                  disabled={answering !== undefined}
+                  onClick={() => {
+                    answer(request, true);
+                  }}
+                >
+                  {t('systemPage.diagnostics.allow')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={answering !== undefined}
+                  onClick={() => {
+                    answer(request, false);
+                  }}
+                >
+                  {t('systemPage.diagnostics.decline')}
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="staff-row__actions">
         <Button
           variant="ghost"

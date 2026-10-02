@@ -20,6 +20,8 @@ export const NOTIFICATION_EVENTS = [
   'LICENSE_STATE',
   /** The daily suspicious-activity report found something (AUD-006, P4-07b). */
   'SUSPICIOUS_ACTIVITY',
+  /** Vendor support asks for diagnostics; a manager allows or declines it (UPD-008, P7-08b). */
+  'SUPPORT_REQUEST',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
@@ -159,6 +161,14 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
   LICENSE_STATE: rule(['OWNER', 'MANAGERS_ON_DUTY'], ['POS', 'DASHBOARD'], null, false, 'DAILY'),
   // Not in Appendix C: AUD-006's daily report goes to the Owner only, once.
   SUSPICIOUS_ACTIVITY: rule(['OWNER'], ['DASHBOARD', 'CONTROL_PLANE'], null, false, 'NONE'),
+  // Not in Appendix C: support's request waits on the dashboard until it is answered (UPD-008).
+  SUPPORT_REQUEST: rule(
+    ['OWNER', 'MANAGERS_ON_DUTY'],
+    ['DASHBOARD'],
+    null,
+    false,
+    'UNTIL_RESOLVED',
+  ),
 };
 
 /** A manager's change to one event's rule (NTF-002); anything left out keeps the default. */

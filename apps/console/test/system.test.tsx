@@ -219,3 +219,79 @@ describe('[UPD-008] sending diagnostics to support', () => {
     });
   });
 });
+
+describe('[UPD-008] support asks for diagnostics', () => {
+  const connected = systemStatus({
+    controlPlane: {
+      configured: true,
+      enrolled: true,
+      lastContactAt: '2026-10-02T09:29:00.000Z',
+      lastError: null,
+    },
+  });
+  const ask = (id: string, reason: string) => ({
+    id,
+    requestedBy: 'Asha',
+    reason,
+    requestedAt: '2026-10-02T09:00:00.000Z',
+    expiresAt: '2026-10-09T09:00:00.000Z',
+  });
+  const FIRST = '0190a1b2-c3d4-7000-8000-0000000000a1';
+  const SECOND = '0190a1b2-c3d4-7000-8000-0000000000a2';
+
+  it('lets a manager allow one request and decline another', async () => {
+    const fake = systemServer(connected, connected, connected)
+      .on(
+        'GET',
+        '/api/v1/system/diagnostics/requests',
+        () => ({
+          status: 200,
+          body: { requests: [ask(FIRST, 'Bills print twice'), ask(SECOND, 'Just checking')] },
+        }),
+        () => ({ status: 200, body: { requests: [ask(SECOND, 'Just checking')] } }),
+        () => ({ status: 200, body: { requests: [] } }),
+      )
+      .on('POST', `/api/v1/system/diagnostics/requests/${FIRST}/allow`, () => ({
+        status: 200,
+        body: { id: '0190a1b2-c3d4-7000-8000-0000000000b9', sentAt: '2026-10-02T09:31:00.000Z' },
+      }))
+      .on('POST', `/api/v1/system/diagnostics/requests/${SECOND}/decline`, () => ({
+        status: 204,
+        body: undefined,
+      }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const list = await screen.findByRole('list', { name: t('systemPage.diagnostics.requests') });
+    expect(
+      within(list).getByText(
+        t('systemPage.diagnostics.request', {
+          name: 'Asha',
+          reason: 'Bills print twice',
+          until: '09-10-2026',
+        }),
+      ),
+    ).toBeVisible();
+    await expectNoAxeViolations(container);
+    const [allow] = within(list).getAllByRole('button', {
+      name: t('systemPage.diagnostics.allow'),
+    });
+    await user.click(allow!);
+    expect(
+      await screen.findByText(t('systemPage.diagnostics.sent', { reference: '0190A1B2' }), {
+        selector: '[role="status"]',
+      }),
+    ).toBeVisible();
+    await vi.waitFor(() => {
+      expect(within(list).queryByText(/Bills print twice/)).toBeNull();
+    });
+    await user.click(
+      within(list).getByRole('button', { name: t('systemPage.diagnostics.decline') }),
+    );
+    expect(await screen.findByText(t('systemPage.diagnostics.declined'))).toBeVisible();
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('list', { name: t('systemPage.diagnostics.requests') })).toBeNull();
+    });
+    expect(
+      fake.callsTo('POST', `/api/v1/system/diagnostics/requests/${SECOND}/decline`),
+    ).toHaveLength(1);
+  });
+});

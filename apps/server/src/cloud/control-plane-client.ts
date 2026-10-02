@@ -1,6 +1,7 @@
 import { createHash, randomBytes, sign } from 'node:crypto';
 import { ApiError } from '@rp/contracts';
 import {
+  type DeclineDiagnosticsRequest,
   type DiagnosticsUploadRequest,
   DiagnosticsUploadResponse,
   CONTROL_PLANE_ERRORS,
@@ -14,7 +15,7 @@ import {
   signedRequestMessage,
   UpdatesResponse,
 } from '@rp/contracts/control-plane';
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { InstallationKey } from './installation-key.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -113,6 +114,21 @@ export class ControlPlaneClient {
       JSON.stringify(upload),
       DiagnosticsUploadResponse,
       UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  /** UPD-008: the manager declined support's request (P7-08b). */
+  async declineDiagnosticsRequest(
+    installationId: string,
+    requestId: string,
+    body: DeclineDiagnosticsRequest,
+  ): Promise<void> {
+    await this.signed(
+      installationId,
+      'POST',
+      `/v1/diagnostics-requests/${encodeURIComponent(requestId)}/decline`,
+      JSON.stringify(body),
+      z.undefined(),
     );
   }
 

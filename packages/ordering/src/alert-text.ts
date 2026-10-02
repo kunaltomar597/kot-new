@@ -77,6 +77,11 @@ function detailOf(alert: AlertView, t: Translator): string | null {
       if (count === null || date === null || !ISO_DATE.test(date)) return null;
       return t('alerts.suspicious', { count, date: formatDisplayDate(date) });
     }
+    case 'SUPPORT_REQUEST': {
+      const name = textOf(payload.requestedBy);
+      const reason = textOf(payload.reason);
+      return name === null || reason === null ? null : t('alerts.supportRequest', { name, reason });
+    }
     case 'DEVICE_LOW_BATTERY_OR_OFFLINE': {
       const device =
         textOf(payload.deviceName) ??

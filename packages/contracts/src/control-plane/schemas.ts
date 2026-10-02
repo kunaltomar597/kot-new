@@ -1,6 +1,7 @@
 import { LICENSE_STATES, WEEKDAYS } from '@rp/domain';
 import { z } from 'zod';
 import { Id, Paise, Timestamp } from '../common.js';
+import { PendingDiagnosticsRequest } from './diagnostics.js';
 
 /**
  * Contracts of the Vendor Control Plane API (ADR-0012): installation enrolment, heartbeats
@@ -283,6 +284,8 @@ export const HeartbeatResponse = z.object({
    * old entry changes every hash after it, so this catches tampering a head alone cannot.
    */
   auditCheck: z.object({ sequence: z.int().positive() }).nullable().default(null),
+  /** Support's open requests for diagnostics, for a manager to allow or decline (UPD-008). */
+  diagnosticsRequests: z.array(PendingDiagnosticsRequest).max(10).default([]),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
 
