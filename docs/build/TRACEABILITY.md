@@ -61,7 +61,7 @@ Must: 224 / 287 covered. Should: 11 / 24. Could: 0 / 7.
 - ORD-015 (M): packages/contracts/test/contracts.test.ts, packages/ordering/test/line-check.test.ts
 - ORD-017 (M): apps/server/test/integration/orders.int.test.ts, apps/waiter-app/test/orders.test.tsx, infra/supabase/test/diner-functions.test.ts, packages/contracts/test/contracts.test.ts, packages/ordering/test/line-check.test.ts
 - KDS-001 (M): apps/console/e2e/console.e2e.ts, apps/console/test/console.test.tsx, apps/console/test/kds-screen.test.tsx, apps/console/test/modes.test.ts, apps/server/test/integration/console-static.int.test.ts, apps/server/test/integration/kds.int.test.ts
-- KDS-002 (M): apps/console/test/devices-view.test.ts, apps/console/test/kds-screen.test.tsx, apps/console/test/printing-view.test.ts, apps/server/test/integration/kds.int.test.ts, apps/server/test/integration/printing.int.test.ts
+- KDS-002 (M): apps/console/test/devices-view.test.ts, apps/console/test/devices.test.tsx, apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts, apps/console/test/printing-view.test.ts, apps/server/test/integration/kds.int.test.ts, apps/server/test/integration/printing.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts
 - KDS-003 (M): apps/console/e2e/console.e2e.ts, apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts, apps/server/test/integration/kds.int.test.ts, packages/contracts/test/contracts.test.ts
 - KDS-004 (M): apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts
 - KDS-005 (M): apps/console/e2e/console.e2e.ts, apps/console/test/kds-screen.test.tsx, apps/console/test/kds-view.test.ts, apps/server/test/integration/kds.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts
@@ -146,7 +146,7 @@ Must: 224 / 287 covered. Should: 11 / 24. Could: 0 / 7.
 - NTF-006 (M): apps/console/test/alerts.test.tsx, apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/event-bus.int.test.ts, apps/server/test/integration/phone-alerts.int.test.ts, apps/server/test/integration/realtime.int.test.ts, packages/api-client/test/realtime.test.ts, packages/contracts/test/realtime.test.ts, packages/mobile-core/test/alert-center.test.ts
 - NTF-007 (M): apps/server/test/integration/notifications.int.test.ts, apps/server/test/integration/phone-alerts.int.test.ts, packages/domain/test/notifications.test.ts
 - NTF-008 (M): apps/console/e2e/console.e2e.ts, apps/console/test/nudge.test.tsx, apps/server/test/integration/notifications-extra.int.test.ts, packages/domain/test/notifications.test.ts, packages/ordering/test/alert-text.test.ts
-- NTF-009 (S): apps/server/test/integration/notifications-extra.int.test.ts, packages/domain/test/notifications.test.ts
+- NTF-009 (S): apps/server/test/integration/notifications-extra.int.test.ts, apps/waiter-app/test/tables.test.tsx, packages/domain/test/notifications.test.ts
 - PGR-001 (M): packages/domain/test/pager.test.ts
 - PGR-005 (M): packages/contracts/test/docs.test.ts, packages/domain/test/pager.test.ts
 - PGR-006 (M): apps/server/test/integration/pagers.int.test.ts, packages/domain/test/pager.test.ts

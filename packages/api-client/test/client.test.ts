@@ -83,6 +83,7 @@ describe('[INT-002] typed REST calls checked against the contracts', () => {
       status: 'REVOKED',
       tableId: null,
       stationId: null,
+      stationIds: [],
       staffId: null,
       pairedAt: null,
       lastSeenAt: null,
@@ -390,6 +391,7 @@ describe('[AUTH-007] device pairing and device tokens', () => {
             name: 'Tandoor screen',
             tableId: null,
             stationId: null,
+            stationIds: [],
             staffId: null,
           },
         };

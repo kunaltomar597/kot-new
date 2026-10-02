@@ -67,6 +67,7 @@ export function server(type: 'POS' | 'KDS' = 'POS'): FakeServer {
         name: 'Counter POS',
         tableId: null,
         stationId: null,
+        stationIds: [],
         staffId: null,
       },
     }))

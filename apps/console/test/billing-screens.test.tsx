@@ -332,6 +332,34 @@ describe('[BILL-013] the cashier’s shift', () => {
     await user.click(screen.getByRole('button', { name: t('shift.close') }));
     expect(await screen.findByText(t('shift.closed', { variance: '-₹4.00' }))).toBeInTheDocument();
   });
+  it('[BILL-013] closes by counting the notes and coins, totalled as they are typed', async () => {
+    const fake = cashier()
+      .on('GET', '/api/v1/shifts/current', () => ({ status: 200, body: { shift: shiftView() } }))
+      .on('POST', `/api/v1/shifts/${B.shift}/close`, () => ({
+        status: 200,
+        body: shiftView({
+          status: 'CLOSED',
+          countedCash: 139_600,
+          variance: -400,
+          closedAt: '2026-09-26T20:00:00.000Z',
+        }),
+      }));
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos/shift' });
+    await user.click(await screen.findByLabelText(t('shift.byNotes')));
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '500' })), '2');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '100' })), '3');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '50' })), '1');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '20' })), '2');
+    await user.type(screen.getByLabelText(t('shift.noteCount', { note: '2' })), '3');
+    expect(screen.getByText(t('shift.notesTotal', { total: '₹1,396.00' }))).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: t('shift.close') }));
+    expect(await screen.findByText(t('shift.closed', { variance: '-₹4.00' }))).toBeInTheDocument();
+    expect(fake.callsTo('POST', `/api/v1/shifts/${B.shift}/close`)[0]?.body).toEqual({
+      countedCash: null,
+      denominations: { '500': 2, '100': 3, '50': 1, '20': 2, '2': 3 },
+    });
+  });
+
   it('[BILL-016] [AUD-006] opens the drawer without a sale, with a reason', async () => {
     const fake = cashier()
       .on('GET', '/api/v1/shifts/current', () => ({ status: 200, body: { shift: shiftView() } }))

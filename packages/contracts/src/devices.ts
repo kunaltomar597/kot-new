@@ -41,6 +41,8 @@ export const CreatePairingCodeRequest = z
     tableId: Id.optional(),
     /** For kitchen screens: the station whose tickets it shows (KDS-002). */
     stationId: Id.optional(),
+    /** For kitchen screens: the stations it shows, when more than one (KDS-002). */
+    stationIds: z.array(Id).min(1).max(10).optional(),
     /**
      * For pagers: the person wearing it. For waiter phones: the person it alerts until someone
      * signs in on it (P2-06a).
@@ -50,6 +52,10 @@ export const CreatePairingCodeRequest = z
   .refine((request) => request.type !== 'TABLE_TABLET' || request.tableId !== undefined, {
     message: 'A table tablet needs its table',
     path: ['tableId'],
+  })
+  .refine((request) => request.stationId === undefined || request.stationIds === undefined, {
+    message: 'Give the station or the stations, not both',
+    path: ['stationIds'],
   });
 export type CreatePairingCodeRequest = z.infer<typeof CreatePairingCodeRequest>;
 
@@ -124,6 +130,8 @@ export const PairedDevice = z.object({
   name: z.string(),
   tableId: Id.nullable(),
   stationId: Id.nullable(),
+  /** Every station a kitchen screen shows; empty for all stations (KDS-002). */
+  stationIds: z.array(Id).default([]),
   staffId: Id.nullable(),
 });
 export type PairedDevice = z.infer<typeof PairedDevice>;
@@ -161,6 +169,8 @@ export const DeviceSummary = z.object({
   status: DeviceStatus,
   tableId: Id.nullable(),
   stationId: Id.nullable(),
+  /** Every station a kitchen screen shows; empty for all stations (KDS-002). */
+  stationIds: z.array(Id).default([]),
   staffId: Id.nullable(),
   pairedAt: Timestamp.nullable(),
   lastSeenAt: Timestamp.nullable(),
@@ -198,6 +208,12 @@ export const DeviceListResponse = z.object({ devices: z.array(DeviceView) });
 export type DeviceListResponse = z.infer<typeof DeviceListResponse>;
 
 export const RenameDeviceRequest = z.strictObject({ name: DeviceName });
+
+/** KDS-002: the stations a kitchen screen shows; none for all of them (an Expo/Pass screen). */
+export const SetDeviceStationsRequest = z.strictObject({
+  stationIds: z.array(Id).max(10),
+});
+export type SetDeviceStationsRequest = z.infer<typeof SetDeviceStationsRequest>;
 export type RenameDeviceRequest = z.infer<typeof RenameDeviceRequest>;
 
 export const RevokeDeviceRequest = z.strictObject({ reason: z.string().trim().min(3).max(200) });

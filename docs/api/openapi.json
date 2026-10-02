@@ -1773,6 +1773,80 @@
         "x-requirements": ["AUTH-008"]
       }
     },
+    "/api/v1/devices/{deviceId}/stations": {
+      "put": {
+        "operationId": "setDeviceStations",
+        "summary": "Choose the stations a kitchen screen shows",
+        "description": "KDS-002: one or more stations, or none for every station (the Expo/Pass view). The screen reconnects at once to show them. Audited, and announced as `RestaurantChanged` `DEVICES`.",
+        "tags": ["devices"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SetDeviceStationsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Changed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DeviceSummary" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such device.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Not a kitchen screen, or unpaired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "A station that is not here, or archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["KDS-002", "MGR-006", "AUD-001"]
+      }
+    },
     "/api/v1/devices/{deviceId}/table": {
       "put": {
         "operationId": "bindTabletTable",
@@ -9575,6 +9649,39 @@
       }
     },
     "/api/v1/staff/me/break": {
+      "get": {
+        "operationId": "getMyBreak",
+        "summary": "Whether the signed-in person is on break",
+        "tags": ["notifications"],
+        "responses": {
+          "200": {
+            "description": "The break state.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BreakView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "SESSION",
+        "x-requirements": ["NTF-009"]
+      },
       "post": {
         "operationId": "setMyBreak",
         "summary": "Start or end \"On break\" for the signed-in person",
@@ -12724,6 +12831,12 @@
           "name": { "$ref": "#/components/schemas/DeviceName" },
           "tableId": { "$ref": "#/components/schemas/Id" },
           "stationId": { "$ref": "#/components/schemas/Id" },
+          "stationIds": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
           "staffId": { "$ref": "#/components/schemas/Id" }
         },
         "required": ["type", "name"],
@@ -12948,6 +13061,16 @@
         "required": ["devices"],
         "additionalProperties": false
       },
+      "DeviceListResponseInput": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DeviceViewInput" }
+          }
+        },
+        "required": ["devices"]
+      },
       "DeviceLocateRequested": {
         "type": "object",
         "properties": {
@@ -13068,6 +13191,49 @@
           "status": { "$ref": "#/components/schemas/DeviceStatus" },
           "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationIds": {
+            "default": [],
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "pairedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastSeenAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "appVersion": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "status",
+          "tableId",
+          "stationId",
+          "stationIds",
+          "staffId",
+          "pairedAt",
+          "lastSeenAt",
+          "appVersion"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceSummaryInput": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/DeviceStatus" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationIds": {
+            "default": [],
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
           "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "pairedAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
@@ -13088,8 +13254,7 @@
           "pairedAt",
           "lastSeenAt",
           "appVersion"
-        ],
-        "additionalProperties": false
+        ]
       },
       "DeviceTokenRequest": {
         "type": "object",
@@ -13123,6 +13288,76 @@
           "status": { "$ref": "#/components/schemas/DeviceStatus" },
           "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationIds": {
+            "default": [],
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "pairedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastSeenAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "appVersion": { "type": ["string", "null"] },
+          "connected": { "type": "boolean" },
+          "batteryPercent": {
+            "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+          },
+          "charging": { "type": ["boolean", "null"] },
+          "network": {
+            "anyOf": [{ "$ref": "#/components/schemas/NetworkKind" }, { "type": "null" }]
+          },
+          "rssi": {
+            "anyOf": [
+              { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "firmwareVersion": { "type": ["string", "null"] },
+          "serial": { "type": ["string", "null"] },
+          "revokedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name",
+          "status",
+          "tableId",
+          "stationId",
+          "stationIds",
+          "staffId",
+          "pairedAt",
+          "lastSeenAt",
+          "appVersion",
+          "connected",
+          "batteryPercent",
+          "charging",
+          "network",
+          "rssi",
+          "firmwareVersion",
+          "serial",
+          "revokedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DeviceViewInput": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/DeviceStatus" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationIds": {
+            "default": [],
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
           "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "pairedAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
@@ -13170,8 +13405,7 @@
           "firmwareVersion",
           "serial",
           "revokedAt"
-        ],
-        "additionalProperties": false
+        ]
       },
       "DiscountReportResponse": {
         "type": "object",
@@ -14318,6 +14552,19 @@
               { "type": "null" }
             ]
           },
+          "stations": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"],
+              "additionalProperties": false
+            }
+          },
           "tickets": { "type": "array", "items": { "$ref": "#/components/schemas/KdsTicket" } },
           "recentlyBumped": {
             "type": "array",
@@ -14326,8 +14573,46 @@
           "settings": { "$ref": "#/components/schemas/KdsSettings" },
           "serverTime": { "$ref": "#/components/schemas/Timestamp" }
         },
-        "required": ["station", "tickets", "recentlyBumped", "settings", "serverTime"],
+        "required": ["station", "stations", "tickets", "recentlyBumped", "settings", "serverTime"],
         "additionalProperties": false
+      },
+      "KdsTicketsResponseInput": {
+        "type": "object",
+        "properties": {
+          "station": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"]
+              },
+              { "type": "null" }
+            ]
+          },
+          "stations": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"]
+            }
+          },
+          "tickets": { "type": "array", "items": { "$ref": "#/components/schemas/KdsTicket" } },
+          "recentlyBumped": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/KdsTicket" }
+          },
+          "settings": { "$ref": "#/components/schemas/KdsSettings" },
+          "serverTime": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["station", "tickets", "recentlyBumped", "settings", "serverTime"]
       },
       "KioskExitRequest": {
         "type": "object",
@@ -16624,10 +16909,42 @@
           "name": { "type": "string" },
           "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationIds": {
+            "default": [],
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
           "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
         },
-        "required": ["deviceId", "restaurantId", "type", "name", "tableId", "stationId", "staffId"],
+        "required": [
+          "deviceId",
+          "restaurantId",
+          "type",
+          "name",
+          "tableId",
+          "stationId",
+          "stationIds",
+          "staffId"
+        ],
         "additionalProperties": false
+      },
+      "PairedDeviceInput": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "$ref": "#/components/schemas/Id" },
+          "restaurantId": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "name": { "type": "string" },
+          "tableId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
+          "stationIds": {
+            "default": [],
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          },
+          "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
+        },
+        "required": ["deviceId", "restaurantId", "type", "name", "tableId", "stationId", "staffId"]
       },
       "PairingCode": { "type": "string", "pattern": "^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$" },
       "PairingCodeResponse": {
@@ -18288,6 +18605,18 @@
           "acknowledgedByName",
           "closedAt"
         ],
+        "additionalProperties": false
+      },
+      "SetDeviceStationsRequest": {
+        "type": "object",
+        "properties": {
+          "stationIds": {
+            "maxItems": 10,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Id" }
+          }
+        },
+        "required": ["stationIds"],
         "additionalProperties": false
       },
       "SetStaffPinRequest": {

@@ -489,6 +489,11 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     }
   }
 
+  /** A device's binding changed (its stations, say): its connections reconnect to new rooms. */
+  reconnectDevice(restaurantId: string, deviceId: string): void {
+    this.endRoom(rooms.device(restaurantId, deviceId), 'DEVICE_CHANGED');
+  }
+
   private end(socket: RealtimeSocket, reason: RealtimeEndReason): void {
     if (!socket.connected) return;
     socket.emit(REALTIME_MESSAGES.ended, { reason });

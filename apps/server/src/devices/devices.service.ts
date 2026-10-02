@@ -110,6 +110,17 @@ function pairingCode(): string {
 type DeviceRow = Prisma.DeviceGetPayload<Record<string, never>>;
 type PairOutcome = { readonly error: AppError } | { readonly device: DeviceRow };
 
+/** Every station a kitchen screen shows, in order; empty for all of them (KDS-002). */
+function stationIdsOf(device: { stationId: string | null; extraStationIds: string[] }): string[] {
+  return device.stationId === null ? [] : [device.stationId, ...device.extraStationIds];
+}
+
+/** The stations a pairing asks for: one, several, or none (every station). */
+function requestedStations(request: CreatePairingCodeRequest): string[] {
+  if (request.stationIds !== undefined) return [...new Set(request.stationIds)];
+  return request.stationId === undefined ? [] : [request.stationId];
+}
+
 function summary(device: DeviceRow): DeviceSummary {
   return {
     id: device.id,
@@ -118,6 +129,7 @@ function summary(device: DeviceRow): DeviceSummary {
     status: device.status,
     tableId: device.tableId,
     stationId: device.stationId,
+    stationIds: stationIdsOf(device),
     staffId: device.staffId,
     pairedAt: device.pairedAt?.toISOString() ?? null,
     lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
@@ -228,6 +240,7 @@ export class DevicesService {
           appVersion: request.appVersion ?? null,
           tableId: code.tableId,
           stationId: code.stationId,
+          extraStationIds: code.extraStationIds,
           staffId: code.staffId,
         },
       });
@@ -246,7 +259,7 @@ export class DevicesService {
           type: device.type,
           name: device.name,
           tableId: device.tableId,
-          stationId: device.stationId,
+          stationIds: stationIdsOf(device),
           staffId: device.staffId,
           keyAlgorithm: request.algorithm,
         },
@@ -263,6 +276,7 @@ export class DevicesService {
       name: device.name,
       tableId: device.tableId,
       stationId: device.stationId,
+      stationIds: stationIdsOf(device),
       staffId: device.staffId,
     };
   }
@@ -341,6 +355,54 @@ export class DevicesService {
       await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
       return summary(renamed);
     });
+  }
+
+  /**
+   * The stations a kitchen screen shows (KDS-002): one or more, or none for every station (the
+   * Expo/Pass view). Audited; the screen reconnects at once to its new stations.
+   */
+  async setStations(
+    principal: Principal,
+    deviceId: string,
+    stationIds: readonly string[],
+  ): Promise<DeviceSummary> {
+    const wanted = [...new Set(stationIds)];
+    const changed = await this.prisma.transaction(async (tx) => {
+      const device = await tx.device.findFirst({
+        where: { id: deviceId, restaurantId: principal.restaurantId },
+      });
+      if (device === null) throw errors.notFound();
+      if (device.status === 'REVOKED') throw errors.deviceRevoked();
+      if (device.type !== 'KDS') {
+        throw new AppError(409, 'NOT_A_KITCHEN_SCREEN', 'Only a kitchen screen shows stations.');
+      }
+      if (wanted.length > 0) {
+        const found = await tx.station.count({
+          where: { id: { in: wanted }, restaurantId: principal.restaurantId, archivedAt: null },
+        });
+        if (found !== wanted.length) throw errors.bindingNotFound('station');
+      }
+      const before = stationIdsOf(device);
+      if (before.join() === wanted.join()) return { device, changed: false };
+      const updated = await tx.device.update({
+        where: { id: device.id },
+        data: { stationId: wanted[0] ?? null, extraStationIds: wanted.slice(1) },
+      });
+      await this.audit.record(tx, {
+        action: 'DEVICE_STATIONS_CHANGED',
+        entityType: 'device',
+        entityId: device.id,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: { stationIds: before },
+        after: { stationIds: wanted },
+      });
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
+      return { device: updated, changed: true };
+    });
+    if (changed.changed) this.realtime.reconnectDevice(principal.restaurantId, deviceId);
+    return summary(changed.device);
   }
 
   /**
@@ -489,11 +551,12 @@ export class DevicesService {
       });
       if (table === null) throw errors.tableNotFound();
     }
-    if (request.stationId !== undefined) {
-      const station = await tx.station.findFirst({
-        where: { id: request.stationId, restaurantId, archivedAt: null },
+    const stations = requestedStations(request);
+    if (stations.length > 0) {
+      const found = await tx.station.count({
+        where: { id: { in: stations }, restaurantId, archivedAt: null },
       });
-      if (station === null) throw errors.bindingNotFound('station');
+      if (found !== stations.length) throw errors.bindingNotFound('station');
     }
     if (request.staffId !== undefined) {
       const staff = await tx.staff.findFirst({
@@ -506,11 +569,15 @@ export class DevicesService {
   private async issueCode(
     tx: TransactionClient,
     restaurantId: string,
-    request: Pick<CreatePairingCodeRequest, 'type' | 'name' | 'tableId' | 'stationId' | 'staffId'>,
+    request: Pick<
+      CreatePairingCodeRequest,
+      'type' | 'name' | 'tableId' | 'stationId' | 'stationIds' | 'staffId'
+    >,
     createdById: string | null,
     actorDeviceId: string | null,
   ): Promise<PairingCodeResponse> {
     const settings = await this.settings.get(restaurantId);
+    const stations = requestedStations(request);
     const code = pairingCode();
     const expiresAt = new Date(Date.now() + settings.pairingCodeMinutes * 60_000);
     const created = await tx.pairingCode.create({
@@ -520,7 +587,8 @@ export class DevicesService {
         type: request.type,
         name: request.name,
         tableId: request.tableId ?? null,
-        stationId: request.stationId ?? null,
+        stationId: stations[0] ?? null,
+        extraStationIds: stations.slice(1),
         staffId: request.staffId ?? null,
         createdById,
         expiresAt,

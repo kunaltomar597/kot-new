@@ -54,9 +54,9 @@ export function roomsForConnection(identity: ConnectionIdentity): string[] {
     return joined;
   }
   if (device.type === 'KDS') {
-    joined.push(
-      device.stationId === null ? rooms.allStations(rid) : rooms.station(rid, device.stationId),
-    );
+    // KDS-002: each of its stations, or every station (the Expo/Pass view).
+    if (device.stationIds.length === 0) joined.push(rooms.allStations(rid));
+    for (const stationId of device.stationIds) joined.push(rooms.station(rid, stationId));
   }
   if (device.type === 'WAITER_PHONE' && device.staffId !== null) {
     joined.push(rooms.alerts(rid, device.staffId));

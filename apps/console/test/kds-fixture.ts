@@ -49,6 +49,7 @@ export function board(
 ): KdsTicketsResponse {
   return {
     station: { id: KDS_IDS.station, name: 'Kitchen' },
+    stations: [{ id: KDS_IDS.station, name: 'Kitchen' }],
     tickets,
     recentlyBumped: [],
     settings: {

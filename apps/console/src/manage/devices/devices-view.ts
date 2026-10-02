@@ -85,8 +85,12 @@ export function bindingOf(device: DeviceView, names: Names): Binding {
   if (device.tableId !== null) {
     return { kind: 'TABLE', label: names.tables.get(device.tableId) ?? '?' };
   }
-  if (device.stationId !== null) {
-    return { kind: 'STATION', name: names.stations.get(device.stationId) ?? '?' };
+  if (device.stationIds.length > 0) {
+    // KDS-002: one or more stations.
+    return {
+      kind: 'STATION',
+      name: device.stationIds.map((id) => names.stations.get(id) ?? '?').join(', '),
+    };
   }
   if (device.type === 'KDS') return { kind: 'ALL_STATIONS' };
   if (device.staffId !== null) {
@@ -127,7 +131,8 @@ export interface PairingForm {
   readonly name: string;
   /** Empty for none. */
   readonly tableId: string;
-  readonly stationId: string;
+  /** A kitchen screen's stations; none for every station (KDS-002). */
+  readonly stationIds: readonly string[];
   readonly staffId: string;
 }
 
@@ -146,13 +151,14 @@ export function checkPairing(form: PairingForm): Partial<Record<PairingField, Pa
 export function pairingRequestOf(form: PairingForm): CreatePairingCodeRequest {
   const optional = (value: string) => (value === '' ? undefined : value);
   const tableId = form.type === 'TABLE_TABLET' ? optional(form.tableId) : undefined;
-  const stationId = form.type === 'KDS' ? optional(form.stationId) : undefined;
+  const stationIds =
+    form.type === 'KDS' && form.stationIds.length > 0 ? form.stationIds : undefined;
   const staffId = form.type === 'WAITER_PHONE' ? optional(form.staffId) : undefined;
   return CreatePairingCodeRequest.parse({
     type: form.type,
     name: form.name.trim(),
     ...(tableId !== undefined && { tableId }),
-    ...(stationId !== undefined && { stationId }),
+    ...(stationIds !== undefined && { stationIds: [...stationIds] }),
     ...(staffId !== undefined && { staffId }),
   });
 }

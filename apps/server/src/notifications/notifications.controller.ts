@@ -62,6 +62,11 @@ export class NotificationsController {
 export class BreakController {
   constructor(private readonly notifications: NotificationsService) {}
 
+  @Get('break')
+  getBreak(@Req() request: AuthenticatedRequest): Promise<BreakView> {
+    return this.notifications.breakOf(principalOf(request));
+  }
+
   @Post('break')
   @HttpCode(200)
   setBreak(

@@ -31,6 +31,7 @@ export function deviceSummary(overrides: Partial<DeviceSummary> = {}): DeviceSum
     status: 'ACTIVE',
     tableId: null,
     stationId: null,
+    stationIds: [],
     staffId: null,
     pairedAt: '2026-09-25T10:00:00.000Z',
     lastSeenAt: null,
@@ -304,6 +305,7 @@ export function fakeLocalServer(
         name: summary.name,
         tableId: summary.tableId,
         stationId: null,
+        stationIds: [],
         staffId: null,
       },
     }))

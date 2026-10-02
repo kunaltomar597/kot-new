@@ -30,6 +30,9 @@ import {
   nextStep,
   notCollected,
   ticketStep,
+  boardStations,
+  type ExpoOrder,
+  expoOrders,
 } from './kds-view.js';
 import { type KitchenSounds, webAudioSounds } from './sounds.js';
 
@@ -227,10 +230,39 @@ function Board(props: BoardProps) {
   const t = useT();
   const { view } = props;
   const summary = allDaySummary(view.tickets);
+  const names = boardStations(view);
+  // KDS-002: a screen of several stations, or all of them, can show orders across them.
+  const severalStations = names.length !== 1;
+  const [expo, setExpo] = useState(false);
+  const byOrder = severalStations && expo;
   return (
     <div className="kds-board">
       <header className="kds-board__bar">
-        <h2 className="kds-board__station">{view.station?.name ?? t('kds.allStations')}</h2>
+        <h2 className="kds-board__station">
+          {names.length === 0 ? t('kds.allStations') : names.join(' + ')}
+        </h2>
+        {severalStations ? (
+          <div className="kds-board__views" role="group" aria-label={t('kds.view')}>
+            <Button
+              variant={byOrder ? 'secondary' : 'primary'}
+              aria-pressed={!byOrder}
+              onClick={() => {
+                setExpo(false);
+              }}
+            >
+              {t('kds.viewTickets')}
+            </Button>
+            <Button
+              variant={byOrder ? 'primary' : 'secondary'}
+              aria-pressed={byOrder}
+              onClick={() => {
+                setExpo(true);
+              }}
+            >
+              {t('kds.viewOrders')}
+            </Button>
+          </div>
+        ) : null}
         {props.soundOn ? null : (
           <Button
             variant="secondary"
@@ -247,10 +279,21 @@ function Board(props: BoardProps) {
       <div className="kds-board__body">
         {view.tickets.length === 0 ? (
           <EmptyState title={t('kds.noTickets')} />
+        ) : byOrder ? (
+          <div className="kds-tickets">
+            {expoOrders(view.tickets).map((order) => (
+              <ExpoOrderCard key={order.orderId} order={order} {...props} />
+            ))}
+          </div>
         ) : (
           <div className="kds-tickets">
             {view.tickets.map((ticket) => (
-              <TicketCard key={ticket.kotId} ticket={ticket} {...props} />
+              <TicketCard
+                key={ticket.kotId}
+                ticket={ticket}
+                showStation={severalStations}
+                {...props}
+              />
             ))}
           </div>
         )}
@@ -273,7 +316,83 @@ function Board(props: BoardProps) {
   );
 }
 
-function TicketCard({ ticket, ...props }: BoardProps & { ticket: KdsTicket }) {
+/**
+ * The Expo/Pass view (KDS-002 S): one card per order with every station's lines, so the pass sees
+ * when the whole order is ready and sends it out together.
+ */
+function ExpoOrderCard({ order, ...props }: BoardProps & { order: ExpoOrder }) {
+  const t = useT();
+  const minutes = minutesBetween(order.since, props.nowMs);
+  const tone = ageTone(minutes, props.view.settings);
+  const where =
+    order.tableLabel !== null
+      ? t('kds.table', { table: order.tableLabel })
+      : order.takeawayToken !== null
+        ? t('kds.token', { token: order.takeawayToken })
+        : '';
+  const title = [t('kds.order', { number: order.orderNumber }), where].filter(Boolean).join(', ');
+  const busy = order.tickets.some((ticket) => props.busy.has(ticket.kotId));
+  return (
+    <article className="kds-ticket" aria-label={title} data-age={tone}>
+      <header className="kds-ticket__header">
+        <h3 className="kds-ticket__title">
+          <span>{t('kds.order', { number: order.orderNumber })}</span>
+          <span className="kds-ticket__destination">{where}</span>
+        </h3>
+        <Badge tone={AGE_BADGE[tone]} variant="solid" icon={<Icon name={AGE_ICONS[tone]} />}>
+          {t('kds.ageMinutes', { minutes })}
+        </Badge>
+        {order.allReady ? (
+          <Badge tone="success" variant="solid" icon={<Icon name="check" />}>
+            {t('kds.orderReady')}
+          </Badge>
+        ) : null}
+      </header>
+      <div className="kds-ticket__lines">
+        {order.tickets.map((ticket) => (
+          <div key={ticket.kotId} className="kds-group">
+            <p className="kds-group__combo">
+              {ticket.stationName} · {t('kds.ticket', { number: ticket.kotNumber })}
+            </p>
+            <ul className="kds-lines">
+              {ticket.lines.map((line) => (
+                <li key={`${line.orderItemId}-${String(line.quantity)}`} className="kds-line">
+                  <div className="kds-line__main">
+                    <span className="kds-line__name">
+                      <strong>{line.quantity}</strong> × {line.name}
+                      {line.variantName === null ? '' : ` (${line.variantName})`}
+                    </span>
+                  </div>
+                  <StatusChip state={line.state} label={t(`pos.itemState.${line.state}`)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {order.ready.length === 0 ? null : (
+        <footer className="kds-ticket__footer">
+          <Button
+            fullWidth
+            disabled={busy}
+            aria-label={t('kds.pickUpOrder', { order: title })}
+            onClick={() => {
+              for (const { ticket, line } of order.ready) props.onStep(ticket, line, 'PICK_UP');
+            }}
+          >
+            {order.allReady ? t('kds.pickUpAll') : t('kds.pickUpReady')}
+          </Button>
+        </footer>
+      )}
+    </article>
+  );
+}
+
+function TicketCard({
+  ticket,
+  showStation = false,
+  ...props
+}: BoardProps & { ticket: KdsTicket; showStation?: boolean }) {
   const t = useT();
   const { settings } = props.view;
   const minutes = minutesBetween(ticket.createdAt, props.nowMs);
@@ -302,7 +421,13 @@ function TicketCard({ ticket, ...props }: BoardProps & { ticket: KdsTicket }) {
           {tone === 'fresh' ? null : ` · ${t(`kds.age.${tone}`)}`}
         </Badge>
         <p className="kds-ticket__meta">
-          {[ticket.waiterName, t(`kds.source.${ticket.source}`)].filter(Boolean).join(' · ')}
+          {[
+            showStation ? ticket.stationName : '',
+            ticket.waiterName,
+            t(`kds.source.${ticket.source}`),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </p>
         <div className="kds-ticket__badges">
           {ticket.movedFrom === null ? null : (

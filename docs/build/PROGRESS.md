@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-05 the should-have batch, then Phase 7.
+- P6-05b to P6-05e, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -337,6 +337,11 @@ Recommended next WPs (dependencies met):
   - [x] P6-04b Review and import on the restaurant PC
   - [x] P6-04c Bulk photo upload (ONB-007)
 - [ ] P6-05 Should-have operations batch
+  - [x] P6-05a Finishing what was half built (KDS-002, KDS-006, NTF-009, BILL-013)
+  - [ ] P6-05b Ordering (ORD-016, WTR-013, MENU-007)
+  - [ ] P6-05c Tables (TBL-006, TBL-004)
+  - [ ] P6-05d Billing (BILL-001, WTR-008)
+  - [ ] P6-05e Setup (ONB-004 steps 5 and 6)
 
 ### Phase 7: Commercial readiness
 
@@ -601,6 +606,27 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-05a):
+
+409. P6-05 is split into five parts (phase-6.md). KDS-010 (the all-day summary) was built in P1-09.
+410. KDS-002's M part was not met: a kitchen screen had one station. A screen now has one or more
+     (`devices.extra_station_ids` after `station_id`; none is every station, the Expo/Pass
+     screen), chosen at pairing or later (`PUT /devices/:id/stations`, audited; the screen
+     reconnects with `DEVICE_CHANGED` to join its new rooms). It may narrow to one of its
+     stations; a person signed in may still choose any.
+411. The Expo/Pass view is a switch on a screen of several stations (or all): Tickets, or Orders,
+     one card per order with every station's lines, "Ready to serve" when all are ready, and
+     "Picked up" for what is ready. Tickets show their station there too.
+412. Automatic escalation (KDS-006 S, setting `kds.autoEscalateNotCollected`, default off): a
+     sweep every 30 s raises the same READY_NOT_COLLECTED alert as the button, without a person
+     or device, once per ticket: an alert acknowledged is not raised again for the same ticket.
+413. "On break" (NTF-009) is a card in the waiter app's tables screen; the server already routed
+     alerts. `GET /staff/me/break` was added so the app shows the state it starts with.
+414. The denomination count (BILL-013 S) is optional at shift close ("Count by notes and coins"):
+     ₹2000, 500, 200, 100, 50, 20, 10, 5, 2 and 1 (a note and a coin of one value are one count),
+     totalled as typed; the server totals it again. Not offered at day-end, which closes shifts
+     already counted.
 
 Decided 2026-10-02 (P6-04c):
 
@@ -2154,6 +2180,23 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-05a Finishing what was half built
+
+Built:
+
+- KDS-002: migration `20261002235000_kds_stations`; `stationIds` on pairing codes, devices,
+  `AuthenticatedDevice` and the station actor; rooms per station; the KDS filter and
+  `stations` in its answer; `setDeviceStations` (service, route, gateway `reconnectDevice`);
+  console pairing with station checkboxes and a Stations dialog; the board's heading, the
+  station on each ticket, and the Orders (Expo) view (`expoOrders`).
+- KDS-006: `KdsEscalationService` and `KdsService.escalateNotCollected`.
+- NTF-009: `getMyBreak`; the waiter app's `BreakCard`.
+- BILL-013: the console's denomination count at shift close.
+
+Tests: server kds +3 (several stations and narrowing, changing a screen's stations, automatic
+escalation), notifications +1 assertion, rooms unit +1; console devices +1 and updated, KDS view
++1 and screen +1, billing +1; waiter app +1.
 
 ### 2026-10-02: P6-04c Bulk photo upload (P6-04 done)
 

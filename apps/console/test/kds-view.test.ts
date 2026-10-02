@@ -4,6 +4,7 @@ import {
   allDaySummary,
   arrivals,
   canBump,
+  expoOrders,
   groupLines,
   linesFor,
   minutesBetween,
@@ -112,5 +113,32 @@ describe('[KDS-003] [KDS-006] [KDS-009] [KDS-010] the board', () => {
       newTickets: 1,
       changes: 1,
     });
+  });
+});
+
+describe('[KDS-002] the Expo/Pass view', () => {
+  it('groups each order’s tickets across stations and says when all of it is ready', () => {
+    const other = '0199a0e0-0000-7000-8000-000000000999';
+    const kitchen = ticket(1, { lines: [line(11, { state: 'READY' })] });
+    const bar = ticket(2, {
+      stationName: 'Bar',
+      createdAt: minutesAgo(5),
+      lines: [line(21, { state: 'READY' }), line(22, { state: 'CANCELLED' })],
+    });
+    const later = ticket(3, {
+      orderId: other,
+      orderNumber: 4,
+      createdAt: minutesAgo(1),
+      lines: [line(31, { state: 'PREPARING' }), line(32, { state: 'READY' })],
+    });
+    const slip = ticket(4, { kind: 'CANCELLED', orderId: other });
+    const orders = expoOrders([later, kitchen, bar, slip]);
+    expect(orders.map((order) => [order.orderNumber, order.allReady, order.ready.length])).toEqual([
+      [3, true, 2],
+      [4, false, 1],
+    ]);
+    // Oldest ticket first within the order; the cancellation slip is not an order.
+    expect(orders[0]?.tickets.map((entry) => entry.stationName)).toEqual(['Bar', 'Kitchen']);
+    expect(orders[1]?.tickets).toHaveLength(1);
   });
 });
