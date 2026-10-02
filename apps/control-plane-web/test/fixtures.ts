@@ -1,5 +1,7 @@
 import {
+  type PlanView,
   type VendorInstallationView,
+  type VendorInvoiceView,
   type VendorLicenceView,
   type VendorMeView,
   type VendorRole,
@@ -104,6 +106,43 @@ export function licence(overrides: Partial<VendorLicenceView> = {}): VendorLicen
       validUntil: '2026-11-01T03:55:00.000Z',
       state: 'GRACE',
     },
+    ...overrides,
+  };
+}
+
+export const PLAN_ID = '0190a1b2-0000-7000-8000-0000000000b1';
+export const INVOICE_ID = '0190a1b2-0000-7000-8000-0000000000c1';
+
+export function plan(overrides: Partial<PlanView> = {}): PlanView {
+  return {
+    id: PLAN_ID,
+    code: 'STANDARD',
+    name: 'Standard',
+    prices: { MONTHLY: 2_49_900, QUARTERLY: null, YEARLY: 24_99_000 },
+    deviceLimits: { TABLE_TABLET: 12, PAGER: 6, WAITER_PHONE: 6, KDS: 2 },
+    modules: ['POS', 'KDS', 'WAITER_APP'],
+    archivedAt: null,
+    subscribers: 1,
+    ...overrides,
+  };
+}
+
+export function invoice(overrides: Partial<VendorInvoiceView> = {}): VendorInvoiceView {
+  return {
+    id: INVOICE_ID,
+    tenantId: TENANT_ID,
+    tenantName: 'Spice Route',
+    number: 'SUB/2026-27/00001',
+    periodStart: '2026-09-01',
+    periodEnd: '2026-09-30',
+    amount: 2_49_900,
+    paid: 1_00_000,
+    dueOn: '2026-09-08',
+    status: 'ISSUED',
+    daysOverdue: 24,
+    issuedAt: '2026-09-01T06:30:00.000Z',
+    paidAt: null,
+    voidReason: null,
     ...overrides,
   };
 }

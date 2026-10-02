@@ -113,7 +113,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build the server, the console and the QR site
+      - name: Build the server, the console, the QR site and the Control Plane with its web app
         run: pnpm build
 
       - name: Install Chromium for Playwright
@@ -125,6 +125,9 @@ jobs:
       - name: QR menu end-to-end tests (a phone against a real relay)
         run: pnpm --filter @rp/qr-menu e2e
 
+      - name: Vendor web app end-to-end tests (against the real Control Plane)
+        run: pnpm --filter @rp/control-plane-web e2e
+
       - name: Keep the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
@@ -135,6 +138,8 @@ jobs:
             apps/console/test-results
             apps/qr-menu/playwright-report
             apps/qr-menu/test-results
+            apps/control-plane-web/playwright-report
+            apps/control-plane-web/test-results
           retention-days: 7
 
   relay-supabase:
