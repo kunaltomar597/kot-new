@@ -353,6 +353,11 @@ Recommended next WPs (dependencies met):
   - [x] P7-01c Local server: the licence agent and enforcement
   - [x] P7-01d Screens: reminders, banners, the Owner's licence page
 - [ ] P7-02 Control Plane: tenants, subscriptions, licences
+  - [x] P7-02a Vendor staff: accounts, MFA, roles, sessions, access reviews
+  - [ ] P7-02b Vendor API for the fleet
+  - [ ] P7-02c Subscriptions and payments
+  - [ ] P7-02d Support notes, QR provisioning, access policy
+  - [ ] P7-02e The Control Plane web app
 - [ ] P7-03 Fleet monitoring
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
@@ -612,6 +617,27 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-02a):
+
+453. P7-02 is split into five (phase-7.md).
+454. Vendor staff sign in with email, password and an authenticator code in one request: MFA is
+     never optional or skippable (VCP-001, SEC-018). Accounts start from a one-time setup token
+     (72 hours, 256 bits, kept as SHA-256) given out of band; the account is active only after
+     the authenticator is confirmed. Passwords: at least 12 characters, Argon2id peppered with
+     the Control Plane's secret key; authenticator secrets sealed with it (AES-256-GCM).
+     `CP_SECRET_KEY` is required in staging and production.
+455. Five failed sign-ins lock an account for 15 minutes; 20 attempts per address per 15 minutes;
+     codes are never accepted twice. Sessions are bearer tokens kept as SHA-256, 8 hours, ended
+     after 30 minutes without use, ended at once when the account is disabled or reset.
+456. Roles and what they may do: Super Admin everything; Onboarding tenants, installations,
+     re-binding, notes; Support re-binding, reactivation codes, notes; Finance licences, codes,
+     billing, the audit trail; Read-only reading. The matrix is in `@rp/contracts/control-plane`
+     (`vendorMay`), enforced by the API, only reflected by the web app. Nobody changes their own
+     account; the last active Super Admin cannot be demoted or disabled.
+457. The quarterly access review (SEC-018) is recorded by a Super Admin listing the accounts to
+     keep; every other active account is disabled at once, audited with the note.
+458. TOTP moved from the server to `@rp/totp`, shared by the restaurant PC and the Control Plane.
 
 Decided 2026-10-03 (P7-01d):
 
@@ -2363,6 +2389,18 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-02a Vendor staff accounts with mandatory MFA
+
+Built: `@rp/totp` (moved from the server); contracts `vendor.ts` (roles, capabilities, sign-in,
+setup, accounts, access review) and the vendor routes; CP migration `20261003020000_vendor_staff`;
+config `CP_SECRET_KEY`; `src/vendor/` (sealing, `VendorAuthService`, `VendorGuard` with
+`@Vendor(capability)`, controller); the installation guard leaves vendor routes alone; CLI
+`vendor-user:create`.
+
+Tests: totp 3, contracts +2, CP integration +7 (CLI bootstrap and setup, sign-in with the code,
+no reuse and lockout, roles, account changes and resets, the access review, sign-out and idle
+end), CP unit +1.
 
 ### 2026-10-03: P7-01d Licence screens (P7-01 done)
 

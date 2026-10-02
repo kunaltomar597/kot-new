@@ -3,12 +3,12 @@ import type { Prisma } from '../generated/prisma/client.js';
 import type { TransactionClient } from '../database/prisma.service.js';
 
 export interface AuditRecord {
-  /** `cli:<user>`, `ci:<pipeline>` or `installation:<id>`. */
+  /** `cli:<user>`, `ci:<pipeline>`, `vendor:<user id>` or `installation:<id>`. */
   readonly actor: string;
   /** Dotted, past tense: `installation.enrolled`, `release.published`. */
   readonly action: string;
   readonly targetType: string;
-  readonly targetId?: string;
+  readonly targetId?: string | null;
   readonly details?: Prisma.InputJsonObject;
 }
 

@@ -62,8 +62,24 @@ export const CpConfigSchema = z
     licenceGraceDays: z.coerce.number().int().min(0).max(90).default(7),
     /** Heartbeats asked of an installation whose licence is not active (LIC-006: within 1 min). */
     licenceHeartbeatSeconds: z.coerce.number().int().min(60).max(600).default(60),
+    /**
+     * The Control Plane's own secret (32+ bytes, base64) from the secret manager: it seals vendor
+     * staff's authenticator secrets and peppers their passwords (VCP-001). Required outside
+     * development.
+     */
+    secretKey: z
+      .string()
+      .refine((value) => Buffer.from(value, 'base64').length >= 32, 'at least 32 bytes')
+      .optional(),
   })
   .superRefine((config, context) => {
+    if (config.env !== 'development' && config.secretKey === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['secretKey'],
+        message: 'staging and production need CP_SECRET_KEY from the secret manager',
+      });
+    }
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
       context.addIssue({
         code: 'custom',
@@ -104,6 +120,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     licenceValidityDays: env.CP_LICENCE_VALIDITY_DAYS,
     licenceGraceDays: env.CP_LICENCE_GRACE_DAYS,
     licenceHeartbeatSeconds: env.CP_LICENCE_HEARTBEAT_SECONDS,
+    secretKey: env.CP_SECRET_KEY === '' ? undefined : env.CP_SECRET_KEY,
   });
   if (!result.success) {
     const problems = result.error.issues

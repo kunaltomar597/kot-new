@@ -1,0 +1,20 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+      "password": { "type": "string", "minLength": 12, "maxLength": 200 }
+    },
+    "required": ["token", "password"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+      "password": { "type": "string", "minLength": 12, "maxLength": 200 }
+    },
+    "required": ["token", "password"],
+    "additionalProperties": false
+  }
+}

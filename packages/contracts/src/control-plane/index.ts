@@ -2,6 +2,7 @@
 export * from './routes.js';
 export * from './schemas.js';
 export * from './signing.js';
+export * from './vendor.js';
 // Shared schemas the Control Plane's routes answer with, so its document names them.
 export { ApiError } from '../common.js';
 export { HealthResponse } from '../system.js';

@@ -1,0 +1,10 @@
+{
+  "input": {
+    "type": "string",
+    "enum": ["SUPER_ADMIN", "ONBOARDING", "SUPPORT", "FINANCE", "READ_ONLY"]
+  },
+  "output": {
+    "type": "string",
+    "enum": ["SUPER_ADMIN", "ONBOARDING", "SUPPORT", "FINANCE", "READ_ONLY"]
+  }
+}

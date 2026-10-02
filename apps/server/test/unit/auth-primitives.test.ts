@@ -8,14 +8,7 @@ import { RateLimiter } from '../../src/auth/rate-limiter.js';
 import { open, seal } from '../../src/auth/secret-box.js';
 import { FileSecretStore, type SecretName, type SecretStore } from '../../src/auth/secret-store.js';
 import { AccessTokenError, randomToken, sha256Hex, TokenService } from '../../src/auth/tokens.js';
-import {
-  base32Decode,
-  base32Encode,
-  hotp,
-  otpauthUri,
-  totpStep,
-  verifyTotp,
-} from '../../src/auth/totp.js';
+import { base32Decode, base32Encode, hotp, otpauthUri, totpStep, verifyTotp } from '@rp/totp';
 
 function memoryStore(seed = 1): SecretStore {
   return {

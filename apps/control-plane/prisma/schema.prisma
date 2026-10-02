@@ -42,6 +42,64 @@ enum LicenceState {
   TERMINATED
 }
 
+/// Vendor staff roles (VCP-001): `@rp/contracts/control-plane` VENDOR_ROLES.
+enum VendorRole {
+  SUPER_ADMIN
+  ONBOARDING
+  SUPPORT
+  FINANCE
+  READ_ONLY
+}
+
+/// A vendor staff account (VCP-001, SEC-018): password and authenticator, both mandatory.
+model VendorUser {
+  id             String     @id @db.Uuid
+  /// Lower case.
+  email          String     @unique
+  name           String
+  role           VendorRole
+  /// Argon2id, peppered with the Control Plane's secret key; null until set up.
+  passwordHash   String?    @map("password_hash")
+  /// The authenticator's secret, sealed with the Control Plane's secret key.
+  totpSecret     String?    @map("totp_secret")
+  /// The last authenticator step used: a code is never accepted twice.
+  totpLastStep   Int?       @map("totp_last_step")
+  /// Set when the authenticator was confirmed: only then can the account sign in.
+  activatedAt    DateTime?  @map("activated_at") @db.Timestamptz(3)
+  /// SHA-256 of the one-time setup token (a new account, or a reset).
+  setupTokenHash String?    @unique @map("setup_token_hash")
+  setupExpiresAt DateTime?  @map("setup_expires_at") @db.Timestamptz(3)
+  failedSignIns  Int        @default(0) @map("failed_sign_ins")
+  lockedUntil    DateTime?  @map("locked_until") @db.Timestamptz(3)
+  disabledAt     DateTime?  @map("disabled_at") @db.Timestamptz(3)
+  lastSignInAt   DateTime?  @map("last_sign_in_at") @db.Timestamptz(3)
+  /// The last quarterly access review that kept the account (SEC-018).
+  reviewedAt     DateTime?  @map("reviewed_at") @db.Timestamptz(3)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions VendorSession[]
+
+  @@map("vendor_users")
+}
+
+/// A signed-in vendor staff member: the bearer token is kept only as its SHA-256.
+model VendorSession {
+  id         String    @id @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt DateTime  @map("last_seen_at") @db.Timestamptz(3)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  endedAt    DateTime? @map("ended_at") @db.Timestamptz(3)
+  address    String?
+
+  user VendorUser @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("vendor_sessions")
+}
+
 /// A restaurant business, the vendor's customer (VCP-002 grows it in P7-02).
 model Tenant {
   id        String   @id @db.Uuid

@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { NestFactory } from '@nestjs/core';
 import {
+  CreateVendorUserRequest,
   DeviceLimits,
   LicenceState,
   RELEASE_CHANNELS,
@@ -14,6 +15,7 @@ import { ControlPlaneModule } from './app.module.js';
 import { loadConfig } from './config/cp-config.js';
 import { CpError } from './errors/cp-error.js';
 import { type LicenceSummary, LicencesService } from './licences/licences.service.js';
+import { VendorAuthService } from './vendor/vendor-auth.service.js';
 
 /**
  * Admin CLI for vendor staff until the web app (VCP-001, P7-02). It talks to the database of the
@@ -32,6 +34,8 @@ Commands:
   installations:list
   release:publish --channel STABLE|PILOT --version <x.y.z> --url <https url>
                   --sha256 <hex> --size <bytes> [--notes <text>]
+  vendor-user:create --email <email> --name <name> --role SUPER_ADMIN|ONBOARDING|SUPPORT|FINANCE|READ_ONLY
+                     the first Super Admin; prints the one-time setup token
   licence:show --installation <id>
   licence:set --installation <id> --reason <text> [--state ACTIVE|PAYMENT_DUE|GRACE|RESTRICTED|TERMINATED]
               [--plan <name>] [--limits TABLE_TABLET=30,PAGER=15,WAITER_PHONE=15,KDS=6]
@@ -59,6 +63,8 @@ const OPTIONS = {
   'validity-days': { type: 'string' },
   'grace-days': { type: 'string' },
   until: { type: 'string' },
+  email: { type: 'string' },
+  role: { type: 'string' },
   help: { type: 'boolean' },
 } as const;
 
@@ -140,6 +146,8 @@ export interface CliContext {
   readonly admin: AdminService;
   /** Licences (P7-01b); commands about them need it. */
   readonly licences?: LicencesService;
+  /** Vendor staff accounts (P7-02a). */
+  readonly vendorAuth?: VendorAuthService;
   readonly actor: string;
   readonly out: (line: string) => void;
 }
@@ -223,6 +231,22 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       out(`Published ${release.component} ${release.version} on ${release.channel}.`);
       return 0;
     }
+    case 'vendor-user:create': {
+      const { vendorAuth } = context;
+      if (vendorAuth === undefined) throw new Error('Vendor accounts are not available here');
+      const created = await vendorAuth.create(
+        CreateVendorUserRequest.parse({
+          email: required(values, 'email'),
+          name: required(values, 'name'),
+          role: required(values, 'role'),
+        }),
+        actor,
+      );
+      out(`Account ${created.user.id} created for ${created.user.email} (${created.user.role}).`);
+      out(`Setup token (shown once; give it to the person directly): ${created.setupToken}`);
+      out(`They set a password and an authenticator before ${created.setupExpiresAt}.`);
+      return 0;
+    }
     case 'licence:show':
     case 'licence:set':
     case 'licence:rebind':
@@ -276,6 +300,7 @@ async function main(): Promise<number> {
     return await runCli(process.argv.slice(2), {
       admin: app.get(AdminService),
       licences: app.get(LicencesService),
+      vendorAuth: app.get(VendorAuthService),
       actor: actorFrom(),
       out: (line) => process.stdout.write(`${line}\n`),
     });
