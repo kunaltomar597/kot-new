@@ -276,6 +276,13 @@ import {
 } from './roles.js';
 import { DiagnosticsBundle, DiagnosticsRequestParams } from './control-plane/diagnostics.js';
 import {
+  ActivateRequest,
+  ActivateResponse,
+  MarkOnboardingStepRequest,
+  OnboardingResponse,
+  OnboardingStepParams,
+} from './onboarding.js';
+import {
   ApproveUpdateRequest,
   ClientErrorReport,
   HealthResponse,
@@ -737,6 +744,60 @@ export const ROUTES = [
       204: { description: 'Taken.' },
       400: { description: 'The request does not match the contract.', schema: ApiError },
       401: { description: 'Unknown or unpaired device.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getOnboarding',
+    method: 'GET',
+    path: '/api/v1/onboarding',
+    summary: 'The first-run setup: each step’s status and whether this PC is activated',
+    description:
+      'ONB-004: statuses come from what is set up, so the setup resumes where it stopped; the ' +
+      'invoice look and the go-live test also need a person to confirm them.',
+    tags: ['onboarding'],
+    requirements: ['ONB-004', 'ONB-003'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The setup.', schema: OnboardingResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'markOnboardingStep',
+    method: 'PUT',
+    path: '/api/v1/onboarding/steps/:step',
+    summary: 'Confirm a step, skip one the restaurant does not need, or take the mark back',
+    tags: ['onboarding'],
+    requirements: ['ONB-004', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: OnboardingStepParams, body: MarkOnboardingStepRequest },
+    responses: {
+      200: { description: 'The setup.', schema: OnboardingResponse },
+      ...standardErrors,
+      409: {
+        description: 'Not a step that may be confirmed or skipped, or not ready.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'activateInstallation',
+    method: 'POST',
+    path: '/api/v1/activation',
+    summary: 'Activate this PC with the vendor’s one-time activation code',
+    description:
+      'ONB-003: enrols the PC with the Vendor Control Plane, which binds its licence (LIC-004). ' +
+      'Owner only. Audited.',
+    tags: ['onboarding'],
+    requirements: ['ONB-003', 'LIC-004'],
+    capability: 'LICENSE_MANAGE',
+    request: { body: ActivateRequest },
+    responses: {
+      200: { description: 'Activated.', schema: ActivateResponse },
+      ...standardErrors,
+      409: { description: 'Already activated, or no vendor address set.', schema: ApiError },
+      422: { description: 'The code is not valid or has expired.', schema: ApiError },
+      503: { description: 'The vendor could not be reached.', schema: ApiError },
     },
   },
   {

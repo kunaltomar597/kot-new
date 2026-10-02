@@ -19,6 +19,7 @@ import { SettingsScreen } from './settings/SettingsScreen.js';
 import { FloorScreen } from './floor/FloorScreen.js';
 import { LicenceScreen } from './licence/LicenceScreen.js';
 import { QrCodesScreen } from './qr/QrCodesScreen.js';
+import { SetupScreen } from './setup/SetupScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
 import { StaffArea } from './staff/StaffArea.js';
@@ -116,9 +117,14 @@ export function ManageHome() {
           </NavLink>
         ) : null}
         {operates ? (
-          <NavLink to="/manage/restaurant" className="dashboard__link">
-            {t('dashboard.section.restaurant')}
-          </NavLink>
+          <>
+            <NavLink to="/manage/setup" className="dashboard__link">
+              {t('dashboard.section.setup')}
+            </NavLink>
+            <NavLink to="/manage/restaurant" className="dashboard__link">
+              {t('dashboard.section.restaurant')}
+            </NavLink>
+          </>
         ) : null}
         {operates ? (
           <NavLink to="/manage/printing" className="dashboard__link">
@@ -166,6 +172,7 @@ export function ManageHome() {
           {managesMenu ? <Route path="menu/ai-import" element={<AiImportScreen />} /> : null}
           {managesMenu ? <Route path="menu/photos" element={<BulkPhotosScreen />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
+          {operates ? <Route path="setup" element={<SetupScreen />} /> : null}
           {operates ? <Route path="restaurant" element={<RestaurantScreen />} /> : null}
           {operates ? <Route path="printing" element={<PrintingScreen />} /> : null}
           {operates ? <Route path="settings" element={<SettingsScreen />} /> : null}

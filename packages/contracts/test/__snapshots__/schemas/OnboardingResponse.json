@@ -1,0 +1,95 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "steps": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "step": {
+              "type": "string",
+              "enum": [
+                "PROFILE",
+                "TAX",
+                "INVOICE",
+                "ACCOUNTS",
+                "FLOOR",
+                "STATIONS",
+                "MENU",
+                "STAFF",
+                "DEVICES",
+                "QR",
+                "GO_LIVE"
+              ]
+            },
+            "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] },
+            "ready": { "type": "boolean" },
+            "confirmable": { "type": "boolean" },
+            "skippable": { "type": "boolean" }
+          },
+          "required": ["step", "status", "ready", "confirmable", "skippable"]
+        }
+      },
+      "complete": { "type": "boolean" },
+      "activation": {
+        "type": "object",
+        "properties": {
+          "configured": { "type": "boolean" },
+          "activated": { "type": "boolean" },
+          "installationName": { "type": ["string", "null"] }
+        },
+        "required": ["configured", "activated", "installationName"]
+      }
+    },
+    "required": ["steps", "complete", "activation"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "steps": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "step": {
+              "type": "string",
+              "enum": [
+                "PROFILE",
+                "TAX",
+                "INVOICE",
+                "ACCOUNTS",
+                "FLOOR",
+                "STATIONS",
+                "MENU",
+                "STAFF",
+                "DEVICES",
+                "QR",
+                "GO_LIVE"
+              ]
+            },
+            "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] },
+            "ready": { "type": "boolean" },
+            "confirmable": { "type": "boolean" },
+            "skippable": { "type": "boolean" }
+          },
+          "required": ["step", "status", "ready", "confirmable", "skippable"],
+          "additionalProperties": false
+        }
+      },
+      "complete": { "type": "boolean" },
+      "activation": {
+        "type": "object",
+        "properties": {
+          "configured": { "type": "boolean" },
+          "activated": { "type": "boolean" },
+          "installationName": { "type": ["string", "null"] }
+        },
+        "required": ["configured", "activated", "installationName"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["steps", "complete", "activation"],
+    "additionalProperties": false
+  }
+}

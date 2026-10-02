@@ -366,6 +366,8 @@ Recommended next WPs (dependencies met):
 - [ ] P7-05 Backup and restore
 - [ ] P7-06 Data lifecycle
 - [ ] P7-07 Onboarding wizard completion
+  - [x] P7-07a Activation and the set-up checklist
+  - [ ] P7-07b Go-live check, settings export, readiness checklist
 - [x] P7-08 Diagnostics, support screen, remote config
   - [x] P7-08a Diagnostics bundle
   - [x] P7-08b Support asks for diagnostics
@@ -624,6 +626,27 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-07a):
+
+510. P7-07 is split into two (phase-7.md): activation and the set-up checklist (P7-07a), and the
+     guided go-live test, settings export and the readiness checklist (P7-07b).
+511. The set-up page reads each step's status from what is set up, so it resumes after any stop.
+     It keeps no separate wizard state, only two kinds of mark in `system_meta`
+     (`onboarding.marks`):
+     - a person's confirmation of the invoice look and of the go-live test;
+     - skips of the two steps a restaurant may not need (devices; QR table tents).
+       The go-live test can only be confirmed once every other step is done or skipped. Marks are
+       audited (`ONBOARDING_STEP_MARKED`).
+512. Each step links to the page that already does it; the wizard adds no second way to edit
+     anything. Stations count as done only once every station that prints has a printer that
+     has printed (`lastSeenAt`).
+513. The Owner activates the PC from the set-up page with the vendor's code (ONB-003,
+     LICENSE_MANAGE, second factor). This uses the installer's enrolment, now audited with the
+     Owner as actor, and sends a heartbeat at once so the licence follows within a minute. A
+     wrong or used code answers 422 with the vendor's message.
+514. The Manage Overview shows "Setup: N of 11 steps done" with a link until the setup is
+     complete, for roles that may open Setup.
 
 Decided 2026-10-03 (P7-08d):
 
@@ -2620,6 +2643,20 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-07a Activation and the set-up checklist
+
+Built:
+
+- `@rp/domain` onboarding (`onboardingProgress`, `stepReady`, `markProblem`);
+- contracts `onboarding.ts` and three local routes;
+- server `src/onboarding/` (`OnboardingService`: facts, marks, activation; controller; module),
+  and `enrolInstallation` takes the actor;
+- console: the Manage "Set up" page (`SetupScreen`, `setup-view.ts`) with activation, steps,
+  confirm, skip and undo, and the Overview's `SetupBanner`.
+
+Tests: domain +4; server +3 integration (progress and marks by role, activation against a
+stand-in Control Plane: Owner only, wrong code, typo, done, audited, twice); console +4.
 
 ### 2026-10-03: P7-08d Error reporting (P7-08 done)
 

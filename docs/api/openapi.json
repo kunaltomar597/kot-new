@@ -20,6 +20,7 @@
     { "name": "licence" },
     { "name": "menu" },
     { "name": "notifications" },
+    { "name": "onboarding" },
     { "name": "orders" },
     { "name": "pagers" },
     { "name": "payments" },
@@ -35,6 +36,66 @@
     { "name": "tables" }
   ],
   "paths": {
+    "/api/v1/activation": {
+      "post": {
+        "operationId": "activateInstallation",
+        "summary": "Activate this PC with the vendor’s one-time activation code",
+        "description": "ONB-003: enrols the PC with the Vendor Control Plane, which binds its licence (LIC-004). Owner only. Audited.",
+        "tags": ["onboarding"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ActivateRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Activated.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ActivateResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Already activated, or no vendor address set.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The code is not valid or has expired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "The vendor could not be reached.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "LICENSE_MANAGE",
+        "x-requirements": ["ONB-003", "LIC-004"]
+      }
+    },
     "/api/v1/alerts": {
       "get": {
         "operationId": "listAlerts",
@@ -5585,6 +5646,118 @@
         },
         "x-capability": "MENU_MANAGE",
         "x-requirements": ["MENU-013", "MENU-012", "MGR-005", "AUD-001"]
+      }
+    },
+    "/api/v1/onboarding": {
+      "get": {
+        "operationId": "getOnboarding",
+        "summary": "The first-run setup: each step’s status and whether this PC is activated",
+        "description": "ONB-004: statuses come from what is set up, so the setup resumes where it stopped; the invoice look and the go-live test also need a person to confirm them.",
+        "tags": ["onboarding"],
+        "responses": {
+          "200": {
+            "description": "The setup.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OnboardingResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-004", "ONB-003"]
+      }
+    },
+    "/api/v1/onboarding/steps/{step}": {
+      "put": {
+        "operationId": "markOnboardingStep",
+        "summary": "Confirm a step, skip one the restaurant does not need, or take the mark back",
+        "tags": ["onboarding"],
+        "parameters": [
+          {
+            "name": "step",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROFILE",
+                "TAX",
+                "INVOICE",
+                "ACCOUNTS",
+                "FLOOR",
+                "STATIONS",
+                "MENU",
+                "STAFF",
+                "DEVICES",
+                "QR",
+                "GO_LIVE"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MarkOnboardingStepRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The setup.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OnboardingResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Not a step that may be confirmed or skipped, or not ready.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-004", "AUD-001"]
       }
     },
     "/api/v1/order-feed": {
@@ -12069,6 +12242,21 @@
   "components": {
     "schemas": {
       "AccentColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+      "ActivateRequest": {
+        "type": "object",
+        "properties": { "code": { "type": "string", "minLength": 16, "maxLength": 40 } },
+        "required": ["code"],
+        "additionalProperties": false
+      },
+      "ActivateResponse": {
+        "type": "object",
+        "properties": {
+          "installationId": { "$ref": "#/components/schemas/Id" },
+          "installationName": { "type": "string" }
+        },
+        "required": ["installationId", "installationName"],
+        "additionalProperties": false
+      },
       "Address": {
         "type": "object",
         "properties": {
@@ -16661,6 +16849,12 @@
         ],
         "additionalProperties": false
       },
+      "MarkOnboardingStepRequest": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] } },
+        "required": ["status"],
+        "additionalProperties": false
+      },
       "MenuArchiveRequest": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
@@ -17276,6 +17470,62 @@
           "alertIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
         },
         "required": ["alertIds"],
+        "additionalProperties": false
+      },
+      "OnboardingResponse": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OnboardingStepView" }
+          },
+          "complete": { "type": "boolean" },
+          "activation": {
+            "type": "object",
+            "properties": {
+              "configured": { "type": "boolean" },
+              "activated": { "type": "boolean" },
+              "installationName": { "type": ["string", "null"] }
+            },
+            "required": ["configured", "activated", "installationName"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["steps", "complete", "activation"],
+        "additionalProperties": false
+      },
+      "OnboardingStep": {
+        "type": "string",
+        "enum": [
+          "PROFILE",
+          "TAX",
+          "INVOICE",
+          "ACCOUNTS",
+          "FLOOR",
+          "STATIONS",
+          "MENU",
+          "STAFF",
+          "DEVICES",
+          "QR",
+          "GO_LIVE"
+        ]
+      },
+      "OnboardingStepParams": {
+        "type": "object",
+        "properties": { "step": { "$ref": "#/components/schemas/OnboardingStep" } },
+        "required": ["step"],
+        "additionalProperties": false
+      },
+      "OnboardingStepView": {
+        "type": "object",
+        "properties": {
+          "step": { "$ref": "#/components/schemas/OnboardingStep" },
+          "status": { "type": "string", "enum": ["DONE", "SKIPPED", "TODO"] },
+          "ready": { "type": "boolean" },
+          "confirmable": { "type": "boolean" },
+          "skippable": { "type": "boolean" }
+        },
+        "required": ["step", "status", "ready", "confirmable", "skippable"],
         "additionalProperties": false
       },
       "OpenBillRequest": {

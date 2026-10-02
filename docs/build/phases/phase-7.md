@@ -151,6 +151,20 @@ device pairing, QR table tents, guided go-live test order through every path); a
 binding the licence; settings export/import (S); printable site-readiness checklist.
 Acceptance: Playwright run through the whole wizard on a fresh install; timing notes for ONB-009.
 
+Split (2026-10-03):
+
+- **P7-07a Activation and the set-up checklist.**
+  - The Owner enters the vendor's activation code in the console, and the PC enrols and gets its
+    licence (ONB-003).
+  - A resumable "Set up" page covers the 11 steps (ONB-004). Each step's status comes from what
+    is set up, plus a person's confirmation of the invoice look and skips for phones and QR. It
+    links to the page that does the step and shows on the Manage home until done.
+- **P7-07b Go-live check, settings export and readiness checklist.**
+  - A guided test order through every path, ticked as each is seen.
+  - Settings export and import (ONB-010, S).
+  - The printable site-readiness checklist (ONB-011).
+  - A Playwright run through the whole set-up on a fresh install, with timing notes (ONB-009).
+
 ## P7-08 Diagnostics, support screen and remote configuration
 
 Requirements: UPD-008, UPD-009, UPD-010, NFR-I03, NFR-O02, VCP-007.

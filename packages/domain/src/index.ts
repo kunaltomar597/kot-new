@@ -5,6 +5,7 @@ export * from './floor-plan.js';
 export * from './subscription-billing.js';
 export * from './fleet-health.js';
 export * from './scrub.js';
+export * from './onboarding.js';
 export * from './tax.js';
 export * from './discount.js';
 export * from './bill.js';

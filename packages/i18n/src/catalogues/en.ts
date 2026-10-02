@@ -553,6 +553,7 @@ export const en = {
       system: 'System',
       settings: 'Settings',
       security: 'Security',
+      setup: 'Set up',
       licence: 'Licence',
       qrCodes: 'QR codes',
       floor: 'Floor',
@@ -2166,6 +2167,94 @@ export const en = {
     print: 'Download table tents (PDF)',
     printed: 'Saved {file}',
     failed: 'That did not work: {message}',
+  },
+  setupPage: {
+    title: 'Set up',
+    intro:
+      'Everything this restaurant needs before its first guest, in order. Each step opens the page that does it; you can stop at any time and carry on later.',
+    loadFailed: 'Couldn’t load the setup.',
+    steps: 'Setup steps',
+    stepTitle: '{number}. {title}',
+    progress: '{finished} of {total} steps done.',
+    complete: 'Setup is complete. The restaurant is ready for guests.',
+    banner: 'Setup: {finished} of {total} steps done.',
+    continue: 'Carry on with the setup',
+    skip: 'We don’t need this',
+    undo: 'Undo',
+    status: {
+      DONE: 'Done',
+      SKIPPED: 'Skipped',
+      TODO: 'To do',
+    },
+    activation: {
+      title: 'Activate this PC',
+      done: 'Activated as “{name}”. The licence arrives within a minute.',
+      notConfigured:
+        'This PC does not know the vendor’s address yet, so it cannot be activated here. Ask the installer or support.',
+      ownerOnly: 'Only the Owner can activate this PC, with the code from the vendor.',
+      code: 'Activation code',
+      codeHint: 'The 16 letters and digits the vendor gave you, like ABCD-EFGH-JKLM-NP23.',
+      activate: 'Activate',
+    },
+    step: {
+      PROFILE: {
+        title: 'Restaurant details',
+        hint: 'Legal name, address, state, GSTIN, FSSAI number, logo, contact and opening hours.',
+        open: 'Open Restaurant',
+      },
+      TAX: {
+        title: 'Taxes',
+        hint: 'Tax groups such as “GST 5 %” with their rates and SAC code, and whether prices include tax.',
+        open: 'Open Restaurant',
+      },
+      INVOICE: {
+        title: 'Invoices',
+        hint: 'The invoice number series and what each bill shows. Check them, then confirm here.',
+        open: 'Open Restaurant',
+        confirm: 'The invoices look right',
+      },
+      ACCOUNTS: {
+        title: 'Owner and managers',
+        hint: 'The Owner’s password and authenticator app (Security), and at least one manager.',
+        open: 'Open Staff',
+      },
+      FLOOR: {
+        title: 'Floor',
+        hint: 'Sections and tables with their seats.',
+        open: 'Open Floor',
+      },
+      STATIONS: {
+        title: 'Kitchen stations and printers',
+        hint: 'Each kitchen station, its printer, and a test print from every printer used.',
+        open: 'Open Printing',
+      },
+      MENU: {
+        title: 'Menu',
+        hint: 'Import the menu (from the Excel template or photos), check it and publish it.',
+        open: 'Open Menu',
+      },
+      STAFF: {
+        title: 'Staff and PINs',
+        hint: 'Waiters, cashiers and kitchen staff with their PINs, and their sections.',
+        open: 'Open Staff',
+      },
+      DEVICES: {
+        title: 'Phones, tablets, kitchen screens and pagers',
+        hint: 'Pair each device the restaurant uses.',
+        open: 'Open Devices',
+      },
+      QR: {
+        title: 'QR table tents',
+        hint: 'Print a table tent for each table so guests can order from their phones.',
+        open: 'Open QR codes',
+      },
+      GO_LIVE: {
+        title: 'Go-live test',
+        hint: 'Place a test order through every path the restaurant uses (waiter, tablet, QR, kitchen screen, pager), then bill it. Confirm once all of it worked.',
+        open: 'Open the POS',
+        confirm: 'The test order worked',
+      },
+    },
   },
   systemPage: {
     title: 'System',
