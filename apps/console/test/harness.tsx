@@ -56,8 +56,36 @@ export const EMPTY_KDS = {
   serverTime: '2026-09-26T10:00:00.000Z',
 };
 
+/** A licence that shows nothing: active, and not applied (development). */
+export function quietLicence(overrides: Record<string, unknown> = {}) {
+  return {
+    state: 'ACTIVE',
+    recorded: 'ACTIVE',
+    problem: null,
+    restrictedFrom: null,
+    daysLeft: null,
+    validUntil: null,
+    enforced: false,
+    capabilities: {
+      openNewTableSessions: true,
+      createOrders: true,
+      sendKots: true,
+      billOpenTables: true,
+      print: true,
+      viewReports: true,
+      exportData: true,
+      backups: true,
+      showPaymentReminder: false,
+      showGraceBanner: false,
+    },
+    details: null,
+    ...overrides,
+  };
+}
+
 export function server(type: 'POS' | 'KDS' = 'POS'): FakeServer {
   return new FakeServer()
+    .on('GET', '/api/v1/licence', () => ({ status: 200, body: quietLicence() }))
     .on('POST', '/api/v1/devices/pair', () => ({
       status: 201,
       body: {

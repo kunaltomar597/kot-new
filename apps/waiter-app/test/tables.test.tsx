@@ -85,6 +85,38 @@ describe('[TBL-003] opening a table', () => {
   });
 });
 
+describe('[LIC-005] the licence on the waiter’s phone', () => {
+  it('shows the days left in grace, and nothing when active', async () => {
+    const restaurant = new Restaurant();
+    restaurant.licence = {
+      ...restaurant.licence,
+      enforced: true,
+      state: 'GRACE',
+      recorded: 'GRACE',
+      daysLeft: 2,
+    };
+    await signedInApp(restaurant);
+    expect(await screen.findByTestId('licence-banner')).toHaveTextContent(
+      /^2 days left to renew the subscription\./,
+    );
+  });
+
+  it('says new orders are paused when restricted', async () => {
+    const restaurant = new Restaurant();
+    restaurant.licence = {
+      ...restaurant.licence,
+      enforced: true,
+      state: 'RESTRICTED',
+      recorded: 'RESTRICTED',
+      daysLeft: 0,
+    };
+    await signedInApp(restaurant);
+    const banner = await screen.findByTestId('licence-banner');
+    expect(banner).toHaveTextContent(/^New tables and orders are paused/);
+    expect(banner).toHaveProp('accessibilityRole', 'alert');
+  });
+});
+
 describe('[TBL-004] a table that needs cleaning', () => {
   it('is marked clean first, then opened like a free one', async () => {
     const restaurant = new Restaurant();
