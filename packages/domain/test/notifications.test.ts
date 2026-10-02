@@ -51,6 +51,7 @@ describe('[NTF-002] [NTF-003] the Appendix C matrix', () => {
     ['DISK_OR_BACKUP', ['asha', 'vikram'], null, false, 'DAILY'],
     ['LICENSE_STATE', ['asha', 'vikram'], null, false, 'DAILY'],
     ['SUSPICIOUS_ACTIVITY', ['asha'], null, false, 'NONE'],
+    ['SUPPORT_REQUEST', ['asha', 'vikram'], null, false, 'UNTIL_RESOLVED'],
   ];
 
   it('covers every event type', () => {

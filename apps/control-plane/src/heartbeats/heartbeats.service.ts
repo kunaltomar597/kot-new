@@ -6,6 +6,7 @@ import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { LicencesService } from '../licences/licences.service.js';
+import { DiagnosticsService } from '../diagnostics/diagnostics.service.js';
 import { FleetService } from '../fleet/fleet.service.js';
 import { ReleasesService } from '../releases/releases.service.js';
 import { SupportService } from '../support/support.service.js';
@@ -24,6 +25,7 @@ export class HeartbeatsService {
     private readonly audit: AuditService,
     private readonly support: SupportService,
     private readonly fleet: FleetService,
+    private readonly diagnostics: DiagnosticsService,
   ) {}
 
   async record(
@@ -94,6 +96,8 @@ export class HeartbeatsService {
       reactivationSecret: licence.reactivationSecret,
       relayCredential,
       auditCheck,
+      // Support's open requests for diagnostics, for a manager to answer (UPD-008).
+      diagnosticsRequests: await this.diagnostics.pendingFor(installation.id, receivedAt),
     };
   }
 }

@@ -146,6 +146,7 @@ export const en = {
       DISK_OR_BACKUP: 'Disk or backup needs attention',
       LICENSE_STATE: 'Licence needs attention',
       SUSPICIOUS_ACTIVITY: 'Suspicious activity to review',
+      SUPPORT_REQUEST: 'Support asks for diagnostics',
     },
     orderFrom:
       'Order {number} from the {source, select, TABLE_TABLET {table tablet} QR {QR menu} WAITER_APP {waiter app} other {POS}}',
@@ -161,6 +162,7 @@ export const en = {
     deviceOffline: '{device} is not connected. Check it is switched on and in Wi-Fi range.',
     suspicious:
       '{count, plural, one {# thing} other {# things}} to review from {date}. See Reports, Suspicious activity.',
+    supportRequest: '{name} from support: “{reason}”. Allow or decline it on the System page.',
     /** Android notifications on the waiter phone (P2-06b, WTR-005). */
     notification: {
       listeningTitle: 'Alerts for {name}',
@@ -2262,6 +2264,12 @@ export const en = {
       cancel: 'Cancel',
       confirm: 'Send now',
       sent: 'Sent to support. Your reference: {reference}.',
+      requests: 'Support’s requests',
+      request:
+        '{name} from support asks for diagnostics: “{reason}”. The request lapses on {until}.',
+      allow: 'Allow and send',
+      decline: 'Decline',
+      declined: 'Declined. Nothing was sent.',
     },
     bytes: {
       B: '{value} B',
@@ -3983,6 +3991,23 @@ export const en = {
       status: 'System status',
       log: 'Log: {name}',
       truncated: 'Older log lines were left out to keep the bundle small.',
+      ask: 'Ask for diagnostics',
+      askTitle: 'Ask the restaurant for diagnostics',
+      askIntro:
+        'The restaurant’s manager sees your name and reason and allows or declines it. The request lapses after 7 days.',
+      askSent: 'Request sent. The restaurant sees it within 5 minutes.',
+      asked: 'Asked',
+      askedBy: 'Asked by',
+      requests: 'Requests to the restaurant',
+      requestsFailed: 'Couldn’t load the requests.',
+      noRequests: 'No requests yet.',
+      answered: '{state} by {name}',
+      requestState: {
+        PENDING: 'Waiting for the restaurant',
+        FULFILLED: 'Sent',
+        DECLINED: 'Declined',
+        EXPIRED: 'Lapsed',
+      },
     },
     tenants: {
       title: 'Restaurants',

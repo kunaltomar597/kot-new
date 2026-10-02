@@ -368,7 +368,7 @@ Recommended next WPs (dependencies met):
 - [ ] P7-07 Onboarding wizard completion
 - [ ] P7-08 Diagnostics, support screen, remote config
   - [x] P7-08a Diagnostics bundle
-  - [ ] P7-08b Support asks for diagnostics
+  - [x] P7-08b Support asks for diagnostics
   - [ ] P7-08c Remote configuration, support screen, error reporting
 - [ ] P7-09 Digital bills
 - [ ] P7-10 Phase 7 exit test
@@ -623,6 +623,25 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-08b):
+
+498. Support (SUPPORT_NOTES) asks an activated PC's restaurant for diagnostics with a reason.
+     - The PC gets open requests in every heartbeat answer (at most 10, oldest first).
+     - A request lapses after 7 days, shown as EXPIRED.
+     - The CP audits asking (`diagnostics.requested`) and declining
+       (`diagnostics.request_declined`). Sending the bundle for a request marks it FULFILLED
+       with the bundle, once.
+499. On the PC, a new request raises a `SUPPORT_REQUEST` alert. It is a new event, not in
+     Appendix C, sent to the Owner and the managers on duty on the dashboard until it is
+     resolved.
+     - The System page lists open requests with "Allow and send" and "Decline".
+     - Answering clears the alert, and so does a request that closed at the vendor (answered
+       elsewhere, or lapsed).
+     - Both answers are audited locally (`DIAGNOSTICS_SENT` with the request id, and
+       `DIAGNOSTICS_REQUEST_DECLINED`). The vendor sees who answered.
+500. The heartbeat service lets other services act on each answer (`onAnswer`), so the System
+     module handles requests without the cloud module knowing about alerts.
 
 Decided 2026-10-03 (P7-08a):
 
@@ -2562,6 +2581,28 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-08b Support asks for diagnostics
+
+Built:
+
+- contracts: diagnostics requests, the heartbeat answer's `diagnosticsRequests`, three CP routes
+  and three local routes;
+- the `SUPPORT_REQUEST` alert event (domain rules, pager, contracts, strings, alert text,
+  console group);
+- CP migration `20261003080000_diagnostics_requests`, `DiagnosticsService` requests, pending,
+  decline and fulfil, and the heartbeat answer;
+- server: `HeartbeatService.onAnswer`, the stored requests (`system_meta`), the alert raised
+  and cleared, allow and decline, and `ControlPlaneClient.declineDiagnosticsRequest`;
+- the console's System page request list;
+- the web app's "Ask for diagnostics" and request history.
+
+Tests: CP integration +3 (decline, fulfil once, lapse and inactive PC); server acceptance +1
+(the real PC alerts, a manager allows one and declines one); console +1; ordering +1; domain
+matrix row; web +2.
+
+Also: the web app's tests wait up to 5 s for `findBy…` (`configure({ asyncUtilTimeout })`).
+Under a full `pnpm check`, a PC's page with its seven loads took longer than the default 1 s.
 
 ### 2026-10-03: P7-08a Diagnostics bundle
 

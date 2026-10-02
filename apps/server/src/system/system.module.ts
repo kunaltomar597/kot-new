@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CloudModule } from '../cloud/cloud.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 import { RealtimeModule } from '../realtime/realtime.module.js';
 import { RelayModule } from '../relay/relay.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -12,7 +13,7 @@ import { SystemService } from './system.service.js';
  * "Send diagnostics to support" (UPD-008, P7-08a).
  */
 @Module({
-  imports: [SettingsModule, CloudModule, RelayModule, RealtimeModule],
+  imports: [SettingsModule, CloudModule, RelayModule, RealtimeModule, NotificationsModule],
   controllers: [SystemController],
   providers: [SystemService, DiagnosticsService],
 })

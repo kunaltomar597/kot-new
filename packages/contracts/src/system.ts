@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DeviceType, Id, IsoDate, Timestamp } from './common.js';
+import { PendingDiagnosticsRequest as PendingDiagnosticsRequestSchema } from './control-plane/diagnostics.js';
 
 /** GET /api/v1/health: liveness and database status, used by the watchdog and support screen. */
 export const HealthResponse = z.object({
@@ -141,7 +142,11 @@ export const ApproveUpdateRequest = z.strictObject({
 export type ApproveUpdateRequest = z.infer<typeof ApproveUpdateRequest>;
 
 /** The bundle a manager can see and send (UPD-008); the Control Plane keeps the same shape. */
-export { DiagnosticsBundle } from './control-plane/diagnostics.js';
+export {
+  DiagnosticsBundle,
+  DiagnosticsRequestParams,
+  PendingDiagnosticsRequest,
+} from './control-plane/diagnostics.js';
 
 /** "Send diagnostics to support" (UPD-008): an optional note for support. */
 export const SendDiagnosticsRequest = z.strictObject({
@@ -155,3 +160,9 @@ export const SendDiagnosticsResponse = z.object({
   sentAt: Timestamp,
 });
 export type SendDiagnosticsResponse = z.infer<typeof SendDiagnosticsResponse>;
+
+/** Support's open requests for diagnostics (UPD-008, P7-08b), for a manager to answer. */
+export const LocalDiagnosticsRequestList = z.object({
+  requests: z.array(PendingDiagnosticsRequestSchema),
+});
+export type LocalDiagnosticsRequestList = z.infer<typeof LocalDiagnosticsRequestList>;

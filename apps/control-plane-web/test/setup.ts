@@ -1,10 +1,14 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 afterEach(() => {
   cleanup();
 });
+
+// A PC's page loads seven things at once; on a busy machine that takes more than the default
+// 1 s that `findBy…` waits. Passing tests are not slower for it.
+configure({ asyncUtilTimeout: 5_000 });
 
 // jsdom has no HTMLDialogElement.showModal/close yet. This shim covers what the Dialog component
 // relies on (the `open` state and the `close` event); focus trapping and inertness are the

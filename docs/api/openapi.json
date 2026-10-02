@@ -10368,6 +10368,159 @@
         "x-requirements": ["UPD-008", "AUD-001"]
       }
     },
+    "/api/v1/system/diagnostics/requests": {
+      "get": {
+        "operationId": "listDiagnosticsRequests",
+        "summary": "Support’s open requests for diagnostics",
+        "description": "UPD-008: what vendor support asked for, and why, for a manager to answer.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The requests.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LocalDiagnosticsRequestList" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["UPD-008"]
+      }
+    },
+    "/api/v1/system/diagnostics/requests/{id}/allow": {
+      "post": {
+        "operationId": "allowDiagnosticsRequest",
+        "summary": "Allow support’s request: send the diagnostics bundle now",
+        "tags": ["system"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sent.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SendDiagnosticsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open request.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "The Control Plane could not be reached.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["UPD-008", "AUD-001"]
+      }
+    },
+    "/api/v1/system/diagnostics/requests/{id}/decline": {
+      "post": {
+        "operationId": "declineDiagnosticsRequest",
+        "summary": "Decline support’s request: nothing is sent",
+        "tags": ["system"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Declined." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such open request.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "The Control Plane could not be reached.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["UPD-008", "AUD-001"]
+      }
+    },
     "/api/v1/system/update/approve": {
       "post": {
         "operationId": "approveUpdateInstall",
@@ -14237,6 +14390,12 @@
         ],
         "additionalProperties": false
       },
+      "DiagnosticsRequestParams": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" } },
+        "required": ["id"],
+        "additionalProperties": false
+      },
       "DiscountReportResponse": {
         "type": "object",
         "properties": {
@@ -16392,6 +16551,17 @@
         "type": "string",
         "enum": ["ACTIVE", "PAYMENT_DUE", "GRACE", "RESTRICTED", "TERMINATED"]
       },
+      "LocalDiagnosticsRequestList": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PendingDiagnosticsRequest" }
+          }
+        },
+        "required": ["requests"],
+        "additionalProperties": false
+      },
       "LocateDeviceResponse": {
         "type": "object",
         "properties": {
@@ -17030,7 +17200,8 @@
           "PRINTER_OFFLINE",
           "DISK_OR_BACKUP",
           "LICENSE_STATE",
-          "SUSPICIOUS_ACTIVITY"
+          "SUSPICIOUS_ACTIVITY",
+          "SUPPORT_REQUEST"
         ]
       },
       "NotifyManagerResponse": {
@@ -18534,6 +18705,18 @@
           }
         },
         "required": ["orders"],
+        "additionalProperties": false
+      },
+      "PendingDiagnosticsRequest": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "requestedBy": { "type": "string", "maxLength": 120 },
+          "reason": { "type": "string", "maxLength": 300 },
+          "requestedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "expiresAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["id", "requestedBy", "reason", "requestedAt", "expiresAt"],
         "additionalProperties": false
       },
       "PhoneNumber": { "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" },

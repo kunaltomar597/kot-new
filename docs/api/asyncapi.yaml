@@ -1502,6 +1502,7 @@ components:
         - DISK_OR_BACKUP
         - LICENSE_STATE
         - SUSPICIOUS_ACTIVITY
+        - SUPPORT_REQUEST
     OrderApproved:
       type: object
       properties:

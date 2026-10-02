@@ -2,6 +2,9 @@ import type { INestApplication } from '@nestjs/common';
 import {
   ApiError,
   type DiagnosticsBundle,
+  DiagnosticsRequestListResponse,
+  DiagnosticsRequestView,
+  HeartbeatResponse,
   DiagnosticsUploadResponse,
   VendorDiagnosticsDetail,
   VendorDiagnosticsListResponse,
@@ -9,8 +12,10 @@ import {
 import type { TestDatabase } from '@rp/test-postgres';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { AdminService } from '../../src/admin/admin.service.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
-import { enrolledInstallation, signedPost } from '../helpers/fleet.js';
+import { DiagnosticsService } from '../../src/diagnostics/diagnostics.service.js';
+import { ACTOR, enrolledInstallation, heartbeatBody, signedPost } from '../helpers/fleet.js';
 import { createTestApp, createTestDatabase, httpServer } from '../helpers/test-app.js';
 import type { TestInstallation } from '../helpers/test-installation.js';
 import { bearer, signInVendor, vendorAccount } from '../helpers/vendor.js';
@@ -141,5 +146,121 @@ describe('[UPD-008] [VCP-007] diagnostics bundles', () => {
       JSON.stringify({ bundle: { format: 2 }, note: null, sentBy: null }),
     );
     expect(wrong.status).toBe(400);
+  });
+});
+
+describe('[UPD-008] support asks for diagnostics', () => {
+  const ask = (reason: string, role = 'SUPPORT') =>
+    server()
+      .post(`/v1/vendor/installations/${pc.id ?? ''}/diagnostics-requests`)
+      .set(as(role))
+      .send({ reason });
+  const pending = async () => {
+    const answer = await signedPost(app, pc, '/v1/heartbeats', heartbeatBody());
+    return HeartbeatResponse.parse(answer.body).diagnosticsRequests;
+  };
+  const requests = async () =>
+    DiagnosticsRequestListResponse.parse(
+      (
+        await server()
+          .get(`/v1/vendor/installations/${pc.id ?? ''}/diagnostics-requests`)
+          .set(as('READ_ONLY'))
+      ).body,
+    ).requests;
+  const upload = (requestId: string) =>
+    signedPost(
+      app,
+      pc,
+      '/v1/diagnostics',
+      JSON.stringify({
+        bundle: bundle(),
+        note: null,
+        sentBy: { name: 'Meena', role: 'MANAGER' },
+        requestId,
+      }),
+    );
+
+  it('reaches the PC in heartbeats until its manager declines it', async () => {
+    expect((await ask('Orders stuck', 'READ_ONLY')).status).toBe(403);
+    const asked = await ask('Bills print twice since Tuesday');
+    expect(asked.status, JSON.stringify(asked.body)).toBe(201);
+    const request = DiagnosticsRequestView.parse(asked.body);
+    expect(request).toMatchObject({
+      state: 'PENDING',
+      requestedBy: expect.stringMatching(/^Staff /) as unknown,
+    });
+    expect((await pending()).map((entry) => entry.reason)).toEqual([
+      'Bills print twice since Tuesday',
+    ]);
+
+    const declined = await signedPost(
+      app,
+      pc,
+      `/v1/diagnostics-requests/${request.id}/decline`,
+      JSON.stringify({ by: { name: 'Meena', role: 'MANAGER' } }),
+    );
+    expect(declined.status, JSON.stringify(declined.body)).toBe(204);
+    expect(await pending()).toEqual([]);
+    expect((await requests())[0]).toMatchObject({
+      state: 'DECLINED',
+      answeredBy: { name: 'Meena', role: 'MANAGER' },
+      bundleId: null,
+    });
+    const again = await signedPost(
+      app,
+      pc,
+      `/v1/diagnostics-requests/${request.id}/decline`,
+      JSON.stringify({ by: { name: 'Meena', role: 'MANAGER' } }),
+    );
+    expect([again.status, ApiError.parse(again.body).code]).toEqual([
+      409,
+      'DIAGNOSTICS_REQUEST_CLOSED',
+    ]);
+    expect(
+      await prisma.auditEntry.count({ where: { action: 'diagnostics.request_declined' } }),
+    ).toBe(1);
+  });
+
+  it('is fulfilled by the bundle sent for it, once', async () => {
+    const request = DiagnosticsRequestView.parse((await ask('Printer stops')).body);
+    const sent = await upload(request.id);
+    expect(sent.status, JSON.stringify(sent.body)).toBe(201);
+    const [latest] = await requests();
+    expect(latest).toMatchObject({
+      id: request.id,
+      state: 'FULFILLED',
+      bundleId: DiagnosticsUploadResponse.parse(sent.body).id,
+    });
+    const twice = await upload(request.id);
+    expect([twice.status, ApiError.parse(twice.body).code]).toEqual([
+      409,
+      'DIAGNOSTICS_REQUEST_CLOSED',
+    ]);
+  });
+
+  it('lapses after 7 days, and is only for an activated PC', async () => {
+    const diagnostics = app.get(DiagnosticsService);
+    const user = await prisma.vendorUser.findFirstOrThrow();
+    const old = await diagnostics.request(
+      pc.id ?? '',
+      'Old question',
+      { userId: user.id, actor: `vendor:${user.id}` },
+      new Date(Date.now() - 8 * 86_400_000),
+    );
+    expect((await requests()).find((entry) => entry.id === old.id)?.state).toBe('EXPIRED');
+    expect(await pending()).toEqual([]);
+    expect((await upload(old.id)).status).toBe(409);
+
+    const admin = app.get(AdminService);
+    const tenant = await admin.createTenant('Not yet open', ACTOR);
+    const waiting = await admin.createInstallation({ tenantId: tenant.id, name: 'New PC' }, ACTOR);
+    const refused = await server()
+      .post(`/v1/vendor/installations/${waiting.installationId}/diagnostics-requests`)
+      .set(as('SUPPORT'))
+      .send({ reason: 'Hello' });
+    expect([refused.status, ApiError.parse(refused.body).code]).toEqual([
+      409,
+      'INSTALLATION_NOT_ACTIVE',
+    ]);
   });
 });

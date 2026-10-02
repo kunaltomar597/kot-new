@@ -89,3 +89,49 @@ export type VendorDiagnosticsDetail = z.infer<typeof VendorDiagnosticsDetail>;
 
 export const DiagnosticsParams = z.strictObject({ id: Id });
 export type DiagnosticsParams = z.infer<typeof DiagnosticsParams>;
+
+/** How long a support request waits for the restaurant's answer. */
+export const DIAGNOSTICS_REQUEST_DAYS = 7;
+
+export const DIAGNOSTICS_REQUEST_STATES = ['PENDING', 'FULFILLED', 'DECLINED', 'EXPIRED'] as const;
+export const DiagnosticsRequestState = z.enum(DIAGNOSTICS_REQUEST_STATES);
+export type DiagnosticsRequestState = z.infer<typeof DiagnosticsRequestState>;
+
+/** Support asks for diagnostics (UPD-008, P7-08b): as the restaurant's manager sees it. */
+export const PendingDiagnosticsRequest = z.object({
+  id: Id,
+  /** The support person's name. */
+  requestedBy: z.string().max(120),
+  reason: z.string().max(300),
+  requestedAt: Timestamp,
+  expiresAt: Timestamp,
+});
+export type PendingDiagnosticsRequest = z.infer<typeof PendingDiagnosticsRequest>;
+
+export const DiagnosticsRequestView = PendingDiagnosticsRequest.extend({
+  installationId: Id,
+  state: DiagnosticsRequestState,
+  answeredAt: Timestamp.nullable(),
+  /** The manager who allowed or declined it. */
+  answeredBy: DiagnosticsSender.nullable(),
+  /** The bundle sent when it was allowed. */
+  bundleId: Id.nullable(),
+});
+export type DiagnosticsRequestView = z.infer<typeof DiagnosticsRequestView>;
+
+export const DiagnosticsRequestListResponse = z.object({
+  requests: z.array(DiagnosticsRequestView),
+});
+export type DiagnosticsRequestListResponse = z.infer<typeof DiagnosticsRequestListResponse>;
+
+export const CreateDiagnosticsRequest = z.strictObject({
+  reason: z.string().trim().min(3).max(300),
+});
+export type CreateDiagnosticsRequest = z.infer<typeof CreateDiagnosticsRequest>;
+
+/** The restaurant declines (sent by its PC with the manager's name). */
+export const DeclineDiagnosticsRequest = z.object({ by: DiagnosticsSender });
+export type DeclineDiagnosticsRequest = z.infer<typeof DeclineDiagnosticsRequest>;
+
+export const DiagnosticsRequestParams = z.strictObject({ id: Id });
+export type DiagnosticsRequestParams = z.infer<typeof DiagnosticsRequestParams>;

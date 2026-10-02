@@ -15,7 +15,8 @@
       "PRINTER_OFFLINE",
       "DISK_OR_BACKUP",
       "LICENSE_STATE",
-      "SUSPICIOUS_ACTIVITY"
+      "SUSPICIOUS_ACTIVITY",
+      "SUPPORT_REQUEST"
     ]
   },
   "output": {
@@ -34,7 +35,8 @@
       "PRINTER_OFFLINE",
       "DISK_OR_BACKUP",
       "LICENSE_STATE",
-      "SUSPICIOUS_ACTIVITY"
+      "SUSPICIOUS_ACTIVITY",
+      "SUPPORT_REQUEST"
     ]
   }
 }

@@ -1,6 +1,8 @@
-import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
 import {
   ApproveUpdateRequest,
+  DiagnosticsRequestParams,
+  type LocalDiagnosticsRequestList,
   SendDiagnosticsRequest,
   type SendDiagnosticsResponse,
   type SystemStatusResponse,
@@ -40,6 +42,32 @@ export class SystemController {
     @Body(new ZodValidationPipe(SendDiagnosticsRequest)) body: SendDiagnosticsRequest,
   ): Promise<SendDiagnosticsResponse> {
     return this.diagnostics.send(principalOf(request), body.note);
+  }
+
+  @Get('diagnostics/requests')
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  async diagnosticsRequests(): Promise<LocalDiagnosticsRequestList> {
+    return { requests: await this.diagnostics.requests() };
+  }
+
+  @Post('diagnostics/requests/:id/allow')
+  @HttpCode(200)
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  allowDiagnosticsRequest(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(DiagnosticsRequestParams)) params: DiagnosticsRequestParams,
+  ): Promise<SendDiagnosticsResponse> {
+    return this.diagnostics.allow(principalOf(request), params.id);
+  }
+
+  @Post('diagnostics/requests/:id/decline')
+  @HttpCode(204)
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  declineDiagnosticsRequest(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(DiagnosticsRequestParams)) params: DiagnosticsRequestParams,
+  ): Promise<void> {
+    return this.diagnostics.decline(principalOf(request), params.id);
   }
 
   @Get()

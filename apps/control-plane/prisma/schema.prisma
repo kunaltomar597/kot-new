@@ -123,18 +123,18 @@ enum PaymentMode {
 
 /// A plan in the catalogue (VCP-003): prices per billing cycle in paise, device limits, modules.
 model Plan {
-  id               String    @id @db.Uuid
-  code             String    @unique
-  name             String
-  monthlyPrice     Int?      @map("monthly_price")
-  quarterlyPrice   Int?      @map("quarterly_price")
-  yearlyPrice      Int?      @map("yearly_price")
+  id             String    @id @db.Uuid
+  code           String    @unique
+  name           String
+  monthlyPrice   Int?      @map("monthly_price")
+  quarterlyPrice Int?      @map("quarterly_price")
+  yearlyPrice    Int?      @map("yearly_price")
   /// DeviceLimits.
-  deviceLimits     Json      @map("device_limits")
-  modules          String[]
-  archivedAt       DateTime? @map("archived_at") @db.Timestamptz(3)
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deviceLimits   Json      @map("device_limits")
+  modules        String[]
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   subscriptions Subscription[]
 
@@ -247,7 +247,7 @@ model Tenant {
   contactEmail String?  @map("contact_email")
   contactPhone String?  @map("contact_phone")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   installations   Installation[]
   menuExtractions MenuExtraction[]
@@ -279,15 +279,16 @@ model Installation {
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  heartbeats      Heartbeat[]
-  nonces          RequestNonce[]
-  menuExtractions MenuExtraction[]
-  licence         InstallationLicence?
-  licenceFiles    LicenceFile[]
-  auditChainHeads AuditChainHead[]
-  fleetAlerts     FleetAlert[]
-  diagnostics     DiagnosticsBundle[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  heartbeats          Heartbeat[]
+  nonces              RequestNonce[]
+  menuExtractions     MenuExtraction[]
+  licence             InstallationLicence?
+  licenceFiles        LicenceFile[]
+  auditChainHeads     AuditChainHead[]
+  fleetAlerts         FleetAlert[]
+  diagnostics         DiagnosticsBundle[]
+  diagnosticsRequests DiagnosticsRequest[]
 
   @@index([tenantId])
   @@map("installations")
@@ -325,16 +326,16 @@ model InstallationLicence {
 
 /// Every licence file issued (LIC-001): the exact text signed, kept for support and audit.
 model LicenceFile {
-  id             String   @id @db.Uuid
-  installationId String   @map("installation_id") @db.Uuid
+  id             String       @id @db.Uuid
+  installationId String       @map("installation_id") @db.Uuid
   /// The terms' revision it was issued from.
   revision       Int
   state          LicenceState
-  issuedAt       DateTime @map("issued_at") @db.Timestamptz(3)
-  validUntil     DateTime @map("valid_until") @db.Timestamptz(3)
+  issuedAt       DateTime     @map("issued_at") @db.Timestamptz(3)
+  validUntil     DateTime     @map("valid_until") @db.Timestamptz(3)
   payload        String
   signature      String
-  keyId          String   @map("key_id")
+  keyId          String       @map("key_id")
 
   installation Installation @relation(fields: [installationId], references: [id])
 
@@ -519,4 +520,30 @@ model DiagnosticsBundle {
 
   @@index([installationId, receivedAt])
   @@map("diagnostics_bundles")
+}
+
+enum DiagnosticsRequestState {
+  PENDING
+  FULFILLED
+  DECLINED
+}
+
+/// Support asks a restaurant for diagnostics (UPD-008, P7-08b).
+model DiagnosticsRequest {
+  id             String                  @id @db.Uuid
+  installationId String                  @map("installation_id") @db.Uuid
+  requestedBy    String                  @map("requested_by")
+  requesterName  String                  @map("requester_name")
+  reason         String
+  requestedAt    DateTime                @map("requested_at") @db.Timestamptz(3)
+  expiresAt      DateTime                @map("expires_at") @db.Timestamptz(3)
+  state          DiagnosticsRequestState @default(PENDING)
+  answeredAt     DateTime?               @map("answered_at") @db.Timestamptz(3)
+  answeredBy     Json?                   @map("answered_by")
+  bundleId       String?                 @map("bundle_id") @db.Uuid
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, requestedAt])
+  @@map("diagnostics_requests")
 }

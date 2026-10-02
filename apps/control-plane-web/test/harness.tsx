@@ -50,7 +50,8 @@ export function controlPlane(role?: VendorRole): FakeControlPlane {
     .on('getFleet', () => ({ installations: [fleetPc()], generatedAt: '2026-10-02T04:00:00.000Z' }))
     .on('listFleetAlerts', () => ({ alerts: [] }))
     .on('listAuditHeads', () => ({ heads: [] }))
-    .on('listVendorDiagnostics', () => ({ bundles: [] }));
+    .on('listVendorDiagnostics', () => ({ bundles: [] }))
+    .on('listVendorDiagnosticsRequests', () => ({ requests: [] }));
   return cp;
 }
 

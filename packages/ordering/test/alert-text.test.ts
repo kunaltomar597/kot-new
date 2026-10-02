@@ -108,6 +108,23 @@ describe('[WTR-006] [NFR-U04] what an alert says on the waiter app and the POS',
     expect(describeAlert({ ...report, payload: { flags: 3 } }, t).detail).toBeNull();
   });
 
+  it('[UPD-008] says who from support asks for diagnostics, and why', () => {
+    const asked = alert({ type: 'SUPPORT_REQUEST', tableLabel: null });
+    expect(
+      describeAlert(
+        {
+          ...asked,
+          payload: { requestId: 'r1', requestedBy: 'Asha', reason: 'Bills print twice' },
+        },
+        t,
+      ),
+    ).toEqual({
+      title: 'Support asks for diagnostics',
+      detail: 'Asha from support: “Bills print twice”. Allow or decline it on the System page.',
+    });
+    expect(describeAlert({ ...asked, payload: {} }, t).detail).toBeNull();
+  });
+
   it('[PGR-013] says which device ran low or went offline', () => {
     const pager = { deviceType: 'PAGER', deviceName: 'Pager 3', online: true, batteryPercent: 12 };
     const device = alert({ type: 'DEVICE_LOW_BATTERY_OR_OFFLINE', tableLabel: null });
