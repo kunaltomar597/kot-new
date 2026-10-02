@@ -40,6 +40,8 @@ export interface BillContext {
   readonly items: readonly BillableItem[];
   /** Items still waiting for a manager's approval (TAB/QR orders), which block printing. */
   readonly awaitingApproval: number;
+  /** Items held back from the kitchen (ORD-016): fire or cancel them before the invoice. */
+  readonly held: number;
   readonly discounts: readonly (ActiveDiscount & {
     reason: string;
     appliedById: string;
@@ -417,6 +419,8 @@ export class BillsService {
       tableLabel: bill.tableSession?.table.label ?? null,
       items,
       awaitingApproval: orderItems.filter((item) => item.state === 'PENDING_APPROVAL').length,
+      held: orderItems.filter((item) => item.state === 'HELD' && item.parentOrderItemId === null)
+        .length,
       discounts,
       settings,
       taxGroups,

@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-05b to P6-05e, then Phase 7.
+- P6-05c to P6-05f, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -338,10 +338,11 @@ Recommended next WPs (dependencies met):
   - [x] P6-04c Bulk photo upload (ONB-007)
 - [ ] P6-05 Should-have operations batch
   - [x] P6-05a Finishing what was half built (KDS-002, KDS-006, NTF-009, BILL-013)
-  - [ ] P6-05b Ordering (ORD-016, WTR-013, MENU-007)
-  - [ ] P6-05c Tables (TBL-006, TBL-004)
-  - [ ] P6-05d Billing (BILL-001, WTR-008)
-  - [ ] P6-05e Setup (ONB-004 steps 5 and 6)
+  - [x] P6-05b Hold and fire (ORD-016)
+  - [ ] P6-05c Ordering (WTR-013, MENU-007)
+  - [ ] P6-05d Tables (TBL-006, TBL-004)
+  - [ ] P6-05e Billing (BILL-001, WTR-008)
+  - [ ] P6-05f Setup (ONB-004 steps 5 and 6)
 
 ### Phase 7: Commercial readiness
 
@@ -606,6 +607,19 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-05b):
+
+415. Hold and fire is a new item state, HELD, between ordering and the kitchen: a staff line may
+     be held (`hold: true`); FIRE moves it to SENT with a NEW ticket per station; CANCEL works
+     from HELD as from SENT (with a reason, stock returned). Diners' orders cannot hold.
+416. A held line is ordered: its counted stock is taken at once, so it cannot be sold to another
+     table, and comes back if it is cancelled. It is not on the bill until fired, and an invoice
+     cannot be issued while anything is held (`ITEMS_HELD`).
+417. Setting `orders.holdAndFire` (restaurant, default on): off, holds are refused. The phones and
+     the POS do not read settings, so they offer Hold always and show the server's refusal.
+418. Anyone who may order may fire an order's held items (`POST /orders/:id/fire`, all or the
+     ones named); audited as ORDER_FIRED.
 
 Decided 2026-10-02 (P6-05a):
 
@@ -2180,6 +2194,18 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-05b Hold and fire
+
+Built: `@rp/domain` HELD and FIRE; migration `20261002235500_hold_and_fire`; contracts
+`OrderLineRequest.hold`, `FireOrderRequest`, route `fireOrder`, setting `orders.holdAndFire`;
+server: held lines at submission (no ticket, stock taken), `OrderItemsService.fire`, the
+`ITEMS_HELD` invoice guard; `@rp/ordering` `CartLine.hold`; the waiter app's and the POS's Hold
+toggle per cart line and "Fire held items" per sent order; HELD labels and chips everywhere.
+
+Tests: domain +1, ordering +1, server orders +4 (held from the kitchen with stock taken; fire
+some then the rest as new tickets, combo parts at their stations; cancel a held line with its
+stock back; refused when off), waiter app +1, console +1.
 
 ### 2026-10-02: P6-05a Finishing what was half built
 

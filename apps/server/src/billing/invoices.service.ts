@@ -459,6 +459,14 @@ export class InvoicesService {
         { awaitingApproval: context.awaitingApproval },
       );
     }
+    if (context.held > 0) {
+      throw new AppError(
+        409,
+        'ITEMS_HELD',
+        `${String(context.held)} items are held back from the kitchen. Fire or cancel them first.`,
+        { held: context.held },
+      );
+    }
     if (context.calculated.result.lines.length === 0) {
       throw new AppError(409, 'NOTHING_TO_BILL', 'There is nothing on this bill yet.');
     }

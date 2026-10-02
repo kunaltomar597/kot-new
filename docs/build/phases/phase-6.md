@@ -83,8 +83,9 @@ Split (2026-10-02), after a survey of what P1 to P5 already built (KDS-010 was d
 - **P6-05a Finishing what was half built.** Kitchen screens with one or more stations and the
   Expo/Pass view (KDS-002, the M part too), automatic escalation of uncollected food (KDS-006),
   "On break" in the waiter app (NTF-009), the denomination count at shift close (BILL-013).
-- **P6-05b Ordering.** Hold and fire (ORD-016), takeaway from the waiter app (WTR-013), time-based
-  item availability (MENU-007).
-- **P6-05c Tables.** Merge tables and transfer items (TBL-006), "Needs cleaning" (TBL-004).
-- **P6-05d Billing.** Amount in words (BILL-001), print the bill from the waiter app (WTR-008).
-- **P6-05e Setup.** Drag-and-drop floor layout (ONB-004 step 5), printer auto-discovery (step 6).
+- **P6-05b Hold and fire** (ORD-016).
+- **P6-05c Ordering.** Takeaway from the waiter app (WTR-013), time-based item availability
+  (MENU-007).
+- **P6-05d Tables.** Merge tables and transfer items (TBL-006), "Needs cleaning" (TBL-004).
+- **P6-05e Billing.** Amount in words (BILL-001), print the bill from the waiter app (WTR-008).
+- **P6-05f Setup.** Drag-and-drop floor layout (ONB-004 step 5), printer auto-discovery (step 6).

@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Req } from '@nestj
 import {
   ApproveAtTableRequest,
   ApproveOrderRequest,
+  FireOrderRequest,
   ModifyOrderItemRequest,
   OrderItemEndRequest,
   OrderItemParams,
@@ -88,6 +89,7 @@ export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
     private readonly approvals: OrderApprovalsService,
+    private readonly items: OrderItemsService,
   ) {}
 
   @Post()
@@ -133,6 +135,23 @@ export class OrdersController {
   ): Promise<OrderView> {
     const parsed = ApproveOrderRequest.parse(body);
     return this.approvals.approve(approverOf(request), params.orderId, parsed.changes);
+  }
+
+  // ORD-016: held items to the kitchen, by anyone who may order.
+  @Post(':orderId/fire')
+  @HttpCode(200)
+  @RequireCapability('ORDER_CREATE')
+  fire(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(OrderParams)) params: OrderParams,
+    @Body(new ZodValidationPipe(FireOrderRequest)) body: FireOrderRequest,
+  ): Promise<OrderView> {
+    return this.items.fire(
+      principalOf(request),
+      params.orderId,
+      body.orderItemIds,
+      request.ownershipRequired === true,
+    );
   }
 
   @Post(':orderId/reject')

@@ -85,6 +85,17 @@ describe('[ORD-001] [ORD-014] the cart', () => {
     });
     expect(JSON.stringify(request)).not.toMatch(/price/i);
   });
+
+  it('[ORD-016] keeps a held line apart and sends it held', () => {
+    let lines: CartLine[] = addLine([], dal, newId);
+    lines = addLine(lines, { ...dal, hold: true }, newId);
+    expect(lines.map((line) => line.hold ?? false)).toEqual([false, true]);
+    const [, held] = lines;
+    lines = updateLine(lines, held?.clientLineId ?? '', { hold: false });
+    expect(lines[1]?.hold).toBe(false);
+    const sent = requestLines(updateLine(lines, held?.clientLineId ?? '', { hold: true }));
+    expect(sent.map((line) => line.hold)).toEqual([undefined, true]);
+  });
 });
 
 describe('[MENU-012] the POS menu', () => {

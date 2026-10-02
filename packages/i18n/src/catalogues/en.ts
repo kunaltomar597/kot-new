@@ -368,6 +368,7 @@ export const en = {
         rejected: 'Not accepted: {reason}',
         lineState: {
           PENDING_APPROVAL: 'Waiting for confirmation',
+          HELD: 'Coming later',
           SENT: 'Received',
           PREPARING: 'Preparing',
           READY: 'Ready',
@@ -1580,6 +1581,7 @@ export const en = {
     invoiceStatus: { ISSUED: 'Issued', SETTLED: 'Settled', VOIDED: 'Voided' },
     itemState: {
       PENDING_APPROVAL: 'Waiting for approval',
+      HELD: 'Held',
       SENT: 'Sent',
       PREPARING: 'Preparing',
       READY: 'Ready',
@@ -1895,6 +1897,7 @@ export const en = {
       line: '{quantity} × {name}',
       itemState: {
         PENDING_APPROVAL: 'Waiting',
+        HELD: 'Held',
         SENT: 'Ordered',
         PREPARING: 'Being prepared',
         READY: 'Ready',
@@ -2508,6 +2511,7 @@ export const en = {
       offlineAlertSeconds: 'Tablet or kitchen screen offline alert after',
     },
     orders: {
+      holdAndFire: 'Hold and fire',
       specialInstructionsMaxLength: 'Longest special instruction',
     },
     billing: {
@@ -2647,6 +2651,7 @@ export const en = {
         'A table tablet or kitchen screen not connected for this long alerts the managers (0: never; our default).',
     },
     orders: {
+      holdAndFire: 'Waiters may hold items, such as the mains, and fire them to the kitchen later.',
       specialInstructionsMaxLength:
         'Longest special instruction a guest or waiter may write on an item.',
     },
@@ -2895,6 +2900,7 @@ export const en = {
     backToTables: 'Back to tables',
     itemState: {
       PENDING_APPROVAL: 'Awaiting approval',
+      HELD: 'Held',
       SENT: 'Sent',
       PREPARING: 'Preparing',
       READY: 'Ready',
@@ -2945,6 +2951,10 @@ export const en = {
       },
     },
     cart: {
+      hold: 'Hold',
+      held: 'Held: fire later',
+      holdOf: 'Hold {name} for later',
+      sendNowOf: 'Send {name} with the order',
       title: 'New items',
       empty: 'Tap a dish to add it.',
       total: 'Estimated total',
@@ -2956,6 +2966,8 @@ export const en = {
       onlyLeft: 'Only {count} left',
     },
     sent: {
+      fire: 'Fire held items',
+      fired: 'Held items sent to the kitchen',
       title: 'Sent to the kitchen',
       none: 'Nothing sent yet.',
       order: 'Order {number}',

@@ -290,6 +290,19 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
   };
 
   /** Several dishes carried to the table at once, one after another; stops at a refusal. */
+  /** ORD-016: the order's held items go to the kitchen now. */
+  const fire = async (order: { readonly id: string }) => {
+    setNotice(undefined);
+    try {
+      await session.api.fireOrder({ params: { orderId: order.id }, body: {} });
+      toast.show({ title: t('pos.sent.fired'), tone: 'success' });
+    } catch (failure) {
+      setNotice(messageOf(failure, t));
+    } finally {
+      settled();
+    }
+  };
+
   const serveAll = async (lines: readonly SentLine[]) => {
     setNotice(undefined);
     const ids = lines.map((line) => line.id);
@@ -525,6 +538,9 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
                   },
                   onEnd: (line, kind) => {
                     setEnding({ line, ending: kind });
+                  },
+                  onFire: (order) => {
+                    void fire(order);
                   },
                 }}
                 onAgain={again}

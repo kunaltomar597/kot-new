@@ -146,6 +146,31 @@ describe('[WTR-003] [ORD-013] taking an order', () => {
     expect(screen.queryByTestId('send-kot')).toBeNull();
   });
 
+  it('[ORD-016] holds a dish for later and fires it when the table is ready', async () => {
+    const { server } = await signedInApp();
+    await openTable('T2');
+    await fireEvent.press(button('Add from the menu'));
+    await fireEvent.press(button('Main Course'));
+    await fireEvent.press(button(/^Dal Makhani,/));
+    await fireEvent.press(screen.getByRole('tab', { name: 'Order (1)' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Hold Dal Makhani for later' }));
+    expect(
+      screen.getByRole('button', { name: 'Send Dal Makhani with the order' }),
+    ).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('send-kot'));
+    expect(await screen.findByText('Order 21 sent to the kitchen')).toBeOnTheScreen();
+    expect(orderPosts(server)[0]).toMatchObject({
+      lines: [{ itemId: IDS.dal, hold: true }],
+    });
+    const order = await screen.findByTestId('order-21');
+    expect(within(order).getByLabelText('Held')).toBeOnTheScreen();
+    await fireEvent.press(within(order).getByTestId('fire-21'));
+    expect(await screen.findByText('Held items sent to the kitchen')).toBeOnTheScreen();
+    expect(
+      server.calls.filter((call) => call.method === 'POST' && call.path.endsWith('/fire')),
+    ).toHaveLength(1);
+  });
+
   it('edits the new items: quantity, note and remove, and keeps them when leaving the table', async () => {
     const { server } = await signedInApp();
     await openTable('T2');

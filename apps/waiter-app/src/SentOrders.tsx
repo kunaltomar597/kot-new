@@ -27,6 +27,8 @@ export interface SentActions {
   readonly onStep: (line: SentLine, event: 'PICK_UP' | 'SERVE') => void;
   readonly onServeAll: (lines: readonly SentLine[]) => void;
   readonly onEnd: (line: SentLine, ending: Ending) => void;
+  /** ORD-016: send an order's held items to the kitchen. */
+  readonly onFire?: (order: OrderView) => void;
 }
 
 /** Why a sent line cannot be ordered again from the phone now, or undefined when it can. */
@@ -133,6 +135,17 @@ export function SentOrders({
           <Text style={[styles.orderTitle, { color: colors.text }]}>
             {t('pos.sent.order', { number: order.orderNumber })}
           </Text>
+          {actions.onFire !== undefined &&
+          order.items.some((item) => item.state === 'HELD' && item.parentOrderItemId === null) ? (
+            <Button
+              testID={`fire-${String(order.orderNumber)}`}
+              onPress={() => {
+                actions.onFire?.(order);
+              }}
+            >
+              {t('pos.sent.fire')}
+            </Button>
+          ) : null}
           {order.kots.map((kot) => {
             const delivery = kotDelivery(kot, menu?.stations ?? []);
             const tone = toneColors(

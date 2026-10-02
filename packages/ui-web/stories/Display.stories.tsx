@@ -23,6 +23,7 @@ type Story = StoryObj;
 
 const STATE_LABELS: Record<OrderItemState, string> = {
   PENDING_APPROVAL: 'Awaiting approval',
+  HELD: 'Held',
   SENT: 'Sent',
   PREPARING: 'Preparing',
   READY: 'Ready',

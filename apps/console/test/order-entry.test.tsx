@@ -112,6 +112,42 @@ describe('[ORD-001] [MENU-012] taking an order at a table', () => {
     expect(thali).toBeDisabled();
   });
 
+  it('[ORD-016] holds a dish for later and fires it from the sent orders', async () => {
+    const held = sentOrder('HELD');
+    const fake = signsInAs(server(), 'CASHIER')
+      .on('GET', '/api/v1/menu', () => ({ status: 200, body: MENU }))
+      .on(
+        'GET',
+        `/api/v1/table-sessions/${IDS.session}/orders`,
+        () => ({ status: 200, body: { orders: [] } }),
+        () => ({ status: 200, body: { orders: [held] } }),
+        () => ({ status: 200, body: { orders: [sentOrder('SENT')] } }),
+      )
+      .on('POST', '/api/v1/orders', () => accepted)
+      .on('POST', `/api/v1/orders/${IDS.order}/fire`, () => ({
+        status: 200,
+        body: sentOrder('SENT'),
+      }));
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: TABLE_PATH });
+    await user.click(await screen.findByRole('button', { name: 'Main Course' }));
+    await user.click(await card(/^Dal Makhani/));
+    const cart = cartPanel();
+    await user.click(
+      within(cart).getByRole('button', { name: t('pos.cart.holdOf', { name: 'Dal Makhani' }) }),
+    );
+    await user.click(within(cart).getByRole('button', { name: t('pos.cart.send') }));
+    await waitFor(() => {
+      expect(bodyOf(fake)?.lines).toEqual([
+        expect.objectContaining({ itemId: IDS.dal, hold: true }),
+      ]);
+    });
+    const sent = within(await screen.findByRole('region', { name: t('pos.sent.title') }));
+    expect(await sent.findByText(t('pos.itemState.HELD'))).toBeInTheDocument();
+    await user.click(sent.getByRole('button', { name: t('pos.sent.fire') }));
+    expect(await screen.findByText(t('pos.sent.fired'))).toBeInTheDocument();
+    expect(fake.callsTo('POST', `/api/v1/orders/${IDS.order}/fire`)).toHaveLength(1);
+  });
+
   it(
     'adds a dish with a variant and modifiers, a combo with its choice, and sends once',
     { timeout: 20_000 },

@@ -25,6 +25,19 @@ import {
   transition,
 } from '../src/index.js';
 
+describe('[ORD-016] hold and fire', () => {
+  it('keeps a held item from the kitchen until it is fired, and lets it be cancelled', () => {
+    expect(transition(orderItemMachine, 'HELD', 'FIRE').to).toBe('SENT');
+    const cancel = transition(orderItemMachine, 'HELD', 'CANCEL');
+    expect(cancel.to).toBe('CANCELLED');
+    expect(cancel.requiresReason).toBe(true);
+    expect(() => transition(orderItemMachine, 'HELD', 'START_PREPARING')).toThrow();
+    expect(() => transition(orderItemMachine, 'SENT', 'FIRE')).toThrow();
+    expect(isBillable('HELD')).toBe(false);
+    expect(isKitchenActive('HELD')).toBe(false);
+  });
+});
+
 describe('[ORD-002] order item state machine (Appendix B)', () => {
   it('[ORD-003] starts customer orders in approval and staff orders as sent', () => {
     expect(isCustomerSource('QR')).toBe(true);

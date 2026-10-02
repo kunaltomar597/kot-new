@@ -296,6 +296,15 @@ export const SETTINGS = [
     unit: 'characters',
   }),
   setting({
+    key: 'orders.holdAndFire',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description: 'Waiters may hold items (mains, say) and fire them to the kitchen later.',
+    requirements: ['ORD-016'],
+  }),
+  setting({
     key: 'billing.priceMode',
     schema: z.enum(['TAX_EXCLUSIVE', 'TAX_INCLUSIVE']),
     defaultValue: 'TAX_EXCLUSIVE',
