@@ -16,6 +16,8 @@ import { HeartbeatsService } from './heartbeats/heartbeats.service.js';
 import { LicenceSigner } from './licences/licence-signer.js';
 import { LicencesService } from './licences/licences.service.js';
 import { FleetAdminController } from './admin/fleet-admin.controller.js';
+import { BillingController } from './billing/billing.controller.js';
+import { BillingService } from './billing/billing.service.js';
 import { FleetAdminService } from './admin/fleet-admin.service.js';
 import { VendorAuthService } from './vendor/vendor-auth.service.js';
 import { VendorController } from './vendor/vendor.controller.js';
@@ -94,6 +96,7 @@ export class ControlPlaneModule {
         MenuExtractionsController,
         VendorController,
         FleetAdminController,
+        BillingController,
       ],
       providers: [
         { provide: CP_CONFIG, useValue: config },
@@ -107,6 +110,7 @@ export class ControlPlaneModule {
         LicencesService,
         VendorAuthService,
         FleetAdminService,
+        BillingService,
         ReleasesService,
         AdminService,
         MenuExtractionsService,

@@ -2,6 +2,7 @@ export * from './errors.js';
 export * from './money.js';
 export * from './amount-in-words.js';
 export * from './floor-plan.js';
+export * from './subscription-billing.js';
 export * from './tax.js';
 export * from './discount.js';
 export * from './bill.js';

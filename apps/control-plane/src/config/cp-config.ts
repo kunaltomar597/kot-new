@@ -62,6 +62,12 @@ export const CpConfigSchema = z
     licenceGraceDays: z.coerce.number().int().min(0).max(90).default(7),
     /** Heartbeats asked of an installation whose licence is not active (LIC-006: within 1 min). */
     licenceHeartbeatSeconds: z.coerce.number().int().min(60).max(600).default(60),
+    /** Days a restaurant has to pay an invoice (LIC-009: as the subscription agreement says). */
+    billingPaymentTermsDays: z.coerce.number().int().min(0).max(90).default(7),
+    /** Days past due before grace starts (LIC-005 ⚙ "overdue beyond N days"). */
+    billingGraceAfterDays: z.coerce.number().int().min(0).max(180).default(15),
+    /** How often the billing run issues invoices and follows up overdue ones; 0 is off (tests). */
+    billingIntervalMinutes: z.coerce.number().int().min(0).max(1_440).default(60),
     /**
      * The Control Plane's own secret (32+ bytes, base64) from the secret manager: it seals vendor
      * staff's authenticator secrets and peppers their passwords (VCP-001). Required outside
@@ -121,6 +127,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     licenceGraceDays: env.CP_LICENCE_GRACE_DAYS,
     licenceHeartbeatSeconds: env.CP_LICENCE_HEARTBEAT_SECONDS,
     secretKey: env.CP_SECRET_KEY === '' ? undefined : env.CP_SECRET_KEY,
+    billingPaymentTermsDays: env.CP_BILLING_PAYMENT_TERMS_DAYS,
+    billingGraceAfterDays: env.CP_BILLING_GRACE_AFTER_DAYS,
+    billingIntervalMinutes: env.CP_BILLING_INTERVAL_MINUTES,
   });
   if (!result.success) {
     const problems = result.error.issues
