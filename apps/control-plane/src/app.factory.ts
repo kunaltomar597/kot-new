@@ -15,6 +15,8 @@ import {
 export const API_PREFIX = 'v1';
 /** Heartbeats are small; anything larger is refused before it is parsed. */
 const JSON_BODY_LIMIT = '64kb';
+/** 20 MB of files in base64, with room for the JSON around them. */
+const MENU_BODY_LIMIT = '28mb';
 
 /** Nest's own body parser is off: `configureControlPlaneApp` installs the pipeline in order. */
 export const NEST_APP_OPTIONS: NestApplicationOptions = { bufferLogs: true, bodyParser: false };
@@ -29,6 +31,11 @@ export function configureControlPlaneApp(app: INestApplication): void {
   express.set('trust proxy', config.trustProxy);
   express.use(correlationMiddleware);
   if (config.env !== 'development') express.use(hstsMiddleware);
+  // Menu photos and PDFs (ONB-006) are the only large bodies; everything else stays small.
+  express.use(
+    `/${API_PREFIX}/menu-extractions`,
+    json({ limit: MENU_BODY_LIMIT, verify: keepRawBody }),
+  );
   express.use(json({ limit: JSON_BODY_LIMIT, verify: keepRawBody }));
   express.use(bodyParserErrorHandler);
   app.setGlobalPrefix(API_PREFIX);

@@ -40,7 +40,8 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  installations Installation[]
+  installations   Installation[]
+  menuExtractions MenuExtraction[]
 
   @@map("tenants")
 }
@@ -65,9 +66,10 @@ model Installation {
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant     Tenant         @relation(fields: [tenantId], references: [id])
-  heartbeats Heartbeat[]
-  nonces     RequestNonce[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  heartbeats      Heartbeat[]
+  nonces          RequestNonce[]
+  menuExtractions MenuExtraction[]
 
   @@index([tenantId])
   @@map("installations")
@@ -133,4 +135,60 @@ model AuditEntry {
 
   @@index([targetType, targetId])
   @@map("audit_log")
+}
+
+/// Where reading a printed menu stands (ONB-006, P6-04a).
+enum MenuExtractionStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// One AI-assisted menu import (ONB-006, VCP-008): the job, what it cost and the draft it read.
+/// The files are kept only until they are read; the draft is purged after 30 days.
+model MenuExtraction {
+  id             String               @id @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  installationId String               @map("installation_id") @db.Uuid
+  status         MenuExtractionStatus @default(QUEUED)
+  files          Int
+  bytes          Int
+  draft          Json?
+  errorCode      String?              @map("error_code")
+  errorMessage   String?              @map("error_message")
+  model          String?
+  inputTokens    Int?                 @map("input_tokens")
+  outputTokens   Int?                 @map("output_tokens")
+  attempts       Int                  @default(0)
+  /// A busy provider is tried again no sooner than this.
+  notBefore      DateTime?            @map("not_before") @db.Timestamptz(3)
+  startedAt      DateTime?            @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?            @map("finished_at") @db.Timestamptz(3)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  installation Installation         @relation(fields: [installationId], references: [id])
+  uploads      MenuExtractionFile[]
+
+  @@index([tenantId, createdAt])
+  @@index([status])
+  @@map("menu_extractions")
+}
+
+/// A photo or PDF waiting to be read; deleted once its extraction is done or failed.
+model MenuExtractionFile {
+  id           String   @id @db.Uuid
+  extractionId String   @map("extraction_id") @db.Uuid
+  position     Int
+  name         String
+  contentType  String   @map("content_type")
+  content      Bytes
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  extraction MenuExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+
+  @@unique([extractionId, position])
+  @@map("menu_extraction_files")
 }

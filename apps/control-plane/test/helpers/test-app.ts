@@ -24,14 +24,19 @@ export function testConfig(databaseUrl: string, overrides: Partial<CpConfig> = {
   });
 }
 
-/** Boots the real Control Plane module against a test database. */
+/** Boots the real Control Plane module against a test database, optionally replacing providers. */
 export async function createTestApp(
   databaseUrl: string,
   overrides: Partial<CpConfig> = {},
+  providers: readonly { provide: symbol | string; useValue: unknown }[] = [],
 ): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({
+  let builder = Test.createTestingModule({
     imports: [ControlPlaneModule.forRoot(testConfig(databaseUrl, overrides))],
-  }).compile();
+  });
+  for (const provider of providers) {
+    builder = builder.overrideProvider(provider.provide).useValue(provider.useValue);
+  }
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication(NEST_APP_OPTIONS);
   configureControlPlaneApp(app);
   await app.init();

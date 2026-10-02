@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["QUEUED", "RUNNING", "DONE", "FAILED"] },
+  "output": { "type": "string", "enum": ["QUEUED", "RUNNING", "DONE", "FAILED"] }
+}
