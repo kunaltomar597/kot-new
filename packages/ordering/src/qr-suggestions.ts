@@ -7,7 +7,7 @@ import {
   recommend,
   timeOfDayOf,
 } from '@rp/domain';
-import { comboOnNow } from './line-check.js';
+import { itemsOffNow } from './line-check.js';
 
 /**
  * The QR page's suggestions (QR-004, REC-001, REC-005): the same engine as every other surface,
@@ -30,18 +30,14 @@ export function qrSuggestions(
   const time = timeOfDayOf(now, document.timeZone);
   const daypart = daypartAt(time, snapshot.dayparts);
   const ranking = snapshot.bestSellers[daypart ?? 'ALL_DAY'];
-  const combosOff = new Set(
-    document.menu.combos
-      .filter((combo) => !comboOnNow(combo, now, document.timeZone))
-      .map((combo) => combo.itemId),
-  );
+  const offNow = itemsOffNow(document.menu, now, document.timeZone);
   const suggestions = recommend({
     items: document.menu.items.map((item) => ({
       id: item.id,
       name: item.name,
       categoryId: item.categoryId,
       foodType: item.foodType,
-      available: item.available && !combosOff.has(item.id),
+      available: item.available && !offNow.has(item.id),
       stockCount: item.stockCount,
       channels: item.channels,
       repeatable: item.repeatable,

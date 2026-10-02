@@ -815,6 +815,15 @@
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
                 "prepTimeMinutes": { "type": "integer", "minimum": 0, "maximum": 240 },
+                "timeWindow": {
+                  "type": "object",
+                  "properties": {
+                    "start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+                    "end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" }
+                  },
+                  "required": ["start", "end"],
+                  "additionalProperties": false
+                },
                 "available": { "type": "boolean" },
                 "stockCount": {
                   "anyOf": [

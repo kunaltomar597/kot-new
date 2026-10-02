@@ -166,6 +166,47 @@ describe('[MENU-005] a combo outside its dates or hours', () => {
   });
 });
 
+describe('[MENU-007] a dish served at some hours only', () => {
+  // Breakfast: 07:00 to 11:00 in Kolkata.
+  const breakfast: MenuSnapshot = {
+    ...MENU,
+    timeZone: 'Asia/Kolkata',
+    items: MENU.items.map((entry) =>
+      entry.id === IDS.dal ? { ...entry, timeWindow: { start: '07:00', end: '11:00' } } : entry,
+    ),
+  };
+  const dal = () => {
+    const found = breakfast.items.find((candidate) => candidate.id === IDS.dal);
+    if (found === undefined) throw new Error('fixture');
+    return found;
+  };
+
+  it('can be ordered in its hours and shows them outside them', () => {
+    // 09:00 IST.
+    const morning = Date.parse('2026-10-02T03:30:00Z');
+    expect(unavailableReason(dal(), { menu: breakfast, now: morning })).toBeUndefined();
+    expect(menuNote(breakfast, dal(), t, morning)).toEqual({});
+    // 13:00 IST.
+    const lunchtime = Date.parse('2026-10-02T07:30:00Z');
+    expect(unavailableReason(dal(), { menu: breakfast, now: lunchtime })).toBe('NOT_NOW');
+    expect(menuNote(breakfast, dal(), t, lunchtime)).toEqual({ unavailable: 'Only 07:00–11:00' });
+    const line = {
+      clientLineId: 'line-1',
+      itemId: IDS.dal,
+      name: 'Dal',
+      summary: '',
+      quantity: 1,
+      selection: {},
+      instructions: '',
+      unitPrice: 25_000,
+    };
+    expect(lineProblems(breakfast, [line], 'WAITER_APP', lunchtime).get('line-1')).toEqual({
+      kind: 'NOT_NOW',
+      hours: '07:00–11:00',
+    });
+  });
+});
+
 describe('[WTR-010] [MENU-006] what the menu card says', () => {
   it('marks sold-out and switched-off dishes, and counts what is left', () => {
     expect(unavailableReason(item(IDS.jamun))).toBe('SOLD_OUT');

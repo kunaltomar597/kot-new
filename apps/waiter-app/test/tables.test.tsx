@@ -4,7 +4,7 @@ import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
 import { PAGER_REFRESH_MS } from '../src/PagerCard';
 import { mayMove } from '../src/MoveSheet';
-import { KIRAN, PAGER_ID, RAVI, Restaurant, signedInApp } from './restaurant';
+import { IDS, KIRAN, PAGER_ID, RAVI, Restaurant, signedInApp } from './restaurant';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 
@@ -275,5 +275,28 @@ describe('[NTF-009] on break', () => {
     await fireEvent.press(within(card).getByText(en.mobile.break.end));
     expect(await within(card).findByText(en.mobile.break.hint)).toBeOnTheScreen();
     expect(restaurant.breakSince).toBeNull();
+  });
+});
+
+describe('[WTR-013] a takeaway order from the phone', () => {
+  it('sends it to the kitchen with the customer’s name, and shows its token', async () => {
+    const restaurant = new Restaurant();
+    const { server } = await signedInApp(restaurant);
+    await fireEvent.press(await screen.findByTestId('new-takeaway'));
+    expect(await screen.findByText(en.mobile.takeaway.none)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Main Course' }));
+    await fireEvent.press(screen.getByRole('button', { name: /^Dal Makhani,/ }));
+    await fireEvent.changeText(screen.getByLabelText(en.mobile.takeaway.customer), 'Asha');
+    await fireEvent.press(screen.getByTestId('send-takeaway'));
+    expect(await screen.findByText('Token 61: order 21 sent to the kitchen')).toBeOnTheScreen();
+    const [body] = server.callsTo('POST', '/api/v1/orders').map((call) => call.body);
+    expect(body).toMatchObject({
+      source: 'WAITER_APP',
+      orderType: 'TAKEAWAY',
+      customerName: 'Asha',
+      lines: [{ itemId: IDS.dal, quantity: 1 }],
+    });
+    expect(await screen.findByTestId('takeaway-61')).toBeOnTheScreen();
+    expect(screen.getByText('Token 61 · Asha')).toBeOnTheScreen();
   });
 });

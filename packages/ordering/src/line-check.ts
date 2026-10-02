@@ -57,6 +57,31 @@ export function comboOnNow(
   );
 }
 
+/** Whether an item is served at `now` by its own daily hours (MENU-007); always when it has none. */
+export function itemHoursOnNow(item: MenuItem, now: Date, timeZone: string): boolean {
+  return item.timeWindow === undefined || inTimeWindow(timeOfDayOf(now, timeZone), item.timeWindow);
+}
+
+/** An item's or its combo's hours as the menu shows them ("07:00–11:00"), if it has any. */
+export function hoursOf(menu: MenuSnapshot, item: MenuItem): string | undefined {
+  const window =
+    item.timeWindow ?? menu.combos.find((combo) => combo.itemId === item.id)?.timeWindow;
+  return window === undefined ? undefined : `${window.start.slice(0, 5)}–${window.end.slice(0, 5)}`;
+}
+
+/**
+ * The items that cannot be ordered at `now` though they are available: outside their own hours
+ * (MENU-007), or combos outside their dates or hours (MENU-005). Suggestions leave them out.
+ */
+export function itemsOffNow(menu: MenuSnapshot, now: Date, timeZone: string): Set<string> {
+  return new Set([
+    ...menu.items.filter((item) => !itemHoursOnNow(item, now, timeZone)).map((item) => item.id),
+    ...menu.combos
+      .filter((combo) => !comboOnNow(combo, now, timeZone))
+      .map((combo) => combo.itemId),
+  ]);
+}
+
 /** Checks and prices one line against `menu`; a rejection says why, in words for the person. */
 export function resolveOrderLine(
   menu: MenuSnapshot,
@@ -75,6 +100,13 @@ export function resolveOrderLine(
   }
   if (!item.channels.includes(context.channel)) {
     return rejectLine(line, 'NOT_ON_CHANNEL', `${item.name} cannot be ordered here.`);
+  }
+  if (!itemHoursOnNow(item, context.now, context.timeZone)) {
+    return rejectLine(
+      line,
+      'NOT_AVAILABLE_NOW',
+      `${item.name} is served ${hoursOf(menu, item) ?? ''} only.`,
+    );
   }
   if ((line.instructions?.length ?? 0) > context.instructionMaxLength) {
     return rejectLine(
@@ -133,6 +165,13 @@ export function resolveOrderLine(
       const part = items.get(chosen ?? '');
       if (part?.available !== true) {
         return rejectLine(line, 'OUT_OF_STOCK', `Part of ${item.name} is out of stock.`);
+      }
+      if (!itemHoursOnNow(part, context.now, context.timeZone)) {
+        return rejectLine(
+          line,
+          'NOT_AVAILABLE_NOW',
+          `${part.name} in ${item.name} is served ${hoursOf(menu, part) ?? ''} only.`,
+        );
       }
       components.push({ item: part, quantity: component.quantity });
     }

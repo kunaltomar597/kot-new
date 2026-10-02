@@ -5,7 +5,7 @@ import type {
   RecommendationsResponse,
 } from '@rp/contracts';
 import { daypartAt, type RecoChannel, type RecoItem, recommend, timeOfDayOf } from '@rp/domain';
-import { comboOnNow } from '@rp/ordering';
+import { itemsOffNow } from '@rp/ordering';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate } from '../common/business-dates.js';
@@ -219,16 +219,15 @@ export class RecommendationsService {
       hours: daypart === null ? null : dayparts[daypart],
       timeZone,
     });
-    // A combo outside its dates or hours cannot be ordered now, so it is not suggested either.
-    const combosOff = new Set(
-      menu.combos.filter((combo) => !comboOnNow(combo, now, timeZone)).map((combo) => combo.itemId),
-    );
+    // A dish outside its hours (MENU-007) or a combo outside its dates or hours cannot be ordered
+    // now, so it is not suggested either.
+    const offNow = itemsOffNow(menu, now, timeZone);
     const items: RecoItem[] = menu.items.map((item) => ({
       id: item.id,
       name: item.name,
       categoryId: item.categoryId,
       foodType: item.foodType,
-      available: item.available && !combosOff.has(item.id),
+      available: item.available && !offNow.has(item.id),
       stockCount: item.stockCount,
       channels: item.channels,
       repeatable: item.repeatable,

@@ -43,6 +43,20 @@
       "prepTimeMinutes": {
         "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 240 }, { "type": "null" }]
       },
+      "timeWindow": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+              "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+            },
+            "required": ["start", "end"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
       "displayOrder": { "type": "integer", "minimum": 0, "maximum": 9999 },
       "channels": {
         "minItems": 1,
@@ -156,6 +170,20 @@
       },
       "prepTimeMinutes": {
         "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 240 }, { "type": "null" }]
+      },
+      "timeWindow": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+              "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+            },
+            "required": ["start", "end"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
       },
       "displayOrder": { "type": "integer", "minimum": 0, "maximum": 9999 },
       "channels": {

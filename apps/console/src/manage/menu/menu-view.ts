@@ -181,6 +181,9 @@ export interface ItemForm {
   readonly tags: string;
   readonly stationId: string;
   readonly prepTime: string;
+  /** MENU-007: the hours it is served each day, 'HH:MM', both empty for all day. */
+  readonly servedFrom: string;
+  readonly servedUntil: string;
   readonly displayOrder: string;
   readonly channels: readonly ItemRequest['channels'][number][];
   readonly variants: readonly VariantForm[];
@@ -200,6 +203,7 @@ export type ItemField =
   | 'stationId'
   | 'shortCode'
   | 'prepTime'
+  | 'hours'
   | 'displayOrder'
   | 'channels'
   | 'tags'
@@ -215,6 +219,8 @@ export type ItemProblem =
   | 'stationRequired'
   | 'shortCodeInvalid'
   | 'prepTimeInvalid'
+  | 'hoursIncomplete'
+  | 'hoursSame'
   | 'orderInvalid'
   | 'channelsRequired'
   | 'tooMany'
@@ -244,6 +250,8 @@ export function itemFormOf(item: ItemView | undefined, defaults: ItemDefaults): 
       tags: '',
       stationId: defaults.stationId,
       prepTime: '',
+      servedFrom: '',
+      servedUntil: '',
       displayOrder: String(defaults.displayOrder),
       channels: [...SALES_CHANNELS],
       variants: [],
@@ -267,6 +275,8 @@ export function itemFormOf(item: ItemView | undefined, defaults: ItemDefaults): 
     tags: item.tags.join(', '),
     stationId: item.stationId,
     prepTime: item.prepTimeMinutes === null ? '' : String(item.prepTimeMinutes),
+    servedFrom: item.timeWindow?.start ?? '',
+    servedUntil: item.timeWindow?.end ?? '',
     displayOrder: String(item.displayOrder),
     channels: item.channels,
     variants: item.variants
@@ -309,6 +319,11 @@ export function checkItem(form: ItemForm): Partial<Record<ItemField, ItemProblem
   if (prep !== '' && !(/^\d{1,3}$/.test(prep) && Number(prep) <= 240)) {
     problems.prepTime = 'prepTimeInvalid';
   }
+  if ((form.servedFrom === '') !== (form.servedUntil === '')) {
+    problems.hours = 'hoursIncomplete';
+  } else if (form.servedFrom !== '' && form.servedFrom === form.servedUntil) {
+    problems.hours = 'hoursSame';
+  }
   if (!isOrder(form.displayOrder)) problems.displayOrder = 'orderInvalid';
   if (form.channels.length === 0) problems.channels = 'channelsRequired';
   const tags = splitList(form.tags);
@@ -348,6 +363,7 @@ export function itemRequestOf(form: ItemForm): ItemRequest {
     tags: splitList(form.tags),
     stationId: form.stationId,
     prepTimeMinutes: form.prepTime.trim() === '' ? null : Number(form.prepTime.trim()),
+    timeWindow: form.servedFrom === '' ? null : { start: form.servedFrom, end: form.servedUntil },
     displayOrder: Number(form.displayOrder),
     channels: [...form.channels],
     variants: form.variants.map((variant) => ({

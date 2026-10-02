@@ -2,7 +2,8 @@ import type { MenuSnapshot, OrderView } from '@rp/contracts';
 import { type ItemSelection, unitPriceOf, validateSelection } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 import type { CartLine, NewCartLine } from './cart.js';
-import { comboHours, summaryOf, unavailableReason } from './item-choice.js';
+import { summaryOf, unavailableReason } from './item-choice.js';
+import { hoursOf } from './line-check.js';
 import { comboOf, comboSlots, type SalesChannel, selectable } from './menu-view.js';
 
 type SentLine = OrderView['items'][number];
@@ -107,7 +108,7 @@ export function lineProblems(
     }
     const reason = unavailableReason(item, now === undefined ? undefined : { menu, now });
     if (reason === 'NOT_NOW') {
-      const hours = comboHours(menu, item);
+      const hours = hoursOf(menu, item);
       problems.set(line.clientLineId, { kind: reason, ...(hours !== undefined && { hours }) });
     } else if (reason !== undefined) {
       problems.set(line.clientLineId, { kind: reason });

@@ -170,6 +170,17 @@ export const en = {
     invalidServer: 'Enter the server address shown on the POS, for example 192.168.1.20:8443.',
     staffTitle: 'Tap your name',
     signedInAs: 'Signed in as {name}',
+    takeaway: {
+      new: 'New takeaway',
+      title: 'Takeaway',
+      back: 'Back to tables',
+      customer: 'Customer name (optional)',
+      phone: 'Phone (optional)',
+      send: 'Send to kitchen',
+      open: 'Open takeaway orders',
+      none: 'No open takeaway orders.',
+      token: 'Token {token}',
+    },
     tables: {
       title: 'Tables',
       empty: 'No tables yet. A manager adds them in Manage → Floor.',
@@ -1024,6 +1035,10 @@ export const en = {
       chooseStation: 'Choose a station',
       prepTime: 'Preparation time (minutes)',
       prepTimeHint: 'Optional. The dashboard calls a dish late after this long.',
+      servedFrom: 'Served from',
+      servedUntil: 'Served until',
+      hoursHint:
+        'Optional hours, like breakfast 07:00 to 11:00. Outside them the dish shows as not available on every device. An end before the start runs past midnight.',
       channels: 'Sold on',
       channel: {
         POS: 'POS',
@@ -1062,6 +1077,8 @@ export const en = {
         stationRequired: 'Choose the kitchen station.',
         shortCodeInvalid: 'Use up to 12 letters, digits or dashes.',
         prepTimeInvalid: 'Use whole minutes from 0 to 240.',
+        hoursIncomplete: 'Give both hours, or neither.',
+        hoursSame: 'The hours must start and end at different times.',
         orderInvalid: 'Use a whole number from 0 to 9999.',
         channelsRequired: 'Choose at least one place it is sold.',
         tooMany: 'Use up to 20, each short.',

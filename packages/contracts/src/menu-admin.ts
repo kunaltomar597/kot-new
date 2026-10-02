@@ -106,6 +106,17 @@ export const VariantRequest = z.strictObject({
 });
 export type VariantRequest = z.infer<typeof VariantRequest>;
 
+const LocalTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+/** A daily window in the restaurant's local time; an end before the start runs past midnight. */
+export const DailyHours = z
+  .strictObject({ start: LocalTime, end: LocalTime })
+  .refine((hours) => hours.start !== hours.end, {
+    message: 'The hours must start and end at different times',
+    path: ['end'],
+  });
+export type DailyHours = z.infer<typeof DailyHours>;
+
 /** MENU-002: every attribute of an item. */
 export const ItemRequest = z
   .strictObject({
@@ -128,6 +139,11 @@ export const ItemRequest = z
     tags: z.array(Name(30)).max(20),
     stationId: Id,
     prepTimeMinutes: z.int().min(0).max(240).nullable(),
+    /**
+     * MENU-007: served only at these hours each day (breakfast 07:00-11:00), null for all day.
+     * Left out, an edit keeps the item's hours.
+     */
+    timeWindow: DailyHours.nullable().optional(),
     displayOrder: z.int().min(0).max(9_999),
     channels: z.array(SalesChannel).min(1),
     /** In display order. Variants left out are archived. */
@@ -183,6 +199,8 @@ export const ItemView = z.object({
   tags: z.array(z.string()),
   stationId: Id,
   prepTimeMinutes: z.int().nullable(),
+  /** MENU-007: the hours it is served each day, or null for all day. */
+  timeWindow: z.object({ start: z.string(), end: z.string() }).nullable().default(null),
   displayOrder: z.int(),
   channels: z.array(SalesChannel),
   variants: z.array(VariantView),
@@ -238,8 +256,8 @@ export const ComboRequest = z
     /** Optional daily window, local time; end before start runs past midnight. */
     timeWindow: z
       .strictObject({
-        start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-        end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+        start: LocalTime,
+        end: LocalTime,
       })
       .nullable(),
     reason: Reason.optional(),

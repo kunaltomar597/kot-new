@@ -743,6 +743,9 @@ model Item {
   stationId       String              @map("station_id") @db.Uuid
   station         Station             @relation(fields: [stationId], references: [id])
   prepTimeMinutes Int?                @map("prep_time_minutes")
+  /// Served only between these local times "HH:MM", both or neither (MENU-007).
+  windowStart     String?             @map("window_start")
+  windowEnd       String?             @map("window_end")
   available       Boolean             @default(true)
   /// Counts stock in stock_levels when true (MENU-006).
   trackStock      Boolean             @default(false) @map("track_stock")

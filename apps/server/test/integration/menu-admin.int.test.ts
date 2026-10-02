@@ -269,6 +269,31 @@ describe('[MENU-002] [MENU-003] [MENU-011] items', () => {
     expect([foreign.status, codeOf(foreign)]).toEqual([422, 'VARIANT_NOT_FOUND']);
   });
 
+  it('[MENU-007] sets the hours a dish is served, kept by an edit that leaves them out', async () => {
+    const [half] = item.variants;
+    const kept = { basePrice: 28_000, variants: [{ id: half?.id, name: 'Half', price: 17_000 }] };
+    const breakfast = await put(
+      `items/${item.id}`,
+      itemBody({ ...kept, timeWindow: { start: '07:00', end: '11:00' } }),
+    );
+    expect(breakfast.status, JSON.stringify(breakfast.body)).toBe(200);
+    expect(ItemView.parse(breakfast.body).timeWindow).toEqual({ start: '07:00', end: '11:00' });
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'MENU_ITEM_CHANGED' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(audit.after).toMatchObject({ timeWindow: { start: '07:00', end: '11:00' } });
+    const untouched = await put(`items/${item.id}`, itemBody(kept));
+    expect(ItemView.parse(untouched.body).timeWindow).toEqual({ start: '07:00', end: '11:00' });
+    const empty = await put(
+      `items/${item.id}`,
+      itemBody({ ...kept, timeWindow: { start: '07:00', end: '07:00' } }),
+    );
+    expect([empty.status, codeOf(empty)]).toEqual([400, 'VALIDATION_FAILED']);
+    const allDay = await put(`items/${item.id}`, itemBody({ ...kept, timeWindow: null }));
+    expect(ItemView.parse(allDay.body).timeWindow).toBeNull();
+  });
+
   it('[MENU-010] archives items, groups and categories in use order, never deleting', async () => {
     const groupInUse = await post(`modifier-groups/${roti.id}/archive`, { reason: 'Not needed' });
     expect([groupInUse.status, codeOf(groupInUse)]).toEqual([409, 'MODIFIER_GROUP_IN_USE']);

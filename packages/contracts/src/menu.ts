@@ -75,6 +75,10 @@ export const MenuItem = z.object({
   tags: z.array(z.string().min(1).max(30)).max(20),
   stationId: Id,
   prepTimeMinutes: z.int().nonnegative().max(240).optional(),
+  /** MENU-007: served only between these local times 'HH:MM' each day. */
+  timeWindow: z
+    .object({ start: z.iso.time({ precision: -1 }), end: z.iso.time({ precision: -1 }) })
+    .optional(),
   available: z.boolean(),
   /** Remaining quantity when stock counting is on (MENU-006). */
   stockCount: z.int().nonnegative().nullable(),

@@ -339,7 +339,7 @@ Recommended next WPs (dependencies met):
 - [ ] P6-05 Should-have operations batch
   - [x] P6-05a Finishing what was half built (KDS-002, KDS-006, NTF-009, BILL-013)
   - [x] P6-05b Hold and fire (ORD-016)
-  - [ ] P6-05c Ordering (WTR-013, MENU-007)
+  - [x] P6-05c Ordering (WTR-013, MENU-007)
   - [ ] P6-05d Tables (TBL-006, TBL-004)
   - [ ] P6-05e Billing (BILL-001, WTR-008)
   - [ ] P6-05f Setup (ONB-004 steps 5 and 6)
@@ -607,6 +607,22 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-05c):
+
+419. Takeaway from the waiter app (WTR-013) is a screen of its own from "My tables": the menu,
+     an optional customer name and phone, Send to kitchen (orderType TAKEAWAY, the same order
+     route as the POS, so the server gives the day's token, TBL-008) and the open takeaway orders
+     with their tokens and each dish's progress. Billing a takeaway stays at the POS.
+420. Time-based availability (MENU-007) is per dish: optional daily hours "Served from / until"
+     in the restaurant's local time, an end before the start running past midnight (items
+     `window_start`/`window_end`, both or neither). Outside them the dish is "Only 07:00–11:00"
+     on every surface, flagged in a waiting cart, refused by the server and the QR relay
+     (NOT_AVAILABLE_NOW, "X is served 07:00–11:00 only."), and never suggested. A combo whose
+     set part is outside its hours is refused too.
+421. Hours are part of the menu (published like a price change), not a live switch like stock.
+     An item edit that leaves `timeWindow` out keeps the hours, so older callers (menu import)
+     never clear them. The import template does not carry hours yet; they are set in the editor.
 
 Decided 2026-10-02 (P6-05b):
 
@@ -2194,6 +2210,18 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-05c Takeaway from the waiter app and time-based availability
+
+Built: the waiter app's Takeaway screen (`TakeawayScreen.tsx`, "New takeaway" on My tables);
+migration `20261003000000_item_hours`; contracts `DailyHours`, `ItemRequest.timeWindow`,
+`ItemView.timeWindow`, `MenuItem.timeWindow`; `@rp/ordering` `itemHoursOnNow`, `hoursOf`
+(replaces `comboHours`), `itemsOffNow`, the line check refusing a dish or a combo part outside its
+hours, `unavailableReason` NOT_NOW for dishes; recommendations (server and QR) skip dishes out of
+hours; the console item editor's "Served from / until".
+
+Tests: ordering +4, server +2 (hours set, kept and cleared; the same refusal on POS, waiter app,
+tablet and QR), console +1, waiter app +1.
 
 ### 2026-10-02: P6-05b Hold and fire
 

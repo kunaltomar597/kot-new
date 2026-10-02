@@ -57,6 +57,7 @@ export function item(overrides: Partial<ItemView> = {}): ItemView {
     tags: [],
     stationId: TANDOOR,
     prepTimeMinutes: null,
+    timeWindow: null,
     displayOrder: 10,
     channels: ['POS', 'WAITER_APP', 'TABLE_TABLET', 'QR'],
     variants: [],

@@ -81,6 +81,10 @@ function toItemView(item: ItemRow): ItemView {
     tags: item.tags.map((link) => link.tag.name),
     stationId: item.stationId,
     prepTimeMinutes: item.prepTimeMinutes,
+    timeWindow:
+      item.windowStart === null || item.windowEnd === null
+        ? null
+        : { start: item.windowStart, end: item.windowEnd },
     displayOrder: item.displayOrder,
     channels: item.channels,
     variants: item.variants.map((variant) => ({
@@ -591,6 +595,11 @@ export class MenuAdminService {
       spiceLevel: request.spiceLevel,
       stationId: request.stationId,
       prepTimeMinutes: request.prepTimeMinutes,
+      // MENU-007: left out of an edit, the item keeps its hours.
+      ...(request.timeWindow !== undefined && {
+        windowStart: request.timeWindow?.start ?? null,
+        windowEnd: request.timeWindow?.end ?? null,
+      }),
       displayOrder: request.displayOrder,
       channels: request.channels,
       repeatable: request.repeatable,

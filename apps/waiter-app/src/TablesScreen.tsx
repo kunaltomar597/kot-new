@@ -35,7 +35,14 @@ const CLOCK_MS = 30_000;
  * tap opens an open table, or opens a free one with its guests first. Read again after table,
  * order, bill and service-request events.
  */
-export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string) => void }) {
+export function TablesScreen({
+  onOpenTable,
+  onTakeaway,
+}: {
+  onOpenTable: (sessionId: string) => void;
+  /** WTR-013: a takeaway order from the phone. */
+  onTakeaway?: () => void;
+}) {
   const session = useDeviceSession();
   const { person } = useSessionState();
   const t = useT();
@@ -100,6 +107,11 @@ export function TablesScreen({ onOpenTable }: { onOpenTable: (sessionId: string)
       <UnsentHome onOpen={onOpenTable} />
       <PagerCard />
       <BreakCard />
+      {onTakeaway === undefined ? null : (
+        <Button variant="secondary" testID="new-takeaway" onPress={onTakeaway}>
+          {t('mobile.takeaway.new')}
+        </Button>
+      )}
       <SegmentedControl
         label={t('mobile.tables.view')}
         options={[
