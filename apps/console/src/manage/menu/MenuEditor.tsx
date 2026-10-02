@@ -1,6 +1,7 @@
 import type { MenuDraftResponse, StationView, TaxGroupView } from '@rp/contracts';
 import { Button, ErrorState, LoadingState, Tabs, useToast } from '@rp/ui-web';
 import { type ReactNode, useState } from 'react';
+import { Link } from 'react-router';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
@@ -113,6 +114,10 @@ export function MenuEditor() {
         </Button>
       </div>
       <p className="dashboard-section__hint">{t('menuEditor.intro')}</p>
+      {/* ONB-006: a printed menu read into a draft to check (P6-04b). */}
+      <Link to="/manage/menu/ai-import" className="staff-pages__link">
+        {t('aiImport.open')}
+      </Link>
       {content}
     </section>
   );

@@ -1712,3 +1712,29 @@ body {
   justify-content: space-between;
   gap: var(--rp-space-3);
 }
+
+/* AI menu import (P6-04b): reading, choosing files, and the dish-by-dish review. */
+.ai-import__reading {
+  display: grid;
+  justify-items: start;
+  gap: var(--rp-space-2);
+  padding: var(--rp-space-4) 0;
+}
+
+.ai-import__chooser {
+  display: grid;
+  justify-items: start;
+  gap: var(--rp-space-3);
+}
+
+.ai-import__dish {
+  display: grid;
+  gap: var(--rp-space-2);
+  align-items: start;
+}
+
+.ai-import__unsure {
+  margin: 0;
+  color: var(--rp-color-warning-text, var(--rp-color-text-muted));
+  font-size: var(--rp-font-size-sm);
+}

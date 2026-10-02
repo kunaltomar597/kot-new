@@ -192,7 +192,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P6-04b review and import, P6-04c bulk photos, P6-05 the should-have batch, then Phase 7.
+- P6-04c bulk photos, P6-05 the should-have batch, then Phase 7.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
   the final check on a real PC needs a person).
@@ -334,7 +334,7 @@ Recommended next WPs (dependencies met):
 - [ ] P6-03 Voice search [H]
 - [ ] P6-04 AI-assisted menu import
   - [x] P6-04a Control Plane reading service
-  - [ ] P6-04b Review and import on the restaurant PC
+  - [x] P6-04b Review and import on the restaurant PC
   - [ ] P6-04c Bulk photo upload (ONB-007)
 - [ ] P6-05 Should-have operations batch
 
@@ -601,6 +601,25 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-02 (P6-04b):
+
+402. The restaurant's server turns each photo upright and makes it at most 2,000 px on its long
+     edge (JPEG 82) before sending it to the Control Plane; PDFs go as they are. The console takes
+     photos up to 15 MB and PDFs up to 20 MB, 40 MB together (a 55 MB body limit on that route
+     only).
+403. The review is per dish and per section: a printed menu cannot say which station cooks a dish
+     or its tax group, so each section gets both (the restaurant's first station and tax group to
+     begin with). A dish needs a name, a price or a price for each size, and veg / non-veg / egg.
+     "Mark all in this section checked" is allowed: the section's dishes are all on the screen.
+404. The server refuses the import while any dish is unchecked (`MENU_REVIEW_INCOMPLETE`), then
+     builds the template's sheets from the review (`reviewedMenuSheets` in `@rp/domain`) and runs
+     the template import (`commitSheets`): the same checks, one transaction, audit
+     (`MENU_IMPORTED` with `format: AI` and the import id) and publishing.
+405. Add-ons found on the menu become option groups, not attached to any dish (a printed menu
+     rarely says which dishes take which extras); the review says to attach them in the editor.
+406. The console keeps the import id in the browser, so a reload comes back to the reading or the
+     review; drafts stay at the vendor for 30 days.
 
 Decided 2026-10-02 (P6-04a):
 
@@ -2124,6 +2143,30 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-02: P6-04b AI menu import: review and import on the restaurant PC
+
+Built:
+
+- Contracts: `AiMenuImportRequest`, `AiMenuImportView`, `MenuReviewRequest`; routes
+  `startAiMenuImport`, `getAiMenuImport`, `commitAiMenuImport`.
+- `@rp/domain` `reviewedMenuSheets`, `uncheckedDishes`, `rupeesText`.
+- Server: `AiMenuImportService` (photos resized with sharp, the Control Plane's answers mapped,
+  the review enforced, `MenuImportService.commitSheets`); `ControlPlaneClient`
+  `createMenuExtraction` / `getMenuExtraction`; `HeartbeatService.connection()`; the route's body
+  limit.
+- Console: **Manage → Menu → Read a printed menu** (`AiImportScreen`, `ai-import-view.ts`):
+  choose files, reading, the review (sections with station and tax group, dishes with name,
+  price or sizes, food type, spice, description, the reader's doubts, checked, leave out), the
+  import report or the summary.
+
+Tests:
+
+- server `ai-menu-import.int.test.ts` 5 (the acceptance test): photos made smaller, sent to a
+  real Control Plane, read by a stand-in provider over HTTP with the vendor's key, the draft
+  back; nothing imported while a dish is unchecked; the checked draft imported, audited and
+  published; managers only; the vendor out of reach says so.
+- domain `menu-review.test.ts` 4; console `ai-import.test.tsx` 3.
 
 ### 2026-10-02: P6-04a AI menu import: the Control Plane's reading service
 

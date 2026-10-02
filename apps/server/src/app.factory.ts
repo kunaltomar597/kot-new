@@ -23,6 +23,9 @@ const JSON_BODY_LIMIT = '1mb';
  */
 const UPLOAD_BODY_LIMIT = '7mb';
 const UPLOAD_PATHS = [`/${API_PREFIX}/photos`, `/${API_PREFIX}/menu/import`];
+/** Up to 40 MB of menu photos or PDFs for AI import (P6-04b), in base64. */
+const AI_IMPORT_BODY_LIMIT = '55mb';
+const AI_IMPORT_PATH = `/${API_PREFIX}/menu/ai-imports`;
 
 /**
  * Options for creating the Nest application. Nest's own body parser is disabled because
@@ -41,6 +44,7 @@ export function configureApp(app: INestApplication): void {
   express.use(caDownloadMiddleware(app.get(TlsService)));
   const { consoleDir } = app.get<AppConfig>(APP_CONFIG);
   if (consoleDir !== undefined) express.use(consoleMiddleware(consoleDir));
+  express.use(AI_IMPORT_PATH, json({ limit: AI_IMPORT_BODY_LIMIT }));
   express.use(UPLOAD_PATHS, json({ limit: UPLOAD_BODY_LIMIT }));
   express.use(json({ limit: JSON_BODY_LIMIT }));
   express.use(bodyParserErrorHandler);

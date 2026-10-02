@@ -151,6 +151,27 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     return this.status();
   }
 
+  /**
+   * A signed connection to the Control Plane for other services (AI menu import, P6-04), or the
+   * reason there is none: not configured, or this PC not enrolled.
+   */
+  async connection(): Promise<
+    | { readonly client: ControlPlaneClient; readonly installationId: string }
+    | { readonly unavailable: 'NOT_CONFIGURED' | 'NOT_ENROLLED' }
+  > {
+    const baseUrl = this.config.controlPlaneUrl;
+    if (baseUrl === undefined) return { unavailable: 'NOT_CONFIGURED' };
+    const enrolment = await readEnrolment(this.prisma);
+    if (enrolment === undefined) return { unavailable: 'NOT_ENROLLED' };
+    this.client ??= new ControlPlaneClient({
+      baseUrl,
+      key: await installationKey(this.secrets),
+      timeoutMs: this.options.requestTimeoutMs,
+      ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
+    });
+    return { client: this.client, installationId: enrolment.installationId };
+  }
+
   /** Logs only when the failure changes, so an offline site does not flood the log. */
   private fail(code: string, message: string, error?: unknown): void {
     if (this.state.lastError !== code) {

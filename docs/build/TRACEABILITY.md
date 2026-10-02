@@ -23,8 +23,8 @@ Must: 224 / 287 covered. Should: 10 / 24. Could: 0 / 7.
 - ONB-001 (M): apps/server/test/integration/api-client.int.test.ts, apps/server/test/integration/devices.int.test.ts
 - ONB-003 (M): apps/control-plane/test/integration/enrolment.int.test.ts, apps/control-plane/test/unit/enrolment-code.test.ts, apps/server/test/unit/control-plane-client.test.ts, packages/contracts/test/control-plane.test.ts
 - ONB-004 (M): apps/console/test/printing-view.test.ts, apps/console/test/printing.test.tsx, apps/console/test/qr-codes.test.tsx, apps/console/test/restaurant-view.test.ts, apps/console/test/restaurant.test.tsx, apps/server/test/integration/print-queue.int.test.ts, apps/server/test/integration/printing.int.test.ts, apps/server/test/integration/restaurant.int.test.ts, apps/server/test/integration/table-qr.int.test.ts, apps/server/test/unit/escpos.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/restaurant.test.ts, packages/contracts/test/settings.test.ts, packages/domain/test/dates-and-invoices.test.ts, packages/domain/test/gstin.test.ts
-- ONB-005 (M): apps/server/test/integration/menu-import.int.test.ts, apps/server/test/unit/menu-workbook.test.ts, packages/domain/test/csv.test.ts, packages/domain/test/menu-import.test.ts
-- ONB-006 (S): apps/control-plane/test/integration/menu-extractions.int.test.ts, apps/control-plane/test/unit/menu-reading.test.ts
+- ONB-005 (M): apps/server/test/integration/menu-import.int.test.ts, apps/server/test/unit/menu-workbook.test.ts, packages/domain/test/csv.test.ts, packages/domain/test/menu-import.test.ts, packages/domain/test/menu-review.test.ts
+- ONB-006 (S): apps/console/test/ai-import.test.tsx, apps/control-plane/test/integration/menu-extractions.int.test.ts, apps/control-plane/test/unit/menu-reading.test.ts, apps/server/test/integration/ai-menu-import.int.test.ts, packages/domain/test/menu-review.test.ts
 - ONB-009 (M): apps/server/test/integration/menu-import.int.test.ts
 - MENU-001 (M): apps/console/test/menu-editor.test.tsx, apps/console/test/menu-view.test.ts, apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/menu-admin.test.ts
 - MENU-002 (M): apps/console/e2e/console.e2e.ts, apps/console/test/menu-editor.test.tsx, apps/console/test/menu-view.test.ts, apps/server/test/integration/menu-admin.int.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/menu-admin.test.ts
@@ -202,7 +202,7 @@ Must: 224 / 287 covered. Should: 10 / 24. Could: 0 / 7.
 - VCP-001 (M): apps/control-plane/test/integration/admin.int.test.ts
 - VCP-002 (M): apps/control-plane/test/integration/admin.int.test.ts, infra/supabase/test/server-functions.test.ts, infra/supabase/test/tokens.test.ts, packages/contracts/test/relay.test.ts
 - VCP-005 (M): apps/control-plane/test/integration/heartbeats.int.test.ts, apps/server/test/integration/control-plane.int.test.ts, apps/server/test/unit/control-plane-client.test.ts, packages/contracts/test/control-plane.test.ts, packages/contracts/test/docs.test.ts
-- VCP-008 (M): apps/control-plane/test/integration/menu-extractions.int.test.ts
+- VCP-008 (M): apps/control-plane/test/integration/menu-extractions.int.test.ts, apps/server/test/integration/ai-menu-import.int.test.ts
 - VCP-009 (M): apps/control-plane/test/integration/admin.int.test.ts, apps/control-plane/test/unit/config.test.ts
 - INT-002 (M): apps/server/test/integration/auth-guard.int.test.ts, packages/api-client/test/client.test.ts, packages/contracts/test/docs.test.ts, packages/contracts/test/snapshot.test.ts
 - INT-004 (M): apps/server/test/integration/event-bus.int.test.ts, apps/server/test/unit/realtime-rooms.test.ts, packages/contracts/test/contracts.test.ts, packages/contracts/test/docs.test.ts
