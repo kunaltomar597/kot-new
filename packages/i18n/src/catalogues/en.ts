@@ -1382,6 +1382,7 @@ export const en = {
       licence: 'Licence',
       controlPlane: 'Vendor connection',
       onboarding: 'Installation',
+      features: 'Features the vendor switches',
       ui: 'Display',
     },
     default: 'Default: {value}',
@@ -2836,6 +2837,9 @@ export const en = {
     onboarding: {
       minFreeDiskGb: 'Free space the installer needs',
     },
+    features: {
+      aiMenuImport: 'Read menus from photos',
+    },
     ui: {
       timeFormat: 'Clock',
     },
@@ -3015,6 +3019,10 @@ export const en = {
     },
     onboarding: {
       minFreeDiskGb: 'Free space the installer requires on the data drive.',
+    },
+    features: {
+      aiMenuImport:
+        'The vendor’s AI service reads a printed menu from photos. The vendor may switch it off for a while.',
     },
     ui: {
       timeFormat: 'Clock format on every screen, bill and report (our default: 12-hour).',
@@ -3552,6 +3560,7 @@ export const en = {
       invoices: 'Invoices',
       plans: 'Plans',
       releases: 'Releases',
+      remote: 'Remote settings',
       audit: 'Audit log',
       staff: 'Staff',
     },
@@ -3964,6 +3973,32 @@ export const en = {
         emptied: 'The log was emptied',
         byCheck: '{text} (found by a check)',
       },
+    },
+    remote: {
+      title: 'Remote settings',
+      intro:
+        'Vendor settings and feature flags for restaurant PCs. Each PC gets changes with its next heartbeat; its managers see them but cannot change them.',
+      loadFailed: 'Couldn’t load the remote settings.',
+      updated: 'Last changed {at}.',
+      setting: 'Setting',
+      defaultValue: 'Default',
+      fleetValue: 'Every PC',
+      ownValue: 'This PC',
+      default: 'Default',
+      on: 'On',
+      off: 'Off',
+      keep: 'Default ({value})',
+      numberHint: '{description} From {min} to {max}; empty keeps the default ({value}).',
+      invalid: 'Not a value this setting allows.',
+      edit: 'Change for every PC',
+      editTitle: 'Change the settings for every PC',
+      editIntro: 'A PC with its own value for a setting keeps it.',
+      editOwn: 'Change for this PC',
+      editOwnTitle: 'Change this PC’s own settings',
+      editOwnIntro: 'Empty: the PC follows the value for every PC.',
+      saved: 'Saved. PCs get it with their next heartbeat.',
+      applied: 'The PC holds these settings',
+      waiting: 'Waiting for the PC to collect them',
     },
     diagnostics: {
       title: 'Diagnostics',

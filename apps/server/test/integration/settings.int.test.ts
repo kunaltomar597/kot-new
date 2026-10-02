@@ -4,6 +4,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuthSettingsService } from '../../src/auth/auth-settings.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import { SettingsService } from '../../src/settings/settings.service.js';
 import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
@@ -128,6 +129,33 @@ describe('[MGR-007] [UPD-010] settings registry', () => {
   it('[UPD-010] keeps vendor-controlled settings read-only here', async () => {
     const response = await put(owner, 'licence.graceDays', { value: 30 });
     expect([response.status, codeOf(response)]).toEqual([403, 'SETTING_VENDOR_CONTROLLED']);
+  });
+
+  it('[UPD-010] applies what the vendor pushes, ignoring keys and values it may not set', async () => {
+    const settings = app.get(SettingsService);
+    const changed = await settings.applyVendorSettings({
+      'qr.pickupTimeoutSeconds': 120,
+      'qr.readOnlyAfterSeconds': 5,
+      'licence.graceDays': 30,
+      'kds.ageAmberMinutes': 1,
+    });
+    // Out-of-range values take the default; non-vendor and licence settings are never touched.
+    expect(changed).toEqual(['qr.pickupTimeoutSeconds']);
+    const snapshot = await settings.snapshot(kit.restaurantId);
+    expect(snapshot.get('qr.pickupTimeoutSeconds')).toBe(120);
+    expect(snapshot.get('qr.readOnlyAfterSeconds')).toBe(120);
+    expect(snapshot.get('licence.graceDays')).toBe(7);
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'VENDOR_SETTINGS_APPLIED' },
+    });
+    expect(audit).toMatchObject({
+      actorId: null,
+      before: { 'qr.pickupTimeoutSeconds': 60 },
+      after: { 'qr.pickupTimeoutSeconds': 120 },
+    });
+    // Pushed again unchanged: nothing to do. Taken back: the default returns.
+    expect(await settings.applyVendorSettings({ 'qr.pickupTimeoutSeconds': 120 })).toEqual([]);
+    expect(await settings.applyVendorSettings({})).toEqual(['qr.pickupTimeoutSeconds']);
   });
 
   it('[AUTH-006] [BILL-004] leaves tax, invoice and data settings to the Owner with a fresh second factor', async () => {

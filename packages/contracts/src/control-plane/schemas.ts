@@ -2,6 +2,7 @@ import { LICENSE_STATES, WEEKDAYS } from '@rp/domain';
 import { z } from 'zod';
 import { Id, Paise, Timestamp } from '../common.js';
 import { PendingDiagnosticsRequest } from './diagnostics.js';
+import { PushedSettings, SettingsDigest } from './remote-settings.js';
 
 /**
  * Contracts of the Vendor Control Plane API (ADR-0012): installation enrolment, heartbeats
@@ -245,6 +246,8 @@ export const HeartbeatRequest = z.looseObject({
     .optional(),
   /** The answer to the last heartbeat's `auditCheck`. */
   auditCheckpoint: AuditCheckpoint.optional(),
+  /** The vendor settings the PC holds, so new ones are pushed until it does (UPD-010). */
+  vendorSettings: z.object({ digest: SettingsDigest.nullable() }).optional(),
 });
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
 
@@ -286,6 +289,8 @@ export const HeartbeatResponse = z.object({
   auditCheck: z.object({ sequence: z.int().positive() }).nullable().default(null),
   /** Support's open requests for diagnostics, for a manager to allow or decline (UPD-008). */
   diagnosticsRequests: z.array(PendingDiagnosticsRequest).max(10).default([]),
+  /** Vendor settings and feature flags to apply, while the PC does not hold them (UPD-010). */
+  vendorSettings: PushedSettings.nullable().default(null),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
 

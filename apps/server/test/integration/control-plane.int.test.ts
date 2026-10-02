@@ -8,6 +8,7 @@ import {
   createControlPlaneApp,
   DiagnosticsService as CpDiagnosticsService,
   FleetService,
+  RemoteSettingsService,
   SupportService,
 } from '@rp/control-plane/testing';
 import { startRelay, type TestRelay } from '@rp/relay/testing';
@@ -29,6 +30,7 @@ import { installationKey } from '../../src/cloud/installation-key.js';
 import { APP_CONFIG, type AppConfig } from '../../src/config/app-config.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { LicenceAgentService } from '../../src/licensing/licence-agent.service.js';
+import { SettingsService } from '../../src/settings/settings.service.js';
 import { readRelayCredential } from '../../src/relay/relay-credential.js';
 import { authHeaders, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
@@ -336,6 +338,50 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     expect(await prisma.auditLog.count({ where: { action: 'DIAGNOSTICS_REQUEST_DECLINED' } })).toBe(
       1,
     );
+  });
+
+  it('[UPD-010] applies the vendor’s settings and feature flags, and the flag gates AI import', async () => {
+    const remote = controlPlane.get(RemoteSettingsService);
+    await remote.setFleet({ 'qr.pickupTimeoutSeconds': 90 }, 'Pilot tuning', 'vendor:admin');
+    const view = await remote.setInstallation(
+      installationId,
+      { 'features.aiMenuImport': false },
+      'AI provider down for this restaurant',
+      'vendor:admin',
+    );
+    await heartbeats.beat();
+    const restaurant = await prisma.restaurant.findFirstOrThrow();
+    const settings = await server.get(SettingsService).snapshot(restaurant.id);
+    expect(settings.get('qr.pickupTimeoutSeconds')).toBe(90);
+    expect(settings.get('features.aiMenuImport')).toBe(false);
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'VENDOR_SETTINGS_APPLIED' },
+    });
+    expect(audit.after).toEqual({ 'qr.pickupTimeoutSeconds': 90, 'features.aiMenuImport': false });
+    // The next heartbeat reports holding them; nothing more is pushed.
+    await heartbeats.beat();
+    expect((await remote.installation(installationId)).appliedDigest).toBe(view.digest);
+
+    const headers = await asManager();
+    const ai = await request(httpServer(server))
+      .post('/api/v1/menu/ai-imports')
+      .set(headers)
+      .send({ files: [{ name: 'menu.jpg', contentType: 'image/jpeg', contentBase64: 'AAAA' }] });
+    expect([ai.status, (ai.body as { code: string }).code]).toEqual([409, 'FEATURE_OFF']);
+    // Managers see the vendor's value but cannot change it.
+    const change = await request(httpServer(server))
+      .put('/api/v1/settings/qr.pickupTimeoutSeconds')
+      .set(headers)
+      .send({ value: 60 });
+    expect(change.status).toBe(403);
+
+    // Taken back by the vendor: the default returns.
+    await remote.setInstallation(installationId, {}, 'Provider is back', 'vendor:admin');
+    await heartbeats.beat();
+    server.get(SettingsService).invalidate();
+    expect(
+      (await server.get(SettingsService).snapshot(restaurant.id)).get('features.aiMenuImport'),
+    ).toBe(true);
   });
 
   it('[NFR-A01] keeps working while the Control Plane is down and reports again when it is back', async () => {

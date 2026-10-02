@@ -29,12 +29,24 @@ const entry = (id: number, action = 'licence.changed') => ({
 
 describe('[VCP-001] [SEC-003] sections by role', () => {
   it.each([
-    ['READ_ONLY', ['Restaurants', 'Fleet', 'Invoices', 'Plans', 'Releases']],
-    ['SUPPORT', ['Restaurants', 'Fleet', 'Invoices', 'Plans', 'Releases']],
-    ['FINANCE', ['Restaurants', 'Fleet', 'Invoices', 'Plans', 'Releases', 'Audit log']],
+    ['READ_ONLY', ['Restaurants', 'Fleet', 'Invoices', 'Plans', 'Releases', 'Remote settings']],
+    ['SUPPORT', ['Restaurants', 'Fleet', 'Invoices', 'Plans', 'Releases', 'Remote settings']],
+    [
+      'FINANCE',
+      ['Restaurants', 'Fleet', 'Invoices', 'Plans', 'Releases', 'Remote settings', 'Audit log'],
+    ],
     [
       'SUPER_ADMIN',
-      ['Restaurants', 'Fleet', 'Invoices', 'Plans', 'Releases', 'Audit log', 'Staff'],
+      [
+        'Restaurants',
+        'Fleet',
+        'Invoices',
+        'Plans',
+        'Releases',
+        'Remote settings',
+        'Audit log',
+        'Staff',
+      ],
     ],
   ] as const)('%s sees %j', async (role, sections) => {
     renderApp({ cp: controlPlane(role), path: '/restaurants' });

@@ -369,7 +369,8 @@ Recommended next WPs (dependencies met):
 - [ ] P7-08 Diagnostics, support screen, remote config
   - [x] P7-08a Diagnostics bundle
   - [x] P7-08b Support asks for diagnostics
-  - [ ] P7-08c Remote configuration, support screen, error reporting
+  - [x] P7-08c Remote configuration
+  - [ ] P7-08d Error reporting
 - [ ] P7-09 Digital bills
 - [ ] P7-10 Phase 7 exit test
 
@@ -623,6 +624,27 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-08c):
+
+501. Remote configuration (UPD-010) pushes the VENDOR settings that have no source of their own:
+     QR ordering limits and timings, `pager.heartbeatSeconds`, and feature flags (`features.*`).
+     Licence values come from the signed licence, the heartbeat interval from the heartbeat
+     answer, and the installer's disk minimum from the installer.
+502. The first feature flag is `features.aiMenuImport` (default on). When it is off, starting
+     an AI menu import answers 409 `FEATURE_OFF` with a message pointing to the Excel template.
+503. The fleet has one set of values; a PC may have its own on top. Only the Super Admin changes
+     them (a new capability, `REMOTE_CONFIG`), always with a reason, audited as
+     `remote_settings.changed`.
+504. The PC reports the digest of what it holds: the first 16 hex digits of the SHA-256 of the
+     canonical JSON. The CP pushes the values in heartbeat answers until the digests match.
+     - A key not pushed returns to its default.
+     - A value the setting does not allow is ignored, so the default applies.
+     - Applying is audited on the PC as `VENDOR_SETTINGS_APPLIED` (no staff actor), with a
+       `SettingsChanged` event, so screens refresh.
+505. The System page is the support screen (NFR-I03): versions, services, storage, devices,
+     backups (from P7-05) and the licence, and now sending diagnostics. Nothing else is
+     needed.
 
 Decided 2026-10-03 (P7-08b):
 
@@ -2581,6 +2603,25 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-08c Remote configuration
+
+Built:
+
+- contracts: `REMOTE_SETTING_KEYS`, `features.aiMenuImport`, `control-plane/remote-settings.ts`,
+  the heartbeat's `vendorSettings` both ways, four vendor routes and the `REMOTE_CONFIG`
+  capability;
+- CP migration `20261003090000_remote_settings` (with `installations.settings_digest`),
+  `RemoteSettingsService`, `RemoteSettingsController`, `settingsDigest`, and the push in
+  heartbeat answers;
+- server: `SettingsService.applyVendorSettings`, `VendorSettingsAgent` (on each answer), the
+  digest twin and the reported digest, and the AI import gate;
+- the web app's Remote settings page and a PC's Remote settings card;
+- runbook "Remote settings and feature flags"; the access policy table.
+
+Tests: CP integration +4 (definitions, Super Admin only and validation, push until held, digest
+vector); server +1 unit (the same vector), +1 integration (apply, ignore, revert), +1 acceptance
+(pushed, applied, reported, flag enforced, manager cannot change, reverted); web +3.
 
 ### 2026-10-03: P7-08b Support asks for diagnostics
 

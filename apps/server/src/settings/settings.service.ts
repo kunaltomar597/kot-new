@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   crossSettingProblems,
+  REMOTE_SETTING_KEYS,
   SETTINGS,
   type SettingDefinition,
   type SettingKey,
@@ -204,6 +205,70 @@ export class SettingsService {
     });
     this.invalidate();
     return this.view(definition, await this.snapshot(principal.restaurantId), principal);
+  }
+
+  /**
+   * Applies the vendor settings and feature flags the Control Plane pushed (UPD-010, P7-08c): each
+   * remote setting takes the pushed value, or its default when the vendor sent none. Values the
+   * setting does not allow are ignored. Audited as the vendor's change, with before and after;
+   * returns the keys that changed.
+   */
+  async applyVendorSettings(values: Readonly<Record<string, unknown>>): Promise<string[]> {
+    const restaurant = await this.prisma.restaurant.findFirst();
+    if (restaurant === null) return [];
+    const snapshot = await this.snapshot(restaurant.id);
+    const changes: { key: string; before: unknown; after: unknown }[] = [];
+    for (const key of REMOTE_SETTING_KEYS) {
+      const definition = settingDefinition(key);
+      if (definition === undefined) continue;
+      const pushed = Object.hasOwn(values, key)
+        ? definition.schema.safeParse(values[key])
+        : undefined;
+      const target: unknown = pushed?.success ? pushed.data : definition.defaultValue;
+      const before = snapshot.valueOf(key);
+      if (!same(before, target)) changes.push({ key, before, after: target });
+    }
+    if (changes.length === 0) return [];
+    const now = new Date();
+    await this.prisma.transaction(async (tx) => {
+      for (const change of changes) {
+        const json =
+          change.after === null ? Prisma.JsonNull : (change.after as Prisma.InputJsonValue);
+        await tx.setting.upsert({
+          where: { restaurantId_key: { restaurantId: restaurant.id, key: change.key } },
+          create: { restaurantId: restaurant.id, key: change.key, value: json, updatedById: null },
+          update: { value: json, updatedById: null },
+        });
+      }
+      await appendEvent(
+        tx,
+        {
+          eventId: newId(),
+          type: 'SettingsChanged',
+          version: 1,
+          occurredAt: now.toISOString(),
+          restaurantId: restaurant.id,
+          businessDate: businessDateOf(now, {
+            cutoff: restaurant.businessDayCutoff,
+            timeZone: restaurant.timeZone,
+          }),
+          payload: { keys: changes.map((change) => change.key) },
+        },
+        { aggregate: { type: 'restaurant', id: restaurant.id } },
+      );
+      await this.audit.record(tx, {
+        action: 'VENDOR_SETTINGS_APPLIED',
+        entityType: 'setting',
+        entityId: null,
+        actorId: null,
+        restaurantId: restaurant.id,
+        before: Object.fromEntries(changes.map((change) => [change.key, change.before])),
+        after: Object.fromEntries(changes.map((change) => [change.key, change.after])),
+        reason: 'Set by the vendor through the Control Plane',
+      });
+    });
+    this.invalidate();
+    return changes.map((change) => change.key);
   }
 
   private view(

@@ -16,7 +16,12 @@ import { SERVER_PACKAGE } from '../common/package-version.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { ControlPlaneClient, ControlPlaneError } from './control-plane-client.js';
-import { readEnrolment, readOfferedUpdate, saveOfferedUpdate } from './control-plane-state.js';
+import {
+  readEnrolment,
+  readOfferedUpdate,
+  readVendorSettingsDigest,
+  saveOfferedUpdate,
+} from './control-plane-state.js';
 import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { ErrorCounter } from '../observability/error-reporter.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
@@ -233,17 +238,27 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
 
   private async collect(errorsNow: number): Promise<HeartbeatRequest> {
     const check = this.auditCheck;
-    const [head, devices, disk, postgres, licence, relayCredential, restaurant, checkpoint] =
-      await Promise.all([
-        this.audit.chainHead(),
-        this.deviceHealth(),
-        this.disk(),
-        this.postgresVersion(),
-        this.licence.heartbeatReport(),
-        readRelayCredential(this.prisma, this.secrets).catch(() => undefined),
-        this.prisma.restaurant.findFirst({ select: { businessHours: true, timeZone: true } }),
-        check === null ? undefined : this.audit.checkpoint(check.sequence),
-      ]);
+    const [
+      head,
+      devices,
+      disk,
+      postgres,
+      licence,
+      relayCredential,
+      restaurant,
+      checkpoint,
+      settingsDigest,
+    ] = await Promise.all([
+      this.audit.chainHead(),
+      this.deviceHealth(),
+      this.disk(),
+      this.postgresVersion(),
+      this.licence.heartbeatReport(),
+      readRelayCredential(this.prisma, this.secrets).catch(() => undefined),
+      this.prisma.restaurant.findFirst({ select: { businessHours: true, timeZone: true } }),
+      check === null ? undefined : this.audit.checkpoint(check.sequence),
+      readVendorSettingsDigest(this.prisma),
+    ]);
     const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
       heartbeatId: newId(),
@@ -266,6 +281,8 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
           businessHours: { timeZone: restaurant.timeZone, hours: hours.data },
         }),
       ...(checkpoint !== undefined && { auditCheckpoint: checkpoint }),
+      // The vendor settings this PC holds; new ones come until it does (UPD-010).
+      vendorSettings: { digest: settingsDigest },
       ...licence,
       relay: {
         credentialDigest:

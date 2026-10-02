@@ -1,0 +1,27 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "digest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "values": {
+        "type": "object",
+        "propertyNames": { "type": "string", "maxLength": 80 },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["digest", "values"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "digest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "values": {
+        "type": "object",
+        "propertyNames": { "type": "string", "maxLength": 80 },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["digest", "values"],
+    "additionalProperties": false
+  }
+}

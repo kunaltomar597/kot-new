@@ -82,6 +82,8 @@ The Control Plane enforces what each role may do, deny by default (`vendorMay` i
 | Read the vendor audit log                                                |      ✓      |            |         |    ✓    |           |
 | Manage vendor staff accounts and access reviews                          |      ✓      |            |         |         |           |
 | Publish releases                                                         |      ✓      |            |         |         |           |
+| Push vendor settings and feature flags to PCs                            |      ✓      |            |         |         |           |
+| Ask a restaurant for diagnostics; open a bundle                          |      ✓      |     ✓      |    ✓    |         |           |
 
 Give each person the narrowest role that fits their work. A second role for one person is not
 possible; when duties change, change the role and record why in the account change.

@@ -1011,6 +1011,18 @@ export const SETTINGS = [
     unit: 'GB',
   }),
 
+  // Feature flags (UPD-010): switched by the vendor for the fleet or one restaurant (P7-08c).
+  setting({
+    key: 'features.aiMenuImport',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'VENDOR',
+    capability: 'MENU_MANAGE',
+    description:
+      'Menus can be read from photos by the vendor’s AI service (ONB-006); the vendor may switch it off, for example while the service is down.',
+    requirements: ['UPD-010', 'ONB-006'],
+  }),
+
   // Formats (NFR-L03)
   setting({
     key: 'ui.timeFormat',
@@ -1035,6 +1047,18 @@ export const SETTING_KEYS = SETTINGS.map((definition) => definition.key) as read
 const BY_KEY = new Map<string, SettingDefinition>(
   SETTINGS.map((definition) => [definition.key, definition as SettingDefinition]),
 );
+
+/**
+ * The vendor settings the Control Plane pushes (UPD-010, P7-08c): every VENDOR setting except
+ * those with a source of their own (the signed licence, the heartbeat answer, the installer).
+ */
+export const REMOTE_SETTING_KEYS: readonly string[] = SETTINGS.filter(
+  (definition) =>
+    definition.scope === 'VENDOR' &&
+    !['licence.', 'controlPlane.', 'onboarding.'].some((prefix) =>
+      definition.key.startsWith(prefix),
+    ),
+).map((definition) => definition.key);
 
 /** The definition of a setting, or undefined for an unknown key. */
 export function settingDefinition(key: string): SettingDefinition | undefined {

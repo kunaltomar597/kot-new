@@ -9,6 +9,7 @@ import { LicencesService } from '../licences/licences.service.js';
 import { DiagnosticsService } from '../diagnostics/diagnostics.service.js';
 import { FleetService } from '../fleet/fleet.service.js';
 import { ReleasesService } from '../releases/releases.service.js';
+import { RemoteSettingsService } from '../remote-settings/remote-settings.service.js';
 import { SupportService } from '../support/support.service.js';
 
 /** The component whose version releases are compared with. */
@@ -26,6 +27,7 @@ export class HeartbeatsService {
     private readonly support: SupportService,
     private readonly fleet: FleetService,
     private readonly diagnostics: DiagnosticsService,
+    private readonly remoteSettings: RemoteSettingsService,
   ) {}
 
   async record(
@@ -98,6 +100,11 @@ export class HeartbeatsService {
       auditCheck,
       // Support's open requests for diagnostics, for a manager to answer (UPD-008).
       diagnosticsRequests: await this.diagnostics.pendingFor(installation.id, receivedAt),
+      // Vendor settings and feature flags, until the PC holds them (UPD-010).
+      vendorSettings: await this.remoteSettings.forHeartbeat(
+        installation.id,
+        heartbeat.vendorSettings,
+      ),
     };
   }
 }

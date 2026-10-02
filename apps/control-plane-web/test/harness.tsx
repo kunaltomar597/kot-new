@@ -9,7 +9,14 @@ import { App } from '../src/App.js';
 import { createServices, type Services } from '../src/app/services.js';
 import type { TokenStorage } from '../src/app/session.js';
 import { FakeControlPlane, FakeRefusal } from './fake-cp.js';
-import { fleetPc, licence, meView, tenantDetail } from './fixtures.js';
+import {
+  fleetPc,
+  INSTALLATION_ID,
+  licence,
+  meView,
+  REMOTE_DEFINITIONS,
+  tenantDetail,
+} from './fixtures.js';
 
 /** Session storage for a test: starts with a token when someone is signed in. */
 export function memoryStorage(token?: string): TokenStorage & { value: string | undefined } {
@@ -51,7 +58,21 @@ export function controlPlane(role?: VendorRole): FakeControlPlane {
     .on('listFleetAlerts', () => ({ alerts: [] }))
     .on('listAuditHeads', () => ({ heads: [] }))
     .on('listVendorDiagnostics', () => ({ bundles: [] }))
-    .on('listVendorDiagnosticsRequests', () => ({ requests: [] }));
+    .on('listVendorDiagnosticsRequests', () => ({ requests: [] }))
+    .on('getFleetRemoteSettings', () => ({
+      definitions: REMOTE_DEFINITIONS,
+      fleet: {},
+      updatedAt: null,
+    }))
+    .on('getInstallationRemoteSettings', () => ({
+      installationId: INSTALLATION_ID,
+      fleet: {},
+      overrides: {},
+      effective: {},
+      digest: '0000000000000000',
+      appliedDigest: '0000000000000000',
+      updatedAt: null,
+    }));
   return cp;
 }
 

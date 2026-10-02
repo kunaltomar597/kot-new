@@ -197,3 +197,24 @@ export function fleetAlert(overrides: Partial<FleetAlertView> = {}): FleetAlertV
     ...overrides,
   };
 }
+
+export const REMOTE_DEFINITIONS = [
+  {
+    key: 'qr.pickupTimeoutSeconds',
+    description: 'T: a QR order the restaurant has not picked up by then expires.',
+    defaultValue: 60,
+    kind: 'INTEGER' as const,
+    min: 15,
+    max: 600,
+    unit: 'seconds',
+  },
+  {
+    key: 'features.aiMenuImport',
+    description: 'Menus can be read from photos by the vendor’s AI service.',
+    defaultValue: true,
+    kind: 'BOOLEAN' as const,
+    min: null,
+    max: null,
+    unit: null,
+  },
+];

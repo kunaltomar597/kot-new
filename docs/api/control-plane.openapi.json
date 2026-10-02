@@ -1429,6 +1429,128 @@
         "x-requirements": ["VCP-002", "LIC-004"]
       }
     },
+    "/v1/vendor/installations/{id}/remote-settings": {
+      "get": {
+        "operationId": "getInstallationRemoteSettings",
+        "summary": "A PC’s vendor settings: the fleet’s, its own, and whether it holds them",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PC’s settings.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InstallationRemoteSettingsView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["UPD-010"]
+      },
+      "put": {
+        "operationId": "setInstallationRemoteSettings",
+        "summary": "Set a PC’s own vendor settings and feature flags, over the fleet’s, with a reason",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateRemoteSettingsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The PC’s settings.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InstallationRemoteSettingsView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "A key that cannot be pushed, or a value not allowed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REMOTE_CONFIG",
+        "x-requirements": ["UPD-010", "SEC-018"]
+      }
+    },
     "/v1/vendor/installations/{id}/revoke": {
       "post": {
         "operationId": "revokeVendorInstallation",
@@ -1994,6 +2116,93 @@
         },
         "x-capability": "RELEASES_MANAGE",
         "x-requirements": ["VCP-006", "UPD-002"]
+      }
+    },
+    "/v1/vendor/remote-settings": {
+      "get": {
+        "operationId": "getFleetRemoteSettings",
+        "summary": "The vendor settings and feature flags every PC gets, and what may be set",
+        "tags": ["vendor"],
+        "responses": {
+          "200": {
+            "description": "The fleet’s settings.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FleetRemoteSettingsView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["UPD-010"]
+      },
+      "put": {
+        "operationId": "setFleetRemoteSettings",
+        "summary": "Set the vendor settings and feature flags for every PC, with a reason",
+        "description": "Keys left out keep their default. Each PC gets the new values in its next heartbeat answer; its managers see them and the change is audited on both sides.",
+        "tags": ["vendor"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateRemoteSettingsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The fleet’s settings.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FleetRemoteSettingsView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "A key that cannot be pushed, or a value not allowed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REMOTE_CONFIG",
+        "x-requirements": ["UPD-010", "SEC-018"]
       }
     },
     "/v1/vendor/session": {
@@ -3775,6 +3984,28 @@
         ],
         "additionalProperties": false
       },
+      "FleetRemoteSettingsView": {
+        "type": "object",
+        "properties": {
+          "definitions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RemoteSettingDefinition" }
+          },
+          "fleet": { "$ref": "#/components/schemas/RemoteSettingValues" },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["definitions", "fleet", "updatedAt"],
+        "additionalProperties": false
+      },
       "FleetResponse": {
         "type": "object",
         "properties": {
@@ -3978,7 +4209,17 @@
             "required": ["timeZone", "hours"],
             "additionalProperties": false
           },
-          "auditCheckpoint": { "$ref": "#/components/schemas/AuditCheckpoint" }
+          "auditCheckpoint": { "$ref": "#/components/schemas/AuditCheckpoint" },
+          "vendorSettings": {
+            "type": "object",
+            "properties": {
+              "digest": {
+                "anyOf": [{ "$ref": "#/components/schemas/SettingsDigest" }, { "type": "null" }]
+              }
+            },
+            "required": ["digest"],
+            "additionalProperties": false
+          }
         },
         "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
         "additionalProperties": {}
@@ -4041,6 +4282,10 @@
             "maxItems": 10,
             "type": "array",
             "items": { "$ref": "#/components/schemas/PendingDiagnosticsRequest" }
+          },
+          "vendorSettings": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/PushedSettings" }, { "type": "null" }]
           }
         },
         "required": [
@@ -4052,7 +4297,8 @@
           "reactivationSecret",
           "relayCredential",
           "auditCheck",
-          "diagnosticsRequests"
+          "diagnosticsRequests",
+          "vendorSettings"
         ],
         "additionalProperties": false
       },
@@ -4113,9 +4359,50 @@
             "maxItems": 10,
             "type": "array",
             "items": { "$ref": "#/components/schemas/PendingDiagnosticsRequest" }
+          },
+          "vendorSettings": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/PushedSettings" }, { "type": "null" }]
           }
         },
         "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
+      },
+      "InstallationRemoteSettingsView": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "fleet": { "$ref": "#/components/schemas/RemoteSettingValues" },
+          "overrides": { "$ref": "#/components/schemas/RemoteSettingValues" },
+          "effective": { "$ref": "#/components/schemas/RemoteSettingValues" },
+          "digest": { "$ref": "#/components/schemas/SettingsDigest" },
+          "appliedDigest": {
+            "anyOf": [{ "$ref": "#/components/schemas/SettingsDigest" }, { "type": "null" }]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "installationId",
+          "fleet",
+          "overrides",
+          "effective",
+          "digest",
+          "appliedDigest",
+          "updatedAt"
+        ],
+        "additionalProperties": false
       },
       "InvoiceQuery": {
         "type": "object",
@@ -4593,6 +4880,15 @@
         "required": ["channel", "version", "url", "sha256", "sizeBytes"],
         "additionalProperties": false
       },
+      "PushedSettings": {
+        "type": "object",
+        "properties": {
+          "digest": { "$ref": "#/components/schemas/SettingsDigest" },
+          "values": { "$ref": "#/components/schemas/RemoteSettingValues" }
+        },
+        "required": ["digest", "values"],
+        "additionalProperties": false
+      },
       "RELAY_DIGEST": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
       "ReactivationCode": {
         "type": "string",
@@ -4710,11 +5006,31 @@
         ],
         "additionalProperties": false
       },
+      "RemoteSettingDefinition": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "description": { "type": "string" },
+          "defaultValue": {},
+          "kind": { "type": "string", "enum": ["BOOLEAN", "INTEGER"] },
+          "min": { "type": ["number", "null"] },
+          "max": { "type": ["number", "null"] },
+          "unit": { "type": ["string", "null"] }
+        },
+        "required": ["key", "description", "defaultValue", "kind", "min", "max", "unit"],
+        "additionalProperties": false
+      },
+      "RemoteSettingValues": {
+        "type": "object",
+        "propertyNames": { "type": "string", "maxLength": 80 },
+        "additionalProperties": {}
+      },
       "SemVer": {
         "type": "string",
         "maxLength": 64,
         "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
       },
+      "SettingsDigest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
       "Sha256Hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
       "SignedLicence": {
         "type": "object",
@@ -4921,6 +5237,15 @@
         ],
         "additionalProperties": false
       },
+      "UpdateRemoteSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "values": { "$ref": "#/components/schemas/RemoteSettingValues" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["values", "reason"],
+        "additionalProperties": false
+      },
       "UpdateVendorUserRequest": {
         "type": "object",
         "properties": {
@@ -4995,7 +5320,8 @@
           "SUPPORT_NOTES",
           "RELEASES_MANAGE",
           "USERS_MANAGE",
-          "AUDIT_VIEW"
+          "AUDIT_VIEW",
+          "REMOTE_CONFIG"
         ]
       },
       "VendorDiagnosticsDetail": {

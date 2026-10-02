@@ -191,6 +191,15 @@
           }
         },
         "required": ["sequence", "hash", "oldestSequence"]
+      },
+      "vendorSettings": {
+        "type": "object",
+        "properties": {
+          "digest": {
+            "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{16}$" }, { "type": "null" }]
+          }
+        },
+        "required": ["digest"]
       }
     },
     "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -397,6 +406,16 @@
           }
         },
         "required": ["sequence", "hash", "oldestSequence"],
+        "additionalProperties": false
+      },
+      "vendorSettings": {
+        "type": "object",
+        "properties": {
+          "digest": {
+            "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{16}$" }, { "type": "null" }]
+          }
+        },
+        "required": ["digest"],
         "additionalProperties": false
       }
     },

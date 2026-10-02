@@ -8,6 +8,7 @@ import { AuditScreen } from './audit/AuditScreen.js';
 import { InvoicesScreen } from './billing/InvoicesScreen.js';
 import { PlansScreen } from './billing/PlansScreen.js';
 import { ReleasesScreen } from './releases/ReleasesScreen.js';
+import { RemoteSettingsScreen } from './remote/RemoteSettingsScreen.js';
 import { FleetScreen } from './fleet/FleetScreen.js';
 import { StaffScreen } from './staff/StaffScreen.js';
 import { type Services, ServicesProvider, useSession } from './app/services.js';
@@ -29,6 +30,7 @@ const PAGES: readonly { path: string; capability: VendorCapability; element: Rea
   { path: '/invoices', capability: 'FLEET_VIEW', element: <InvoicesScreen /> },
   { path: '/plans', capability: 'FLEET_VIEW', element: <PlansScreen /> },
   { path: '/releases', capability: 'FLEET_VIEW', element: <ReleasesScreen /> },
+  { path: '/remote-settings', capability: 'FLEET_VIEW', element: <RemoteSettingsScreen /> },
   { path: '/audit', capability: 'AUDIT_VIEW', element: <AuditScreen /> },
   { path: '/staff', capability: 'USERS_MANAGE', element: <StaffScreen /> },
 ];

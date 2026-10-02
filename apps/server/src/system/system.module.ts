@@ -7,6 +7,7 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { DiagnosticsService } from './diagnostics.service.js';
 import { SystemController } from './system.controller.js';
 import { SystemService } from './system.service.js';
+import { VendorSettingsAgent } from './vendor-settings.agent.js';
 
 /**
  * The System page (P4-04): versions, services, storage, devices and the update on offer, and
@@ -15,6 +16,6 @@ import { SystemService } from './system.service.js';
 @Module({
   imports: [SettingsModule, CloudModule, RelayModule, RealtimeModule, NotificationsModule],
   controllers: [SystemController],
-  providers: [SystemService, DiagnosticsService],
+  providers: [SystemService, DiagnosticsService, VendorSettingsAgent],
 })
 export class SystemModule {}

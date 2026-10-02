@@ -1,0 +1,78 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "definitions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": { "type": "string" },
+            "description": { "type": "string" },
+            "defaultValue": {},
+            "kind": { "type": "string", "enum": ["BOOLEAN", "INTEGER"] },
+            "min": { "type": ["number", "null"] },
+            "max": { "type": ["number", "null"] },
+            "unit": { "type": ["string", "null"] }
+          },
+          "required": ["key", "description", "defaultValue", "kind", "min", "max", "unit"]
+        }
+      },
+      "fleet": {
+        "type": "object",
+        "propertyNames": { "type": "string", "maxLength": 80 },
+        "additionalProperties": {}
+      },
+      "updatedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["definitions", "fleet", "updatedAt"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "definitions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": { "type": "string" },
+            "description": { "type": "string" },
+            "defaultValue": {},
+            "kind": { "type": "string", "enum": ["BOOLEAN", "INTEGER"] },
+            "min": { "type": ["number", "null"] },
+            "max": { "type": ["number", "null"] },
+            "unit": { "type": ["string", "null"] }
+          },
+          "required": ["key", "description", "defaultValue", "kind", "min", "max", "unit"],
+          "additionalProperties": false
+        }
+      },
+      "fleet": {
+        "type": "object",
+        "propertyNames": { "type": "string", "maxLength": 80 },
+        "additionalProperties": {}
+      },
+      "updatedAt": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "required": ["definitions", "fleet", "updatedAt"],
+    "additionalProperties": false
+  }
+}
