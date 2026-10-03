@@ -118,9 +118,20 @@ export const CpConfigSchema = z
     backupS3SecretAccessKey: z.string().min(1).optional(),
     /** For S3-compatible services that address buckets by path. */
     backupS3PathStyle: booleanFlag,
-    /** Cloud backups kept per PC: the newest of each of the last N days and weeks (DATA-002). */
-    backupKeepDaily: z.coerce.number().int().min(1).max(90).default(14),
-    backupKeepWeekly: z.coerce.number().int().min(0).max(104).default(8),
+    /**
+     * The vendor's escrow key for restaurants' backup keys (DATA-003, OI-10, P7-05e): an AWS KMS
+     * RSA_4096 ENCRYPT_DECRYPT key in India, or in development an RSA private key (PKCS#8 DER,
+     * base64) from configuration. Neither: no escrow, and no restore from the cloud.
+     */
+    escrowPrivateKey: z.string().min(100).optional(),
+    escrowKmsKeyId: z.string().min(1).optional(),
+    escrowKmsRegion: z.string().min(1).default('ap-south-1'),
+    escrowKmsEndpoint: z.url({ protocol: /^https?$/ }).optional(),
+    escrowKmsAccessKeyId: z.string().min(1).optional(),
+    escrowKmsSecretAccessKey: z.string().min(1).optional(),
+    /** Cloud backups kept per PC (BRD §9.3): the newest of each of the last 30 days and 12 months. */
+    backupKeepDaily: z.coerce.number().int().min(1).max(90).default(30),
+    backupKeepMonthly: z.coerce.number().int().min(0).max(120).default(12),
   })
   .superRefine((config, context) => {
     if (config.env !== 'development' && config.secretKey === undefined) {
@@ -203,6 +214,36 @@ export const CpConfigSchema = z
         message: 'staging and production need an https:// CP_BACKUP_S3_ENDPOINT',
       });
     }
+    // OI-10: in staging and production the escrow key never leaves the KMS.
+    if (config.env !== 'development' && config.escrowPrivateKey !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['escrowPrivateKey'],
+        message: 'staging and production keep the escrow key in the KMS (CP_ESCROW_KMS_KEY_ID)',
+      });
+    }
+    if (
+      config.escrowKmsKeyId !== undefined &&
+      (config.escrowKmsAccessKeyId === undefined || config.escrowKmsSecretAccessKey === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['escrowKmsKeyId'],
+        message:
+          'CP_ESCROW_KMS_KEY_ID needs CP_ESCROW_KMS_ACCESS_KEY_ID and CP_ESCROW_KMS_SECRET_ACCESS_KEY',
+      });
+    }
+    if (
+      config.env !== 'development' &&
+      config.escrowKmsKeyId !== undefined &&
+      !INDIA_REGIONS.includes(config.escrowKmsRegion)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['escrowKmsRegion'],
+        message: `the escrow key stays in India: CP_ESCROW_KMS_REGION is one of ${INDIA_REGIONS.join(', ')}`,
+      });
+    }
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
       context.addIssue({
         code: 'custom',
@@ -264,8 +305,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     backupS3SecretAccessKey:
       env.CP_BACKUP_S3_SECRET_ACCESS_KEY === '' ? undefined : env.CP_BACKUP_S3_SECRET_ACCESS_KEY,
     backupS3PathStyle: env.CP_BACKUP_S3_PATH_STYLE,
+    escrowPrivateKey: env.CP_ESCROW_PRIVATE_KEY === '' ? undefined : env.CP_ESCROW_PRIVATE_KEY,
+    escrowKmsKeyId: env.CP_ESCROW_KMS_KEY_ID === '' ? undefined : env.CP_ESCROW_KMS_KEY_ID,
+    escrowKmsRegion: env.CP_ESCROW_KMS_REGION === '' ? undefined : env.CP_ESCROW_KMS_REGION,
+    escrowKmsEndpoint: env.CP_ESCROW_KMS_ENDPOINT === '' ? undefined : env.CP_ESCROW_KMS_ENDPOINT,
+    escrowKmsAccessKeyId:
+      env.CP_ESCROW_KMS_ACCESS_KEY_ID === '' ? undefined : env.CP_ESCROW_KMS_ACCESS_KEY_ID,
+    escrowKmsSecretAccessKey:
+      env.CP_ESCROW_KMS_SECRET_ACCESS_KEY === '' ? undefined : env.CP_ESCROW_KMS_SECRET_ACCESS_KEY,
     backupKeepDaily: env.CP_BACKUP_KEEP_DAILY,
-    backupKeepWeekly: env.CP_BACKUP_KEEP_WEEKLY,
+    backupKeepMonthly: env.CP_BACKUP_KEEP_MONTHLY,
   });
   if (!result.success) {
     const problems = result.error.issues

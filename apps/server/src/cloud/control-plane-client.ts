@@ -3,6 +3,7 @@ import { ApiError } from '@rp/contracts';
 import {
   CloudBackupView,
   type CompleteCloudBackupRequest,
+  type EscrowBackupKeyRequest,
   type StartCloudBackupRequest,
   StartCloudBackupResponse,
   type DeclineDiagnosticsRequest,
@@ -171,6 +172,17 @@ export class ControlPlaneClient {
       'POST',
       `/v1/cloud-backups/${encodeURIComponent(id)}/abort`,
       undefined,
+      z.undefined(),
+    );
+  }
+
+  /** DATA-003, OI-10: the backup key, wrapped with the vendor's escrow key (P7-05e). */
+  async escrowBackupKey(installationId: string, request: EscrowBackupKeyRequest): Promise<void> {
+    await this.signed(
+      installationId,
+      'PUT',
+      '/v1/backup-key-escrow',
+      JSON.stringify(request),
       z.undefined(),
     );
   }

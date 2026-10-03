@@ -40,6 +40,11 @@ export const VENDOR_CAPABILITIES = [
   'AUDIT_VIEW',
   /** Vendor settings and feature flags pushed to restaurant PCs (UPD-010). Super Admin only. */
   'REMOTE_CONFIG',
+  /**
+   * Issue a restore code that releases a restaurant's escrowed backup key (DATA-003, OI-10),
+   * after verifying its Owner. The restaurant's Owner is told.
+   */
+  'BACKUP_RESTORE',
 ] as const;
 export const VendorCapability = z.enum(VENDOR_CAPABILITIES);
 export type VendorCapability = z.infer<typeof VendorCapability>;
@@ -47,7 +52,13 @@ export type VendorCapability = z.infer<typeof VendorCapability>;
 const MATRIX: Readonly<Record<VendorRole, readonly VendorCapability[]>> = {
   SUPER_ADMIN: VENDOR_CAPABILITIES,
   ONBOARDING: ['FLEET_VIEW', 'TENANTS_MANAGE', 'LICENCE_REBIND', 'SUPPORT_NOTES'],
-  SUPPORT: ['FLEET_VIEW', 'LICENCE_REBIND', 'REACTIVATION_CODES', 'SUPPORT_NOTES'],
+  SUPPORT: [
+    'FLEET_VIEW',
+    'LICENCE_REBIND',
+    'REACTIVATION_CODES',
+    'SUPPORT_NOTES',
+    'BACKUP_RESTORE',
+  ],
   FINANCE: ['FLEET_VIEW', 'LICENCES_MANAGE', 'REACTIVATION_CODES', 'BILLING_MANAGE', 'AUDIT_VIEW'],
   READ_ONLY: ['FLEET_VIEW'],
 };

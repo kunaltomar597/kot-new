@@ -131,12 +131,13 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
       expect(table.getByText(`${t('backups.notCopied')} ${t('backups.inCloud')}`)).toBeVisible();
       // DATA-003: the copy in the cloud.
       expect(backup.getByText(t('backups.cloud.state.OK'))).toBeVisible();
+      const at = (iso: string) => t('backups.at', displayDateTime(new Date(iso)));
       expect(
         backup.getByText(
-          t('backups.cloud.last', {
-            when: t('backups.at', displayDateTime(new Date('2026-10-01T23:00:00.000Z'))),
-            sent: t('backups.at', displayDateTime(new Date('2026-10-01T23:20:00.000Z'))),
-          }),
+          `${t('backups.cloud.last', {
+            when: at('2026-10-01T23:00:00.000Z'),
+            sent: at('2026-10-01T23:20:00.000Z'),
+          })} ${t('backups.cloud.escrowed', { when: at('2026-10-01T23:30:00.000Z') })}`,
         ),
       ).toBeVisible();
       await expectNoAxeViolations(container);

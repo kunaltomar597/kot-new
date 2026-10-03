@@ -118,6 +118,7 @@ export function backupsView(overrides: Partial<BackupsResponse> = {}): BackupsRe
       lastUploadedBackupAt: '2026-10-01T23:00:00.000Z',
       lastFailureAt: null,
       lastError: null,
+      keyEscrowedAt: '2026-10-01T23:30:00.000Z',
     },
     restorePending: false,
     lastRestore: null,

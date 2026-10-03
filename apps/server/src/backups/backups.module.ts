@@ -6,6 +6,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { BackupController } from './backup.controller.js';
 import { BACKUP_OPTIONS, BackupService, DEFAULT_BACKUP_OPTIONS } from './backup.service.js';
+import { BackupEscrowAgent } from './backup-escrow.agent.js';
 import {
   CLOUD_BACKUP_OPTIONS,
   CloudBackupService,
@@ -29,6 +30,7 @@ import {
     BackupService,
     ContinuousBackupService,
     CloudBackupService,
+    BackupEscrowAgent,
     ServerLifecycle,
     { provide: BACKUP_OPTIONS, useValue: DEFAULT_BACKUP_OPTIONS },
     { provide: CONTINUOUS_BACKUP_OPTIONS, useValue: DEFAULT_CONTINUOUS_BACKUP_OPTIONS },

@@ -10,6 +10,7 @@ import { useLoad } from '../app/use-load.js';
 import { LoadView } from '../components/LoadView.js';
 import { InstallationHealth } from '../fleet/InstallationHealth.js';
 import { RemoteSettingsCard } from '../remote/RemoteSettingsCard.js';
+import { CloudBackupsCard } from './CloudBackupsCard.js';
 import { DiagnosticsCard } from './DiagnosticsCard.js';
 import { Page } from '../components/Page.js';
 import { ReasonDialog } from '../components/ReasonDialog.js';
@@ -139,6 +140,7 @@ export function InstallationScreen() {
             <LicenceCard installationId={installation.id} />
             <InstallationHealth installationId={installation.id} />
             <DiagnosticsCard installationId={installation.id} />
+            <CloudBackupsCard installationId={installation.id} />
             <RemoteSettingsCard installationId={installation.id} />
           </div>
           <ActivationCodeDialog

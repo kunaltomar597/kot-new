@@ -318,7 +318,14 @@ function CloudSummary({ view, at }: { view: CloudBackupStatusView; at: (iso: str
   }
   return (
     <>
-      <p className="dashboard-section__hint">{text}</p>
+      <p className="dashboard-section__hint">
+        {text}{' '}
+        {view.state === 'OFF' || view.state === 'NOT_SET_UP'
+          ? null
+          : view.keyEscrowedAt === null
+            ? t('backups.cloud.notEscrowed')
+            : t('backups.cloud.escrowed', { when: at(view.keyEscrowedAt) })}
+      </p>
       {view.state === 'FAILING' && view.lastError !== null ? (
         <p className="console-notice console-notice--danger">{view.lastError}</p>
       ) : null}

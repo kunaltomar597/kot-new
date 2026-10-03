@@ -48,7 +48,7 @@ function view(row: CloudBackup): CloudBackupView {
  * The encrypted cloud backup (DATA-003, P7-05d). A restaurant PC starts an upload of its nightly
  * backup file, PUTs the parts straight to object storage with the signed URLs it gets, then
  * completes it. The file is encrypted on the PC with a key the Control Plane does not hold. The
- * retention keeps the newest of each of the last 14 days and 8 weeks per PC (configurable).
+ * retention keeps the newest of each of the last 30 days and 12 months per PC (BRD §9.3).
  */
 @Injectable()
 export class CloudBackupsService {
@@ -212,7 +212,7 @@ export class CloudBackupsService {
   }
 
   /**
-   * Retention (DATA-002's 14 daily and 8 weekly by default) for one PC, and uploads left
+   * Retention (BRD §9.3: 30 daily and 12 monthly by default) for one PC, and uploads left
    * unfinished for two days. Removed objects keep their row, marked DELETED.
    */
   async prune(installationId: string, now = new Date()): Promise<string[]> {
@@ -232,7 +232,9 @@ export class CloudBackupsService {
       backupsToRemove(
         kept.map((row) => ({ name: row.id, takenAt: row.backupCreatedAt })),
         this.config.backupKeepDaily,
-        this.config.backupKeepWeekly,
+        0,
+        undefined,
+        this.config.backupKeepMonthly,
       ),
     );
     const removed: string[] = [];

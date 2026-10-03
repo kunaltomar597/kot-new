@@ -35,6 +35,7 @@ const GROUP_OF_TYPE: Readonly<
   LICENSE_STATE: 'system',
   SUSPICIOUS_ACTIVITY: 'staff',
   SUPPORT_REQUEST: 'system',
+  VENDOR_RESTORE_CODE: 'system',
 };
 
 export function groupOf(alert: AlertView, staffId: string): AlertGroup {

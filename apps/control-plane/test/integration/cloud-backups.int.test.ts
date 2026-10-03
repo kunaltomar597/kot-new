@@ -26,7 +26,7 @@ import { bearer, signInVendor, vendorAccount } from '../helpers/vendor.js';
 
 /**
  * The encrypted cloud backup (P7-05d, DATA-003): a PC uploads its backup file in parts with signed
- * URLs, completes it, and the retention keeps 14 daily and 8 weekly per PC. The local store
+ * URLs, completes it, and the retention keeps 30 daily and 12 monthly per PC. The local store
  * stands in for S3 here, with 1 MiB parts so a small file has several.
  */
 
@@ -186,7 +186,7 @@ describe('[DATA-003] uploading a backup to the cloud', () => {
     expect(abort.status).toBe(204);
   });
 
-  it('[DATA-002] keeps the newest of each of the last 14 days and 8 weeks per PC', async () => {
+  it('[DATA-002] keeps the newest of each of the last 30 days and 12 months per PC (§9.3)', async () => {
     const service = app.get(CloudBackupsService);
     // 60 nightly backups for the other PC, one a day.
     for (let day = 0; day < 60; day += 1) {
@@ -196,10 +196,10 @@ describe('[DATA-003] uploading a backup to the cloud', () => {
       expect((await signedPost(app, other, path, JSON.stringify({ parts }))).status).toBe(200);
     }
     const kept = await service.list(other.id ?? '');
-    // 14 daily, plus the newest of each earlier week up to 8 weeks.
-    expect(kept.length).toBeGreaterThanOrEqual(14);
-    expect(kept.length).toBeLessThanOrEqual(22);
+    // 2 August to 30 September in India: the 30 days of September, and August's last night.
+    expect(kept.length).toBe(31);
     expect(kept[0]?.backupCreatedAt).toBe('2026-09-29T23:00:00.000Z');
+    expect(kept.at(-1)?.backupCreatedAt).toBe('2026-08-30T23:00:00.000Z');
     const deleted = await app.get(PrismaService).cloudBackup.findMany({
       where: { installationId: other.id ?? '', status: 'DELETED' },
     });

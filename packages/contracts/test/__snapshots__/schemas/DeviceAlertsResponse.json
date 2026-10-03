@@ -46,7 +46,8 @@
                 "DISK_OR_BACKUP",
                 "LICENSE_STATE",
                 "SUSPICIOUS_ACTIVITY",
-                "SUPPORT_REQUEST"
+                "SUPPORT_REQUEST",
+                "VENDOR_RESTORE_CODE"
               ]
             },
             "status": { "type": "string", "enum": ["OPEN", "ACKNOWLEDGED", "CLEARED"] },
@@ -226,7 +227,8 @@
                 "DISK_OR_BACKUP",
                 "LICENSE_STATE",
                 "SUSPICIOUS_ACTIVITY",
-                "SUPPORT_REQUEST"
+                "SUPPORT_REQUEST",
+                "VENDOR_RESTORE_CODE"
               ]
             },
             "status": { "type": "string", "enum": ["OPEN", "ACKNOWLEDGED", "CLEARED"] },

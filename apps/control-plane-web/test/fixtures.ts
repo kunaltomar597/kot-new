@@ -166,6 +166,7 @@ export function fleetPc(overrides: Partial<FleetInstallationView> = {}): FleetIn
     disk: { totalBytes: 500_000_000_000, freeBytes: 190_000_000_000, usedPercent: 62 },
     backup: null,
     cloudBackupAt: null,
+    backupKeyEscrowedAt: null,
     devices: [
       { type: 'KDS', paired: 2, connected: 1 },
       { type: 'WAITER_PHONE', paired: 4, connected: 4 },

@@ -147,6 +147,7 @@ export const en = {
       LICENSE_STATE: 'Licence needs attention',
       SUSPICIOUS_ACTIVITY: 'Suspicious activity to review',
       SUPPORT_REQUEST: 'Support asks for diagnostics',
+      VENDOR_RESTORE_CODE: 'The vendor can open your cloud backups',
     },
     orderFrom:
       'Order {number} from the {source, select, TABLE_TABLET {table tablet} QR {QR menu} WAITER_APP {waiter app} other {POS}}',
@@ -163,6 +164,8 @@ export const en = {
     suspicious:
       '{count, plural, one {# thing} other {# things}} to review from {date}. See Reports, Suspicious activity.',
     supportRequest: '{name} from support: “{reason}”. Allow or decline it on the System page.',
+    vendorRestoreCode:
+      '{name} from the vendor issued a restore code for your cloud backups: “{reason}”. If you did not ask for a restore onto a new PC, call the vendor now.',
     /** Android notifications on the waiter phone (P2-06b, WTR-005). */
     notification: {
       listeningTitle: 'Alerts for {name}',
@@ -2404,6 +2407,10 @@ export const en = {
       none: 'No backup has reached the cloud yet. The nightly backup is sent when the internet is there.',
       off: 'The Owner turned the cloud backup off. If this PC and the backup drive are both lost, the data is lost too.',
       notSetUp: 'This PC is not activated with the vendor yet, so nothing is sent to the cloud.',
+      escrowed:
+        'The vendor holds the backup key in escrow (since {when}), so the cloud backups can be restored onto a new PC once you are verified.',
+      notEscrowed:
+        'The backup key is not in the vendor’s escrow yet: keep the recovery key safe, or a new PC cannot read the cloud backups.',
     },
     inCloud: 'Also in the cloud',
     continuous: {
@@ -4261,6 +4268,8 @@ export const en = {
       cloudLast: 'Newest made {at}',
       cloudFailed: 'Upload failing since {at}',
       cloudOff: 'Turned off by the Owner',
+      keyEscrowed: '(key in escrow)',
+      keyNotEscrowed: '(key not in escrow)',
       devices: 'Devices',
       devicesConnected: '{connected} of {paired} connected',
       devicesPaired: '{paired} paired',
@@ -4341,6 +4350,29 @@ export const en = {
       saved: 'Saved. PCs get it with their next heartbeat.',
       applied: 'The PC holds these settings',
       waiting: 'Waiting for the PC to collect them',
+    },
+    cloudBackups: {
+      title: 'Backups in the cloud',
+      intro:
+        'The PC’s nightly backups, encrypted on the PC before they were sent: the vendor cannot read them. With the Owner verified, a restore code lets a new PC restore the newest one.',
+      loadFailed: 'The cloud backups could not be loaded.',
+      none: 'None yet.',
+      made: 'Made',
+      mb: '{size} MB',
+      key: 'Backup key',
+      issue: 'Issue a restore code',
+      issueIntro:
+        'Only once you have verified that you are speaking to the restaurant’s Owner (the vendor’s restore policy). The code works once, within 24 hours; the restaurant’s Owner is told it was issued.',
+      verification: 'How the Owner was verified',
+      verificationHint:
+        'For example: video call, Aadhaar seen; call back on the registered number.',
+      issueConfirm: 'Issue the code',
+      codeTitle: 'Restore code',
+      codeIntro:
+        'Read it to the Owner or the installer; it is not shown again. It works once, until {until}, on the new PC’s restore tool:',
+      code: 'Restore code',
+      command: 'node dist\\backups\\restore-cli.js cloud {code}',
+      done: 'Done',
     },
     diagnostics: {
       title: 'Diagnostics',

@@ -102,6 +102,26 @@ describe('[DATA-005] backup health', () => {
   });
 });
 
+describe('[DATA-003] the cloud’s retention (BRD §9.3: 30 daily + 12 monthly)', () => {
+  it('keeps the last 30 days and the newest backup of each of the last 12 months', () => {
+    // Every night for 500 days, to 3 October 2026.
+    const backups = nightly('2025-05-22', 500);
+    const kept = new Set(
+      backups
+        .map((backup) => backup.name)
+        .filter((name) => !backupsToRemove(backups, 30, 0, undefined, 12).includes(name)),
+    );
+    // 30 days (4 September to 3 October), and the last night of each month back to November
+    // 2025: twelve months counting October and September, which the days already cover.
+    expect(kept.size).toBe(30 + 10);
+    expect(kept.has('rp-2026-09-04')).toBe(true);
+    expect(kept.has('rp-2026-09-03')).toBe(false);
+    expect(kept.has('rp-2026-08-31')).toBe(true);
+    expect(kept.has('rp-2025-11-30')).toBe(true);
+    expect(kept.has('rp-2025-10-31')).toBe(false);
+  });
+});
+
 describe('[DATA-003] [DATA-005] cloud backup state', () => {
   const now = new Date('2026-10-03T12:00:00Z');
   const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60_000);

@@ -53,6 +53,7 @@ export const DEFAULT_VIBRATION: Readonly<Record<NotificationEvent, VibrationPatt
   LICENSE_STATE: 'ONE_SHORT',
   SUSPICIOUS_ACTIVITY: 'ONE_SHORT',
   SUPPORT_REQUEST: 'ONE_SHORT',
+  VENDOR_RESTORE_CODE: 'ONE_SHORT',
 };
 
 /** An escalated alert always buzzes three times: it has come to the manager. */

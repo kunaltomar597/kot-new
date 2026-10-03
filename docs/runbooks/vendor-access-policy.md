@@ -24,6 +24,7 @@ The Control Plane holds only what is needed to licence, bill, update and support
 | The restaurant's QR-relay credential, sealed, until its PC holds it         | VCP-002, VCP-008                                  |
 | The vendor's own audit log                                                  | SEC-018                                           |
 | Each restaurant's nightly backup file, encrypted on its PC with its own key | DATA-003: surviving the loss of the PC (P7-05d)   |
+| Each PC's backup key, wrapped by the vendor's KMS key (escrow)              | DATA-003, OI-10: restore onto a new PC (P7-05e)   |
 
 The Control Plane never receives order, bill, payment, customer or staff records. The heartbeat
 contract (`packages/contracts/src/control-plane/schemas.ts`) has no field for any of them. The
@@ -33,10 +34,9 @@ yet, so that a newer PC is never refused. For that reason, any change that adds 
 heartbeat must be checked against this policy in review.
 
 The cloud backups (DATA-003) hold the whole restaurant database, but encrypted on the restaurant's
-PC with the PC's backup key before they leave. The Control Plane stores them in India and never
-holds that key: vendor staff can list a PC's backups (when and how large), not read them. The key
-escrow that lets the vendor help restore onto a new PC, after the Owner is verified, is P7-05e and
-open item OI-10.
+PC with the PC's backup key before they leave. The Control Plane stores them in India. It holds
+that key only wrapped by the vendor's KMS key, which unwraps it only for a restore code (§3):
+vendor staff can list a PC's backups (when and how large), not read them.
 
 The QR relay holds the restaurant's published menu and the diners' orders in transit (P5). Vendor
 staff do not read relay data, except to diagnose a fault the restaurant has reported, through
@@ -63,9 +63,16 @@ Vendor staff see business data only through:
    bundle from the Control Plane. The restaurant's manager is then asked and must allow it. Without
    that consent nothing is sent.
 2. **Backups (DATA-003, P7-05).** Cloud backups are encrypted on the restaurant's PC before upload.
-   The vendor's escrowed copy of the key is released only on the Owner's own authenticated restore
-   request, and only to restore that restaurant's system. Vendor staff never decrypt a backup to
-   read it.
+   Each PC's backup key is escrowed wrapped by the vendor's KMS key, whose private half never
+   leaves the KMS (P7-05e). It is released only through a restore code:
+   - Support or the Super Admin issues it only after verifying, by the restore policy (OI-10),
+     that they are speaking to the restaurant's Owner, and records how;
+   - the code works once, within 24 hours, and only in the restore tool on a new PC, which gets
+     the key wrapped for a key it made itself;
+   - the restaurant's Owner is alerted on the POS and dashboard when a code is issued, and each
+     issue and release is in the vendor audit log;
+   - vendor staff never run the restore tool themselves and never decrypt a backup to read it.
+     The quarterly access review (§6) checks every restore code against its ticket.
 
 A bundle or restore is handled only for the ticket it was given for, and kept no longer than that
 ticket needs (at most 30 days for a diagnostics bundle). It is never copied to personal devices,
@@ -91,6 +98,7 @@ The Control Plane enforces what each role may do, deny by default (`vendorMay` i
 | Publish releases                                                         |      ✓      |            |         |         |           |
 | Push vendor settings and feature flags to PCs                            |      ✓      |            |         |         |           |
 | Ask a restaurant for diagnostics; open a bundle                          |      ✓      |     ✓      |    ✓    |         |           |
+| Issue a restore code for a restaurant's cloud backups (Owner verified)   |      ✓      |            |    ✓    |         |           |
 
 Give each person the narrowest role that fits their work. A second role for one person is not
 possible; when duties change, change the role and record why in the account change.
@@ -118,7 +126,8 @@ Every quarter (January, April, July, October), a Super Admin:
    Every other active account, except the reviewer's own, is disabled and its sessions end. At
    least one Super Admin is always kept.
 4. Checks the vendor audit log for unusual actions since the last review: reactivation codes,
-   re-binds, licence changes and account changes.
+   re-binds, restore codes and key releases (each against its ticket), licence changes and
+   account changes.
 5. Reviews the access of the infrastructure behind the Control Plane: the hosting account, the
    secret manager, the KMS key (manual task 23), the QR relay project and the code host. Each must
    have MFA and personal accounts.

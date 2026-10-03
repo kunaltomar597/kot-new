@@ -88,7 +88,8 @@
             "RELEASES_MANAGE",
             "USERS_MANAGE",
             "AUDIT_VIEW",
-            "REMOTE_CONFIG"
+            "REMOTE_CONFIG",
+            "BACKUP_RESTORE"
           ]
         }
       }
@@ -185,7 +186,8 @@
             "RELEASES_MANAGE",
             "USERS_MANAGE",
             "AUDIT_VIEW",
-            "REMOTE_CONFIG"
+            "REMOTE_CONFIG",
+            "BACKUP_RESTORE"
           ]
         }
       }

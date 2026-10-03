@@ -67,7 +67,8 @@ CP_BACKUP_S3_ACCESS_KEY_ID=<from the secret manager>
 CP_BACKUP_S3_SECRET_ACCESS_KEY=<from the secret manager>
 ```
 
-Optional: `CP_BACKUP_KEEP_DAILY` (14) and `CP_BACKUP_KEEP_WEEKLY` (8), the backups kept per PC.
+Optional: `CP_BACKUP_KEEP_DAILY` (30) and `CP_BACKUP_KEEP_MONTHLY` (12), the backups kept per PC
+(BRD §9.3).
 Deploy the Control Plane again.
 
 ## 4. Check it with a staging PC

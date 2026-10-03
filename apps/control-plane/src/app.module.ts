@@ -22,6 +22,8 @@ import { BillingService } from './billing/billing.service.js';
 import { CloudBackupsController } from './cloud-backups/cloud-backups.controller.js';
 import { CloudBackupsService, OBJECT_STORE } from './cloud-backups/cloud-backups.service.js';
 import { objectStoreFor } from './cloud-backups/object-store-for.js';
+import { BackupEscrowService, ESCROW_KEY } from './cloud-backups/backup-escrow.service.js';
+import { escrowKeySourceFor } from './cloud-backups/escrow-keys.js';
 import { ALERT_NOTIFIER, alertNotifierFor } from './fleet/alert-notifier.js';
 import { DiagnosticsController } from './diagnostics/diagnostics.controller.js';
 import { DiagnosticsService } from './diagnostics/diagnostics.service.js';
@@ -136,6 +138,8 @@ export class ControlPlaneModule {
         RemoteSettingsService,
         CloudBackupsService,
         { provide: OBJECT_STORE, useValue: objectStoreFor(config) },
+        BackupEscrowService,
+        { provide: ESCROW_KEY, useValue: escrowKeySourceFor(config) },
         { provide: ALERT_NOTIFIER, useValue: alertNotifierFor(config) },
         { provide: RELAY_PROVISIONER, useClass: PgRelayProvisioner },
         ReleasesService,

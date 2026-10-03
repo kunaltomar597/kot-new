@@ -21,6 +21,57 @@
     { "name": "vendor" }
   ],
   "paths": {
+    "/v1/backup-key-escrow": {
+      "put": {
+        "operationId": "escrowBackupKey",
+        "summary": "Escrow the PC’s backup key, wrapped with the vendor’s escrow key",
+        "description": "DATA-003, OI-10: sent when a heartbeat answer offers the escrow key. The Control Plane stores only the wrapped key; unwrapping needs the vendor’s KMS. Audited.",
+        "tags": ["backups"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EscrowBackupKeyRequest" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Escrowed (or already held)." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The escrow key changed: wrap it again.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "Escrow is not set up here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["DATA-003", "SEC-007"]
+      }
+    },
     "/v1/cloud-backups": {
       "get": {
         "operationId": "listCloudBackups",
@@ -228,6 +279,56 @@
         },
         "x-capability": "INSTALLATION",
         "x-requirements": ["DATA-003", "DATA-002"]
+      }
+    },
+    "/v1/cloud-restores": {
+      "post": {
+        "operationId": "releaseCloudRestore",
+        "summary": "Trade a restore code for the backup key and the cloud backups’ addresses",
+        "description": "The restore tool on a new PC (DATA-004). The key is unwrapped by the vendor’s KMS and wrapped again for the tool’s own public key, so it never crosses in the clear. The code works once. Rate-limited per address; audited.",
+        "tags": ["backups"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CloudRestoreRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The key and the backups.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CloudRestoreResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "Not a valid restore code, already used or expired.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "Too many attempts from this address.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "Escrow or the cloud backup is not set up here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["DATA-003", "DATA-004"]
       }
     },
     "/v1/diagnostics": {
@@ -1814,6 +1915,72 @@
         },
         "x-capability": "REMOTE_CONFIG",
         "x-requirements": ["UPD-010", "SEC-018"]
+      }
+    },
+    "/v1/vendor/installations/{id}/restore-codes": {
+      "post": {
+        "operationId": "issueRestoreCode",
+        "summary": "Issue a one-time restore code for a restaurant’s cloud backups",
+        "description": "After verifying the Owner (OI-10). The code releases the escrowed backup key to the restore tool on a new PC, once, within 24 hours. Audited with the reason and how the Owner was verified; the restaurant’s Owner is told at the PC’s next heartbeat.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RestoreCodeRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The code, shown once.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/RestoreCodeView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Nothing to restore: no cloud backup, or no escrowed key.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BACKUP_RESTORE",
+        "x-requirements": ["DATA-003", "DATA-004", "SEC-018"]
       }
     },
     "/v1/vendor/installations/{id}/revoke": {
@@ -3630,7 +3797,7 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           },
           "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "keyId": { "type": "string" },
           "status": { "$ref": "#/components/schemas/CloudBackupStatus" },
           "startedAt": {
@@ -3660,6 +3827,91 @@
           "status",
           "startedAt",
           "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CloudRestoreRequest": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "minLength": 16, "maxLength": 24 },
+          "publicKey": {
+            "type": "string",
+            "minLength": 400,
+            "maxLength": 1000,
+            "format": "base64",
+            "contentEncoding": "base64",
+            "pattern": "^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$"
+          }
+        },
+        "required": ["code", "publicKey"],
+        "additionalProperties": false
+      },
+      "CloudRestoreResponse": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationName": { "type": "string" },
+          "tenantName": { "type": "string" },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+                "wrappedKey": {
+                  "type": "string",
+                  "minLength": 300,
+                  "maxLength": 800,
+                  "format": "base64",
+                  "contentEncoding": "base64",
+                  "pattern": "^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$"
+                }
+              },
+              "required": ["keyId", "wrappedKey"],
+              "additionalProperties": false
+            }
+          },
+          "backups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileName": { "$ref": "#/components/schemas/CloudBackupFileName" },
+                "backupCreatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+                "url": { "type": "string", "minLength": 1 }
+              },
+              "required": ["fileName", "backupCreatedAt", "sizeBytes", "sha256", "keyId", "url"],
+              "additionalProperties": false
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "installationId",
+          "installationName",
+          "tenantName",
+          "keys",
+          "backups",
+          "expiresAt"
         ],
         "additionalProperties": false
       },
@@ -4106,6 +4358,39 @@
         "type": "string",
         "pattern": "^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$"
       },
+      "EscrowBackupKeyRequest": {
+        "type": "object",
+        "properties": {
+          "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+          "escrowKeyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+          "wrappedKey": {
+            "type": "string",
+            "minLength": 300,
+            "maxLength": 800,
+            "format": "base64",
+            "contentEncoding": "base64",
+            "pattern": "^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$"
+          }
+        },
+        "required": ["keyId", "escrowKeyId", "wrappedKey"],
+        "additionalProperties": false
+      },
+      "EscrowOffer": {
+        "type": "object",
+        "properties": {
+          "escrowKeyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+          "publicKey": {
+            "type": "string",
+            "minLength": 400,
+            "maxLength": 1000,
+            "format": "base64",
+            "contentEncoding": "base64",
+            "pattern": "^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$"
+          }
+        },
+        "required": ["escrowKeyId", "publicKey"],
+        "additionalProperties": false
+      },
       "FleetAlertKind": {
         "type": "string",
         "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
@@ -4284,6 +4569,16 @@
               { "type": "null" }
             ]
           },
+          "backupKeyEscrowedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
           "devices": {
             "type": "array",
             "items": {
@@ -4357,6 +4652,7 @@
           "disk",
           "backup",
           "cloudBackupAt",
+          "backupKeyEscrowedAt",
           "devices",
           "errorCount",
           "licenceState",
@@ -4630,6 +4926,18 @@
             },
             "required": ["digest"],
             "additionalProperties": false
+          },
+          "backupKeyId": {
+            "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{16}$" }, { "type": "null" }]
+          },
+          "restoreCodesSeen": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
           }
         },
         "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -4697,6 +5005,16 @@
           "vendorSettings": {
             "default": null,
             "anyOf": [{ "$ref": "#/components/schemas/PushedSettings" }, { "type": "null" }]
+          },
+          "backupKeyEscrow": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/EscrowOffer" }, { "type": "null" }]
+          },
+          "restoreCodes": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RestoreCodeNotice" }
           }
         },
         "required": [
@@ -4709,7 +5027,9 @@
           "relayCredential",
           "auditCheck",
           "diagnosticsRequests",
-          "vendorSettings"
+          "vendorSettings",
+          "backupKeyEscrow",
+          "restoreCodes"
         ],
         "additionalProperties": false
       },
@@ -4774,6 +5094,16 @@
           "vendorSettings": {
             "default": null,
             "anyOf": [{ "$ref": "#/components/schemas/PushedSettings" }, { "type": "null" }]
+          },
+          "backupKeyEscrow": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/EscrowOffer" }, { "type": "null" }]
+          },
+          "restoreCodes": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RestoreCodeNotice" }
           }
         },
         "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
@@ -5436,6 +5766,52 @@
         "propertyNames": { "type": "string", "maxLength": 80 },
         "additionalProperties": {}
       },
+      "RestoreCodeNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "issuedBy": { "type": "string", "maxLength": 120 },
+          "reason": { "type": "string", "maxLength": 500 }
+        },
+        "required": ["id", "issuedAt", "issuedBy", "reason"],
+        "additionalProperties": false
+      },
+      "RestoreCodeRequest": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string", "minLength": 3, "maxLength": 500 },
+          "ownerVerification": { "type": "string", "minLength": 3, "maxLength": 500 }
+        },
+        "required": ["reason", "ownerVerification"],
+        "additionalProperties": false
+      },
+      "RestoreCodeView": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$" },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["code", "installationId", "expiresAt"],
+        "additionalProperties": false
+      },
       "SemVer": {
         "type": "string",
         "maxLength": 64,
@@ -5463,7 +5839,7 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           },
           "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 2199023255552 },
-          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
         },
         "required": ["fileName", "backupCreatedAt", "sizeBytes", "sha256", "keyId"],
@@ -5779,7 +6155,8 @@
           "RELEASES_MANAGE",
           "USERS_MANAGE",
           "AUDIT_VIEW",
-          "REMOTE_CONFIG"
+          "REMOTE_CONFIG",
+          "BACKUP_RESTORE"
         ]
       },
       "VendorDiagnosticsDetail": {

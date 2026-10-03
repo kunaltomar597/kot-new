@@ -16,6 +16,11 @@ import {
 import {
   CloudBackupListResponse,
   CloudBackupParams,
+  CloudRestoreRequest,
+  CloudRestoreResponse,
+  EscrowBackupKeyRequest,
+  RestoreCodeRequest,
+  RestoreCodeView,
   CompleteCloudBackupRequest,
   CloudBackupView,
   StartCloudBackupRequest,
@@ -999,6 +1004,72 @@ export const CONTROL_PLANE_ROUTES = [
       200: { description: 'The backups.', schema: CloudBackupListResponse },
       ...vendorErrors,
       404: { description: 'No such installation.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'escrowBackupKey',
+    method: 'PUT',
+    path: '/v1/backup-key-escrow',
+    summary: 'Escrow the PC’s backup key, wrapped with the vendor’s escrow key',
+    description:
+      'DATA-003, OI-10: sent when a heartbeat answer offers the escrow key. The Control Plane ' +
+      'stores only the wrapped key; unwrapping needs the vendor’s KMS. Audited.',
+    tags: ['backups'],
+    requirements: ['DATA-003', 'SEC-007'],
+    capability: 'INSTALLATION',
+    request: { body: EscrowBackupKeyRequest },
+    responses: {
+      204: { description: 'Escrowed (or already held).' },
+      ...signedErrors,
+      409: { description: 'The escrow key changed: wrap it again.', schema: ApiError },
+      503: { description: 'Escrow is not set up here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'issueRestoreCode',
+    method: 'POST',
+    path: '/v1/vendor/installations/:id/restore-codes',
+    summary: 'Issue a one-time restore code for a restaurant’s cloud backups',
+    description:
+      'After verifying the Owner (OI-10). The code releases the escrowed backup key to the ' +
+      'restore tool on a new PC, once, within 24 hours. Audited with the reason and how the ' +
+      'Owner was verified; the restaurant’s Owner is told at the PC’s next heartbeat.',
+    tags: ['vendor'],
+    requirements: ['DATA-003', 'DATA-004', 'SEC-018'],
+    capability: 'BACKUP_RESTORE',
+    request: { params: VendorInstallationParams, body: RestoreCodeRequest },
+    responses: {
+      201: { description: 'The code, shown once.', schema: RestoreCodeView },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
+      409: {
+        description: 'Nothing to restore: no cloud backup, or no escrowed key.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'releaseCloudRestore',
+    method: 'POST',
+    path: '/v1/cloud-restores',
+    summary: 'Trade a restore code for the backup key and the cloud backups’ addresses',
+    description:
+      'The restore tool on a new PC (DATA-004). The key is unwrapped by the vendor’s KMS and ' +
+      'wrapped again for the tool’s own public key, so it never crosses in the clear. The code ' +
+      'works once. Rate-limited per address; audited.',
+    tags: ['backups'],
+    requirements: ['DATA-003', 'DATA-004'],
+    capability: 'PUBLIC',
+    request: { body: CloudRestoreRequest },
+    responses: {
+      200: { description: 'The key and the backups.', schema: CloudRestoreResponse },
+      400: { description: 'The request does not match the contract.', schema: ApiError },
+      403: {
+        description: 'Not a valid restore code, already used or expired.',
+        schema: ApiError,
+      },
+      429: { description: 'Too many attempts from this address.', schema: ApiError },
+      503: { description: 'Escrow or the cloud backup is not set up here.', schema: ApiError },
     },
   },
   {

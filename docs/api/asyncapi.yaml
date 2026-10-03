@@ -1503,6 +1503,7 @@ components:
         - LICENSE_STATE
         - SUSPICIOUS_ACTIVITY
         - SUPPORT_REQUEST
+        - VENDOR_RESTORE_CODE
     OrderApproved:
       type: object
       properties:

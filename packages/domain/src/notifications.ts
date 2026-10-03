@@ -22,6 +22,8 @@ export const NOTIFICATION_EVENTS = [
   'SUSPICIOUS_ACTIVITY',
   /** Vendor support asks for diagnostics; a manager allows or declines it (UPD-008, P7-08b). */
   'SUPPORT_REQUEST',
+  /** The vendor issued a code that opens this restaurant's cloud backups (DATA-003, P7-05e). */
+  'VENDOR_RESTORE_CODE',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
@@ -169,6 +171,8 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     false,
     'UNTIL_RESOLVED',
   ),
+  // Not in Appendix C: the Owner hears whenever the vendor can open the backups (OI-10).
+  VENDOR_RESTORE_CODE: rule(['OWNER'], ['POS', 'DASHBOARD'], null, false, 'NONE'),
 };
 
 /** A manager's change to one event's rule (NTF-002); anything left out keeps the default. */

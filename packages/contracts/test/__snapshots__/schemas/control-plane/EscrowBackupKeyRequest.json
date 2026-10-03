@@ -1,0 +1,36 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "escrowKeyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "wrappedKey": {
+        "type": "string",
+        "minLength": 300,
+        "maxLength": 800,
+        "format": "base64",
+        "contentEncoding": "base64",
+        "pattern": "^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$"
+      }
+    },
+    "required": ["keyId", "escrowKeyId", "wrappedKey"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "escrowKeyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "wrappedKey": {
+        "type": "string",
+        "minLength": 300,
+        "maxLength": 800,
+        "format": "base64",
+        "contentEncoding": "base64",
+        "pattern": "^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$"
+      }
+    },
+    "required": ["keyId", "escrowKeyId", "wrappedKey"],
+    "additionalProperties": false
+  }
+}

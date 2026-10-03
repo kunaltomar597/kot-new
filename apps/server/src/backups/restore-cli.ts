@@ -7,6 +7,7 @@ import { type AppConfig, loadConfig } from '../config/app-config.js';
 import { verifyBackupFile } from './backup-contents.js';
 import { readBackupHeader } from './backup-file.js';
 import { join } from 'node:path';
+import { restoreFromCloud } from './cloud-restore.js';
 import { runPendingRestore } from './pending-restore.js';
 import { restorePointInTime } from './point-in-time.js';
 import { parseRecoveryKey } from './recovery-key.js';
@@ -16,6 +17,7 @@ const USAGE = `Usage:
   node dist/backups/restore-cli.js verify <backup file>
   node dist/backups/restore-cli.js restore <backup file>
   node dist/backups/restore-cli.js pitr <time | latest> [<backup folder> ...]
+  node dist/backups/restore-cli.js cloud <restore code>
   node dist/backups/restore-cli.js pending
 
 verify   checks a backup end to end and says what it holds.
@@ -25,6 +27,8 @@ pitr     restores the database to a moment (an ISO time such as 2026-10-03T14:30
          the latest archived change, from the continuous backup: the data drive's, then each
          backup folder given (the second location's rp-backups folder). Photos, TLS files and
          secrets come from the nightly backup before that moment. Stop the server first.
+cloud    restores the newest cloud backup onto this (new) PC, with the restore code the vendor gave
+         the Owner after verifying them. Needs RP_CONTROL_PLANE_URL. Stop the server first.
 pending  runs a restore requested from the System page (the Windows service runs it before the
          server starts).
 
@@ -131,6 +135,27 @@ export async function runRestoreCli(
       log(`The database as it was before is kept as ${result.previousDatabase}.`);
     }
     log('Start the restaurant server. Every device refreshes everything when it reconnects.');
+    return 0;
+  }
+  if (command === 'cloud' && file !== undefined) {
+    if (config.controlPlaneUrl === undefined) {
+      log('Set RP_CONTROL_PLANE_URL, the vendor’s address, to restore from the cloud.');
+      return 2;
+    }
+    const result = await restoreFromCloud({
+      controlPlaneUrl: config.controlPlaneUrl,
+      code: file,
+      databaseUrl: config.databaseUrl,
+      adminUrl: adminUrlOf(config),
+      dataDir: config.dataDir,
+      secrets: createSecretStore(config),
+      pgBin: config.pgBin,
+      log,
+    });
+    log(
+      `Restored ${result.tenantName} from ${result.fileName}, the backup made ${result.info.createdAt}.`,
+    );
+    log('Ask the vendor to move the licence to this PC, then start the restaurant server.');
     return 0;
   }
   if (command === 'pending') {

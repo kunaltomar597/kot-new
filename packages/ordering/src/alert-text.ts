@@ -82,6 +82,13 @@ function detailOf(alert: AlertView, t: Translator): string | null {
       const reason = textOf(payload.reason);
       return name === null || reason === null ? null : t('alerts.supportRequest', { name, reason });
     }
+    case 'VENDOR_RESTORE_CODE': {
+      const name = textOf(payload.issuedBy);
+      const reason = textOf(payload.reason);
+      return name === null || reason === null
+        ? null
+        : t('alerts.vendorRestoreCode', { name, reason });
+    }
     case 'DEVICE_LOW_BATTERY_OR_OFFLINE': {
       const device =
         textOf(payload.deviceName) ??
