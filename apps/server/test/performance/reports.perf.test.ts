@@ -9,7 +9,7 @@ import { PrismaService } from '../../src/database/prisma.service.js';
 import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
-import { generateYear } from './generate-year.js';
+import { seedDesignCapacity } from './design-capacity.js';
 
 /**
  * RPT-018: any report over twelve months at design capacity (§7.2) in five seconds or less,
@@ -62,65 +62,12 @@ describe.skipIf(!ENABLED)('[RPT-018] twelve months at design capacity', () => {
     prisma = app.get(PrismaService);
     kit = await createAuthKit(app);
     manager = await signIn(app, kit, 'MANAGER');
-    const base = { restaurantId: kit.restaurantId };
-    const station = await prisma.station.create({
-      data: { ...base, name: 'Kitchen', mode: 'SCREEN' },
-    });
-    const tax = await prisma.taxGroup.create({
-      data: {
-        ...base,
-        name: 'GST 5 %',
-        sacCode: '996331',
-        components: {
-          create: [
-            { ...base, code: 'CGST', rateBp: 250 },
-            { ...base, code: 'SGST', rateBp: 250 },
-          ],
-        },
-      },
-    });
-    const categories = await Promise.all(
-      Array.from({ length: 20 }, (_, index) =>
-        prisma.category.create({ data: { ...base, name: `Category ${String(index)}` } }),
-      ),
-    );
-    await prisma.item.createMany({
-      data: Array.from({ length: 1_000 }, (_, index) => ({
-        ...base,
-        categoryId: categories[index % categories.length]?.id ?? '',
-        name: `Dish ${String(index)}`,
-        basePrice: 10_000 + (index % 30) * 1_000,
-        taxGroupId: tax.id,
-        foodType: 'VEG' as const,
-        stationId: station.id,
-      })),
-    });
-    const section = await prisma.section.create({ data: { ...base, name: 'Hall' } });
-    await prisma.diningTable.createMany({
-      data: Array.from({ length: 100 }, (_, index) => ({
-        ...base,
-        sectionId: section.id,
-        label: `T${String(index + 1)}`,
-      })),
-    });
-    const series = await prisma.invoiceSeries.create({
-      data: { ...base, name: 'Main', prefix: 'INV', isDefault: true },
-    });
     const started = performance.now();
-    const generated = await generateYear(
-      prisma,
-      {
-        restaurantId: kit.restaurantId,
-        deviceId: kit.deviceId,
-        waiterId: kit.staff.WAITER,
-        cashierId: kit.staff.CASHIER,
-        managerId: kit.staff.MANAGER,
-        taxGroupId: tax.id,
-        stationId: station.id,
-        seriesId: series.id,
-      },
-      { lastDay: LAST_DAY, days: DAYS, ordersPerDay: ORDERS_A_DAY },
-    );
+    const generated = await seedDesignCapacity(app, kit, {
+      lastDay: LAST_DAY,
+      days: DAYS,
+      ordersPerDay: ORDERS_A_DAY,
+    });
     firstDay = generated.firstDay;
     if (HOLD !== undefined) {
       writeFileSync(HOLD, `${database.url}\n${kit.restaurantId}\n${firstDay}\n`);

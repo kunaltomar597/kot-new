@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { once } from 'node:events';
 import { createReadStream } from 'node:fs';
 import { lstat, readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
@@ -123,14 +122,27 @@ export interface VerifiedBackup {
 /** Writes to a program's input until it stops reading (pg_restore --list reads only the start). */
 function inputOf(stdin: NodeJS.WritableStream & { destroyed: boolean; writableEnded: boolean }) {
   let closed = false;
-  stdin.on('close', () => {
+  const stop = () => {
     closed = true;
-  });
+  };
+  stdin.on('close', stop);
+  // EPIPE once it stops reading: expected, and its exit status says whether the dump was good.
+  stdin.on('error', stop);
   return {
     async write(bytes: Buffer): Promise<void> {
       if (closed || stdin.destroyed) return;
       if (!stdin.write(bytes)) {
-        await Promise.race([once(stdin, 'drain'), once(stdin, 'close')]);
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            stdin.off('drain', done);
+            stdin.off('close', done);
+            stdin.off('error', done);
+            resolve();
+          };
+          stdin.on('drain', done);
+          stdin.on('close', done);
+          stdin.on('error', done);
+        });
       }
     },
     end(): void {

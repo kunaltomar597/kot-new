@@ -365,7 +365,7 @@ Recommended next WPs (dependencies met):
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
-  - [ ] P7-05b Restore
+  - [x] P7-05b Restore
   - [ ] P7-05c Continuous WAL archiving
   - [ ] P7-05d Cloud backup and key escrow
 - [ ] P7-06 Data lifecycle
@@ -631,6 +631,39 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-05b):
+
+531. A restore goes into a new database (`<name>_restoring`), owned by `rp_owner`, and is
+     switched in by renaming. So the same steps serve the same PC and a new PC, and a failure
+     never touches the live database.
+     - The database there before is kept as `<name>_before_<time>`, to go back to. It is dropped
+       when it held no restaurant (a fresh install).
+     - Secrets, photos and TLS files are swapped the same way: the earlier ones are kept, and are
+       put back if a later step fails.
+532. `pg_restore` runs with `--jobs` (up to 4) rather than one transaction: about twice as fast
+     (19 s against 11 s for 1.3 GB), and the separate database already makes it all-or-nothing.
+533. The dump's default privileges name the role that ran the migrations on the old PC. They are
+     restored separately and rewritten to `FOR ROLE rp_owner`. Everything else is restored as
+     `rp_owner`, with its grants, so AUD-004's missing DELETE comes back.
+534. The Owner's one-click restore on the same PC needs DATA_ADMIN, which means the Owner with a
+     fresh second factor (AUTH-006), and a reason.
+     - The server checks the file is there and opens with this PC's key.
+     - It saves the request and exits with code 75. The Windows service runs
+       `restore-cli pending` before starting the server again (P0-16).
+     - The request is removed before the restore starts, so a failed restore runs once and its
+       outcome shows on the System page.
+     - The server holds the administrator's database password only when `RP_ADMIN_DATABASE_URL`
+       is set. That is meant for development, not for the restaurant PC.
+535. The backup recovery key (`RPK1-…`, base32 with a 2-byte check) can be shown to the Owner,
+     with a fresh second factor; this is audited.
+     - It lets the backups be read on a new PC even without the vendor's escrow (P7-05d), in
+       line with "data never withheld".
+     - It is not in the BRD. It is the Owner's own copy of their key, alongside the escrow.
+       **Question for the Business Owner**: keep it, or rely on the escrow only? Default: keep.
+536. A restored PC keeps the backup's installation key (its identity with the vendor), but keeps
+     its own backup key. So a new PC must not be activated with a new code before restoring; the
+     vendor moves the licence instead (LIC-004).
 
 Decided 2026-10-03 (P7-05a):
 
@@ -2726,6 +2759,52 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-05b Restore
+
+Built:
+
+- server `src/backups/`:
+  - `restore.ts`, `restoreBackup`: verify, unpack, refuse while in use, restore to
+    `_restoring`, apply default privileges for `rp_owner`, remove the stream id, record, swap
+    secrets, files and the database, undo on failure;
+  - `pending-restore.ts`: the request and outcome files, `runPendingRestore`;
+  - `restore-cli.ts`: `verify`, `restore` and `pending`; `pnpm backup:restore`;
+  - `recovery-key.ts`.
+- `FileSecretStore.replace` and `WritableSecretStore`.
+- `ServerLifecycle` (exit code 75), and the restore before start-up in `main.ts` when
+  `RP_ADMIN_DATABASE_URL` is set.
+- `BackupService`: `requestRestore`, `recoveryKey`, and `auditRestore` at start-up.
+- Routes `POST /backups/restore` and `/backups/recovery-key` (DATA_ADMIN). `BackupsResponse`
+  gains `restorePending` and `lastRestore`.
+- console `BackupRestore.tsx` (the restore dialog and the recovery key, Owner only) in the Backups
+  panel.
+- docs:
+  - the runbook's recovery key, restore and going-back sections;
+  - `docs/build/restore-timing.md`;
+  - `manual-tasks/25-restore-rehearsal.md`.
+- The design-capacity seeding is shared by the performance runs (`test/performance/design-capacity.ts`).
+
+Tests:
+
+- server unit +2 (recovery key).
+- server integration +3:
+  - the new PC, with the RTO and RPO measured: CLI restore with the recovery key, PIN and device
+    still work, later data gone, new stream id, audited, grants, ownership and default privileges;
+  - refused for a damaged file, the wrong key, or a database in use, with nothing changed;
+  - the Owner's one-click restore: manager 403, stale second factor 403, 404, recovery key,
+    request, audit, restart requested, pending restore once, previous database kept, restored
+    data, audited with the Owner.
+- `restore.perf.test.ts` (opt-in).
+- console +2.
+
+Gotchas:
+
+- PostgreSQL 15+ gives `public` to the database owner, so the restore database is created with
+  `OWNER rp_owner`.
+- `events.once(stdin, 'drain')` rejects on EPIPE when `pg_restore --list` stops reading. Larger
+  dumps hit this; wait on drain, close or error instead.
+- Vitest hides `console.log` from passing tests. Use `--silent=false` to see the timing report.
 
 ### 2026-10-03: P7-05a Encrypted local backups
 
@@ -5959,6 +6038,12 @@ Notes for the next session:
 - P4 (manager dashboard) or the device settings screen should show the CA fingerprint so people
   can compare it without the log.
 - P7-05: backups must include `<RP_DATA_DIR>/tls` and the secret store. (Done in P7-05a.)
+- P0-16 (from P7-05): the installer sets `RP_PG_BIN` and ships `pg_dump.exe` and
+  `pg_restore.exe`.
+  - The DPAPI store provides `backup-key` and implements `replace`.
+  - The service runs `restore-cli pending` (with the administrator's connection) before starting
+    the server, and restarts it on exit code 75.
+  - It never gives the server `RP_ADMIN_DATABASE_URL`.
 
 ### 2026-09-26: P0-14b web console shell
 

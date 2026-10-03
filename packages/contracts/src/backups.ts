@@ -56,9 +56,54 @@ export const BackupsResponse = z.object({
   runs: z.array(BackupRunView),
   /** Which backup key this PC's backups need (not the key). */
   keyId: z.string(),
+  /** A restore was asked for and runs when the server restarts (P7-05b). */
+  restorePending: z.boolean(),
+  /** How the last restore on this PC went, if there was one. */
+  lastRestore: z
+    .object({
+      at: Timestamp,
+      ok: z.boolean(),
+      error: z.string().nullable(),
+      backupCreatedAt: Timestamp.nullable(),
+      /** The database as it was before, kept to go back to. */
+      previousDatabase: z.string().nullable(),
+    })
+    .nullable(),
 });
 export type BackupsResponse = z.infer<typeof BackupsResponse>;
 
 /** "Back up now": the backup started, running in the background. */
 export const StartBackupResponse = z.object({ run: BackupRunView });
 export type StartBackupResponse = z.infer<typeof StartBackupResponse>;
+
+/** A backup file's name as the server makes it. */
+export const BackupFileName = z.string().regex(/^rp-backup-\d{8}T\d{6}Z-(nightly|manual)\.rpbk$/);
+
+/**
+ * Restore this PC from one of its backups (DATA-004, P7-05b): the Owner, with a fresh second
+ * factor and a reason. Everything after the backup's time is lost; the server restarts to do it.
+ */
+export const RestoreBackupRequest = z.strictObject({
+  location: BackupLocation,
+  fileName: BackupFileName,
+  reason: z.string().trim().min(3).max(200),
+});
+export type RestoreBackupRequest = z.infer<typeof RestoreBackupRequest>;
+
+export const RestoreBackupResponse = z.object({
+  requestedAt: Timestamp,
+  /** When the backup being restored was made: what the restaurant goes back to. */
+  backupCreatedAt: Timestamp,
+});
+export type RestoreBackupResponse = z.infer<typeof RestoreBackupResponse>;
+
+/**
+ * The backup recovery key (P7-05b): the backup key written out for the Owner to keep on paper, to
+ * read the backups on a new PC. Shown to the Owner only, with a fresh second factor; audited.
+ */
+export const RecoveryKeyResponse = z.object({
+  /** `RPK1-XXXXX-...`: 11 groups of five letters and digits. */
+  recoveryKey: z.string(),
+  keyId: z.string(),
+});
+export type RecoveryKeyResponse = z.infer<typeof RecoveryKeyResponse>;

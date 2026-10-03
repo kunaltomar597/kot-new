@@ -104,7 +104,37 @@
           ]
         }
       },
-      "keyId": { "type": "string" }
+      "keyId": { "type": "string" },
+      "restorePending": { "type": "boolean" },
+      "lastRestore": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "ok": { "type": "boolean" },
+              "error": { "type": ["string", "null"] },
+              "backupCreatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "previousDatabase": { "type": ["string", "null"] }
+            },
+            "required": ["at", "ok", "error", "backupCreatedAt", "previousDatabase"]
+          },
+          { "type": "null" }
+        ]
+      }
     },
     "required": [
       "health",
@@ -113,7 +143,9 @@
       "running",
       "locations",
       "runs",
-      "keyId"
+      "keyId",
+      "restorePending",
+      "lastRestore"
     ]
   },
   "output": {
@@ -224,7 +256,38 @@
           "additionalProperties": false
         }
       },
-      "keyId": { "type": "string" }
+      "keyId": { "type": "string" },
+      "restorePending": { "type": "boolean" },
+      "lastRestore": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "ok": { "type": "boolean" },
+              "error": { "type": ["string", "null"] },
+              "backupCreatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "previousDatabase": { "type": ["string", "null"] }
+            },
+            "required": ["at", "ok", "error", "backupCreatedAt", "previousDatabase"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      }
     },
     "required": [
       "health",
@@ -233,7 +296,9 @@
       "running",
       "locations",
       "runs",
-      "keyId"
+      "keyId",
+      "restorePending",
+      "lastRestore"
     ],
     "additionalProperties": false
   }

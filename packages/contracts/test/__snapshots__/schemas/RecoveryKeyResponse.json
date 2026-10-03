@@ -1,0 +1,13 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "recoveryKey": { "type": "string" }, "keyId": { "type": "string" } },
+    "required": ["recoveryKey", "keyId"]
+  },
+  "output": {
+    "type": "object",
+    "properties": { "recoveryKey": { "type": "string" }, "keyId": { "type": "string" } },
+    "required": ["recoveryKey", "keyId"],
+    "additionalProperties": false
+  }
+}

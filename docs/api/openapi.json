@@ -974,6 +974,108 @@
         "x-requirements": ["DATA-002", "AUD-001"]
       }
     },
+    "/api/v1/backups/recovery-key": {
+      "post": {
+        "operationId": "showRecoveryKey",
+        "summary": "The backup recovery key, for the Owner to keep",
+        "description": "DATA-004: the key that reads this PC’s backups, written out to keep on paper away from the PC. The Owner, with a fresh second factor. Audited.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The recovery key.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecoveryKeyResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["DATA-004", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/backups/restore": {
+      "post": {
+        "operationId": "restoreBackup",
+        "summary": "Restore this PC from one of its backups",
+        "description": "DATA-004: the Owner, with a fresh second factor and a reason. The backup is checked, the request saved and the server restarts; the restore runs before it starts again. Audited.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RestoreBackupRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The server restarts to restore.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RestoreBackupResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "There is no such backup there.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "A backup is running, or no second location is set.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The backup was made with another key.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["DATA-004", "AUTH-006", "AUD-001"]
+      }
+    },
     "/api/v1/bills": {
       "post": {
         "operationId": "openBill",
@@ -13266,6 +13368,10 @@
         "required": ["valid", "checkedEntries", "head", "verifiedAt"],
         "additionalProperties": false
       },
+      "BackupFileName": {
+        "type": "string",
+        "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
+      },
       "BackupHealth": { "type": "string", "enum": ["OK", "FAILED", "OVERDUE", "NONE"] },
       "BackupKind": { "type": "string", "enum": ["NIGHTLY", "MANUAL"] },
       "BackupLocation": { "type": "string", "enum": ["DATA_DRIVE", "SECOND"] },
@@ -13346,7 +13452,27 @@
             }
           },
           "runs": { "type": "array", "items": { "$ref": "#/components/schemas/BackupRunView" } },
-          "keyId": { "type": "string" }
+          "keyId": { "type": "string" },
+          "restorePending": { "type": "boolean" },
+          "lastRestore": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "at": { "$ref": "#/components/schemas/Timestamp" },
+                  "ok": { "type": "boolean" },
+                  "error": { "type": ["string", "null"] },
+                  "backupCreatedAt": {
+                    "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                  },
+                  "previousDatabase": { "type": ["string", "null"] }
+                },
+                "required": ["at", "ok", "error", "backupCreatedAt", "previousDatabase"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
         },
         "required": [
           "health",
@@ -13355,7 +13481,9 @@
           "running",
           "locations",
           "runs",
-          "keyId"
+          "keyId",
+          "restorePending",
+          "lastRestore"
         ],
         "additionalProperties": false
       },
@@ -20234,6 +20362,12 @@
         "required": ["events"],
         "additionalProperties": false
       },
+      "RecoveryKeyResponse": {
+        "type": "object",
+        "properties": { "recoveryKey": { "type": "string" }, "keyId": { "type": "string" } },
+        "required": ["recoveryKey", "keyId"],
+        "additionalProperties": false
+      },
       "RefreshRequest": {
         "type": "object",
         "properties": { "refreshToken": { "type": "string", "minLength": 20, "maxLength": 200 } },
@@ -20570,6 +20704,25 @@
           "businessDayCutoff",
           "updatedAt"
         ],
+        "additionalProperties": false
+      },
+      "RestoreBackupRequest": {
+        "type": "object",
+        "properties": {
+          "location": { "$ref": "#/components/schemas/BackupLocation" },
+          "fileName": { "$ref": "#/components/schemas/BackupFileName" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["location", "fileName", "reason"],
+        "additionalProperties": false
+      },
+      "RestoreBackupResponse": {
+        "type": "object",
+        "properties": {
+          "requestedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "backupCreatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["requestedAt", "backupCreatedAt"],
         "additionalProperties": false
       },
       "RevokeDeviceRequest": {

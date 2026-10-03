@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, open } from 'node:fs/promises';
+import { copyFile, mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /** Injection token for the `SecretStore`. */
@@ -37,6 +37,18 @@ export interface SecretStore {
   get(name: SecretName): Promise<Buffer>;
 }
 
+/** A store a restore can write to (DATA-004, P7-05b). */
+export interface WritableSecretStore extends SecretStore {
+  /**
+   * Replaces these secrets with a backup's, keeping the ones there before under `keepAs`.
+   * Returns a function that puts the earlier ones back.
+   */
+  replace(
+    values: Partial<Record<SecretName, Buffer>>,
+    keepAs: string,
+  ): Promise<() => Promise<void>>;
+}
+
 function envName(name: SecretName): string {
   return `RP_SECRET_${name.toUpperCase().replaceAll('-', '_')}`;
 }
@@ -47,7 +59,7 @@ function envName(name: SecretName): string {
  * For development, tests and CI. On the restaurant PC the installer wires the Windows DPAPI store
  * instead (P0-16, SEC-006).
  */
-export class FileSecretStore implements SecretStore {
+export class FileSecretStore implements WritableSecretStore {
   private readonly cache = new Map<SecretName, Promise<Buffer>>();
 
   constructor(
@@ -64,6 +76,56 @@ export class FileSecretStore implements SecretStore {
       this.cache.set(name, secret);
     }
     return secret;
+  }
+
+  async replace(
+    values: Partial<Record<SecretName, Buffer>>,
+    keepAs: string,
+  ): Promise<() => Promise<void>> {
+    if (!/^[a-z0-9-]+$/.test(keepAs)) throw new Error(`Unsafe folder name: ${keepAs}`);
+    const names = SECRET_NAMES.filter((name) => values[name] !== undefined);
+    for (const name of names) {
+      const fromEnv = this.env[envName(name)];
+      if (fromEnv !== undefined && fromEnv !== '') {
+        throw new Error(`${envName(name)} is set, so ${name} cannot be restored. Unset it first.`);
+      }
+    }
+    const kept = join(this.directory, keepAs);
+    await mkdir(kept, { recursive: true, mode: 0o700 });
+    const replaced: { name: SecretName; hadOne: boolean }[] = [];
+    const undo = async () => {
+      for (const { name, hadOne } of replaced.reverse()) {
+        const path = join(this.directory, `${name}.key`);
+        if (hadOne) await copyFile(join(kept, `${name}.key`), path);
+        else await rm(path, { force: true });
+        this.cache.delete(name);
+      }
+    };
+    try {
+      for (const name of names) {
+        const value = values[name];
+        if (value === undefined || value.length < SECRET_BYTES) {
+          throw new Error(`The restored ${name} is too short`);
+        }
+        const path = join(this.directory, `${name}.key`);
+        const hadOne = await copyFile(path, join(kept, `${name}.key`)).then(
+          () => true,
+          (error: unknown) => {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+            throw error;
+          },
+        );
+        replaced.push({ name, hadOne });
+        // Written beside it, then renamed over it: never half a key.
+        await writeFile(`${path}.new`, value.subarray(0, SECRET_BYTES), { mode: 0o600 });
+        await rename(`${path}.new`, path);
+        this.cache.delete(name);
+      }
+    } catch (error) {
+      await undo();
+      throw error;
+    }
+    return undo;
   }
 
   private async load(name: SecretName): Promise<Buffer> {
@@ -100,6 +162,6 @@ export class FileSecretStore implements SecretStore {
  * The installation's secret store: files under `<dataDir>/secrets` for now; the installer swaps in
  * the Windows DPAPI store (P0-16, SEC-006).
  */
-export function createSecretStore(config: { readonly dataDir: string }): SecretStore {
+export function createSecretStore(config: { readonly dataDir: string }): WritableSecretStore {
   return new FileSecretStore(join(config.dataDir, 'secrets'));
 }

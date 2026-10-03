@@ -1,8 +1,7 @@
 # Backups
 
-How the restaurant PC backs itself up (DATA-002, DATA-005, SEC-007). Restoring a backup is in
-P7-05b, continuous WAL archiving in P7-05c and the cloud copy in P7-05d. Each will add its section
-here.
+How the restaurant PC backs itself up (DATA-002, DATA-005, SEC-007) and how a backup is restored
+(DATA-004). Continuous WAL archiving (P7-05c) and the cloud copy (P7-05d) will add their sections.
 
 ## What a backup holds
 
@@ -110,24 +109,115 @@ Common causes:
   `C:\Program Files\PostgreSQL\16\bin`. Unset, they are looked up on the PATH.
 - `RP_BACKUPS=off`: turns the nightly backup off, for development and the end-to-end tests where
   `pg_dump` may be missing. Refused in production. "Back up now" still works.
+- `RP_ADMIN_DATABASE_URL`: a role that may create, rename and drop databases, used by the
+  restore tool. The server needs it only to run a requested restore itself. Leave it unset for the
+  server and let the Windows service run `restore-cli pending` before starting it, so the everyday
+  server never holds the administrator's password.
+- The Windows service restarts the server when it exits with code 75 (a restore was asked for).
+- The DPAPI store must support `replace` (writing a backup's secrets during a restore), as
+  `FileSecretStore` does.
 - The database role in `DATABASE_URL` must be able to read every table (`pg_dump`). The password
   goes to `pg_dump` through its environment, never its command line.
 - The DPAPI secret store must provide `backup-key` (32 random bytes, made at installation).
 
+## The recovery key
+
+A backup can only be read with the backup key of the PC that made it. The key stays on that PC,
+in the DPAPI store. If the PC is lost, the backups on the USB drive or NAS need the key from
+somewhere else:
+
+- **The Owner's recovery key.** On the System page, "Show the recovery key" (Owner only, with a
+  fresh second factor, audited as `BACKUP_RECOVERY_KEY_SHOWN`) shows the key written out, like
+  `RPK1-ABCDE-...`, in 11 groups. The Owner writes it down and keeps it away from the PC. The last
+  two bytes are a check, so a mistyped character is caught before a backup is tried.
+- **The vendor's escrowed copy** (P7-05d), released for a restore once the Owner is verified.
+
+## Restoring
+
+A restore puts the whole restaurant back to the moment the backup was made: database, secrets,
+photos and TLS files. Everything after that is lost, and devices paired since then must be paired
+again. Every device does a full refresh when it reconnects, because the event stream starts again
+(P0-12).
+
+What the restore does, in order:
+
+1. Checks the whole file: every chunk, the manifest and `pg_restore --list`. A damaged file, or the
+   wrong key, stops it here.
+2. Unpacks it into `<RP_DATA_DIR>/.restore-<time>` (removed afterwards).
+3. Refuses while anything is connected to the database. Stop the server first.
+4. Makes sure the roles `rp_owner`, `rp_app` and `rp_purge` exist.
+5. Restores into a new database, `<name>_restoring`, owned by `rp_owner`, with
+   `pg_restore --jobs=4`. The grants come with it (AUD-004). The default privileges are
+   re-applied for `rp_owner`. The event stream id is removed, and a record is left for the server
+   to audit.
+6. Replaces the secrets with the backup's (not the backup key). The earlier ones are kept in
+   `<RP_DATA_DIR>/secrets/before-restore-<time>/`.
+7. Replaces `photos` and `tls`. The earlier folders are kept as `<folder>.before-restore-<time>`.
+8. Swaps the databases by renaming them:
+   - the database there before becomes `<name>_before_<time>`, and is kept to go back to;
+   - it is dropped if it held no restaurant (a fresh install).
+
+If step 6, 7 or 8 fails, the earlier steps are undone. If anything before step 6 fails, nothing has
+changed. When the server next starts, it writes `BACKUP_RESTORED` to the audit log, naming the Owner
+who asked for the restore.
+
+### On the same PC, from the System page
+
+1. The Owner opens System, then Backups, then "Restore from a backup…".
+2. They pick the backup (from the data drive or the second location), give a reason and confirm.
+   This needs the Owner with a fresh second factor; it is audited as `RESTORE_REQUESTED`.
+3. The server checks that the file is there and opens with this PC's key. It saves the request in
+   `<RP_DATA_DIR>/backups/restore-request.json`, then exits with code 75.
+4. The Windows service runs `restore-cli pending` before it starts the server again (P0-16). A
+   server given `RP_ADMIN_DATABASE_URL` does this itself when it starts.
+5. The request is removed before the restore starts, so a failed restore is not tried again on
+   every start.
+6. The outcome goes to `restore-outcome.json` and shows on the System page.
+
+### On a new PC
+
+1. Install the software. Do not do the first run (no restaurant) or activate it with a new code,
+   since the backup brings the installation's own identity. Then stop the server.
+2. Ask the vendor to move the licence to the new PC (LIC-004). The restored installation key
+   keeps the installation's identity.
+3. Copy the backup file from the USB drive or NAS.
+4. Run the restore tool with the Owner's recovery key:
+
+   ```sh
+   set RP_RECOVERY_KEY=RPK1-ABCDE-...        # or RP_RECOVERY_KEY_FILE=<file with the key>
+   set RP_ADMIN_DATABASE_URL=postgresql://postgres:<password>@localhost:5432/postgres
+   node dist\backups\restore-cli.js verify  D:\rp-backups\rp-backup-20261003T230000Z-nightly.rpbk
+   node dist\backups\restore-cli.js restore D:\rp-backups\rp-backup-20261003T230000Z-nightly.rpbk
+   ```
+
+   `pnpm backup:restore restore <file>` does the same from `apps/server`.
+
+5. Start the server. The staff sign in with their PINs as before, and paired devices reconnect.
+   A device paired after the backup must be paired again.
+
+### Going back
+
+The database as it was before is kept as `<name>_before_<time>`. To go back:
+
+1. Stop the server.
+2. Rename the databases back, as an administrator.
+3. Restore the files from `secrets/before-restore-<time>/`, `photos.before-restore-<time>` and
+   `tls.before-restore-<time>`.
+
+Once the restore has been checked, drop the kept database and folders to free the space.
+
+### Times
+
+The measured times are in `docs/build/restore-timing.md`: 90 days at design capacity (1.3 GB)
+restore in about 11 seconds, about 113 MB/s. The RTO is two hours once the hardware is there. The
+rehearsal before the pilot is `manual-tasks/25-restore-rehearsal.md`.
+
 ## Checking a backup by hand
 
-From `apps/server` on the PC (or a copy of the server), with the backup key available:
+From `apps/server` on the PC (this PC's key, or `RP_RECOVERY_KEY` for another PC's backup):
 
 ```sh
-node -e "
-const { createReadStream } = require('node:fs');
-import('./dist/backups/backup-contents.js').then(async ({ verifyBackupFile }) => {
-  const { createSecretStore } = await import('./dist/auth/secret-store.js');
-  const key = await createSecretStore({ dataDir: process.env.RP_DATA_DIR }).get('backup-key');
-  const result = await verifyBackupFile(createReadStream(process.argv[1]), key,
-    { pgBin: process.env.RP_PG_BIN, databaseUrl: process.env.DATABASE_URL });
-  console.log(result.info, result.entries.length, 'entries');
-});" <path-to-file.rpbk>
+pnpm backup:restore verify <path-to-file.rpbk>
 ```
 
-The restore tool (P7-05b) adds a proper `verify` command.
+It says whether the backup is complete and unchanged, when it was made and for which restaurant.

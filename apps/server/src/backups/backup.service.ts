@@ -11,7 +11,14 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
-import type { BackupKind, BackupRunView, BackupsResponse } from '@rp/contracts';
+import type {
+  BackupKind,
+  BackupRunView,
+  BackupsResponse,
+  RecoveryKeyResponse,
+  RestoreBackupRequest,
+  RestoreBackupResponse,
+} from '@rp/contracts';
 import {
   backupHealth,
   backupsToRemove,
@@ -23,6 +30,7 @@ import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
 import { SECRET_NAMES, SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
+import { ServerLifecycle } from '../common/server-lifecycle.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -41,9 +49,12 @@ import {
   verifyBackupFile,
   withManifest,
 } from './backup-contents.js';
-import { backupKeyId, encryptBackup } from './backup-file.js';
+import { BackupFileError, backupKeyId, encryptBackup, readBackupHeader } from './backup-file.js';
 import { backupSummary } from './backup-state.js';
+import { readRestoreOutcome, readRestoreRequest, saveRestoreRequest } from './pending-restore.js';
 import { pgProgram, runPgTool } from './pg-tools.js';
+import { formatRecoveryKey } from './recovery-key.js';
+import { RESTORE_RECORD_KEY, RestoreRecord } from './restore.js';
 
 export const BACKUP_OPTIONS = Symbol('BACKUP_OPTIONS');
 
@@ -94,6 +105,15 @@ function plainError(error: unknown): string {
 const errors = {
   running: () =>
     new AppError(409, 'BACKUP_RUNNING', 'A backup is running already. Wait for it to finish.'),
+  noSecondLocation: () =>
+    new AppError(409, 'NO_SECOND_LOCATION', 'No second backup location is set.'),
+  notFound: () => new AppError(404, 'BACKUP_NOT_FOUND', 'There is no such backup there.'),
+  otherKey: () =>
+    new AppError(
+      422,
+      'BACKUP_KEY_MISMATCH',
+      'That backup was made with another backup key. Restore it with the restore tool and the recovery key of the PC that made it.',
+    ),
 };
 
 /**
@@ -119,6 +139,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(SECRET_STORE) private readonly secrets: SecretStore,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(BACKUP_OPTIONS) private readonly options: BackupOptions,
+    private readonly lifecycle: ServerLifecycle,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -136,6 +157,9 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
       .catch((error: unknown) => {
         this.logger.warn({ err: error }, 'Interrupted backups could not be marked');
       });
+    await this.auditRestore().catch((error: unknown) => {
+      this.logger.warn({ err: error }, 'The restore could not be audited yet');
+    });
     if (this.options.checkEveryMs > 0 && this.config.backups === 'on') {
       this.schedule(this.options.firstDelayMs);
     }
@@ -229,14 +253,127 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
     return run;
   }
 
+  /**
+   * "Restore" (DATA-004, P7-05b): checks the backup is there and opens with this PC's key, saves
+   * the request and restarts the server, which restores before it starts again. The Owner only,
+   * with a fresh second factor (the route's DATA_ADMIN); audited with the reason.
+   */
+  async requestRestore(
+    principal: Principal,
+    request: RestoreBackupRequest,
+  ): Promise<RestoreBackupResponse> {
+    const settings = await this.settings.snapshot(principal.restaurantId);
+    let folder = this.dataDriveFolder;
+    if (request.location === 'SECOND') {
+      const second = settings.get('backups.secondLocation');
+      if (second === null) throw errors.noSecondLocation();
+      folder = join(second, SECOND_FOLDER);
+    }
+    if (takenAtOf(request.fileName) === null) throw errors.notFound();
+    const path = join(folder, request.fileName);
+    const header = await readBackupHeader(path).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw errors.notFound();
+      if (error instanceof BackupFileError) throw errors.notFound();
+      throw error;
+    });
+    if (header.keyId !== backupKeyId(await this.secrets.get(BACKUP_KEY))) throw errors.otherKey();
+    if ((await this.prisma.backupRun.count({ where: { status: 'RUNNING' } })) > 0) {
+      throw errors.running();
+    }
+    const requestedAt = this.options.now();
+    await saveRestoreRequest(this.config.dataDir, {
+      path,
+      requestedAt: requestedAt.toISOString(),
+      requestedBy: { staffId: principal.staffId, deviceId: principal.deviceId },
+    });
+    await this.prisma.transaction((tx) =>
+      this.audit.record(tx, {
+        action: 'RESTORE_REQUESTED',
+        entityType: 'backup',
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        after: {
+          location: request.location,
+          fileName: request.fileName,
+          backupCreatedAt: header.createdAt,
+        },
+        reason: request.reason,
+      }),
+    );
+    this.logger.warn({ fileName: request.fileName }, 'Restarting to restore a backup');
+    this.lifecycle.requestRestart();
+    return { requestedAt: requestedAt.toISOString(), backupCreatedAt: header.createdAt };
+  }
+
+  /** The recovery key for the Owner to keep on paper (P7-05b). Audited. */
+  async recoveryKey(principal: Principal): Promise<RecoveryKeyResponse> {
+    const key = await this.secrets.get(BACKUP_KEY);
+    await this.prisma.transaction((tx) =>
+      this.audit.record(tx, {
+        action: 'BACKUP_RECOVERY_KEY_SHOWN',
+        entityType: 'backup',
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        after: { keyId: backupKeyId(key) },
+      }),
+    );
+    return { recoveryKey: formatRecoveryKey(key), keyId: backupKeyId(key) };
+  }
+
+  /**
+   * The restore tool leaves a record in the restored database; the server audits it once when it
+   * starts (AUD-001), naming the Owner who asked for it from the System page.
+   */
+  async auditRestore(): Promise<boolean> {
+    const row = await this.prisma.systemMeta.findUnique({ where: { key: RESTORE_RECORD_KEY } });
+    if (row === null) return false;
+    let parsed;
+    try {
+      parsed = RestoreRecord.safeParse(JSON.parse(row.value));
+    } catch {
+      return false;
+    }
+    if (!parsed.success || parsed.data.audited) return false;
+    const record = parsed.data;
+    const restaurants = await this.prisma.restaurant.findMany({ select: { id: true } });
+    await this.prisma.transaction(async (tx) => {
+      for (const { id } of restaurants) {
+        await this.audit.record(tx, {
+          action: 'BACKUP_RESTORED',
+          entityType: 'backup',
+          restaurantId: id,
+          ...(record.requestedBy !== null && {
+            actorId: record.requestedBy.staffId,
+            deviceId: record.requestedBy.deviceId,
+          }),
+          after: {
+            restoredAt: record.restoredAt,
+            backupCreatedAt: record.backupCreatedAt,
+            fileName: record.fileName,
+          },
+          reason: 'Restored from a backup',
+        });
+      }
+      await tx.systemMeta.update({
+        where: { key: RESTORE_RECORD_KEY },
+        data: { value: JSON.stringify({ ...record, audited: true }) },
+      });
+    });
+    return true;
+  }
+
   /** The Backups part of the System page. */
   async overview(restaurantId: string): Promise<BackupsResponse> {
     const settings = await this.settings.snapshot(restaurantId);
     const now = this.options.now();
-    const [summary, runs, key] = await Promise.all([
+    const [summary, runs, key, pending, restored] = await Promise.all([
       backupSummary(this.prisma),
       this.prisma.backupRun.findMany({ orderBy: { startedAt: 'desc' }, take: RUNS_SHOWN }),
       this.secrets.get(BACKUP_KEY),
+      readRestoreRequest(this.config.dataDir),
+      readRestoreOutcome(this.config.dataDir),
     ]);
     const second = settings.get('backups.secondLocation');
     const names = await this.namesOf(runs);
@@ -262,6 +399,17 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
       ],
       runs: runs.map((run) => this.viewOf(run, names)),
       keyId: backupKeyId(key),
+      restorePending: pending !== null,
+      lastRestore:
+        restored === null
+          ? null
+          : {
+              at: restored.at,
+              ok: restored.ok,
+              error: restored.error,
+              backupCreatedAt: restored.backupCreatedAt,
+              previousDatabase: restored.previousDatabase,
+            },
     };
   }
 
