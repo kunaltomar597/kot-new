@@ -12,6 +12,7 @@ import type { HeartbeatRequest, HeartbeatResponse, ReleaseInfo } from '@rp/contr
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { newId } from '../common/ids.js';
+import { backupSummary } from '../backups/backup-state.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -248,6 +249,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       restaurant,
       checkpoint,
       settingsDigest,
+      backup,
     ] = await Promise.all([
       this.audit.chainHead(),
       this.deviceHealth(),
@@ -258,6 +260,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       this.prisma.restaurant.findFirst({ select: { businessHours: true, timeZone: true } }),
       check === null ? undefined : this.audit.checkpoint(check.sequence),
       readVendorSettingsDigest(this.prisma),
+      backupSummary(this.prisma),
     ]);
     const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
@@ -272,10 +275,14 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       disk,
       auditChainHead: head === null ? null : { sequence: head.seq, hash: head.hash },
       devices: devices.paired,
-      // Fleet health (VCP-005, NFR-O03, P7-03). Backups report here once they exist (P7-05).
+      // Fleet health (VCP-005, NFR-O03, P7-03), with the backups (DATA-005, P7-05a).
       devicesConnected: devices.connected,
       errorCount: Math.max(0, errorsNow - this.errorsDelivered),
-      backup: null,
+      backup: {
+        lastSuccessAt: backup.lastSuccessAt?.toISOString() ?? null,
+        lastFailureAt: backup.lastFailureAt?.toISOString() ?? null,
+        lastError: backup.lastError,
+      },
       ...(restaurant !== null &&
         hours.success && {
           businessHours: { timeZone: restaurant.timeZone, hours: hours.data },

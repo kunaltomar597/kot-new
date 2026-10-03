@@ -22,6 +22,11 @@ export const SECRET_NAMES = [
    * reactivation secret, so they cannot be edited in the database unnoticed (LIC-007, P7-01c).
    */
   'licence-record-key',
+  /**
+   * Encrypts the backups (DATA-003, SEC-007, P7-05a). Never inside a backup; escrowed with the
+   * vendor for a restore on a new PC (P7-05d).
+   */
+  'backup-key',
 ] as const;
 export type SecretName = (typeof SECRET_NAMES)[number];
 

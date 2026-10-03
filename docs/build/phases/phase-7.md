@@ -129,6 +129,34 @@ A restore must delete `system_meta` key `events.stream_id` before the server sta
 device does a full refresh instead of resuming from sequences of the lost timeline (P0-12).
 Acceptance: automated backup → wipe → restore test with RPO/RTO measured; tampered backup detected.
 
+Split (2026-10-03):
+
+- **P7-05a Encrypted local backups.**
+  - The backup key: a local secret made at installation.
+  - The backup file: AES-256-GCM in authenticated chunks, so a changed, reordered or cut file is
+    found.
+  - The nightly full backup: the database (`pg_dump`), photos, the LAN TLS files and the secrets
+    the data needs. It goes to the data drive and to the second location, and each copy is
+    integrity-checked.
+  - Retention of 14 daily and 8 weekly backups, and "Back up now".
+  - The backup state on the System page and in the heartbeat; failures alert the Owner and
+    managers (DATA-005).
+  - Acceptance: a tampered or truncated backup is detected.
+- **P7-05b Restore.**
+  - Restore a backup file onto the same PC (the Owner, with a fresh second factor) or a new one
+    (the restore tool, after the licence is moved, LIC-004).
+  - `events.stream_id` is removed.
+  - An automated backup → wipe → restore test, with the RTO measured.
+  - The restore runbook and rehearsal checklist.
+- **P7-05c Continuous WAL archiving (RPO ≤ 1 hour).**
+  - WAL is archived, encrypted, to the second location, with a nightly base backup.
+  - Point-in-time recovery in the restore tool, with the RPO measured.
+- **P7-05d Cloud backup and key escrow.**
+  - A nightly encrypted upload to storage in India through the Control Plane.
+  - The backup key escrowed, wrapped by a vendor KMS key, and released for a restore only on a
+    vendor restore code given after the Owner is verified (audited).
+  - Opt-out is audited, and the cloud backup state shows in the fleet view.
+
 ## P7-06 Data lifecycle
 
 Requirements: DATA-006 to DATA-012, AUD-004 (purge role), §9.3 retention, §12 GST retention.

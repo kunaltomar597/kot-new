@@ -862,6 +862,16 @@ export const SETTINGS = [
     requirements: ['DATA-002'],
   }),
   setting({
+    key: 'backups.nightlyAt',
+    schema: TimeOfDay,
+    defaultValue: '04:30',
+    scope: 'RESTAURANT',
+    capability: 'DATA_ADMIN',
+    description:
+      'The nightly full backup starts at this time; a PC that was off then backs up when it starts.',
+    requirements: ['DATA-002'],
+  }),
+  setting({
     key: 'backups.secondLocation',
     schema: z.string().trim().min(1).max(260).nullable(),
     defaultValue: null,

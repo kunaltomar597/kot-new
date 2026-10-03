@@ -2317,6 +2317,50 @@ export const en = {
     },
     readinessLink: 'Print the site-readiness checklist',
   },
+  backups: {
+    at: '{date} {time}',
+    next: 'The next nightly backup starts {date} {time}.',
+    health: {
+      OK: 'Backed up',
+      FAILED: 'The last backup failed',
+      OVERDUE: 'No backup for more than a day',
+      NONE: 'No backup yet',
+    },
+    locations: 'Where backups are kept',
+    location: {
+      DATA_DRIVE: 'On the data drive',
+      SECOND: 'At the second location',
+    },
+    secondNotSet:
+      'No second location is set. Set a folder on a second disk, USB drive or NAS so a backup survives a disk failure.',
+    openSettings: 'Open Settings',
+    kept: '{count, plural, =0 {No backups kept yet.} one {# backup kept.} other {# backups kept.}}',
+    unavailable: 'Not reachable now. Is the drive connected?',
+    now: 'Back up now',
+    running: 'Backing up…',
+    started: 'The backup has started. It takes a few minutes.',
+    latest: 'Latest backups',
+    column: {
+      when: 'Started',
+      kind: 'Kind',
+      status: 'Result',
+      size: 'Size',
+      notes: 'Notes',
+    },
+    kind: {
+      NIGHTLY: 'Nightly',
+      MANUAL: 'Back up now',
+    },
+    kindBy: '{kind} ({name})',
+    status: {
+      RUNNING: 'Running',
+      SUCCEEDED: 'Done',
+      PARTIAL: 'Not copied',
+      FAILED: 'Failed',
+    },
+    copied: 'Also at the second location',
+    notCopied: 'On the data drive only',
+  },
   readiness: {
     title: 'Site-readiness checklist',
     intro:
@@ -2456,9 +2500,8 @@ export const en = {
     },
     backup: {
       title: 'Backups',
-      notSetUp: 'Backups are not set up on this PC yet.',
-      last: 'Last backup {date} {time}',
-      never: 'No backup yet',
+      last: 'Last backup {date} {time}.',
+      never: 'No backup yet.',
     },
     licence: {
       title: 'Licence',
@@ -3023,6 +3066,7 @@ export const en = {
     },
     backups: {
       walMode: 'Incremental backup',
+      nightlyAt: 'Nightly backup at',
       secondLocation: 'Second backup location',
       keepDaily: 'Daily backups kept',
       keepWeekly: 'Weekly backups kept',
@@ -3202,6 +3246,8 @@ export const en = {
     },
     backups: {
       walMode: 'Incremental backup of the database log: continuous or hourly.',
+      nightlyAt:
+        'The nightly full backup starts at this time (24-hour, like 04:30). A PC that was off then backs up when it starts.',
       secondLocation: 'Folder on a second disk, USB drive or NAS for the nightly full backup.',
       keepDaily: 'Daily backups kept.',
       keepWeekly: 'Weekly backups kept.',

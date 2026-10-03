@@ -364,6 +364,10 @@ Recommended next WPs (dependencies met):
   - [x] P7-03b Fleet dashboard
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
+  - [x] P7-05a Encrypted local backups
+  - [ ] P7-05b Restore
+  - [ ] P7-05c Continuous WAL archiving
+  - [ ] P7-05d Cloud backup and key escrow
 - [ ] P7-06 Data lifecycle
 - [x] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
@@ -627,6 +631,46 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-05a):
+
+522. P7-05 is split into four (phase-7.md): encrypted local backups, restore, continuous WAL
+     archiving, and the cloud backup with key escrow.
+523. A backup is one encrypted file. It uses AES-256-GCM in 1 MiB chunks, with a key for each file
+     derived from the backup key and a random salt (HKDF-SHA256). Every chunk authenticates the
+     header, its position and whether it is the last. This means:
+     - a file of any size streams through;
+     - a changed, reordered or cut file, or the wrong key, is found;
+     - the header names its key (a key id) without revealing it.
+524. The full backup is a logical dump (`pg_dump`, custom format, without owners, with grants),
+     plus the photos, the LAN TLS files and the secrets the data needs. That is every local secret
+     except the backup key itself.
+     - It can be restored onto a new PC and onto another PostgreSQL 16 minor version.
+     - The installation key is included, so a restored PC keeps its identity with the vendor. The
+       licence moves to the new PC by the vendor's rebind (LIC-004), which already binds whichever
+       PC asks next.
+525. The nightly backup runs at a new setting, `backups.nightlyAt` (04:30 India time by default,
+     after the cut-off, Owner only).
+     - A PC that was off then backs up when it starts.
+     - A failed nightly backup is tried again after an hour.
+     - "Back up now" is for anyone with OPERATIONS_CONFIGURE and is audited.
+526. Every backup is read back in full before it gets its name: all chunks, the manifest and
+     `pg_restore --list`. The copy at the second location is checked the same way.
+     - A failed copy makes the backup PARTIAL, which alerts like a failure.
+     - With no second location set, the backup succeeds, but the System page asks for one.
+527. Retention applies to each location separately, by file name: the newest backup of each of
+     the last `keepDaily` days and of each of the last `keepWeekly` weeks (Monday to Sunday). The
+     newest backup is always kept.
+528. A failed or partial backup:
+     - raises `DISK_OR_BACKUP` (one alert, `backup`) for the Owner and managers until a backup
+       works;
+     - goes to the vendor in the heartbeat.
+       No successful backup for 26 hours shows as overdue.
+529. Two new configuration values:
+     - `RP_PG_BIN`: where the PostgreSQL client programs are; the installer sets it.
+     - `RP_BACKUPS=off`: development and end-to-end tests only; refused in production.
+530. The record of backups (`backup_runs`) belongs to the installation, not a restaurant, since a
+     backup holds the whole database. Its audit entries are written for each restaurant.
 
 Decided 2026-10-03 (P7-07c):
 
@@ -2682,6 +2726,57 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-05a Encrypted local backups
+
+Built:
+
+- `@rp/domain` `backups.ts`:
+  - `backupsToRemove` (14 daily + 8 weekly);
+  - `lastNightlySlot` and `nightlyBackupDue`;
+  - `backupHealth`.
+- contracts `backups.ts` (`BackupsResponse`, `BackupRunView`, `StartBackupResponse`), two routes
+  and the setting `backups.nightlyAt`.
+- server `src/backups/`:
+  - `backup-file.ts`: the RPBK chunked AES-256-GCM format, `ByteQueue`;
+  - `backup-archive.ts`: named, framed entries;
+  - `backup-contents.ts`: the entries, the manifest and `verifyBackupFile`;
+  - `pg-tools.ts`: `pg_dump` and `pg_restore` with the password in their environment;
+  - `backup.service.ts`: schedule, make, check, copy, prune, record, alert, audit;
+  - `backup-state.ts`, the controller and the module.
+  - Also: migration `backup_runs`, secret `backup-key`, config `RP_PG_BIN` and `RP_BACKUPS`.
+  - The heartbeat and the System page now report the backups.
+- console `BackupsPanel` on the System page (state, locations, latest backups, "Back up now",
+  polled while running).
+- `docs/runbooks/backups.md`.
+- CI: the check job sets `RP_PG_BIN`, and installs the PostgreSQL 16 client if missing.
+
+Tests:
+
+- domain +6;
+- server unit +7 (format: round trip, a changed byte, a cut, a swapped chunk, extra data, another
+  key, the header) and +1 config;
+- server integration +8:
+  - a backup of everything, to both places;
+  - the contents and the secrets;
+  - `pg_restore --list`;
+  - the audit;
+  - tamper and cut detection;
+  - one at a time;
+  - retention;
+  - partial and failed backups alerting, on the System page and in the heartbeat;
+  - an interrupted backup;
+  - the nightly schedule;
+  - a waiter refused;
+- console +1.
+
+Gotchas:
+
+- The Mac's embedded PostgreSQL has no `pg_dump`. Use the EDB PostgreSQL 16 binaries in
+  `~/.local/pg16-edb/pgsql/bin` (set `PG_BIN` to it).
+- Test databases have no `_prisma_migrations` table, so `schemaVersion` is null there.
+- `pg_restore --list` stops reading early. Writes after that are dropped, and its exit status is
+  what counts.
 
 ### 2026-10-03: P7-07c Go-live test, settings export and the readiness checklist (P7-07 done)
 
@@ -5863,7 +5958,7 @@ Notes for the next session:
 - P2-04: the MQTT broker reuses the server certificate and must pick up renewals too.
 - P4 (manager dashboard) or the device settings screen should show the CA fingerprint so people
   can compare it without the log.
-- P7-05: backups must include `<RP_DATA_DIR>/tls` and the secret store.
+- P7-05: backups must include `<RP_DATA_DIR>/tls` and the secret store. (Done in P7-05a.)
 
 ### 2026-09-26: P0-14b web console shell
 

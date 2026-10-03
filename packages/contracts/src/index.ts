@@ -17,6 +17,7 @@ export * from './realtime.js';
 export * from './restaurant.js';
 export * from './roles.js';
 export * from './billing.js';
+export * from './backups.js';
 export * from './day-end.js';
 export * from './events.js';
 export * from './pagers.js';

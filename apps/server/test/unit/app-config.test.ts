@@ -72,4 +72,16 @@ describe('server configuration', () => {
       'REVG',
     ]);
   });
+
+  it('[DATA-002] keeps the nightly backup on in production, with the PostgreSQL programs', () => {
+    expect(loadConfig(base).backups).toBe('on');
+    expect(loadConfig({ ...base, RP_BACKUPS: 'off' }).backups).toBe('off');
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', RP_BACKUPS: 'off' })).toThrow(
+      /backup/,
+    );
+    expect(loadConfig({ ...base, RP_PG_BIN: 'C:\\PostgreSQL\\16\\bin' }).pgBin).toBe(
+      'C:\\PostgreSQL\\16\\bin',
+    );
+    expect(loadConfig({ ...base, RP_PG_BIN: '' }).pgBin).toBeUndefined();
+  });
 });

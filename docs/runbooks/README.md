@@ -13,3 +13,5 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `vendor-access-policy.md`: what vendor staff may see and do: no standing access to a restaurant,
   business data only through diagnostics or backups, roles, MFA, quarterly access reviews and
   auditing (P7-02d).
+- `backups.md`: what a backup holds, its encryption, when and where backups are made, how each is
+  checked, retention, failure alerts and what to do, and the installer's settings (P7-05a).

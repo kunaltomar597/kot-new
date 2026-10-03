@@ -241,7 +241,13 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     const view = (await fleet.fleet()).installations.find(
       (entry) => entry.installationId === installationId,
     );
-    expect(view).toMatchObject({ online: true, errorCount: 0, openAlerts: [], backup: null });
+    // No backup made yet (P7-05a): nothing has failed.
+    expect(view).toMatchObject({
+      online: true,
+      errorCount: 0,
+      openAlerts: [],
+      backup: { lastSuccessAt: null, lastFailureAt: null, lastError: null },
+    });
     expect(view?.auditHead?.verifiedAt).not.toBeNull();
 
     // Someone with access to the database rewrites every entry but the newest (and so every hash
