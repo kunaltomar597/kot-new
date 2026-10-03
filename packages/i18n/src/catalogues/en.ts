@@ -1402,6 +1402,30 @@ export const en = {
       features: 'Features the vendor switches',
       ui: 'Display',
     },
+    transfer: {
+      export: 'Export settings',
+      import: 'Import settings',
+      file: 'Settings file',
+      notAnExport: 'That file is not a settings export from this system.',
+      title: 'Import settings',
+      confirm:
+        '{count, plural, one {# setting} other {# settings}} from “{restaurant}”. Each is checked as if changed by hand; tax, invoice and data settings need the Owner.',
+      apply: 'Import',
+      done: 'Done',
+      applied:
+        '{count, plural, =0 {Nothing was changed.} one {# setting changed.} other {# settings changed.}}',
+      appliedList: 'Changed',
+      skippedList: 'Left as they were',
+      skippedHint: 'Left as they were:',
+      skipped: '{name}: {reason}',
+      reason: {
+        UNKNOWN: 'this version doesn’t have it',
+        VENDOR: 'set by the vendor',
+        INVALID: 'the value is not allowed',
+        NOT_ALLOWED: 'someone with more rights changes this',
+        UNCHANGED: 'already the same',
+      },
+    },
     default: 'Default: {value}',
     changed: 'Changed',
     vendor: 'Set by the vendor',
@@ -2269,6 +2293,91 @@ export const en = {
         hint: 'Place a test order through every path the restaurant uses (waiter, tablet, QR, kitchen screen, pager), then bill it. Confirm once all of it worked.',
         open: 'Open the POS',
         confirm: 'The test order worked',
+      },
+    },
+    goLive: {
+      title: 'Go-live test',
+      intro:
+        'Start the test, then place one test order through each path below and bill it. Each path is ticked as soon as the server sees it; when all are ticked, confirm the step.',
+      paths: 'Paths to test',
+      start: 'Start the test',
+      restart: 'Start again',
+      waiting: 'Waiting',
+      seen: 'Seen at {time}',
+      passed: 'Every path worked. Confirm the go-live test below.',
+      path: {
+        POS_ORDER: 'An order taken on the POS',
+        WAITER_APP: 'An order from a waiter’s phone',
+        TABLE_TABLET: 'An order from a table tablet',
+        QR: 'An order from a guest’s phone (QR)',
+        KDS: 'A ticket bumped on a kitchen screen',
+        PAGER: 'A call answered on a pager',
+        BILL: 'A bill settled',
+      },
+    },
+    readinessLink: 'Print the site-readiness checklist',
+  },
+  readiness: {
+    title: 'Site-readiness checklist',
+    intro:
+      'What the restaurant should have in place before the installer comes. Print it, tick each line on site and note anything missing.',
+    back: 'Back to the setup',
+    print: 'Print',
+    done: 'Done',
+    item: 'What',
+    notes: 'Notes',
+    signature: 'Checked by: ____________________   Date: ____________',
+    items: {
+      pc: {
+        title: 'Restaurant PC',
+        detail:
+          'Windows 11 64-bit, 4-core CPU, 8 GB RAM (16 GB recommended), 256 GB SSD, wired Ethernet to the router.',
+      },
+      backupDrive: {
+        title: 'Second drive for backups',
+        detail: 'A second internal or USB drive that stays connected, for the nightly backups.',
+      },
+      bitlocker: {
+        title: 'Disk encryption',
+        detail: 'BitLocker turned on, with the recovery key kept somewhere safe away from the PC.',
+      },
+      ups: {
+        title: 'UPS',
+        detail: 'At least 15 minutes of battery for the PC, the router and the printers.',
+      },
+      wifiSeparate: {
+        title: 'Separate staff and guest Wi-Fi',
+        detail:
+          'The staff network (PC, phones, tablets, printers, pagers) on its own SSID or VLAN, apart from guest Wi-Fi.',
+      },
+      coverage: {
+        title: '2.4 GHz coverage',
+        detail:
+          'Good 2.4 GHz Wi-Fi signal everywhere the pagers go: kitchen, floor, store room and outdoor seating.',
+      },
+      printers: {
+        title: 'Printers',
+        detail:
+          '80 mm ESC/POS thermal printers on Ethernet for the counter and each kitchen station.',
+      },
+      tablets: {
+        title: 'Table tablets and stands',
+        detail: 'Android tablets with chargers and secure stands for each table that uses one.',
+      },
+      speechPack: {
+        title: 'Offline speech pack',
+        detail:
+          'On each table tablet: the Android offline English speech pack, so voice search works without the internet.',
+      },
+      phones: {
+        title: 'Waiter phones and kitchen screens',
+        detail:
+          'Android phones for the waiters and a screen with a browser for each kitchen station.',
+      },
+      internet: {
+        title: 'Broadband',
+        detail:
+          'At least 10 Mbps for online orders, the QR menu, backups and updates. The restaurant keeps working without it.',
       },
     },
   },

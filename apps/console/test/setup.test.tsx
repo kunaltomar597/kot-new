@@ -1,7 +1,8 @@
-import type { OnboardingResponse } from '@rp/contracts';
+import type { GoLiveView, OnboardingResponse } from '@rp/contracts';
 import { ONBOARDING_STEPS } from '@rp/domain';
 import { screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { READINESS_ITEMS } from '../src/manage/setup/ReadinessChecklist.js';
 import { nextStep, setupCounts } from '../src/manage/setup/setup-view.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
 
@@ -18,6 +19,22 @@ function onboarding(overrides: Partial<OnboardingResponse> & { done?: readonly s
     complete: false,
     activation: { configured: true, activated: false, installationName: null },
     ...overrides,
+  };
+  return view;
+}
+
+function goLive(seen: readonly string[], startedAt: string | null = '2026-10-02T06:00:00.000Z') {
+  const needed = new Set(['POS_ORDER', 'WAITER_APP', 'KDS', 'BILL']);
+  const view: GoLiveView = {
+    startedAt,
+    paths: (['POS_ORDER', 'WAITER_APP', 'TABLE_TABLET', 'QR', 'KDS', 'PAGER', 'BILL'] as const).map(
+      (path) => ({
+        path,
+        needed: needed.has(path),
+        seenAt: seen.includes(path) ? '2026-10-02T06:05:00.000Z' : null,
+      }),
+    ),
+    passed: startedAt !== null && [...needed].every((path) => seen.includes(path)),
   };
   return view;
 }
@@ -119,6 +136,83 @@ describe('[ONB-004] the setup page', () => {
       'href',
       '/manage/setup',
     );
+  });
+
+  it('runs the go-live test, ticking each path the restaurant uses as it is seen', async () => {
+    const othersDone = ONBOARDING_STEPS.filter((step) => step !== 'GO_LIVE');
+    const fake = signsInAs(server(), 'MANAGER')
+      .on('GET', '/api/v1/onboarding', () => ({
+        status: 200,
+        body: onboarding({ done: othersDone }),
+      }))
+      .on(
+        'GET',
+        '/api/v1/onboarding/go-live',
+        () => ({ status: 200, body: goLive([], null) }),
+        () => ({
+          status: 200,
+          body: goLive(['POS_ORDER', 'WAITER_APP', 'KDS', 'BILL']),
+        }),
+      )
+      .on('POST', '/api/v1/onboarding/go-live/start', () => ({
+        status: 200,
+        body: goLive(['POS_ORDER']),
+      }));
+    const { user, container } = await renderConsole({
+      fake,
+      path: '/manage/setup',
+      signedIn: 'MANAGER',
+    });
+    await user.click(await screen.findByRole('button', { name: t('setupPage.goLive.start') }));
+    const paths = within(await screen.findByRole('list', { name: t('setupPage.goLive.paths') }));
+    // Only what this restaurant uses: no tablets, QR or pagers here.
+    expect(paths.getAllByRole('listitem')).toHaveLength(4);
+    expect(paths.queryByText(t('setupPage.goLive.path.PAGER'))).toBeNull();
+    expect(paths.getAllByText(t('setupPage.goLive.waiting'))).toHaveLength(3);
+    expect(paths.getByText(t('setupPage.goLive.seen', { time: '11:35' }))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/onboarding/go-live/start')).toHaveLength(1);
+    await expectNoAxeViolations(container);
+  });
+
+  it('[ONB-004] shows the go-live test as passed once every path was seen', async () => {
+    const othersDone = ONBOARDING_STEPS.filter((step) => step !== 'GO_LIVE');
+    const fake = signsInAs(server(), 'MANAGER')
+      .on('GET', '/api/v1/onboarding', () => ({
+        status: 200,
+        body: onboarding({ done: othersDone }),
+      }))
+      .on('GET', '/api/v1/onboarding/go-live', () => ({
+        status: 200,
+        body: goLive(['POS_ORDER', 'WAITER_APP', 'KDS', 'BILL']),
+      }));
+    await renderConsole({ fake, path: '/manage/setup', signedIn: 'MANAGER' });
+    expect(await screen.findByText(t('setupPage.goLive.passed'))).toBeVisible();
+    expect(screen.getByRole('button', { name: t('setupPage.goLive.restart') })).toBeVisible();
+  });
+
+  it('[ONB-011] prints the site-readiness checklist', async () => {
+    const print = vi.fn();
+    vi.stubGlobal('print', print);
+    const fake = signsInAs(server(), 'MANAGER').on('GET', '/api/v1/onboarding', () => ({
+      status: 200,
+      body: onboarding(),
+    }));
+    const { user, container } = await renderConsole({
+      fake,
+      path: '/manage/setup',
+      signedIn: 'MANAGER',
+    });
+    await user.click(await screen.findByRole('link', { name: t('setupPage.readinessLink') }));
+    expect(await screen.findByRole('heading', { name: t('readiness.title') })).toBeVisible();
+    const rows = screen.getAllByRole('row');
+    // A header row and one row per item.
+    expect(rows).toHaveLength(READINESS_ITEMS.length + 1);
+    expect(screen.getByText(t('readiness.items.ups.title'))).toBeVisible();
+    expect(screen.getByText(t('readiness.items.speechPack.title'))).toBeVisible();
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('button', { name: t('readiness.print') }));
+    expect(print).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 
   it('counts the steps and finds the next one', () => {

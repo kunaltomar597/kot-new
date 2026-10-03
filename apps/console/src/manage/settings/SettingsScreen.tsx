@@ -20,6 +20,7 @@ import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { useLive } from '../../app/use-live.js';
 import { SecondFactorCancelled, useSecondFactor } from '../../owner/second-factor.js';
+import { SettingsTransfer } from './SettingsTransfer.js';
 import {
   bpText,
   checkedValue,
@@ -323,6 +324,7 @@ export function SettingsScreen() {
             setSearch(event.target.value);
           }}
         />
+        <SettingsTransfer onImported={reload} />
       </div>
       {content}
       {editing !== undefined && data.status === 'ready' ? (

@@ -1,12 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type {
   ActivateResponse,
+  GoLiveView,
   OnboardingResponse,
   OnboardingStep,
   OnboardingStepView,
 } from '@rp/contracts';
 import {
   CONFIRMED_STEPS,
+  type GoLivePath,
+  goLiveCheck,
   markProblem,
   type OnboardingFacts,
   type OnboardingMark,
@@ -26,6 +29,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 
 const MARKS_KEY = 'onboarding.marks';
+const GO_LIVE_KEY = 'onboarding.go_live_started_at';
 const Marks = z.record(z.string(), z.enum(['DONE', 'SKIPPED']));
 
 const MARK_PROBLEMS = {
@@ -166,6 +170,106 @@ export class OnboardingService {
     }
   }
 
+  /**
+   * The guided go-live test (ONB-004 step 11, P7-07c): since it started, has the server seen an
+   * order from each place the restaurant takes them, a kitchen screen working one, a pager
+   * acknowledging an alert, and a bill paid?
+   */
+  async goLive(restaurantId: string): Promise<GoLiveView> {
+    const [startedRow, marks, devices, tablesWithQr] = await Promise.all([
+      this.prisma.systemMeta.findUnique({ where: { key: GO_LIVE_KEY } }),
+      this.marks(),
+      this.prisma.device.findMany({
+        where: { restaurantId, status: 'ACTIVE' },
+        select: { id: true, type: true },
+      }),
+      this.prisma.diningTable.count({
+        where: { restaurantId, archivedAt: null, qrToken: { not: null } },
+      }),
+    ]);
+    const startedAt = startedRow === null ? null : startedRow.value;
+    const has = (type: string) => devices.some((device) => device.type === type);
+    const use = {
+      waiterPhones: has('WAITER_PHONE'),
+      tablets: has('TABLE_TABLET'),
+      qr: marks.QR !== 'SKIPPED' && tablesWithQr > 0,
+      kitchenScreens: has('KDS'),
+      pagers: has('PAGER'),
+    };
+    if (startedAt === null) return goLiveCheck(null, use, {});
+    const since = new Date(startedAt);
+    const firstOrder = (source: 'POS' | 'WAITER_APP' | 'TABLE_TABLET' | 'QR') =>
+      this.prisma.order
+        .findFirst({
+          where: { restaurantId, source, createdAt: { gte: since } },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        })
+        .then((row) => row?.createdAt);
+    const kds = devices.filter((device) => device.type === 'KDS').map((device) => device.id);
+    const [pos, waiter, tablet, qr, kitchen, pager, bill] = await Promise.all([
+      firstOrder('POS'),
+      firstOrder('WAITER_APP'),
+      firstOrder('TABLE_TABLET'),
+      firstOrder('QR'),
+      this.prisma.orderEvent
+        .findFirst({
+          where: { restaurantId, deviceId: { in: kds }, occurredAt: { gte: since } },
+          orderBy: { occurredAt: 'asc' },
+          select: { occurredAt: true },
+        })
+        .then((row) => row?.occurredAt),
+      this.prisma.alert
+        .findFirst({
+          where: { restaurantId, channels: { has: 'PAGER' }, acknowledgedAt: { gte: since } },
+          orderBy: { acknowledgedAt: 'asc' },
+          select: { acknowledgedAt: true },
+        })
+        .then((row) => row?.acknowledgedAt ?? undefined),
+      this.prisma.payment
+        .findFirst({
+          where: { restaurantId, status: 'CAPTURED', createdAt: { gte: since } },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        })
+        .then((row) => row?.createdAt),
+    ]);
+    const seen: Partial<Record<GoLivePath, string>> = {};
+    const entries: [GoLivePath, Date | undefined][] = [
+      ['POS_ORDER', pos],
+      ['WAITER_APP', waiter],
+      ['TABLE_TABLET', tablet],
+      ['QR', qr],
+      ['KDS', kitchen],
+      ['PAGER', pager],
+      ['BILL', bill],
+    ];
+    for (const [path, at] of entries) if (at !== undefined) seen[path] = at.toISOString();
+    return goLiveCheck(startedAt, use, seen);
+  }
+
+  /** Starts the go-live test again from now: only what happens next counts. Audited. */
+  async startGoLive(principal: Principal): Promise<GoLiveView> {
+    const now = new Date().toISOString();
+    await this.prisma.transaction(async (tx) => {
+      await tx.systemMeta.upsert({
+        where: { key: GO_LIVE_KEY },
+        create: { key: GO_LIVE_KEY, value: now },
+        update: { value: now },
+      });
+      await this.audit.record(tx, {
+        action: 'GO_LIVE_TEST_STARTED',
+        entityType: 'onboarding',
+        entityId: null,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        after: { startedAt: now },
+      });
+    });
+    return this.goLive(principal.restaurantId);
+  }
+
   /** What the restaurant has, counted (ONB-004). */
   async facts(restaurantId: string): Promise<OnboardingFacts> {
     const live = { restaurantId, archivedAt: null };
@@ -211,6 +315,7 @@ export class OnboardingService {
       }),
       this.prisma.diningTable.count({ where: { ...live, qrToken: null } }),
     ]);
+    const goLive = await this.goLive(restaurantId);
     const hours = restaurant?.businessHours;
     return {
       profileComplete:
@@ -241,6 +346,7 @@ export class OnboardingService {
       staffWithPins,
       pairedDevices,
       tablesWithoutQr,
+      goLivePassed: goLive.passed,
     };
   }
 }

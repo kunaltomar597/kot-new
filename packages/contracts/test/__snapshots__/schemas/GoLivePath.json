@@ -1,0 +1,10 @@
+{
+  "input": {
+    "type": "string",
+    "enum": ["POS_ORDER", "WAITER_APP", "TABLE_TABLET", "QR", "KDS", "PAGER", "BILL"]
+  },
+  "output": {
+    "type": "string",
+    "enum": ["POS_ORDER", "WAITER_APP", "TABLE_TABLET", "QR", "KDS", "PAGER", "BILL"]
+  }
+}

@@ -5738,6 +5738,76 @@
         "x-requirements": ["ONB-004", "ONB-003"]
       }
     },
+    "/api/v1/onboarding/go-live": {
+      "get": {
+        "operationId": "getGoLive",
+        "summary": "The go-live test: each path the restaurant uses, and whether it was seen yet",
+        "tags": ["onboarding"],
+        "responses": {
+          "200": {
+            "description": "The test.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/GoLiveView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-004"]
+      }
+    },
+    "/api/v1/onboarding/go-live/start": {
+      "post": {
+        "operationId": "startGoLive",
+        "summary": "Start (or start again) the go-live test: paths count from now",
+        "tags": ["onboarding"],
+        "responses": {
+          "200": {
+            "description": "The test.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/GoLiveView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-004", "AUD-001"]
+      }
+    },
     "/api/v1/onboarding/steps/{step}": {
       "put": {
         "operationId": "markOnboardingStep",
@@ -9627,6 +9697,92 @@
         },
         "x-capability": "OPERATIONS_CONFIGURE",
         "x-requirements": ["MGR-007", "AUD-001", "AUTH-006", "BILL-006"]
+      }
+    },
+    "/api/v1/settings/export": {
+      "get": {
+        "operationId": "exportSettings",
+        "summary": "The restaurant’s settings as a file, for a new PC or a reinstall",
+        "description": "ONB-010: settings changed from their default; vendor settings are left out.",
+        "tags": ["settings"],
+        "responses": {
+          "200": {
+            "description": "The settings.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SettingsExport" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-010"]
+      }
+    },
+    "/api/v1/settings/import": {
+      "post": {
+        "operationId": "importSettings",
+        "summary": "Apply settings from an export",
+        "description": "ONB-010: each setting is checked as if changed by hand: unknown, vendor-controlled, invalid or not allowed for this person are skipped and listed; tax, invoice and data settings need the Owner with a fresh second factor. Audited.",
+        "tags": ["settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SettingsExport" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was applied and skipped.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SettingsImportResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The settings conflict with each other.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["ONB-010", "AUD-001"]
       }
     },
     "/api/v1/shifts": {
@@ -15029,6 +15185,36 @@
       },
       "FoodType": { "type": "string", "enum": ["VEG", "NON_VEG", "EGG"] },
       "FssaiNumber": { "type": "string", "pattern": "^\\d{14}$" },
+      "GoLivePath": {
+        "type": "string",
+        "enum": ["POS_ORDER", "WAITER_APP", "TABLE_TABLET", "QR", "KDS", "PAGER", "BILL"]
+      },
+      "GoLiveView": {
+        "type": "object",
+        "properties": {
+          "startedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "$ref": "#/components/schemas/GoLivePath" },
+                "needed": { "type": "boolean" },
+                "seenAt": {
+                  "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                }
+              },
+              "required": ["path", "needed", "seenAt"],
+              "additionalProperties": false
+            }
+          },
+          "passed": { "type": "boolean" }
+        },
+        "required": ["startedAt", "paths", "passed"],
+        "additionalProperties": false
+      },
       "GstStateCode": { "type": "string", "pattern": "^\\d{2}$" },
       "GstSummaryResponse": {
         "type": "object",
@@ -20775,6 +20961,44 @@
           "businessDate",
           "payload"
         ],
+        "additionalProperties": false
+      },
+      "SettingsExport": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "number", "const": 1 },
+          "exportedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "restaurantName": { "type": "string" },
+          "values": {
+            "type": "object",
+            "propertyNames": { "type": "string", "maxLength": 80 },
+            "additionalProperties": {}
+          }
+        },
+        "required": ["format", "exportedAt", "restaurantName", "values"],
+        "additionalProperties": false
+      },
+      "SettingsImportResponse": {
+        "type": "object",
+        "properties": {
+          "applied": { "type": "array", "items": { "type": "string" } },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": { "type": "string" },
+                "reason": {
+                  "type": "string",
+                  "enum": ["UNKNOWN", "VENDOR", "INVALID", "NOT_ALLOWED", "UNCHANGED"]
+                }
+              },
+              "required": ["key", "reason"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["applied", "skipped"],
         "additionalProperties": false
       },
       "SettingsResponse": {

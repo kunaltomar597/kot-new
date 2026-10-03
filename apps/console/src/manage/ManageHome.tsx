@@ -19,6 +19,7 @@ import { SettingsScreen } from './settings/SettingsScreen.js';
 import { FloorScreen } from './floor/FloorScreen.js';
 import { LicenceScreen } from './licence/LicenceScreen.js';
 import { QrCodesScreen } from './qr/QrCodesScreen.js';
+import { ReadinessChecklist } from './setup/ReadinessChecklist.js';
 import { SetupScreen } from './setup/SetupScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
@@ -173,6 +174,7 @@ export function ManageHome() {
           {managesMenu ? <Route path="menu/photos" element={<BulkPhotosScreen />} /> : null}
           {pairsDevices ? <Route path="devices" element={<DevicesScreen />} /> : null}
           {operates ? <Route path="setup" element={<SetupScreen />} /> : null}
+          {operates ? <Route path="setup/readiness" element={<ReadinessChecklist />} /> : null}
           {operates ? <Route path="restaurant" element={<RestaurantScreen />} /> : null}
           {operates ? <Route path="printing" element={<PrintingScreen />} /> : null}
           {operates ? <Route path="settings" element={<SettingsScreen />} /> : null}

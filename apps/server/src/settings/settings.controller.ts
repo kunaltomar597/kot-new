@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Put, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/common';
 import {
   SettingKeyParams,
+  SettingsExport,
+  type SettingsImportResponse,
   type SettingsResponse,
   type SettingView,
   UpdateSettingRequest,
@@ -25,6 +27,22 @@ export class SettingsController {
   @RequireCapability('OPERATIONS_CONFIGURE')
   async list(@Req() request: AuthenticatedRequest): Promise<SettingsResponse> {
     return { settings: await this.settings.list(principalOf(request)) };
+  }
+
+  @Get('export')
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  export(@Req() request: AuthenticatedRequest): Promise<SettingsExport> {
+    return this.settings.exportValues(principalOf(request).restaurantId);
+  }
+
+  @Post('import')
+  @HttpCode(200)
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  import(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(SettingsExport)) body: SettingsExport,
+  ): Promise<SettingsImportResponse> {
+    return this.settings.importValues(principalOf(request), body.values);
   }
 
   // The route needs OPERATIONS_CONFIGURE; the service also checks the capability the setting

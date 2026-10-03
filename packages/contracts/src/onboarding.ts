@@ -1,7 +1,7 @@
-import { ONBOARDING_STEPS } from '@rp/domain';
+import { GO_LIVE_PATHS, ONBOARDING_STEPS } from '@rp/domain';
 import { z } from 'zod';
 import { Pin } from './auth.js';
-import { Id } from './common.js';
+import { Id, Timestamp } from './common.js';
 
 /**
  * The first-run setup (ONB-004, P7-07): each step's status and the PC's activation (ONB-003).
@@ -71,3 +71,43 @@ export type FirstRunRequest = z.infer<typeof FirstRunRequest>;
 
 export const FirstRunResponse = z.object({ restaurantId: Id, ownerId: Id });
 export type FirstRunResponse = z.infer<typeof FirstRunResponse>;
+
+export const GoLivePath = z.enum(GO_LIVE_PATHS);
+export type GoLivePath = z.infer<typeof GoLivePath>;
+
+/** The guided go-live test (ONB-004 step 11): each path ticked as the server sees it happen. */
+export const GoLiveView = z.object({
+  startedAt: Timestamp.nullable(),
+  paths: z.array(
+    z.object({
+      path: GoLivePath,
+      /** The restaurant uses it (it has the devices or QR ordering). */
+      needed: z.boolean(),
+      seenAt: Timestamp.nullable(),
+    }),
+  ),
+  passed: z.boolean(),
+});
+export type GoLiveView = z.infer<typeof GoLiveView>;
+
+/** The restaurant's settings, to move to a new PC or a reinstall (ONB-010). */
+export const SettingsExport = z.object({
+  format: z.literal(1),
+  exportedAt: Timestamp,
+  restaurantName: z.string(),
+  /** Settings changed from their default, by key. */
+  values: z.record(z.string().max(80), z.unknown()),
+});
+export type SettingsExport = z.infer<typeof SettingsExport>;
+
+export const SettingsImportResponse = z.object({
+  applied: z.array(z.string()),
+  /** Keys left as they were, and why. */
+  skipped: z.array(
+    z.object({
+      key: z.string(),
+      reason: z.enum(['UNKNOWN', 'VENDOR', 'INVALID', 'NOT_ALLOWED', 'UNCHANGED']),
+    }),
+  ),
+});
+export type SettingsImportResponse = z.infer<typeof SettingsImportResponse>;
