@@ -11,6 +11,7 @@ import {
   NudgeResponse,
 } from './alerts.js';
 import { AuditListQuery, AuditListResponse, AuditVerifyResponse } from './audit.js';
+import { BackupsResponse, StartBackupResponse } from './backups.js';
 import {
   BillCustomerRequest,
   BillDiscountParams,
@@ -686,6 +687,35 @@ export const ROUTES = [
       ...standardErrors,
       409: { description: 'This PC is not connected to the Control Plane.', schema: ApiError },
       503: { description: 'The Control Plane could not be reached.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listBackups',
+    method: 'GET',
+    path: '/api/v1/backups',
+    summary: 'The backups: how they stand, the files kept and the latest runs',
+    description:
+      'DATA-002, DATA-005: the nightly full backup to the data drive and the second location, ' +
+      'each checked after it is written.',
+    tags: ['system'],
+    requirements: ['DATA-002', 'DATA-005'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: { 200: { description: 'The backups.', schema: BackupsResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'startBackup',
+    method: 'POST',
+    path: '/api/v1/backups',
+    summary: 'Back up now',
+    description:
+      'DATA-002: starts a full backup in the background; read the backups to follow it. Audited.',
+    tags: ['system'],
+    requirements: ['DATA-002', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      202: { description: 'Started.', schema: StartBackupResponse },
+      ...standardErrors,
+      409: { description: 'A backup is running already.', schema: ApiError },
     },
   },
   {

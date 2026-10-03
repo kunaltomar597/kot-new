@@ -1,4 +1,4 @@
-import type { SystemStatusResponse } from '@rp/contracts';
+import type { BackupsResponse, SystemStatusResponse } from '@rp/contracts';
 
 const GB = 1_024 ** 3;
 
@@ -55,6 +55,52 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
     },
     backup: null,
     licence: null,
+    ...overrides,
+  };
+}
+
+/** The Backups panel (P7-05a): two nights backed up, no second location yet. */
+export function backupsView(overrides: Partial<BackupsResponse> = {}): BackupsResponse {
+  return {
+    health: 'OK',
+    lastSuccessAt: '2026-10-01T23:05:00.000Z',
+    nextNightlyAt: '2026-10-02T23:00:00.000Z',
+    running: false,
+    locations: [
+      {
+        location: 'DATA_DRIVE',
+        path: 'D:\\RestaurantData\\backups\\full',
+        available: true,
+        files: [
+          {
+            name: 'rp-backup-20261001T230000Z-nightly.rpbk',
+            takenAt: '2026-10-01T23:00:00.000Z',
+            sizeBytes: 52 * 1_024 ** 2,
+          },
+          {
+            name: 'rp-backup-20260930T230000Z-nightly.rpbk',
+            takenAt: '2026-09-30T23:00:00.000Z',
+            sizeBytes: 51 * 1_024 ** 2,
+          },
+        ],
+      },
+      { location: 'SECOND', path: null, available: false, files: [] },
+    ],
+    runs: [
+      {
+        id: '0190a1b2-c3d4-7000-8000-00000000bb01',
+        kind: 'NIGHTLY',
+        status: 'SUCCEEDED',
+        startedAt: '2026-10-01T23:00:00.000Z',
+        finishedAt: '2026-10-01T23:05:00.000Z',
+        fileName: 'rp-backup-20261001T230000Z-nightly.rpbk',
+        sizeBytes: 52 * 1_024 ** 2,
+        secondCopy: 'NOT_SET',
+        error: null,
+        requestedBy: null,
+      },
+    ],
+    keyId: '0123456789abcdef',
     ...overrides,
   };
 }

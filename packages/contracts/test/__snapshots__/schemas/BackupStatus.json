@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["RUNNING", "SUCCEEDED", "PARTIAL", "FAILED"] },
+  "output": { "type": "string", "enum": ["RUNNING", "SUCCEEDED", "PARTIAL", "FAILED"] }
+}

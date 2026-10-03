@@ -15,6 +15,7 @@ import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { grantOf } from '../../app/modes.js';
 import { useLive } from '../../app/use-live.js';
+import { BackupsPanel } from './BackupsPanel.js';
 import { DiagnosticsPanel } from './DiagnosticsPanel.js';
 import { bytesParts, uptimeParts } from './system-view.js';
 
@@ -86,7 +87,7 @@ function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) 
  * The System page (P4-04, MGR-010, NFR-I03, DATA-006): the services, the data drive by kind of
  * data with its warning levels, the devices connected, the update on offer with "Install now"
  * (UPD-004), backups, the licence, the versions and "Send diagnostics to support" (UPD-008).
- * Backups show what they will once their module exists (P7-05). Read again every half minute.
+ * Backups have their own panel (P7-05a). Read again every half minute.
  */
 export function SystemScreen() {
   const t = useT();
@@ -301,21 +302,7 @@ export function SystemScreen() {
           )}
         </section>
 
-        <section className="device-group" aria-labelledby="system-backup">
-          <h3 id="system-backup" className="device-group__heading">
-            {t('systemPage.backup.title')}
-          </h3>
-          <p className="dashboard-section__hint">
-            {system.backup === null
-              ? t('systemPage.backup.notSetUp')
-              : system.backup.lastSuccessAt === null
-                ? t('systemPage.backup.never')
-                : t(
-                    'systemPage.backup.last',
-                    displayDateTime(new Date(system.backup.lastSuccessAt)),
-                  )}
-          </p>
-        </section>
+        <BackupsPanel />
 
         <section className="device-group" aria-labelledby="system-licence">
           <h3 id="system-licence" className="device-group__heading">

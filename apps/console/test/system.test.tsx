@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
-import { systemStatus } from './system-fixture.js';
+import { backupsView, systemStatus } from './system-fixture.js';
 
 const PATH = '/manage/system';
 
@@ -13,7 +13,8 @@ function systemServer(...answers: ReturnType<typeof systemStatus>[]): FakeServer
     .on('POST', '/api/v1/system/update/approve', () => ({
       status: 200,
       body: systemStatus(),
-    }));
+    }))
+    .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView() }));
 }
 
 const section = async (name: string) =>
@@ -73,10 +74,78 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
       devices.getByText(t('systemPage.devices.line', { connected: 3, paired: 4 })),
     ).toBeVisible();
     const backup = await section(t('systemPage.backup.title'));
-    expect(backup.getByText(t('systemPage.backup.notSetUp'))).toBeVisible();
+    expect(await backup.findByText(t('backups.health.OK'))).toBeVisible();
     const versions = await section(t('systemPage.versions.title'));
     expect(versions.getByText('16.4')).toBeVisible();
     await expectNoAxeViolations(container);
+  });
+
+  it('[DATA-002] [DATA-005] shows the backups, where they are kept, and backs up now', async () => {
+    const running = backupsView({ running: true });
+    const done = backupsView({
+      lastSuccessAt: '2026-10-02T09:32:00.000Z',
+      runs: [
+        {
+          id: '0190a1b2-c3d4-7000-8000-00000000bb02',
+          kind: 'MANUAL',
+          status: 'PARTIAL',
+          startedAt: '2026-10-02T09:30:00.000Z',
+          finishedAt: '2026-10-02T09:32:00.000Z',
+          fileName: 'rp-backup-20261002T093000Z-manual.rpbk',
+          sizeBytes: 53 * 1_024 ** 2,
+          secondCopy: 'FAILED',
+          error: 'The copy to the second location failed: the drive is not there.',
+          requestedBy: 'Test manager',
+        },
+        ...backupsView().runs,
+      ],
+      health: 'FAILED',
+    });
+    const fake = systemServer()
+      .on(
+        'GET',
+        '/api/v1/backups',
+        () => ({ status: 200, body: backupsView() }),
+        () => ({ status: 200, body: running }),
+        () => ({ status: 200, body: done }),
+      )
+      .on('POST', '/api/v1/backups', () => ({
+        status: 202,
+        body: { run: { ...done.runs[0], status: 'RUNNING', finishedAt: null, error: null } },
+      }));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+      const backup = await section(t('systemPage.backup.title'));
+      expect(await backup.findByText(t('backups.health.OK'))).toBeVisible();
+      expect(backup.getByText(t('backups.kept', { count: 2 }))).toBeVisible();
+      expect(backup.getByText(/No second location is set/)).toBeVisible();
+      expect(backup.getByRole('link', { name: t('backups.openSettings') })).toHaveAttribute(
+        'href',
+        '/manage/settings',
+      );
+      const table = within(backup.getByRole('table', { name: t('backups.latest') }));
+      expect(table.getByText(t('backups.status.SUCCEEDED'))).toBeVisible();
+      expect(table.getByText(t('backups.notCopied'))).toBeVisible();
+      await expectNoAxeViolations(container);
+
+      await user.click(backup.getByRole('button', { name: t('backups.now') }));
+      expect(await screen.findByText(t('backups.started'))).toBeVisible();
+      expect(fake.callsTo('POST', '/api/v1/backups')).toHaveLength(1);
+      expect(await backup.findByRole('button', { name: t('backups.running') })).toBeDisabled();
+      await vi.advanceTimersByTimeAsync(3_100);
+      expect(await backup.findByText(t('backups.health.FAILED'))).toBeVisible();
+      expect(
+        backup.getByText('The copy to the second location failed: the drive is not there.'),
+      ).toBeVisible();
+      expect(
+        backup.getByText(
+          t('backups.kindBy', { kind: t('backups.kind.MANUAL'), name: 'Test manager' }),
+        ),
+      ).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('[DATA-006] warns when the drive is getting full', async () => {

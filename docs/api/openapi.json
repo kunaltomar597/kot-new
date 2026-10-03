@@ -896,6 +896,84 @@
         "x-requirements": ["AUTH-003", "AUTH-013"]
       }
     },
+    "/api/v1/backups": {
+      "get": {
+        "operationId": "listBackups",
+        "summary": "The backups: how they stand, the files kept and the latest runs",
+        "description": "DATA-002, DATA-005: the nightly full backup to the data drive and the second location, each checked after it is written.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The backups.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BackupsResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["DATA-002", "DATA-005"]
+      },
+      "post": {
+        "operationId": "startBackup",
+        "summary": "Back up now",
+        "description": "DATA-002: starts a full backup in the background; read the backups to follow it. Audited.",
+        "tags": ["system"],
+        "responses": {
+          "202": {
+            "description": "Started.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StartBackupResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "A backup is running already.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["DATA-002", "AUD-001"]
+      }
+    },
     "/api/v1/bills": {
       "post": {
         "operationId": "openBill",
@@ -13188,6 +13266,99 @@
         "required": ["valid", "checkedEntries", "head", "verifiedAt"],
         "additionalProperties": false
       },
+      "BackupHealth": { "type": "string", "enum": ["OK", "FAILED", "OVERDUE", "NONE"] },
+      "BackupKind": { "type": "string", "enum": ["NIGHTLY", "MANUAL"] },
+      "BackupLocation": { "type": "string", "enum": ["DATA_DRIVE", "SECOND"] },
+      "BackupRunView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "kind": { "$ref": "#/components/schemas/BackupKind" },
+          "status": { "$ref": "#/components/schemas/BackupStatus" },
+          "startedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "finishedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "fileName": { "type": ["string", "null"] },
+          "sizeBytes": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "secondCopy": {
+            "anyOf": [
+              { "type": "string", "enum": ["COPIED", "NOT_SET", "FAILED"] },
+              { "type": "null" }
+            ]
+          },
+          "error": { "type": ["string", "null"] },
+          "requestedBy": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "fileName",
+          "sizeBytes",
+          "secondCopy",
+          "error",
+          "requestedBy"
+        ],
+        "additionalProperties": false
+      },
+      "BackupStatus": { "type": "string", "enum": ["RUNNING", "SUCCEEDED", "PARTIAL", "FAILED"] },
+      "BackupsResponse": {
+        "type": "object",
+        "properties": {
+          "health": { "$ref": "#/components/schemas/BackupHealth" },
+          "lastSuccessAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "nextNightlyAt": { "$ref": "#/components/schemas/Timestamp" },
+          "running": { "type": "boolean" },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "location": { "$ref": "#/components/schemas/BackupLocation" },
+                "path": { "type": ["string", "null"] },
+                "available": { "type": "boolean" },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string" },
+                      "takenAt": { "$ref": "#/components/schemas/Timestamp" },
+                      "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["name", "takenAt", "sizeBytes"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["location", "path", "available", "files"],
+              "additionalProperties": false
+            }
+          },
+          "runs": { "type": "array", "items": { "$ref": "#/components/schemas/BackupRunView" } },
+          "keyId": { "type": "string" }
+        },
+        "required": [
+          "health",
+          "lastSuccessAt",
+          "nextNightlyAt",
+          "running",
+          "locations",
+          "runs",
+          "keyId"
+        ],
+        "additionalProperties": false
+      },
       "BasisPoints": { "type": "integer", "minimum": 0, "maximum": 10000 },
       "BestSellersResponse": {
         "type": "object",
@@ -21408,6 +21579,12 @@
           "createdAt",
           "updatedAt"
         ],
+        "additionalProperties": false
+      },
+      "StartBackupResponse": {
+        "type": "object",
+        "properties": { "run": { "$ref": "#/components/schemas/BackupRunView" } },
+        "required": ["run"],
         "additionalProperties": false
       },
       "Station": {

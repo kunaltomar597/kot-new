@@ -82,7 +82,8 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     });
     // The test kit pairs one POS terminal; it has no live connection here.
     expect(system.devices).toEqual([{ type: 'POS', paired: 1, connected: 0 }]);
-    expect(system.backup).toBeNull();
+    // No backup made yet (P7-05a).
+    expect(system.backup).toEqual({ lastSuccessAt: null, lastError: null });
     expect(system.licence).toBeNull();
   });
 

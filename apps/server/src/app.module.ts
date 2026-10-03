@@ -1,6 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { AuditModule } from './audit/audit.module.js';
+import { BackupsModule } from './backups/backups.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CloudModule } from './cloud/cloud.module.js';
 import { OnboardingModule } from './onboarding/onboarding.module.js';
@@ -80,6 +81,7 @@ export class AppModule {
         OnboardingModule,
         RelayModule,
         SystemModule,
+        BackupsModule,
         HealthModule,
       ],
       providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }],

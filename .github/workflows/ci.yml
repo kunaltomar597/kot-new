@@ -33,6 +33,8 @@ jobs:
           --health-retries 20
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # pg_dump and pg_restore for the backup tests (P7-05a), from the runner's PostgreSQL 16.
+      RP_PG_BIN: /usr/lib/postgresql/16/bin
     steps:
       - uses: actions/checkout@v7
 
@@ -56,6 +58,10 @@ jobs:
 
       - name: Format
         run: pnpm format:check
+
+      - name: PostgreSQL client programs
+        # The backup tests (P7-05a) run pg_dump and pg_restore 16; the runner image usually has them.
+        run: test -x "$RP_PG_BIN/pg_dump" || (sudo apt-get update && sudo apt-get install -y postgresql-client-16)
 
       - name: Build packages
         run: pnpm build

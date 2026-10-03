@@ -63,6 +63,8 @@ export async function startServer(
       DATABASE_URL: databaseUrl,
       RP_DATA_DIR: dataDir,
       RP_CONSOLE_DIR: CONSOLE_DIST,
+      // No nightly backup during the tests (P7-05a); pg_dump may not be installed.
+      RP_BACKUPS: 'off',
       LOG_LEVEL: 'warn',
     },
     stdio: ['ignore', 'inherit', 'inherit'],

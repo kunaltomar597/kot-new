@@ -1964,3 +1964,41 @@ model RelayServiceRequest {
   @@index([restaurantId, outcome])
   @@map("relay_service_requests")
 }
+
+enum BackupKind {
+  NIGHTLY
+  MANUAL
+}
+
+enum BackupStatus {
+  RUNNING
+  SUCCEEDED
+  /// Made and checked on the data drive, but the copy at the second location failed.
+  PARTIAL
+  FAILED
+}
+
+/// One backup (DATA-002, DATA-005, P7-05a): the nightly full backup or a "Back up now". The
+/// backup holds the whole database, so the record is installation-wide.
+model BackupRun {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  kind          BackupKind
+  status        BackupStatus
+  startedAt     DateTime     @map("started_at") @db.Timestamptz(3)
+  finishedAt    DateTime?    @map("finished_at") @db.Timestamptz(3)
+  /// The file's name, the same in every location.
+  fileName      String?      @map("file_name")
+  sizeBytes     BigInt?      @map("size_bytes")
+  /// SHA-256 of the encrypted file, hex.
+  sha256        String?
+  /// COPIED, NOT_SET or FAILED: the copy at the second location.
+  secondCopy    String?      @map("second_copy")
+  /// What went wrong, in plain words, without secrets.
+  error         String?
+  requestedById String?      @map("requested_by_id") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([startedAt])
+  @@map("backup_runs")
+}

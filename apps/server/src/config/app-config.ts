@@ -90,6 +90,16 @@ export const AppConfigSchema = z.object({
    * reports leave the PC.
    */
   errorDsn: z.url({ protocol: /^https?$/ }).optional(),
+  /**
+   * The folder of the PostgreSQL client programs (`pg_dump`, `pg_restore`) for backups (P7-05),
+   * set by the installer; unset, they are found on the PATH.
+   */
+  pgBin: z.string().min(1).optional(),
+  /**
+   * The nightly backup (DATA-002): always on in production; development and the end-to-end tests
+   * may turn it off (`RP_BACKUPS=off`) where `pg_dump` is not installed. "Back up now" still works.
+   */
+  backups: z.enum(['on', 'off']).default('on'),
   /** The pagers' MQTT broker (P2-04, PGR-005): on by default; over TLS when `tls` is on. */
   mqtt: z.enum(['on', 'off']).default('on'),
   /** MQTT port; 8883 is MQTTS. 0 picks a free port (tests). */
@@ -165,6 +175,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     qrSiteUrl: env.RP_QR_SITE_URL,
     productVersion: env.RP_PRODUCT_VERSION,
     errorDsn: env.RP_ERROR_DSN === '' ? undefined : env.RP_ERROR_DSN,
+    pgBin: env.RP_PG_BIN === '' ? undefined : env.RP_PG_BIN,
+    backups: env.RP_BACKUPS,
     mqtt: env.RP_MQTT,
     mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,
@@ -192,6 +204,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (config.nodeEnv === 'production' && config.qrSiteUrl?.startsWith('https://') === false) {
     throw new ConfigError('In production RP_QR_SITE_URL must use https://');
+  }
+  // DATA-002: backups are automatic in production.
+  if (config.nodeEnv === 'production' && config.backups === 'off') {
+    throw new ConfigError('In production the nightly backup cannot be switched off');
   }
   // LIC-003: in production the licence always applies, checked only against the keys built in.
   if (config.nodeEnv === 'production') {

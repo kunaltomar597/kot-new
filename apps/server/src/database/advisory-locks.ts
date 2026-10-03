@@ -11,4 +11,6 @@ export const ADVISORY_LOCKS = {
   outboxSequence: 7_261_000_003n,
   /** Serialises changes to the restaurant's setup: unique names and one default series (P1-01b). */
   restaurantSetup: 7_261_000_004n,
+  /** Lets only one backup run at a time (P7-05a). */
+  backupStart: 7_261_000_005n,
 } as const;

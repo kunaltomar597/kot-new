@@ -1945,3 +1945,29 @@ body {
     border-color: #000;
   }
 }
+
+/* Backups on the System page (P7-05a). */
+.backups__path {
+  overflow-wrap: anywhere;
+  font-family: var(--rp-font-mono, monospace);
+}
+
+.backups-table {
+  width: 100%;
+  margin-top: var(--rp-space-3);
+  border-collapse: collapse;
+}
+
+.backups-table caption {
+  padding-bottom: var(--rp-space-2);
+  font-weight: 600;
+  text-align: start;
+}
+
+.backups-table th,
+.backups-table td {
+  padding: var(--rp-space-2);
+  border-bottom: 1px solid var(--rp-color-border);
+  text-align: start;
+  vertical-align: top;
+}

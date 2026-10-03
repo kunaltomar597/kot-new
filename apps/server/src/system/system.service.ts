@@ -8,6 +8,7 @@ import {
   type SystemStatusResponse,
 } from '@rp/contracts';
 import type { Principal } from '../auth/principal.js';
+import { backupSummary } from '../backups/backup-state.js';
 import { HeartbeatService } from '../cloud/heartbeat.service.js';
 import { readOfferedUpdate } from '../cloud/control-plane-state.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
@@ -57,18 +58,29 @@ export class SystemService {
 
   async status(principal: Principal): Promise<SystemStatusResponse> {
     const { restaurantId } = principal;
-    const [database, settings, postgres, space, categories, devices, offered, approval, open] =
-      await Promise.all([
-        this.prisma.ping(),
-        this.settings.snapshot(restaurantId),
-        this.postgresVersion(),
-        driveSpace(this.config.dataDir),
-        this.categories(),
-        this.devices(restaurantId),
-        readOfferedUpdate(this.prisma),
-        readInstallApproval(this.prisma),
-        this.prisma.tableSession.count({ where: { restaurantId, status: 'OPEN' } }),
-      ]);
+    const [
+      database,
+      settings,
+      postgres,
+      space,
+      categories,
+      devices,
+      offered,
+      approval,
+      open,
+      backup,
+    ] = await Promise.all([
+      this.prisma.ping(),
+      this.settings.snapshot(restaurantId),
+      this.postgresVersion(),
+      driveSpace(this.config.dataDir),
+      this.categories(),
+      this.devices(restaurantId),
+      readOfferedUpdate(this.prisma),
+      readInstallApproval(this.prisma),
+      this.prisma.tableSession.count({ where: { restaurantId, status: 'OPEN' } }),
+      backupSummary(this.prisma),
+    ]);
     const approverId = approval?.approvedByStaffId ?? null;
     const approver =
       approverId === null
@@ -141,7 +153,10 @@ export class SystemService {
         maintenanceWindow: settings.get('updates.maintenanceWindow'),
         openTables: open,
       },
-      backup: null,
+      backup: {
+        lastSuccessAt: backup.lastSuccessAt?.toISOString() ?? null,
+        lastError: backup.lastError,
+      },
       licence: null,
     };
   }
