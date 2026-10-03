@@ -30,6 +30,8 @@ export const RestoreRecord = z.object({
   restoredAt: z.iso.datetime(),
   backupCreatedAt: z.iso.datetime(),
   fileName: z.string().nullable(),
+  /** For a restore to a point in time (P7-05c): the last change brought back. */
+  restoredTo: z.iso.datetime().nullable().default(null),
   requestedBy: z.object({ staffId: z.string(), deviceId: z.string().nullable() }).nullable(),
   audited: z.boolean(),
 });
@@ -51,6 +53,13 @@ export interface RestoreOptions {
   readonly ownerRole?: string;
   /** Who asked, for the audit entry the server writes when it starts. */
   readonly requestedBy?: { readonly staffId: string; readonly deviceId: string | null } | null;
+  /**
+   * A database dump to restore instead of the backup's own (a point in time, P7-05c); the
+   * backup still brings the secrets, photos and TLS files.
+   */
+  readonly databaseDump?: string;
+  /** For a point in time: the last change the dump holds, for the record. */
+  readonly restoredTo?: Date | null;
   readonly now?: () => Date;
   readonly log?: (message: string) => void;
 }
@@ -191,7 +200,10 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
     log('Unpacking the backup');
     let secrets: BackupSecrets | undefined;
     await readArchive(createReadStream(options.file).pipe(decryptBackup(options.key)), (name) => {
-      if (name === DATABASE_DUMP) return fileSink(join(staging, DATABASE_DUMP));
+      if (name === DATABASE_DUMP) {
+        if (options.databaseDump === undefined) return fileSink(join(staging, DATABASE_DUMP));
+        return { write: () => undefined, end: () => undefined };
+      }
       if (name.startsWith(FILES_PREFIX)) return fileSink(join(staging, ...name.split('/')));
       const parts: Buffer[] = [];
       return {
@@ -211,14 +223,17 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
 
     log('Restoring the database');
     await withClient(adminUrl, async (admin) => {
-      const inUse = await admin.query<{ n: number }>(
-        'SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()',
+      const inUse = await admin.query<{ who: string | null }>(
+        // People's connections only: PostgreSQL stops autovacuum itself to rename a database.
+        `SELECT nullif(application_name, '') AS who FROM pg_stat_activity
+          WHERE datname = $1 AND pid <> pg_backend_pid() AND backend_type = 'client backend'`,
         [target],
       );
-      if ((inUse.rows[0]?.n ?? 0) > 0) {
+      if (inUse.rows.length > 0) {
+        const who = [...new Set(inUse.rows.map((row) => row.who ?? 'a program'))].join(', ');
         throw new RestoreError(
           'DATABASE_IN_USE',
-          'The database is in use. Stop the restaurant server before restoring.',
+          `The database is in use (${who}). Stop the restaurant server before restoring.`,
         );
       }
       for (const role of GROUP_ROLES) {
@@ -237,7 +252,7 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
         admin.query(`DROP DATABASE IF EXISTS ${quoteIdent(restoring)}`).then(() => undefined),
       ),
     );
-    const dump = join(staging, DATABASE_DUMP);
+    const dump = options.databaseDump ?? join(staging, DATABASE_DUMP);
     const restoringUrl = withDatabase(adminUrl, restoring);
     // Everything is restored as the owner role, except the default privileges: those name the
     // role that ran the migrations on the old PC, so they are applied for the owner role below.
@@ -297,6 +312,7 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
             restoredAt: startedAt.toISOString(),
             backupCreatedAt: info.createdAt,
             fileName: options.file.split(/[\\/]/).at(-1) ?? null,
+            restoredTo: options.restoredTo?.toISOString() ?? null,
             requestedBy: options.requestedBy ?? null,
             audited: false,
           } satisfies RestoreRecord),

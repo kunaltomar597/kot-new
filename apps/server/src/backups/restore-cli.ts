@@ -6,18 +6,25 @@ import { createSecretStore } from '../auth/secret-store.js';
 import { type AppConfig, loadConfig } from '../config/app-config.js';
 import { verifyBackupFile } from './backup-contents.js';
 import { readBackupHeader } from './backup-file.js';
+import { join } from 'node:path';
 import { runPendingRestore } from './pending-restore.js';
+import { restorePointInTime } from './point-in-time.js';
 import { parseRecoveryKey } from './recovery-key.js';
 import { restoreBackup } from './restore.js';
 
 const USAGE = `Usage:
   node dist/backups/restore-cli.js verify <backup file>
   node dist/backups/restore-cli.js restore <backup file>
+  node dist/backups/restore-cli.js pitr <time | latest> [<backup folder> ...]
   node dist/backups/restore-cli.js pending
 
 verify   checks a backup end to end and says what it holds.
 restore  replaces this PC's database, secrets, photos and TLS files with the backup's. Stop the
          restaurant server first. The earlier database is kept as <name>_before_<time>.
+pitr     restores the database to a moment (an ISO time such as 2026-10-03T14:30:00+05:30) or to
+         the latest archived change, from the continuous backup: the data drive's, then each
+         backup folder given (the second location's rp-backups folder). Photos, TLS files and
+         secrets come from the nightly backup before that moment. Stop the server first.
 pending  runs a restore requested from the System page (the Windows service runs it before the
          server starts).
 
@@ -88,6 +95,38 @@ export async function runRestoreCli(
     });
     const seconds = Math.round((result.finishedAt.getTime() - result.startedAt.getTime()) / 1000);
     log(`Restored the backup made ${result.info.createdAt} in ${String(seconds)} s.`);
+    if (result.previousDatabase !== null) {
+      log(`The database as it was before is kept as ${result.previousDatabase}.`);
+    }
+    log('Start the restaurant server. Every device refreshes everything when it reconnects.');
+    return 0;
+  }
+  if (command === 'pitr' && file !== undefined) {
+    const to = file === 'latest' ? null : new Date(file);
+    if (to !== null && Number.isNaN(to.getTime())) {
+      log('That is not a time. Use an ISO time such as 2026-10-03T14:30:00+05:30, or latest.');
+      return 2;
+    }
+    const extra = argv.slice(2);
+    const local = join(config.dataDir, 'backups');
+    const result = await restorePointInTime({
+      to,
+      roots: [local, ...extra],
+      fullBackupFolders: [join(local, 'full'), ...extra],
+      key: await keyFor(config, env),
+      databaseUrl: config.databaseUrl,
+      adminUrl: adminUrlOf(config),
+      dataDir: config.dataDir,
+      secrets: createSecretStore(config),
+      pgBin: config.pgBin,
+      log,
+    });
+    const seconds = Math.round((result.finishedAt.getTime() - result.startedAt.getTime()) / 1000);
+    log(
+      `Restored from ${result.baseBackup} to ${result.restoredTo?.toISOString() ?? 'its start'} in ${String(seconds)} s.`,
+    );
+    if (!result.reachedTarget)
+      log('The archive ended before that time: everything archived is back.');
     if (result.previousDatabase !== null) {
       log(`The database as it was before is kept as ${result.previousDatabase}.`);
     }

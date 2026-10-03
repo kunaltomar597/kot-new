@@ -18,6 +18,7 @@ import type {
   RecoveryKeyResponse,
   RestoreBackupRequest,
   RestoreBackupResponse,
+  RestorePointInTimeRequest,
 } from '@rp/contracts';
 import {
   backupHealth,
@@ -51,6 +52,8 @@ import {
 } from './backup-contents.js';
 import { BackupFileError, backupKeyId, encryptBackup, readBackupHeader } from './backup-file.js';
 import { backupSummary } from './backup-state.js';
+import { ContinuousBackupService } from './continuous-backup.service.js';
+import { fullBackupFor, locateRecovery, PointInTimeError } from './point-in-time.js';
 import { readRestoreOutcome, readRestoreRequest, saveRestoreRequest } from './pending-restore.js';
 import { pgProgram, runPgTool } from './pg-tools.js';
 import { formatRecoveryKey } from './recovery-key.js';
@@ -114,6 +117,13 @@ const errors = {
       'BACKUP_KEY_MISMATCH',
       'That backup was made with another backup key. Restore it with the restore tool and the recovery key of the PC that made it.',
     ),
+  future: () => new AppError(422, 'POINT_IN_TIME_FUTURE', 'Choose a time that has passed.'),
+  pointInTime: (error: PointInTimeError) =>
+    new AppError(
+      422,
+      error.code === 'NO_FULL_BACKUP' ? 'NO_FULL_BACKUP' : 'NO_BASE_BACKUP',
+      error.message,
+    ),
 };
 
 /**
@@ -140,6 +150,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(BACKUP_OPTIONS) private readonly options: BackupOptions,
     private readonly lifecycle: ServerLifecycle,
+    private readonly continuous: ContinuousBackupService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -263,6 +274,9 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
     request: RestoreBackupRequest,
   ): Promise<RestoreBackupResponse> {
     const settings = await this.settings.snapshot(principal.restaurantId);
+    if ('pointInTime' in request) {
+      return this.requestPointInTime(principal, request, settings.get('backups.secondLocation'));
+    }
     let folder = this.dataDriveFolder;
     if (request.location === 'SECOND') {
       const second = settings.get('backups.secondLocation');
@@ -303,7 +317,68 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
     );
     this.logger.warn({ fileName: request.fileName }, 'Restarting to restore a backup');
     this.lifecycle.requestRestart();
-    return { requestedAt: requestedAt.toISOString(), backupCreatedAt: header.createdAt };
+    return {
+      requestedAt: requestedAt.toISOString(),
+      backupCreatedAt: header.createdAt,
+      pointInTime: null,
+    };
+  }
+
+  /**
+   * "Restore to a moment" (DATA-004, P7-05c): checks there is a base backup from before it, made
+   * with this PC's key, and a nightly backup for the photos and keys; then as a file restore.
+   */
+  private async requestPointInTime(
+    principal: Principal,
+    request: RestorePointInTimeRequest,
+    secondLocation: string | null,
+  ): Promise<RestoreBackupResponse> {
+    const requestedAt = this.options.now();
+    const to = request.pointInTime.to === null ? null : new Date(request.pointInTime.to);
+    if (to !== null && to.getTime() > requestedAt.getTime()) throw errors.future();
+    const second = this.continuous.secondRoot(secondLocation);
+    const roots = [this.continuous.dataDriveRoot, ...(second === null ? [] : [second])];
+    const fullBackupFolders = [this.dataDriveFolder, ...(second === null ? [] : [second])];
+    const key = await this.secrets.get(BACKUP_KEY);
+    let located;
+    try {
+      located = await locateRecovery(roots, to);
+      await fullBackupFor(fullBackupFolders, to ?? requestedAt, key);
+    } catch (error) {
+      if (error instanceof PointInTimeError) throw errors.pointInTime(error);
+      throw error;
+    }
+    const header = await readBackupHeader(located.file);
+    if (header.keyId !== backupKeyId(key)) throw errors.otherKey();
+    if ((await this.prisma.backupRun.count({ where: { status: 'RUNNING' } })) > 0) {
+      throw errors.running();
+    }
+    await saveRestoreRequest(this.config.dataDir, {
+      pointInTime: { to: to?.toISOString() ?? null, roots, fullBackupFolders },
+      requestedAt: requestedAt.toISOString(),
+      requestedBy: { staffId: principal.staffId, deviceId: principal.deviceId },
+    });
+    await this.prisma.transaction((tx) =>
+      this.audit.record(tx, {
+        action: 'RESTORE_REQUESTED',
+        entityType: 'backup',
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        after: {
+          pointInTime: to?.toISOString() ?? 'LATEST',
+          baseBackup: located.base.name,
+        },
+        reason: request.reason,
+      }),
+    );
+    this.logger.warn({ to: to?.toISOString() ?? 'latest' }, 'Restarting to restore to a moment');
+    this.lifecycle.requestRestart();
+    return {
+      requestedAt: requestedAt.toISOString(),
+      backupCreatedAt: located.base.endAt.toISOString(),
+      pointInTime: to?.toISOString() ?? null,
+    };
   }
 
   /** The recovery key for the Owner to keep on paper (P7-05b). Audited. */
@@ -352,6 +427,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
             restoredAt: record.restoredAt,
             backupCreatedAt: record.backupCreatedAt,
             fileName: record.fileName,
+            restoredTo: record.restoredTo,
           },
           reason: 'Restored from a backup',
         });
@@ -368,12 +444,13 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
   async overview(restaurantId: string): Promise<BackupsResponse> {
     const settings = await this.settings.snapshot(restaurantId);
     const now = this.options.now();
-    const [summary, runs, key, pending, restored] = await Promise.all([
+    const [summary, runs, key, pending, restored, continuous] = await Promise.all([
       backupSummary(this.prisma),
       this.prisma.backupRun.findMany({ orderBy: { startedAt: 'desc' }, take: RUNS_SHOWN }),
       this.secrets.get(BACKUP_KEY),
       readRestoreRequest(this.config.dataDir),
       readRestoreOutcome(this.config.dataDir),
+      this.continuous.view(),
     ]);
     const second = settings.get('backups.secondLocation');
     const names = await this.namesOf(runs);
@@ -399,6 +476,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
       ],
       runs: runs.map((run) => this.viewOf(run, names)),
       keyId: backupKeyId(key),
+      continuous,
       restorePending: pending !== null,
       lastRestore:
         restored === null
@@ -408,6 +486,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
               ok: restored.ok,
               error: restored.error,
               backupCreatedAt: restored.backupCreatedAt,
+              restoredTo: restored.restoredTo,
               previousDatabase: restored.previousDatabase,
             },
     };

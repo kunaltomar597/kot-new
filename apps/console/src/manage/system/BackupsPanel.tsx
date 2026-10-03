@@ -1,4 +1,4 @@
-import type { BackupsResponse } from '@rp/contracts';
+import type { BackupsResponse, ContinuousBackupView } from '@rp/contracts';
 import { displayDateTime } from '@rp/domain';
 import { Badge, Button, useToast } from '@rp/ui-web';
 import { useCallback, useEffect, useState } from 'react';
@@ -18,6 +18,12 @@ const HEALTH_TONE = {
   FAILED: 'danger',
   OVERDUE: 'warning',
   NONE: 'warning',
+} as const;
+const CONTINUOUS_TONE = {
+  NOT_SET_UP: 'neutral',
+  OK: 'success',
+  BEHIND: 'warning',
+  FAILING: 'danger',
 } as const;
 const STATUS_TONE = {
   RUNNING: 'info',
@@ -84,11 +90,15 @@ export function BackupsPanel() {
       {view === undefined ? null : (
         <>
           <p className="staff-row__states">
-            <Badge tone={HEALTH_TONE[view.health]}>{t(`backups.health.${view.health}`)}</Badge>
+            <Badge tone={HEALTH_TONE[view.health]}>{t(`backups.health.${view.health}`)}</Badge>{' '}
+            <Badge tone={CONTINUOUS_TONE[view.continuous.state]}>
+              {t(`backups.continuous.state.${view.continuous.state}`)}
+            </Badge>
           </p>
+          <ContinuousSummary view={view.continuous} at={at} />
           {restarting === undefined ? null : (
             <p role="status" className="console-notice console-notice--info">
-              {t('backups.restore.restarting', { when: at(restarting) })}
+              {t('backups.restore.restarting', { when: restarting })}
             </p>
           )}
           {view.restorePending && restarting === undefined ? (
@@ -96,12 +106,17 @@ export function BackupsPanel() {
           ) : null}
           {view.lastRestore === null ? null : view.lastRestore.ok ? (
             <p className="dashboard-section__hint">
-              {view.lastRestore.backupCreatedAt === null
-                ? t('backups.restore.doneAt', { at: at(view.lastRestore.at) })
-                : t('backups.restore.done', {
+              {view.lastRestore.restoredTo !== null
+                ? t('backups.restore.doneTo', {
                     at: at(view.lastRestore.at),
-                    when: at(view.lastRestore.backupCreatedAt),
-                  })}{' '}
+                    when: at(view.lastRestore.restoredTo),
+                  })
+                : view.lastRestore.backupCreatedAt === null
+                  ? t('backups.restore.doneAt', { at: at(view.lastRestore.at) })
+                  : t('backups.restore.done', {
+                      at: at(view.lastRestore.at),
+                      when: at(view.lastRestore.backupCreatedAt),
+                    })}{' '}
               {view.lastRestore.previousDatabase === null
                 ? null
                 : t('backups.restore.kept', { name: view.lastRestore.previousDatabase })}
@@ -187,9 +202,9 @@ export function BackupsPanel() {
               onClose={() => {
                 setRestoring(false);
               }}
-              onRequested={(backupCreatedAt) => {
+              onRequested={(when) => {
                 setRestoring(false);
-                setRestarting(backupCreatedAt);
+                setRestarting(when);
               }}
             />
           ) : null}
@@ -239,5 +254,38 @@ export function BackupsPanel() {
         </>
       )}
     </section>
+  );
+}
+
+/** The continuous backup (DATA-002, P7-05c): how far the log is archived and how far back it reaches. */
+function ContinuousSummary({
+  view,
+  at,
+}: {
+  view: ContinuousBackupView;
+  at: (iso: string) => string;
+}) {
+  const t = useT();
+  if (view.state === 'NOT_SET_UP') {
+    return <p className="dashboard-section__hint">{t('backups.continuous.notSetUp')}</p>;
+  }
+  return (
+    <>
+      <p className="dashboard-section__hint">
+        {view.lastArchivedAt === null
+          ? t('backups.continuous.nothingArchived')
+          : t('backups.continuous.archived', { when: at(view.lastArchivedAt) })}{' '}
+        {view.restorableFrom === null
+          ? t('backups.continuous.noBase')
+          : t('backups.continuous.restorable', { when: at(view.restorableFrom) })}{' '}
+        {view.waiting > 0 ? t('backups.continuous.waiting', { count: view.waiting }) : null}{' '}
+        {view.secondLocationBehind > 0
+          ? t('backups.continuous.behind', { count: view.secondLocationBehind })
+          : null}
+      </p>
+      {view.error === null ? null : (
+        <p className="console-notice console-notice--danger">{view.error}</p>
+      )}
+    </>
   );
 }

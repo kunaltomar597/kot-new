@@ -1,4 +1,4 @@
-# 25. Restore rehearsal before the pilot (DATA-004, P7-05b)
+# 25. Restore rehearsal before the pilot (DATA-004, P7-05b, P7-05c)
 
 The BRD wants the restore documented and rehearsed before the pilot. Claude has built and tested
 the restore on the build Mac and in CI. This rehearsal checks it on the real Windows restaurant PC,
@@ -53,16 +53,37 @@ You need:
    - check the licence is active;
    - check the vendor's fleet view shows the installation online.
 
+## D. Restore to a moment (30 minutes, when the restaurant is closed)
+
+This checks the continuous backup (P7-05c). It needs the installer's set-up for it (System, then
+Backups, says "Continuous backup on").
+
+1. Note the time, to the minute: call it T. Wait two minutes.
+2. Make a test order and settle it. Note its bill number. Wait 6 minutes, so the log is archived.
+3. System, then Backups, then "Restore from a backup…". Choose "A moment I choose", enter T, give a
+   reason and confirm with the second factor. Time it until the console is back.
+4. Check that the test order and its bill are gone, and that everything before T is there.
+5. Make another test order. Then on the spare PC (after part C), with the server stopped and the
+   USB drive's `rp-backups` folder copied over:
+
+   ```sh
+   node dist\backups\restore-cli.js pitr latest E:\rp-backups
+   ```
+
+   Check that the order from step 5 is there if it was more than 5 minutes old when the USB copy
+   was made (that is the RPO).
+
 ## Report back
 
 Paste these into a Claude session, or into `docs/build/restore-timing.md`:
 
 - the database size (System, then Storage);
 - the backup file's size;
-- the time for each of steps B and C;
+- the time for each of steps B, C and D;
 - anything that did not work as described.
 
 | Step                      | Time | Notes |
 | ------------------------- | ---- | ----- |
 | B. Restore on the same PC |      |       |
 | C. Restore on a new PC    |      |       |
+| D. Restore to a moment    |      |       |

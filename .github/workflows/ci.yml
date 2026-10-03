@@ -59,9 +59,13 @@ jobs:
       - name: Format
         run: pnpm format:check
 
-      - name: PostgreSQL client programs
-        # The backup tests (P7-05a) run pg_dump and pg_restore 16; the runner image usually has them.
-        run: test -x "$RP_PG_BIN/pg_dump" || (sudo apt-get update && sudo apt-get install -y postgresql-client-16)
+      - name: PostgreSQL programs
+        # The backup tests (P7-05a) run pg_dump and pg_restore 16. The continuous backup test
+        # (P7-05c) starts its own cluster with WAL archiving: initdb, pg_ctl and pg_basebackup.
+        # The runner image usually has them all.
+        run: |
+          test -x "$RP_PG_BIN/initdb" && test -x "$RP_PG_BIN/pg_basebackup" && test -x "$RP_PG_BIN/pg_dump" \
+            || (sudo apt-get update && sudo apt-get install -y postgresql-16 postgresql-client-16)
 
       - name: Build packages
         run: pnpm build

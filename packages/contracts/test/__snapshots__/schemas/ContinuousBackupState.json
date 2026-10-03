@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["NOT_SET_UP", "OK", "BEHIND", "FAILING"] },
+  "output": { "type": "string", "enum": ["NOT_SET_UP", "OK", "BEHIND", "FAILING"] }
+}

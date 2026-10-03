@@ -109,6 +109,19 @@ export const AppConfigSchema = z.object({
     .string()
     .regex(/^postgres(ql)?:\/\//, 'RP_ADMIN_DATABASE_URL must be a postgresql:// connection string')
     .optional(),
+  /**
+   * The continuous backup's database role (P7-05c): a role with REPLICATION that may run
+   * `pg_switch_wal()`, for the nightly base backup and to close off the log. The installer creates
+   * it and turns on PostgreSQL's WAL archiving (P0-16). Unset, there is no continuous backup; the
+   * nightly full backups still run.
+   */
+  backupDatabaseUrl: z
+    .string()
+    .regex(
+      /^postgres(ql)?:\/\//,
+      'RP_BACKUP_DATABASE_URL must be a postgresql:// connection string',
+    )
+    .optional(),
   /** The pagers' MQTT broker (P2-04, PGR-005): on by default; over TLS when `tls` is on. */
   mqtt: z.enum(['on', 'off']).default('on'),
   /** MQTT port; 8883 is MQTTS. 0 picks a free port (tests). */
@@ -187,6 +200,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     pgBin: env.RP_PG_BIN === '' ? undefined : env.RP_PG_BIN,
     backups: env.RP_BACKUPS,
     adminDatabaseUrl: env.RP_ADMIN_DATABASE_URL === '' ? undefined : env.RP_ADMIN_DATABASE_URL,
+    backupDatabaseUrl: env.RP_BACKUP_DATABASE_URL === '' ? undefined : env.RP_BACKUP_DATABASE_URL,
     mqtt: env.RP_MQTT,
     mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,

@@ -10,7 +10,15 @@
 // it (CREATE DATABASE ... TEMPLATE), which takes milliseconds and isolates test files.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { chownSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  appendFileSync,
+  chownSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -100,7 +108,29 @@ function runPg(bin: string, args: string[], asPostgresUser: boolean): void {
   }
 }
 
-async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Promise<void> }> {
+/** A value for postgresql.conf, quoted. */
+function confValue(value: string): string {
+  return `'${value.replaceAll('\\', '\\\\').replaceAll("'", "''")}'`;
+}
+
+/** A throwaway PostgreSQL cluster of its own (see `startLocalPostgres`). */
+export interface LocalPostgres {
+  readonly adminUrl: string;
+  readonly dataDir: string;
+  /** The folder of the PostgreSQL programs it was started with. */
+  readonly bin: string;
+  readonly port: number;
+  stop(): Promise<void>;
+}
+
+/**
+ * Starts a throwaway cluster on a free localhost port with `settings` added to its
+ * postgresql.conf (for example WAL archiving), and removes it on `stop`. Durability is off unless
+ * a setting turns it back on.
+ */
+export async function startLocalPostgres(
+  settings: Readonly<Record<string, string>> = {},
+): Promise<LocalPostgres> {
   const bin = findPgBin();
   if (bin === undefined) {
     throw new Error(
@@ -122,21 +152,31 @@ async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Prom
     ['-D', dataDir, '--auth=trust', '--username=postgres', '--encoding=UTF8', '--no-sync'],
     asPostgresUser,
   );
-  const options = [
-    '-c listen_addresses=127.0.0.1',
-    `-c port=${String(port)}`,
-    `-c unix_socket_directories=${baseDir}`,
-    '-c fsync=off',
-    '-c synchronous_commit=off',
-    '-c full_page_writes=off',
-  ].join(' ');
+  const conf: Record<string, string> = {
+    listen_addresses: '127.0.0.1',
+    port: String(port),
+    unix_socket_directories: baseDir,
+    fsync: 'off',
+    synchronous_commit: 'off',
+    full_page_writes: 'off',
+    ...settings,
+  };
+  appendFileSync(
+    join(dataDir, 'postgresql.conf'),
+    `\n${Object.entries(conf)
+      .map(([key, value]) => `${key} = ${confValue(value)}`)
+      .join('\n')}\n`,
+  );
   runPg(
     join(bin, 'pg_ctl'),
-    ['-D', dataDir, '-o', options, '-l', join(baseDir, 'server.log'), '-w', 'start'],
+    ['-D', dataDir, '-l', join(baseDir, 'server.log'), '-w', 'start'],
     asPostgresUser,
   );
   return {
     adminUrl: `postgresql://postgres@127.0.0.1:${String(port)}/postgres`,
+    dataDir,
+    bin,
+    port,
     stop: () => {
       try {
         runPg(
@@ -150,6 +190,10 @@ async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Prom
       return Promise.resolve();
     },
   };
+}
+
+async function startLocalCluster(): Promise<{ adminUrl: string; stop: () => Promise<void> }> {
+  return startLocalPostgres();
 }
 
 /**
