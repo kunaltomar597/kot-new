@@ -371,7 +371,7 @@ Recommended next WPs (dependencies met):
   - [x] P7-05e Key escrow and restore from the cloud
 - [ ] P7-06 Data lifecycle
   - [x] P7-06a Automatic retention
-  - [ ] P7-06b Archive-then-purge
+  - [x] P7-06b Archive-then-purge
   - [ ] P7-06c Archive viewer and full data export
   - [ ] P7-06d Data-volume test
 - [x] P7-07 Onboarding wizard completion
@@ -636,6 +636,36 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-06b):
+
+568. Only the oldest whole financial year still on the PC may be archived and purged, so what
+     stays is one stretch of time and the audit chain keeps its tail (the audit log goes from its
+     start up to the year's last entry).
+569. A year is its orders, invoices, bills and shifts by business date; what hangs off them goes
+     with them whatever its own date (items, KOTs, events, payments, cash movements), so no
+     required link from a later record can block the purge and the archive is complete. Table
+     sessions, staff and the menu stay. Suggestion outcomes (derived report data) go by date.
+570. The statutory period is 72 months from the due date of the year's annual return, taken as 31
+     December after the year ends (§12); within it the Owner must acknowledge that the restaurant
+     keeps the archive. The PC does not refuse: the BRD asks for a clear warning.
+571. The archive is the backup file format (kind ARCHIVE), encrypted with the backup key, holding
+     every row as `row_to_json` lines, a description with the counts and the last audit entry, and
+     a manifest. It is read back in full, counts included, before anything is deleted.
+572. The human-readable export is the invoice register (CSV, amounts in rupees, CGST/SGST/IGST/
+     CESS columns) and a PDF book per day with every invoice as printed on 80 mm paper. The PDF is
+     written by a small text-only writer (Courier, two columns), because pdfmake takes too long for
+     a year of invoices; the bill text is the receipt renderer's own.
+573. The purge runs through a separate login in `rp_purge` (`RP_PURGE_DATABASE_URL`), in one
+     transaction: each table must lose exactly the rows archived or nothing is deleted, and the
+     purge record is written in the same transaction. The application role still has no DELETE on
+     these tables (AUD-004).
+574. The invoice-line guard now lets the purge delete lines of settled invoices, and lets a later
+     year's invoice line lose its link to a purged order item (the foreign key's SET NULL);
+     nothing else about a settled invoice's lines may change.
+575. Archives go to the cloud after the nightly backup. The Control Plane marks them ARCHIVE (from
+     the file name): the retention keeps them for good and a restore from the cloud never uses
+     them.
 
 Decided 2026-10-03 (P7-06a):
 
@@ -2896,6 +2926,28 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-06b Archive-then-purge
+
+Built:
+
+- domain `archive.ts` (`statutoryRetentionEnd`, `withinStatutoryPeriod`, `purgeableYears`,
+  `financialYearOfLabel`); contracts `archives.ts` and the routes `listArchives`/`startArchive`.
+- server `src/lifecycle/`: `ArchiveService`, `ArchiveController`, `business-archive.ts`
+  (format, `verifyBusinessArchive`), `year-records.ts`, `text-pdf.ts`; `billTextLines` from the
+  receipt renderer; `invoiceView` exported; `RP_PURGE_DATABASE_URL`; migration (archive runs, the
+  purge role's grants, the invoice-line guard); archives in the cloud upload.
+- Control Plane: cloud files have a kind (BACKUP or ARCHIVE); retention, restore and the fleet's
+  newest backup use backups only.
+- console: "Old years" on the System page for the Owner.
+- docs: the data lifecycle runbook's archive-then-purge and purge login sections.
+
+Tests: domain 3; server integration 3 (years offered and refused, archive with export, read back,
+purge of FY 2023-24 through a real `rp_purge` login with FY 2024-25 untouched, the audit
+records) and the cloud upload of an archive; console 1 new and 1 updated.
+
+Gotcha: unreferenced `$n` parameters make PostgreSQL refuse a statement, so each table's clause
+takes exactly its own parameters (`paramsFor`).
 
 ### 2026-10-03: P7-06a Automatic retention
 
@@ -6305,6 +6357,9 @@ Notes for the next session:
   - The service runs `restore-cli pending` (with the administrator's connection) before starting
     the server, and restarts it on exit code 75.
   - It never gives the server `RP_ADMIN_DATABASE_URL`.
+- P0-16 (from P7-06b): the purge login `rp_purger` (LOGIN, IN ROLE rp_purge, a random password in
+  the installer's store) and `RP_PURGE_DATABASE_URL` for the server
+  (`docs/runbooks/data-lifecycle.md`).
 - P0-16 (from P7-05c): the continuous backup's set-up, as `docs/runbooks/backups.md` says:
   - postgresql.conf: `wal_level = replica`, `archive_mode = on`, `archive_timeout = 3600`,
     `max_wal_senders = 4`, and `archive_command` running `dist/backups/wal-stage.js` with the

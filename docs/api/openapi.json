@@ -234,6 +234,94 @@
         "x-requirements": ["NTF-008", "NTF-004"]
       }
     },
+    "/api/v1/archives": {
+      "get": {
+        "operationId": "listArchives",
+        "summary": "The years that may be archived and purged, and every archive-then-purge",
+        "description": "DATA-008: whole financial years that have ended, oldest first, each with whether GST law still asks for its records (72 months, §12); the runs, which once done are the purge records.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The years and runs.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ArchivesResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["DATA-008"]
+      },
+      "post": {
+        "operationId": "startArchive",
+        "summary": "Archive a financial year, read the archive back, then purge the year",
+        "description": "DATA-008, AUD-004: the Owner with a fresh second factor and a reason. Only the oldest year; within the statutory period only once the Owner acknowledges the warning. The archive and a human-readable export (invoice register CSV, invoice PDFs) go to the folder given or the second backup location; the purge runs through the separate purge login. Runs in the background; audited.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/StartArchiveRequest" } }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Started.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ArchiveRunView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "An archive is running, or the year is not the oldest.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "Not a year that may be purged, no folder, the statutory warning not acknowledged, or the purge login not set up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["DATA-008", "AUD-004", "AUTH-006", "AUD-001"]
+      }
+    },
     "/api/v1/audit": {
       "get": {
         "operationId": "listAuditEntries",
@@ -13175,6 +13263,96 @@
         "required": ["reason"],
         "additionalProperties": false
       },
+      "ArchiveRunView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "financialYear": { "$ref": "#/components/schemas/FinancialYearLabel" },
+          "status": { "$ref": "#/components/schemas/ArchiveStatus" },
+          "startedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "finishedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "requestedBy": { "type": ["string", "null"] },
+          "folder": { "type": ["string", "null"] },
+          "archiveFile": { "type": ["string", "null"] },
+          "sizeBytes": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "sha256": { "type": ["string", "null"] },
+          "counts": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": { "type": "string" },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              { "type": "null" }
+            ]
+          },
+          "error": { "type": ["string", "null"] }
+        },
+        "required": [
+          "id",
+          "financialYear",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "requestedBy",
+          "folder",
+          "archiveFile",
+          "sizeBytes",
+          "sha256",
+          "counts",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "ArchiveStatus": {
+        "type": "string",
+        "enum": ["ARCHIVING", "VERIFYING", "PURGING", "DONE", "FAILED"]
+      },
+      "ArchivesResponse": {
+        "type": "object",
+        "properties": {
+          "years": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "financialYear": { "$ref": "#/components/schemas/FinancialYearLabel" },
+                "startDate": { "$ref": "#/components/schemas/IsoDate" },
+                "endDate": { "$ref": "#/components/schemas/IsoDate" },
+                "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "withinStatutoryPeriod": { "type": "boolean" },
+                "statutoryUntil": { "$ref": "#/components/schemas/IsoDate" },
+                "next": { "type": "boolean" }
+              },
+              "required": [
+                "financialYear",
+                "startDate",
+                "endDate",
+                "invoices",
+                "withinStatutoryPeriod",
+                "statutoryUntil",
+                "next"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "runs": { "type": "array", "items": { "$ref": "#/components/schemas/ArchiveRunView" } },
+          "running": { "type": "boolean" }
+        },
+        "required": ["years", "runs", "running"],
+        "additionalProperties": false
+      },
       "AssignPagerRequest": {
         "type": "object",
         "properties": {
@@ -15482,6 +15660,7 @@
         ],
         "additionalProperties": false
       },
+      "FinancialYearLabel": { "type": "string", "pattern": "^\\d{4}-\\d{2}$" },
       "FireOrderRequest": {
         "type": "object",
         "properties": {
@@ -21845,6 +22024,19 @@
           "createdAt",
           "updatedAt"
         ],
+        "additionalProperties": false
+      },
+      "StartArchiveRequest": {
+        "type": "object",
+        "properties": {
+          "financialYear": { "$ref": "#/components/schemas/FinancialYearLabel" },
+          "folder": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 260 }, { "type": "null" }]
+          },
+          "acknowledgeStatutory": { "type": "boolean" },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["financialYear", "folder", "acknowledgeStatutory", "reason"],
         "additionalProperties": false
       },
       "StartBackupResponse": {

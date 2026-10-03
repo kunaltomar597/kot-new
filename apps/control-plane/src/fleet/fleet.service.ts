@@ -445,7 +445,7 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
       // DATA-003: the newest backup each PC stored in the cloud (P7-05d).
       this.prisma.cloudBackup.groupBy({
         by: ['installationId'],
-        where: { status: 'COMPLETE' },
+        where: { status: 'COMPLETE', kind: 'BACKUP' },
         _max: { backupCreatedAt: true },
       }),
       // P7-05e: the escrowed backup keys, to match each PC's current one.

@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["BACKUP", "ARCHIVE"] },
+  "output": { "type": "string", "enum": ["BACKUP", "ARCHIVE"] }
+}

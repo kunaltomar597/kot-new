@@ -139,6 +139,8 @@ export function formatLocal(instant: Date, timeZone: string): string {
 
 class Receipt {
   private readonly bytes: number[] = [...INIT];
+  /** The text without printer commands (the archive's invoice books, P7-06b). */
+  readonly texts: string[] = [];
 
   command(sequence: readonly number[]): this {
     this.bytes.push(...sequence);
@@ -146,6 +148,7 @@ class Receipt {
   }
 
   line(text = ''): this {
+    this.texts.push(toPrintable(text));
     for (const char of toPrintable(text)) this.bytes.push(char.charCodeAt(0));
     this.bytes.push(LF);
     return this;
@@ -330,6 +333,22 @@ export function renderBill(
     readonly timeZone: string;
   },
 ): Uint8Array {
+  return buildBill(invoice, options).finish();
+}
+
+/** The bill as plain text lines, as printed on 80 mm paper (the archive's invoice books). */
+export function billTextLines(invoice: InvoiceView, timeZone: string): string[] {
+  return buildBill(invoice, { paperWidthMm: 80, duplicate: false, timeZone }).texts;
+}
+
+function buildBill(
+  invoice: InvoiceView,
+  options: {
+    readonly paperWidthMm: PaperWidthMm;
+    readonly duplicate: boolean;
+    readonly timeZone: string;
+  },
+): Receipt {
   const width = charactersPerLine(options.paperWidthMm);
   const half = Math.floor(width / 2);
   const { particulars } = invoice;
@@ -424,7 +443,7 @@ export function renderBill(
   if (sacCodes.length > 0) receipt.lines(wrap(`SAC: ${sacCodes.join(', ')}`, width));
   receipt.command(ALIGN_CENTRE);
   for (const text of particulars.footerLines) receipt.lines(wrap(text, width));
-  return receipt.finish();
+  return receipt;
 }
 
 /**

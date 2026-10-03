@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { open, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import {
   Inject,
   Injectable,
@@ -15,7 +15,6 @@ import type { ControlPlaneClient } from '../cloud/control-plane-client.js';
 import { HeartbeatService } from '../cloud/heartbeat.service.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { BackupRun } from '../generated/prisma/client.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { readBackupHeader } from './backup-file.js';
@@ -125,7 +124,12 @@ export class CloudBackupService implements OnApplicationBootstrap, OnModuleDestr
   runIfDue(): Promise<CloudBackupOutcome> {
     const run = (this.current ?? Promise.resolve('NOTHING' as CloudBackupOutcome))
       .catch((): CloudBackupOutcome => 'NOTHING')
-      .then(() => this.sendNewest());
+      .then(async () => {
+        const outcome = await this.sendNewest();
+        // Archived years go too (DATA-008), after the night's backup, whatever its outcome.
+        if (outcome !== 'OFF' && outcome !== 'NOT_SET_UP') await this.sendArchives();
+        return outcome;
+      });
     this.current = run;
     return run;
   }
@@ -204,7 +208,7 @@ export class CloudBackupService implements OnApplicationBootstrap, OnModuleDestr
       const cloudBackupId = await this.upload(
         connection.client,
         connection.installationId,
-        newest,
+        newest.fileName ?? '',
         path,
         newest.sha256,
       );
@@ -240,16 +244,76 @@ export class CloudBackupService implements OnApplicationBootstrap, OnModuleDestr
   }
 
   /** Uploads the file in the parts the Control Plane asks for; returns its record's id. */
+  /**
+   * Each archived year not yet in the cloud (DATA-008 step 2, P7-06b): the same encrypted file as
+   * in the archive folder. A failure is tried again at the next look; it raises no alert of its
+   * own, since the archive folder holds the file.
+   */
+  private async sendArchives(): Promise<number> {
+    const waiting = await this.prisma.archiveRun.findMany({
+      where: { status: 'DONE', cloudStatus: { in: ['PENDING', 'FAILED'] } },
+      orderBy: { startedAt: 'asc' },
+    });
+    if (waiting.length === 0) return 0;
+    const connection = await this.heartbeat.connection();
+    if ('unavailable' in connection) return 0;
+    let sent = 0;
+    for (const run of waiting) {
+      const now = this.options.now();
+      if (
+        run.cloudStatus === 'FAILED' &&
+        run.cloudAttemptedAt !== null &&
+        now.getTime() - run.cloudAttemptedAt.getTime() < this.options.retryAfterMs
+      ) {
+        continue;
+      }
+      if (run.archiveFile === null || run.sha256 === null) continue;
+      try {
+        await this.upload(
+          connection.client,
+          connection.installationId,
+          basename(run.archiveFile),
+          run.archiveFile,
+          run.sha256,
+        );
+        await this.prisma.archiveRun.update({
+          where: { id: run.id },
+          data: {
+            cloudStatus: 'UPLOADED',
+            cloudAttemptedAt: now,
+            cloudUploadedAt: this.options.now(),
+            cloudError: null,
+          },
+        });
+        sent += 1;
+      } catch (error) {
+        await this.prisma.archiveRun.update({
+          where: { id: run.id },
+          data: {
+            cloudStatus: 'FAILED',
+            cloudAttemptedAt: now,
+            cloudError: `The upload to the cloud failed: ${plainError(error)}`.slice(0, 480),
+          },
+        });
+        this.logger.warn(
+          { err: error, financialYear: run.financialYear },
+          'An archive could not be sent',
+        );
+      }
+    }
+    return sent;
+  }
+
   private async upload(
     client: ControlPlaneClient,
     installationId: string,
-    run: BackupRun,
+    fileName: string,
     path: string,
     sha256: string,
   ): Promise<string> {
     const [header, file] = await Promise.all([readBackupHeader(path), stat(path)]);
     const started = await client.startCloudBackup(installationId, {
-      fileName: run.fileName ?? '',
+      fileName,
       backupCreatedAt: new Date(header.createdAt).toISOString(),
       sizeBytes: file.size,
       sha256,

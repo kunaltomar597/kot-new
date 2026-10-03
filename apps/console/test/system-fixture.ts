@@ -1,4 +1,4 @@
-import type { BackupsResponse, SystemStatusResponse } from '@rp/contracts';
+import type { ArchivesResponse, BackupsResponse, SystemStatusResponse } from '@rp/contracts';
 
 const GB = 1_024 ** 3;
 
@@ -128,6 +128,35 @@ export function backupsView(overrides: Partial<BackupsResponse> = {}): BackupsRe
     },
     restorePending: false,
     lastRestore: null,
+    ...overrides,
+  };
+}
+
+/** Old years (P7-06b): FY 2023-24 may be archived (still within the statutory period). */
+export function archivesView(overrides: Partial<ArchivesResponse> = {}): ArchivesResponse {
+  return {
+    years: [
+      {
+        financialYear: '2023-24',
+        startDate: '2023-04-01',
+        endDate: '2024-03-31',
+        invoices: 41_200,
+        withinStatutoryPeriod: true,
+        statutoryUntil: '2030-12-31',
+        next: true,
+      },
+      {
+        financialYear: '2024-25',
+        startDate: '2024-04-01',
+        endDate: '2025-03-31',
+        invoices: 52_900,
+        withinStatutoryPeriod: true,
+        statutoryUntil: '2031-12-31',
+        next: false,
+      },
+    ],
+    runs: [],
+    running: false,
     ...overrides,
   };
 }

@@ -15,6 +15,7 @@ import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import { grantOf } from '../../app/modes.js';
 import { useLive } from '../../app/use-live.js';
+import { ArchivesPanel } from './ArchivesPanel.js';
 import { BackupsPanel } from './BackupsPanel.js';
 import { DiagnosticsPanel } from './DiagnosticsPanel.js';
 import { bytesParts, uptimeParts } from './system-view.js';
@@ -316,6 +317,8 @@ export function SystemScreen() {
         </section>
 
         <BackupsPanel />
+
+        <ArchivesPanel />
 
         <section className="device-group" aria-labelledby="system-licence">
           <h3 id="system-licence" className="device-group__heading">

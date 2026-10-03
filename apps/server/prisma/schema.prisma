@@ -2011,3 +2011,43 @@ model BackupRun {
   @@index([cloudStatus])
   @@map("backup_runs")
 }
+
+enum ArchiveStatus {
+  ARCHIVING
+  VERIFYING
+  PURGING
+  DONE
+  FAILED
+}
+
+/// Archive-then-purge of a financial year (DATA-008, P7-06b). Once DONE it is the purge record:
+/// what was archived, where, its checksum, and the rows deleted per table. Kept for good.
+model ArchiveRun {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  financialYear    String        @map("financial_year")
+  status           ArchiveStatus
+  startedAt        DateTime      @map("started_at") @db.Timestamptz(3)
+  finishedAt       DateTime?     @map("finished_at") @db.Timestamptz(3)
+  requestedById    String?       @map("requested_by_id") @db.Uuid
+  reason           String
+  folder           String?
+  archiveFile      String?       @map("archive_file")
+  sizeBytes        BigInt?       @map("size_bytes")
+  sha256           String?
+  /// Rows archived, then deleted, per table.
+  counts           Json?
+  /// The audit chain archived: up to this entry, whose hash it was.
+  auditChainTo     BigInt?       @map("audit_chain_to")
+  auditChainHash   String?       @map("audit_chain_hash")
+  error            String?
+  /// The copy in the cloud backup set: PENDING, UPLOADED, FAILED or SKIPPED.
+  cloudStatus      String?       @map("cloud_status")
+  cloudAttemptedAt DateTime?     @map("cloud_attempted_at") @db.Timestamptz(3)
+  cloudUploadedAt  DateTime?     @map("cloud_uploaded_at") @db.Timestamptz(3)
+  cloudError       String?       @map("cloud_error")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([financialYear])
+  @@map("archive_runs")
+}

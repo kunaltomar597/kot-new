@@ -313,8 +313,9 @@ export class BackupEscrowService {
   /** The PC's cloud backups whose key is escrowed, newest first. */
   private async restorable(installationId: string) {
     const [backups, escrows] = await Promise.all([
+      // Only nightly backups restore a PC; an archived year is opened with the archive viewer.
       this.prisma.cloudBackup.findMany({
-        where: { installationId, status: 'COMPLETE' },
+        where: { installationId, status: 'COMPLETE', kind: 'BACKUP' },
         orderBy: { backupCreatedAt: 'desc' },
       }),
       this.prisma.backupKeyEscrow.findMany({

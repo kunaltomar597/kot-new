@@ -15,9 +15,23 @@ const Sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
 export const CLOUD_BACKUP_MAX_BYTES = 2 * 1024 ** 4;
 
 /** A full backup's file name, as the restaurant PC makes it (P7-05a). */
+export const BACKUP_FILE_NAME = /^rp-backup-\d{8}T\d{6}Z-(nightly|manual)\.rpbk$/;
+/** An archived financial year's file name (DATA-008, P7-06b). */
+export const ARCHIVE_FILE_NAME = /^rp-archive-FY\d{4}-\d{2}-\d{8}T\d{6}Z\.rpar$/;
+
+/** A file kept in the cloud: a nightly backup, or an archived year (kept, never pruned). */
 export const CloudBackupFileName = z
   .string()
-  .regex(/^rp-backup-\d{8}T\d{6}Z-(nightly|manual)\.rpbk$/);
+  .refine((name) => BACKUP_FILE_NAME.test(name) || ARCHIVE_FILE_NAME.test(name), {
+    message: 'Not a backup or archive file name',
+  });
+
+export const CloudFileKind = z.enum(['BACKUP', 'ARCHIVE']);
+export type CloudFileKind = z.infer<typeof CloudFileKind>;
+
+export function cloudFileKindOf(fileName: string): CloudFileKind {
+  return ARCHIVE_FILE_NAME.test(fileName) ? 'ARCHIVE' : 'BACKUP';
+}
 
 /** The PC starts an upload: what the file is. */
 export const StartCloudBackupRequest = z.strictObject({
@@ -74,6 +88,8 @@ export const CloudBackupView = z.object({
   sizeBytes: z.int().nonnegative(),
   sha256: Sha256Hex,
   keyId: z.string(),
+  /** An archived year is kept for good: the retention and a restore never use it. */
+  kind: CloudFileKind.default('BACKUP'),
   status: CloudBackupStatus,
   startedAt: Timestamp,
   completedAt: Timestamp.nullable(),

@@ -2,10 +2,7 @@
   "input": {
     "type": "object",
     "properties": {
-      "fileName": {
-        "type": "string",
-        "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
-      },
+      "fileName": { "type": "string" },
       "backupCreatedAt": {
         "type": "string",
         "format": "date-time",
@@ -21,10 +18,7 @@
   "output": {
     "type": "object",
     "properties": {
-      "fileName": {
-        "type": "string",
-        "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
-      },
+      "fileName": { "type": "string" },
       "backupCreatedAt": {
         "type": "string",
         "format": "date-time",

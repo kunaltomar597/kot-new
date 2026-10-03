@@ -122,6 +122,15 @@ export const AppConfigSchema = z.object({
       'RP_BACKUP_DATABASE_URL must be a postgresql:// connection string',
     )
     .optional(),
+  /**
+   * The purge login (DATA-008, AUD-004, P7-06b): a role in `rp_purge`, the only one that may
+   * delete orders, bills, payments and the audit log, used only by archive-then-purge after the
+   * archive is read back. The installer creates it (P0-16). Unset: no year can be purged.
+   */
+  purgeDatabaseUrl: z
+    .string()
+    .regex(/^postgres(ql)?:\/\//, 'RP_PURGE_DATABASE_URL must be a postgresql:// connection string')
+    .optional(),
   /** The pagers' MQTT broker (P2-04, PGR-005): on by default; over TLS when `tls` is on. */
   mqtt: z.enum(['on', 'off']).default('on'),
   /** MQTT port; 8883 is MQTTS. 0 picks a free port (tests). */
@@ -201,6 +210,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     backups: env.RP_BACKUPS,
     adminDatabaseUrl: env.RP_ADMIN_DATABASE_URL === '' ? undefined : env.RP_ADMIN_DATABASE_URL,
     backupDatabaseUrl: env.RP_BACKUP_DATABASE_URL === '' ? undefined : env.RP_BACKUP_DATABASE_URL,
+    purgeDatabaseUrl: env.RP_PURGE_DATABASE_URL === '' ? undefined : env.RP_PURGE_DATABASE_URL,
     mqtt: env.RP_MQTT,
     mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,

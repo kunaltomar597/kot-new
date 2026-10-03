@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type {
-  CloudBackupView,
+import {
+  cloudFileKindOf,
+  type CloudBackupView,
   CompleteCloudBackupRequest,
   StartCloudBackupRequest,
   StartCloudBackupResponse,
@@ -38,6 +39,7 @@ function view(row: CloudBackup): CloudBackupView {
     sizeBytes: Number(row.sizeBytes),
     sha256: row.sha256,
     keyId: row.keyId,
+    kind: row.kind === 'ARCHIVE' ? 'ARCHIVE' : 'BACKUP',
     status: row.status,
     startedAt: row.startedAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,
@@ -98,6 +100,7 @@ export class CloudBackupsService {
         sizeBytes: BigInt(request.sizeBytes),
         sha256: request.sha256,
         keyId: request.keyId,
+        kind: cloudFileKindOf(request.fileName),
         uploadId: upload.uploadId,
         partSize: upload.partSize,
         startedAt: now,
@@ -225,8 +228,9 @@ export class CloudBackupsService {
       },
     });
     for (const row of stale) await this.abortRow(row, now);
+    // Archived years are kept for good (DATA-008): the retention is for nightly backups.
     const kept = await this.prisma.cloudBackup.findMany({
-      where: { installationId, status: 'COMPLETE' },
+      where: { installationId, status: 'COMPLETE', kind: 'BACKUP' },
     });
     const remove = new Set(
       backupsToRemove(

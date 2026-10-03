@@ -9,6 +9,7 @@ export * from './onboarding.js';
 export * from './backups.js';
 export * from './continuous-backup.js';
 export * from './retention.js';
+export * from './archive.js';
 export * from './tax.js';
 export * from './discount.js';
 export * from './bill.js';

@@ -1,8 +1,11 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { createWriteStream, mkdtempSync, readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { INestApplication } from '@nestjs/common';
 import { BackupsResponse } from '@rp/contracts';
 import {
@@ -19,6 +22,7 @@ import { createMigratedDatabase, type TestDatabase } from '@rp/test-postgres';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { BACKUP_OPTIONS, BackupService } from '../../src/backups/backup.service.js';
+import { encryptBackup } from '../../src/backups/backup-file.js';
 import {
   CLOUD_BACKUP_OPTIONS,
   type CloudBackupOptions,
@@ -220,6 +224,49 @@ describe('[DATA-003] the nightly backup in the cloud', () => {
     expect((await prisma.backupRun.findUniqueOrThrow({ where: { id: second } })).cloudStatus).toBe(
       'UPLOADED',
     );
+  });
+
+  it('[DATA-008] sends an archived year too, kept for good and never used to restore', async () => {
+    const prisma = server.get(PrismaService);
+    // An archived year: encrypted with the backup key like a backup (P7-06b).
+    const archiveFile = join(
+      mkdtempSync(join(tmpdir(), 'rp-cloud-archive-')),
+      'rp-archive-FY2023-24-20261003T060000Z.rpar',
+    );
+    const key = await server.get<SecretStore>(SECRET_STORE).get('backup-key');
+    await pipeline(
+      Readable.from([randomBytes(50_000)]),
+      encryptBackup(key, { kind: 'ARCHIVE', appVersion: '1.0.0' }),
+      createWriteStream(archiveFile),
+    );
+    const sha256 = createHash('sha256').update(readFileSync(archiveFile)).digest('hex');
+    const run = await prisma.archiveRun.create({
+      data: {
+        financialYear: '2023-24',
+        status: 'DONE',
+        startedAt: clock,
+        finishedAt: clock,
+        reason: 'Disk space',
+        archiveFile,
+        sha256,
+        cloudStatus: 'PENDING',
+      },
+    });
+    await server.get(CloudBackupService).runIfDue();
+    expect(await prisma.archiveRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({
+      cloudStatus: 'UPLOADED',
+      cloudError: null,
+    });
+    const cloud = controlPlane.get(CloudBackupsService);
+    const stored = (await cloud.list(installationId)).filter((entry) => entry.kind === 'ARCHIVE');
+    expect(stored.map((entry) => entry.fileName)).toEqual([
+      'rp-archive-FY2023-24-20261003T060000Z.rpar',
+    ]);
+    // Years later the retention removes old nightly backups, never the archive.
+    await cloud.prune(installationId, new Date(clock.getTime() + 400 * 24 * HOUR));
+    expect(
+      (await cloud.list(installationId)).filter((entry) => entry.kind === 'ARCHIVE'),
+    ).toHaveLength(1);
   });
 
   it('lets the Owner opt out, audited, and tells the vendor', async () => {

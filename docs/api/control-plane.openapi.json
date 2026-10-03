@@ -3746,10 +3746,7 @@
         "required": ["issued", "paymentDue", "grace", "restricted"],
         "additionalProperties": false
       },
-      "CloudBackupFileName": {
-        "type": "string",
-        "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
-      },
+      "CloudBackupFileName": { "type": "string" },
       "CloudBackupListResponse": {
         "type": "object",
         "properties": {
@@ -3760,6 +3757,16 @@
         },
         "required": ["backups"],
         "additionalProperties": false
+      },
+      "CloudBackupListResponseInput": {
+        "type": "object",
+        "properties": {
+          "backups": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CloudBackupViewInput" }
+          }
+        },
+        "required": ["backups"]
       },
       "CloudBackupParams": {
         "type": "object",
@@ -3799,6 +3806,62 @@
           "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
           "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "keyId": { "type": "string" },
+          "kind": { "default": "BACKUP", "$ref": "#/components/schemas/CloudFileKind" },
+          "status": { "$ref": "#/components/schemas/CloudBackupStatus" },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "installationId",
+          "fileName",
+          "backupCreatedAt",
+          "sizeBytes",
+          "sha256",
+          "keyId",
+          "kind",
+          "status",
+          "startedAt",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CloudBackupViewInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "fileName": { "$ref": "#/components/schemas/CloudBackupFileName" },
+          "backupCreatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "keyId": { "type": "string" },
+          "kind": { "default": "BACKUP", "$ref": "#/components/schemas/CloudFileKind" },
           "status": { "$ref": "#/components/schemas/CloudBackupStatus" },
           "startedAt": {
             "type": "string",
@@ -3827,9 +3890,9 @@
           "status",
           "startedAt",
           "completedAt"
-        ],
-        "additionalProperties": false
+        ]
       },
+      "CloudFileKind": { "type": "string", "enum": ["BACKUP", "ARCHIVE"] },
       "CloudRestoreRequest": {
         "type": "object",
         "properties": {
