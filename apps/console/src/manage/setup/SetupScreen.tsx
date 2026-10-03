@@ -8,6 +8,7 @@ import { messageOf } from '../../app/messages.js';
 import { grantOf } from '../../app/modes.js';
 import { useLive } from '../../app/use-live.js';
 import { SecondFactorCancelled, useSecondFactor } from '../../owner/second-factor.js';
+import { GoLivePanel } from './GoLivePanel.js';
 import { setupCounts, STEP_PAGES } from './setup-view.js';
 
 const STATUS_TONE = { DONE: 'success', SKIPPED: 'neutral', TODO: 'warning' } as const;
@@ -214,6 +215,9 @@ export function SetupScreen() {
             </li>
           ))}
         </ol>
+        {view.steps.find((entry) => entry.step === 'GO_LIVE')?.status === 'TODO' ? (
+          <GoLivePanel onChange={reload} />
+        ) : null}
       </>
     );
   }
@@ -224,6 +228,11 @@ export function SetupScreen() {
         {t('setupPage.title')}
       </h2>
       <p className="dashboard-section__hint">{t('setupPage.intro')}</p>
+      <p>
+        <Link className="console-link" to="/manage/setup/readiness">
+          {t('setupPage.readinessLink')}
+        </Link>
+      </p>
       {content}
     </section>
   );

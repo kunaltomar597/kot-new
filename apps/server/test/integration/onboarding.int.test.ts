@@ -1,7 +1,14 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { INestApplication } from '@nestjs/common';
-import { ApiError, type LoginResponse, OnboardingResponse } from '@rp/contracts';
+import {
+  ApiError,
+  GoLiveView,
+  type LoginResponse,
+  OnboardingResponse,
+  SettingsExport,
+  SettingsImportResponse,
+} from '@rp/contracts';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../../src/database/prisma.service.js';
@@ -189,5 +196,95 @@ describe('[ONB-003] activating the PC', () => {
       .set(as(owner))
       .send({ code: 'ABCD-EFGH-JKLM-NP23' });
     expect([again.status, ApiError.parse(again.body).code]).toEqual([409, 'ALREADY_ACTIVATED']);
+  });
+});
+
+describe('[ONB-004] the go-live test', () => {
+  it('counts only what happens after it starts, and only the paths the restaurant uses', async () => {
+    const before = GoLiveView.parse(
+      (await server().get('/api/v1/onboarding/go-live').set(as(manager))).body,
+    );
+    expect(before).toMatchObject({ startedAt: null, passed: false });
+    // An order from before the test does not count.
+    const order = (source: 'POS' | 'QR') =>
+      prisma.order.create({
+        data: {
+          restaurantId: kit.restaurantId,
+          businessDate: new Date(),
+          orderNumber: Math.floor(Math.random() * 1_000_000),
+          orderType: 'TAKEAWAY',
+          source,
+          status: 'OPEN',
+        },
+      });
+    await order('POS');
+    const started = await server().post('/api/v1/onboarding/go-live/start').set(as(manager));
+    expect(started.status, JSON.stringify(started.body)).toBe(200);
+    const view = GoLiveView.parse(started.body);
+    expect(view.startedAt).not.toBeNull();
+    // This kit has only a POS paired, and no QR codes: an order at the POS and a bill.
+    expect(view.paths.filter((entry) => entry.needed).map((entry) => entry.path)).toEqual([
+      'POS_ORDER',
+      'BILL',
+    ]);
+    expect(view.paths.every((entry) => entry.seenAt === null)).toBe(true);
+
+    await order('POS');
+    const after = GoLiveView.parse(
+      (await server().get('/api/v1/onboarding/go-live').set(as(manager))).body,
+    );
+    expect(after.paths.find((entry) => entry.path === 'POS_ORDER')?.seenAt).not.toBeNull();
+    expect(after.passed).toBe(false);
+    expect(ApiError.parse((await mark('GO_LIVE', 'DONE')).body).code).toBe('NOT_READY');
+    expect(await prisma.auditLog.count({ where: { action: 'GO_LIVE_TEST_STARTED' } })).toBe(1);
+  });
+});
+
+describe('[ONB-010] settings export and import', () => {
+  it('exports what was changed, and imports it as changes by hand would be', async () => {
+    await server().put('/api/v1/settings/kds.ageAmberMinutes').set(as(manager)).send({ value: 9 });
+    const exported = SettingsExport.parse(
+      (await server().get('/api/v1/settings/export').set(as(manager))).body,
+    );
+    expect(exported.values).toMatchObject({ 'kds.ageAmberMinutes': 9 });
+    expect(Object.keys(exported.values)).not.toContain('qr.pickupTimeoutSeconds');
+
+    const imported = await server()
+      .post('/api/v1/settings/import')
+      .set(as(manager))
+      .send({
+        ...exported,
+        values: {
+          'kds.ageAmberMinutes': 9,
+          'kds.ageRedMinutes': 25,
+          'qr.pickupTimeoutSeconds': 90,
+          'no.such': 1,
+          'storage.warnPercent': 'lots',
+        },
+      });
+    expect(imported.status, JSON.stringify(imported.body)).toBe(200);
+    expect(SettingsImportResponse.parse(imported.body)).toEqual({
+      applied: ['kds.ageRedMinutes'],
+      skipped: [
+        { key: 'kds.ageAmberMinutes', reason: 'UNCHANGED' },
+        { key: 'qr.pickupTimeoutSeconds', reason: 'VENDOR' },
+        { key: 'no.such', reason: 'UNKNOWN' },
+        { key: 'storage.warnPercent', reason: 'INVALID' },
+      ],
+    });
+    expect(await prisma.auditLog.count({ where: { action: 'SETTINGS_IMPORTED' } })).toBe(1);
+    // Settings that conflict are refused together.
+    const conflict = await server()
+      .post('/api/v1/settings/import')
+      .set(as(manager))
+      .send({ ...exported, values: { 'kds.ageAmberMinutes': 30 } });
+    expect([conflict.status, ApiError.parse(conflict.body).code]).toEqual([
+      422,
+      'SETTING_CONFLICT',
+    ]);
+    // A waiter cannot import at all.
+    expect(
+      (await server().post('/api/v1/settings/import').set(as(waiter)).send(exported)).status,
+    ).toBe(403);
   });
 });

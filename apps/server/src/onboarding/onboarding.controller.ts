@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/
 import {
   ActivateRequest,
   type ActivateResponse,
+  type GoLiveView,
   MarkOnboardingStepRequest,
   type OnboardingResponse,
   OnboardingStepParams,
@@ -36,6 +37,19 @@ export class OnboardingController {
     @Body(new ZodValidationPipe(MarkOnboardingStepRequest)) body: MarkOnboardingStepRequest,
   ): Promise<OnboardingResponse> {
     return this.onboarding.mark(principalOf(request), params.step, body.status);
+  }
+
+  @Get('onboarding/go-live')
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  goLive(@Req() request: AuthenticatedRequest): Promise<GoLiveView> {
+    return this.onboarding.goLive(principalOf(request).restaurantId);
+  }
+
+  @Post('onboarding/go-live/start')
+  @HttpCode(200)
+  @RequireCapability('OPERATIONS_CONFIGURE')
+  startGoLive(@Req() request: AuthenticatedRequest): Promise<GoLiveView> {
+    return this.onboarding.startGoLive(principalOf(request));
   }
 
   @Post('activation')

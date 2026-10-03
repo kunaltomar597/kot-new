@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
+import { parseSettingsFile, settingsFile } from '../src/manage/settings/settings-transfer.js';
 import { settingsAsManager, settingView } from './settings-fixture.js';
 
 const PATH = '/manage/settings';
@@ -156,6 +157,90 @@ describe('[MGR-007] [UPD-010] the Settings page', () => {
         value: 1500,
       });
     });
+  });
+
+  it('[ONB-010] exports the settings to a file and imports them, listing what was left alone', async () => {
+    const exported = {
+      format: 1 as const,
+      exportedAt: '2026-10-02T06:30:00.000Z',
+      restaurantName: 'Spice Route',
+      values: { 'kds.ageRedMinutes': 25, 'qr.pickupTimeoutSeconds': 90, 'old.setting': 1 },
+    };
+    const createObjectURL = vi.fn((_file: Blob) => 'blob:settings');
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const fake = settingsServer()
+      .on('GET', '/api/v1/settings/export', () => ({ status: 200, body: exported }))
+      .on('POST', '/api/v1/settings/import', () => ({
+        status: 200,
+        body: {
+          applied: ['kds.ageRedMinutes'],
+          skipped: [
+            { key: 'old.setting', reason: 'UNKNOWN' },
+            { key: 'qr.pickupTimeoutSeconds', reason: 'VENDOR' },
+          ],
+        },
+      }));
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    await user.click(
+      await screen.findByRole('button', { name: t('settingsPage.transfer.export') }),
+    );
+    await waitFor(() => {
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+    });
+    const blob = createObjectURL.mock.calls[0]![0];
+    expect(parseSettingsFile(await blob.text())).toEqual(exported);
+
+    // Not an export: refused before anything is sent.
+    const input = screen.getByLabelText(t('settingsPage.transfer.file'));
+    await user.upload(input, new File(['{"hello":1}'], 'notes.json', { type: 'application/json' }));
+    expect(await screen.findByText(t('settingsPage.transfer.notAnExport'))).toBeVisible();
+
+    await user.upload(
+      input,
+      new File([JSON.stringify(exported)], 'settings.json', { type: 'application/json' }),
+    );
+    const dialog = within(
+      await screen.findByRole('dialog', { name: t('settingsPage.transfer.title') }),
+    );
+    expect(
+      dialog.getByText(t('settingsPage.transfer.confirm', { count: 3, restaurant: 'Spice Route' })),
+    ).toBeVisible();
+    await user.click(dialog.getByRole('button', { name: t('settingsPage.transfer.apply') }));
+    expect(await dialog.findByText(t('settingsPage.transfer.applied', { count: 1 }))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/settings/import')[0]?.body).toEqual(exported);
+    const skipped = within(
+      dialog.getByRole('list', { name: t('settingsPage.transfer.skippedList') }),
+    );
+    expect(
+      skipped.getByText(
+        t('settingsPage.transfer.skipped', {
+          name: 'old.setting',
+          reason: t('settingsPage.transfer.reason.UNKNOWN'),
+        }),
+      ),
+    ).toBeVisible();
+    expect(
+      skipped.getByText(
+        t('settingsPage.transfer.skipped', {
+          name: t('settingLabels.qr.pickupTimeoutSeconds'),
+          reason: t('settingsPage.transfer.reason.VENDOR'),
+        }),
+      ),
+    ).toBeVisible();
+    await user.click(dialog.getByRole('button', { name: t('settingsPage.transfer.done') }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('[ONB-010] names the export after the restaurant and its date', () => {
+    const file = settingsFile({
+      format: 1,
+      exportedAt: '2026-10-02T20:30:00.000Z',
+      restaurantName: 'Spice Route & Co.',
+      values: {},
+    });
+    // 20:30 UTC is the next morning in India.
+    expect(file.filename).toBe('settings-spice-route-co-2026-10-03.json');
+    expect(parseSettingsFile('not json')).toBeUndefined();
   });
 
   it('is not linked for a cashier', async () => {

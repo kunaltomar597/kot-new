@@ -48,6 +48,8 @@ export interface OnboardingFacts {
   readonly pairedDevices: number;
   /** Tables whose QR table tent code was never issued. */
   readonly tablesWithoutQr: number;
+  /** The guided go-live test saw every path the restaurant uses (P7-07c). */
+  readonly goLivePassed: boolean;
 }
 
 /** Whether the data says a step is done (before confirmations and skips). */
@@ -74,7 +76,7 @@ export function stepReady(step: OnboardingStep, facts: OnboardingFacts): boolean
     case 'QR':
       return facts.tables > 0 && facts.tablesWithoutQr === 0;
     case 'GO_LIVE':
-      return true;
+      return facts.goLivePassed;
   }
 }
 
@@ -105,8 +107,9 @@ export function onboardingProgress(
     ready: stepReady(step, facts),
   }));
   const othersFinished = before.every((entry) => entry.status !== 'TODO');
-  const goLive: OnboardingStatus = othersFinished && marks.GO_LIVE === 'DONE' ? 'DONE' : 'TODO';
-  const steps = [...before, { step: 'GO_LIVE' as const, status: goLive, ready: othersFinished }];
+  const ready = othersFinished && facts.goLivePassed;
+  const goLive: OnboardingStatus = ready && marks.GO_LIVE === 'DONE' ? 'DONE' : 'TODO';
+  const steps = [...before, { step: 'GO_LIVE' as const, status: goLive, ready }];
   return { steps, complete: steps.every((entry) => entry.status !== 'TODO') };
 }
 
@@ -120,4 +123,63 @@ export function markProblem(
   if (!CONFIRMED_STEPS.includes(step)) return 'NOT_CONFIRMABLE';
   const entry = progress.steps.find((candidate) => candidate.step === step);
   return entry?.ready === true ? null : 'NOT_READY';
+}
+
+/** The paths of the go-live test: an order from each place it can come from, and its bill. */
+export const GO_LIVE_PATHS = [
+  'POS_ORDER',
+  'WAITER_APP',
+  'TABLE_TABLET',
+  'QR',
+  'KDS',
+  'PAGER',
+  'BILL',
+] as const;
+export type GoLivePath = (typeof GO_LIVE_PATHS)[number];
+
+/** What the restaurant uses: a path it does not use is not part of its test. */
+export interface GoLiveUse {
+  readonly waiterPhones: boolean;
+  readonly tablets: boolean;
+  readonly qr: boolean;
+  readonly kitchenScreens: boolean;
+  readonly pagers: boolean;
+}
+
+export interface GoLiveCheck {
+  readonly startedAt: string | null;
+  readonly paths: { path: GoLivePath; needed: boolean; seenAt: string | null }[];
+  /** Started, and every path the restaurant uses was seen since. */
+  readonly passed: boolean;
+}
+
+/**
+ * The guided go-live test (ONB-004 step 11, P7-07c): after a manager starts it, each path the
+ * restaurant uses is ticked as the server sees it happen (an order from each source, a kitchen
+ * screen working it, a pager acknowledging, a bill paid).
+ */
+export function goLiveCheck(
+  startedAt: string | null,
+  use: GoLiveUse,
+  seen: Readonly<Partial<Record<GoLivePath, string>>>,
+): GoLiveCheck {
+  const needed: Readonly<Record<GoLivePath, boolean>> = {
+    POS_ORDER: true,
+    WAITER_APP: use.waiterPhones,
+    TABLE_TABLET: use.tablets,
+    QR: use.qr,
+    KDS: use.kitchenScreens,
+    PAGER: use.pagers,
+    BILL: true,
+  };
+  const paths = GO_LIVE_PATHS.map((path) => ({
+    path,
+    needed: needed[path],
+    seenAt: startedAt === null ? null : (seen[path] ?? null),
+  }));
+  return {
+    startedAt,
+    paths,
+    passed: startedAt !== null && paths.every((entry) => !entry.needed || entry.seenAt !== null),
+  };
 }

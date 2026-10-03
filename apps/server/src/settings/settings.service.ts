@@ -6,6 +6,8 @@ import {
   type SettingDefinition,
   type SettingKey,
   type SettingValue,
+  type SettingsExport,
+  type SettingsImportResponse,
   type SettingView,
   settingDefinition,
   type UpdateSettingRequest,
@@ -205,6 +207,136 @@ export class SettingsService {
     });
     this.invalidate();
     return this.view(definition, await this.snapshot(principal.restaurantId), principal);
+  }
+
+  /** The restaurant's settings changed from their default, for a new PC (ONB-010). */
+  async exportValues(restaurantId: string): Promise<SettingsExport> {
+    const [snapshot, restaurant] = await Promise.all([
+      this.snapshot(restaurantId),
+      this.prisma.restaurant.findUniqueOrThrow({ where: { id: restaurantId } }),
+    ]);
+    const values: Record<string, unknown> = {};
+    for (const definition of SETTINGS) {
+      if (definition.scope !== 'RESTAURANT') continue;
+      const value = snapshot.valueOf(definition.key);
+      if (!same(value, definition.defaultValue)) values[definition.key] = value;
+    }
+    return {
+      format: 1,
+      exportedAt: new Date().toISOString(),
+      restaurantName: restaurant.displayName,
+      values,
+    };
+  }
+
+  /**
+   * Applies settings from an export (ONB-010), each checked as a change by hand would be: a
+   * setting that is unknown, the vendor's, not valid or not this person's to change is skipped
+   * and listed; tax, invoice and data settings need the Owner's fresh second factor. Audited.
+   */
+  async importValues(
+    principal: Principal,
+    values: Readonly<Record<string, unknown>>,
+  ): Promise<SettingsImportResponse> {
+    const snapshot = await this.snapshot(principal.restaurantId);
+    const skipped: SettingsImportResponse['skipped'] = [];
+    const changes: { key: string; before: unknown; after: unknown }[] = [];
+    for (const [key, raw] of Object.entries(values)) {
+      const definition = settingDefinition(key);
+      if (definition === undefined) {
+        skipped.push({ key, reason: 'UNKNOWN' });
+        continue;
+      }
+      if (definition.scope === 'VENDOR') {
+        skipped.push({ key, reason: 'VENDOR' });
+        continue;
+      }
+      const parsed = definition.schema.safeParse(raw);
+      if (!parsed.success) {
+        skipped.push({ key, reason: 'INVALID' });
+        continue;
+      }
+      if (
+        actorGrant(
+          { role: principal.role, extraCapabilities: principal.capabilities },
+          definition.capability,
+        ) !== 'ALLOW'
+      ) {
+        skipped.push({ key, reason: 'NOT_ALLOWED' });
+        continue;
+      }
+      const before = snapshot.valueOf(key);
+      if (same(before, parsed.data)) {
+        skipped.push({ key, reason: 'UNCHANGED' });
+        continue;
+      }
+      if (
+        OWNER_SECOND_FACTOR_CAPABILITIES.has(definition.capability) &&
+        !hasFreshStepUp(principal, snapshot.get('auth.stepUpMinutes'))
+      ) {
+        throw authErrors.secondFactorRequired();
+      }
+      changes.push({ key, before, after: parsed.data });
+    }
+    const merged = {
+      ...snapshot.all(),
+      ...Object.fromEntries(changes.map((change) => [change.key, change.after])),
+    };
+    const problems = crossSettingProblems(merged);
+    if (problems.length > 0) {
+      throw new AppError(422, 'SETTING_CONFLICT', problems.join(' '), { problems });
+    }
+    if (changes.length > 0) {
+      const now = new Date();
+      await this.prisma.transaction(async (tx) => {
+        for (const change of changes) {
+          const json =
+            change.after === null ? Prisma.JsonNull : (change.after as Prisma.InputJsonValue);
+          await tx.setting.upsert({
+            where: { restaurantId_key: { restaurantId: principal.restaurantId, key: change.key } },
+            create: {
+              restaurantId: principal.restaurantId,
+              key: change.key,
+              value: json,
+              updatedById: principal.staffId,
+            },
+            update: { value: json, updatedById: principal.staffId },
+          });
+        }
+        const restaurant = await tx.restaurant.findUniqueOrThrow({
+          where: { id: principal.restaurantId },
+        });
+        await appendEvent(
+          tx,
+          {
+            eventId: newId(),
+            type: 'SettingsChanged',
+            version: 1,
+            occurredAt: now.toISOString(),
+            restaurantId: principal.restaurantId,
+            businessDate: businessDateOf(now, {
+              cutoff: restaurant.businessDayCutoff,
+              timeZone: restaurant.timeZone,
+            }),
+            payload: { keys: changes.map((change) => change.key) },
+          },
+          { aggregate: { type: 'restaurant', id: principal.restaurantId } },
+        );
+        await this.audit.record(tx, {
+          action: 'SETTINGS_IMPORTED',
+          entityType: 'setting',
+          entityId: null,
+          actorId: principal.staffId,
+          deviceId: principal.deviceId,
+          restaurantId: principal.restaurantId,
+          before: Object.fromEntries(changes.map((change) => [change.key, change.before])),
+          after: Object.fromEntries(changes.map((change) => [change.key, change.after])),
+          reason: 'Imported from a settings file',
+        });
+      });
+      this.invalidate();
+    }
+    return { applied: changes.map((change) => change.key), skipped };
   }
 
   /**

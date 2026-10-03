@@ -365,10 +365,10 @@ Recommended next WPs (dependencies met):
 - [ ] P7-04 Release management and remote updates
 - [ ] P7-05 Backup and restore
 - [ ] P7-06 Data lifecycle
-- [ ] P7-07 Onboarding wizard completion
+- [x] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
   - [x] P7-07b First run on a fresh install
-  - [ ] P7-07c Go-live check, settings export, readiness checklist
+  - [x] P7-07c Go-live check, settings export, readiness checklist
 - [x] P7-08 Diagnostics, support screen, remote config
   - [x] P7-08a Diagnostics bundle
   - [x] P7-08b Support asks for diagnostics
@@ -627,6 +627,28 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-07c):
+
+518. The go-live test is judged from what the server records after "Start the test", not from a
+     separate test mode, so it exercises the real paths:
+     - a POS order and a settled bill are always needed;
+     - a waiter-phone, table-tablet, kitchen-screen or pager path is needed when at least one
+       active device of that kind is paired;
+     - QR is needed unless the QR step was skipped and at least one table has a code;
+     - the evidence is the first order from each source, a ticket bumped from a kitchen screen,
+       a pager call answered and a captured payment, all after the start.
+519. Test orders are ordinary orders. The manager voids the test bill afterwards with a reason, so
+     reports leave it out; nothing is deleted (AUD-004). "Start again" moves the start time and the
+     evidence is looked for afresh. The go-live step can be confirmed only once the test passes.
+520. The settings export holds only the restaurant's own settings that differ from their default,
+     with the restaurant's name and the time. Vendor settings, secrets, devices and staff are left
+     out. Import checks each setting as if it were changed by hand (same rights; Owner-only
+     settings need the Owner with a fresh second factor), lists what it left alone and why, and
+     refuses the whole file if the result would break a rule between settings (amber after red).
+     The whole import is audited as one `SETTINGS_IMPORTED` entry.
+521. The site-readiness checklist (ONB-011) is a printable page under Set up. It lists the BRD §11
+     items and is ticked by hand on paper; nothing about it is stored.
 
 Decided 2026-10-03 (P7-07b):
 
@@ -2660,6 +2682,35 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-07c Go-live test, settings export and the readiness checklist (P7-07 done)
+
+Built:
+
+- `@rp/domain` `goLiveCheck` (`GO_LIVE_PATHS`; `goLivePassed` in the onboarding facts);
+- contracts: `GoLiveView`, `SettingsExport`, `SettingsImportResponse` and four local routes;
+- server: `OnboardingService.goLive` and `startGoLive`, plus `SettingsService.exportValues` and
+  `importValues` behind `GET /settings/export` and `POST /settings/import`;
+- console:
+  - `GoLivePanel` on the set-up page, which polls every 5 s while the test runs;
+  - `SettingsTransfer` (export, and import with a result list) on the Settings page;
+  - `ReadinessChecklist` at `/manage/setup/readiness`, with print styles.
+
+Tests: domain +1; server +2 integration:
+
+- the go-live test, with paths from the paired devices and evidence after the start;
+- export and import, covering the skip reasons, a conflict and a waiter's 403.
+
+Console +5:
+
+- go-live start and ticks;
+- go-live passed;
+- the readiness checklist prints;
+- settings export and import;
+- the export's file name.
+
+Gotcha: imported keys this version does not know have no label in the catalogue. The import
+result shows the raw key for those (`reason: UNKNOWN`), because `t()` throws on a missing key.
 
 ### 2026-10-03: P7-07b First run on a fresh install
 

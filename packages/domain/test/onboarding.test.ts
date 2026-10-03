@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  goLiveCheck,
   markProblem,
   type OnboardingFacts,
   onboardingProgress,
@@ -20,6 +21,7 @@ const NOTHING: OnboardingFacts = {
   staffWithPins: 0,
   pairedDevices: 0,
   tablesWithoutQr: 0,
+  goLivePassed: false,
 };
 
 const READY: OnboardingFacts = {
@@ -34,6 +36,7 @@ const READY: OnboardingFacts = {
   menuPublished: true,
   staffWithPins: 6,
   pairedDevices: 3,
+  goLivePassed: true,
 };
 
 describe('[ONB-004] the first-run setup', () => {
@@ -80,6 +83,45 @@ describe('[ONB-004] the first-run setup', () => {
     expect(markProblem('MENU', 'DONE', progress)).toBe('NOT_CONFIRMABLE');
     expect(markProblem('INVOICE', 'DONE', progress)).toBeNull();
     expect(markProblem('GO_LIVE', 'DONE', progress)).toBe('NOT_READY');
+    // Every other step done, but the go-live test not passed yet.
+    const notTested = onboardingProgress({ ...READY, goLivePassed: false }, { INVOICE: 'DONE' });
+    expect(markProblem('GO_LIVE', 'DONE', notTested)).toBe('NOT_READY');
+    expect(
+      markProblem('GO_LIVE', 'DONE', onboardingProgress(READY, { INVOICE: 'DONE' })),
+    ).toBeNull();
     expect(stepReady('INVOICE', { ...READY, defaultInvoiceSeries: false })).toBe(false);
+  });
+});
+
+describe('[ONB-004] the go-live test', () => {
+  const use = { waiterPhones: true, tablets: false, qr: true, kitchenScreens: true, pagers: false };
+
+  it('needs every path the restaurant uses, seen after it started', () => {
+    expect(goLiveCheck(null, use, { POS_ORDER: 'x' }).passed).toBe(false);
+    const half = goLiveCheck('2026-10-02T10:00:00Z', use, {
+      POS_ORDER: '2026-10-02T10:01:00Z',
+      BILL: '2026-10-02T10:09:00Z',
+    });
+    expect(half.passed).toBe(false);
+    expect(half.paths.filter((entry) => entry.needed).map((entry) => entry.path)).toEqual([
+      'POS_ORDER',
+      'WAITER_APP',
+      'QR',
+      'KDS',
+      'BILL',
+    ]);
+    const all = goLiveCheck('2026-10-02T10:00:00Z', use, {
+      POS_ORDER: 'a',
+      WAITER_APP: 'b',
+      QR: 'c',
+      KDS: 'd',
+      BILL: 'e',
+    });
+    expect(all.passed).toBe(true);
+    expect(all.paths.find((entry) => entry.path === 'PAGER')).toEqual({
+      path: 'PAGER',
+      needed: false,
+      seenAt: null,
+    });
   });
 });
