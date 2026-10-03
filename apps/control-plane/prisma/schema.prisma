@@ -291,6 +291,7 @@ model Installation {
   fleetAlerts         FleetAlert[]
   diagnostics         DiagnosticsBundle[]
   diagnosticsRequests DiagnosticsRequest[]
+  cloudBackups        CloudBackup[]
 
   @@index([tenantId])
   @@map("installations")
@@ -558,4 +559,37 @@ model RemoteSettings {
   updatedBy String   @map("updated_by")
 
   @@map("remote_settings")
+}
+
+enum CloudBackupStatus {
+  UPLOADING
+  COMPLETE
+  ABORTED
+  DELETED
+}
+
+/// A restaurant PC's encrypted backup in object storage (DATA-003, P7-05d). The Control Plane
+/// cannot read it: it is encrypted on the PC with the PC's own backup key.
+model CloudBackup {
+  id              String            @id @db.Uuid
+  installationId  String            @map("installation_id") @db.Uuid
+  objectKey       String            @unique @map("object_key")
+  fileName        String            @map("file_name")
+  backupCreatedAt DateTime          @map("backup_created_at") @db.Timestamptz(3)
+  sizeBytes       BigInt            @map("size_bytes")
+  sha256          String
+  keyId           String            @map("key_id")
+  status          CloudBackupStatus @default(UPLOADING)
+  /// The object store's multipart upload, while UPLOADING.
+  uploadId        String?           @map("upload_id")
+  partSize        Int               @map("part_size")
+  startedAt       DateTime          @map("started_at") @db.Timestamptz(3)
+  completedAt     DateTime?         @map("completed_at") @db.Timestamptz(3)
+  /// When the retention removed the object, or the upload was given up.
+  endedAt         DateTime?         @map("ended_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, status, backupCreatedAt])
+  @@map("cloud_backups")
 }

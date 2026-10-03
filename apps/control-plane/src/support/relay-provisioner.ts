@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import pg from 'pg';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
 
@@ -18,6 +18,7 @@ export interface RelayProvisioner {
 
 @Injectable()
 export class PgRelayProvisioner implements RelayProvisioner, OnModuleDestroy {
+  private readonly logger = new Logger(PgRelayProvisioner.name);
   private pool: pg.Pool | undefined;
 
   constructor(@Inject(CP_CONFIG) private readonly config: CpConfig) {}
@@ -58,7 +59,14 @@ export class PgRelayProvisioner implements RelayProvisioner, OnModuleDestroy {
   private async inRole<T>(work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
     const url = this.config.relayDatabaseUrl;
     if (url === undefined) throw new Error('CP_RELAY_DATABASE_URL is not set');
-    this.pool ??= new pg.Pool({ connectionString: url, max: 2 });
+    if (this.pool === undefined) {
+      this.pool = new pg.Pool({ connectionString: url, max: 2 });
+      // An idle connection the relay's database closes (a restart, maintenance) is dropped from
+      // the pool; without a listener the error would stop the whole Control Plane.
+      this.pool.on('error', (error) => {
+        this.logger.warn({ err: error }, 'An idle connection to the QR relay closed');
+      });
+    }
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');

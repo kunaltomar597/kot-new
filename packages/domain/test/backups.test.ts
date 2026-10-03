@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   backupHealth,
   backupsToRemove,
+  cloudBackupState,
   lastNightlySlot,
   nightlyBackupDue,
   weekStartOf,
@@ -98,5 +99,36 @@ describe('[DATA-005] backup health', () => {
     expect(backupHealth({ now, lastSuccessAt: hoursAgo(1), lastFailureAt: hoursAgo(8) })).toBe(
       'OK',
     );
+  });
+});
+
+describe('[DATA-003] [DATA-005] cloud backup state', () => {
+  const now = new Date('2026-10-03T12:00:00Z');
+  const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60_000);
+  const base = { enabled: true, setUp: true, now, lastSuccessAt: null, lastFailureAt: null };
+
+  it('is off when the Owner opted out, and not set up before activation', () => {
+    expect(cloudBackupState({ ...base, enabled: false, lastFailureAt: hoursAgo(50) })).toBe('OFF');
+    expect(cloudBackupState({ ...base, setUp: false })).toBe('NOT_SET_UP');
+  });
+
+  it('is OK after a recent upload, and pending before the first', () => {
+    expect(cloudBackupState({ ...base, lastSuccessAt: hoursAgo(7) })).toBe('OK');
+    expect(cloudBackupState(base)).toBe('PENDING');
+    expect(cloudBackupState({ ...base, lastSuccessAt: hoursAgo(30) })).toBe('PENDING');
+  });
+
+  it('retries quietly while the last upload is recent, and fails after a day without one', () => {
+    expect(
+      cloudBackupState({ ...base, lastSuccessAt: hoursAgo(20), lastFailureAt: hoursAgo(1) }),
+    ).toBe('PENDING');
+    expect(
+      cloudBackupState({ ...base, lastSuccessAt: hoursAgo(30), lastFailureAt: hoursAgo(1) }),
+    ).toBe('FAILING');
+    expect(cloudBackupState({ ...base, lastFailureAt: hoursAgo(1) })).toBe('FAILING');
+    // A failure before the last success no longer counts.
+    expect(
+      cloudBackupState({ ...base, lastSuccessAt: hoursAgo(1), lastFailureAt: hoursAgo(2) }),
+    ).toBe('OK');
   });
 });

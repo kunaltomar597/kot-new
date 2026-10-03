@@ -95,6 +95,7 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
           fileName: 'rp-backup-20261002T093000Z-manual.rpbk',
           sizeBytes: 53 * 1_024 ** 2,
           secondCopy: 'FAILED',
+          cloud: null,
           error: 'The copy to the second location failed: the drive is not there.',
           requestedBy: 'Test manager',
         },
@@ -127,7 +128,17 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
       );
       const table = within(backup.getByRole('table', { name: t('backups.latest') }));
       expect(table.getByText(t('backups.status.SUCCEEDED'))).toBeVisible();
-      expect(table.getByText(t('backups.notCopied'))).toBeVisible();
+      expect(table.getByText(`${t('backups.notCopied')} ${t('backups.inCloud')}`)).toBeVisible();
+      // DATA-003: the copy in the cloud.
+      expect(backup.getByText(t('backups.cloud.state.OK'))).toBeVisible();
+      expect(
+        backup.getByText(
+          t('backups.cloud.last', {
+            when: t('backups.at', displayDateTime(new Date('2026-10-01T23:00:00.000Z'))),
+            sent: t('backups.at', displayDateTime(new Date('2026-10-01T23:20:00.000Z'))),
+          }),
+        ),
+      ).toBeVisible();
       await expectNoAxeViolations(container);
 
       await user.click(backup.getByRole('button', { name: t('backups.now') }));

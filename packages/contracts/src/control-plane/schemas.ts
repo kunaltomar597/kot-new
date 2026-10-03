@@ -183,12 +183,24 @@ export const HeartbeatOpeningWindow = z.object({
   end: HhMm,
 });
 
+/** The cloud backup as the PC sees it (DATA-003, P7-05d). */
+export const HeartbeatCloudBackup = z.object({
+  /** False when the Owner opted out (`backups.cloudEnabled`). */
+  enabled: z.boolean(),
+  lastSuccessAt: Timestamp.nullable(),
+  lastFailureAt: Timestamp.nullable(),
+  lastError: z.string().max(500).nullable(),
+});
+export type HeartbeatCloudBackup = z.infer<typeof HeartbeatCloudBackup>;
+
 /** The latest backups (DATA-005): null until backups are set up (P7-05). */
 export const HeartbeatBackup = z.object({
   lastSuccessAt: Timestamp.nullable(),
   lastFailureAt: Timestamp.nullable(),
   /** What went wrong, in plain words, without paths or secrets. */
   lastError: z.string().max(500).nullable(),
+  /** Absent from PCs older than P7-05d. */
+  cloud: HeartbeatCloudBackup.optional(),
 });
 export type HeartbeatBackup = z.infer<typeof HeartbeatBackup>;
 

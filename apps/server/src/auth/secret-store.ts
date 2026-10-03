@@ -24,7 +24,7 @@ export const SECRET_NAMES = [
   'licence-record-key',
   /**
    * Encrypts the backups (DATA-003, SEC-007, P7-05a). Never inside a backup; escrowed with the
-   * vendor for a restore on a new PC (P7-05d).
+   * vendor for a restore on a new PC (P7-05e).
    */
   'backup-key',
 ] as const;

@@ -1981,24 +1981,33 @@ enum BackupStatus {
 /// One backup (DATA-002, DATA-005, P7-05a): the nightly full backup or a "Back up now". The
 /// backup holds the whole database, so the record is installation-wide.
 model BackupRun {
-  id            String       @id @default(uuid(7)) @db.Uuid
-  kind          BackupKind
-  status        BackupStatus
-  startedAt     DateTime     @map("started_at") @db.Timestamptz(3)
-  finishedAt    DateTime?    @map("finished_at") @db.Timestamptz(3)
+  id               String       @id @default(uuid(7)) @db.Uuid
+  kind             BackupKind
+  status           BackupStatus
+  startedAt        DateTime     @map("started_at") @db.Timestamptz(3)
+  finishedAt       DateTime?    @map("finished_at") @db.Timestamptz(3)
   /// The file's name, the same in every location.
-  fileName      String?      @map("file_name")
-  sizeBytes     BigInt?      @map("size_bytes")
+  fileName         String?      @map("file_name")
+  sizeBytes        BigInt?      @map("size_bytes")
   /// SHA-256 of the encrypted file, hex.
-  sha256        String?
+  sha256           String?
   /// COPIED, NOT_SET or FAILED: the copy at the second location.
-  secondCopy    String?      @map("second_copy")
+  secondCopy       String?      @map("second_copy")
   /// What went wrong, in plain words, without secrets.
-  error         String?
-  requestedById String?      @map("requested_by_id") @db.Uuid
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  error            String?
+  requestedById    String?      @map("requested_by_id") @db.Uuid
+  /// The copy in the cloud (DATA-003, P7-05d): PENDING, UPLOADED, FAILED or SKIPPED (not sent:
+  /// a newer backup was, or the Owner opted out); null for a backup that is never sent.
+  cloudStatus      String?      @map("cloud_status")
+  cloudAttemptedAt DateTime?    @map("cloud_attempted_at") @db.Timestamptz(3)
+  cloudUploadedAt  DateTime?    @map("cloud_uploaded_at") @db.Timestamptz(3)
+  cloudError       String?      @map("cloud_error")
+  /// The Control Plane's record of it.
+  cloudBackupId    String?      @map("cloud_backup_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([startedAt])
+  @@index([cloudStatus])
   @@map("backup_runs")
 }

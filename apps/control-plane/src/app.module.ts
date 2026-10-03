@@ -19,6 +19,9 @@ import { LicencesService } from './licences/licences.service.js';
 import { FleetAdminController } from './admin/fleet-admin.controller.js';
 import { BillingController } from './billing/billing.controller.js';
 import { BillingService } from './billing/billing.service.js';
+import { CloudBackupsController } from './cloud-backups/cloud-backups.controller.js';
+import { CloudBackupsService, OBJECT_STORE } from './cloud-backups/cloud-backups.service.js';
+import { objectStoreFor } from './cloud-backups/object-store-for.js';
 import { ALERT_NOTIFIER, alertNotifierFor } from './fleet/alert-notifier.js';
 import { DiagnosticsController } from './diagnostics/diagnostics.controller.js';
 import { DiagnosticsService } from './diagnostics/diagnostics.service.js';
@@ -112,6 +115,7 @@ export class ControlPlaneModule {
         FleetController,
         DiagnosticsController,
         RemoteSettingsController,
+        CloudBackupsController,
       ],
       providers: [
         { provide: CP_CONFIG, useValue: config },
@@ -130,6 +134,8 @@ export class ControlPlaneModule {
         FleetService,
         DiagnosticsService,
         RemoteSettingsService,
+        CloudBackupsService,
+        { provide: OBJECT_STORE, useValue: objectStoreFor(config) },
         { provide: ALERT_NOTIFIER, useValue: alertNotifierFor(config) },
         { provide: RELAY_PROVISIONER, useClass: PgRelayProvisioner },
         ReleasesService,

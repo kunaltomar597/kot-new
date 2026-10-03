@@ -14,6 +14,14 @@ import {
   UpdatesResponse,
 } from './schemas.js';
 import {
+  CloudBackupListResponse,
+  CloudBackupParams,
+  CompleteCloudBackupRequest,
+  CloudBackupView,
+  StartCloudBackupRequest,
+  StartCloudBackupResponse,
+} from './cloud-backups.js';
+import {
   BillingRunView,
   InvoiceQuery,
   PlanListResponse,
@@ -909,6 +917,88 @@ export const CONTROL_PLANE_ROUTES = [
       201: { description: 'Stored.', schema: DiagnosticsUploadResponse },
       ...signedErrors,
       413: { description: 'Larger than 4 MB.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'startCloudBackup',
+    method: 'POST',
+    path: '/v1/cloud-backups',
+    summary: 'Start uploading the night’s encrypted backup: signed URLs for its parts',
+    description:
+      'DATA-003: the file is encrypted on the PC with its own backup key; the PC PUTs each part ' +
+      'straight to object storage in India. Starting the same file again (same SHA-256) answers ' +
+      'COMPLETE with no parts.',
+    tags: ['backups'],
+    requirements: ['DATA-003'],
+    capability: 'INSTALLATION',
+    request: { body: StartCloudBackupRequest },
+    responses: {
+      201: { description: 'Where to put the parts.', schema: StartCloudBackupResponse },
+      ...signedErrors,
+      503: { description: 'The cloud backup is not set up here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'completeCloudBackup',
+    method: 'POST',
+    path: '/v1/cloud-backups/:id/complete',
+    summary: 'Join the uploaded parts into the stored backup',
+    description:
+      'Checks the stored size against the file’s, then applies the retention (14 daily and 8 ' +
+      'weekly by default) to the PC’s cloud backups. Audited.',
+    tags: ['backups'],
+    requirements: ['DATA-003', 'DATA-002'],
+    capability: 'INSTALLATION',
+    request: { params: CloudBackupParams, body: CompleteCloudBackupRequest },
+    responses: {
+      200: { description: 'Stored.', schema: CloudBackupView },
+      ...signedErrors,
+      404: { description: 'No such upload for this PC.', schema: ApiError },
+      409: { description: 'The upload was aborted or is already complete.', schema: ApiError },
+      422: { description: 'A part is missing or the size does not match.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'abortCloudBackup',
+    method: 'POST',
+    path: '/v1/cloud-backups/:id/abort',
+    summary: 'Give up an upload and remove its parts',
+    tags: ['backups'],
+    requirements: ['DATA-003'],
+    capability: 'INSTALLATION',
+    request: { params: CloudBackupParams },
+    responses: {
+      204: { description: 'Aborted.' },
+      ...signedErrors,
+      404: { description: 'No such upload for this PC.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listCloudBackups',
+    method: 'GET',
+    path: '/v1/cloud-backups',
+    summary: 'The PC’s own backups kept in the cloud, newest first',
+    tags: ['backups'],
+    requirements: ['DATA-003'],
+    capability: 'INSTALLATION',
+    responses: {
+      200: { description: 'The backups.', schema: CloudBackupListResponse },
+      ...signedErrors,
+    },
+  },
+  {
+    operationId: 'listVendorCloudBackups',
+    method: 'GET',
+    path: '/v1/vendor/installations/:id/cloud-backups',
+    summary: 'A PC’s backups kept in the cloud, newest first (the files stay encrypted)',
+    tags: ['vendor'],
+    requirements: ['DATA-003', 'VCP-005'],
+    capability: 'FLEET_VIEW',
+    request: { params: VendorInstallationParams },
+    responses: {
+      200: { description: 'The backups.', schema: CloudBackupListResponse },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
     },
   },
   {

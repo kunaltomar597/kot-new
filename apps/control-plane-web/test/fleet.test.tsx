@@ -22,6 +22,7 @@ const OFFLINE_PC = fleetPc({
     lastSuccessAt: '2026-10-01T20:00:00.000Z',
     lastFailureAt: '2026-10-02T20:00:00.000Z',
     lastError: 'USB drive missing',
+    cloud: { enabled: false, lastSuccessAt: null, lastFailureAt: null, lastError: null },
   },
   devices: [{ type: 'KDS', paired: 1, connected: null }],
   errorCount: null,
@@ -32,7 +33,10 @@ function fleetPlane(role: Parameters<typeof controlPlane>[0]) {
   return controlPlane(role)
     .on('getFleet', () => ({
       installations: [
-        fleetPc({ openAlerts: ['AUDIT_CHAIN_MISMATCH'] }),
+        fleetPc({
+          openAlerts: ['AUDIT_CHAIN_MISMATCH'],
+          cloudBackupAt: '2026-10-01T23:00:00.000Z',
+        }),
         OFFLINE_PC,
         fleetPc({
           installationId: PENDING_ID,
@@ -148,6 +152,8 @@ describe('[VCP-005] [NFR-O03] the fleet page', () => {
     expect(await screen.findByText('RESTAURANT_PC 1.4.0, postgres 16.4')).toBeVisible();
     expect(screen.getByText('62 % used, 177.0 GB free')).toBeVisible();
     expect(screen.getByText('KDS: 1 of 2 connected, WAITER_PHONE: 4 of 4 connected')).toBeVisible();
+    // DATA-003: the newest backup the Control Plane holds for it.
+    expect(screen.getByText('Newest made 02-10-2026 04:30')).toBeVisible();
     expect(await screen.findByText('Set aside after an alert')).toBeVisible();
     expect(screen.getByText('Data drive 93 % full')).toBeVisible();
     expect(screen.getByText('Closed 01-10-2026 14:30')).toBeVisible();

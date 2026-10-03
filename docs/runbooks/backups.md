@@ -2,7 +2,8 @@
 
 How the restaurant PC backs itself up (DATA-002, DATA-005, SEC-007) and how a backup is restored
 (DATA-004): the nightly full backup (P7-05a), restore (P7-05b) and the continuous backup with
-restore to a moment (P7-05c). The cloud copy (P7-05d) will add its section.
+restore to a moment (P7-05c) and the encrypted cloud copy (P7-05d). Restoring from the cloud
+with the vendor's escrowed key is P7-05e.
 
 ## What a backup holds
 
@@ -37,7 +38,7 @@ it. That key is the `keyId` on the System page.
 
 The backup key is a local secret (`backup-key`). The installation makes it on first use: a file
 under `<RP_DATA_DIR>/secrets` in development, the Windows DPAPI store on the restaurant PC (P0-16).
-Without that key, a backup cannot be read. P7-05d escrows a copy with the vendor for a restore on a
+Without that key, a backup cannot be read. P7-05e escrows a copy with the vendor for a restore on a
 new PC.
 
 ## When and where
@@ -132,7 +133,7 @@ somewhere else:
   fresh second factor, audited as `BACKUP_RECOVERY_KEY_SHOWN`) shows the key written out, like
   `RPK1-ABCDE-...`, in 11 groups. The Owner writes it down and keeps it away from the PC. The last
   two bytes are a check, so a mistyped character is caught before a backup is tried.
-- **The vendor's escrowed copy** (P7-05d), released for a restore once the Owner is verified.
+- **The vendor’s escrowed copy** (P7-05e), released for a restore once the Owner is verified.
 
 ## The continuous backup (P7-05c)
 
@@ -205,6 +206,26 @@ account needs to read and delete there.
 | `The base backup failed: ... permission denied ... replication` | The `pg_hba.conf` line or the role's REPLICATION attribute is missing.                                            |
 | `permission denied for function pg_switch_wal`                  | Run the `GRANT EXECUTE` above.                                                                                    |
 | "behind", pieces not at the second location                     | Connect the USB drive or NAS: the server catches up by itself.                                                    |
+
+## The cloud backup (P7-05d)
+
+Every nightly backup (not "Back up now") is also sent to the vendor's storage in India
+(DATA-003). It is the same file, already encrypted on this PC with its backup key, so the vendor
+cannot read it.
+
+- Within a few minutes of the nightly backup, the server asks the Control Plane where to put the
+  file. It uploads the parts straight to storage (64 MiB each, each with its MD5 so a damaged part
+  is refused), then completes the upload. The Control Plane checks the stored size.
+- Only the newest backup waiting is sent; an older one still waiting is marked as skipped.
+- Without the internet, or if storage fails, it waits an hour and tries again (NFR-A04). After a
+  day with nothing in the cloud, the Owner and managers get the `DISK_OR_BACKUP` alert (dedupe key
+  `cloud-backup`), which closes when an upload works.
+- The Owner may opt out: Settings, `Encrypted cloud backup` (`backups.cloudEnabled`). The change
+  is audited (`SETTING_CHANGED`, with the reason) and reported to the vendor in the heartbeat.
+  Backups made while it is off are not sent; turning it on sends the newest.
+- The System page shows "In the cloud", "waiting", "failing", "off" or "not set up" (a PC not
+  activated with the vendor), and the newest backup in the cloud.
+- The vendor keeps the newest backup of each of the last 14 days and 8 weeks.
 
 ## Restoring
 

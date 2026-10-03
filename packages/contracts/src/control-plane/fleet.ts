@@ -67,6 +67,8 @@ export const FleetInstallationView = z.object({
     })
     .nullable(),
   backup: HeartbeatBackup.nullable(),
+  /** The newest backup this PC stored in the cloud (DATA-003, P7-05d), from the Control Plane's record. */
+  cloudBackupAt: Timestamp.nullable(),
   /** Paired devices by type, and how many are connected (null from PCs older than P7-03). */
   devices: z.array(
     z.object({

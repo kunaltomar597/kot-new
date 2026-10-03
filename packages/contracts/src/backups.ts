@@ -22,6 +22,8 @@ export const BackupRunView = z.object({
   fileName: z.string().nullable(),
   sizeBytes: z.int().nonnegative().nullable(),
   secondCopy: z.enum(['COPIED', 'NOT_SET', 'FAILED']).nullable(),
+  /** The copy in the cloud (P7-05d): null for a backup that is not sent (a manual one). */
+  cloud: z.enum(['PENDING', 'UPLOADED', 'FAILED', 'SKIPPED']).nullable(),
   /** What went wrong, in plain words. */
   error: z.string().nullable(),
   /** Who pressed "Back up now"; null for the nightly backup. */
@@ -58,6 +60,23 @@ export const ContinuousBackupView = z.object({
 });
 export type ContinuousBackupView = z.infer<typeof ContinuousBackupView>;
 
+/** How the cloud backup stands (P7-05d): see `cloudBackupState` in `@rp/domain`. */
+export const CloudBackupState = z.enum(['OFF', 'NOT_SET_UP', 'OK', 'PENDING', 'FAILING']);
+export type CloudBackupState = z.infer<typeof CloudBackupState>;
+
+/** The encrypted cloud backup (DATA-003, P7-05d), as the System page shows it. */
+export const CloudBackupStatusView = z.object({
+  state: CloudBackupState,
+  /** When a backup last reached the cloud. */
+  lastUploadAt: Timestamp.nullable(),
+  /** Which backup that was: when it was made. */
+  lastUploadedBackupAt: Timestamp.nullable(),
+  lastFailureAt: Timestamp.nullable(),
+  /** What went wrong last, in plain words. */
+  lastError: z.string().nullable(),
+});
+export type CloudBackupStatusView = z.infer<typeof CloudBackupStatusView>;
+
 /** The Backups part of the System page (DATA-002, DATA-005, P7-05a). */
 export const BackupsResponse = z.object({
   health: BackupHealth,
@@ -83,6 +102,7 @@ export const BackupsResponse = z.object({
   /** Which backup key this PC's backups need (not the key). */
   keyId: z.string(),
   continuous: ContinuousBackupView,
+  cloud: CloudBackupStatusView,
   /** A restore was asked for and runs when the server restarts (P7-05b). */
   restorePending: z.boolean(),
   /** How the last restore on this PC went, if there was one. */

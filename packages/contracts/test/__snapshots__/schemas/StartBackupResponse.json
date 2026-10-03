@@ -40,6 +40,12 @@
               { "type": "null" }
             ]
           },
+          "cloud": {
+            "anyOf": [
+              { "type": "string", "enum": ["PENDING", "UPLOADED", "FAILED", "SKIPPED"] },
+              { "type": "null" }
+            ]
+          },
           "error": { "type": ["string", "null"] },
           "requestedBy": { "type": ["string", "null"] }
         },
@@ -52,6 +58,7 @@
           "fileName",
           "sizeBytes",
           "secondCopy",
+          "cloud",
           "error",
           "requestedBy"
         ]
@@ -100,6 +107,12 @@
               { "type": "null" }
             ]
           },
+          "cloud": {
+            "anyOf": [
+              { "type": "string", "enum": ["PENDING", "UPLOADED", "FAILED", "SKIPPED"] },
+              { "type": "null" }
+            ]
+          },
           "error": { "type": ["string", "null"] },
           "requestedBy": { "type": ["string", "null"] }
         },
@@ -112,6 +125,7 @@
           "fileName",
           "sizeBytes",
           "secondCopy",
+          "cloud",
           "error",
           "requestedBy"
         ],

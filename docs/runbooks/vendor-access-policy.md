@@ -14,15 +14,16 @@ orders, bills, payments, customers, staff, the audit log and reports.
 
 The Control Plane holds only what is needed to licence, bill, update and support the restaurant:
 
-| Held by the Control Plane                                                  | Why                                               |
-| -------------------------------------------------------------------------- | ------------------------------------------------- |
-| Restaurant name, legal name, GSTIN, contacts, address                      | Licences, the vendor's invoices, onboarding       |
-| Installations, their public keys and PC fingerprint                        | Enrolment and licence binding (LIC-004)           |
-| Heartbeats: versions, disk, device counts, licence state, audit-chain head | Fleet health and tamper checks (VCP-005, AUD-003) |
-| Licences, subscriptions, the vendor's invoices and payments                | LIC-001 to LIC-009, VCP-003                       |
-| Support notes written by vendor staff                                      | VCP-007                                           |
-| The restaurant's QR-relay credential, sealed, until its PC holds it        | VCP-002, VCP-008                                  |
-| The vendor's own audit log                                                 | SEC-018                                           |
+| Held by the Control Plane                                                   | Why                                               |
+| --------------------------------------------------------------------------- | ------------------------------------------------- |
+| Restaurant name, legal name, GSTIN, contacts, address                       | Licences, the vendor's invoices, onboarding       |
+| Installations, their public keys and PC fingerprint                         | Enrolment and licence binding (LIC-004)           |
+| Heartbeats: versions, disk, device counts, licence state, audit-chain head  | Fleet health and tamper checks (VCP-005, AUD-003) |
+| Licences, subscriptions, the vendor's invoices and payments                 | LIC-001 to LIC-009, VCP-003                       |
+| Support notes written by vendor staff                                       | VCP-007                                           |
+| The restaurant's QR-relay credential, sealed, until its PC holds it         | VCP-002, VCP-008                                  |
+| The vendor's own audit log                                                  | SEC-018                                           |
+| Each restaurant's nightly backup file, encrypted on its PC with its own key | DATA-003: surviving the loss of the PC (P7-05d)   |
 
 The Control Plane never receives order, bill, payment, customer or staff records. The heartbeat
 contract (`packages/contracts/src/control-plane/schemas.ts`) has no field for any of them. The
@@ -30,6 +31,12 @@ local server builds each heartbeat from those named fields only
 (`apps/server/src/cloud/heartbeat.service.ts`). The Control Plane keeps fields it does not know
 yet, so that a newer PC is never refused. For that reason, any change that adds a field to the
 heartbeat must be checked against this policy in review.
+
+The cloud backups (DATA-003) hold the whole restaurant database, but encrypted on the restaurant's
+PC with the PC's backup key before they leave. The Control Plane stores them in India and never
+holds that key: vendor staff can list a PC's backups (when and how large), not read them. The key
+escrow that lets the vendor help restore onto a new PC, after the Owner is verified, is P7-05e and
+open item OI-10.
 
 The QR relay holds the restaurant's published menu and the diners' orders in transit (P5). Vendor
 staff do not read relay data, except to diagnose a fault the restaurant has reported, through

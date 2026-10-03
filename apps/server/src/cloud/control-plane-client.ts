@@ -1,6 +1,10 @@
 import { createHash, randomBytes, sign } from 'node:crypto';
 import { ApiError } from '@rp/contracts';
 import {
+  CloudBackupView,
+  type CompleteCloudBackupRequest,
+  type StartCloudBackupRequest,
+  StartCloudBackupResponse,
   type DeclineDiagnosticsRequest,
   type DiagnosticsUploadRequest,
   DiagnosticsUploadResponse,
@@ -130,6 +134,50 @@ export class ControlPlaneClient {
       JSON.stringify(body),
       z.undefined(),
     );
+  }
+
+  /** DATA-003: where to put the night's encrypted backup, part by part (P7-05d). */
+  startCloudBackup(
+    installationId: string,
+    request: StartCloudBackupRequest,
+  ): Promise<StartCloudBackupResponse> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/cloud-backups',
+      JSON.stringify(request),
+      StartCloudBackupResponse,
+    );
+  }
+
+  completeCloudBackup(
+    installationId: string,
+    id: string,
+    request: CompleteCloudBackupRequest,
+  ): Promise<CloudBackupView> {
+    return this.signed(
+      installationId,
+      'POST',
+      `/v1/cloud-backups/${encodeURIComponent(id)}/complete`,
+      JSON.stringify(request),
+      CloudBackupView,
+      UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  async abortCloudBackup(installationId: string, id: string): Promise<void> {
+    await this.signed(
+      installationId,
+      'POST',
+      `/v1/cloud-backups/${encodeURIComponent(id)}/abort`,
+      undefined,
+      z.undefined(),
+    );
+  }
+
+  /** A part URL the Control Plane gave, absolute (S3) or on its own address (development). */
+  resolveUrl(url: string): string {
+    return new URL(url, `${this.options.baseUrl}/`).toString();
   }
 
   getMenuExtraction(installationId: string, extractionId: string): Promise<MenuExtractionView> {

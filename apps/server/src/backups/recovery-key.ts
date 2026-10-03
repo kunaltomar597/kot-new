@@ -45,6 +45,9 @@ function unbase32(text: string): Buffer | undefined {
       bits -= 8;
     }
   }
+  // The last character's unused bits are zero when written: anything else is a typing mistake
+  // the check bytes cannot see.
+  if ((value & ((1 << bits) - 1)) !== 0) return undefined;
   return Buffer.from(out);
 }
 

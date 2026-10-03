@@ -6,7 +6,7 @@ import { useLoad } from '../app/use-load.js';
 import { LoadView } from '../components/LoadView.js';
 import { AlertsTable } from './AlertsTable.js';
 import { diskShown } from './fleet-view.js';
-import { BackupText, ChainText, OnlineBadge } from './PcHealth.js';
+import { BackupText, CloudBackupText, ChainText, OnlineBadge } from './PcHealth.js';
 
 /**
  * One PC's health from its latest heartbeat (VCP-005), its alerts, open and closed, and the audit
@@ -77,6 +77,12 @@ export function InstallationHealth({ installationId }: { installationId: string 
                   <dt>{t('vendorApp.fleet.backup')}</dt>
                   <dd>
                     <BackupText pc={pc} />
+                  </dd>
+                </div>
+                <div className="cp-facts__row">
+                  <dt>{t('vendorApp.fleet.cloudBackup')}</dt>
+                  <dd>
+                    <CloudBackupText pc={pc} />
                   </dd>
                 </div>
                 <div className="cp-facts__row">

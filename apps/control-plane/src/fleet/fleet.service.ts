@@ -422,7 +422,7 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Every PC's health from its latest heartbeat (VCP-005, NFR-O03). */
   async fleet(now = new Date()): Promise<FleetResponse> {
-    const [installations, open, heads, verified] = await Promise.all([
+    const [installations, open, heads, verified, cloud] = await Promise.all([
       this.prisma.installation.findMany({
         include: { tenant: true, licence: { select: { state: true } } },
         orderBy: [{ tenant: { name: 'asc' } }, { name: 'asc' }],
@@ -441,6 +441,12 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
         by: ['installationId'],
         where: { supersededAt: null },
         _max: { verifiedAt: true },
+      }),
+      // DATA-003: the newest backup each PC stored in the cloud (P7-05d).
+      this.prisma.cloudBackup.groupBy({
+        by: ['installationId'],
+        where: { status: 'COMPLETE' },
+        _max: { backupCreatedAt: true },
       }),
     ]);
     // Online: heard from within two heartbeats and a minute.
@@ -464,6 +470,10 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
         components: report?.components ?? [],
         disk: report?.disk ? { ...report.disk, usedPercent: diskUsedPercent(report.disk) } : null,
         backup: report?.backup ?? null,
+        cloudBackupAt:
+          cloud
+            .find((row) => row.installationId === installation.id)
+            ?._max.backupCreatedAt?.toISOString() ?? null,
         // By type, as JSONB keeps no key order.
         devices: Object.entries(report?.devices ?? {})
           .sort(([a], [b]) => a.localeCompare(b))

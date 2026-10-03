@@ -42,6 +42,9 @@ code from going live:
 - [ ] Error reporting: a Sentry-compatible service (best in India), two projects and their DSNs in
       the Control Plane's secret manager and the installer's CI secret:
       [`manual-tasks/24-error-reporting.md`](manual-tasks/24-error-reporting.md).
+- [ ] Cloud backup storage: an S3 bucket in India (ap-south-1) per environment, its access key
+      in the Control Plane's secret manager:
+      [`manual-tasks/26-cloud-backup-storage.md`](manual-tasks/26-cloud-backup-storage.md).
 
 ## 3. Hardware and on-site tests
 

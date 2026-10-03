@@ -95,6 +95,30 @@ the application, or was restored from a backup.
 6. No explanation: escalate to the Super Admin and leave the alert open. The audit log may have
    been tampered with (SEC-018).
 
+## Cloud backups (DATA-003)
+
+Each restaurant PC uploads its nightly backup, encrypted on the PC with its own backup key, to
+object storage in India. The Control Plane hands out signed URLs for the parts and keeps the
+record; the bytes go straight from the PC to storage, and the Control Plane cannot read them.
+
+- **Configuration:** `CP_BACKUP_STORE=s3` with `CP_BACKUP_S3_REGION` (`ap-south-1` or
+  `ap-south-2`; any other region is refused in staging and production), `CP_BACKUP_S3_ENDPOINT`,
+  `CP_BACKUP_S3_BUCKET` and the access key pair from the secret manager. Setting up the bucket is
+  `manual-tasks/26-cloud-backup-storage.md`. In development, `CP_BACKUP_STORE=local` with
+  `CP_BACKUP_LOCAL_DIR` keeps them in a folder and serves the signed URLs itself at
+  `/v1/object-store/...`. Unset (`off`), PCs are told the cloud backup is not set up and keep
+  their backups locally.
+- **Retention:** per PC, the newest backup of each of the last `CP_BACKUP_KEEP_DAILY` (14) days
+  and `CP_BACKUP_KEEP_WEEKLY` (8) weeks, applied after each upload. A removed backup keeps its
+  record as DELETED. Uploads not completed in two days are aborted and their parts removed; the
+  bucket's lifecycle rule removes any left behind.
+- **Audit:** `cloud_backup.stored` for each upload, `cloud_backup.removed` for the retention.
+- **Where it shows:** the PC's page in the web app ("Cloud backup"), and
+  `GET /v1/vendor/installations/:id/cloud-backups` for any vendor role. A PC whose Owner opted
+  out shows "Turned off by the Owner". A failing upload shows on the PC's own System page and
+  alerts its Owner and managers after a day.
+- **Restoring from the cloud** (the key escrow and the vendor's restore code) is P7-05e.
+
 ## Connecting a restaurant PC
 
 1. `cli tenant:create --name "<restaurant>"` (once per restaurant business).
