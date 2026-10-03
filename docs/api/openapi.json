@@ -22263,6 +22263,32 @@
                   "required": ["category", "bytes"],
                   "additionalProperties": false
                 }
+              },
+              "retention": {
+                "type": "object",
+                "properties": {
+                  "operationalDays": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "dinerContactMonths": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastRunAt": {
+                    "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                  },
+                  "lastRunTotal": {
+                    "anyOf": [
+                      { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["operationalDays", "dinerContactMonths", "lastRunAt", "lastRunTotal"],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -22272,7 +22298,8 @@
               "level",
               "warnPercent",
               "criticalPercent",
-              "categories"
+              "categories",
+              "retention"
             ],
             "additionalProperties": false
           },

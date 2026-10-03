@@ -106,11 +106,8 @@ describe('[DATA-003] the cloud’s retention (BRD §9.3: 30 daily + 12 monthly)'
   it('keeps the last 30 days and the newest backup of each of the last 12 months', () => {
     // Every night for 500 days, to 3 October 2026.
     const backups = nightly('2025-05-22', 500);
-    const kept = new Set(
-      backups
-        .map((backup) => backup.name)
-        .filter((name) => !backupsToRemove(backups, 30, 0, undefined, 12).includes(name)),
-    );
+    const removed = new Set(backupsToRemove(backups, 30, 0, undefined, 12));
+    const kept = new Set(backups.map((backup) => backup.name).filter((name) => !removed.has(name)));
     // 30 days (4 September to 3 October), and the last night of each month back to November
     // 2025: twelve months counting October and September, which the days already cover.
     expect(kept.size).toBe(30 + 10);

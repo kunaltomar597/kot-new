@@ -29,6 +29,12 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
       level: 'OK',
       warnPercent: 80,
       criticalPercent: 90,
+      retention: {
+        operationalDays: 90,
+        dinerContactMonths: 24,
+        lastRunAt: '2026-10-02T04:40:00.000Z',
+        lastRunTotal: 12,
+      },
       categories: [
         { category: 'TRANSACTIONS', bytes: 3 * 1_024 ** 2 },
         { category: 'AUDIT', bytes: 512 * 1_024 },

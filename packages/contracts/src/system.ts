@@ -103,6 +103,16 @@ export const SystemStatusResponse = z.object({
     criticalPercent: z.int(),
     /** Null for a category not measured (no backups set up yet, say). */
     categories: z.array(z.object({ category: StorageCategory, bytes: Bytes.nullable() })),
+    /**
+     * The automatic retention (DATA-007, P7-06a): operational data kept this many days, and the
+     * last daily run with what it removed or anonymised.
+     */
+    retention: z.object({
+      operationalDays: z.int().positive(),
+      dinerContactMonths: z.int().positive(),
+      lastRunAt: Timestamp.nullable(),
+      lastRunTotal: z.int().nonnegative().nullable(),
+    }),
   }),
   /** Paired (active) and connected devices of each type. */
   devices: z.array(z.object({ type: DeviceType, paired: Bytes, connected: Bytes })),

@@ -2556,6 +2556,10 @@ export const en = {
         BACKUPS: 'Backups',
       },
       notMeasured: 'Not set up',
+      retention:
+        'Old alerts, service calls, logs and temporary files are removed after {days} days, and a diner’s number after {months} months without a visit. Orders, bills and the audit trail are kept until the Owner archives them.',
+      retentionRun:
+        'Last tidied up {when}: {count, plural, =0 {nothing to remove} one {# item} other {# items}}.',
     },
     devices: {
       title: 'Devices',

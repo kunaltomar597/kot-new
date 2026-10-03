@@ -201,8 +201,8 @@ Must: 241 / 287 covered. Should: 16 / 24. Could: 0 / 7.
 - DATA-004 (M): apps/console/test/system.test.tsx, apps/control-plane/test/integration/key-escrow.int.test.ts, apps/server/test/integration/cloud-restore.int.test.ts, apps/server/test/integration/continuous-backup.int.test.ts, apps/server/test/integration/restore.int.test.ts, apps/server/test/performance/point-in-time.perf.test.ts, apps/server/test/performance/restore.perf.test.ts, apps/server/test/unit/recovery-key.test.ts, packages/domain/test/continuous-backup.test.ts
 - DATA-005 (M): apps/console/test/system.test.tsx, apps/control-plane/test/integration/fleet.int.test.ts, apps/server/test/integration/backups.int.test.ts, apps/server/test/integration/cloud-backup.int.test.ts, apps/server/test/integration/continuous-backup.int.test.ts, packages/domain/test/backups.test.ts, packages/domain/test/continuous-backup.test.ts, packages/domain/test/fleet-health.test.ts
 - DATA-006 (M): apps/console/test/system-view.test.ts, apps/console/test/system.test.tsx, apps/server/test/integration/system.int.test.ts, apps/server/test/unit/storage-usage.test.ts
-- DATA-007 (M): apps/server/test/integration/photos.int.test.ts
-- DATA-011 (M): apps/server/test/integration/feedback.int.test.ts
+- DATA-007 (M): apps/server/test/integration/photos.int.test.ts, apps/server/test/integration/retention.int.test.ts, packages/domain/test/retention.test.ts
+- DATA-011 (M): apps/server/test/integration/feedback.int.test.ts, apps/server/test/integration/retention.int.test.ts, packages/domain/test/retention.test.ts
 - LIC-001 (M): apps/control-plane/test/integration/licences.int.test.ts, apps/server/test/integration/control-plane.int.test.ts, apps/server/test/integration/licence-agent.int.test.ts, packages/licensing/test/licensing.test.ts
 - LIC-002 (M): apps/control-plane/test/integration/licences.int.test.ts, packages/licensing/test/licensing.test.ts
 - LIC-003 (M): apps/server/test/integration/licence-agent.int.test.ts, apps/server/test/unit/app-config.test.ts, packages/licensing/test/licensing.test.ts

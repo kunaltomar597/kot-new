@@ -12,6 +12,7 @@ import { backupSummary } from '../backups/backup-state.js';
 import { HeartbeatService } from '../cloud/heartbeat.service.js';
 import { readOfferedUpdate } from '../cloud/control-plane-state.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
+import { readRetentionRun } from '../lifecycle/retention-state.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
@@ -69,6 +70,7 @@ export class SystemService {
       approval,
       open,
       backup,
+      retention,
     ] = await Promise.all([
       this.prisma.ping(),
       this.settings.snapshot(restaurantId),
@@ -80,6 +82,7 @@ export class SystemService {
       readInstallApproval(this.prisma),
       this.prisma.tableSession.count({ where: { restaurantId, status: 'OPEN' } }),
       backupSummary(this.prisma),
+      readRetentionRun(this.prisma),
     ]);
     const approverId = approval?.approvedByStaffId ?? null;
     const approver =
@@ -128,6 +131,12 @@ export class SystemService {
         warnPercent,
         criticalPercent,
         categories,
+        retention: {
+          operationalDays: settings.get('retention.operationalDays'),
+          dinerContactMonths: settings.get('retention.dinerContactMonths'),
+          lastRunAt: retention?.at ?? null,
+          lastRunTotal: retention?.total ?? null,
+        },
       },
       devices,
       update: {
