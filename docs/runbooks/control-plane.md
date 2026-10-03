@@ -108,8 +108,10 @@ record; the bytes go straight from the PC to storage, and the Control Plane cann
   `CP_BACKUP_LOCAL_DIR` keeps them in a folder and serves the signed URLs itself at
   `/v1/object-store/...`. Unset (`off`), PCs are told the cloud backup is not set up and keep
   their backups locally.
-- **Retention:** per PC, the newest backup of each of the last `CP_BACKUP_KEEP_DAILY` (14) days
-  and `CP_BACKUP_KEEP_WEEKLY` (8) weeks, applied after each upload. A removed backup keeps its
+- **Retention (BRD §9.3):** per PC, the newest backup of each of the last
+  `CP_BACKUP_KEEP_DAILY` (30) days and `CP_BACKUP_KEEP_MONTHLY` (12) calendar months, applied
+  after each upload. When a restaurant's contract ends, delete its cloud backups within 30 days,
+  after notice and once the restaurant's CA confirms (a manual step for now). A removed backup keeps its
   record as DELETED. Uploads not completed in two days are aborted and their parts removed; the
   bucket's lifecycle rule removes any left behind.
 - **Audit:** `cloud_backup.stored` for each upload, `cloud_backup.removed` for the retention.
@@ -117,7 +119,17 @@ record; the bytes go straight from the PC to storage, and the Control Plane cann
   `GET /v1/vendor/installations/:id/cloud-backups` for any vendor role. A PC whose Owner opted
   out shows "Turned off by the Owner". A failing upload shows on the PC's own System page and
   alerts its Owner and managers after a day.
-- **Restoring from the cloud** (the key escrow and the vendor's restore code) is P7-05e.
+- **Key escrow (P7-05e, OI-10):** `CP_ESCROW_KMS_KEY_ID` (an RSA_4096 encrypt-and-decrypt KMS
+  key in India) with its access key pair, set up by `manual-tasks/27-key-escrow.md`. Each heartbeat
+  answer offers its public key until the PC's backup key is escrowed; the Control Plane stores
+  only the wrapped key (`backup_key.escrowed`). In development, `CP_ESCROW_PRIVATE_KEY` (an RSA
+  PKCS#8 key, base64) stands in; staging and production refuse it.
+- **Restore codes:** Support or the Super Admin, on the PC's page, "Issue a restore code", only
+  after verifying the Owner by the restore policy, with the reason and how they were verified
+  (`restore_code.issued`). The code is shown once and works once, within 24 hours, in
+  `restore-cli cloud <code>` on the new PC (`backup_key.released`, with the address it came
+  from). `POST /v1/cloud-restores` allows 5 attempts a minute per address. The restaurant's
+  Owner is alerted at the PC's next heartbeat, if it is still running.
 
 ## Connecting a restaurant PC
 

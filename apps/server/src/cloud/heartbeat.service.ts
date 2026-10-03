@@ -12,7 +12,9 @@ import type { HeartbeatRequest, HeartbeatResponse, ReleaseInfo } from '@rp/contr
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { newId } from '../common/ids.js';
+import { backupKeyId } from '../backups/backup-file.js';
 import { backupSummary, cloudBackupSummary } from '../backups/backup-state.js';
+import { readRestoreCodesSeen } from '../backups/escrow-state.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
@@ -261,6 +263,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       backup,
       cloud,
       cloudEnabled,
+      restoreCodesSeen,
     ] = await Promise.all([
       this.audit.chainHead(),
       this.deviceHealth(),
@@ -274,6 +277,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       backupSummary(this.prisma),
       cloudBackupSummary(this.prisma),
       this.cloudBackupEnabled(),
+      readRestoreCodesSeen(this.prisma),
     ]);
     const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
@@ -310,6 +314,9 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       ...(checkpoint !== undefined && { auditCheckpoint: checkpoint }),
       // The vendor settings this PC holds; new ones come until it does (UPD-010).
       vendorSettings: { digest: settingsDigest },
+      // The backup key to escrow (P7-05e): none while the Owner opted out of the cloud backup.
+      backupKeyId: cloudEnabled ? backupKeyId(await this.secrets.get('backup-key')) : null,
+      restoreCodesSeen,
       ...licence,
       relay: {
         credentialDigest:

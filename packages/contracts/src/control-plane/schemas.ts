@@ -1,6 +1,7 @@
 import { LICENSE_STATES, WEEKDAYS } from '@rp/domain';
 import { z } from 'zod';
 import { Id, Paise, Timestamp } from '../common.js';
+import { EscrowOffer, RestoreCodeNotice } from './cloud-backups.js';
 import { PendingDiagnosticsRequest } from './diagnostics.js';
 import { PushedSettings, SettingsDigest } from './remote-settings.js';
 
@@ -260,6 +261,17 @@ export const HeartbeatRequest = z.looseObject({
   auditCheckpoint: AuditCheckpoint.optional(),
   /** The vendor settings the PC holds, so new ones are pushed until it does (UPD-010). */
   vendorSettings: z.object({ digest: SettingsDigest.nullable() }).optional(),
+  /**
+   * Which backup key this PC uses (not the key), for the escrow (P7-05e); null while the Owner
+   * has opted out of the cloud backup.
+   */
+  backupKeyId: z
+    .string()
+    .regex(/^[0-9a-f]{16}$/)
+    .nullable()
+    .optional(),
+  /** The restore code notices the PC has shown its Owner. */
+  restoreCodesSeen: z.array(Id).max(20).optional(),
 });
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
 
@@ -303,6 +315,10 @@ export const HeartbeatResponse = z.object({
   diagnosticsRequests: z.array(PendingDiagnosticsRequest).max(10).default([]),
   /** Vendor settings and feature flags to apply, while the PC does not hold them (UPD-010). */
   vendorSettings: PushedSettings.nullable().default(null),
+  /** While this PC's backup key is not escrowed: the key to wrap it with (DATA-003, P7-05e). */
+  backupKeyEscrow: EscrowOffer.nullable().default(null),
+  /** Restore codes issued in the last 7 days for this restaurant's backups: the Owner is told. */
+  restoreCodes: z.array(RestoreCodeNotice).max(20).default([]),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
 

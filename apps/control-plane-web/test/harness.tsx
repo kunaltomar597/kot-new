@@ -59,6 +59,7 @@ export function controlPlane(role?: VendorRole): FakeControlPlane {
     .on('listAuditHeads', () => ({ heads: [] }))
     .on('listVendorDiagnostics', () => ({ bundles: [] }))
     .on('listVendorDiagnosticsRequests', () => ({ requests: [] }))
+    .on('listVendorCloudBackups', () => ({ backups: [] }))
     .on('getFleetRemoteSettings', () => ({
       definitions: REMOTE_DEFINITIONS,
       fleet: {},

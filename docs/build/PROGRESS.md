@@ -363,12 +363,12 @@ Recommended next WPs (dependencies met):
   - [x] P7-03a Heartbeat health and alerts
   - [x] P7-03b Fleet dashboard
 - [ ] P7-04 Release management and remote updates
-- [ ] P7-05 Backup and restore
+- [x] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
   - [x] P7-05b Restore
   - [x] P7-05c Continuous WAL archiving
   - [x] P7-05d Cloud backup
-  - [ ] P7-05e Key escrow and restore from the cloud
+  - [x] P7-05e Key escrow and restore from the cloud
 - [ ] P7-06 Data lifecycle
 - [x] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
@@ -633,6 +633,37 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-10-03 (P7-05e):
+
+556. Escrow is RSA-OAEP (SHA-256) with an RSA_4096 encrypt-and-decrypt KMS key in India: the PC
+     wraps its backup key with the public half the heartbeat answer offers; only a KMS Decrypt,
+     for a restore code, unwraps it. The KMS adapter uses our SigV4 module; a configured RSA key
+     stands in for development and is refused in staging and production.
+557. A PC sends its backup key id in each heartbeat (none while the Owner opted out of the cloud
+     backup), so the vendor offers escrow until it holds that key. Every key a PC ever used stays
+     escrowed, since older cloud backups need it until the retention removes them.
+558. A restore code (OI-10): new vendor capability BACKUP_RESTORE (Super Admin, Support), with the
+     reason and how the Owner was verified, audited. 16 characters without look-alikes, one use,
+     24 hours. Issued only when there is a cloud backup whose key is escrowed.
+559. The code is traded by the restore tool on the new PC (`POST /v1/cloud-restores`, public,
+     5 attempts a minute per address). The tool makes a key pair; the Control Plane unwraps with
+     the KMS and wraps again for the tool, so the key never crosses in the clear and the Control
+     Plane keeps nothing unwrapped. The code is claimed atomically, so it works once.
+560. The restaurant's Owner is told when a code is issued: heartbeat answers carry the week's codes
+     until the PC reports them seen, and the PC raises the new alert type `VENDOR_RESTORE_CODE`
+     (Owner, POS and dashboard, not repeated).
+561. The cloud restore restores the newest cloud backup whose key was released, checked against
+     its SHA-256, through P7-05b's restore; the licence moves by the vendor's rebind as before.
+
+562. Correction to 553: BRD §9.3 keeps cloud backups 30 daily + 12 monthly, not the local
+     14 + 8. `backupsToRemove` gained monthly retention; the Control Plane's defaults are
+     `CP_BACKUP_KEEP_DAILY=30` and `CP_BACKUP_KEEP_MONTHLY=12`. §9.3's deletion within 30 days of
+     a contract ending (after notice and the CA's confirmation) is a manual step in the runbook.
+
+**Question for the Business Owner (OI-10):** how Support verifies the Owner before issuing a restore
+code. Default: a video call with government ID matching the Owner on record, and a call back on
+the registered number. A two-person rule is the stricter option.
+
 Decided 2026-10-03 (P7-05d):
 
 547. P7-05d is split: the cloud backup itself (P7-05d), and the key escrow with restore from the
@@ -657,7 +688,8 @@ Decided 2026-10-03 (P7-05d):
      with a fresh second factor); its change is the audited `SETTING_CHANGED` with the reason, and
      the heartbeat tells the vendor (`backup.cloud.enabled`). Backups made while it is off stay
      waiting, so turning it back on sends the newest at once.
-553. The Control Plane keeps 14 daily and 8 weekly cloud backups per PC (`CP_BACKUP_KEEP_*`, the
+553. (Corrected in P7-05e, decision 562: §9.3 keeps 30 daily and 12 monthly.) The Control Plane
+     keeps 14 daily and 8 weekly cloud backups per PC (`CP_BACKUP_KEEP_*`, the
      same retention as the local backups), applied after each upload. Rows stay as DELETED, and
      uploads unfinished for two days are aborted. Vendor staff (any role) see when and how large;
      they cannot read them.
@@ -2842,6 +2874,32 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-05e Key escrow and restore from the cloud
+
+Built:
+
+- contracts: `EscrowOffer`, `EscrowBackupKeyRequest`, `RestoreCodeRequest`/`View`,
+  `CloudRestoreRequest`/`Response`, `RestoreCodeNotice`; heartbeat `backupKeyId` and
+  `restoreCodesSeen`, answer `backupKeyEscrow` and `restoreCodes`; fleet `backupKeyEscrowedAt`;
+  capability BACKUP_RESTORE; alert type `VENDOR_RESTORE_CODE` (domain rule, pager, strings);
+  `CloudBackupStatusView.keyEscrowedAt`.
+- Control Plane: `escrow-keys.ts` (local key, AWS KMS adapter), `backup-escrow.service.ts`
+  (offer, escrow, codes, release, notices), routes, models `BackupKeyEscrow` and `RestoreCode`,
+  `CP_ESCROW_*` configuration.
+- server: `BackupEscrowAgent` (escrow on offer, Owner alerts), `escrow-state.ts`,
+  `cloud-restore.ts` and `restore-cli cloud`, heartbeat fields, the System page's escrow line.
+- vendor web app: "Backups in the cloud" on a PC's page, with "Issue a restore code" for Support
+  and the Super Admin; the fleet's "(key in escrow)".
+- docs: the runbooks (backups, Control Plane), the vendor access policy (§3, the role table, the
+  quarterly review), `manual-tasks/27-key-escrow.md`, the OI-10 line in MANUAL_TASKS.
+
+Tests: CP unit 4 (escrow keys, KMS calls, config) and integration 4 (escrow, codes, release once,
+expiry, rate limit); server integration 1 end to end (escrow, upload, code, Owner alert once,
+restore on a fresh PC with `restore-cli cloud`, the code refused a second time); vendor web 3;
+domain matrix and console updated.
+
+P7-05 is complete. Next: P7-06 Data lifecycle.
 
 ### 2026-10-03: P7-05d Cloud backup
 

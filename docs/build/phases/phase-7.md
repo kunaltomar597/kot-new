@@ -170,6 +170,10 @@ Split (2026-10-03):
     vendor restore code given after the Owner is verified (audited).
   - The restore tool restores the newest cloud backup onto a new PC with that code (DATA-004,
     RPO ≤ 24 hours when only the cloud survives).
+  - Built (2026-10-03): escrow offered in heartbeat answers and sent by the PC (RSA-OAEP with the
+    KMS key; AWS KMS adapter over SigV4, a configured key in development); restore codes for
+    BACKUP_RESTORE (Support, Super Admin) with the Owner's verification recorded and the Owner
+    alerted (`VENDOR_RESTORE_CODE`); `POST /v1/cloud-restores` and `restore-cli cloud`.
 
 ## P7-06 Data lifecycle
 

@@ -22,6 +22,7 @@ export const NotificationEventType = z.enum([
   'LICENSE_STATE',
   'SUSPICIOUS_ACTIVITY',
   'SUPPORT_REQUEST',
+  'VENDOR_RESTORE_CODE',
 ]);
 export type NotificationEventType = z.infer<typeof NotificationEventType>;
 

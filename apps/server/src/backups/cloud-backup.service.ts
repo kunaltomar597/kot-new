@@ -19,7 +19,10 @@ import type { BackupRun } from '../generated/prisma/client.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { readBackupHeader } from './backup-file.js';
+import { backupKeyId } from './backup-file.js';
 import { cloudBackupSummary } from './backup-state.js';
+import { readEscrowedKey } from './escrow-state.js';
+import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 
 export const CLOUD_BACKUP_OPTIONS = Symbol('CLOUD_BACKUP_OPTIONS');
 
@@ -98,6 +101,7 @@ export class CloudBackupService implements OnApplicationBootstrap, OnModuleDestr
     private readonly heartbeat: HeartbeatService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(CLOUD_BACKUP_OPTIONS) private readonly options: CloudBackupOptions,
+    @Inject(SECRET_STORE) private readonly secrets: SecretStore,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -129,7 +133,11 @@ export class CloudBackupService implements OnApplicationBootstrap, OnModuleDestr
   /** The System page's view of it. */
   async view(restaurantId: string): Promise<CloudBackupStatusView> {
     const settings = await this.settings.snapshot(restaurantId);
-    const summary = await cloudBackupSummary(this.prisma);
+    const [summary, escrowed, key] = await Promise.all([
+      cloudBackupSummary(this.prisma),
+      readEscrowedKey(this.prisma),
+      this.secrets.get('backup-key'),
+    ]);
     return {
       state: cloudBackupState({
         enabled: settings.get('backups.cloudEnabled'),
@@ -142,6 +150,7 @@ export class CloudBackupService implements OnApplicationBootstrap, OnModuleDestr
       lastUploadedBackupAt: summary.lastUploadedBackupAt?.toISOString() ?? null,
       lastFailureAt: summary.lastFailureAt?.toISOString() ?? null,
       lastError: summary.lastError,
+      keyEscrowedAt: escrowed?.keyId === backupKeyId(key) ? escrowed.at : null,
     };
   }
 

@@ -55,10 +55,14 @@ export function CloudBackupText({ pc }: { pc: FleetInstallationView }) {
       </Badge>
     );
   }
-  return pc.cloudBackupAt === null ? (
-    <>{t('vendorApp.fleet.cloudNone')}</>
-  ) : (
-    <>{t('vendorApp.fleet.cloudLast', { at: when(pc.cloudBackupAt) })}</>
+  if (pc.cloudBackupAt === null) return <>{t('vendorApp.fleet.cloudNone')}</>;
+  return (
+    <>
+      {t('vendorApp.fleet.cloudLast', { at: when(pc.cloudBackupAt) })}{' '}
+      {pc.backupKeyEscrowedAt === null
+        ? t('vendorApp.fleet.keyNotEscrowed')
+        : t('vendorApp.fleet.keyEscrowed')}
+    </>
   );
 }
 

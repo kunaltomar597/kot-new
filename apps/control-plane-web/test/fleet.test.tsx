@@ -36,6 +36,7 @@ function fleetPlane(role: Parameters<typeof controlPlane>[0]) {
         fleetPc({
           openAlerts: ['AUDIT_CHAIN_MISMATCH'],
           cloudBackupAt: '2026-10-01T23:00:00.000Z',
+          backupKeyEscrowedAt: '2026-09-20T10:00:00.000Z',
         }),
         OFFLINE_PC,
         fleetPc({
@@ -153,7 +154,7 @@ describe('[VCP-005] [NFR-O03] the fleet page', () => {
     expect(screen.getByText('62 % used, 177.0 GB free')).toBeVisible();
     expect(screen.getByText('KDS: 1 of 2 connected, WAITER_PHONE: 4 of 4 connected')).toBeVisible();
     // DATA-003: the newest backup the Control Plane holds for it.
-    expect(screen.getByText('Newest made 02-10-2026 04:30')).toBeVisible();
+    expect(screen.getByText('Newest made 02-10-2026 04:30 (key in escrow)')).toBeVisible();
     expect(await screen.findByText('Set aside after an alert')).toBeVisible();
     expect(screen.getByText('Data drive 93 % full')).toBeVisible();
     expect(screen.getByText('Closed 01-10-2026 14:30')).toBeVisible();

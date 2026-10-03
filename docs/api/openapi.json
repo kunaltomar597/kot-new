@@ -14242,9 +14242,19 @@
           "lastFailureAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           },
-          "lastError": { "type": ["string", "null"] }
+          "lastError": { "type": ["string", "null"] },
+          "keyEscrowedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
         },
-        "required": ["state", "lastUploadAt", "lastUploadedBackupAt", "lastFailureAt", "lastError"],
+        "required": [
+          "state",
+          "lastUploadAt",
+          "lastUploadedBackupAt",
+          "lastFailureAt",
+          "lastError",
+          "keyEscrowedAt"
+        ],
         "additionalProperties": false
       },
       "Combo": {
@@ -18080,7 +18090,8 @@
           "DISK_OR_BACKUP",
           "LICENSE_STATE",
           "SUSPICIOUS_ACTIVITY",
-          "SUPPORT_REQUEST"
+          "SUPPORT_REQUEST",
+          "VENDOR_RESTORE_CODE"
         ]
       },
       "NotifyManagerResponse": {

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { HeartbeatRequest, HeartbeatResponse } from '@rp/contracts/control-plane';
 import { AuditService } from '../audit/audit.service.js';
+import { BackupEscrowService } from '../cloud-backups/backup-escrow.service.js';
 import type { AuthenticatedInstallation } from '../auth/installation.guard.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -28,6 +29,7 @@ export class HeartbeatsService {
     private readonly fleet: FleetService,
     private readonly diagnostics: DiagnosticsService,
     private readonly remoteSettings: RemoteSettingsService,
+    private readonly escrow: BackupEscrowService,
   ) {}
 
   async record(
@@ -104,6 +106,14 @@ export class HeartbeatsService {
       vendorSettings: await this.remoteSettings.forHeartbeat(
         installation.id,
         heartbeat.vendorSettings,
+      ),
+      // The escrow key, until the PC's backup key is escrowed (DATA-003, P7-05e).
+      backupKeyEscrow: await this.escrow.offerFor(installation.id, heartbeat.backupKeyId),
+      // Restore codes issued for this restaurant: its Owner is told (OI-10).
+      restoreCodes: await this.escrow.noticesFor(
+        installation.id,
+        heartbeat.restoreCodesSeen,
+        receivedAt,
       ),
     };
   }

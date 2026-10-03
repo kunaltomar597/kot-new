@@ -45,6 +45,8 @@ code from going live:
 - [ ] Cloud backup storage: an S3 bucket in India (ap-south-1) per environment, its access key
       in the Control Plane's secret manager:
       [`manual-tasks/26-cloud-backup-storage.md`](manual-tasks/26-cloud-backup-storage.md).
+- [ ] Backup key escrow: the restore policy with counsel (OI-10) and the KMS key in India:
+      [`manual-tasks/27-key-escrow.md`](manual-tasks/27-key-escrow.md).
 
 ## 3. Hardware and on-site tests
 
@@ -76,7 +78,8 @@ any of them by telling Claude.
 - [ ] OI-04 hardware models; OI-05 MDM vendor.
 - [ ] OI-06 WhatsApp or SMS for digital bills (today: WhatsApp).
 - [ ] OI-08 grace period and subscription terms (today: 7 days); OI-10 backup key escrow (today:
-      escrowed, released on the Owner's authenticated request).
+      escrowed in the KMS, released by a one-time restore code Support issues after verifying the
+      Owner by video call with ID and a call back; the Owner is alerted; see manual task 27).
 - [ ] Pricing and plans.
 
 ## 5. Legal, compliance and pilot

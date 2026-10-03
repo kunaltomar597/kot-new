@@ -13,6 +13,11 @@ import {
 import {
   type CloudBackupListResponse,
   CloudBackupParams,
+  CloudRestoreRequest,
+  type CloudRestoreResponse,
+  EscrowBackupKeyRequest,
+  RestoreCodeRequest,
+  type RestoreCodeView,
   type CloudBackupView,
   CompleteCloudBackupRequest,
   StartCloudBackupRequest,
@@ -24,7 +29,8 @@ import { type InstallationRequest, installationOf } from '../auth/installation.g
 import { Public } from '../auth/public.decorator.js';
 import { CpError } from '../errors/cp-error.js';
 import { ZodPipe } from '../http/zod.pipe.js';
-import { Vendor } from '../vendor/vendor.guard.js';
+import { Vendor, type VendorRequest, vendorOf } from '../vendor/vendor.guard.js';
+import { BackupEscrowService } from './backup-escrow.service.js';
 import { CloudBackupsService, OBJECT_STORE } from './cloud-backups.service.js';
 import { BadDigestError, LocalObjectStore } from './local-object-store.js';
 import type { ObjectStore } from './object-store.js';
@@ -34,6 +40,7 @@ import type { ObjectStore } from './object-store.js';
 export class CloudBackupsController {
   constructor(
     private readonly backups: CloudBackupsService,
+    private readonly escrow: BackupEscrowService,
     @Inject(OBJECT_STORE) private readonly store: ObjectStore | null,
   ) {}
 
@@ -76,6 +83,38 @@ export class CloudBackupsController {
     @Param(new ZodPipe(VendorInstallationParams)) params: VendorInstallationParams,
   ): Promise<CloudBackupListResponse> {
     return { backups: await this.backups.listForVendor(params.id) };
+  }
+
+  // Key escrow (P7-05e): the PC's backup key, wrapped with the vendor's escrow key.
+  @Put('backup-key-escrow')
+  @HttpCode(204)
+  async escrowKey(
+    @Req() request: InstallationRequest,
+    @Body(new ZodPipe(EscrowBackupKeyRequest)) body: EscrowBackupKeyRequest,
+  ): Promise<void> {
+    await this.escrow.escrow(installationOf(request).id, body);
+  }
+
+  @Post('vendor/installations/:id/restore-codes')
+  @Vendor('BACKUP_RESTORE')
+  issueRestoreCode(
+    @Req() request: VendorRequest,
+    @Param(new ZodPipe(VendorInstallationParams)) params: VendorInstallationParams,
+    @Body(new ZodPipe(RestoreCodeRequest)) body: RestoreCodeRequest,
+  ): Promise<RestoreCodeView> {
+    return this.escrow.issueCode(params.id, body, vendorOf(request));
+  }
+
+  // Public: the new PC has no identity of its own yet. The one-time code the vendor gave the
+  // Owner is the authorisation (rate-limited per address, audited).
+  @Post('cloud-restores')
+  @HttpCode(200)
+  @Public()
+  release(
+    @Req() request: Request,
+    @Body(new ZodPipe(CloudRestoreRequest)) body: CloudRestoreRequest,
+  ): Promise<CloudRestoreResponse> {
+    return this.escrow.release(body, request.ip ?? 'unknown');
   }
 
   // The local store's signed URLs (development and tests only; staging and production use S3,

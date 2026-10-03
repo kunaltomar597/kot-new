@@ -2,8 +2,8 @@
 
 How the restaurant PC backs itself up (DATA-002, DATA-005, SEC-007) and how a backup is restored
 (DATA-004): the nightly full backup (P7-05a), restore (P7-05b) and the continuous backup with
-restore to a moment (P7-05c) and the encrypted cloud copy (P7-05d). Restoring from the cloud
-with the vendor's escrowed key is P7-05e.
+restore to a moment (P7-05c), the encrypted cloud copy (P7-05d) and restoring from the cloud
+with the vendor's escrowed key (P7-05e).
 
 ## What a backup holds
 
@@ -38,7 +38,7 @@ it. That key is the `keyId` on the System page.
 
 The backup key is a local secret (`backup-key`). The installation makes it on first use: a file
 under `<RP_DATA_DIR>/secrets` in development, the Windows DPAPI store on the restaurant PC (P0-16).
-Without that key, a backup cannot be read. P7-05e escrows a copy with the vendor for a restore on a
+Without that key, a backup cannot be read. The vendor holds a copy in escrow for a restore on a
 new PC.
 
 ## When and where
@@ -225,7 +225,7 @@ cannot read it.
   Backups made while it is off are not sent; turning it on sends the newest.
 - The System page shows "In the cloud", "waiting", "failing", "off" or "not set up" (a PC not
   activated with the vendor), and the newest backup in the cloud.
-- The vendor keeps the newest backup of each of the last 14 days and 8 weeks.
+- The vendor keeps the newest backup of each of the last 30 days and 12 months (BRD §9.3).
 
 ## Restoring
 
@@ -324,6 +324,33 @@ node dist\backups\restore-cli.js pitr 2026-10-03T14:30:00+05:30 E:\rp-backups
 On a new PC, set `RP_RECOVERY_KEY` as for a file restore. The temporary PostgreSQL is reached as
 the administrator role in `RP_ADMIN_DATABASE_URL`, by name: use the same administrator role name on
 every PC (the installer does).
+
+### From the cloud, onto a new PC (P7-05e)
+
+When the PC, its backup drive and the recovery key are all gone, the cloud backup can still be
+restored. Each PC's backup key is escrowed with the vendor: when a heartbeat answer offers the
+vendor's escrow public key, the PC wraps its key with it (RSA-OAEP, SHA-256) and sends it. Only the
+vendor's KMS can unwrap it. The System page says "The vendor holds the backup key in escrow". A
+PC whose Owner opted out of the cloud backup sends no key.
+
+1. Install the software on the new PC, set `RP_CONTROL_PLANE_URL`, and stop the server (no first
+   run, no activation).
+2. The Owner calls the vendor. Support verifies them (the restore policy, OI-10) and issues a
+   restore code from the PC's page in the vendor web app. The old PC's Owner alert ("The vendor
+   can open your cloud backups") reaches any POS still running.
+3. On the new PC, with `RP_ADMIN_DATABASE_URL` set:
+
+   ```sh
+   node dist\backups\restore-cli.js cloud ABCD-EFGH-JKLM-NP23
+   ```
+
+   The tool makes a key pair, trades the code for the backup key wrapped for its public half and
+   the backups' download addresses, downloads the newest backup into `backups\cloud\`, checks
+   its SHA-256 and restores it as a file restore does.
+
+4. Ask the vendor to move the licence (LIC-004), then start the server.
+
+The code works once, within 24 hours. The cloud RPO is the nightly backup: up to a day.
 
 ### Going back
 

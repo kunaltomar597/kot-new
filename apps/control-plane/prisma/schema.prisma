@@ -292,6 +292,8 @@ model Installation {
   diagnostics         DiagnosticsBundle[]
   diagnosticsRequests DiagnosticsRequest[]
   cloudBackups        CloudBackup[]
+  backupKeyEscrows    BackupKeyEscrow[]
+  restoreCodes        RestoreCode[]
 
   @@index([tenantId])
   @@map("installations")
@@ -592,4 +594,49 @@ model CloudBackup {
 
   @@index([installationId, status, backupCreatedAt])
   @@map("cloud_backups")
+}
+
+/// A PC's backup key, wrapped with the vendor's escrow key (DATA-003, OI-10, P7-05e). Only the
+/// vendor's KMS can unwrap it, and only for a restore code. One per key a PC ever used.
+model BackupKeyEscrow {
+  id             String   @id @db.Uuid
+  installationId String   @map("installation_id") @db.Uuid
+  /// Which backup key (not the key).
+  keyId          String   @map("key_id")
+  /// Which vendor escrow key wrapped it.
+  escrowKeyId    String   @map("escrow_key_id")
+  /// RSA-OAEP (SHA-256), base64.
+  wrappedKey     String   @map("wrapped_key")
+  createdAt      DateTime @map("created_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@unique([installationId, keyId])
+  @@map("backup_key_escrows")
+}
+
+/// A one-time code that releases a restaurant's escrowed backup key to the restore tool on a new
+/// PC (DATA-004, P7-05e), issued by vendor staff after verifying the Owner.
+model RestoreCode {
+  id                String    @id @db.Uuid
+  installationId    String    @map("installation_id") @db.Uuid
+  /// SHA-256 (hex) of the code; the code itself is shown once.
+  codeHash          String    @unique @map("code_hash")
+  reason            String
+  /// How the Owner was verified (OI-10).
+  ownerVerification String    @map("owner_verification")
+  /// `vendor:<id>`, and the person's name as the restaurant sees it.
+  issuedBy          String    @map("issued_by")
+  issuerName        String    @map("issuer_name")
+  issuedAt          DateTime  @map("issued_at") @db.Timestamptz(3)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt            DateTime? @map("used_at") @db.Timestamptz(3)
+  usedFrom          String?   @map("used_from")
+  /// When the restaurant's PC said its Owner was told.
+  notifiedAt        DateTime? @map("notified_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@index([installationId, issuedAt])
+  @@map("restore_codes")
 }

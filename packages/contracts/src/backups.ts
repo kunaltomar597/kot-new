@@ -74,6 +74,11 @@ export const CloudBackupStatusView = z.object({
   lastFailureAt: Timestamp.nullable(),
   /** What went wrong last, in plain words. */
   lastError: z.string().nullable(),
+  /**
+   * When this PC's backup key was escrowed with the vendor (P7-05e), for a restore onto a new
+   * PC; null while it is not.
+   */
+  keyEscrowedAt: Timestamp.nullable(),
 });
 export type CloudBackupStatusView = z.infer<typeof CloudBackupStatusView>;
 

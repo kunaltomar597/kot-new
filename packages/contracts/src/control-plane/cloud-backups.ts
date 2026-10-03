@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { Id, Timestamp } from '../common.js';
-import { Sha256Hex } from './schemas.js';
+
+/** SHA-256, hex (as `Sha256Hex` in schemas.ts, which imports this file). */
+const Sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
 
 /**
  * The encrypted cloud backup (DATA-003, P7-05d): each night the restaurant PC uploads its newest
@@ -81,3 +83,87 @@ export type CloudBackupView = z.infer<typeof CloudBackupView>;
 /** The backups kept in the cloud, newest first. */
 export const CloudBackupListResponse = z.object({ backups: z.array(CloudBackupView) });
 export type CloudBackupListResponse = z.infer<typeof CloudBackupListResponse>;
+
+// ------------------------------------------------------------ key escrow (P7-05e, OI-10)
+
+const KeyId = z.string().regex(/^[0-9a-f]{16}$/);
+/** An RSA public key, SPKI DER in base64 (3072 or 4096 bits). */
+const RsaPublicKey = z.base64().min(400).max(1_000);
+/** A secret wrapped with RSA-OAEP (SHA-256): as long as the key's modulus. */
+const Wrapped = z.base64().min(300).max(800);
+
+/**
+ * In a heartbeat answer, while this PC's backup key is not escrowed: the vendor's escrow public
+ * key to wrap it with (RSA-OAEP, SHA-256). The private half stays in the vendor's KMS.
+ */
+export const EscrowOffer = z.object({
+  escrowKeyId: KeyId,
+  publicKey: RsaPublicKey,
+});
+export type EscrowOffer = z.infer<typeof EscrowOffer>;
+
+/** The PC's backup key, wrapped with the escrow key it was offered. */
+export const EscrowBackupKeyRequest = z.strictObject({
+  keyId: KeyId,
+  escrowKeyId: KeyId,
+  wrappedKey: Wrapped,
+});
+export type EscrowBackupKeyRequest = z.infer<typeof EscrowBackupKeyRequest>;
+
+/**
+ * Vendor staff issue a restore code once they have verified the restaurant's Owner (OI-10): why,
+ * and how the Owner was verified. Audited, and the restaurant's Owner is told.
+ */
+export const RestoreCodeRequest = z.strictObject({
+  reason: z.string().trim().min(3).max(500),
+  ownerVerification: z.string().trim().min(3).max(500),
+});
+export type RestoreCodeRequest = z.infer<typeof RestoreCodeRequest>;
+
+/** The code, shown once: one use, within 24 hours, on the new PC's restore tool. */
+export const RestoreCodeView = z.object({
+  code: z.string().regex(/^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/),
+  installationId: Id,
+  expiresAt: Timestamp,
+});
+export type RestoreCodeView = z.infer<typeof RestoreCodeView>;
+
+/** The restore tool on a new PC trades the code for the key, wrapped for a key it made now. */
+export const CloudRestoreRequest = z.strictObject({
+  code: z.string().min(16).max(24),
+  publicKey: RsaPublicKey,
+});
+export type CloudRestoreRequest = z.infer<typeof CloudRestoreRequest>;
+
+export const CloudRestoreResponse = z.object({
+  installationId: Id,
+  installationName: z.string(),
+  tenantName: z.string(),
+  /** Each escrowed backup key the backups need, wrapped for the tool's public key. */
+  keys: z.array(z.object({ keyId: KeyId, wrappedKey: Wrapped })),
+  /** The PC's cloud backups, newest first, each with a download address. */
+  backups: z.array(
+    z.object({
+      fileName: CloudBackupFileName,
+      backupCreatedAt: Timestamp,
+      sizeBytes: z.int().positive(),
+      sha256: Sha256Hex,
+      keyId: KeyId,
+      /** Absolute, or relative to the Control Plane's address (development). */
+      url: z.string().min(1),
+    }),
+  ),
+  /** The download addresses stop working after this. */
+  expiresAt: Timestamp,
+});
+export type CloudRestoreResponse = z.infer<typeof CloudRestoreResponse>;
+
+/** In a heartbeat answer: a restore code vendor staff issued for this restaurant's backups. */
+export const RestoreCodeNotice = z.object({
+  id: Id,
+  issuedAt: Timestamp,
+  /** The vendor staff member, as the restaurant sees them. */
+  issuedBy: z.string().max(120),
+  reason: z.string().max(500),
+});
+export type RestoreCodeNotice = z.infer<typeof RestoreCodeNotice>;

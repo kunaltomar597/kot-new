@@ -25,15 +25,17 @@ export function weekStartOf(date: IsoDate): IsoDate {
 }
 
 /**
- * Retention (DATA-002, default 14 daily + 8 weekly): the newest backup of each of the last
- * `keepDaily` days that have one, and the newest of each of the last `keepWeekly` weeks. The
- * newest backup is always kept. Returns the names to remove, oldest first.
+ * Retention (DATA-002, default 14 daily + 8 weekly; the cloud's 30 daily + 12 monthly, §9.3): the
+ * newest backup of each of the last `keepDaily` days that have one, of each of the last
+ * `keepWeekly` weeks and of each of the last `keepMonthly` calendar months. The newest backup is
+ * always kept. Returns the names to remove, oldest first.
  */
 export function backupsToRemove(
   backups: readonly BackupFileInfo[],
   keepDaily: number,
   keepWeekly: number,
   timeZone: string = DEFAULT_TIME_ZONE,
+  keepMonthly = 0,
 ): string[] {
   const newestFirst = [...backups].sort(
     (a, b) => b.takenAt.getTime() - a.takenAt.getTime() || b.name.localeCompare(a.name),
@@ -41,9 +43,15 @@ export function backupsToRemove(
   const keep = new Set<string>();
   const days = new Set<IsoDate>();
   const weeks = new Set<IsoDate>();
+  const months = new Set<string>();
   for (const backup of newestFirst) {
     const day = calendarDateOf(backup.takenAt, timeZone);
     const week = weekStartOf(day);
+    const month = day.slice(0, 7);
+    if (!months.has(month) && months.size < keepMonthly) {
+      months.add(month);
+      keep.add(backup.name);
+    }
     if (!days.has(day) && days.size < Math.max(1, keepDaily)) {
       days.add(day);
       keep.add(backup.name);

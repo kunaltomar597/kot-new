@@ -26,7 +26,8 @@
           "DISK_OR_BACKUP",
           "LICENSE_STATE",
           "SUSPICIOUS_ACTIVITY",
-          "SUPPORT_REQUEST"
+          "SUPPORT_REQUEST",
+          "VENDOR_RESTORE_CODE"
         ]
       },
       "lines": {
@@ -75,7 +76,8 @@
           "DISK_OR_BACKUP",
           "LICENSE_STATE",
           "SUSPICIOUS_ACTIVITY",
-          "SUPPORT_REQUEST"
+          "SUPPORT_REQUEST",
+          "VENDOR_RESTORE_CODE"
         ]
       },
       "lines": {
