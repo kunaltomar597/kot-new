@@ -581,6 +581,8 @@ model CloudBackup {
   sizeBytes       BigInt            @map("size_bytes")
   sha256          String
   keyId           String            @map("key_id")
+  /// BACKUP (a nightly backup, pruned by the retention) or ARCHIVE (a year, kept for good).
+  kind            String            @default("BACKUP")
   status          CloudBackupStatus @default(UPLOADING)
   /// The object store's multipart upload, while UPLOADING.
   uploadId        String?           @map("upload_id")

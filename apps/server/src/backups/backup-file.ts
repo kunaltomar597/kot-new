@@ -31,8 +31,11 @@ const MAX_CHUNK_BYTES = 16 * 1024 * 1024;
 const MAX_HEADER_BYTES = 64 * 1024;
 
 export const BackupHeader = z.object({
-  /** What the file holds: a full backup (P7-05a), archived WAL or a base backup (P7-05c). */
-  kind: z.enum(['FULL', 'WAL', 'BASE']),
+  /**
+   * What the file holds: a full backup (P7-05a), archived WAL or a base backup (P7-05c), a year's
+   * business records (P7-06b).
+   */
+  kind: z.enum(['FULL', 'WAL', 'BASE', 'ARCHIVE']),
   createdAt: z.iso.datetime(),
   /** Which backup key opens it (`backupKeyId`). */
   keyId: z.string().regex(/^[0-9a-f]{16}$/),

@@ -3,7 +3,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
-import { backupsView, systemStatus } from './system-fixture.js';
+import { archivesView, backupsView, systemStatus } from './system-fixture.js';
 
 const PATH = '/manage/system';
 
@@ -302,6 +302,71 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     });
   });
 
+  it('[DATA-008] lets the Owner archive the oldest year, with the statutory warning', async () => {
+    const started = {
+      id: '0190a1b2-c3d4-7000-8000-00000000cc01',
+      financialYear: '2023-24',
+      status: 'ARCHIVING' as const,
+      startedAt: '2026-10-03T10:00:00.000Z',
+      finishedAt: null,
+      requestedBy: 'Test owner',
+      folder: 'E:\\rp-archives\\rp-archive-FY2023-24',
+      archiveFile: null,
+      sizeBytes: null,
+      sha256: null,
+      counts: null,
+      error: null,
+    };
+    const fake = signsInAs(server(), 'OWNER')
+      .on('GET', '/api/v1/system', () => ({ status: 200, body: systemStatus() }))
+      .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView() }))
+      .on(
+        'GET',
+        '/api/v1/archives',
+        () => ({ status: 200, body: archivesView() }),
+        () => ({ status: 200, body: archivesView({ runs: [started], running: true }) }),
+      )
+      .on('POST', '/api/v1/archives', () => ({ status: 202, body: started }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'OWNER' });
+    const archives = await section(t('archives.title'));
+    expect(await archives.findByText(t('archives.year', { year: '2023-24' }))).toBeVisible();
+    // Oldest first: only 2023-24 can go now.
+    expect(archives.getAllByRole('button', { name: /^Archive / })).toHaveLength(1);
+    await user.click(
+      archives.getByRole('button', { name: t('archives.archive', { year: '2023-24' }) }),
+    );
+    const dialog = within(
+      await screen.findByRole('dialog', { name: t('archives.dialog.title', { year: '2023-24' }) }),
+    );
+    expect(dialog.getByRole('note')).toHaveTextContent(/until 31-12-2030/);
+    const confirm = dialog.getByRole('button', { name: t('archives.dialog.confirm') });
+    await user.type(
+      dialog.getByRole('textbox', { name: t('archives.dialog.reason') }),
+      'Disk space',
+    );
+    await user.click(
+      dialog.getByRole('checkbox', { name: t('archives.dialog.understood', { year: '2023-24' }) }),
+    );
+    // Not until the statutory warning is acknowledged.
+    expect(confirm).toBeDisabled();
+    await user.click(
+      dialog.getByRole('checkbox', {
+        name: t('archives.dialog.acknowledge', { until: '31-12-2030' }),
+      }),
+    );
+    await expectNoAxeViolations(container);
+    await user.click(confirm);
+    expect(await screen.findByText(t('archives.started'))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/archives')[0]?.body).toEqual({
+      financialYear: '2023-24',
+      folder: null,
+      acknowledgeStatutory: true,
+      reason: 'Disk space',
+    });
+    const table = within(await archives.findByRole('table', { name: t('archives.made') }));
+    expect(table.getByText(t('archives.status.ARCHIVING'))).toBeVisible();
+  });
+
   it('[DATA-004] keeps restore away from managers, and shows how the last restore went', async () => {
     const fake = systemServer().on('GET', '/api/v1/backups', () => ({
       status: 200,
@@ -333,6 +398,8 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     expect(backup.getByText('The base backup failed: disk full')).toBeVisible();
     expect(backup.queryByRole('button', { name: t('backups.restore.open') })).toBeNull();
     expect(backup.queryByRole('button', { name: t('backups.recovery.show') })).toBeNull();
+    // DATA-008: old years are the Owner's.
+    expect(screen.queryByRole('heading', { level: 3, name: t('archives.title') })).toBeNull();
   });
 
   it('[DATA-006] warns when the drive is getting full', async () => {

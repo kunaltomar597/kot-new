@@ -10,6 +10,7 @@ import {
   NudgeRequest,
   NudgeResponse,
 } from './alerts.js';
+import { ArchiveRunView, ArchivesResponse, StartArchiveRequest } from './archives.js';
 import { AuditListQuery, AuditListResponse, AuditVerifyResponse } from './audit.js';
 import {
   BackupsResponse,
@@ -742,6 +743,53 @@ export const ROUTES = [
       404: { description: 'There is no such backup there.', schema: ApiError },
       409: { description: 'A backup is running, or no second location is set.', schema: ApiError },
       422: { description: 'The backup was made with another key.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listArchives',
+    method: 'GET',
+    path: '/api/v1/archives',
+    summary: 'The years that may be archived and purged, and every archive-then-purge',
+    description:
+      'DATA-008: whole financial years that have ended, oldest first, each with whether GST law ' +
+      'still asks for its records (72 months, §12); the runs, which once done are the purge ' +
+      'records.',
+    tags: ['system'],
+    requirements: ['DATA-008'],
+    capability: 'DATA_ADMIN',
+    responses: {
+      200: { description: 'The years and runs.', schema: ArchivesResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'startArchive',
+    method: 'POST',
+    path: '/api/v1/archives',
+    summary: 'Archive a financial year, read the archive back, then purge the year',
+    description:
+      'DATA-008, AUD-004: the Owner with a fresh second factor and a reason. Only the oldest ' +
+      'year; within the statutory period only once the Owner acknowledges the warning. The ' +
+      'archive and a human-readable export (invoice register CSV, invoice PDFs) go to the folder ' +
+      'given or the second backup location; the purge runs through the separate purge login. ' +
+      'Runs in the background; audited.',
+    tags: ['system'],
+    requirements: ['DATA-008', 'AUD-004', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: StartArchiveRequest },
+    responses: {
+      202: { description: 'Started.', schema: ArchiveRunView },
+      ...standardErrors,
+      409: {
+        description: 'An archive is running, or the year is not the oldest.',
+        schema: ApiError,
+      },
+      422: {
+        description:
+          'Not a year that may be purged, no folder, the statutory warning not acknowledged, or ' +
+          'the purge login not set up.',
+        schema: ApiError,
+      },
     },
   },
   {

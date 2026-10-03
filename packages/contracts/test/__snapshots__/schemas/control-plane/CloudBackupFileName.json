@@ -1,4 +1,1 @@
-{
-  "input": { "type": "string", "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$" },
-  "output": { "type": "string", "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$" }
-}
+{ "input": { "type": "string" }, "output": { "type": "string" } }

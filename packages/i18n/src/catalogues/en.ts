@@ -2441,6 +2441,42 @@ export const en = {
       done: 'I have written it down',
     },
   },
+  archives: {
+    title: 'Old years',
+    intro:
+      'A whole financial year can be archived and then removed from this PC, oldest first. The archive is encrypted and checked, with an invoice register and the invoices as PDFs, before anything is removed. Keep it safe: it is the restaurant’s record of that year.',
+    none: 'No year can be archived yet: only years that have ended.',
+    years: 'Years that can be archived',
+    year: 'Financial year {year}',
+    invoices: '{count, plural, =0 {No invoices.} one {# invoice.} other {# invoices.}}',
+    keepUntil: 'GST law asks for its records until {until}.',
+    archive: 'Archive {year}…',
+    started: 'The archive has started. It may take some minutes.',
+    made: 'Archives made',
+    column: { year: 'Year', started: 'Started', status: 'Result', where: 'Folder' },
+    status: {
+      ARCHIVING: 'Archiving',
+      VERIFYING: 'Checking',
+      PURGING: 'Removing',
+      DONE: 'Archived and removed',
+      FAILED: 'Failed: nothing removed',
+    },
+    dialog: {
+      title: 'Archive financial year {year}',
+      intro:
+        'Every order, bill, payment and audit entry from {from} to {to} ({invoices, plural, one {# invoice} other {# invoices}}) is written to an encrypted archive with a readable copy, checked, and then removed from this PC. The archive is also sent to the cloud backup.',
+      statutory:
+        'GST law asks the restaurant to keep this year’s records until {until}. After archiving, the archive is the only copy: keep it, and the drive it is on, until then.',
+      folder: 'Folder for the archive',
+      folderHint: 'Leave empty to use the second backup location.',
+      reason: 'Why',
+      reasonHint: 'Kept in the audit trail.',
+      acknowledge: 'The restaurant will keep the archive until {until}.',
+      understood: 'I understand that {year} will be removed from this PC.',
+      confirm: 'Archive and remove',
+      cancel: 'Cancel',
+    },
+  },
   readiness: {
     title: 'Site-readiness checklist',
     intro:

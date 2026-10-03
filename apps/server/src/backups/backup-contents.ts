@@ -85,7 +85,7 @@ export async function* folderEntries(
 
 /** Wraps entries so each one's size and SHA-256 are counted as it is written, then the manifest. */
 export async function* withManifest(
-  entries: AsyncIterable<ArchiveEntry>,
+  entries: AsyncIterable<ArchiveEntry> | Iterable<ArchiveEntry>,
 ): AsyncGenerator<ArchiveEntry> {
   const manifest: BackupManifest = { format: 1, entries: [] };
   for await (const entry of entries) {

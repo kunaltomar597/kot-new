@@ -17,10 +17,7 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
-            "fileName": {
-              "type": "string",
-              "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
-            },
+            "fileName": { "type": "string" },
             "backupCreatedAt": {
               "type": "string",
               "format": "date-time",
@@ -29,6 +26,7 @@
             "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
             "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
             "keyId": { "type": "string" },
+            "kind": { "default": "BACKUP", "type": "string", "enum": ["BACKUP", "ARCHIVE"] },
             "status": { "type": "string", "enum": ["UPLOADING", "COMPLETE", "ABORTED", "DELETED"] },
             "startedAt": {
               "type": "string",
@@ -81,10 +79,7 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
-            "fileName": {
-              "type": "string",
-              "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
-            },
+            "fileName": { "type": "string" },
             "backupCreatedAt": {
               "type": "string",
               "format": "date-time",
@@ -93,6 +88,7 @@
             "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
             "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
             "keyId": { "type": "string" },
+            "kind": { "default": "BACKUP", "type": "string", "enum": ["BACKUP", "ARCHIVE"] },
             "status": { "type": "string", "enum": ["UPLOADING", "COMPLETE", "ABORTED", "DELETED"] },
             "startedAt": {
               "type": "string",
@@ -118,6 +114,7 @@
             "sizeBytes",
             "sha256",
             "keyId",
+            "kind",
             "status",
             "startedAt",
             "completedAt"
