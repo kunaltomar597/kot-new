@@ -1971,3 +1971,20 @@ body {
   text-align: start;
   vertical-align: top;
 }
+
+.backups__owner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+  margin-top: var(--rp-space-2);
+}
+
+.backups__recovery-key {
+  padding: var(--rp-space-3);
+  border: 1px dashed var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-md, 8px);
+  font-family: var(--rp-font-mono, monospace);
+  font-size: 1.125rem;
+  letter-spacing: 0.05em;
+  overflow-wrap: anywhere;
+}

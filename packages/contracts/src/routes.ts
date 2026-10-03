@@ -11,7 +11,13 @@ import {
   NudgeResponse,
 } from './alerts.js';
 import { AuditListQuery, AuditListResponse, AuditVerifyResponse } from './audit.js';
-import { BackupsResponse, StartBackupResponse } from './backups.js';
+import {
+  BackupsResponse,
+  RecoveryKeyResponse,
+  RestoreBackupRequest,
+  RestoreBackupResponse,
+  StartBackupResponse,
+} from './backups.js';
 import {
   BillCustomerRequest,
   BillDiscountParams,
@@ -716,6 +722,42 @@ export const ROUTES = [
       202: { description: 'Started.', schema: StartBackupResponse },
       ...standardErrors,
       409: { description: 'A backup is running already.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'restoreBackup',
+    method: 'POST',
+    path: '/api/v1/backups/restore',
+    summary: 'Restore this PC from one of its backups',
+    description:
+      'DATA-004: the Owner, with a fresh second factor and a reason. The backup is checked, the ' +
+      'request saved and the server restarts; the restore runs before it starts again. Audited.',
+    tags: ['system'],
+    requirements: ['DATA-004', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: RestoreBackupRequest },
+    responses: {
+      202: { description: 'The server restarts to restore.', schema: RestoreBackupResponse },
+      ...standardErrors,
+      404: { description: 'There is no such backup there.', schema: ApiError },
+      409: { description: 'A backup is running, or no second location is set.', schema: ApiError },
+      422: { description: 'The backup was made with another key.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'showRecoveryKey',
+    method: 'POST',
+    path: '/api/v1/backups/recovery-key',
+    summary: 'The backup recovery key, for the Owner to keep',
+    description:
+      'DATA-004: the key that reads this PC’s backups, written out to keep on paper away from ' +
+      'the PC. The Owner, with a fresh second factor. Audited.',
+    tags: ['system'],
+    requirements: ['DATA-004', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    responses: {
+      200: { description: 'The recovery key.', schema: RecoveryKeyResponse },
+      ...standardErrors,
     },
   },
   {

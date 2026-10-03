@@ -3,9 +3,11 @@ import { displayDateTime } from '@rp/domain';
 import { Badge, Button, useToast } from '@rp/ui-web';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { useConsole } from '../../app/console-context.js';
+import { useConsole, useConsoleState } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
+import { grantOf } from '../../app/modes.js';
+import { RecoveryKeyButton, RestoreDialog } from './BackupRestore.js';
 import { bytesParts } from './system-view.js';
 
 /** While a backup runs, look again this often. */
@@ -26,15 +28,21 @@ const STATUS_TONE = {
 
 /**
  * Backups on the System page (DATA-002, DATA-005, P7-05a): how they stand, where they are kept,
- * the latest ones and "Back up now". A failure is also an alert for the Owner and managers.
+ * the latest ones and "Back up now". A failure is also an alert for the Owner and managers. The
+ * Owner restores from here and sees the recovery key (DATA-004, P7-05b).
  */
 export function BackupsPanel() {
   const t = useT();
   const controller = useConsole();
+  const { person } = useConsoleState();
   const toast = useToast();
   const [view, setView] = useState<BackupsResponse | undefined>();
   const [failed, setFailed] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restarting, setRestarting] = useState<string | undefined>();
+  // DATA-004, AUTH-006: restore and the recovery key are the Owner's.
+  const owner = person !== undefined && grantOf(person, 'DATA_ADMIN') !== 'DENY';
 
   const load = useCallback(() => {
     controller.api.listBackups().then(
@@ -78,6 +86,34 @@ export function BackupsPanel() {
           <p className="staff-row__states">
             <Badge tone={HEALTH_TONE[view.health]}>{t(`backups.health.${view.health}`)}</Badge>
           </p>
+          {restarting === undefined ? null : (
+            <p role="status" className="console-notice console-notice--info">
+              {t('backups.restore.restarting', { when: at(restarting) })}
+            </p>
+          )}
+          {view.restorePending && restarting === undefined ? (
+            <p className="console-notice console-notice--info">{t('backups.restore.pending')}</p>
+          ) : null}
+          {view.lastRestore === null ? null : view.lastRestore.ok ? (
+            <p className="dashboard-section__hint">
+              {view.lastRestore.backupCreatedAt === null
+                ? t('backups.restore.doneAt', { at: at(view.lastRestore.at) })
+                : t('backups.restore.done', {
+                    at: at(view.lastRestore.at),
+                    when: at(view.lastRestore.backupCreatedAt),
+                  })}{' '}
+              {view.lastRestore.previousDatabase === null
+                ? null
+                : t('backups.restore.kept', { name: view.lastRestore.previousDatabase })}
+            </p>
+          ) : (
+            <p className="console-notice console-notice--danger">
+              {t('backups.restore.failed', {
+                at: at(view.lastRestore.at),
+                error: view.lastRestore.error ?? '',
+              })}
+            </p>
+          )}
           <p className="dashboard-section__hint">
             {view.lastSuccessAt === null
               ? t('systemPage.backup.never')
@@ -131,6 +167,32 @@ export function BackupsPanel() {
           >
             {running ? t('backups.running') : t('backups.now')}
           </Button>
+          {owner ? (
+            <div className="backups__owner">
+              <Button
+                variant="ghost"
+                disabled={running || view.restorePending || restarting !== undefined}
+                onClick={() => {
+                  setRestoring(true);
+                }}
+              >
+                {t('backups.restore.open')}
+              </Button>
+              <RecoveryKeyButton />
+            </div>
+          ) : null}
+          {restoring ? (
+            <RestoreDialog
+              view={view}
+              onClose={() => {
+                setRestoring(false);
+              }}
+              onRequested={(backupCreatedAt) => {
+                setRestoring(false);
+                setRestarting(backupCreatedAt);
+              }}
+            />
+          ) : null}
           {view.runs.length === 0 ? null : (
             <table className="backups-table">
               <caption>{t('backups.latest')}</caption>

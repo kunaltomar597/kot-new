@@ -101,6 +101,8 @@ export function backupsView(overrides: Partial<BackupsResponse> = {}): BackupsRe
       },
     ],
     keyId: '0123456789abcdef',
+    restorePending: false,
+    lastRestore: null,
     ...overrides,
   };
 }

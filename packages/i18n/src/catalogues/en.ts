@@ -2360,6 +2360,37 @@ export const en = {
     },
     copied: 'Also at the second location',
     notCopied: 'On the data drive only',
+    restore: {
+      open: 'Restore from a backup…',
+      title: 'Restore from a backup',
+      intro:
+        'This puts the whole restaurant back to how it was when the backup was made: orders, bills, menu, staff, settings and photos. The server restarts to do it, so do it when the restaurant is closed.',
+      backup: 'Backup',
+      choice: '{when} ({where})',
+      none: 'There is no backup to restore here.',
+      loss: 'Everything after {when} is lost: orders, bills, payments and changes made since. Devices paired since then must be paired again.',
+      reason: 'Why',
+      reasonHint: 'Kept in the audit trail.',
+      understood: 'I understand that everything after this backup is lost.',
+      confirm: 'Restore and restart',
+      cancel: 'Cancel',
+      restarting:
+        'The server is restarting to restore the backup from {when}. The console reconnects when it is back, usually within a few minutes.',
+      pending: 'A restore is waiting for the server to restart.',
+      done: 'Restored on {at} from the backup made {when}.',
+      doneAt: 'Restored on {at}.',
+      kept: 'The database as it was before is kept as {name}.',
+      failed: 'The restore on {at} failed, and nothing was changed: {error}',
+    },
+    recovery: {
+      show: 'Show the recovery key',
+      title: 'Backup recovery key',
+      intro:
+        'With this key, the backups can be read on a new PC, even without the vendor. Write it down and keep it somewhere safe, away from this PC.',
+      key: 'Recovery key',
+      keep: 'Anyone with this key and a backup can read the restaurant’s data. Do not photograph it or send it by message.',
+      done: 'I have written it down',
+    },
   },
   readiness: {
     title: 'Site-readiness checklist',

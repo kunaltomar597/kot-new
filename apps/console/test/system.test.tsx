@@ -1,3 +1,4 @@
+import { displayDateTime } from '@rp/domain';
 import { screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
@@ -146,6 +147,85 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('[DATA-004] [AUTH-006] lets the Owner restore from a backup and see the recovery key', async () => {
+    const fake = signsInAs(server(), 'OWNER')
+      .on('GET', '/api/v1/system', () => ({ status: 200, body: systemStatus() }))
+      .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView() }))
+      .on('POST', '/api/v1/backups/restore', () => ({
+        status: 202,
+        body: {
+          requestedAt: '2026-10-02T10:00:00.000Z',
+          backupCreatedAt: '2026-09-30T23:00:00.000Z',
+        },
+      }))
+      .on('POST', '/api/v1/backups/recovery-key', () => ({
+        status: 200,
+        body: {
+          recoveryKey: 'RPK1-AAAAA-BBBBB-CCCCC-DDDDD-EEEEE-FFFFF-GGGGG-HHHHH-IIIII-JJJJJ-KKKKK',
+          keyId: '0123456789abcdef',
+        },
+      }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'OWNER' });
+    const backup = await section(t('systemPage.backup.title'));
+    await user.click(await backup.findByRole('button', { name: t('backups.restore.open') }));
+    const dialog = within(await screen.findByRole('dialog', { name: t('backups.restore.title') }));
+    await expectNoAxeViolations(container);
+    // Newest first; the older one is chosen here.
+    const choice = dialog.getByRole('combobox', { name: t('backups.restore.backup') });
+    expect(within(choice).getAllByRole('option')).toHaveLength(2);
+    await user.selectOptions(choice, 'DATA_DRIVE/rp-backup-20260930T230000Z-nightly.rpbk');
+    const when = t('backups.at', displayDateTime(new Date('2026-09-30T23:00:00.000Z')));
+    expect(dialog.getByText(t('backups.restore.loss', { when }))).toBeVisible();
+    const confirm = dialog.getByRole('button', { name: t('backups.restore.confirm') });
+    expect(confirm).toBeDisabled();
+    await user.type(
+      dialog.getByRole('textbox', { name: t('backups.restore.reason') }),
+      'Bad import',
+    );
+    expect(confirm).toBeDisabled();
+    await user.click(dialog.getByRole('checkbox', { name: t('backups.restore.understood') }));
+    await user.click(confirm);
+    expect(
+      await backup.findByText(
+        t('backups.restore.restarting', {
+          when: t('backups.at', displayDateTime(new Date('2026-09-30T23:00:00.000Z'))),
+        }),
+      ),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/backups/restore')[0]?.body).toEqual({
+      location: 'DATA_DRIVE',
+      fileName: 'rp-backup-20260930T230000Z-nightly.rpbk',
+      reason: 'Bad import',
+    });
+    expect(backup.getByRole('button', { name: t('backups.restore.open') })).toBeDisabled();
+
+    await user.click(backup.getByRole('button', { name: t('backups.recovery.show') }));
+    const shown = within(await screen.findByRole('dialog', { name: t('backups.recovery.title') }));
+    expect(shown.getByText(/^RPK1-AAAAA-BBBBB/)).toBeVisible();
+  });
+
+  it('[DATA-004] keeps restore away from managers, and shows how the last restore went', async () => {
+    const fake = systemServer().on('GET', '/api/v1/backups', () => ({
+      status: 200,
+      body: backupsView({
+        lastRestore: {
+          at: '2026-10-02T10:05:00.000Z',
+          ok: false,
+          error: 'The database is in use. Stop the restaurant server before restoring.',
+          backupCreatedAt: null,
+          previousDatabase: null,
+        },
+      }),
+    }));
+    await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const backup = await section(t('systemPage.backup.title'));
+    expect(
+      await backup.findByText(/The restore on .* failed, and nothing was changed/),
+    ).toBeVisible();
+    expect(backup.queryByRole('button', { name: t('backups.restore.open') })).toBeNull();
+    expect(backup.queryByRole('button', { name: t('backups.recovery.show') })).toBeNull();
   });
 
   it('[DATA-006] warns when the drive is getting full', async () => {
