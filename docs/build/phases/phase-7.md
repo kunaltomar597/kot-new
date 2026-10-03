@@ -187,6 +187,24 @@ at any time including restricted mode; personal-data erasure/anonymisation; data
 100 GB / 5 years sizing target.
 Acceptance: scenario S10 parts: archive-then-purge with verification; erasure keeps invoices.
 
+Split (2026-10-03):
+
+- **P7-06a Automatic retention (DATA-007, DATA-011, §9.3).** Daily: operational data after
+  `retention.operationalDays` (alerts, service requests, print notices, idempotency records, log
+  files, restore leftovers; the outbox and photos already prune themselves); a diner's phone after
+  `retention.dinerContactMonths` without a visit and feedback comments after
+  `retention.feedbackMonths` anonymised (ratings kept). Audited counts. The System page shows the
+  last run.
+- **P7-06b Archive-then-purge (DATA-008, AUD-004).** The Owner with a fresh second factor picks
+  whole financial years; an encrypted, checksummed archive and a human-readable export (invoice
+  register CSV and invoice PDFs) go to a chosen folder and the cloud backup set; the archive is
+  read back; then the year's business records are deleted through a separate `rp_purge` login and
+  a purge record is written. A clear warning while the year is within the statutory 72 months.
+- **P7-06c Archive viewer and full data export (DATA-009, DATA-010).** Open an archive read-only to
+  view and print invoices and reports; a full export in open formats (CSV/JSON and invoice PDFs) at
+  any time, including in restricted licence mode.
+- **P7-06d Data-volume test (DATA-012).** Five years at design capacity within 100 GB, measured.
+
 ## P7-07 Onboarding wizard completion and go-live check
 
 Requirements: ONB-001 to ONB-004, ONB-008, ONB-009, ONB-010 (S), ONB-011, BO-5.

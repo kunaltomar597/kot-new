@@ -192,7 +192,15 @@ describe('[AUD-004] [SEC-007] least-privilege database roles', () => {
     for (const table of PROTECTED) expect(deletable, table).not.toContain(table);
     // Operational tables stay deletable (e.g. expired sessions, published outbox rows).
     expect(deletable).toEqual(
-      expect.arrayContaining(['sessions', 'idempotency_records', 'outbox']),
+      expect.arrayContaining([
+        'sessions',
+        'idempotency_records',
+        'outbox',
+        // The automatic retention (DATA-007, P7-06a).
+        'alerts',
+        'service_requests',
+        'print_notices',
+      ]),
     );
   });
 

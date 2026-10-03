@@ -370,6 +370,10 @@ Recommended next WPs (dependencies met):
   - [x] P7-05d Cloud backup
   - [x] P7-05e Key escrow and restore from the cloud
 - [ ] P7-06 Data lifecycle
+  - [x] P7-06a Automatic retention
+  - [ ] P7-06b Archive-then-purge
+  - [ ] P7-06c Archive viewer and full data export
+  - [ ] P7-06d Data-volume test
 - [x] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
   - [x] P7-07b First run on a fresh install
@@ -632,6 +636,24 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-06a):
+
+563. P7-06 is split into four (phase-7.md): automatic retention, archive-then-purge, the archive
+     viewer with the full data export, and the data-volume test.
+564. The daily retention removes cleared or acknowledged alerts (not one a service call still
+     points at), closed service calls, printed or failed print notices and expired idempotency
+     records after `retention.operationalDays`; and log files, downloaded cloud backups and restore
+     leftovers. The outbox, inbox and photos keep their own pruning.
+565. A diner's "visit" is their consent or their latest feedback; after
+     `retention.dinerContactMonths` without one, the number is anonymised (as an erasure, with
+     `erasedAt`). Feedback after `retention.feedbackMonths` loses its comment and diner link and
+     keeps its ratings, so the reports still count it.
+566. Each run that changes something writes one `RETENTION_APPLIED` audit entry per restaurant with
+     the counts; the System page shows the last run.
+567. A new migration grants DELETE on alerts, service requests and print notices to `rp_app`. The
+     roles migration's grant loop covered only the tables then present; the schema test now lists
+     them among the deletable tables, so the retention works under the restaurant PC's real role.
 
 Decided 2026-10-03 (P7-05e):
 
@@ -2874,6 +2896,22 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-06a Automatic retention
+
+Built: domain `retention.ts` (`monthsBefore`, `retentionCutoffs`, `lastVisitOf`); server
+`src/lifecycle/` (`RetentionService`, `retention-state.ts`, `LifecycleModule`), the migration
+granting DELETE on the three operational tables, `SystemStatusResponse.storage.retention`;
+console: the retention line on the System page; `docs/runbooks/data-lifecycle.md`.
+
+Tests: domain 3; server integration 2 (every kind removed or kept as it should be, files, the
+audit entry once, the System page) and the schema test's deletable tables; console 1 updated.
+
+Gotcha: tests run as a superuser, so a missing grant only shows on a database queried for
+`has_table_privilege`; the schema test is where to add each table a feature deletes from.
+
+Also: the REC-011 p95 timing tests may retry twice (201 ms against 200 ms once, with four test
+packages running); the P7-05e cloud-retention test no longer computes the retention per backup.
 
 ### 2026-10-03: P7-05e Key escrow and restore from the cloud
 

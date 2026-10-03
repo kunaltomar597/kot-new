@@ -225,6 +225,19 @@ export function SystemScreen() {
                 ] as const,
             )}
           />
+          {/* DATA-007, BRD §9.3: what is removed by itself, and when it last ran (P7-06a). */}
+          <p className="dashboard-section__hint">
+            {t('systemPage.storage.retention', {
+              days: storage.retention.operationalDays,
+              months: storage.retention.dinerContactMonths,
+            })}{' '}
+            {storage.retention.lastRunAt === null
+              ? null
+              : t('systemPage.storage.retentionRun', {
+                  when: t('backups.at', displayDateTime(new Date(storage.retention.lastRunAt))),
+                  count: storage.retention.lastRunTotal ?? 0,
+                })}
+          </p>
         </section>
 
         <section className="device-group" aria-labelledby="system-devices">

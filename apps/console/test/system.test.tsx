@@ -68,6 +68,18 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     expect(storage.getByText(t('systemPage.storage.category.PHOTOS'))).toBeVisible();
     expect(storage.getByText(t('systemPage.bytes.MB', { value: '42' }))).toBeVisible();
     expect(storage.getByText(t('systemPage.storage.notMeasured'))).toBeVisible();
+    // DATA-007: what is removed by itself, and the last run (P7-06a).
+    expect(
+      storage.getByText(
+        `${t('systemPage.storage.retention', { days: 90, months: 24 })} ${t(
+          'systemPage.storage.retentionRun',
+          {
+            when: t('backups.at', displayDateTime(new Date('2026-10-02T04:40:00.000Z'))),
+            count: 12,
+          },
+        )}`,
+      ),
+    ).toBeVisible();
     expect(storage.queryByRole('alert')).toBeNull();
 
     const devices = await section(t('systemPage.devices.title'));

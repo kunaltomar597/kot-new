@@ -16,3 +16,5 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `backups.md`: what a backup holds, its encryption, when and where backups are made, how each is
   checked, retention, failure alerts and what to do, and the installer's settings (P7-05a); the
   recovery key and restoring on the same or a new PC, and going back (P7-05b).
+- `data-lifecycle.md`: how long each kind of data is kept (BRD §9.3) and the daily automatic
+  retention (P7-06a).
