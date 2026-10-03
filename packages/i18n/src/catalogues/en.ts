@@ -2371,16 +2371,44 @@ export const en = {
       loss: 'Everything after {when} is lost: orders, bills, payments and changes made since. Devices paired since then must be paired again.',
       reason: 'Why',
       reasonHint: 'Kept in the audit trail.',
-      understood: 'I understand that everything after this backup is lost.',
+      understood: 'I understand that everything after that time is lost.',
       confirm: 'Restore and restart',
       cancel: 'Cancel',
       restarting:
-        'The server is restarting to restore the backup from {when}. The console reconnects when it is back, usually within a few minutes.',
+        'The server is restarting to restore the restaurant to {when}. The console reconnects when it is back, usually within a few minutes.',
       pending: 'A restore is waiting for the server to restart.',
       done: 'Restored on {at} from the backup made {when}.',
       doneAt: 'Restored on {at}.',
       kept: 'The database as it was before is kept as {name}.',
       failed: 'The restore on {at} failed, and nothing was changed: {error}',
+      doneTo: 'Restored on {at} to {when}.',
+      latest: 'The latest moment (changes up to {when})',
+      latestNever: 'The latest moment',
+      latestShort: 'the latest moment',
+      moment: 'A moment I choose',
+      momentLabel: 'Go back to',
+      momentHint: 'Any minute from {from} until now, in India time.',
+      momentInvalid: 'Choose a minute from {from} until now.',
+      lossLatest:
+        'Changes in the last few minutes, after the last moment archived ({when}), may be lost. Devices paired since then must be paired again.',
+    },
+    continuous: {
+      state: {
+        NOT_SET_UP: 'Continuous backup off',
+        OK: 'Continuous backup on',
+        BEHIND: 'Continuous backup behind',
+        FAILING: 'Continuous backup failing',
+      },
+      notSetUp:
+        'This PC does not archive the database log, so it can only go back to a nightly backup. The installer turns this on.',
+      archived: 'The database log was last archived {when}.',
+      nothingArchived: 'No database log is archived yet.',
+      restorable: 'The restaurant can be restored to any minute since {when}.',
+      noBase: 'A base backup is taken tonight; until then it can only go back to a nightly backup.',
+      waiting:
+        '{count, plural, one {# piece of the log is} other {# pieces of the log are}} waiting to be archived.',
+      behind:
+        '{count, plural, one {# archived piece is} other {# archived pieces are}} not at the second location yet.',
     },
     recovery: {
       show: 'Show the recovery key',
@@ -3097,6 +3125,7 @@ export const en = {
     },
     backups: {
       walMode: 'Incremental backup',
+      pointInTimeDays: 'Days that can be restored to any minute',
       nightlyAt: 'Nightly backup at',
       secondLocation: 'Second backup location',
       keepDaily: 'Daily backups kept',
@@ -3276,7 +3305,10 @@ export const en = {
         'A kitchen ticket or bill printed again this many times or more appears in the daily report.',
     },
     backups: {
-      walMode: 'Incremental backup of the database log: continuous or hourly.',
+      walMode:
+        'How often the database log is archived: continuous (every 5 minutes) or hourly. It is the most a restore can lose while the data drive survives.',
+      pointInTimeDays:
+        'How many days back the restaurant can be restored to any minute. Older days use the nightly backups. More days take more room on the drives.',
       nightlyAt:
         'The nightly full backup starts at this time (24-hour, like 04:30). A PC that was off then backs up when it starts.',
       secondLocation: 'Folder on a second disk, USB drive or NAS for the nightly full backup.',

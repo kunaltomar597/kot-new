@@ -1,5 +1,5 @@
 import { displayDateTime } from '@rp/domain';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
@@ -158,6 +158,7 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
         body: {
           requestedAt: '2026-10-02T10:00:00.000Z',
           backupCreatedAt: '2026-09-30T23:00:00.000Z',
+          pointInTime: null,
         },
       }))
       .on('POST', '/api/v1/backups/recovery-key', () => ({
@@ -206,6 +207,77 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     expect(shown.getByText(/^RPK1-AAAAA-BBBBB/)).toBeVisible();
   });
 
+  it('[DATA-004] restores to the latest moment or a chosen minute from the continuous backup', async () => {
+    const continuous = {
+      state: 'OK' as const,
+      mode: 'CONTINUOUS' as const,
+      lastArchivedAt: '2026-10-02T09:55:00.000Z',
+      waiting: 0,
+      secondLocationBehind: 0,
+      lastBaseBackupAt: '2026-10-01T23:10:00.000Z',
+      restorableFrom: '2026-10-01T23:10:00.000Z',
+      error: null,
+    };
+    const fake = signsInAs(server(), 'OWNER')
+      .on('GET', '/api/v1/system', () => ({ status: 200, body: systemStatus() }))
+      .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView({ continuous }) }))
+      .on('POST', '/api/v1/backups/restore', () => ({
+        status: 202,
+        body: {
+          requestedAt: '2026-10-02T10:00:00.000Z',
+          backupCreatedAt: '2026-10-01T23:10:00.000Z',
+          pointInTime: '2026-10-02T04:00:00.000Z',
+        },
+      }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'OWNER' });
+    const backup = await section(t('systemPage.backup.title'));
+    const at = (iso: string) => t('backups.at', displayDateTime(new Date(iso)));
+    expect(await backup.findByText(t('backups.continuous.state.OK'))).toBeVisible();
+    expect(
+      backup.getByText(
+        new RegExp(t('backups.continuous.archived', { when: at(continuous.lastArchivedAt) })),
+      ),
+    ).toBeVisible();
+
+    await user.click(backup.getByRole('button', { name: t('backups.restore.open') }));
+    const dialog = within(await screen.findByRole('dialog', { name: t('backups.restore.title') }));
+    const choice = dialog.getByRole('combobox', { name: t('backups.restore.backup') });
+    // The latest moment first, then a chosen minute, then the nightly backups.
+    expect(within(choice).getAllByRole('option')).toHaveLength(4);
+    expect(choice).toHaveValue('LATEST');
+    expect(
+      dialog.getByText(t('backups.restore.lossLatest', { when: at(continuous.lastArchivedAt) })),
+    ).toBeVisible();
+
+    await user.selectOptions(choice, 'MOMENT');
+    const field = dialog.getByLabelText(t('backups.restore.momentLabel'));
+    // Before the oldest base backup: refused.
+    fireEvent.change(field, { target: { value: '2026-09-01T10:00' } });
+    const from = at(continuous.restorableFrom);
+    expect(dialog.getByText(t('backups.restore.momentInvalid', { from }))).toBeVisible();
+    await expectNoAxeViolations(container);
+    // 09:30 in India is 04:00 UTC.
+    fireEvent.change(field, { target: { value: '2026-10-02T09:30' } });
+    expect(
+      dialog.getByText(t('backups.restore.loss', { when: at('2026-10-02T04:00:00.000Z') })),
+    ).toBeVisible();
+    await user.type(
+      dialog.getByRole('textbox', { name: t('backups.restore.reason') }),
+      'Wrong menu import',
+    );
+    await user.click(dialog.getByRole('checkbox', { name: t('backups.restore.understood') }));
+    await user.click(dialog.getByRole('button', { name: t('backups.restore.confirm') }));
+    expect(
+      await backup.findByText(
+        t('backups.restore.restarting', { when: at('2026-10-02T04:00:00.000Z') }),
+      ),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/backups/restore')[0]?.body).toEqual({
+      pointInTime: { to: '2026-10-02T04:00:00.000Z' },
+      reason: 'Wrong menu import',
+    });
+  });
+
   it('[DATA-004] keeps restore away from managers, and shows how the last restore went', async () => {
     const fake = systemServer().on('GET', '/api/v1/backups', () => ({
       status: 200,
@@ -215,7 +287,15 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
           ok: false,
           error: 'The database is in use. Stop the restaurant server before restoring.',
           backupCreatedAt: null,
+          restoredTo: null,
           previousDatabase: null,
+        },
+        continuous: {
+          ...backupsView().continuous,
+          state: 'FAILING',
+          lastArchivedAt: '2026-10-02T09:55:00.000Z',
+          restorableFrom: '2026-10-01T23:10:00.000Z',
+          error: 'The base backup failed: disk full',
         },
       }),
     }));
@@ -224,6 +304,9 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     expect(
       await backup.findByText(/The restore on .* failed, and nothing was changed/),
     ).toBeVisible();
+    // DATA-005: the continuous backup's failure shows too.
+    expect(backup.getByText(t('backups.continuous.state.FAILING'))).toBeVisible();
+    expect(backup.getByText('The base backup failed: disk full')).toBeVisible();
     expect(backup.queryByRole('button', { name: t('backups.restore.open') })).toBeNull();
     expect(backup.queryByRole('button', { name: t('backups.recovery.show') })).toBeNull();
   });

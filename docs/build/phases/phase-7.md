@@ -151,6 +151,12 @@ Split (2026-10-03):
 - **P7-05c Continuous WAL archiving (RPO ≤ 1 hour).**
   - WAL is archived, encrypted, to the second location, with a nightly base backup.
   - Point-in-time recovery in the restore tool, with the RPO measured.
+  - Built (2026-10-03): `wal-stage` as the archive_command (staging only), the server's
+    `ContinuousBackupService` (encrypt, copy, `pg_switch_wal` by `backups.walMode`, nightly
+    `pg_basebackup`, retention by `backups.pointInTimeDays`, DATA-005 alert), restore to a moment
+    (`restore-cli pitr`, and "Restore from a backup…" for the Owner) through a temporary PostgreSQL,
+    then P7-05b's restore. The installer's part (postgresql.conf, the `rp_backup` role,
+    `RP_BACKUP_DATABASE_URL`) is in `docs/runbooks/backups.md` for P0-16.
 - **P7-05d Cloud backup and key escrow.**
   - A nightly encrypted upload to storage in India through the Control Plane.
   - The backup key escrowed, wrapped by a vendor KMS key, and released for a restore only on a

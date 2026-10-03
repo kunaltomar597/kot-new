@@ -1,7 +1,8 @@
 # Backups
 
 How the restaurant PC backs itself up (DATA-002, DATA-005, SEC-007) and how a backup is restored
-(DATA-004). Continuous WAL archiving (P7-05c) and the cloud copy (P7-05d) will add their sections.
+(DATA-004): the nightly full backup (P7-05a), restore (P7-05b) and the continuous backup with
+restore to a moment (P7-05c). The cloud copy (P7-05d) will add its section.
 
 ## What a backup holds
 
@@ -119,6 +120,7 @@ Common causes:
 - The database role in `DATABASE_URL` must be able to read every table (`pg_dump`). The password
   goes to `pg_dump` through its environment, never its command line.
 - The DPAPI secret store must provide `backup-key` (32 random bytes, made at installation).
+- `RP_BACKUP_DATABASE_URL`: the continuous backup's role (see "The continuous backup").
 
 ## The recovery key
 
@@ -131,6 +133,78 @@ somewhere else:
   `RPK1-ABCDE-...`, in 11 groups. The Owner writes it down and keeps it away from the PC. The last
   two bytes are a check, so a mistyped character is caught before a backup is tried.
 - **The vendor's escrowed copy** (P7-05d), released for a restore once the Owner is verified.
+
+## The continuous backup (P7-05c)
+
+The nightly backup alone can lose up to a day. The continuous backup keeps the most a restore can
+lose to minutes while the data drive survives (RPO ≤ 1 hour, DATA-004), and to what had reached the
+second location when the data drive dies.
+
+How it works:
+
+1. PostgreSQL archives its write-ahead log (WAL) as it fills each 16 MB piece. Its
+   `archive_command` is `wal-stage`, which copies the piece into
+   `<RP_DATA_DIR>/backups/wal-staging/<system id>/`. That step needs no key, no database and no
+   second drive, so an unplugged USB drive never stops PostgreSQL or fills the data drive.
+2. Every 30 seconds the server:
+   - compresses and encrypts each staged piece (kind WAL, the same format as a backup) into
+     `<RP_DATA_DIR>/backups/wal/<system id>/`, reads it back and compares it, then removes it from
+     staging;
+   - copies the pieces the second location lacks to `<second location>/rp-backups/wal/<system id>/`,
+     checked byte for byte;
+   - closes the log every 5 minutes (`backups.walMode` CONTINUOUS) or every hour (HOURLY) with
+     `pg_switch_wal()`, so a quiet restaurant's last orders are archived too. Nothing is archived
+     while nothing changes.
+3. Every night, at `backups.nightlyAt`, the server takes a base backup with
+   `pg_basebackup --format=tar --wal-method=fetch`. It is compressed and encrypted on the way to
+   disk (kind BASE), read back in full, then named `rp-base-<end>-<first WAL piece>.rpbase` under
+   `backups/base/<system id>/`, and copied to the second location. A failed base backup is tried
+   again an hour later.
+4. Retention, in each place: the base backups of the last `backups.pointInTimeDays` days (2 by
+   default) and the newest one before them, and the log from the oldest of those on. Older days are
+   still covered by the nightly backups (14 daily, 8 weekly).
+
+The system id is PostgreSQL's cluster identifier. It keeps the archives of two clusters apart: a
+new PC numbers its log from the start again.
+
+On the System page, Backups shows "Continuous backup on", "behind" (no base backup for a day, log
+waiting, or pieces not yet at the second location) or "failing". Failing raises the same
+`DISK_OR_BACKUP` alert as a failed backup (dedupe key `continuous-backup`) until it works again.
+
+### Setting it up (installer, P0-16)
+
+In `postgresql.conf` (then restart PostgreSQL):
+
+```conf
+wal_level = replica
+archive_mode = on
+archive_timeout = 3600          # a backstop while the server is stopped
+archive_command = '"C:/Program Files/RestaurantPlatform/node/node.exe" "C:/Program Files/RestaurantPlatform/server/dist/backups/wal-stage.js" "%p" "%f" "D:/RestaurantData/backups/wal-staging"'
+max_wal_senders = 4
+```
+
+In `pg_hba.conf`: `host replication rp_backup 127.0.0.1/32 scram-sha-256`. Then, as the
+administrator:
+
+```sql
+CREATE ROLE rp_backup LOGIN REPLICATION PASSWORD '<random, kept by the installer>';
+GRANT EXECUTE ON FUNCTION pg_switch_wal() TO rp_backup;
+```
+
+Give the server `RP_BACKUP_DATABASE_URL=postgresql://rp_backup:<password>@localhost:5432/postgres`.
+Without it the continuous backup is off and the System page says so; the nightly backups still
+run. The PostgreSQL service account needs write access to the staging folder, and the server's
+account needs to read and delete there.
+
+### Problems
+
+| What the System page or the log says                            | What to do                                                                                                        |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `PostgreSQL cannot hand over its log (check wal-stage)`         | Read PostgreSQL's log for `archive command failed`: the node or script path, or the staging folder's rights.      |
+| `... is archived already with different content`                | A staged piece clashes with the archive: move it out of `wal-staging` and tell support (it is never overwritten). |
+| `The base backup failed: ... permission denied ... replication` | The `pg_hba.conf` line or the role's REPLICATION attribute is missing.                                            |
+| `permission denied for function pg_switch_wal`                  | Run the `GRANT EXECUTE` above.                                                                                    |
+| "behind", pieces not at the second location                     | Connect the USB drive or NAS: the server catches up by itself.                                                    |
 
 ## Restoring
 
@@ -195,6 +269,41 @@ who asked for the restore.
 5. Start the server. The staff sign in with their PINs as before, and paired devices reconnect.
    A device paired after the backup must be paired again.
 
+### To a moment (P7-05c)
+
+With the continuous backup on, the Owner can go back to the latest moment archived, or to any
+minute since the oldest base backup kept ("Restore from a backup…", then "The latest moment" or "A
+moment I choose", in India time). It needs the Owner with a fresh second factor and a reason, like
+a file restore, and is audited (`RESTORE_REQUESTED` with the moment, then `BACKUP_RESTORED` with
+`restoredTo`, the last change brought back).
+
+What the restore tool does:
+
+1. Picks the newest base backup that finished before the moment, from the data drive or the
+   second location, and the log after it (the same cluster).
+2. Unpacks it into `<RP_DATA_DIR>/.pitr-<time>/` and decrypts the log beside it.
+3. Starts a temporary PostgreSQL there, on a free port on 127.0.0.1 only, which replays the log up
+   to the moment and then stops (`recovery_target_time`, then `promote`). If the archive ends
+   before the moment, it brings back everything archived and says so.
+4. Dumps that database (`pg_dump`) and stops the temporary PostgreSQL.
+5. Restores the dump exactly as a file restore does (steps 3 to 8 above), with the photos, TLS
+   files and secrets of the nightly backup made before the moment.
+
+Nothing on the PC changes before step 5. The temporary folder is removed at the end, whatever
+happens.
+
+From the command line (the server stopped), with the second location's folder when the data drive
+is gone:
+
+```sh
+node dist\backups\restore-cli.js pitr latest E:\rp-backups
+node dist\backups\restore-cli.js pitr 2026-10-03T14:30:00+05:30 E:\rp-backups
+```
+
+On a new PC, set `RP_RECOVERY_KEY` as for a file restore. The temporary PostgreSQL is reached as
+the administrator role in `RP_ADMIN_DATABASE_URL`, by name: use the same administrator role name on
+every PC (the installer does).
+
 ### Going back
 
 The database as it was before is kept as `<name>_before_<time>`. To go back:
@@ -209,7 +318,8 @@ Once the restore has been checked, drop the kept database and folders to free th
 ### Times
 
 The measured times are in `docs/build/restore-timing.md`: 90 days at design capacity (1.3 GB)
-restore in about 11 seconds, about 113 MB/s. The RTO is two hours once the hardware is there. The
+restore in about 11 seconds, about 113 MB/s. A restore to a moment adds unpacking the base
+backup, replaying the log and the dump. The RTO is two hours once the hardware is there. The
 rehearsal before the pilot is `manual-tasks/25-restore-rehearsal.md`.
 
 ## Checking a backup by hand

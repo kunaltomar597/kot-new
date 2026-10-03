@@ -4,7 +4,7 @@ import type { Readable, Writable } from 'node:stream';
 
 /** A PostgreSQL client program (P7-05): its path, from `RP_PG_BIN` or the PATH. */
 export function pgProgram(
-  name: 'pg_dump' | 'pg_restore' | 'psql',
+  name: 'pg_dump' | 'pg_restore' | 'psql' | 'pg_basebackup' | 'pg_ctl',
   pgBin: string | undefined,
 ): string {
   const file = process.platform === 'win32' ? `${name}.exe` : name;

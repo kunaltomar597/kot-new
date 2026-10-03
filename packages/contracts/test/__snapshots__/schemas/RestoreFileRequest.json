@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "location": { "type": "string", "enum": ["DATA_DRIVE", "SECOND"] },
+      "fileName": {
+        "type": "string",
+        "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
+      },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["location", "fileName", "reason"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "location": { "type": "string", "enum": ["DATA_DRIVE", "SECOND"] },
+      "fileName": {
+        "type": "string",
+        "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
+      },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["location", "fileName", "reason"],
+    "additionalProperties": false
+  }
+}

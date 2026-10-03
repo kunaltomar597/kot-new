@@ -366,7 +366,7 @@ Recommended next WPs (dependencies met):
 - [ ] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
   - [x] P7-05b Restore
-  - [ ] P7-05c Continuous WAL archiving
+  - [x] P7-05c Continuous WAL archiving
   - [ ] P7-05d Cloud backup and key escrow
 - [ ] P7-06 Data lifecycle
 - [x] P7-07 Onboarding wizard completion
@@ -631,6 +631,53 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-05c):
+
+537. PostgreSQL's `archive_command` only stages each WAL piece (`wal-stage`: copy, fsync, rename,
+     under the cluster's system id), and the server encrypts it into the archive and copies it to
+     the second location. So an unplugged USB drive or an unreadable key store never makes
+     archiving fail, which would fill the data drive and stop the database.
+538. The server closes the log with `pg_switch_wal()` every 5 minutes (`backups.walMode`
+     CONTINUOUS, the default) or every hour (HOURLY); the installer sets `archive_timeout = 3600`
+     as a backstop while the server is stopped. The RPO while the data drive survives is about the
+     interval plus 30 seconds.
+539. A base backup every night at `backups.nightlyAt`: `pg_basebackup --format=tar
+--wal-method=fetch` (so it is complete on its own), gzip level 1, then the backup file format
+     (kind BASE), read back in full before it is named.
+     - New setting `backups.pointInTimeDays` (2 by default, 1 to 14, Owner): the base backups of
+       those days and the newest one before them are kept, with the log from the oldest on.
+     - Older days are covered by the nightly backups (14 daily, 8 weekly). A base backup is a
+       physical copy of the whole cluster, so 14 of them would double the room backups take.
+540. The archive is kept per PostgreSQL system identifier (`wal/<id>/`, `base/<id>/`), because a
+     new cluster numbers its log from the start again.
+541. The continuous backup needs its own role, `rp_backup` (REPLICATION, EXECUTE on
+     `pg_switch_wal()`), given as `RP_BACKUP_DATABASE_URL`. Without it the service is off and the
+     System page says so. The everyday role never gets REPLICATION.
+542. A restore to a moment replays the log on a temporary PostgreSQL started on the base backup,
+     then dumps it and restores the dump with P7-05b's steps.
+     - The temporary PostgreSQL listens on 127.0.0.1 only, on a free port, and trusts local
+       connections while it runs (its pg_hba.conf is replaced). It is reached as the
+       administrator role named in `RP_ADMIN_DATABASE_URL`.
+     - The photos, TLS files and secrets come from the newest nightly backup made at or before the
+       moment.
+     - Why: it reuses P7-05b's tested swap and undo, works the same on the same PC and a new one,
+       and never stops or touches the live cluster's files.
+     - The cost is an extra dump and restore: 33 MB/s here, within the two-hour RTO up to about
+       60 GB on the restaurant PC. P0-16 may add an in-place switch for larger databases.
+543. A moment beyond the end of the archive brings back everything archived instead of failing,
+     and says so. The server refuses a moment in the future (`POINT_IN_TIME_FUTURE`) and one before
+     the oldest base backup (`NO_BASE_BACKUP`). The Owner's console offers "the latest moment" and
+     "a moment I choose", in India time.
+544. An unplugged second location shows the continuous backup as "behind", with no alert; it
+     catches up by itself. A failure to archive, to close the log or to take a base backup is
+     "failing" and raises `DISK_OR_BACKUP` (dedupe key `continuous-backup`) until it works (DATA-005).
+545. The restore's "database in use" check counts client connections only (PostgreSQL stops
+     autovacuum itself for the rename), and names the programs connected. The new test found
+     that autovacuum on a just-restored database could make P7-05b's restore fail.
+546. The licence agent now waits for a check under way when the server shuts down. Its late
+     write reconnected Prisma after shutdown and held a connection, so a restore right after a
+     restart found the database in use.
 
 Decided 2026-10-03 (P7-05b):
 
@@ -2759,6 +2806,56 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-05c Continuous WAL archiving
+
+Built:
+
+- domain `continuous-backup.ts`: `walSwitchEveryMs`, `baseBackupsToRemove`,
+  `walFilesToRemove`, `continuousBackupState`.
+- contracts:
+  - `ContinuousBackupView` in `BackupsResponse.continuous`;
+  - `RestoreBackupRequest` is now a file or `{ pointInTime: { to } }`, and the response gains
+    `pointInTime`;
+  - `lastRestore.restoredTo`;
+  - the setting `backups.pointInTimeDays`.
+- server `src/backups/`:
+  - `wal-stage.ts`, the archive_command (Node's own modules only);
+  - `tar.ts`, a reader for `pg_basebackup`'s tar that refuses links and paths leaving the folder;
+  - `wal-archive.ts`, the archive layout and encrypt, copy and read steps;
+  - `base-backup.ts`;
+  - `continuous-backup.service.ts` (two lanes: archive every 30 s, base backups and retention
+    every 5 min);
+  - `point-in-time.ts`;
+  - `restore-cli pitr`;
+  - pending restores and the Owner's request for a moment;
+  - `RP_BACKUP_DATABASE_URL`.
+- `@rp/test-postgres` `startLocalPostgres(settings)`: a throwaway cluster with extra settings.
+- console: the continuous backup's state in Backups, and "The latest moment" and "A moment I
+  choose" in the restore dialog.
+- docs:
+  - the runbook's continuous backup, installer set-up, problems and restore to a moment;
+  - `docs/build/restore-timing.md`, with the RPO and the restore to a moment measured;
+  - part D of `manual-tasks/25-restore-rehearsal.md`.
+- Fixes found on the way: the restore's in-use check (autovacuum), and the licence agent's
+  shutdown.
+
+Tests:
+
+- domain: 9;
+- server unit: 6;
+- integration `continuous-backup.int.test.ts`: 3, on its own cluster with archiving on, skipped as
+  root;
+- console: 1 new and 2 updated;
+- an opt-in performance run.
+
+Gotchas:
+
+- `recovery_target_time` refuses ISO's `T` and `Z`.
+- `pg_last_xact_replay_timestamp()` is null when nothing was replayed.
+- `pg_ctl` start must be waited for on `exit`, not `close`, because the server keeps running.
+- Each recovery attempt needs its own log file.
+- Running one test with `-t` skips the one that takes the base backup.
 
 ### 2026-10-03: P7-05b Restore
 
@@ -6044,6 +6141,21 @@ Notes for the next session:
   - The service runs `restore-cli pending` (with the administrator's connection) before starting
     the server, and restarts it on exit code 75.
   - It never gives the server `RP_ADMIN_DATABASE_URL`.
+- P0-16 (from P7-05c): the continuous backup's set-up, as `docs/runbooks/backups.md` says:
+  - postgresql.conf: `wal_level = replica`, `archive_mode = on`, `archive_timeout = 3600`,
+    `max_wal_senders = 4`, and `archive_command` running `dist/backups/wal-stage.js` with the
+    bundled node and `<data>/backups/wal-staging`;
+  - pg_hba.conf: `host replication rp_backup 127.0.0.1/32 scram-sha-256`;
+  - the role `rp_backup` (LOGIN REPLICATION, EXECUTE on `pg_switch_wal()`), its password in the
+    installer's store, and `RP_BACKUP_DATABASE_URL` for the server;
+  - ship `pg_basebackup.exe` and `pg_ctl.exe` with the other client programs;
+  - the PostgreSQL service account writes the staging folder, the server's account reads and
+    deletes there;
+  - use the same administrator role name on every PC (a restore to a moment reaches its temporary
+    PostgreSQL by that name);
+  - optional, for databases above about 60 GB: a restore to a moment could switch PostgreSQL's
+    data folder in place (stop the service, rename the folders, start it) instead of dumping and
+    restoring, which keeps it within the two-hour RTO (`docs/build/restore-timing.md`).
 
 ### 2026-09-26: P0-14b web console shell
 

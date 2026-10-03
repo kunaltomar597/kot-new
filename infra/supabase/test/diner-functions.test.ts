@@ -153,6 +153,9 @@ describe('[QR-002] [QR-008] the menu', () => {
     expect(QrMenuResponse.parse((await call(qrMenu, 'qr-menu')).body).readOnly).toBe(true);
     await lastSeen(db, a.id, 119);
     expect(QrMenuResponse.parse((await call(qrMenu, 'qr-menu')).body).readOnly).toBe(false);
+    // Heard from just now again: 119 seconds ago turns read-only a second later, which a busy
+    // machine reaches before the next tests submit their orders.
+    await lastSeen(db, a.id, 0);
   });
 
   it('[QR-001] opens nothing without a valid token', async () => {

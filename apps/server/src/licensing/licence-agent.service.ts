@@ -133,8 +133,11 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     this.timer.unref();
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     if (this.timer !== undefined) clearInterval(this.timer);
+    // A check under way finishes before the database closes; otherwise its write reconnects
+    // after shutdown and holds a connection (a restore then finds the database in use).
+    await this.running?.catch(() => undefined);
   }
 
   get enforced(): boolean {

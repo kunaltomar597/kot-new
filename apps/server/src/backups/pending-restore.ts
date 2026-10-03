@@ -2,7 +2,8 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { WritableSecretStore } from '../auth/secret-store.js';
-import { restoreBackup } from './restore.js';
+import { restorePointInTime } from './point-in-time.js';
+import { type RestoreResult, restoreBackup } from './restore.js';
 
 /**
  * "Restore" on the System page (DATA-004, P7-05b): the server checks the request, writes it here
@@ -11,12 +12,25 @@ import { restoreBackup } from './restore.js';
  * given `RP_ADMIN_DATABASE_URL` runs it itself at start-up.
  */
 
-export const RestoreRequest = z.object({
-  /** The backup file, already resolved to its full path by the server. */
-  path: z.string().min(1),
-  requestedAt: z.iso.datetime(),
-  requestedBy: z.object({ staffId: z.string(), deviceId: z.string().nullable() }),
-});
+export const RestoreRequest = z
+  .object({
+    /** A backup file, already resolved to its full path by the server. */
+    path: z.string().min(1).optional(),
+    /** Or a moment from the continuous backup (P7-05c), with the folders to look in. */
+    pointInTime: z
+      .object({
+        /** Null brings back everything archived. */
+        to: z.iso.datetime().nullable(),
+        roots: z.array(z.string().min(1)).min(1),
+        fullBackupFolders: z.array(z.string().min(1)).min(1),
+      })
+      .optional(),
+    requestedAt: z.iso.datetime(),
+    requestedBy: z.object({ staffId: z.string(), deviceId: z.string().nullable() }),
+  })
+  .refine((request) => (request.path === undefined) !== (request.pointInTime === undefined), {
+    message: 'A restore request names a backup file or a point in time',
+  });
 export type RestoreRequest = z.infer<typeof RestoreRequest>;
 
 /** How the last restore attempt ended, kept outside the database (which it may not reach). */
@@ -26,6 +40,8 @@ export const RestoreOutcome = z.object({
   /** What went wrong, in plain words; null when it worked. */
   error: z.string().nullable(),
   backupCreatedAt: z.iso.datetime().nullable(),
+  /** For a point in time: the last change brought back. */
+  restoredTo: z.iso.datetime().nullable().default(null),
   /** The database as it was before, kept to go back to. */
   previousDatabase: z.string().nullable(),
   durationMs: z.int().nonnegative().nullable(),
@@ -90,8 +106,7 @@ export async function runPendingRestore(
   const started = now();
   let outcome: RestoreOutcome;
   try {
-    const result = await restoreBackup({
-      file: request.path,
+    const common = {
       key: await options.secrets.get('backup-key'),
       databaseUrl: options.databaseUrl,
       adminUrl: options.adminUrl,
@@ -101,12 +116,28 @@ export async function runPendingRestore(
       requestedBy: request.requestedBy,
       now,
       ...(options.log !== undefined && { log: options.log }),
-    });
+    };
+    let result: RestoreResult;
+    let restoredTo: Date | null = null;
+    if (request.pointInTime !== undefined) {
+      const { to, roots, fullBackupFolders } = request.pointInTime;
+      const recovered = await restorePointInTime({
+        ...common,
+        to: to === null ? null : new Date(to),
+        roots,
+        fullBackupFolders,
+      });
+      result = recovered;
+      restoredTo = recovered.restoredTo;
+    } else {
+      result = await restoreBackup({ ...common, file: request.path ?? '' });
+    }
     outcome = {
       at: result.finishedAt.toISOString(),
       ok: true,
       error: null,
       backupCreatedAt: result.info.createdAt,
+      restoredTo: restoredTo?.toISOString() ?? null,
       previousDatabase: result.previousDatabase,
       durationMs: result.finishedAt.getTime() - result.startedAt.getTime(),
     };
@@ -116,6 +147,7 @@ export async function runPendingRestore(
       ok: false,
       error: (error instanceof Error ? error.message : String(error)).trim().slice(0, 480),
       backupCreatedAt: null,
+      restoredTo: null,
       previousDatabase: null,
       durationMs: now().getTime() - started.getTime(),
     };

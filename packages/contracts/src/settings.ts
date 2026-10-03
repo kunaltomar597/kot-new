@@ -862,6 +862,16 @@ export const SETTINGS = [
     requirements: ['DATA-002'],
   }),
   setting({
+    key: 'backups.pointInTimeDays',
+    schema: int(1, 14),
+    defaultValue: 2,
+    scope: 'RESTAURANT',
+    capability: 'DATA_ADMIN',
+    description:
+      'How many days back the database can be restored to any minute (continuous backup); older days use the nightly backups.',
+    requirements: ['DATA-002', 'DATA-004'],
+  }),
+  setting({
     key: 'backups.nightlyAt',
     schema: TimeOfDay,
     defaultValue: '04:30',
