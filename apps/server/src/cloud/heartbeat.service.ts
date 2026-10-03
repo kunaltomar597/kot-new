@@ -12,8 +12,9 @@ import type { HeartbeatRequest, HeartbeatResponse, ReleaseInfo } from '@rp/contr
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { newId } from '../common/ids.js';
-import { backupSummary } from '../backups/backup-state.js';
+import { backupSummary, cloudBackupSummary } from '../backups/backup-state.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { ControlPlaneClient, ControlPlaneError } from './control-plane-client.js';
@@ -97,6 +98,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     private readonly licence: LicenceAgentService,
     private readonly errors: ErrorCounter,
     private readonly realtime: RealtimeGateway,
+    private readonly settings: SettingsService,
   ) {
     this.intervalMs = options.defaultIntervalMs;
   }
@@ -216,6 +218,13 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     return { client: this.client, installationId: enrolment.installationId };
   }
 
+  /** The Owner's `backups.cloudEnabled` (on by default, DATA-003). */
+  private async cloudBackupEnabled(): Promise<boolean> {
+    const restaurant = await this.prisma.restaurant.findFirst({ select: { id: true } });
+    if (restaurant === null) return true;
+    return (await this.settings.snapshot(restaurant.id)).get('backups.cloudEnabled');
+  }
+
   /** Logs only when the failure changes, so an offline site does not flood the log. */
   private fail(code: string, message: string, error?: unknown): void {
     if (this.state.lastError !== code) {
@@ -250,6 +259,8 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       checkpoint,
       settingsDigest,
       backup,
+      cloud,
+      cloudEnabled,
     ] = await Promise.all([
       this.audit.chainHead(),
       this.deviceHealth(),
@@ -261,6 +272,8 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       check === null ? undefined : this.audit.checkpoint(check.sequence),
       readVendorSettingsDigest(this.prisma),
       backupSummary(this.prisma),
+      cloudBackupSummary(this.prisma),
+      this.cloudBackupEnabled(),
     ]);
     const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
@@ -282,6 +295,13 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
         lastSuccessAt: backup.lastSuccessAt?.toISOString() ?? null,
         lastFailureAt: backup.lastFailureAt?.toISOString() ?? null,
         lastError: backup.lastError,
+        // DATA-003: the cloud copy, and whether the Owner opted out (P7-05d).
+        cloud: {
+          enabled: cloudEnabled,
+          lastSuccessAt: cloud.lastSuccessAt?.toISOString() ?? null,
+          lastFailureAt: cloud.lastFailureAt?.toISOString() ?? null,
+          lastError: cloud.lastError,
+        },
       },
       ...(restaurant !== null &&
         hours.success && {

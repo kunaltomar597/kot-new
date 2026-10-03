@@ -367,7 +367,8 @@ Recommended next WPs (dependencies met):
   - [x] P7-05a Encrypted local backups
   - [x] P7-05b Restore
   - [x] P7-05c Continuous WAL archiving
-  - [ ] P7-05d Cloud backup and key escrow
+  - [x] P7-05d Cloud backup
+  - [ ] P7-05e Key escrow and restore from the cloud
 - [ ] P7-06 Data lifecycle
 - [x] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
@@ -631,6 +632,41 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-03 (P7-05d):
+
+547. P7-05d is split: the cloud backup itself (P7-05d), and the key escrow with restore from the
+     cloud (P7-05e), which needs the vendor KMS key and the OI-10 policy.
+548. The PC uploads straight to object storage with signed URLs the Control Plane issues, in
+     parts of 64 MiB (larger for files that would need more than 10,000), each with its
+     `Content-MD5`. The bytes never pass through the Control Plane. A 100 GB database makes a
+     backup of about 19 GB, which a 10 Mbps line sends in about 4 hours, so the URLs last 24 hours.
+549. Storage is S3 or S3-compatible, signed with Signature Version 4 by our own small module
+     (checked against AWS's published examples), so no SDK is added. Staging and production
+     refuse any region but `ap-south-1` and `ap-south-2` (DATA-003: stored in India). A local
+     folder, served by the Control Plane with HMAC-signed URLs, stands in for development and
+     tests, and is refused in staging and production.
+550. What is sent: the nightly full backup file as it is (already AES-256-GCM encrypted on the PC
+     with its backup key), not the continuous backup. The cloud's RPO is the BRD's 24 hours.
+     Manual backups are not sent. Only the newest waiting backup goes; older waiting ones are
+     marked SKIPPED.
+551. A failed upload waits an hour and tries again. The alert (`DISK_OR_BACKUP`, dedupe
+     `cloud-backup`) opens only when it failed and nothing reached the cloud for 26 hours, so a
+     few hours without the internet stay quiet (NFR-A04).
+552. The Owner's opt-out is the existing setting `backups.cloudEnabled` (DATA_ADMIN, so the Owner
+     with a fresh second factor); its change is the audited `SETTING_CHANGED` with the reason, and
+     the heartbeat tells the vendor (`backup.cloud.enabled`). Backups made while it is off stay
+     waiting, so turning it back on sends the newest at once.
+553. The Control Plane keeps 14 daily and 8 weekly cloud backups per PC (`CP_BACKUP_KEEP_*`, the
+     same retention as the local backups), applied after each upload. Rows stay as DELETED, and
+     uploads unfinished for two days are aborted. Vendor staff (any role) see when and how large;
+     they cannot read them.
+554. The Control Plane's QR-relay provisioner pool now listens for errors on idle connections.
+     Before, the relay's database closing one (a restart, or a test dropping it) crashed the whole
+     Control Plane; the full check caught it as an unhandled error in `support.int.test.ts`.
+555. The recovery key's parser refuses a last character whose spare bits are not zero. 34 bytes
+     leave 3 unused bits in the 55th character, which the check bytes do not cover, so a mistype
+     there (A for B) used to pass in about a quarter of keys; a flaky P7-05b test showed it.
 
 Decided 2026-10-03 (P7-05c):
 
@@ -2806,6 +2842,38 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-03: P7-05d Cloud backup
+
+Built:
+
+- contracts: `control-plane/cloud-backups.ts` (start, complete, abort, list; the vendor's list),
+  `HeartbeatBackup.cloud`, `FleetInstallationView.cloudBackupAt`; locally
+  `BackupsResponse.cloud` and `BackupRunView.cloud`.
+- domain `cloudBackupState`.
+- Control Plane `src/cloud-backups/`: `aws-sigv4.ts`, `object-store.ts`, `s3-object-store.ts`,
+  `local-object-store.ts`, `object-store-for.ts`, `cloud-backups.service.ts` (records, retention,
+  audit), the controller (signed routes, the vendor's list, the local store's PUT and GET);
+  model `CloudBackup` and its migration; `CP_BACKUP_*` configuration; the fleet view's
+  `cloudBackupAt`.
+- server: `CloudBackupService` (newest waiting backup, parts with MD5 and retries, hourly retry,
+  alert), `backup_runs.cloud_*` columns, the client's cloud calls, the heartbeat's `cloud`, the
+  System page's state; `CloudModule` now imports `SettingsModule`.
+- vendor web app: "Cloud backup" on a PC's page. Console: the cloud state and the newest backup
+  in the cloud in Backups.
+- docs: the backups and Control Plane runbooks, the vendor access policy, and
+  `manual-tasks/26-cloud-backup-storage.md` (the S3 bucket in India).
+
+Tests: domain 3; CP unit 9 (SigV4 vectors, the S3 adapter against a fake S3, the local store,
+config) and integration 5; server integration 4 (a real Control Plane with the local store:
+byte-for-byte upload, failure, retry and alert, newest only, opt-out audited and reported);
+vendor web 1 updated; console 1 updated.
+
+Gotchas: a stream given a `data` listener before an `await` flows into it alone (hash in a
+Transform instead); S3 can answer 200 with an `<Error>` inside on completing an upload.
+
+Next: P7-05e (key escrow, restore from the cloud) needs the vendor KMS key and OI-10; its code
+can be built with a stand-in KMS like the licence signer.
 
 ### 2026-10-03: P7-05c Continuous WAL archiving
 

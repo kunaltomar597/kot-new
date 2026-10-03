@@ -52,6 +52,7 @@ import {
 } from './backup-contents.js';
 import { BackupFileError, backupKeyId, encryptBackup, readBackupHeader } from './backup-file.js';
 import { backupSummary } from './backup-state.js';
+import { CloudBackupService } from './cloud-backup.service.js';
 import { ContinuousBackupService } from './continuous-backup.service.js';
 import { fullBackupFor, locateRecovery, PointInTimeError } from './point-in-time.js';
 import { readRestoreOutcome, readRestoreRequest, saveRestoreRequest } from './pending-restore.js';
@@ -80,7 +81,7 @@ const FILE_PATTERN = /^rp-backup-(\d{8}T\d{6}Z)-(nightly|manual)\.rpbk$/;
 /** The folder backups go in, under the data folder and under the second location. */
 const FULL_FOLDER = join('backups', 'full');
 const SECOND_FOLDER = 'rp-backups';
-/** The secret that opens the backups is never inside them (it is escrowed instead, P7-05d). */
+/** The secret that opens the backups is never inside them (it is escrowed instead, P7-05e). */
 const BACKUP_KEY = 'backup-key';
 const RUNS_SHOWN = 20;
 
@@ -151,6 +152,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(BACKUP_OPTIONS) private readonly options: BackupOptions,
     private readonly lifecycle: ServerLifecycle,
     private readonly continuous: ContinuousBackupService,
+    private readonly cloud: CloudBackupService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -444,13 +446,14 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
   async overview(restaurantId: string): Promise<BackupsResponse> {
     const settings = await this.settings.snapshot(restaurantId);
     const now = this.options.now();
-    const [summary, runs, key, pending, restored, continuous] = await Promise.all([
+    const [summary, runs, key, pending, restored, continuous, cloud] = await Promise.all([
       backupSummary(this.prisma),
       this.prisma.backupRun.findMany({ orderBy: { startedAt: 'desc' }, take: RUNS_SHOWN }),
       this.secrets.get(BACKUP_KEY),
       readRestoreRequest(this.config.dataDir),
       readRestoreOutcome(this.config.dataDir),
       this.continuous.view(),
+      this.cloud.view(restaurantId),
     ]);
     const second = settings.get('backups.secondLocation');
     const names = await this.namesOf(runs);
@@ -477,6 +480,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
       runs: runs.map((run) => this.viewOf(run, names)),
       keyId: backupKeyId(key),
       continuous,
+      cloud,
       restorePending: pending !== null,
       lastRestore:
         restored === null
@@ -516,6 +520,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
       fileName: run.fileName,
       sizeBytes: run.sizeBytes === null ? null : Number(run.sizeBytes),
       secondCopy: (run.secondCopy as BackupRunView['secondCopy']) ?? null,
+      cloud: (run.cloudStatus as BackupRunView['cloud']) ?? null,
       error: run.error,
       requestedBy: run.requestedById === null ? null : (names.get(run.requestedById) ?? null),
     };
@@ -599,6 +604,7 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
       outcome = { status: 'FAILED', error: plainError(failure) };
     }
     await this.finish(run, fileName, outcome);
+    if (run.kind === 'NIGHTLY' && outcome.status !== 'FAILED') this.cloud.soon();
   }
 
   private async settingsForBackups() {
@@ -760,6 +766,8 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
           sha256: outcome.sha256 ?? null,
           secondCopy: outcome.secondCopy ?? null,
           error: outcome.error ?? null,
+          // DATA-003: each nightly backup made goes to the cloud (P7-05d).
+          ...(run.kind === 'NIGHTLY' && outcome.status !== 'FAILED' && { cloudStatus: 'PENDING' }),
         },
       });
       for (const { id } of restaurants) {

@@ -15,6 +15,9 @@ const booleanFlag = z
   .optional()
   .transform((value) => value === 'true' || value === '1');
 
+/** The India regions cloud backups may be stored in (DATA-003): Mumbai and Hyderabad. */
+export const INDIA_REGIONS: readonly string[] = ['ap-south-1', 'ap-south-2'];
+
 /** True when the connection string makes PostgreSQL use TLS (`sslmode=require` or stricter). */
 export function databaseUsesTls(databaseUrl: string): boolean {
   try {
@@ -100,6 +103,24 @@ export const CpConfigSchema = z
       .string()
       .refine((value) => Buffer.from(value, 'base64').length >= 32, 'at least 32 bytes')
       .optional(),
+    /**
+     * Where cloud backups go (DATA-003, P7-05d): S3 in India in staging and production, a local
+     * folder in development, or off (PCs are told the cloud backup is not set up).
+     */
+    backupStore: z.enum(['off', 'local', 's3']).default('off'),
+    backupLocalDir: z.string().min(1).optional(),
+    backupS3Endpoint: z
+      .url({ protocol: /^https?$/ })
+      .default('https://s3.ap-south-1.amazonaws.com'),
+    backupS3Region: z.string().min(1).default('ap-south-1'),
+    backupS3Bucket: z.string().min(3).max(63).optional(),
+    backupS3AccessKeyId: z.string().min(1).optional(),
+    backupS3SecretAccessKey: z.string().min(1).optional(),
+    /** For S3-compatible services that address buckets by path. */
+    backupS3PathStyle: booleanFlag,
+    /** Cloud backups kept per PC: the newest of each of the last N days and weeks (DATA-002). */
+    backupKeepDaily: z.coerce.number().int().min(1).max(90).default(14),
+    backupKeepWeekly: z.coerce.number().int().min(0).max(104).default(8),
   })
   .superRefine((config, context) => {
     if (config.env !== 'development' && config.secretKey === undefined) {
@@ -130,6 +151,56 @@ export const CpConfigSchema = z
         code: 'custom',
         path: ['alertWebhookUrl'],
         message: 'staging and production need an https:// CP_ALERT_WEBHOOK_URL',
+      });
+    }
+    if (config.backupStore === 'local' && config.backupLocalDir === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['backupLocalDir'],
+        message: 'CP_BACKUP_STORE=local needs CP_BACKUP_LOCAL_DIR',
+      });
+    }
+    if (config.env !== 'development' && config.backupStore === 'local') {
+      context.addIssue({
+        code: 'custom',
+        path: ['backupStore'],
+        message: 'staging and production keep cloud backups in S3 (CP_BACKUP_STORE=s3)',
+      });
+    }
+    if (
+      config.backupStore === 's3' &&
+      (config.backupS3Bucket === undefined ||
+        config.backupS3AccessKeyId === undefined ||
+        config.backupS3SecretAccessKey === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['backupS3Bucket'],
+        message:
+          'CP_BACKUP_STORE=s3 needs CP_BACKUP_S3_BUCKET, CP_BACKUP_S3_ACCESS_KEY_ID and CP_BACKUP_S3_SECRET_ACCESS_KEY',
+      });
+    }
+    // DATA-003: the restaurant's backups are stored in India.
+    if (
+      config.env !== 'development' &&
+      config.backupStore === 's3' &&
+      !INDIA_REGIONS.includes(config.backupS3Region)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['backupS3Region'],
+        message: `cloud backups must stay in India: CP_BACKUP_S3_REGION is one of ${INDIA_REGIONS.join(', ')}`,
+      });
+    }
+    if (
+      config.env !== 'development' &&
+      config.backupStore === 's3' &&
+      !config.backupS3Endpoint.startsWith('https://')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['backupS3Endpoint'],
+        message: 'staging and production need an https:// CP_BACKUP_S3_ENDPOINT',
       });
     }
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
@@ -183,6 +254,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     fleetSweepSeconds: env.CP_FLEET_SWEEP_SECONDS,
     alertWebhookUrl: env.CP_ALERT_WEBHOOK_URL === '' ? undefined : env.CP_ALERT_WEBHOOK_URL,
     errorDsn: env.CP_ERROR_DSN === '' ? undefined : env.CP_ERROR_DSN,
+    backupStore: env.CP_BACKUP_STORE === '' ? undefined : env.CP_BACKUP_STORE,
+    backupLocalDir: env.CP_BACKUP_LOCAL_DIR === '' ? undefined : env.CP_BACKUP_LOCAL_DIR,
+    backupS3Endpoint: env.CP_BACKUP_S3_ENDPOINT === '' ? undefined : env.CP_BACKUP_S3_ENDPOINT,
+    backupS3Region: env.CP_BACKUP_S3_REGION === '' ? undefined : env.CP_BACKUP_S3_REGION,
+    backupS3Bucket: env.CP_BACKUP_S3_BUCKET === '' ? undefined : env.CP_BACKUP_S3_BUCKET,
+    backupS3AccessKeyId:
+      env.CP_BACKUP_S3_ACCESS_KEY_ID === '' ? undefined : env.CP_BACKUP_S3_ACCESS_KEY_ID,
+    backupS3SecretAccessKey:
+      env.CP_BACKUP_S3_SECRET_ACCESS_KEY === '' ? undefined : env.CP_BACKUP_S3_SECRET_ACCESS_KEY,
+    backupS3PathStyle: env.CP_BACKUP_S3_PATH_STYLE,
+    backupKeepDaily: env.CP_BACKUP_KEEP_DAILY,
+    backupKeepWeekly: env.CP_BACKUP_KEEP_WEEKLY,
   });
   if (!result.success) {
     const problems = result.error.issues

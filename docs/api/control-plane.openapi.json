@@ -12,6 +12,7 @@
     }
   ],
   "tags": [
+    { "name": "backups" },
     { "name": "diagnostics" },
     { "name": "installations" },
     { "name": "onboarding" },
@@ -20,6 +21,215 @@
     { "name": "vendor" }
   ],
   "paths": {
+    "/v1/cloud-backups": {
+      "get": {
+        "operationId": "listCloudBackups",
+        "summary": "The PC’s own backups kept in the cloud, newest first",
+        "tags": ["backups"],
+        "responses": {
+          "200": {
+            "description": "The backups.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CloudBackupListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["DATA-003"]
+      },
+      "post": {
+        "operationId": "startCloudBackup",
+        "summary": "Start uploading the night’s encrypted backup: signed URLs for its parts",
+        "description": "DATA-003: the file is encrypted on the PC with its own backup key; the PC PUTs each part straight to object storage in India. Starting the same file again (same SHA-256) answers COMPLETE with no parts.",
+        "tags": ["backups"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StartCloudBackupRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Where to put the parts.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StartCloudBackupResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "The cloud backup is not set up here.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["DATA-003"]
+      }
+    },
+    "/v1/cloud-backups/{id}/abort": {
+      "post": {
+        "operationId": "abortCloudBackup",
+        "summary": "Give up an upload and remove its parts",
+        "tags": ["backups"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Aborted." },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such upload for this PC.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["DATA-003"]
+      }
+    },
+    "/v1/cloud-backups/{id}/complete": {
+      "post": {
+        "operationId": "completeCloudBackup",
+        "summary": "Join the uploaded parts into the stored backup",
+        "description": "Checks the stored size against the file’s, then applies the retention (14 daily and 8 weekly by default) to the PC’s cloud backups. Audited.",
+        "tags": ["backups"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompleteCloudBackupRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CloudBackupView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such upload for this PC.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "The upload was aborted or is already complete.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "A part is missing or the size does not match.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["DATA-003", "DATA-002"]
+      }
+    },
     "/v1/diagnostics": {
       "post": {
         "operationId": "uploadDiagnostics",
@@ -874,6 +1084,61 @@
         },
         "x-capability": "FLEET_VIEW",
         "x-requirements": ["AUD-003"]
+      }
+    },
+    "/v1/vendor/installations/{id}/cloud-backups": {
+      "get": {
+        "operationId": "listVendorCloudBackups",
+        "summary": "A PC’s backups kept in the cloud, newest first (the files stay encrypted)",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The backups.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CloudBackupListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "FLEET_VIEW",
+        "x-requirements": ["DATA-003", "VCP-005"]
       }
     },
     "/v1/vendor/installations/{id}/code": {
@@ -3314,6 +3579,111 @@
         "required": ["issued", "paymentDue", "grace", "restricted"],
         "additionalProperties": false
       },
+      "CloudBackupFileName": {
+        "type": "string",
+        "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
+      },
+      "CloudBackupListResponse": {
+        "type": "object",
+        "properties": {
+          "backups": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CloudBackupView" }
+          }
+        },
+        "required": ["backups"],
+        "additionalProperties": false
+      },
+      "CloudBackupParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "CloudBackupStatus": {
+        "type": "string",
+        "enum": ["UPLOADING", "COMPLETE", "ABORTED", "DELETED"]
+      },
+      "CloudBackupView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "fileName": { "$ref": "#/components/schemas/CloudBackupFileName" },
+          "backupCreatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "keyId": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/CloudBackupStatus" },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "installationId",
+          "fileName",
+          "backupCreatedAt",
+          "sizeBytes",
+          "sha256",
+          "keyId",
+          "status",
+          "startedAt",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CompleteCloudBackupRequest": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "minItems": 1,
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": { "type": "integer", "minimum": 1, "maximum": 10000 },
+                "etag": { "type": "string", "minLength": 1, "maxLength": 200 }
+              },
+              "required": ["number", "etag"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["parts"],
+        "additionalProperties": false
+      },
       "ComponentVersion": {
         "type": "object",
         "properties": {
@@ -3904,6 +4274,16 @@
           "backup": {
             "anyOf": [{ "$ref": "#/components/schemas/HeartbeatBackup" }, { "type": "null" }]
           },
+          "cloudBackupAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
           "devices": {
             "type": "array",
             "items": {
@@ -3976,6 +4356,7 @@
           "components",
           "disk",
           "backup",
+          "cloudBackupAt",
           "devices",
           "errorCount",
           "licenceState",
@@ -4075,9 +4456,39 @@
               { "type": "null" }
             ]
           },
-          "lastError": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+          "lastError": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] },
+          "cloud": { "$ref": "#/components/schemas/HeartbeatCloudBackup" }
         },
         "required": ["lastSuccessAt", "lastFailureAt", "lastError"],
+        "additionalProperties": false
+      },
+      "HeartbeatCloudBackup": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "lastSuccessAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "lastFailureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "lastError": { "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }] }
+        },
+        "required": ["enabled", "lastSuccessAt", "lastFailureAt", "lastError"],
         "additionalProperties": false
       },
       "HeartbeatOpeningWindow": {
@@ -5040,6 +5451,53 @@
           "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
         },
         "required": ["payload", "signature", "keyId"],
+        "additionalProperties": false
+      },
+      "StartCloudBackupRequest": {
+        "type": "object",
+        "properties": {
+          "fileName": { "$ref": "#/components/schemas/CloudBackupFileName" },
+          "backupCreatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 2199023255552 },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "keyId": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+        },
+        "required": ["fileName", "backupCreatedAt", "sizeBytes", "sha256", "keyId"],
+        "additionalProperties": false
+      },
+      "StartCloudBackupResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": { "$ref": "#/components/schemas/CloudBackupStatus" },
+          "partSize": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": { "type": "integer", "minimum": 1, "maximum": 10000 },
+                "url": { "type": "string", "minLength": 1 }
+              },
+              "required": ["number", "url"],
+              "additionalProperties": false
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["id", "status", "partSize", "parts", "expiresAt"],
         "additionalProperties": false
       },
       "SubscriptionRequest": {

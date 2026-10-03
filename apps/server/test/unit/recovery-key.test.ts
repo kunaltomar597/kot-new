@@ -12,6 +12,17 @@ describe('[DATA-004] the backup recovery key', () => {
     expect(parseRecoveryKey(typed)?.equals(key)).toBe(true);
   });
 
+  it('finds a mistyped last character, whose spare bits the check bytes do not cover', () => {
+    // 34 bytes fill 54 characters and 2 bits of the 55th; its other 3 bits must stay zero.
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const written = formatRecoveryKey(randomBytes(32));
+      const last = written.at(-1)!;
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      const neighbour = alphabet[(alphabet.indexOf(last) + 1) % 32]!;
+      expect(parseRecoveryKey(`${written.slice(0, -1)}${neighbour}`)).toBeUndefined();
+    }
+  });
+
   it('finds a mistyped character before any backup is tried', () => {
     const written = formatRecoveryKey(randomBytes(32));
     const last = written.at(-1) === 'A' ? 'B' : 'A';

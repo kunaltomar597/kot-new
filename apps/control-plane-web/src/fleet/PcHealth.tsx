@@ -34,6 +34,34 @@ export function BackupText({ pc }: { pc: FleetInstallationView }) {
   return <>{t('vendorApp.fleet.backupLast', { at: whenOrDash(backup.lastSuccessAt) })}</>;
 }
 
+/**
+ * The encrypted cloud backup (DATA-003, P7-05d): opted out, failing as the PC reports it, or the
+ * newest backup the Control Plane holds.
+ */
+export function CloudBackupText({ pc }: { pc: FleetInstallationView }) {
+  const t = useT();
+  const cloud = pc.backup?.cloud;
+  if (cloud?.enabled === false) {
+    return <Badge tone="neutral">{t('vendorApp.fleet.cloudOff')}</Badge>;
+  }
+  const failed =
+    cloud !== undefined &&
+    cloud.lastFailureAt !== null &&
+    (cloud.lastSuccessAt === null || cloud.lastFailureAt > cloud.lastSuccessAt);
+  if (failed) {
+    return (
+      <Badge tone="warning">
+        {t('vendorApp.fleet.cloudFailed', { at: when(cloud.lastFailureAt ?? '') })}
+      </Badge>
+    );
+  }
+  return pc.cloudBackupAt === null ? (
+    <>{t('vendorApp.fleet.cloudNone')}</>
+  ) : (
+    <>{t('vendorApp.fleet.cloudLast', { at: when(pc.cloudBackupAt) })}</>
+  );
+}
+
 /** The audit chain: whether a check has confirmed it, or an open alert says it changed. */
 export function ChainText({ pc }: { pc: FleetInstallationView }) {
   const t = useT();

@@ -3,6 +3,8 @@
 import { fileURLToPath } from 'node:url';
 
 export { AdminService } from './admin/admin.service.js';
+export { CloudBackupsService, OBJECT_STORE } from './cloud-backups/cloud-backups.service.js';
+export { LocalObjectStore } from './cloud-backups/local-object-store.js';
 export { DiagnosticsService } from './diagnostics/diagnostics.service.js';
 export { FleetService } from './fleet/fleet.service.js';
 export { RemoteSettingsService } from './remote-settings/remote-settings.service.js';

@@ -114,3 +114,31 @@ export function backupHealth(input: {
   if (lastSuccessAt === null) return 'NONE';
   return now.getTime() - lastSuccessAt.getTime() > BACKUP_OVERDUE_MS ? 'OVERDUE' : 'OK';
 }
+
+export type CloudBackupState = 'OFF' | 'NOT_SET_UP' | 'OK' | 'PENDING' | 'FAILING';
+
+/**
+ * How the cloud backup stands (DATA-003, DATA-005, P7-05d):
+ * - OFF: the Owner opted out; NOT_SET_UP: this PC is not activated with the vendor;
+ * - OK: a backup reached the cloud within a day, and nothing failed since;
+ * - PENDING: waiting for the first upload, or retrying after a failure while the last one is
+ *   still recent (the internet down for a few hours);
+ * - FAILING: it failed, and nothing reached the cloud for more than a day. This alerts.
+ */
+export function cloudBackupState(input: {
+  readonly enabled: boolean;
+  readonly setUp: boolean;
+  readonly now: Date;
+  readonly lastSuccessAt: Date | null;
+  readonly lastFailureAt: Date | null;
+}): CloudBackupState {
+  if (!input.enabled) return 'OFF';
+  if (!input.setUp) return 'NOT_SET_UP';
+  const { now, lastSuccessAt, lastFailureAt } = input;
+  const recent =
+    lastSuccessAt !== null && now.getTime() - lastSuccessAt.getTime() <= BACKUP_OVERDUE_MS;
+  const failedSince =
+    lastFailureAt !== null && (lastSuccessAt === null || lastFailureAt > lastSuccessAt);
+  if (failedSince) return recent ? 'PENDING' : 'FAILING';
+  return recent ? 'OK' : 'PENDING';
+}

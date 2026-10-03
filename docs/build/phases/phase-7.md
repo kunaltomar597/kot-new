@@ -157,11 +157,19 @@ Split (2026-10-03):
     (`restore-cli pitr`, and "Restore from a backup…" for the Owner) through a temporary PostgreSQL,
     then P7-05b's restore. The installer's part (postgresql.conf, the `rp_backup` role,
     `RP_BACKUP_DATABASE_URL`) is in `docs/runbooks/backups.md` for P0-16.
-- **P7-05d Cloud backup and key escrow.**
-  - A nightly encrypted upload to storage in India through the Control Plane.
+- **P7-05d Cloud backup.**
+  - A nightly encrypted upload to storage in India through the Control Plane: the PC uploads the
+    backup file (already AES-256-GCM encrypted on the PC) straight to object storage with signed
+    URLs the Control Plane issues, in parts.
+  - The Control Plane keeps the record and its own retention; an S3 adapter (India region) for
+    staging and production, a local folder for development and tests.
+  - Opt-out (`backups.cloudEnabled`) is audited; failures alert the Owner and managers; the cloud
+    backup state shows on the System page, in the heartbeat and in the fleet view.
+- **P7-05e Key escrow and restore from the cloud.** (Split 2026-10-03.)
   - The backup key escrowed, wrapped by a vendor KMS key, and released for a restore only on a
     vendor restore code given after the Owner is verified (audited).
-  - Opt-out is audited, and the cloud backup state shows in the fleet view.
+  - The restore tool restores the newest cloud backup onto a new PC with that code (DATA-004,
+    RPO ≤ 24 hours when only the cloud survives).
 
 ## P7-06 Data lifecycle
 

@@ -13398,6 +13398,12 @@
               { "type": "null" }
             ]
           },
+          "cloud": {
+            "anyOf": [
+              { "type": "string", "enum": ["PENDING", "UPLOADED", "FAILED", "SKIPPED"] },
+              { "type": "null" }
+            ]
+          },
           "error": { "type": ["string", "null"] },
           "requestedBy": { "type": ["string", "null"] }
         },
@@ -13410,6 +13416,7 @@
           "fileName",
           "sizeBytes",
           "secondCopy",
+          "cloud",
           "error",
           "requestedBy"
         ],
@@ -13454,6 +13461,7 @@
           "runs": { "type": "array", "items": { "$ref": "#/components/schemas/BackupRunView" } },
           "keyId": { "type": "string" },
           "continuous": { "$ref": "#/components/schemas/ContinuousBackupView" },
+          "cloud": { "$ref": "#/components/schemas/CloudBackupStatusView" },
           "restorePending": { "type": "boolean" },
           "lastRestore": {
             "anyOf": [
@@ -13494,6 +13502,7 @@
           "runs",
           "keyId",
           "continuous",
+          "cloud",
           "restorePending",
           "lastRestore"
         ],
@@ -14214,6 +14223,28 @@
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
         "required": ["reason"],
+        "additionalProperties": false
+      },
+      "CloudBackupState": {
+        "type": "string",
+        "enum": ["OFF", "NOT_SET_UP", "OK", "PENDING", "FAILING"]
+      },
+      "CloudBackupStatusView": {
+        "type": "object",
+        "properties": {
+          "state": { "$ref": "#/components/schemas/CloudBackupState" },
+          "lastUploadAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastUploadedBackupAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastFailureAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastError": { "type": ["string", "null"] }
+        },
+        "required": ["state", "lastUploadAt", "lastUploadedBackupAt", "lastFailureAt", "lastError"],
         "additionalProperties": false
       },
       "Combo": {

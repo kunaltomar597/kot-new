@@ -39,3 +39,36 @@ export async function backupSummary(
         : null,
   };
 }
+
+export interface CloudBackupSummary {
+  /** When a backup last reached the cloud, and when that backup was made. */
+  readonly lastSuccessAt: Date | null;
+  readonly lastUploadedBackupAt: Date | null;
+  /** The latest upload still failing, and why. */
+  readonly lastFailureAt: Date | null;
+  readonly lastError: string | null;
+}
+
+/** The cloud backup's latest success and failure (DATA-003, P7-05d), from the backup record. */
+export async function cloudBackupSummary(
+  prisma: Pick<PrismaService, 'backupRun'>,
+): Promise<CloudBackupSummary> {
+  const [success, failure] = await Promise.all([
+    prisma.backupRun.findFirst({
+      where: { cloudStatus: 'UPLOADED' },
+      orderBy: { cloudUploadedAt: 'desc' },
+      select: { cloudUploadedAt: true, startedAt: true },
+    }),
+    prisma.backupRun.findFirst({
+      where: { cloudStatus: 'FAILED' },
+      orderBy: { cloudAttemptedAt: 'desc' },
+      select: { cloudAttemptedAt: true, cloudError: true },
+    }),
+  ]);
+  return {
+    lastSuccessAt: success?.cloudUploadedAt ?? null,
+    lastUploadedBackupAt: success?.startedAt ?? null,
+    lastFailureAt: failure?.cloudAttemptedAt ?? null,
+    lastError: failure?.cloudError ?? null,
+  };
+}

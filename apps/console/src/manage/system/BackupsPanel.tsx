@@ -1,4 +1,4 @@
-import type { BackupsResponse, ContinuousBackupView } from '@rp/contracts';
+import type { BackupsResponse, CloudBackupStatusView, ContinuousBackupView } from '@rp/contracts';
 import { displayDateTime } from '@rp/domain';
 import { Badge, Button, useToast } from '@rp/ui-web';
 import { useCallback, useEffect, useState } from 'react';
@@ -23,6 +23,13 @@ const CONTINUOUS_TONE = {
   NOT_SET_UP: 'neutral',
   OK: 'success',
   BEHIND: 'warning',
+  FAILING: 'danger',
+} as const;
+const CLOUD_TONE = {
+  OFF: 'warning',
+  NOT_SET_UP: 'neutral',
+  OK: 'success',
+  PENDING: 'info',
   FAILING: 'danger',
 } as const;
 const STATUS_TONE = {
@@ -93,9 +100,13 @@ export function BackupsPanel() {
             <Badge tone={HEALTH_TONE[view.health]}>{t(`backups.health.${view.health}`)}</Badge>{' '}
             <Badge tone={CONTINUOUS_TONE[view.continuous.state]}>
               {t(`backups.continuous.state.${view.continuous.state}`)}
+            </Badge>{' '}
+            <Badge tone={CLOUD_TONE[view.cloud.state]}>
+              {t(`backups.cloud.state.${view.cloud.state}`)}
             </Badge>
           </p>
           <ContinuousSummary view={view.continuous} at={at} />
+          <CloudSummary view={view.cloud} at={at} />
           {restarting === undefined ? null : (
             <p role="status" className="console-notice console-notice--info">
               {t('backups.restore.restarting', { when: restarting })}
@@ -245,6 +256,7 @@ export function BackupsPanel() {
                           : run.secondCopy === 'NOT_SET'
                             ? t('backups.notCopied')
                             : '')}
+                      {run.cloud === 'UPLOADED' ? ` ${t('backups.inCloud')}` : null}
                     </td>
                   </tr>
                 ))}
@@ -286,6 +298,30 @@ function ContinuousSummary({
       {view.error === null ? null : (
         <p className="console-notice console-notice--danger">{view.error}</p>
       )}
+    </>
+  );
+}
+
+/** The encrypted cloud backup (DATA-003, P7-05d): the newest copy there, or why there is none. */
+function CloudSummary({ view, at }: { view: CloudBackupStatusView; at: (iso: string) => string }) {
+  const t = useT();
+  let text: string;
+  if (view.state === 'OFF') text = t('backups.cloud.off');
+  else if (view.state === 'NOT_SET_UP') text = t('backups.cloud.notSetUp');
+  else if (view.lastUploadAt === null || view.lastUploadedBackupAt === null) {
+    text = t('backups.cloud.none');
+  } else {
+    text = t('backups.cloud.last', {
+      when: at(view.lastUploadedBackupAt),
+      sent: at(view.lastUploadAt),
+    });
+  }
+  return (
+    <>
+      <p className="dashboard-section__hint">{text}</p>
+      {view.state === 'FAILING' && view.lastError !== null ? (
+        <p className="console-notice console-notice--danger">{view.lastError}</p>
+      ) : null}
     </>
   );
 }

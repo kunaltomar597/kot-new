@@ -2392,6 +2392,20 @@ export const en = {
       lossLatest:
         'Changes in the last few minutes, after the last moment archived ({when}), may be lost. Devices paired since then must be paired again.',
     },
+    cloud: {
+      state: {
+        OFF: 'Cloud backup off',
+        NOT_SET_UP: 'Cloud backup not set up',
+        OK: 'In the cloud',
+        PENDING: 'Cloud backup waiting',
+        FAILING: 'Cloud backup failing',
+      },
+      last: 'The newest backup in the cloud was made {when} and sent {sent}. It is encrypted on this PC before it leaves.',
+      none: 'No backup has reached the cloud yet. The nightly backup is sent when the internet is there.',
+      off: 'The Owner turned the cloud backup off. If this PC and the backup drive are both lost, the data is lost too.',
+      notSetUp: 'This PC is not activated with the vendor yet, so nothing is sent to the cloud.',
+    },
+    inCloud: 'Also in the cloud',
     continuous: {
       state: {
         NOT_SET_UP: 'Continuous backup off',
@@ -4242,6 +4256,11 @@ export const en = {
       backupNone: 'Not set up yet',
       backupLast: 'Last {at}',
       backupFailed: 'Failed {at}',
+      cloudBackup: 'Cloud backup',
+      cloudNone: 'None in the cloud yet',
+      cloudLast: 'Newest made {at}',
+      cloudFailed: 'Upload failing since {at}',
+      cloudOff: 'Turned off by the Owner',
       devices: 'Devices',
       devicesConnected: '{connected} of {paired} connected',
       devicesPaired: '{paired} paired',
