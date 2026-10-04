@@ -70,8 +70,17 @@ export const VendorInstallationView = z.object({
   /** The installed `RESTAURANT_PC` version, from the last heartbeat. */
   version: z.string().nullable(),
   licenceState: LicenceState.nullable(),
+  /** Held at this version by the vendor (UPD-002); null when it follows its channel. */
+  pinnedVersion: SemVer.nullable().default(null),
 });
 export type VendorInstallationView = z.infer<typeof VendorInstallationView>;
+
+/** Hold a PC at a version, or let it follow its channel again (UPD-002). */
+export const PinInstallationRequest = z.strictObject({
+  version: SemVer.nullable(),
+  reason: Reason,
+});
+export type PinInstallationRequest = z.infer<typeof PinInstallationRequest>;
 
 export const VendorTenantView = TenantRequest.extend({
   id: Id,
@@ -135,8 +144,46 @@ export const ReactivationCodeView = z.object({
 });
 export type ReactivationCodeView = z.infer<typeof ReactivationCodeView>;
 
-export const VendorReleaseListResponse = z.object({ releases: z.array(ReleaseInfo) });
+export const RolloutState = z.enum(['ACTIVE', 'PAUSED', 'HALTED']);
+export type RolloutState = z.infer<typeof RolloutState>;
+
+/** A release with its rollout (UPD-003) and how installing it is going. */
+export const VendorReleaseView = ReleaseInfo.extend({
+  id: Id,
+  rollout: z.object({
+    percent: z.int().min(0).max(100),
+    state: RolloutState,
+    /** PCs offered it whatever their bucket. */
+    cohort: z.array(z.object({ id: Id, name: z.string() })),
+    haltReason: z.string().nullable(),
+    changedAt: Timestamp,
+  }),
+  /** A hotfix: the one PC it is for. */
+  target: z.object({ id: Id, name: z.string() }).nullable(),
+  installs: z.object({
+    /** PCs that started installing it or run it. */
+    attempts: z.int().nonnegative(),
+    installed: z.int().nonnegative(),
+    failures: z.int().nonnegative(),
+    errorSpikes: z.int().nonnegative(),
+  }),
+});
+export type VendorReleaseView = z.infer<typeof VendorReleaseView>;
+
+export const VendorReleaseListResponse = z.object({ releases: z.array(VendorReleaseView) });
 export type VendorReleaseListResponse = z.infer<typeof VendorReleaseListResponse>;
+
+export const VendorReleaseParams = z.object({ id: Id });
+export type VendorReleaseParams = z.infer<typeof VendorReleaseParams>;
+
+/** Widen, narrow, pause, resume or halt a rollout (UPD-003). */
+export const UpdateRolloutRequest = z.strictObject({
+  percent: z.int().min(0).max(100),
+  state: RolloutState,
+  cohort: z.array(Id).max(100).default([]),
+  reason: Reason,
+});
+export type UpdateRolloutRequest = z.input<typeof UpdateRolloutRequest>;
 
 /** A release CI built and signed (VCP-006). */
 export const PublishReleaseRequest = z.strictObject({
@@ -147,6 +194,12 @@ export const PublishReleaseRequest = z.strictObject({
   sha256: Sha256Hex,
   sizeBytes: z.int().positive(),
   notes: z.string().max(2_000).nullable().default(null),
+  /** UPD-004: may install while tables are open, with a manager's approval. */
+  securityCritical: z.boolean().default(false),
+  /** The share of the channel's PCs offered it at once (UPD-003); 100 for all. */
+  rolloutPercent: z.int().min(0).max(100).default(100),
+  /** A hotfix for this PC only (UPD-002). */
+  targetInstallationId: Id.nullable().default(null),
 });
 export type PublishReleaseRequest = z.input<typeof PublishReleaseRequest>;
 

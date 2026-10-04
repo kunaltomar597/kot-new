@@ -278,6 +278,8 @@ model Installation {
   lastHeartbeat          Json?              @map("last_heartbeat")
   /// The digest of the vendor settings the PC reported holding (UPD-010, P7-08c).
   settingsDigest         String?            @map("settings_digest")
+  /// Held at this version by the vendor (UPD-002, P7-04a); null follows the channel.
+  pinnedVersion          String?            @map("pinned_version")
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -293,6 +295,8 @@ model Installation {
   diagnosticsRequests DiagnosticsRequest[]
   cloudBackups        CloudBackup[]
   backupKeyEscrows    BackupKeyEscrow[]
+  hotfixes            Release[]            @relation("Hotfixes")
+  releaseInstalls     ReleaseInstall[]
   digitalBills        DigitalBill[]
   restoreCodes        RestoreCode[]
 
@@ -380,19 +384,56 @@ model RequestNonce {
 
 /// A published build on a channel (UPD-002). Rollouts, pinning and halts come in P7-04.
 model Release {
-  id          String           @id @db.Uuid
-  component   ReleaseComponent
-  channel     ReleaseChannel
-  version     String
-  url         String
-  sha256      String
-  sizeBytes   BigInt           @map("size_bytes")
-  notes       String?
-  publishedAt DateTime         @default(now()) @map("published_at") @db.Timestamptz(3)
-  publishedBy String           @map("published_by")
+  id                   String           @id @db.Uuid
+  component            ReleaseComponent
+  channel              ReleaseChannel
+  version              String
+  url                  String
+  sha256               String
+  sizeBytes            BigInt           @map("size_bytes")
+  notes                String?
+  publishedAt          DateTime         @default(now()) @map("published_at") @db.Timestamptz(3)
+  publishedBy          String           @map("published_by")
+  /// UPD-004: may install while tables are open, with a manager's approval.
+  securityCritical     Boolean          @default(false) @map("security_critical")
+  /// UPD-003: the share of the channel's PCs offered it, ACTIVE, PAUSED or HALTED, and the PCs
+  /// offered it whatever their bucket.
+  rolloutPercent       Int              @default(100) @map("rollout_percent")
+  rolloutState         String           @default("ACTIVE") @map("rollout_state")
+  rolloutCohort        String[]         @default([]) @map("rollout_cohort") @db.Uuid
+  haltReason           String?          @map("halt_reason")
+  rolloutChangedAt     DateTime         @default(now()) @map("rollout_changed_at") @db.Timestamptz(3)
+  /// A hotfix for one PC (UPD-002).
+  targetInstallationId String?          @map("target_installation_id") @db.Uuid
+
+  targetInstallation Installation?    @relation("Hotfixes", fields: [targetInstallationId], references: [id], onDelete: Restrict)
+  installs           ReleaseInstall[]
 
   @@unique([component, channel, version])
   @@map("releases")
+}
+
+/// How installing a release went on one PC (UPD-003, P7-04a), for the rollout's health.
+model ReleaseInstall {
+  releaseId      String    @map("release_id") @db.Uuid
+  installationId String    @map("installation_id") @db.Uuid
+  /// INSTALLING, INSTALLED, ROLLED_BACK, FAILED or SILENT (no heartbeat after INSTALLING).
+  outcome        String
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(3)
+  installedAt    DateTime? @map("installed_at") @db.Timestamptz(3)
+  failedAt       DateTime? @map("failed_at") @db.Timestamptz(3)
+  error          String?
+  /// Server errors the PC reported in the day after it installed it.
+  errorsAfter    Int       @default(0) @map("errors_after")
+  errorSpike     Boolean   @default(false) @map("error_spike")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  release      Release      @relation(fields: [releaseId], references: [id])
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@id([releaseId, installationId])
+  @@index([outcome, startedAt])
+  @@map("release_installs")
 }
 
 /// Every vendor or installation action (VCP-001: every action is audited). Append-only: a
@@ -490,6 +531,7 @@ enum FleetAlertKind {
   DISK_FULL
   BACKUP_FAILED
   AUDIT_CHAIN_MISMATCH
+  UPDATE_FAILED
 }
 
 /// A fleet alert (VCP-005): at most one open per PC and kind (a partial unique index).

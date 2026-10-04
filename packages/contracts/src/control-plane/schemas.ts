@@ -215,6 +215,19 @@ export const AuditCheckpoint = z.object({
 });
 export type AuditCheckpoint = z.infer<typeof AuditCheckpoint>;
 
+/** How installing a release went on the PC (UPD-003, UPD-005), for the rollout's health. */
+export const UpdateReport = z.object({
+  version: SemVer,
+  /**
+   * INSTALLING just before the installer runs, then INSTALLED once the health check passed,
+   * ROLLED_BACK when it failed and the previous version is back, FAILED when it did not start.
+   */
+  outcome: z.enum(['INSTALLING', 'INSTALLED', 'ROLLED_BACK', 'FAILED']),
+  at: Timestamp,
+  error: z.string().max(300).nullable(),
+});
+export type UpdateReport = z.infer<typeof UpdateReport>;
+
 export const HeartbeatRequest = z.looseObject({
   /** Chosen by the installation; sending the same heartbeat again is harmless. */
   heartbeatId: Id,
@@ -252,6 +265,8 @@ export const HeartbeatRequest = z.looseObject({
   devicesConnected: z.record(z.string().regex(/^[A-Z_]{1,40}$/), z.int().nonnegative()).optional(),
   /** Server errors since the previous heartbeat that reached the Control Plane. */
   errorCount: z.int().nonnegative().optional(),
+  /** The latest update attempt, until the Control Plane has seen it (P7-04). */
+  updateReport: UpdateReport.nullable().optional(),
   backup: HeartbeatBackup.nullable().optional(),
   /** The restaurant's opening hours, for "offline during business hours" (VCP-005). */
   businessHours: z
@@ -285,6 +300,11 @@ export const ReleaseInfo = z.object({
   sizeBytes: z.int().positive(),
   notes: z.string().max(2_000).nullable(),
   publishedAt: Timestamp,
+  /**
+   * A security fix (UPD-004): with a manager's approval it may install while tables are open. A
+   * Control Plane older than P7-04a sends nothing: not critical.
+   */
+  securityCritical: z.boolean().default(false),
 });
 export type ReleaseInfo = z.infer<typeof ReleaseInfo>;
 

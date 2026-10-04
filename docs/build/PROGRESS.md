@@ -363,6 +363,10 @@ Recommended next WPs (dependencies met):
   - [x] P7-03a Heartbeat health and alerts
   - [x] P7-03b Fleet dashboard
 - [ ] P7-04 Release management and remote updates
+  - [x] P7-04a Rollouts at the Control Plane
+  - [ ] P7-04b Release management in the vendor web app
+  - [ ] P7-04c The update agent on the restaurant PC (installer step waits for P0-16)
+  - [ ] P7-04d Phones, tablets and pagers; the version matrix
 - [x] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
   - [x] P7-05b Restore
@@ -638,6 +642,37 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P7-04a):
+
+593. P7-04 is built in four parts:
+     - a: rollouts at the Control Plane;
+     - b: the vendor web app's release pages;
+     - c: the update agent on the PC (its installer step waits for P0-16);
+     - d: phones, tablets and pagers, and the version matrix.
+       P0-16 is prepared before c.
+594. A PC's place in a rollout is a stable bucket (0 to 99, FNV-1a of the release and the PC), so
+     widening keeps everyone already reached. The cohort gets a release whatever the percentage.
+     PAUSED and HALTED both stop new offers; HALTED carries a reason. The CLI and pipeline
+     publish at 100 % by default.
+595. A PC is never offered an older version (forward-only migrations, UPD-005).
+     - A held PC gets its pinned version, whatever the rollout, while it runs an older one, and
+       nothing newer.
+     - A hotfix is a release for one PC, offered ahead of the channel.
+     - A halted release is not offered even to a held PC or a hotfix target.
+596. Install outcomes come with heartbeats (`updateReport`: INSTALLING just before the installer,
+     then INSTALLED, ROLLED_BACK or FAILED), and a PC that runs a release counts as installed.
+     The failures are:
+     - a rollback or a failure;
+     - INSTALLING followed by no heartbeat for `CP_ROLLOUT_SILENT_MINUTES` (45);
+     - `CP_ROLLOUT_ERROR_SPIKE` (100) server errors in the day after an install.
+       The rollout halts by itself at 2 or more failures that are 20 % or more of the installs
+       (settings). The halt is audited by `system:rollout`.
+597. Each failed install opens an `UPDATE_FAILED` fleet alert, delivered like the others. It
+     closes when the PC runs that version or a newer one, or by Support with a reason when it
+     never will. It is not one of the heartbeat-state alerts that every heartbeat re-evaluates.
+598. Version ordering moved from the Control Plane to `@rp/domain` (`semver.ts`), next to the
+     rollout rules, and the Control Plane re-exports it.
 
 Decided 2026-10-04 (P7-09b):
 
@@ -3004,6 +3039,31 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P7-04a Rollouts at the Control Plane
+
+Built:
+
+- domain: `rollout.ts` (`rolloutBucket`, `inRollout`, `releaseToOffer`, `haltReason`); `semver.ts`
+  moved here; fleet alert kind `UPDATE_FAILED`.
+- contracts: `ReleaseInfo.securityCritical`, `UpdateReport` in heartbeats, `VendorReleaseView`
+  with its rollout and installs, `UpdateRolloutRequest`, `PinInstallationRequest`,
+  `VendorInstallationView.pinnedVersion`; publish takes `securityCritical`, `rolloutPercent` and
+  `targetInstallationId`; routes `updateVendorRollout` and `pinVendorInstallation`.
+- Control Plane: release rollout columns, `installations.pinned_version` and `release_installs`.
+  `ReleasesService` gained the offer, publish, rollout changes, holds, heartbeat recording, the
+  silent sweep and the automatic halt. `FleetService` gained `updateFailed`/`updateSucceeded` and
+  manual closing of failed-update alerts. New `CP_ROLLOUT_*` settings.
+- vendor web app: the alert's text and tone; fixtures updated (the release pages are P7-04b).
+- docs: the Control Plane runbook's staged rollout and one-restaurant sections.
+
+Tests: domain 6 rollout plus the moved semver tests; CP integration 4. They cover the share and
+its widening, the cohort, pause and resume, the hold and its release, a hotfix with its security
+flag, the automatic halt from a rollback and a silent PC with their alerts, an alert closing when
+the PC runs the version and by Support, and an error spike.
+
+Gotcha: `SELF_RESOLVING_ALERTS` are closed by every heartbeat that does not show their condition.
+An alert opened from another source must not be in that list.
 
 ### 2026-10-04: P7-09b Digital bills on the restaurant PC (P7-09 done)
 

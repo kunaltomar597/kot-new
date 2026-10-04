@@ -80,6 +80,15 @@ export const CpConfigSchema = z
     /** How often silent PCs are looked for and alerts sent; 0 is off (tests). */
     fleetSweepSeconds: z.coerce.number().int().min(0).max(3_600).default(60),
     /**
+     * Staged rollouts (UPD-003): minutes without a heartbeat after a PC starts installing before
+     * it counts as a failed install; server errors in the day after an install that count as a
+     * spike; and the failures, and share of installs failing, that halt a rollout by itself.
+     */
+    rolloutSilentMinutes: z.coerce.number().int().min(5).max(1_440).default(45),
+    rolloutErrorSpike: z.coerce.number().int().min(1).max(100_000).default(100),
+    rolloutMinFailures: z.coerce.number().int().min(1).max(100).default(2),
+    rolloutMaxFailurePercent: z.coerce.number().int().min(1).max(100).default(20),
+    /**
      * Where fleet alerts are posted as they open and close (`{ text, alert }`, which Slack and
      * Teams incoming webhooks take), from the secret manager. Unset: alerts only show in the app.
      */
@@ -365,6 +374,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     offlineAlertMinutes: env.CP_OFFLINE_ALERT_MINUTES,
     diskAlertPercent: env.CP_DISK_ALERT_PERCENT,
     fleetSweepSeconds: env.CP_FLEET_SWEEP_SECONDS,
+    rolloutSilentMinutes: env.CP_ROLLOUT_SILENT_MINUTES,
+    rolloutErrorSpike: env.CP_ROLLOUT_ERROR_SPIKE,
+    rolloutMinFailures: env.CP_ROLLOUT_MIN_FAILURES,
+    rolloutMaxFailurePercent: env.CP_ROLLOUT_MAX_FAILURE_PERCENT,
     alertWebhookUrl: env.CP_ALERT_WEBHOOK_URL === '' ? undefined : env.CP_ALERT_WEBHOOK_URL,
     errorDsn: env.CP_ERROR_DSN === '' ? undefined : env.CP_ERROR_DSN,
     backupStore: env.CP_BACKUP_STORE === '' ? undefined : env.CP_BACKUP_STORE,

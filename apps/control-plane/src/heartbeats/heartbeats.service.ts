@@ -68,6 +68,14 @@ export class HeartbeatsService {
           });
         }
       }
+      // UPD-003: how installing releases went, for the rollouts' health (P7-04a).
+      await this.releases.recordHeartbeat(
+        tx,
+        installation,
+        INSTALLER_COMPONENT,
+        heartbeat,
+        receivedAt,
+      );
       // VCP-005, AUD-003: the chain head and audit check, and the alerts the report calls for.
       return this.fleet.onHeartbeat(tx, installation.id, heartbeat, receivedAt);
     });
@@ -79,11 +87,7 @@ export class HeartbeatsService {
     const update =
       installed === undefined
         ? null
-        : await this.releases.updateFor(
-            INSTALLER_COMPONENT,
-            installation.channel,
-            installed.version,
-          );
+        : await this.releases.offerFor(installation.id, INSTALLER_COMPONENT, installed.version);
     // A new licence when one is due (LIC-002), and every minute while it is not active (LIC-006).
     const licence = await this.licences.forHeartbeat(installation, heartbeat.licence, receivedAt);
     // The QR relay credential, until the PC holds it (VCP-002).

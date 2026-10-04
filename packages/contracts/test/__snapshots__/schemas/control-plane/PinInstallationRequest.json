@@ -1,0 +1,38 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "version": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["version", "reason"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "version": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+          },
+          { "type": "null" }
+        ]
+      },
+      "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "required": ["version", "reason"],
+    "additionalProperties": false
+  }
+}

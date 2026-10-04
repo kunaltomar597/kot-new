@@ -21,7 +21,7 @@
       "tenantName": { "type": "string" },
       "kind": {
         "type": "string",
-        "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+        "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH", "UPDATE_FAILED"]
       },
       "openedAt": {
         "type": "string",
@@ -83,7 +83,7 @@
       "tenantName": { "type": "string" },
       "kind": {
         "type": "string",
-        "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+        "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH", "UPDATE_FAILED"]
       },
       "openedAt": {
         "type": "string",

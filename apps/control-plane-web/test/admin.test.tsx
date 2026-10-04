@@ -15,6 +15,17 @@ const RELEASE = {
   sizeBytes: 157_286_400,
   notes: 'Floor plan',
   publishedAt: '2026-09-20T05:00:00.000Z',
+  securityCritical: false,
+  id: '0190a1b2-0000-7000-8000-0000000000r1'.replace('r1', '71'),
+  rollout: {
+    percent: 100,
+    state: 'ACTIVE',
+    cohort: [],
+    haltReason: null,
+    changedAt: '2026-09-20T05:00:00.000Z',
+  },
+  target: null,
+  installs: { attempts: 0, installed: 0, failures: 0, errorSpikes: 0 },
 } as const;
 
 const entry = (id: number, action = 'licence.changed') => ({
@@ -108,6 +119,9 @@ describe('[VCP-006] releases', () => {
       sha256: 'b'.repeat(64),
       sizeBytes: 1024,
       notes: null,
+      securityCritical: false,
+      rolloutPercent: 100,
+      targetInstallationId: null,
     });
   });
 

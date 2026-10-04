@@ -211,6 +211,21 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
 
   // ----------------------------------------------------------------- alerts
 
+  /** A PC's update failed, rolled back or went silent (UPD-003, P7-04a): an alert to follow. */
+  updateFailed(
+    tx: TransactionClient,
+    installationId: string,
+    now: Date,
+    details: { readonly version: string; readonly outcome: string; readonly error: string | null },
+  ): Promise<void> {
+    return this.open(tx, installationId, 'UPDATE_FAILED', now, details);
+  }
+
+  /** The PC now runs the version that failed, or a newer one. */
+  updateSucceeded(tx: TransactionClient, installationId: string, now: Date): Promise<void> {
+    return this.close(tx, installationId, 'UPDATE_FAILED', now, FLEET_ACTOR, null);
+  }
+
   /** Opens an alert unless one of its kind is open for the PC; audited. */
   private async open(
     tx: TransactionClient,
@@ -384,7 +399,9 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
       if (alert.resolvedAt !== null) {
         throw new CpError(409, 'ALERT_CLOSED', 'This alert is already closed.');
       }
-      if (alert.kind !== 'AUDIT_CHAIN_MISMATCH') {
+      // A chain alert needs a person; a failed update may, when the PC will not run that version
+      // (held at an older one, or replaced). The others close by themselves.
+      if (alert.kind !== 'AUDIT_CHAIN_MISMATCH' && alert.kind !== 'UPDATE_FAILED') {
         throw new CpError(
           409,
           'ALERT_CLOSES_ITSELF',
@@ -392,10 +409,12 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
         );
       }
       await this.close(tx, alert.installationId, alert.kind, now, actor, reason);
-      await tx.auditChainHead.updateMany({
-        where: { installationId: alert.installationId, supersededAt: null },
-        data: { supersededAt: now },
-      });
+      if (alert.kind === 'AUDIT_CHAIN_MISMATCH') {
+        await tx.auditChainHead.updateMany({
+          where: { installationId: alert.installationId, supersededAt: null },
+          data: { supersededAt: now },
+        });
+      }
       const row = await tx.fleetAlert.findUniqueOrThrow({
         where: { id },
         include: { installation: { include: { tenant: true } } },

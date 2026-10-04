@@ -209,7 +209,13 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+                "enum": [
+                  "OFFLINE",
+                  "DISK_FULL",
+                  "BACKUP_FAILED",
+                  "AUDIT_CHAIN_MISMATCH",
+                  "UPDATE_FAILED"
+                ]
               }
             }
           },
@@ -459,7 +465,13 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+                "enum": [
+                  "OFFLINE",
+                  "DISK_FULL",
+                  "BACKUP_FAILED",
+                  "AUDIT_CHAIN_MISMATCH",
+                  "UPDATE_FAILED"
+                ]
               }
             }
           },

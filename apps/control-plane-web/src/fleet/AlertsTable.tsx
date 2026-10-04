@@ -13,6 +13,7 @@ export const ALERT_TONE = {
   DISK_FULL: 'warning',
   BACKUP_FAILED: 'warning',
   AUDIT_CHAIN_MISMATCH: 'danger',
+  UPDATE_FAILED: 'warning',
 } as const;
 
 /**

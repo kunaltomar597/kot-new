@@ -20,7 +20,10 @@ import {
   ReactivationCodeRequest,
   type ReactivationCodeView,
   ReasonRequest,
-  type ReleaseInfo,
+  PinInstallationRequest,
+  UpdateRolloutRequest,
+  VendorReleaseParams,
+  type VendorReleaseView,
   TenantRequest,
   VendorInstallationParams,
   type VendorInstallationView,
@@ -217,12 +220,33 @@ export class FleetAdminController {
   publish(
     @Req() request: VendorRequest,
     @Body(new ZodPipe(PublishReleaseRequest)) body: z.output<typeof PublishReleaseRequest>,
-  ): Promise<ReleaseInfo> {
+  ): Promise<VendorReleaseView> {
     const { notes, ...release } = body;
     return this.releases.publish(
       { ...release, ...(notes !== null && { notes }) },
       vendorOf(request).actor,
     );
+  }
+
+  @Put('releases/:id/rollout')
+  @Vendor('RELEASES_MANAGE')
+  rollout(
+    @Req() request: VendorRequest,
+    @Param(new ZodPipe(VendorReleaseParams)) params: VendorReleaseParams,
+    @Body(new ZodPipe(UpdateRolloutRequest)) body: z.output<typeof UpdateRolloutRequest>,
+  ): Promise<VendorReleaseView> {
+    return this.releases.updateRollout(params.id, body, vendorOf(request).actor);
+  }
+
+  @Put('installations/:id/pin')
+  @Vendor('RELEASES_MANAGE')
+  async pin(
+    @Req() request: VendorRequest,
+    @Param(new ZodPipe(VendorInstallationParams)) params: VendorInstallationParams,
+    @Body(new ZodPipe(PinInstallationRequest)) body: PinInstallationRequest,
+  ): Promise<VendorInstallationView> {
+    await this.releases.pin(params.id, body.version, body.reason, vendorOf(request).actor);
+    return this.fleet.installation(params.id);
   }
 
   @Get('audit')
