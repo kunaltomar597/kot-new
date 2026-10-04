@@ -3,9 +3,30 @@ import { createApp } from './app.factory.js';
 import type { SentryReporter } from '@rp/error-reporting';
 import { createSecretStore } from './auth/secret-store.js';
 import { runPendingRestore } from './backups/pending-restore.js';
-import { RESTART_EXIT_CODE, ServerLifecycle } from './common/server-lifecycle.js';
+import { RESTART_EXIT_CODE, ServerLifecycle, SHUTDOWN_MESSAGE } from './common/server-lifecycle.js';
 import { loadConfig } from './config/app-config.js';
 import { SENTRY_REPORTER } from './observability/error-reporter.js';
+
+/** The app once it exists, so a stop asked for during start-up can still close it. */
+let started: { close(): Promise<void> } | undefined;
+
+if (process.send !== undefined) {
+  // Run by the service host (P0-16b): it says when to stop, over IPC, since Windows has no
+  // signals. The channel closing means the host is gone, so the server goes too and never holds
+  // the ports against the next host. Ctrl+C reaches the whole console on Windows; the host passes
+  // the stop on itself. Listening from the first moment, so a stop during start-up is not missed.
+  let closing = false;
+  const close = () => {
+    if (closing) return;
+    closing = true;
+    void (started?.close() ?? Promise.resolve()).finally(() => process.exit(0));
+  };
+  process.on('message', (message: unknown) => {
+    if ((message as { type?: unknown } | null)?.type === SHUTDOWN_MESSAGE.type) close();
+  });
+  process.on('disconnect', close);
+  process.on('SIGINT', () => undefined);
+}
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -22,6 +43,7 @@ async function main(): Promise<void> {
     });
   }
   const app = await createApp(config);
+  started = app;
   // A restart that is meant (a restore): the service starts the server again on this exit code.
   app.get(ServerLifecycle).onRestart(() => {
     void app.close().finally(() => process.exit(RESTART_EXIT_CODE));

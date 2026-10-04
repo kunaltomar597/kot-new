@@ -6,6 +6,9 @@ import { Injectable } from '@nestjs/common';
  */
 export const RESTART_EXIT_CODE = 75;
 
+/** The message the service host sends the server over IPC to stop it (P0-16b, `main.ts`). */
+export const SHUTDOWN_MESSAGE = { type: 'rp:shutdown' } as const;
+
 /** Lets a feature ask for the server to restart; `main.ts` does it after the reply is sent. */
 @Injectable()
 export class ServerLifecycle {

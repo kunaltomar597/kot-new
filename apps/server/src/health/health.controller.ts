@@ -20,7 +20,10 @@ export class HealthController {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  /** 200 when everything is up, 503 when the database is down (the watchdog restarts on 503). */
+  /**
+   * 200 when everything is up, 503 when the database is down. The service host starts the server
+   * again when it stops answering, or answers 503 for two minutes (P0-16b).
+   */
   @Get('health')
   async health(@Res({ passthrough: true }) response: Response): Promise<HealthResponse> {
     const database = await this.prisma.ping();

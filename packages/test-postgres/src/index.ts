@@ -60,7 +60,8 @@ function quoteIdentifier(name: string): string {
   return `"${name}"`;
 }
 
-function findPgBin(): string | undefined {
+/** The folder of the PostgreSQL programs: `PG_BIN`, `pg_config` or a known install path. */
+export function findPgBin(): string | undefined {
   const fromEnv = process.env.PG_BIN;
   if (fromEnv !== undefined && existsSync(join(fromEnv, 'initdb'))) return fromEnv;
   try {

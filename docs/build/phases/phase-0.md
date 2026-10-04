@@ -349,16 +349,29 @@ Split (2026-10-04). Everything but the check on a real PC is built without Windo
   - Starts with Windows, reopens when it is closed and reloads a crashed page (NFR-A04).
   - One shell per PC.
   - Tested without Electron.
-- **P0-16b Windows services (`infra/installer/windows`, server).**
-  - WinSW definitions for the server and the watchdog, and PostgreSQL 16 as a service on the data
-    drive, set up for WAL archiving.
-  - The database logins (`rp_migrator`, `rp_server`, `rp_purger`, `rp_backup`), the server's
-    settings and the migrations.
-  - Firewall rules for the staff network, repair and uninstall that keep the data.
-  - The DPAPI secret store, the watchdog (a hang ends the process; the wrapper restarts it), and
-    the server's PID file.
-  - Pester tests for the PowerShell helpers.
-- **P0-16c Packaging and CI.**
+- **P0-16b The services' runtime and set-up commands (server, testable without Windows).**
+  - The DPAPI secret store (`RP_SECRET_STORE=dpapi`), with the database logins' passwords kept
+    apart from the secrets a backup carries.
+  - The service host: the program the server's Windows service runs. It runs a restore asked for
+    on the System page with the administrator's login (which the server never gets), applies
+    pending migrations, then starts the server and keeps it running: restarted at once when it
+    exits, ended and restarted when it stops answering (NFR-A04). Its state file (the PIDs, the
+    phase, a heartbeat) replaces the PID file.
+  - The watchdog service: starts the database and server services when they stop and restarts a
+    server service whose host stopped beating, except during maintenance.
+  - The set-up commands the installer runs, idempotent so repair runs them again: the installation
+    file, the secrets, `initdb` with the managed `postgresql.conf` (localhost only, UTC, WAL
+    archiving) and `pg_hba.conf`, the database logins (`rp_migrator`, `rp_server`, `rp_purger`,
+    `rp_backup`), the migrations without the Prisma CLI, and the WinSW definitions.
+  - Tested on a real PostgreSQL (logins, grants, migrations as a non-superuser) and with a stand-in
+    server process (crash, hang, restore restart, stop).
+- **P0-16c Windows set-up scripts (`infra/installer/windows`).**
+  - PowerShell: the data-drive choice (ONB-002), the folders' permissions, PostgreSQL registered
+    as a service, the WinSW services with their accounts and recovery, firewall rules for the
+    staff network, repair, and uninstall that keeps the data (deleting it needs the Owner's
+    password and second factor, NFR-I02).
+  - Pester tests for the PowerShell helpers, run on `windows-latest`.
+- **P0-16d Packaging and CI.** (Was P0-16c before the split of 2026-10-04.)
   - electron-builder NSIS with the data-drive page, fuses, and bundling Node, the server,
     PostgreSQL and WinSW.
   - The `windows-latest` workflow: build, install silently, check that the services start and that

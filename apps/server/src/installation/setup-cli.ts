@@ -1,0 +1,279 @@
+import { access } from 'node:fs/promises';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
+import { createSecretStore } from '../auth/secret-store.js';
+import { hostStatePath, readHostState } from '../service/host-state.js';
+import {
+  endMaintenance,
+  maintenancePath,
+  readMaintenance,
+  startMaintenance,
+} from '../service/maintenance.js';
+import { WindowsServiceControl } from '../service/windows-services.js';
+import { setupDatabase } from './database-setup.js';
+import {
+  databaseUrl,
+  defaultInstallationFile,
+  InstallationFile,
+  installationPaths,
+  readDatabasePasswords,
+  readInstallationFile,
+  SERVICE_NAMES,
+  writeInstallationFile,
+} from './installation.js';
+import { migrate } from './migrations.js';
+import { initPostgres, pgCtlRegisterArgs, runProgram } from './postgres-setup.js';
+import { writeServiceDefinitions } from './winsw.js';
+
+const USAGE = `Usage: node dist/installation/setup-cli.js <command> [--installation <file>] [options]
+
+The installer runs these in order; each can run again (repair) without losing data.
+
+write-installation  writes the installation file. Options: --install-dir, --data-dir,
+                    --product-version, --port, --mqtt-port, --pg-port, --control-plane-url,
+                    --relay-url, --qr-site-url, --error-dsn, --tls-hostnames (comma-separated).
+                    On repair, values not given are kept.
+secrets             makes the secrets that are missing (Windows DPAPI on the restaurant PC).
+postgres-init       creates PostgreSQL's data folder on the data drive if there is none, and
+                    writes its settings (localhost only, UTC, WAL archiving) and pg_hba.conf.
+postgres-register   registers the database service (Windows; skipped when it exists).
+database            makes the logins and the database (PostgreSQL must be running).
+migrate             applies the pending migrations.
+service-files       writes the WinSW definitions of the server and watchdog services.
+maintenance on|off  while on (--minutes, at most 240; --reason), the watchdog leaves the services
+                    alone.
+status              prints the service host's state and the maintenance flag.
+
+The installation file is ${defaultInstallationFile()} unless --installation names another.
+`;
+
+export interface CliOutput {
+  write(text: string): void;
+}
+
+const OPTIONS = {
+  installation: { type: 'string' },
+  'install-dir': { type: 'string' },
+  'data-dir': { type: 'string' },
+  'product-version': { type: 'string' },
+  port: { type: 'string' },
+  'mqtt-port': { type: 'string' },
+  'pg-port': { type: 'string' },
+  'control-plane-url': { type: 'string' },
+  'relay-url': { type: 'string' },
+  'qr-site-url': { type: 'string' },
+  'error-dsn': { type: 'string' },
+  'tls-hostnames': { type: 'string' },
+  'secret-store': { type: 'string' },
+  minutes: { type: 'string' },
+  reason: { type: 'string' },
+} as const;
+
+type Values = ReturnType<
+  typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>
+>['values'];
+
+const port = (value: string | undefined) => (value === undefined ? undefined : Number(value));
+
+/** The installation file from the options, over the one already there (repair). */
+async function installationFrom(path: string, values: Values): Promise<InstallationFile> {
+  const existing = await access(path).then(
+    () => readInstallationFile(path),
+    () => undefined,
+  );
+  const cloud = { ...existing?.cloud };
+  if (values['control-plane-url'] !== undefined)
+    cloud.controlPlaneUrl = values['control-plane-url'];
+  if (values['relay-url'] !== undefined) cloud.relayUrl = values['relay-url'];
+  if (values['qr-site-url'] !== undefined) cloud.qrSiteUrl = values['qr-site-url'];
+  if (values['error-dsn'] !== undefined) cloud.errorDsn = values['error-dsn'];
+  const parsed = InstallationFile.safeParse({
+    format: 1,
+    installDir: values['install-dir'] ?? existing?.installDir,
+    dataDir: values['data-dir'] ?? existing?.dataDir,
+    productVersion: values['product-version'] ?? existing?.productVersion,
+    secretStore:
+      values['secret-store'] ??
+      existing?.secretStore ??
+      (process.platform === 'win32' ? 'dpapi' : 'file'),
+    server: {
+      port: port(values.port) ?? existing?.server.port,
+      mqttPort: port(values['mqtt-port']) ?? existing?.server.mqttPort,
+      logLevel: existing?.server.logLevel,
+      tlsHostnames:
+        values['tls-hostnames'] === undefined
+          ? existing?.server.tlsHostnames
+          : values['tls-hostnames']
+              .split(',')
+              .map((name) => name.trim().toLowerCase())
+              .filter((name) => name !== ''),
+    },
+    postgres: {
+      port: port(values['pg-port']) ?? existing?.postgres.port,
+      database: existing?.postgres.database,
+    },
+    cloud,
+  });
+  if (!parsed.success) {
+    const problems = parsed.error.issues
+      .map((issue) => `${issue.path.join('.') || 'file'}: ${issue.message}`)
+      .join('; ');
+    throw new Error(`The installation settings are not valid: ${problems}`);
+  }
+  return parsed.data;
+}
+
+/** The set-up tool (P0-16b). Returns the exit code. */
+export async function runSetupCli(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  out: CliOutput,
+): Promise<number> {
+  let parsed: { values: Values; positionals: string[] };
+  try {
+    parsed = parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true });
+  } catch (error) {
+    out.write(`${error instanceof Error ? error.message : String(error)}\n\n${USAGE}`);
+    return 2;
+  }
+  const { values, positionals } = parsed;
+  const [command, argument] = positionals;
+  const file = values.installation ?? defaultInstallationFile(env);
+  const log = (message: string) => {
+    out.write(`${message}\n`);
+  };
+
+  if (command === 'write-installation') {
+    const installation = await installationFrom(file, values);
+    await writeInstallationFile(file, installation);
+    log(`Wrote ${file}`);
+    return 0;
+  }
+  if (command === undefined || command === 'help') {
+    out.write(USAGE);
+    return command === undefined ? 2 : 0;
+  }
+
+  const installation = await readInstallationFile(file);
+  const secrets = createSecretStore(installation);
+  const paths = installationPaths(installation);
+
+  switch (command) {
+    case 'secrets': {
+      const created = await secrets.ensure();
+      log(created.length === 0 ? 'Every secret is there.' : `Made ${created.join(', ')}.`);
+      return 0;
+    }
+    case 'postgres-init': {
+      const passwords = await readDatabasePasswords(secrets);
+      const created = await initPostgres(installation, passwords.admin);
+      log(
+        created
+          ? `Created PostgreSQL's data folder ${paths.pgData}.`
+          : `PostgreSQL's data folder ${paths.pgData} is there; its settings were written again.`,
+      );
+      return 0;
+    }
+    case 'postgres-register': {
+      if (process.platform !== 'win32') {
+        log('Registering the database service needs Windows.');
+        return 1;
+      }
+      if ((await new WindowsServiceControl().state(SERVICE_NAMES.database)) !== 'MISSING') {
+        log(`The ${SERVICE_NAMES.database} service is already registered.`);
+        return 0;
+      }
+      const result = await runProgram(
+        join(paths.pgBin, 'pg_ctl.exe'),
+        pgCtlRegisterArgs(installation),
+      );
+      log(result.output.trim());
+      return result.code === 0 ? 0 : 1;
+    }
+    case 'database': {
+      const passwords = await readDatabasePasswords(secrets);
+      const result = await setupDatabase({
+        adminUrl: databaseUrl(installation, 'admin', passwords, 'postgres'),
+        database: installation.postgres.database,
+        passwords,
+      });
+      log(
+        result.databaseCreated
+          ? `Created the database ${installation.postgres.database} and its logins.`
+          : 'The database is there; its logins were brought up to date.',
+      );
+      return 0;
+    }
+    case 'migrate': {
+      const passwords = await readDatabasePasswords(secrets);
+      const result = await migrate({ url: databaseUrl(installation, 'migrator', passwords), log });
+      log(
+        result.applied.length === 0
+          ? 'The database is up to date.'
+          : `Applied ${String(result.applied.length)} migrations.`,
+      );
+      if (result.changed.length > 0) log(`Changed since applied: ${result.changed.join(', ')}`);
+      if (result.unknown.length > 0) {
+        log(`In the database but not in this version: ${result.unknown.join(', ')}`);
+      }
+      return 0;
+    }
+    case 'service-files': {
+      for (const path of await writeServiceDefinitions(installation, file)) log(`Wrote ${path}`);
+      return 0;
+    }
+    case 'maintenance': {
+      const flag = maintenancePath(installation.dataDir);
+      if (argument === 'on') {
+        const set = await startMaintenance(flag, {
+          minutes: Number(values.minutes ?? '30'),
+          reason: values.reason ?? 'maintenance',
+        });
+        log(`The watchdog leaves the services alone until ${set.until}.`);
+        return 0;
+      }
+      if (argument === 'off') {
+        await endMaintenance(flag);
+        log('The watchdog looks after the services again.');
+        return 0;
+      }
+      out.write(USAGE);
+      return 2;
+    }
+    case 'status': {
+      const [host, maintenance] = await Promise.all([
+        readHostState(hostStatePath(installation.dataDir)),
+        readMaintenance(maintenancePath(installation.dataDir), new Date()),
+      ]);
+      out.write(
+        `${JSON.stringify(
+          {
+            productVersion: installation.productVersion,
+            dataDir: installation.dataDir,
+            host,
+            maintenance,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      return 0;
+    }
+    default:
+      out.write(USAGE);
+      return 2;
+  }
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runSetupCli(process.argv.slice(2), process.env, process.stdout).then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (error: unknown) => {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exitCode = 1;
+    },
+  );
+}
