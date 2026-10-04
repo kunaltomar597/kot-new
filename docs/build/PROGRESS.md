@@ -3148,6 +3148,9 @@ Security-sensitive PRs for the P8-03 human review:
   lock screen, and the new Android permissions (blocked on the table tablet).
 - P0-16a (merged locally): the Electron shell's web preferences, navigation and permission
   rules, and its certificate rule pinning the installation's CA on loopback.
+- P0-16b (merged locally): the DPAPI secret store (machine scope, entropy, the PowerShell call),
+  the database logins and their grants, keeping the administrator's login from the server, and
+  the watchdog acting as LocalSystem.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
