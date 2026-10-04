@@ -19,6 +19,9 @@ automatic retention (P7-06a) and archive-then-purge of business records (DATA-00
 
 The settings are in Settings, "Keeping data" (the Owner only).
 
+How much room it takes: five years at design capacity (2,000 orders a day) come to about 50 GB of
+database, half the 100 GB sizing target (DATA-012, measured in `docs/build/data-volume.md`).
+
 ## The daily run (P7-06a)
 
 Ten minutes after the server starts, then every day, the retention:
