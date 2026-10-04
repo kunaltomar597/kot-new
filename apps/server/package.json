@@ -4,6 +4,10 @@
   "private": true,
   "description": "Local server (C1): REST, real time, engines. Runs on the restaurant PC as a Windows service.",
   "type": "module",
+  "files": [
+    "dist",
+    "prisma/migrations"
+  ],
   "scripts": {
     "generate": "prisma generate",
     "build": "tsc -p tsconfig.build.json",

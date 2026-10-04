@@ -186,13 +186,20 @@ What exists:
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
-  start-up page until the server answers, reopens a closed window and reloads a crashed page.
-  14 tests without Electron. Packaging is P0-16d.
+  start-up page until the server answers, reopens a closed window and reloads a crashed page. It
+  reads the port and the CA's folder from the installation file. The Windows installer (P0-16d):
+  electron-builder's NSIS installer, per machine, with Electron's fuses, the data-drive page, the
+  server (`pnpm deploy`, trimmed, with third-party notices), the console, Node.js 24, PostgreSQL
+  16.15 and WinSW 2.12 pinned by SHA-256, and hooks that run the set-up scripts on install,
+  update, repair and uninstall. 35 tests without Electron; the CI job "Windows installer" builds,
+  installs, kills the server, repairs and uninstalls on `windows-latest`.
 - `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
   5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
   recovery, firewall rules for the staff network (SEC-008), install and repair, and uninstall that
-  keeps the data unless the Owner allowed deleting it (NFR-I02). 84 Pester tests anywhere
-  (`pnpm installer:test`, needs `pwsh`), 6 more on Windows only (CI job "Windows set-up scripts").
+  keeps the data unless the Owner allowed deleting it (NFR-I02). The drive page's INI file, and
+  stopping and starting the services around an update (P0-16d). 102 Pester tests anywhere
+  (`pnpm installer:test`, needs `pwsh`), 7 more on Windows only (CI job "Windows set-up scripts");
+  `windows/ci/Test-Installer.ps1` checks the built installer in the CI job "Windows installer".
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -207,12 +214,10 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- Phase 7 (P7-01 onwards).
+- P7-04c The update agent on the restaurant PC: the installer it hands off to exists now (P0-16d;
+  silent `/S`, exit codes 0, 1, 2 in `docs/runbooks/windows-installer.md`).
+- P7-04d Phones, tablets and pagers; the version matrix.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
-- P0-16d packaging: electron-builder NSIS with the data-drive page (from
-  `Get-DataDriveChoice.ps1`), fuses, bundling Node, the server, PostgreSQL and WinSW, and running
-  `Install-`/`Uninstall-RestaurantPlatform.ps1` (`docs/runbooks/windows-installer.md`). Prepared on
-  this Mac, checked on the `windows-latest` CI runner; the final check on a real PC needs a person.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -235,11 +240,11 @@ Recommended next WPs (dependencies met):
 - [x] P0-14a API client and i18n
 - [x] P0-14b Web console shell
 - [x] P0-15 LAN TLS decision and implementation
-- [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
+- [ ] P0-16 Windows packaging (only the person's check on a clean PC remains, manual task 14) [H]
   - [x] P0-16a Electron shell
   - [x] P0-16b The services' runtime and set-up commands (service host, watchdog, DPAPI store)
   - [x] P0-16c Windows set-up scripts (PowerShell, Pester)
-  - [ ] P0-16d Packaging, the windows-latest CI job and the person's checklist [H]
+  - [x] P0-16d Packaging and the windows-latest CI job (runs on the first push; manual task 14)
 - [x] P0-17a Control Plane service (deployment waits for the hosting account)
 - [x] P0-17b Local server heartbeat client
 - [ ] P0-H1 Pager battery prototype [H]
@@ -663,6 +668,62 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P0-16d):
+
+625. The installer is electron-builder's NSIS, assisted (not one-click), per machine in
+     `C:\Program Files\Restaurant Platform` (not changeable: nothing gains from moving it), with
+     administrator rights. Its app id `in.restaurantplatform.pos` must never change: updates find
+     the installed version by it. The server's programs go beside the POS window, in the layout
+     `installationPaths` describes, so the set-up scripts and services need no change.
+626. Updates and repairs go through this installer, run by the update agent (P7-04c), not
+     electron-updater: one signed file brings the shell, the server, Node.js and PostgreSQL to the
+     same version. electron-builder runs the installed version's uninstaller first; ours keeps the
+     services and data when it runs for an update (`--updated`). The services are stopped before
+     any file is touched (`Stop-RestaurantPlatform.ps1`); if the old files cannot be removed, the
+     old version is started again (`Start-RestaurantPlatform.ps1`) and the installer ends with 2.
+627. Bundled programs are pinned by version and SHA-256 and checked at every use: Node.js 24.21.0
+     (as `.nvmrc`), PostgreSQL 16.15 (EDB's Windows binaries, without pgAdmin, StackBuilder, tests
+     and build files; EDB publishes no checksum, so the hash is the first HTTPS download's), and
+     WinSW 2.12.0's .NET Framework 4.6.1 build, which uses the .NET Framework 4.8 every Windows 10
+     and 11 PC has and updates, not the self-contained build's unsupported .NET Core 3.1.
+     "PostgreSQL" joined the licence policy's allowed licences (a permissive, BSD-like licence).
+628. The server ships as `pnpm deploy --prod` with a hoisted layout (real folders, no links), then
+     trimmed to the packages reachable from the server (dependencies, optional dependencies and
+     required peers): the workspace's `auto-install-peers` brings the Prisma CLI and TypeScript as
+     optional peers, which nothing loads (497 MB → 219 MB; elkjs, the licence policy's exception
+     through Prisma Studio, is not shipped). Type declarations are left out. `apps/server` gained
+     `files: ["dist", "prisma/migrations"]`. The stage step checks the payload against the
+     server's own `setup-cli paths` and loads every service program and the native modules with
+     the staged packages. `server\THIRD-PARTY-NOTICES.txt` lists every package with its licence
+     text and names libvips' source (LGPL, shipped unmodified and replaceable).
+629. The POS window is bundled with esbuild into one `main.js`; app.asar holds it and its
+     `package.json` only. electron-builder is told node_modules are handled elsewhere
+     (`beforeBuild` answers false), or it would pack `apps/desktop`'s own. Fuses: no
+     `ELECTRON_RUN_AS_NODE`, no `NODE_OPTIONS`, no inspector flags, only the app.asar whose hash
+     is embedded, cookies encrypted, no extra `file://` privileges (SEC-011).
+630. The installer is staged and built on Windows (the CI job), because the server's native
+     modules (sharp, Argon2) are installed for the system the stage step runs on. The package step
+     refuses a payload staged elsewhere unless `--any-platform`, which only checks that the NSIS
+     script builds (done on this Mac: both NSIS builds pass with warnings as errors, the fuses are
+     set, the installer is 138 MB).
+631. The POS window finds the server's port and the CA's folder in the installation file (readable
+     by every Windows user), because it starts at sign-in for whoever signs in, without the
+     installer's environment. The environment still overrides it.
+632. Installer options: `/DATADIR=`, `/STAFFSUBNET=` (several with commas; the install script now
+     splits a comma list, since `powershell.exe -File` passes one string), `/MINFREEGB=`; the
+     uninstaller's `/DELETEDATA`. The installer's exit codes: 0 done, 1 the set-up failed or the
+     services could not be stopped, 2 the installed version could not be replaced; the
+     uninstaller's 3 when the Owner has not allowed deleting the data. The vendor's addresses are
+     fixed per build from `RP_CONTROL_PLANE_URL`, `RP_RELAY_URL`, `RP_QR_SITE_URL` and
+     `RP_ERROR_DSN` (repository variables and a secret in CI).
+633. The installer's texts are English `!define`s in `installer.nsh` (NFR-L02: the product is
+     English only in v1; NSIS pages cannot use `@rp/i18n`). There is no product icon yet (OI-01
+     branding), so Electron's is used.
+634. Signing waits for the code-signing certificate: the CI job signs when the secrets
+     `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` exist (MANUAL_TASKS.md). CI
+     builds carry `apps/desktop/package.json`'s version (0.1.0); releases set
+     `RP_PRODUCT_VERSION` (P7-04).
 
 Decided 2026-10-04 (P0-16b):
 
@@ -3202,6 +3263,9 @@ Security-sensitive PRs for the P8-03 human review:
 - P0-16c (merged locally): the folder permissions, the server's virtual account, the firewall
   rules, the Owner's permission to delete the data (`POST /api/v1/system/data-deletion`) and the
   uninstaller's checks before deleting anything.
+- P0-16d (merged locally): Electron's fuses, the elevated installer and the PowerShell it runs
+  (arguments built from the command line), the pinned downloads and their checksums, the signing
+  secrets' use in CI, and what the uninstaller does with `/DELETEDATA`.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -3209,6 +3273,96 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P0-16d Packaging and the windows-latest CI job
+
+Built the restaurant PC's installer (`docs/runbooks/windows-installer.md`, "The installer"):
+
+- `apps/desktop/src/packaging/`:
+  - `components.ts`: Node.js 24.21.0, PostgreSQL 16.15 and WinSW 2.12.0 (+ its licence) pinned
+    by SHA-256; `download.ts` fetches into `node_modules/.cache/rp-installer` and checks the hash
+    at every use.
+  - `stage.ts` (`package:stage`): the shell bundled by esbuild; the server by `pnpm deploy`
+    (hoisted), trimmed by `prune.ts`, with `notices.ts`' third-party notices; the console;
+    Node.js and PostgreSQL unpacked (`payload.ts` decides what of EDB's zip ships); WinSW as
+    `RPServer.exe`/`RPWatchdog.exe`; the set-up scripts; `installer-defines.nsh` (`nsis.ts`). It
+    checks the payload against the staged server's `setup-cli paths` and loads every service
+    program and the native modules.
+  - `builder-config.ts` and `package-cli.ts` (`package:win`): NSIS per machine, fuses, signing
+    when `WIN_CSC_LINK` is set, `release/RestaurantPlatform-Setup-<version>.exe`.
+- `apps/desktop/installer/installer.nsh`: the data-drive page; Stop before files are replaced,
+  Start when an update cannot go ahead; Install after the copy; the uninstall page with "delete the
+  data too" and Uninstall before the files go; `/DATADIR=`, `/STAFFSUBNET=`, `/MINFREEGB=`,
+  `/DELETEDATA`.
+- The shell reads the installation file for the port and the CA's folder (`config.ts`, `main.ts`).
+- `infra/installer/windows`: `Get-DataDriveChoice.ps1 -IniFile` (UTF-16 INI for the page),
+  `Stop-` and `Start-RestaurantPlatform.ps1`, comma lists for `-StaffSubnet`/`-TlsHostnames`.
+- CI job "Windows installer" (`ci.yml`): build, stage, package, then
+  `infra/installer/windows/ci/Test-Installer.ps1` installs silently, checks the services (running,
+  automatic), the health check and the firewall, kills the server (back within 10 s), repairs,
+  refuses `/DELETEDATA` without permission, uninstalls keeping the data, installs again and
+  uninstalls. Logs and the installer are kept as artifacts.
+- `manual-tasks/14-windows-installer.md`: the person's check on a clean Windows 11 PC.
+- `apps/server/package.json` `files`; `PostgreSQL` in the licence policy; ESLint and git ignore
+  `apps/desktop/staging` and `release`.
+
+Tests:
+
+- Desktop 14 → 35 (coverage 99.6 % of lines; the stage step and the command-line tools run in the
+  CI job): the pins, downloads (cache, mismatch, tampered cache, HTTP error), what of PostgreSQL
+  ships, the zip commands, the payload's required files, trimming with nested versions and optional
+  peers, notices, NSIS defines and escaping, the script's defines and scripts, the fuses and
+  installer settings, the installation file in the shell.
+- Pester 84 → 102 (+1 Windows-only, 7 in all): the drive page's INI, stop and start, comma lists,
+  the new scripts' exit codes; the CI script is ASCII and parses.
+
+Checked on this Mac:
+
+- `package:stage` ran end to end (payload: server 210 MB, PostgreSQL 91 MB, Node.js 89 MB,
+  console 9 MB), and the staged server's programs, sharp, Argon2, Prisma's query compiler and
+  pdfmake's fonts load from the trimmed packages.
+- `package:win --any-platform` built `RestaurantPlatform-Setup-0.1.0.exe` (138 MB): both NSIS
+  builds (installer and uninstaller) pass with warnings as errors; app.asar holds `main.js` and
+  `package.json` only; `@electron/fuses read` shows the fuses set.
+
+Not done or not verified:
+
+- The CI job has not run: `gh` is not logged in (manual task 1). The first push runs it; expect to
+  fix small Windows-only issues there (paths, `pnpm` through `cmd`, the runner's drives).
+- No real install has run anywhere yet. Manual task 14 is the person's check.
+- No product icon (OI-01); unsigned until the certificate exists. The PowerShell scripts are
+  unsigned too: a PC whose Group Policy sets the execution policy (AllSigned) overrides
+  `-ExecutionPolicy Bypass` and the set-up would fail. Sign them with the same certificate
+  (`Set-AuthenticodeSignature`) in the stage step once it exists (P8-03).
+- `pnpm audit --audit-level high` reports two advisories that were already there, both in the
+  table tablet's Expo and Jest tools (node-forge GHSA-86w9-cpqp-85rv through `@expo/cli`, braces
+  GHSA-vfj7-8cjw-p6xm through `@react-native/jest-preset`). The security workflow's audit will
+  fail on them until they are fixed or accepted in `auditConfig.ignoreGhsas`.
+
+Notes for P7-04c (the update agent):
+
+- Run the installer silently: `RestaurantPlatform-Setup-<v>.exe /S`. Exit 0 done; 1 the set-up
+  failed (the services may be stopped: run the previous installer to roll back) or the services
+  could not be stopped (nothing changed); 2 the installed version could not be replaced (it was
+  started again).
+- The installer stops `RPDatabase` too. The update agent cannot run it from the server's own
+  process tree: `Stop-RestaurantPlatform.ps1` stops `RPServer` (and the watchdog). Hand off to
+  something outside it (a scheduled task as SYSTEM, or the watchdog, which is LocalSystem).
+- The server's account cannot elevate; the installer needs an administrator.
+
+Gotchas:
+
+- `pnpm deploy --legacy` with a hoisted layout dropped `uuid@14` (the server's own dependency)
+  for exceljs' `uuid@8`. The non-legacy deploy (`--config.inject-workspace-packages=true`) is
+  right, but keeps the lockfile's `auto-install-peers`, hence the trimming.
+- electron-builder looks for node_modules in the project folder when the app folder has none, and
+  packs them; `beforeBuild` returning false stops it (only when `npmRebuild` is on).
+- electron-builder includes `installer.nsh` before its own script: functions that use MUI macros
+  must be defined in `customHeader`; variables and functions must be inside
+  `!ifdef BUILD_UNINSTALLER` / `!ifndef` per build, or warnings (errors) stop the build.
+- `apps/*/build/` is git-ignored, so the NSIS resources live in `apps/desktop/installer/`.
+- `GetOptions` matches by prefix: the uninstaller's `/S` check would match `/STAFFSUBNET=`, which
+  is an installer-only option.
 
 ### 2026-10-05: P0-16c Windows set-up scripts
 

@@ -385,6 +385,15 @@ installer:test`); 6 more, tagged Windows, run icacls, the firewall and `sc.exe` 
     a killed server is back within 10 s, uninstall. Signing sits behind a secret.
   - The person's checklist on a clean PC (`manual-tasks/14-windows-installer.md`, already listed
     in `MANUAL_TASKS.md`).
+  - As built: `apps/desktop/src/packaging/` (stage and package steps, electron-builder's
+    configuration, the pinned downloads) and `apps/desktop/installer/installer.nsh` (the drive
+    page, stopping the services before files are replaced, the set-up scripts on install, update,
+    repair and uninstall). `Stop-` and `Start-RestaurantPlatform.ps1` joined the set-up scripts.
+    The POS window reads the installation file for the port and the CA. The CI job "Windows
+    installer" stages, builds, installs, kills the server, repairs and uninstalls on
+    `windows-latest` (`infra/installer/windows/ci/Test-Installer.ps1`). Updates go through this
+    installer, run by the update agent (P7-04c), not electron-updater. See
+    `docs/runbooks/windows-installer.md`.
 
 ## P0-17 Minimal Vendor Control Plane
 

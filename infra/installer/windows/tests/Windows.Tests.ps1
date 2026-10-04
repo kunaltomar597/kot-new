@@ -27,6 +27,19 @@ Describe 'on Windows' -Tag 'Windows' -Skip:(-not $OnWindows) {
         $choice.Default | Should -Not -BeNullOrEmpty
     }
 
+    It '[ONB-002] writes the drive page''s INI file in UTF-16, which Windows'' INI functions read' {
+        $ini = Join-Path $TestDrive 'drives.ini'
+        $script = Join-Path (Split-Path -Parent $PSScriptRoot) 'Get-DataDriveChoice.ps1'
+        $json = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script -MinFreeGB 1 -IniFile $ini
+        $LASTEXITCODE | Should -Be 0
+        ($json | Out-String | ConvertFrom-Json).Default | Should -Not -BeNullOrEmpty
+        $bytes = [IO.File]::ReadAllBytes($ini)
+        $bytes[0..1] | Should -Be @(0xFF, 0xFE)
+        $text = [IO.File]::ReadAllText($ini, [Text.Encoding]::Unicode)
+        $text | Should -Match '\[Choice\]'
+        $text | Should -Match 'EligibleCount=[1-9]'
+    }
+
     It '[SEC-007] gives real folders exactly the planned entries, removing others' {
         $data = Join-Path $TestDrive 'data'
         $programData = Join-Path $TestDrive 'programdata'

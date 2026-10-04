@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { healthUrlOf, shellConfig } from '../src/config.js';
+import {
+  healthUrlOf,
+  installationFileOf,
+  installationSettings,
+  shellConfig,
+} from '../src/config.js';
 import {
   certificateVerdict,
   isAllowedNavigation,
@@ -85,6 +90,28 @@ describe('[NFR-A04] starting with the PC', () => {
       caFile: join('D:', 'RestaurantData', 'tls', 'ca.crt'),
     });
     expect(shellConfig({ RP_SHELL_CA_FILE: 'ca.pem', RP_DATA_DIR: 'D:' }).caFile).toBe('ca.pem');
+    // On the restaurant PC the installer writes the installation file, not the environment.
+    const installed = installationSettings(
+      JSON.stringify({ format: 1, dataDir: 'E:\\RestaurantPlatform', server: { port: 9443 } }),
+    );
+    expect(installed).toEqual({ dataDir: 'E:\\RestaurantPlatform', port: 9443 });
+    expect(shellConfig({}, installed)).toMatchObject({
+      consoleUrl: 'https://127.0.0.1:9443/',
+      caFile: join('E:\\RestaurantPlatform', 'tls', 'ca.crt'),
+    });
+    expect(shellConfig({ RP_SHELL_PORT: '8081', RP_DATA_DIR: 'D:' }, installed)).toMatchObject({
+      consoleUrl: 'https://127.0.0.1:8081/',
+      caFile: join('D:', 'tls', 'ca.crt'),
+    });
+    for (const text of [undefined, '', 'not json', 'null', '[]', '{"server":{"port":"8080"}}']) {
+      expect(installationSettings(text)).toEqual({});
+    }
+    expect(installationSettings('{"dataDir":"","server":{"port":70000}}')).toEqual({});
+    expect(installationFileOf({ ProgramData: 'D:\\ProgramData' })).toBe(
+      'D:\\ProgramData\\RestaurantPlatform\\installation.json',
+    );
+    expect(installationFileOf({})).toBe('C:\\ProgramData\\RestaurantPlatform\\installation.json');
+    expect(installationFileOf({ RP_INSTALLATION_FILE: 'x.json' })).toBe('x.json');
     expect(() => shellConfig({ RP_SHELL_URL: 'file:///C:/' })).toThrow(/http/);
     expect(healthUrlOf(CONSOLE)).toBe('https://127.0.0.1:8080/api/v1/health');
   });

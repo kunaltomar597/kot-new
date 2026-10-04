@@ -9,10 +9,20 @@
     (SYSTEM_DRIVE, NO_DRIVE or null), DataFoundOn and Drives, each with Letter, Label,
     FileSystem, FreeGB, SizeGB, System, HasData, Eligible and Reason (NETWORK, REMOVABLE,
     NOT_A_DISK, FILE_SYSTEM, TOO_LITTLE_SPACE or null).
+
+    With -IniFile it also writes the answer as an INI file for the installer's page, which reads
+    it with NSIS's ReadINIStr (ConvertTo-RPDriveChoiceIni).
 #>
 [CmdletBinding()]
-param([ValidateRange(1, 100000)] [int] $MinFreeGB = 20)
+param(
+    [ValidateRange(1, 100000)] [int] $MinFreeGB = 20,
+    [string] $IniFile
+)
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'RestaurantPlatform.Setup.psm1') -Force
-Get-RPDataDriveChoice -Volume @(Get-RPVolume) -SystemDrive $env:SystemDrive -MinFreeGB $MinFreeGB |
-    ConvertTo-Json -Depth 4
+$choice = Get-RPDataDriveChoice -Volume @(Get-RPVolume) -SystemDrive $env:SystemDrive -MinFreeGB $MinFreeGB
+if ($IniFile) {
+    # UTF-16 with a byte order mark, which Windows' INI functions read: drive labels may not be ASCII.
+    Set-Content -LiteralPath $IniFile -Value (ConvertTo-RPDriveChoiceIni -Choice $choice) -Encoding Unicode
+}
+$choice | ConvertTo-Json -Depth 4

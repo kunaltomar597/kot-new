@@ -187,6 +187,73 @@ jobs:
           path: pester-*.xml
           retention-days: 7
 
+  windows-installer:
+    # The restaurant PC's installer (P0-16d). Staged and built on Windows, so the server's native
+    # modules are Windows' own; then installed silently here: the three services run, a killed
+    # server answers again within 10 s (NFR-A04), running the installer again repairs, and
+    # uninstalling keeps the data unless the Owner allowed deleting it (NFR-I02). Signed only when
+    # the code-signing certificate's secrets exist; the vendor's addresses come from repository
+    # variables (unset ones stay off on the PC).
+    name: Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      RP_CONTROL_PLANE_URL: ${{ vars.RP_CONTROL_PLANE_URL }}
+      RP_RELAY_URL: ${{ vars.RP_RELAY_URL }}
+      RP_QR_SITE_URL: ${{ vars.RP_QR_SITE_URL }}
+      RP_ERROR_DSN: ${{ secrets.RP_ERROR_DSN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the server, the console and the POS window
+        run: pnpm turbo run build --filter=@rp/server --filter=@rp/console --filter=@rp/desktop
+
+      # Node.js, PostgreSQL and WinSW, checked against their pinned SHA-256 at every use.
+      - name: Downloads cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules/.cache/rp-installer
+          key: rp-installer-${{ hashFiles('apps/desktop/src/packaging/components.ts') }}
+
+      - name: Stage the installer's contents
+        run: pnpm --filter @rp/desktop package:stage
+
+      - name: Build the installer
+        env:
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: pnpm --filter @rp/desktop package:win
+
+      - name: Install, check, repair and uninstall on this runner
+        shell: pwsh
+        run: |
+          $installer = (Get-Item apps/desktop/release/RestaurantPlatform-Setup-*.exe).FullName
+          ./infra/installer/windows/ci/Test-Installer.ps1 -Installer $installer -ResultDir installer-results
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-logs
+          path: installer-results
+          retention-days: 7
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: apps/desktop/release/RestaurantPlatform-Setup-*.exe
+          retention-days: 14
+
   relay-supabase:
     # The relay's isolation and rule tests (P5-01) also run in the check job on plain PostgreSQL
     # with a Supabase prelude; here they run against a real local Supabase stack (ADR-0015).

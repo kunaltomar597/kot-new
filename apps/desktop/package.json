@@ -2,7 +2,7 @@
   "name": "@rp/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Electron shell (C4) that opens the console from the restaurant PC's own server, hardened per SEC-011 (P0-16a).",
+  "description": "Electron shell (C4) that opens the console from the restaurant PC's own server, hardened per SEC-011 (P0-16a), and the Windows installer (P0-16d).",
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
@@ -11,12 +11,17 @@
     "start": "electron .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "clean": "rm -rf dist coverage"
+    "package:stage": "node dist/packaging/stage-cli.js",
+    "package:win": "node dist/packaging/package-cli.js",
+    "clean": "rm -rf dist coverage staging release"
   },
   "dependencies": {
     "@rp/i18n": "workspace:*"
   },
   "devDependencies": {
-    "electron": "44.5.1"
+    "@rp/contracts": "workspace:*",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2"
   }
 }
