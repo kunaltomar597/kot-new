@@ -369,11 +369,11 @@ Recommended next WPs (dependencies met):
   - [x] P7-05c Continuous WAL archiving
   - [x] P7-05d Cloud backup
   - [x] P7-05e Key escrow and restore from the cloud
-- [ ] P7-06 Data lifecycle
+- [x] P7-06 Data lifecycle
   - [x] P7-06a Automatic retention
   - [x] P7-06b Archive-then-purge
   - [x] P7-06c Archive viewer and full data export
-  - [ ] P7-06d Data-volume test
+  - [x] P7-06d Data-volume test
 - [x] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
   - [x] P7-07b First run on a fresh install
@@ -636,6 +636,19 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P7-06d):
+
+581. The data-volume test (DATA-012) projects five years from two measurements rather than
+     generating five years: a service day through the real API gives each table's rows per order,
+     and days at design capacity give each row's cost on disk with its indexes. Each table takes
+     the larger count and the measured cost where the bulk run has 1,000 rows or more. The result
+     is the same from 30 and 180 days (50.35 GB), so 30 days is the default.
+582. Tables the daily retention or the event bus empty count 90 days; tables neither run writes
+     (QR inbox rows, QR calls, feedback, diners' numbers, approvals, cash movements) get stated,
+     generous figures; 30 % is added for the space updates leave behind, plus the schema, the menu
+     and 1 GB of WAL. The test fails above 100 GB (decimal), so a schema change that blows up a
+     table shows when it runs.
 
 Decided 2026-10-04 (P7-06c):
 
@@ -2948,6 +2961,15 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P7-06d Data-volume test (P7-06 done)
+
+Built: `test/performance/volume-model.ts` (`projectVolume`), `volume.perf.test.ts` (opt-in,
+`RP_PERF=1`), `seedDesignRestaurant` split out of `seedDesignCapacity`; `docs/build/data-volume.md`
+with the measured numbers: about 50 GB for five years at design capacity, half the 100 GB target.
+
+Tests: unit 4 (the projection: scaling, larger count, estimates, assumptions, retention); the
+volume run itself at 30 and 180 days.
 
 ### 2026-10-04: P7-06c Archive viewer and full data export
 
