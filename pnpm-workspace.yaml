@@ -20,3 +20,5 @@ overrides:
   # the workspace's in type checking. It needs no types of its own at run time.
   '@fast-csv/format>@types/node': ^22.20.4
   '@fast-csv/parse>@types/node': ^22.20.4
+  # Electron lists the @types/node of its own Node.js release; one version for the workspace.
+  'electron>@types/node': ^22.20.4

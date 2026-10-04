@@ -2526,6 +2526,10 @@ export const en = {
       FAILED: 'The last export failed: {error}',
     },
   },
+  desktop: {
+    title: 'Restaurant system',
+    starting: 'Starting the restaurant’s server. This takes up to a minute after the PC starts.',
+  },
   readiness: {
     title: 'Site-readiness checklist',
     intro:

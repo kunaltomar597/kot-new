@@ -339,6 +339,33 @@ People needed: someone runs the installer on a clean Windows 11 PC and reports r
 Acceptance: installer builds in CI; on a clean PC it installs, services start at boot before login,
 killing the server process is recovered ≤ 10 s, and an update from the channel installs.
 
+Split (2026-10-04). Everything but the check on a real PC is built without Windows:
+
+- **P0-16a Electron shell (`apps/desktop`).**
+  - Hardened per SEC-011: context isolation, the sandbox, no Node.js, no preload, no IPC.
+  - Opens only this PC's server. On a loopback address it trusts a certificate signed by the
+    installation's CA (`<RP_DATA_DIR>/tls/ca.crt`) and refuses any other.
+  - Shows a start-up page until the server answers.
+  - Starts with Windows, reopens when it is closed and reloads a crashed page (NFR-A04).
+  - One shell per PC.
+  - Tested without Electron.
+- **P0-16b Windows services (`infra/installer/windows`, server).**
+  - WinSW definitions for the server and the watchdog, and PostgreSQL 16 as a service on the data
+    drive, set up for WAL archiving.
+  - The database logins (`rp_migrator`, `rp_server`, `rp_purger`, `rp_backup`), the server's
+    settings and the migrations.
+  - Firewall rules for the staff network, repair and uninstall that keep the data.
+  - The DPAPI secret store, the watchdog (a hang ends the process; the wrapper restarts it), and
+    the server's PID file.
+  - Pester tests for the PowerShell helpers.
+- **P0-16c Packaging and CI.**
+  - electron-builder NSIS with the data-drive page, fuses, and bundling Node, the server,
+    PostgreSQL and WinSW.
+  - The `windows-latest` workflow: build, install silently, check that the services start and that
+    a killed server is back within 10 s, uninstall. Signing sits behind a secret.
+  - The person's checklist on a clean PC (`manual-tasks/14-windows-installer.md`, already listed
+    in `MANUAL_TASKS.md`).
+
 ## P0-17 Minimal Vendor Control Plane
 
 Goal: the smallest cloud service needed for Phase 0: heartbeats and update channels.

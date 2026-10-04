@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-02.
+Last updated: 2026-10-04.
 
 What exists:
 
@@ -178,6 +178,11 @@ What exists:
   as CSV, Excel or PDF (P4-06); the audit trail with filters, paging, export and the chain check
   (P4-07a); the Suspicious activity report and the POS shift screen's "Open the drawer (no sale)"
   (P4-07b). 291 tests, and 23 Playwright steps.
+- `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
+  console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
+  no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
+  start-up page until the server answers, reopens a closed window and reloads a crashed page.
+  14 tests without Electron. Packaging is P0-16c.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -194,8 +199,9 @@ Recommended next WPs (dependencies met):
 
 - Phase 7 (P7-01 onwards).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
-- P0-16 Windows packaging (prepared in the container, checked on the `windows-latest` CI runner;
-  the final check on a real PC needs a person).
+- P0-16b Windows services, watchdog and the DPAPI secret store, then P0-16c packaging (prepared
+  on this Mac, checked on the `windows-latest` CI runner; the final check on a real PC needs a
+  person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -219,6 +225,9 @@ Recommended next WPs (dependencies met):
 - [x] P0-14b Web console shell
 - [x] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
+  - [x] P0-16a Electron shell
+  - [ ] P0-16b Windows services, watchdog, DPAPI secret store
+  - [ ] P0-16c Packaging, the windows-latest CI job and the person's checklist [H]
 - [x] P0-17a Control Plane service (deployment waits for the hosting account)
 - [x] P0-17b Local server heartbeat client
 - [ ] P0-H1 Pager battery prototype [H]
@@ -642,6 +651,28 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P0-16a):
+
+602. P0-16 is built in three parts: the Electron shell (a), the Windows services, watchdog and
+     DPAPI secret store (b), and packaging with the `windows-latest` CI job and the person's
+     checklist (c). See `docs/build/phases/phase-0.md`.
+603. The shell trusts the server on this PC by the installation's CA. On a loopback address it
+     accepts a certificate signed by `<RP_DATA_DIR>/tls/ca.crt` (or `RP_SHELL_CA_FILE`) and refuses
+     any other, so another program on the PC cannot pass as the server. Any other address, or no
+     CA file, gets Chromium's normal checks: a PC that opens the server across the LAN installs the
+     CA as `docs/runbooks/lan-tls.md` says.
+604. The IPC allow-list of SEC-011 is empty: no preload, no IPC, no Node.js in the page. The
+     console may ask for notifications, the camera (scanning a pager's QR code) and writing to the
+     clipboard, from its own server only. The server's own CSP (P0-14b) covers the console; the
+     start-up page has `default-src 'none'`.
+605. The shell starts with Windows as the signed-in user's login item. The services start before
+     anyone signs in (P0-16b); the window appears at sign-in. `RP_SHELL_OPEN_AT_LOGIN=0` turns
+     this off for a back-office PC. Closing the window brings it back after a second, except when
+     the shell quits or Windows signs out or shuts down.
+606. Electron is pinned to an exact version (44.5.1) and kept current by Dependabot. Its
+     `@types/node` is overridden to the workspace's version, so adding it changes no other
+     package's types.
 
 Decided 2026-10-04 (P7-04b):
 
@@ -3043,6 +3074,8 @@ Security-sensitive PRs for the P8-03 human review:
 - #59 P2-06b: the waiter phone's foreground service and wake lock, the non-exported receiver that
   acknowledges from a notification (and keeps presses in private preferences), alert text on the
   lock screen, and the new Android permissions (blocked on the table tablet).
+- P0-16a (merged locally): the Electron shell's web preferences, navigation and permission
+  rules, and its certificate rule pinning the installation's CA on loopback.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -3050,6 +3083,37 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P0-16a Electron shell
+
+Built `apps/desktop` (`@rp/desktop`):
+
+- `security.ts`: the web preferences (context isolation, sandbox, no Node.js, no preload), the
+  navigation and permission rules, and the certificate verdict that pins the installation's CA
+  on loopback (`isIssuedBy` with `node:crypto`).
+- `shell.ts` (`startShell`): one instance per PC, login item, session handlers, the window with
+  its start-up page, waiting for `/api/v1/health` through Chromium's network stack, reopening,
+  crash reload and waiting again when the console fails to load.
+- `config.ts` (`RP_SHELL_URL`/`RP_SHELL_PORT`, `RP_SHELL_FULLSCREEN`, `RP_SHELL_OPEN_AT_LOGIN`,
+  `RP_SHELL_CA_FILE` or `RP_DATA_DIR`), `server-wait.ts`, `splash.ts` (a `data:` page with
+  `default-src 'none'`), `main.ts` (Electron's objects, not unit-tested).
+- i18n `desktop.*`; P0-16 split into a/b/c in `phase-0.md`.
+
+Tests: 14 (hardening, CA pin with certificate fixtures, settings, back-off, start-up page,
+reopening, sign-out, failed and aborted loads, crash reload, navigation, permissions, single
+instance).
+
+Not done here: fuses, ASAR integrity, NSIS and signing (P0-16c); the services and watchdog
+(P0-16b); running the shell on Windows (P0-16c's CI job and the person's checklist).
+
+Gotchas:
+
+- pnpm does not run Electron's postinstall, so its binary is not downloaded. Run
+  `node node_modules/electron/install.js` in `apps/desktop` once before `pnpm start`.
+- Chromium reports `did-fail-load` with `ERR_ABORTED` (-3) whenever a load replaces another. The
+  shell ignores it, or its own start-up page would start a second wait.
+- A self-signed CA presented as the leaf passes `checkIssued` against itself. That is fine, since
+  the TLS handshake proves the presenter holds that CA's key. Tests use another CA instead.
 
 ### 2026-10-04: P7-04b Release management in the vendor web app
 
