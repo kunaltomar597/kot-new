@@ -166,6 +166,32 @@ describe('[VCP-005] [NFR-O03] the fleet page', () => {
   });
 });
 
+describe('[UPD-003] a failed update', () => {
+  it('lets Support close the alert of a PC that will not run that version', async () => {
+    const failed = fleetAlert({
+      kind: 'UPDATE_FAILED',
+      details: { version: '1.5.0', outcome: 'SILENT', error: null },
+    });
+    const cp = controlPlane('SUPPORT')
+      .on('listFleetAlerts', () => ({ alerts: [failed] }))
+      .on('resolveFleetAlert', ({ body }) => ({
+        ...failed,
+        resolvedAt: '2026-10-04T05:00:00.000Z',
+        resolution: (body as { reason: string }).reason,
+      }));
+    const { user } = renderApp({ cp, path: '/fleet' });
+    expect(await screen.findByText('Silent since it started installing 1.5.0')).toBeVisible();
+    await user.click(
+      await screen.findByRole('button', { name: 'Close the update alert for Main counter PC' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Close the update alert' });
+    await user.type(within(dialog).getByLabelText(/^Reason/), 'PC replaced');
+    await user.click(within(dialog).getByRole('button', { name: 'Close alert' }));
+    expect(await screen.findByText('Alert closed')).toBeVisible();
+    expect(cp.callsOf('resolveFleetAlert')[0]?.body).toEqual({ reason: 'PC replaced' });
+  });
+});
+
 describe('fleet view helpers', () => {
   const t = createTranslator();
 
@@ -191,6 +217,22 @@ describe('fleet view helpers', () => {
     expect(
       alertDetail(fleetAlert({ kind: 'BACKUP_FAILED', details: { error: 'Disk full' } }), t),
     ).toBe('The latest backup failed: Disk full');
+    // UPD-003: a failed update (P7-04).
+    expect(
+      alertDetail(
+        fleetAlert({
+          kind: 'UPDATE_FAILED',
+          details: { version: '1.5.0', outcome: 'ROLLED_BACK', error: 'Health check failed' },
+        }),
+        t,
+      ),
+    ).toBe('The update to 1.5.0 failed its health check and was rolled back: Health check failed');
+    expect(
+      alertDetail(
+        fleetAlert({ kind: 'UPDATE_FAILED', details: { version: '1.5.0', outcome: 'SILENT' } }),
+        t,
+      ),
+    ).toBe('Silent since it started installing 1.5.0');
     expect(alertDetail(fleetAlert({ kind: 'BACKUP_FAILED', details: null }), t)).toBe(
       'The latest backup failed',
     );

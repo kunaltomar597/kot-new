@@ -134,6 +134,9 @@ describe('[VCP-006] releases', () => {
       sha256: 'f'.repeat(64),
       sizeBytes: '12x',
       notes: '',
+      percent: '100',
+      securityCritical: false,
+      target: '',
     } as const;
     expect(releaseRequestOf(draft).success).toBe(false);
     expect(releaseRequestOf({ ...draft, sizeBytes: '12' }).success).toBe(true);

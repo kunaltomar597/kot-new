@@ -16,6 +16,7 @@ import { Page } from '../components/Page.js';
 import { ReasonDialog } from '../components/ReasonDialog.js';
 import { ActivationCodeDialog, INSTALLATION_TONE } from './InstallationsPanel.js';
 import { LicenceCard } from './LicenceCard.js';
+import { UpdatesCard } from './UpdatesCard.js';
 
 function Facts({ installation }: { installation: VendorInstallationView }) {
   const t = useT();
@@ -138,6 +139,7 @@ export function InstallationScreen() {
               <Facts installation={installation} />
             </Card>
             <LicenceCard installationId={installation.id} />
+            <UpdatesCard installation={installation} onChanged={reload} />
             <InstallationHealth installationId={installation.id} />
             <DiagnosticsCard installationId={installation.id} />
             <CloudBackupsCard installationId={installation.id} />
