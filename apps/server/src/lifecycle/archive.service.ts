@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, open, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -8,7 +8,6 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs
 import type { ArchiveRunView, ArchivesResponse, StartArchiveRequest } from '@rp/contracts';
 import {
   calendarDateOf,
-  DEFAULT_TIME_ZONE,
   type FinancialYear,
   financialYearOfLabel,
   purgeableYears,
@@ -22,13 +21,11 @@ import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { type ArchiveEntry, writeArchive } from '../backups/backup-archive.js';
 import { withManifest } from '../backups/backup-contents.js';
 import { encryptBackup } from '../backups/backup-file.js';
-import { invoiceView } from '../billing/invoices.service.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import type { ArchiveRun } from '../generated/prisma/client.js';
-import { billTextLines } from '../printing/escpos.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
   ARCHIVE_INFO,
@@ -36,13 +33,12 @@ import {
   TABLES_PREFIX,
   verifyBusinessArchive,
 } from './business-archive.js';
-import { layoutPages, textPdf } from './text-pdf.js';
+import { writeInvoiceBooks, writeInvoiceRegister } from './invoice-books.js';
 import { paramsFor, YEAR_TABLES, type YearTable } from './year-records.js';
 
 /** Rows read per query while archiving. */
 const BATCH = 2_000;
 const ACTIVE = ['ARCHIVING', 'VERIFYING', 'PURGING'] as const;
-const TAX_COLUMNS = ['CGST', 'SGST', 'IGST', 'CESS'] as const;
 
 const errors = {
   notSetUp: () =>
@@ -91,18 +87,6 @@ function stampOf(date: Date): string {
     .toISOString()
     .replace(/[-:]/g, '')
     .replace(/\.\d{3}/, '');
-}
-
-/** Paise as rupees for a spreadsheet: 12345 → "123.45". */
-function rupees(paise: number): string {
-  const sign = paise < 0 ? '-' : '';
-  const value = Math.abs(paise);
-  return `${sign}${String(Math.floor(value / 100))}.${String(value % 100).padStart(2, '0')}`;
-}
-
-function csvField(value: string | number | null): string {
-  const text = value === null ? '' : String(value);
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 function viewOf(run: ArchiveRun): ArchiveRunView {
@@ -418,116 +402,14 @@ export class ArchiveService implements OnApplicationBootstrap {
     return { sizeBytes, sha256: hash.digest('hex') };
   }
 
-  /**
-   * The human-readable export (DATA-008 step 2): the invoice register as CSV, and every invoice
-   * as printed, a PDF book a day under `invoices/<month>/`.
-   */
+  /** The human-readable export (DATA-008 step 2): the invoice register and the PDF books. */
   private async writeExport(folder: string, year: FinancialYear): Promise<void> {
-    const register = await this.prisma.$queryRaw<
-      {
-        number: string;
-        date: string;
-        status: string;
-        customer: string | null;
-        gstin: string | null;
-        taxable: bigint | null;
-        taxes: Record<string, number> | null;
-        tax_total: number;
-        discount_total: number;
-        service_charge: number;
-        round_off: number;
-        grand_total: number;
-      }[]
-    >`
-      SELECT i.invoice_number AS number, i.invoice_date::text AS date, i.status::text AS status,
-             i.customer_name AS customer, i.customer_gstin AS gstin,
-             (SELECT SUM(l.taxable_value) FROM invoice_lines l
-              WHERE l.invoice_id = i.id AND l.version = i.version) AS taxable,
-             (SELECT json_object_agg(code, amount) FROM (
-                SELECT t.code, SUM(t.amount)::int AS amount FROM tax_lines t
-                WHERE t.invoice_id = i.id AND t.version = i.version GROUP BY t.code) x) AS taxes,
-             i.tax_total, i.discount_total, i.service_charge, i.round_off, i.grand_total
-      FROM invoices i
-      WHERE i.business_date BETWEEN ${year.startDate}::date AND ${year.endDate}::date
-      ORDER BY i.invoice_date, i.invoice_number`;
-    const header = [
-      'Invoice number',
-      'Invoice date',
-      'Status',
-      'Customer',
-      'Customer GSTIN',
-      'Taxable value',
-      ...TAX_COLUMNS,
-      'Other taxes',
-      'Tax total',
-      'Discount',
-      'Service charge',
-      'Round off',
-      'Invoice total',
-    ];
-    const lines = [header.map(csvField).join(',')];
-    for (const row of register) {
-      const taxes = row.taxes ?? {};
-      const listed = TAX_COLUMNS.map((code) => taxes[code] ?? 0);
-      const other = Object.entries(taxes)
-        .filter(([code]) => !(TAX_COLUMNS as readonly string[]).includes(code))
-        .reduce((sum, [, amount]) => sum + amount, 0);
-      const [y, m, d] = row.date.split('-');
-      lines.push(
-        [
-          row.number,
-          `${d ?? ''}-${m ?? ''}-${y ?? ''}`,
-          row.status,
-          row.customer,
-          row.gstin,
-          rupees(Number(row.taxable ?? 0)),
-          ...listed.map(rupees),
-          rupees(other),
-          rupees(row.tax_total),
-          rupees(row.discount_total),
-          rupees(row.service_charge),
-          rupees(row.round_off),
-          rupees(row.grand_total),
-        ]
-          .map(csvField)
-          .join(','),
-      );
-    }
-    await writeFile(
+    await writeInvoiceRegister(
+      this.prisma,
       join(folder, `invoice-register-FY${year.label}.csv`),
-      `${lines.join('\r\n')}\r\n`,
+      year,
     );
-
-    const restaurant = await this.prisma.restaurant.findFirst({ select: { timeZone: true } });
-    const timeZone = restaurant?.timeZone ?? DEFAULT_TIME_ZONE;
-    const days = await this.prisma.$queryRaw<{ day: string }[]>`
-      SELECT DISTINCT business_date::text AS day FROM invoices
-      WHERE business_date BETWEEN ${year.startDate}::date AND ${year.endDate}::date
-      ORDER BY day`;
-    for (const { day } of days) {
-      const invoices = await this.prisma.invoice.findMany({
-        where: { businessDate: new Date(day) },
-        include: {
-          lines: true,
-          taxLines: true,
-          tableSession: { select: { table: { select: { label: true } } } },
-        },
-        orderBy: [{ invoiceDate: 'asc' }, { invoiceNumber: 'asc' }],
-      });
-      const blocks = invoices.map((invoice) =>
-        billTextLines(
-          invoiceView({
-            ...invoice,
-            lines: invoice.lines.filter((line) => line.version === invoice.version),
-            taxLines: invoice.taxLines.filter((line) => line.version === invoice.version),
-          }),
-          timeZone,
-        ),
-      );
-      const month = join(folder, 'invoices', day.slice(0, 7));
-      await mkdir(month, { recursive: true });
-      await writeFile(join(month, `${day}.pdf`), textPdf(layoutPages(blocks)));
-    }
+    await writeInvoiceBooks(this.prisma, join(folder, 'invoices'), year);
   }
 
   /**

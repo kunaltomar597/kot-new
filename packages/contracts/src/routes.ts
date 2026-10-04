@@ -10,7 +10,20 @@ import {
   NudgeRequest,
   NudgeResponse,
 } from './alerts.js';
-import { ArchiveRunView, ArchivesResponse, StartArchiveRequest } from './archives.js';
+import {
+  ArchivedDaysResponse,
+  ArchivedInvoiceListResponse,
+  ArchivedInvoiceParams,
+  ArchivedInvoiceQuery,
+  ArchivedInvoiceResponse,
+  ArchiveParams,
+  ArchiveRunView,
+  ArchivesResponse,
+  DataExportResponse,
+  DataExportView,
+  StartArchiveRequest,
+  StartDataExportRequest,
+} from './archives.js';
 import { AuditListQuery, AuditListResponse, AuditVerifyResponse } from './audit.js';
 import {
   BackupsResponse,
@@ -755,8 +768,10 @@ export const ROUTES = [
       'still asks for its records (72 months, §12); the runs, which once done are the purge ' +
       'records.',
     tags: ['system'],
-    requirements: ['DATA-008'],
-    capability: 'DATA_ADMIN',
+    requirements: ['DATA-008', 'DATA-009'],
+    // Those who read reports may see the archives and open them (DATA-009); only the Owner
+    // archives (startArchive).
+    capability: 'REPORTS_VIEW_EXPORT',
     responses: {
       200: { description: 'The years and runs.', schema: ArchivesResponse },
       ...standardErrors,
@@ -790,6 +805,87 @@ export const ROUTES = [
           'the purge login not set up.',
         schema: ApiError,
       },
+    },
+  },
+  {
+    operationId: 'getArchivedDays',
+    method: 'GET',
+    path: '/api/v1/archives/:id/days',
+    summary: 'An archived year day by day, read from the archive',
+    description:
+      'DATA-009: read-only, without restoring anything: invoices, voids, sales and tax per day. ' +
+      'The archive file must be where it was written (or its drive connected).',
+    tags: ['system'],
+    requirements: ['DATA-009'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { params: ArchiveParams },
+    responses: {
+      200: { description: 'The days.', schema: ArchivedDaysResponse },
+      ...standardErrors,
+      404: { description: 'No such archive, or its file is not there.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listArchivedInvoices',
+    method: 'GET',
+    path: '/api/v1/archives/:id/invoices',
+    summary: 'Invoices in an archive, by business date or invoice number',
+    tags: ['system'],
+    requirements: ['DATA-009'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { params: ArchiveParams, query: ArchivedInvoiceQuery },
+    responses: {
+      200: { description: 'The invoices.', schema: ArchivedInvoiceListResponse },
+      ...standardErrors,
+      404: { description: 'No such archive, or its file is not there.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getArchivedInvoice',
+    method: 'GET',
+    path: '/api/v1/archives/:id/invoices/:invoiceId',
+    summary: 'One archived invoice, with its text as printed',
+    tags: ['system'],
+    requirements: ['DATA-009'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { params: ArchivedInvoiceParams },
+    responses: {
+      200: { description: 'The invoice.', schema: ArchivedInvoiceResponse },
+      ...standardErrors,
+      404: { description: 'No such archive or invoice.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getDataExport',
+    method: 'GET',
+    path: '/api/v1/data-export',
+    summary: 'The last full data export',
+    tags: ['system'],
+    requirements: ['DATA-010'],
+    capability: 'DATA_ADMIN',
+    responses: {
+      200: { description: 'The last export.', schema: DataExportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'startDataExport',
+    method: 'POST',
+    path: '/api/v1/data-export',
+    summary: 'Export all the restaurant’s data in open formats',
+    description:
+      'DATA-010: every table as JSON lines and CSV, the invoice register and the invoices as PDFs, ' +
+      'into a folder; at any time, including in restricted licence mode. No credentials or ' +
+      'secret hashes. The Owner; audited.',
+    tags: ['system'],
+    requirements: ['DATA-010', 'LIC-005', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: StartDataExportRequest },
+    responses: {
+      202: { description: 'Started.', schema: DataExportView },
+      ...standardErrors,
+      409: { description: 'An export is running.', schema: ApiError },
+      422: { description: 'No folder.', schema: ApiError },
     },
   },
   {

@@ -1988,3 +1988,35 @@ body {
   letter-spacing: 0.05em;
   overflow-wrap: anywhere;
 }
+
+/* The archive viewer (P7-06c): an archived invoice as printed, and printed again on its own. */
+.archive-invoice__figure {
+  margin: 0;
+}
+
+.archive-invoice {
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--rp-font-mono, monospace);
+  font-size: 0.875rem;
+  white-space: pre;
+}
+
+@media print {
+  body:has(.archive-invoice) * {
+    visibility: hidden;
+  }
+
+  .archive-invoice,
+  .archive-invoice * {
+    visibility: visible;
+  }
+
+  .archive-invoice {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    overflow: visible;
+    color: #000;
+  }
+}

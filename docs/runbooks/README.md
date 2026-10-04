@@ -17,5 +17,5 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
   checked, retention, failure alerts and what to do, and the installer's settings (P7-05a); the
   recovery key and restoring on the same or a new PC, and going back (P7-05b).
 - `data-lifecycle.md`: how long each kind of data is kept (BRD §9.3), the daily automatic
-  retention (P7-06a), and archive-then-purge of whole financial years with the purge login
-  (P7-06b).
+  retention (P7-06a), archive-then-purge of whole financial years with the purge login
+  (P7-06b), the archive viewer and the full data export (P7-06c).

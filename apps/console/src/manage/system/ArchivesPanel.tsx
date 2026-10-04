@@ -1,7 +1,8 @@
-import type { ArchivesResponse } from '@rp/contracts';
+import type { ArchivesResponse, DataExportView } from '@rp/contracts';
 import { displayDateTime, formatDisplayDate } from '@rp/domain';
 import { Badge, Button, Dialog, TextField, useToast } from '@rp/ui-web';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { Link } from 'react-router';
 import { useConsole, useConsoleState } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
@@ -172,6 +173,9 @@ export function ArchivesPanel() {
   const { person } = useConsoleState();
   const toast = useToast();
   const owner = person !== undefined && grantOf(person, 'DATA_ADMIN') !== 'DENY';
+  // DATA-009: those who read the restaurant's reports open archives (a cashier's are their own
+  // shifts'); only the Owner archives.
+  const reads = person !== undefined && grantOf(person, 'REPORTS_VIEW_EXPORT') === 'ALLOW';
   const [view, setView] = useState<ArchivesResponse | undefined>();
   const [failed, setFailed] = useState<string | undefined>();
   const [archiving, setArchiving] = useState<Year | undefined>();
@@ -188,8 +192,8 @@ export function ArchivesPanel() {
     );
   }, [controller, t]);
   useEffect(() => {
-    if (owner) load();
-  }, [owner, load]);
+    if (reads) load();
+  }, [reads, load]);
   const running = view?.running === true;
   useEffect(() => {
     if (!running) return;
@@ -199,7 +203,7 @@ export function ArchivesPanel() {
     };
   }, [running, load]);
 
-  if (!owner) return null;
+  if (!reads) return null;
   const at = (iso: string) => t('backups.at', displayDateTime(new Date(iso)));
   return (
     <section className="device-group" aria-labelledby="system-archives">
@@ -233,7 +237,7 @@ export function ArchivesPanel() {
                         : null}
                     </p>
                   </div>
-                  {year.next ? (
+                  {year.next && owner ? (
                     <div className="staff-row__actions">
                       <Button
                         variant="secondary"
@@ -259,6 +263,7 @@ export function ArchivesPanel() {
                   <th scope="col">{t('archives.column.started')}</th>
                   <th scope="col">{t('archives.column.status')}</th>
                   <th scope="col">{t('archives.column.where')}</th>
+                  <th scope="col">{t('archives.column.open')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -272,6 +277,17 @@ export function ArchivesPanel() {
                       </Badge>
                     </td>
                     <td className="backups__path">{run.error ?? run.folder ?? ''}</td>
+                    <td>
+                      {run.status === 'DONE' ? (
+                        <Link
+                          className="console-link"
+                          to={`/manage/archives/${run.id}`}
+                          aria-label={t('archives.openYear', { year: run.financialYear })}
+                        >
+                          {t('archives.open')}
+                        </Link>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -292,6 +308,124 @@ export function ArchivesPanel() {
           }}
         />
       )}
+      {owner ? <DataExport /> : null}
     </section>
+  );
+}
+
+/**
+ * The full data export (DATA-010, P7-06c): everything in open formats, into a folder, at any time,
+ * also while the licence restricts ordering.
+ */
+function DataExport() {
+  const t = useT();
+  const controller = useConsole();
+  const { withSecondFactor, dialog } = useSecondFactor();
+  const [last, setLast] = useState<DataExportView | null | undefined>();
+  const [asking, setAsking] = useState(false);
+  const [folder, setFolder] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const load = useCallback(() => {
+    controller.api.getDataExport().then(
+      (answer) => {
+        setLast(answer.last);
+      },
+      () => undefined,
+    );
+  }, [controller]);
+  useEffect(load, [load]);
+  const running = last?.status === 'RUNNING';
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(load, ARCHIVE_POLL_MS);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [running, load]);
+  return (
+    <div className="backups__owner">
+      <p className="dashboard-section__hint">
+        {last === undefined || last === null
+          ? t('dataExport.intro')
+          : t(`dataExport.status.${last.status}`, { folder: last.folder, error: last.error ?? '' })}
+      </p>
+      <Button
+        variant="secondary"
+        disabled={running}
+        loading={running}
+        onClick={() => {
+          setAsking(true);
+        }}
+      >
+        {t('dataExport.open')}
+      </Button>
+      {asking ? (
+        <Dialog
+          open
+          onClose={() => {
+            setAsking(false);
+          }}
+          dismissible={!busy}
+          title={t('dataExport.title')}
+          description={t('dataExport.description')}
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => {
+                  setAsking(false);
+                }}
+              >
+                {t('archives.dialog.cancel')}
+              </Button>
+              <Button
+                loading={busy}
+                onClick={() => {
+                  setBusy(true);
+                  setError(undefined);
+                  withSecondFactor(() =>
+                    controller.api.startDataExport({
+                      body: { folder: folder.trim() === '' ? null : folder.trim() },
+                    }),
+                  ).then(
+                    (started) => {
+                      setBusy(false);
+                      setAsking(false);
+                      setLast(started);
+                    },
+                    (failure: unknown) => {
+                      setBusy(false);
+                      if (!(failure instanceof SecondFactorCancelled)) {
+                        setError(messageOf(failure, t));
+                      }
+                    },
+                  );
+                }}
+              >
+                {t('dataExport.confirm')}
+              </Button>
+            </>
+          }
+        >
+          <TextField
+            label={t('archives.dialog.folder')}
+            hint={t('archives.dialog.folderHint')}
+            value={folder}
+            maxLength={260}
+            onChange={(event) => {
+              setFolder(event.target.value);
+            }}
+          />
+          {error === undefined ? null : (
+            <p role="alert" className="console-notice console-notice--danger">
+              {error}
+            </p>
+          )}
+        </Dialog>
+      ) : null}
+      {dialog}
+    </div>
   );
 }

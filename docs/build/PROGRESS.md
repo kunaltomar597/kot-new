@@ -372,7 +372,7 @@ Recommended next WPs (dependencies met):
 - [ ] P7-06 Data lifecycle
   - [x] P7-06a Automatic retention
   - [x] P7-06b Archive-then-purge
-  - [ ] P7-06c Archive viewer and full data export
+  - [x] P7-06c Archive viewer and full data export
   - [ ] P7-06d Data-volume test
 - [x] P7-07 Onboarding wizard completion
   - [x] P7-07a Activation and the set-up checklist
@@ -636,6 +636,28 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P7-06c):
+
+576. The archive viewer reads the archive file itself, streamed and decrypted once per question,
+     never a restore into the live database (DATA-009). The year's daily report is kept in memory
+     once read; an invoice search scans the invoices table only, skipping lines that cannot match
+     before parsing them. At design capacity a year is a few hundred MB, read in seconds.
+577. Those who read the restaurant's reports (the Owner and managers) see the old years and open
+     their archives; a cashier's reports are their own shifts' (§4.2), so the archive routes
+     refuse an OWN grant. Archiving and the full export stay the Owner's (DATA_ADMIN).
+578. An archive made with another PC's backup key is refused with a clear message (open it on
+     that PC, or get the key back through escrow) rather than a decryption error.
+579. The full data export (DATA-010) is every table as JSON lines and CSV, read in one
+     REPEATABLE READ READ ONLY transaction through cursors, plus the invoice register and the
+     PDF books by financial year (the same writers as the archive's human-readable export). It
+     leaves out credentials, sessions, one-time codes, the server's bookkeeping tables and every
+     `*_hash`/`*secret` column. It goes to a folder typed in (a whole path, refused otherwise) or
+     the second backup location's `rp-exports`. It runs in the background, one at a time; the
+     last result is kept until the server restarts (the folder stays).
+580. The export is not held back by a restricted licence: the licence agent gates ordering only
+     (LIC-005), and the export's routes do not ask it. Covered by a test that makes the licence
+     refuse everything.
 
 Decided 2026-10-03 (P7-06b):
 
@@ -2926,6 +2948,30 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P7-06c Archive viewer and full data export
+
+Built:
+
+- contracts: `ArchivedDaysResponse`, `ArchivedInvoiceQuery`/`ListResponse`/`Params`/`Response`,
+  `DataExportView`/`Response`, `StartDataExportRequest`; routes `getArchivedDays`,
+  `listArchivedInvoices`, `getArchivedInvoice`, `getDataExport`, `startDataExport`; `listArchives`
+  now REPORTS_VIEW_EXPORT.
+- server `src/lifecycle/`: `archive-reader.ts` (`scanArchive`, `camelRow`),
+  `ArchiveViewerService`, `DataExportService` and its controller, `invoice-books.ts` (the
+  register and PDF books, moved out of `ArchiveService` and shared with the export).
+- console: "Open" on each finished archive, the archive viewer page (`/manage/archives/:id`) with
+  the day-by-day report, invoice search and the invoice as printed (print styles), "Export all
+  data…" for the Owner; old years visible to managers.
+- docs: the data lifecycle runbook's archive viewer and full export sections.
+
+Tests: server integration 1 new in archive-purge (days, search by date and number, one invoice as
+printed, waiter and cashier refused) and 3 in data-export (every table in both formats, no
+secrets, register and PDF books by year, while the licence is restricted; a relative folder
+refused; managers refused); console 3 new and 1 updated.
+
+Note: this WP was started by the headless autorun and finished from the chat panel after the
+autorun paused on the weekly limit (it resumes Thu 8 Oct 09:32 and continues the same session).
 
 ### 2026-10-03: P7-06b Archive-then-purge
 

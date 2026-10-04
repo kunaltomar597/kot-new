@@ -266,8 +266,8 @@
             }
           }
         },
-        "x-capability": "DATA_ADMIN",
-        "x-requirements": ["DATA-008"]
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["DATA-008", "DATA-009"]
       },
       "post": {
         "operationId": "startArchive",
@@ -320,6 +320,198 @@
         },
         "x-capability": "DATA_ADMIN",
         "x-requirements": ["DATA-008", "AUD-004", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/archives/{id}/days": {
+      "get": {
+        "operationId": "getArchivedDays",
+        "summary": "An archived year day by day, read from the archive",
+        "description": "DATA-009: read-only, without restoring anything: invoices, voids, sales and tax per day. The archive file must be where it was written (or its drive connected).",
+        "tags": ["system"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The days.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ArchivedDaysResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such archive, or its file is not there.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["DATA-009"]
+      }
+    },
+    "/api/v1/archives/{id}/invoices": {
+      "get": {
+        "operationId": "listArchivedInvoices",
+        "summary": "Invoices in an archive, by business date or invoice number",
+        "tags": ["system"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "number",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "minLength": 1, "maxLength": 40 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoices.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ArchivedInvoiceListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such archive, or its file is not there.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["DATA-009"]
+      }
+    },
+    "/api/v1/archives/{id}/invoices/{invoiceId}": {
+      "get": {
+        "operationId": "getArchivedInvoice",
+        "summary": "One archived invoice, with its text as printed",
+        "tags": ["system"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoice.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ArchivedInvoiceResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such archive or invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "REPORTS_VIEW_EXPORT",
+        "x-requirements": ["DATA-009"]
       }
     },
     "/api/v1/audit": {
@@ -1777,6 +1969,97 @@
         },
         "x-capability": "DEVICE",
         "x-requirements": ["NFR-O02"]
+      }
+    },
+    "/api/v1/data-export": {
+      "get": {
+        "operationId": "getDataExport",
+        "summary": "The last full data export",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The last export.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DataExportResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["DATA-010"]
+      },
+      "post": {
+        "operationId": "startDataExport",
+        "summary": "Export all the restaurant’s data in open formats",
+        "description": "DATA-010: every table as JSON lines and CSV, the invoice register and the invoices as PDFs, into a folder; at any time, including in restricted licence mode. No credentials or secret hashes. The Owner; audited.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StartDataExportRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Started.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DataExportView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "An export is running.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "No folder.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["DATA-010", "LIC-005", "AUD-001"]
       }
     },
     "/api/v1/day-end": {
@@ -13251,6 +13534,12 @@
         "required": ["version"],
         "additionalProperties": false
       },
+      "ArchiveParams": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" } },
+        "required": ["id"],
+        "additionalProperties": false
+      },
       "ArchiveRequest": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
@@ -13318,6 +13607,125 @@
       "ArchiveStatus": {
         "type": "string",
         "enum": ["ARCHIVING", "VERIFYING", "PURGING", "DONE", "FAILED"]
+      },
+      "ArchivedDaysResponse": {
+        "type": "object",
+        "properties": {
+          "financialYear": { "$ref": "#/components/schemas/FinancialYearLabel" },
+          "restaurants": { "type": "array", "items": { "type": "string" } },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "$ref": "#/components/schemas/IsoDate" },
+                "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "voided": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "sales": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "tax": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["date", "invoices", "voided", "sales", "tax"],
+              "additionalProperties": false
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "voided": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "sales": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "tax": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["invoices", "voided", "sales", "tax"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["financialYear", "restaurants", "days", "totals"],
+        "additionalProperties": false
+      },
+      "ArchivedInvoiceListResponse": {
+        "type": "object",
+        "properties": {
+          "invoices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "invoiceNumber": { "type": "string" },
+                "invoiceDate": { "$ref": "#/components/schemas/IsoDate" },
+                "status": { "type": "string", "enum": ["ISSUED", "SETTLED", "VOIDED"] },
+                "customer": { "type": ["string", "null"] },
+                "grandTotal": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "invoiceNumber",
+                "invoiceDate",
+                "status",
+                "customer",
+                "grandTotal"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["invoices"],
+        "additionalProperties": false
+      },
+      "ArchivedInvoiceParams": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "invoiceId": { "$ref": "#/components/schemas/Id" }
+        },
+        "required": ["id", "invoiceId"],
+        "additionalProperties": false
+      },
+      "ArchivedInvoiceQuery": {
+        "type": "object",
+        "properties": {
+          "date": { "$ref": "#/components/schemas/IsoDate" },
+          "number": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "additionalProperties": false
+      },
+      "ArchivedInvoiceResponse": {
+        "type": "object",
+        "properties": {
+          "invoice": { "$ref": "#/components/schemas/InvoiceView" },
+          "printed": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["invoice", "printed"],
+        "additionalProperties": false
+      },
+      "ArchivedInvoiceResponseInput": {
+        "type": "object",
+        "properties": {
+          "invoice": { "$ref": "#/components/schemas/InvoiceViewInput" },
+          "printed": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["invoice", "printed"]
       },
       "ArchivesResponse": {
         "type": "object",
@@ -14781,6 +15189,36 @@
           "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
         },
         "required": ["start", "end"],
+        "additionalProperties": false
+      },
+      "DataExportResponse": {
+        "type": "object",
+        "properties": {
+          "last": {
+            "anyOf": [{ "$ref": "#/components/schemas/DataExportView" }, { "type": "null" }]
+          }
+        },
+        "required": ["last"],
+        "additionalProperties": false
+      },
+      "DataExportView": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["RUNNING", "DONE", "FAILED"] },
+          "folder": { "type": "string" },
+          "startedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "finishedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "tables": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "error": { "type": ["string", "null"] }
+        },
+        "required": ["status", "folder", "startedAt", "finishedAt", "tables", "error"],
         "additionalProperties": false
       },
       "DayEndBlockers": {
@@ -22043,6 +22481,16 @@
         "type": "object",
         "properties": { "run": { "$ref": "#/components/schemas/BackupRunView" } },
         "required": ["run"],
+        "additionalProperties": false
+      },
+      "StartDataExportRequest": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 260 }, { "type": "null" }]
+          }
+        },
+        "required": ["folder"],
         "additionalProperties": false
       },
       "Station": {
