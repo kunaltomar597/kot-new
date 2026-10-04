@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
 import {
+  AllowDataDeletionRequest,
+  type AllowDataDeletionResponse,
   ApproveUpdateRequest,
   DiagnosticsRequestParams,
   type LocalDiagnosticsRequestList,
@@ -84,5 +86,16 @@ export class SystemController {
     @Body(new ZodValidationPipe(ApproveUpdateRequest)) body: ApproveUpdateRequest,
   ): Promise<SystemStatusResponse> {
     return this.system.approveUpdate(principalOf(request), body);
+  }
+
+  /** The Owner allows the uninstaller to delete the data for a while (NFR-I02, P0-16c). */
+  @Post('data-deletion')
+  @HttpCode(200)
+  @RequireCapability('DATA_ADMIN')
+  allowDataDeletion(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(AllowDataDeletionRequest)) body: AllowDataDeletionRequest,
+  ): Promise<AllowDataDeletionResponse> {
+    return this.system.allowDataDeletion(principalOf(request), body);
   }
 }

@@ -27,7 +27,8 @@ const SKIP_DIRS = new Set([
   '.expo',
   'build',
 ]);
-const TEST_FILE = /\.(test|spec|e2e)\.(ts|tsx|js|mjs)$/;
+// Vitest, Jest and Playwright files, and the Windows set-up scripts' Pester files (P0-16c).
+const TEST_FILE = /\.(test|spec|e2e)\.(ts|tsx|js|mjs)$|\.Tests\.ps1$/;
 const REFERENCE = /\[((?:[A-Z]{2,4})-\d{3}|NFR-[A-Z]\d{2})\]/g;
 
 function* walk(directory) {

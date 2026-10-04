@@ -17,9 +17,11 @@ Built by P0-16, in parts:
 
   `docs/runbooks/windows-services.md` describes all of it.
 
-- **P0-16c (next): `windows/`, the PowerShell set-up scripts** that run those commands in order and
-  do what only Windows can: the data-drive choice, folder permissions, `pg_ctl register`, the WinSW
-  services with their accounts and recovery, firewall rules for the staff network, repair and
-  uninstall. Pester tests on `windows-latest`.
+- **P0-16c (done): `windows/`, the PowerShell set-up scripts** that run those commands in order and
+  do what only Windows can: the data-drive choice (ONB-002), folder permissions, the services'
+  accounts and recovery, firewall rules for the staff network (SEC-008), repair, and uninstall that
+  keeps the data unless the Owner allowed deleting it (NFR-I02). Pester tests run on any PC
+  (`pnpm installer:test`) and on `windows-latest` under Windows PowerShell 5.1 and PowerShell 7.
+  `docs/runbooks/windows-installer.md` describes them.
 - **P0-16d: packaging** (electron-builder NSIS, bundling Node, the server, PostgreSQL and WinSW), the
   `windows-latest` workflow and the person's checklist on a clean PC (manual task 14).

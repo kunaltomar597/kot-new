@@ -371,6 +371,13 @@ Split (2026-10-04). Everything but the check on a real PC is built without Windo
     staff network, repair, and uninstall that keeps the data (deleting it needs the Owner's
     password and second factor, NFR-I02).
   - Pester tests for the PowerShell helpers, run on `windows-latest`.
+  - As built: `RestaurantPlatform.Setup.psm1` with `Install-`, `Uninstall-RestaurantPlatform.ps1`
+    and `Get-DataDriveChoice.ps1` (JSON for the installer's drive page), for Windows PowerShell
+    5.1. The Owner allows deleting the data on the System page (`POST /api/v1/system/data-deletion`,
+    DATA_ADMIN, 30 minutes, audited); the uninstaller asks `setup-cli data-deletion`. `setup-cli
+paths` gives the scripts the folders and ports. 84 Pester tests run anywhere (`pnpm
+installer:test`); 6 more, tagged Windows, run icacls, the firewall and `sc.exe` for real in the
+    CI job "Windows set-up scripts". See `docs/runbooks/windows-installer.md`.
 - **P0-16d Packaging and CI.** (Was P0-16c before the split of 2026-10-04.)
   - electron-builder NSIS with the data-drive page, fuses, and bundling Node, the server,
     PostgreSQL and WinSW.

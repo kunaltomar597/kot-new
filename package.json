@@ -25,6 +25,7 @@
     "licenses:check": "node infra/ci/check-licenses.mjs",
     "secrets:scan": "bash infra/ci/gitleaks.sh",
     "ci:test": "node --test infra/ci/*.test.mjs",
+    "installer:test": "pwsh -NoProfile -File infra/installer/windows/Invoke-Tests.ps1",
     "clean": "turbo run clean && rm -rf node_modules/.cache"
   },
   "devDependencies": {

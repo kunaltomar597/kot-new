@@ -1,6 +1,8 @@
 import { resolve } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  type AllowDataDeletionRequest,
+  type AllowDataDeletionResponse,
   type ApproveUpdateRequest,
   DeviceType,
   STORAGE_CATEGORIES,
@@ -17,6 +19,13 @@ import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { AuditService } from '../audit/audit.service.js';
+import {
+  dataDeletionAllowedUntil,
+  dataDeletionPermission,
+  readDataDeletionPermission,
+  removeDataDeletionPermission,
+  saveDataDeletionPermission,
+} from '../installation/data-deletion.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { RelayOrdersService } from '../relay/relay-orders.service.js';
 import { RelaySyncService } from '../relay/relay-sync.service.js';
@@ -71,6 +80,7 @@ export class SystemService {
       open,
       backup,
       retention,
+      deletion,
     ] = await Promise.all([
       this.prisma.ping(),
       this.settings.snapshot(restaurantId),
@@ -83,6 +93,7 @@ export class SystemService {
       this.prisma.tableSession.count({ where: { restaurantId, status: 'OPEN' } }),
       backupSummary(this.prisma),
       readRetentionRun(this.prisma),
+      readDataDeletionPermission(this.config.dataDir).catch(() => null),
     ]);
     const approverId = approval?.approvedByStaffId ?? null;
     const approver =
@@ -167,7 +178,43 @@ export class SystemService {
         lastError: backup.lastError,
       },
       licence: null,
+      dataDeletionAllowedUntil:
+        dataDeletionAllowedUntil(deletion, new Date())?.toISOString() ?? null,
     };
+  }
+
+  /**
+   * The Owner allows the uninstaller to delete the data (NFR-I02, P0-16c). The guard has checked
+   * the fresh second factor (DATA_ADMIN). The permission file is written inside the audit's
+   * transaction, so there is never one without its audit entry.
+   */
+  async allowDataDeletion(
+    principal: Principal,
+    request: AllowDataDeletionRequest,
+  ): Promise<AllowDataDeletionResponse> {
+    const permission = dataDeletionPermission(
+      { staffId: principal.staffId, deviceId: principal.deviceId },
+      new Date(),
+    );
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.audit.record(tx, {
+          action: 'DATA_DELETION_ALLOWED',
+          entityType: 'installation',
+          entityId: null,
+          actorId: principal.staffId,
+          deviceId: principal.deviceId,
+          restaurantId: principal.restaurantId,
+          after: { allowedAt: permission.allowedAt, until: permission.until },
+          reason: request.reason,
+        });
+        await saveDataDeletionPermission(this.config.dataDir, permission);
+      });
+    } catch (error) {
+      await removeDataDeletionPermission(this.config.dataDir).catch(() => undefined);
+      throw error;
+    }
+    return { allowedUntil: permission.until };
   }
 
   /** "Install now" (UPD-004) for the version on offer; audited with the optional reason. */

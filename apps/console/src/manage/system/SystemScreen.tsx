@@ -18,6 +18,7 @@ import { useLive } from '../../app/use-live.js';
 import { ArchivesPanel } from './ArchivesPanel.js';
 import { BackupsPanel } from './BackupsPanel.js';
 import { DiagnosticsPanel } from './DiagnosticsPanel.js';
+import { UninstallPanel } from './UninstallPanel.js';
 import { bytesParts, uptimeParts } from './system-view.js';
 
 /** Disk, connections and the vendor link are not announced, so read them again. */
@@ -87,7 +88,8 @@ function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) 
 /**
  * The System page (P4-04, MGR-010, NFR-I03, DATA-006): the services, the data drive by kind of
  * data with its warning levels, the devices connected, the update on offer with "Install now"
- * (UPD-004), backups, the licence, the versions and "Send diagnostics to support" (UPD-008).
+ * (UPD-004), backups, the licence, the versions, "Send diagnostics to support" (UPD-008) and
+ * the Owner's permission for the uninstaller to delete the data (NFR-I02).
  * Backups have their own panel (P7-05a). Read again every half minute.
  */
 export function SystemScreen() {
@@ -337,6 +339,8 @@ export function SystemScreen() {
         </section>
 
         <DiagnosticsPanel connected={system.controlPlane.enrolled} />
+
+        <UninstallPanel allowedUntil={system.dataDeletionAllowedUntil} onAllowed={reload} />
       </>
     );
   }

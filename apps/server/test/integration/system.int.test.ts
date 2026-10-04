@@ -2,12 +2,19 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
-import { ApiError, type LoginResponse, SystemStatusResponse } from '@rp/contracts';
+import {
+  AllowDataDeletionResponse,
+  ApiError,
+  type LoginResponse,
+  SystemStatusResponse,
+} from '@rp/contracts';
 import type { ReleaseInfo } from '@rp/contracts/control-plane';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { saveOfferedUpdate } from '../../src/cloud/control-plane-state.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import { runSetupCli } from '../../src/installation/setup-cli.js';
+import { writeInstallationFile } from '../../src/installation/installation.js';
 import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
@@ -155,5 +162,83 @@ describe('[UPD-004] [AUD-001] "Install now"', () => {
       offered: { version: '1.3.0' },
       installApproval: null,
     });
+  });
+});
+
+describe('[NFR-I02] [AUTH-006] [AUD-001] the Owner allows the uninstaller to delete the data', () => {
+  const body = { reason: 'Closing this branch' };
+  const allow = (login: LoginResponse) =>
+    server().post('/api/v1/system/data-deletion').set(as(login)).send(body);
+
+  /** What the uninstall script asks the set-up tool (P0-16c). */
+  const uninstallerSees = async () => {
+    const file = join(dataDir, 'installation.json');
+    await writeInstallationFile(file, {
+      format: 1,
+      installDir: join(dataDir, 'program'),
+      dataDir,
+      productVersion: '1.0.0',
+      secretStore: 'file',
+      server: { port: 8080, mqttPort: 8883, logLevel: 'info', tlsHostnames: [] },
+      postgres: { port: 5432, database: 'restaurant' },
+      cloud: {},
+    });
+    const lines: string[] = [];
+    const code = await runSetupCli(
+      ['data-deletion', '--installation', file],
+      {},
+      { write: (text) => lines.push(text) },
+    );
+    return { code, answer: JSON.parse(lines.join('')) as { allowed: boolean } };
+  };
+
+  it('is the Owner’s alone, with a fresh second factor', async () => {
+    const owner = await signIn(app, kit, 'OWNER');
+    expect((await allow(manager)).status).toBe(403);
+    const stale = await allow(owner);
+    expect([stale.status, ApiError.parse(stale.body).code]).toEqual([
+      403,
+      'SECOND_FACTOR_REQUIRED',
+    ]);
+    expect(await uninstallerSees()).toEqual({
+      code: 3,
+      answer: { allowed: false, until: null, allowedBy: null },
+    });
+    expect((await status()).dataDeletionAllowedUntil).toBeNull();
+  });
+
+  it('lasts half an hour, audited with the reason, and the uninstaller sees it', async () => {
+    const owner = await signIn(app, kit, 'OWNER');
+    await prisma.session.update({
+      where: { id: owner.session.id },
+      data: { secondFactorAt: new Date() },
+    });
+    const blank = await server()
+      .post('/api/v1/system/data-deletion')
+      .set(as(owner))
+      .send({ reason: ' ' });
+    expect(blank.status).toBe(400);
+    const before = Date.now();
+    const response = await allow(owner);
+    expect(response.status).toBe(200);
+    const { allowedUntil } = AllowDataDeletionResponse.parse(response.body);
+    const minutes = (Date.parse(allowedUntil) - before) / 60_000;
+    expect(minutes).toBeGreaterThan(29.9);
+    expect(minutes).toBeLessThanOrEqual(30.1);
+    expect((await status()).dataDeletionAllowedUntil).toBe(allowedUntil);
+
+    const entry = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'DATA_DELETION_ALLOWED' },
+    });
+    expect(entry).toMatchObject({
+      entityType: 'installation',
+      actorId: owner.staff.id,
+      reason: 'Closing this branch',
+    });
+    expect(entry.after).toMatchObject({ until: allowedUntil });
+
+    const seen = await uninstallerSees();
+    expect(seen.code).toBe(0);
+    expect(seen.answer).toEqual({ allowed: true, until: allowedUntil, allowedBy: owner.staff.id });
   });
 });

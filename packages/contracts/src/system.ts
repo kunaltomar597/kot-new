@@ -141,8 +141,25 @@ export const SystemStatusResponse = z.object({
   licence: z
     .object({ state: z.string(), validUntil: IsoDate.nullable(), daysLeft: z.int().nullable() })
     .nullable(),
+  /**
+   * Uninstalling keeps the data unless the Owner allowed deleting it (NFR-I02): until when the
+   * uninstaller may delete it, or null.
+   */
+  dataDeletionAllowedUntil: Timestamp.nullable(),
 });
 export type SystemStatusResponse = z.infer<typeof SystemStatusResponse>;
+
+/**
+ * The Owner allows the uninstaller to delete the data on the data drive for a short while
+ * (NFR-I02, P0-16c); needs a fresh second factor and is audited with the reason.
+ */
+export const AllowDataDeletionRequest = z.strictObject({
+  reason: z.string().trim().min(3).max(200),
+});
+export type AllowDataDeletionRequest = z.infer<typeof AllowDataDeletionRequest>;
+
+export const AllowDataDeletionResponse = z.object({ allowedUntil: Timestamp });
+export type AllowDataDeletionResponse = z.infer<typeof AllowDataDeletionResponse>;
 
 /** "Install now" for the version on offer (UPD-004). Audited with the optional reason. */
 export const ApproveUpdateRequest = z.strictObject({

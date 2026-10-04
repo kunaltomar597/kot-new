@@ -1,5 +1,5 @@
 import { access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createSecretStore } from '../auth/secret-store.js';
@@ -11,6 +11,7 @@ import {
   startMaintenance,
 } from '../service/maintenance.js';
 import { WindowsServiceControl } from '../service/windows-services.js';
+import { dataDeletionAllowedUntil, readDataDeletionPermission } from './data-deletion.js';
 import { setupDatabase } from './database-setup.js';
 import {
   databaseUrl,
@@ -44,6 +45,9 @@ service-files       writes the WinSW definitions of the server and watchdog serv
 maintenance on|off  while on (--minutes, at most 240; --reason), the watchdog leaves the services
                     alone.
 status              prints the service host's state and the maintenance flag.
+paths               prints the folders, ports and service names as JSON (the set-up scripts').
+data-deletion       whether the Owner allowed the uninstaller to delete the data (System page),
+                    as JSON; exit code 0 when allowed, 3 when not.
 
 The installation file is ${defaultInstallationFile()} unless --installation names another.
 `;
@@ -240,6 +244,41 @@ export async function runSetupCli(
       }
       out.write(USAGE);
       return 2;
+    }
+    case 'paths': {
+      out.write(
+        `${JSON.stringify(
+          {
+            installationFile: file,
+            programDataDir: dirname(file),
+            installDir: installation.installDir,
+            dataDir: installation.dataDir,
+            setupCli: join(paths.serverDir, 'dist', 'installation', 'setup-cli.js'),
+            ...paths,
+            ports: {
+              server: installation.server.port,
+              mqtt: installation.server.mqttPort,
+              postgres: installation.postgres.port,
+            },
+            services: SERVICE_NAMES,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      return 0;
+    }
+    case 'data-deletion': {
+      const permission = await readDataDeletionPermission(installation.dataDir);
+      const until = dataDeletionAllowedUntil(permission, new Date());
+      out.write(
+        `${JSON.stringify({
+          allowed: until !== null,
+          until: until?.toISOString() ?? null,
+          allowedBy: until === null ? null : (permission?.allowedBy.staffId ?? null),
+        })}\n`,
+      );
+      return until === null ? 3 : 0;
     }
     case 'status': {
       const [host, maintenance] = await Promise.all([

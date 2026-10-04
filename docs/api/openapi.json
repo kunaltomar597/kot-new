@@ -11359,6 +11359,52 @@
         "x-requirements": ["MGR-010", "NFR-I03", "DATA-006", "UPD-004"]
       }
     },
+    "/api/v1/system/data-deletion": {
+      "post": {
+        "operationId": "allowDataDeletion",
+        "summary": "Allow the uninstaller to delete the data for 30 minutes",
+        "description": "NFR-I02: uninstalling keeps the data on the data drive unless the Owner, with a fresh second factor and a reason, allows deleting it; the uninstaller may then delete it for 30 minutes. Audited.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AllowDataDeletionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Allowed until the time given.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AllowDataDeletionResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DATA_ADMIN",
+        "x-requirements": ["NFR-I02", "AUTH-006", "AUD-001"]
+      }
+    },
     "/api/v1/system/diagnostics": {
       "get": {
         "operationId": "previewDiagnostics",
@@ -13560,6 +13606,18 @@
           "acknowledgedById",
           "clearedAt"
         ],
+        "additionalProperties": false
+      },
+      "AllowDataDeletionRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
+      "AllowDataDeletionResponse": {
+        "type": "object",
+        "properties": { "allowedUntil": { "$ref": "#/components/schemas/Timestamp" } },
+        "required": ["allowedUntil"],
         "additionalProperties": false
       },
       "ApiError": {
@@ -23217,6 +23275,9 @@
               },
               { "type": "null" }
             ]
+          },
+          "dataDeletionAllowedUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           }
         },
         "required": [
@@ -23230,7 +23291,8 @@
           "devices",
           "update",
           "backup",
-          "licence"
+          "licence",
+          "dataDeletionAllowedUntil"
         ],
         "additionalProperties": false
       },

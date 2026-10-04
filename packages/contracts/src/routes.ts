@@ -311,6 +311,8 @@ import {
   SettingsImportResponse,
 } from './onboarding.js';
 import {
+  AllowDataDeletionRequest,
+  AllowDataDeletionResponse,
   ApproveUpdateRequest,
   ClientErrorReport,
   HealthResponse,
@@ -675,6 +677,24 @@ export const ROUTES = [
       200: { description: 'The status with the approval.', schema: SystemStatusResponse },
       ...standardErrors,
       409: { description: 'That version is not on offer.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'allowDataDeletion',
+    method: 'POST',
+    path: '/api/v1/system/data-deletion',
+    summary: 'Allow the uninstaller to delete the data for 30 minutes',
+    description:
+      'NFR-I02: uninstalling keeps the data on the data drive unless the Owner, with a fresh ' +
+      'second factor and a reason, allows deleting it; the uninstaller may then delete it for 30 ' +
+      'minutes. Audited.',
+    tags: ['system'],
+    requirements: ['NFR-I02', 'AUTH-006', 'AUD-001'],
+    capability: 'DATA_ADMIN',
+    request: { body: AllowDataDeletionRequest },
+    responses: {
+      200: { description: 'Allowed until the time given.', schema: AllowDataDeletionResponse },
+      ...standardErrors,
     },
   },
   {
