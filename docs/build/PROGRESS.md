@@ -364,7 +364,7 @@ Recommended next WPs (dependencies met):
   - [x] P7-03b Fleet dashboard
 - [ ] P7-04 Release management and remote updates
   - [x] P7-04a Rollouts at the Control Plane
-  - [ ] P7-04b Release management in the vendor web app
+  - [x] P7-04b Release management in the vendor web app
   - [ ] P7-04c The update agent on the restaurant PC (installer step waits for P0-16)
   - [ ] P7-04d Phones, tablets and pagers; the version matrix
 - [x] P7-05 Backup and restore
@@ -642,6 +642,17 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P7-04b):
+
+599. A release published from the web app starts at 10 % on Stable and 100 % on Pilot. The share
+     can be changed before publishing. A hotfix goes to its PC whatever the share, so its form
+     hides the share.
+600. Only the Super Admin (RELEASES_MANAGE) sees the rollout and hold controls. Everyone with
+     FLEET_VIEW sees each release's rollout, its halt reason and how installing it went. The cohort
+     is picked from the release's own channel's PCs.
+601. A PC's page has an Updates card: what it follows or the version it is held at. The hold
+     starts from the PC's own version. Holding and releasing both need a reason.
 
 Decided 2026-10-04 (P7-04a):
 
@@ -3039,6 +3050,21 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P7-04b Release management in the vendor web app
+
+Built: `releases/release-view.ts` (labels, the default share, the share check), `RolloutDialog`,
+and the reworked `ReleasesScreen`:
+
+- columns for the rollout with its halt reason, installs and the security badge;
+- the publish form's share, security flag and hotfix PC;
+- the rollout button.
+  Also: `tenants/UpdatesCard` (hold and release), and Support can close an update alert in
+  `AlertsTable`.
+
+Tests: vendor web 6 new (labels, hotfix and staged publish requests, widening with a pilot PC and
+a reason, read-only for Support, holding a PC, hidden without the right) plus the update alert's
+text and closing.
 
 ### 2026-10-04: P7-04a Rollouts at the Control Plane
 
