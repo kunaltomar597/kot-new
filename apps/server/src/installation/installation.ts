@@ -74,6 +74,9 @@ export interface InstallationPaths {
   /** The service host's state file and the maintenance flag. */
   readonly runDir: string;
   readonly secretsDir: string;
+  /** The LAN CA and certificates; `ca.crt` there is what the POS window pins (P0-16a). */
+  readonly tlsDir: string;
+  readonly backupsDir: string;
   readonly walStaging: string;
 }
 
@@ -90,6 +93,8 @@ export function installationPaths(installation: InstallationFile): InstallationP
     logsDir: join(dataDir, 'logs'),
     runDir: join(dataDir, 'run'),
     secretsDir: join(dataDir, 'secrets'),
+    tlsDir: join(dataDir, 'tls'),
+    backupsDir: join(dataDir, 'backups'),
     walStaging: join(dataDir, 'backups', 'wal-staging'),
   };
 }

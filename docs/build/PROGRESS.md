@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-04.
+Last updated: 2026-10-05.
 
 What exists:
 
@@ -79,8 +79,10 @@ What exists:
   with the pager list (P4-02b); the device list with live connections, rename, and device changes
   announced, with every database session in UTC (P4-02c); the Windows services' runtime: the
   service host that prepares and supervises the server, the watchdog, the DPAPI secret store and
-  the installer's set-up commands with a migration runner that needs no Prisma CLI (P0-16b).
-  1071 tests (26 skipped: Windows only, a real install, or the performance runs).
+  the installer's set-up commands with a migration runner that needs no Prisma CLI (P0-16b); the
+  Owner's audited permission for the uninstaller to delete the data, and `setup-cli paths` and
+  `data-deletion` for the set-up scripts (P0-16c).
+  1081 tests (26 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -179,12 +181,18 @@ What exists:
   drill-down from a row to everything about its order (P4-05d, Recharts); export of every report
   as CSV, Excel or PDF (P4-06); the audit trail with filters, paging, export and the chain check
   (P4-07a); the Suspicious activity report and the POS shift screen's "Open the drawer (no sale)"
-  (P4-07b). 291 tests, and 23 Playwright steps.
+  (P4-07b); "Removing the software" on the System page, where the Owner allows the uninstaller to
+  delete the data for 30 minutes (P0-16c). 355 tests, and 23 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
   start-up page until the server answers, reopens a closed window and reloads a crashed page.
   14 tests without Electron. Packaging is P0-16d.
+- `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
+  5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
+  recovery, firewall rules for the staff network (SEC-008), install and repair, and uninstall that
+  keeps the data unless the Owner allowed deleting it (NFR-I02). 84 Pester tests anywhere
+  (`pnpm installer:test`, needs `pwsh`), 6 more on Windows only (CI job "Windows set-up scripts").
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -201,9 +209,10 @@ Recommended next WPs (dependencies met):
 
 - Phase 7 (P7-01 onwards).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
-- P0-16c Windows set-up scripts (PowerShell and Pester, running `setup-cli`, see
-  `docs/runbooks/windows-services.md`), then P0-16d packaging (prepared on this Mac, checked on
-  the `windows-latest` CI runner; the final check on a real PC needs a person).
+- P0-16d packaging: electron-builder NSIS with the data-drive page (from
+  `Get-DataDriveChoice.ps1`), fuses, bundling Node, the server, PostgreSQL and WinSW, and running
+  `Install-`/`Uninstall-RestaurantPlatform.ps1` (`docs/runbooks/windows-installer.md`). Prepared on
+  this Mac, checked on the `windows-latest` CI runner; the final check on a real PC needs a person.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -229,7 +238,7 @@ Recommended next WPs (dependencies met):
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
   - [x] P0-16a Electron shell
   - [x] P0-16b The services' runtime and set-up commands (service host, watchdog, DPAPI store)
-  - [ ] P0-16c Windows set-up scripts (PowerShell, Pester)
+  - [x] P0-16c Windows set-up scripts (PowerShell, Pester)
   - [ ] P0-16d Packaging, the windows-latest CI job and the person's checklist [H]
 - [x] P0-17a Control Plane service (deployment waits for the hosting account)
 - [x] P0-17b Local server heartbeat client
@@ -723,6 +732,45 @@ Decided 2026-10-04 (P0-16b):
      secret. The install folder's layout, which P0-16d packages, is `node\`, `server\` (with
      `dist\` and `prisma\migrations\`), `console\`, `postgres\bin\` and `services\` (WinSW). The
      data folder holds `postgres\`, `secrets\`, `logs\` (WinSW's and the server's) and `run\`.
+618. Deleting the data on uninstall (NFR-I02): the Owner allows it on the System page ("Removing the
+     software"), with a reason and a fresh second factor (`DATA_ADMIN`), audited as
+     `DATA_DELETION_ALLOWED`. The permission lasts 30 minutes, in `<data>\run\data-deletion.json`.
+     The uninstaller asks `setup-cli data-deletion`; without the permission it changes nothing and
+     exits with 3. Chosen over typing the Owner's password into the uninstaller: no sign-in path
+     without a paired device, and the existing lockouts and audit apply. It guards against
+     mistakes and people without the Owner's secrets, not against a Windows administrator.
+619. The data drive (ONB-002): the folder is `<drive>:\RestaurantPlatform`. GB are counted as
+     Windows Explorer counts them (1024³ bytes). NTFS or ReFS is needed (folder permissions).
+     USB, SD, MMC, FireWire and file-backed disks count as removable, iSCSI as network. When
+     installing again, the drive that already has the data is the default. The installer passes
+     the catalogue's `onboarding.minFreeDiskGb` default (20), since the settings do not exist yet;
+     a server test keeps the two equal. A data folder in or around Windows' own folders is refused,
+     and the uninstaller never deletes one.
+620. Folder permissions (`docs/runbooks/windows-installer.md`): the server's account
+     (`NT SERVICE\RPServer`, by its computed SID) may modify the data folder but only read
+     PostgreSQL's. Network Service owns `postgres\` and writes `backups\wal-staging\`. Only
+     administrators, SYSTEM and the server reach `secrets\`. Users may read `tls\` (the POS
+     window's pinned `ca.crt`; the keys there are sealed) and the installation file's folder. Each
+     run removes entries the plan does not name. `initdb` drops the administrator's rights, so the
+     installer's own account may write the data folder until the full permissions are set.
+621. Firewall (SEC-008): two inbound rules, for the server's `node.exe` only, on every network
+     profile (Windows may call the restaurant's network public), from `LocalSubnet` unless
+     `-StaffSubnet` names the staff network (none wider than /8). The outbound allow-list of
+     vendor and relay domains is the router's job (site readiness, P8-06): the Windows firewall
+     cannot filter by domain name.
+622. WinSW 2 has no `refresh`, so repair sets an installed service up with `sc.exe` (start at
+     boot, the dependency, the account, recovery). It installs a service again only when the
+     service runs another program. The failure flag is on, so a stop with an error also restarts
+     the service. `RPDatabase` restarts after 5, 10 and 30 seconds.
+623. A PC set up again with the old data drive cannot read the DPAPI secrets. The install stops,
+     changes nothing and points to a restore with the recovery key. It does not reset the logins
+     through a temporary `trust` line: the pepper, TLS keys and backup key would stay unreadable
+     anyway.
+624. The set-up scripts target Windows PowerShell 5.1, which every PC has, and are ASCII. They are
+     checked with PSScriptAnalyzer's 5.1 profiles and run in CI under 5.1 and 7. Their messages
+     are log text in English, not UI strings: the installer's pages (P0-16d) carry the UI text.
+     Install and repair log to `%ProgramData%\RestaurantPlatform\setup-logs\`; uninstall logs to
+     `%TEMP%`. A failed repair leaves the server and watchdog stopped, and the log says why.
 
 Decided 2026-10-04 (P0-16a):
 
@@ -3151,6 +3199,9 @@ Security-sensitive PRs for the P8-03 human review:
 - P0-16b (merged locally): the DPAPI secret store (machine scope, entropy, the PowerShell call),
   the database logins and their grants, keeping the administrator's login from the server, and
   the watchdog acting as LocalSystem.
+- P0-16c (merged locally): the folder permissions, the server's virtual account, the firewall
+  rules, the Owner's permission to delete the data (`POST /api/v1/system/data-deletion`) and the
+  uninstaller's checks before deleting anything.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -3158,6 +3209,85 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P0-16c Windows set-up scripts
+
+Built `infra/installer/windows/` for Windows PowerShell 5.1 (`docs/runbooks/windows-installer.md`):
+
+- `RestaurantPlatform.Setup.psm1`:
+  - the data-drive choice (ONB-002);
+  - the folder-permission plan by SID, applied with icacls, removing entries the plan does not
+    name;
+  - the server's service SID, computed;
+  - the WinSW and `sc.exe` service set-up with accounts and recovery;
+  - the firewall rules for the staff network (SEC-008);
+  - `Invoke-RPInstall` (install and repair) and `Invoke-RPUninstall`.
+- `Install-RestaurantPlatform.ps1`, `Uninstall-RestaurantPlatform.ps1` (exit 3 when deleting the
+  data is not allowed), and `Get-DataDriveChoice.ps1` (JSON for the installer's drive page,
+  P0-16d).
+- `PSScriptAnalyzerSettings.psd1`, with the Windows PowerShell 5.1 and 7 compatibility profiles;
+  `Invoke-Tests.ps1`; `pnpm installer:test`.
+- CI job "Windows set-up scripts" on `windows-latest`: Pester and PSScriptAnalyzer under 5.1 and
+  under 7.
+
+The Owner's permission to delete the data (NFR-I02, decision 618):
+
+- `POST /api/v1/system/data-deletion` (DATA_ADMIN, reason, audited `DATA_DELETION_ALLOWED`, 30
+  minutes);
+- `dataDeletionAllowedUntil` on the System status;
+- "Removing the software" on the System page (`UninstallPanel`);
+- `setup-cli data-deletion`, and `setup-cli paths` for the scripts;
+- `installationPaths` gained `tlsDir` and `backupsDir`.
+
+`scripts/traceability.mjs` now counts Pester `*.Tests.ps1` files.
+
+Tests:
+
+- Pester: 84 pass on this Mac (PowerShell 7.6, Pester 5.7.1). They cover the drive choice and its
+  refusals, the permission plan and icacls calls, the firewall, the services, install, repair and
+  their failures (also a repair given another data folder, or whose folder is gone), uninstall with
+  and without permission, the files being ASCII and parsing,
+  PSScriptAnalyzer, and the scripts' exit codes. 6 more, tagged Windows, are not run yet (below).
+- Server unit +8: the permission's rules and file; `paths` and `data-deletion`; the scripts
+  agreeing with the server (service names, folders, the setup-cli commands called, the free-space
+  default).
+- Server integration +2: only the Owner with a fresh second factor; audited; the uninstaller sees
+  it.
+- Console +2: a manager sees why there is no button; the Owner allows it with the second factor.
+
+Not done or not verified:
+
+- The 6 Windows-only Pester tests (real icacls, firewall, `sc.exe showsid`, drives, services) and
+  the Windows PowerShell 5.1 run need the CI job. `gh` is not logged in on this Mac (manual task
+  1), so they run on the first push.
+- Running the scripts with the real packaged software is P0-16d (its CI job installs silently) and
+  manual task 14 on a clean PC.
+
+Notes for P0-16d:
+
+- The NSIS drive page runs `Get-DataDriveChoice.ps1 -MinFreeGB 20`. It offers `Default`, shows
+  `Warning` (SYSTEM_DRIVE, NO_DRIVE), and gives the refusal reasons in words. The installer's
+  strings belong to the NSIS pages.
+- After copying the files, run `Install-RestaurantPlatform.ps1 -InstallDir ... -ProductVersion ...
+[-DataDir ...] [-StaffSubnet ...]` and the cloud URLs. Repair is the same call.
+- Uninstall: run `Uninstall-RestaurantPlatform.ps1 -InstallDir ... [-DeleteData]` before
+  removing the files. On exit 3, tell the person the Owner must allow it on the System page.
+- Stop `RPWatchdog`, then `RPServer`, before replacing files on an update or repair (the script
+  does it too, but the files are copied first).
+
+Gotchas:
+
+- `pwsh` is not on the Mac by default. It is now at `~/.local/pwsh` (`~/.local/bin/pwsh`), with
+  Pester 5.7.1 and 6.2.0 and PSScriptAnalyzer 1.25.0 in `~/.local/share/powershell/Modules`.
+  `Invoke-Tests.ps1` pins Pester 5.x.
+- `Join-Path` uses `/` on macOS. The module builds Windows paths with `Join-RPPath`, so the tests
+  see what Windows sees.
+- `Get-ChildItem -Include` matches nothing without `-Recurse` or a wildcard path.
+- Windows PowerShell 5.1 turns a program's stderr into a terminating error under
+  `ErrorActionPreference = 'Stop'` when redirected. `Invoke-RPProgram` switches to `Continue`
+  locally.
+- PSScriptAnalyzer's compatibility rules do not know Pester, so they check only the shipped
+  scripts.
 
 ### 2026-10-04: P0-16b The services' runtime and set-up commands
 

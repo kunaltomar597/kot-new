@@ -2,8 +2,8 @@
 
 How the restaurant PC keeps its server running (ONB-001, NFR-A04, P0-16b): the three services, what
 each does when something fails, the installation file, the secrets, the database logins and the
-set-up tool the installer runs. The installer's own scripts (P0-16c) and packaging (P0-16d) call
-what is described here.
+set-up tool the installer runs. The installer's own scripts (P0-16c, `windows-installer.md`) and
+packaging (P0-16d) call what is described here.
 
 ## The services
 
@@ -18,7 +18,8 @@ someone signs in to Windows and waits until the server answers.
 
 `RPServer` and `RPWatchdog` are WinSW 2 services: `<install>\services\RPServer.exe` with
 `RPServer.xml` beside it (written by `setup-cli service-files`). Windows restarts either one 1, 2
-and 5 seconds after it fails.
+and 5 seconds after it fails, and `RPDatabase` 5, 10 and 30 seconds after. WinSW installs a service
+once and reads the XML at every start; repair sets the rest with `sc.exe` (`windows-installer.md`).
 
 ## What happens when something fails
 
@@ -110,12 +111,18 @@ node dist\installation\setup-cli.js migrate
 node dist\installation\setup-cli.js service-files        (RPServer.xml, RPWatchdog.xml)
 ```
 
+`Install-RestaurantPlatform.ps1` runs them in this order, with the folders' permissions, the
+services' accounts and recovery, and the firewall around them (`windows-installer.md`).
+
 Other commands:
 
 - `maintenance on --minutes 60 --reason "update 1.5.0"` and `maintenance off`: while on, the
   watchdog leaves the services alone. It always expires (at most 4 hours), so an installer that
   crashed cannot leave the server down.
 - `status`: the service host's state and the maintenance flag, as JSON.
+- `paths`: the folders, ports and service names, as JSON, for the set-up scripts.
+- `data-deletion`: whether the Owner allowed the uninstaller to delete the data (exit code 0 when
+  allowed, 3 when not; `windows-installer.md`).
 
 `postgres-init` writes these settings into `postgresql.conf` between two marker lines (repair
 replaces the block): `listen_addresses = 'localhost'`, the port, `timezone = 'UTC'`,

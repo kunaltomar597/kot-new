@@ -2681,6 +2681,24 @@ export const en = {
       notActive: 'The licence status shows here once the restaurant is activated.',
     },
     versions: { title: 'Versions' },
+    uninstall: {
+      title: 'Removing the software',
+      intro:
+        'Uninstalling the software from this PC keeps the restaurant’s data on the data drive, so installing it again carries on where it left off.',
+      ownerOnly: 'Only the Owner can allow the uninstaller to delete the data as well.',
+      open: 'Allow deleting the data…',
+      allowedUntil:
+        'The uninstaller may delete the data until {time}. After that, uninstalling keeps it again.',
+      dialogTitle: 'Allow deleting the data',
+      dialogIntro:
+        'For the next 30 minutes, the uninstaller on this PC may delete every order, bill, report, photo, setting and backup kept on the data drive, if the person uninstalling chooses it. Backups on a second drive or in the cloud are not deleted.',
+      reason: 'Why',
+      reasonHint: 'Kept in the audit trail.',
+      understood: 'I understand that the data cannot be brought back from this PC afterwards.',
+      confirm: 'Allow for 30 minutes',
+      cancel: 'Cancel',
+      done: 'The uninstaller may delete the data until {time}.',
+    },
     diagnostics: {
       title: 'Support',
       intro:

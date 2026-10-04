@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
 import { invoiceView } from './billing-fixture.js';
+import { ownerSecurity, SECOND_FACTOR_REQUIRED } from './staff-fixture.js';
 import { archivesView, backupsView, systemStatus } from './system-fixture.js';
 
 const PATH = '/manage/system';
@@ -767,5 +768,74 @@ describe('[DATA-010] [LIC-005] the full data export', () => {
       await archives.findByText(t('dataExport.status.RUNNING', { folder: running.folder })),
     ).toBeVisible();
     expect(fake.callsTo('POST', '/api/v1/data-export')[0]?.body).toEqual({ folder: 'E:\\exports' });
+  });
+});
+
+describe('[NFR-I02] removing the software keeps the data unless the Owner allows deleting it', () => {
+  const UNTIL = '2026-10-01T10:00:00.000Z';
+
+  it('tells a manager the data is kept and only the Owner can allow deleting it', async () => {
+    await renderConsole({ fake: systemServer(), path: PATH, signedIn: 'MANAGER' });
+    const panel = await section(t('systemPage.uninstall.title'));
+    expect(panel.getByText(t('systemPage.uninstall.intro'))).toBeVisible();
+    expect(panel.getByText(t('systemPage.uninstall.ownerOnly'))).toBeVisible();
+    expect(panel.queryByRole('button', { name: t('systemPage.uninstall.open') })).toBeNull();
+  });
+
+  it('[AUTH-006] lets the Owner allow it for 30 minutes with a reason and the second factor', async () => {
+    const fake = signsInAs(server(), 'OWNER')
+      .on(
+        'GET',
+        '/api/v1/system',
+        () => ({ status: 200, body: systemStatus() }),
+        () => ({ status: 200, body: systemStatus({ dataDeletionAllowedUntil: UNTIL }) }),
+      )
+      .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView() }))
+      .on('GET', '/api/v1/archives', () => ({ status: 200, body: archivesView() }))
+      .on('GET', '/api/v1/auth/owner/security', () => ({ status: 200, body: ownerSecurity() }))
+      .on('POST', '/api/v1/auth/step-up', () => ({
+        status: 200,
+        body: { secondFactorValidUntil: '2026-10-01T09:40:00.000Z' },
+      }))
+      .on(
+        'POST',
+        '/api/v1/system/data-deletion',
+        () => SECOND_FACTOR_REQUIRED,
+        () => ({ status: 200, body: { allowedUntil: UNTIL } }),
+      );
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'OWNER' });
+    const panel = await section(t('systemPage.uninstall.title'));
+    await user.click(panel.getByRole('button', { name: t('systemPage.uninstall.open') }));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: t('systemPage.uninstall.dialogTitle') }),
+    );
+    await expectNoAxeViolations(container);
+    const confirm = dialog.getByRole('button', { name: t('systemPage.uninstall.confirm') });
+    expect(confirm).toBeDisabled();
+    await user.type(
+      dialog.getByRole('textbox', { name: t('systemPage.uninstall.reason') }),
+      'Closing this branch',
+    );
+    expect(confirm).toBeDisabled();
+    await user.click(dialog.getByRole('checkbox', { name: t('systemPage.uninstall.understood') }));
+    await user.click(confirm);
+
+    const factor = within(await screen.findByRole('dialog', { name: t('secondFactor.title') }));
+    await user.type(
+      await factor.findByLabelText(new RegExp(`^${t('secondFactor.password')}`)),
+      'correct horse battery',
+    );
+    await user.type(factor.getByLabelText(new RegExp(`^${t('secondFactor.code')}`)), '123456');
+    await user.click(factor.getByRole('button', { name: t('secondFactor.confirm') }));
+
+    const time = displayDateTime(new Date(UNTIL)).time;
+    expect(await panel.findByText(t('systemPage.uninstall.allowedUntil', { time }))).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/system/data-deletion').map((call) => call.body)).toEqual([
+      { reason: 'Closing this branch' },
+      { reason: 'Closing this branch' },
+    ]);
+    expect(
+      screen.queryByRole('dialog', { name: t('systemPage.uninstall.dialogTitle') }),
+    ).toBeNull();
   });
 });

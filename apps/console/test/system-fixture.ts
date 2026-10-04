@@ -61,6 +61,7 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
     },
     backup: null,
     licence: null,
+    dataDeletionAllowedUntil: null,
     ...overrides,
   };
 }

@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { settingDefinition } from '@rp/contracts';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config/app-config.js';
 import {
@@ -11,6 +12,7 @@ import {
   InstallationFile,
   installationPaths,
   readInstallationFile,
+  SERVICE_NAMES,
   restoreEnvironment,
   serverEnvironment,
   writeInstallationFile,
@@ -23,6 +25,14 @@ import {
   pgCtlRegisterArgs,
   withManagedBlock,
 } from '../../src/installation/postgres-setup.js';
+import {
+  DATA_DELETION_MINUTES,
+  dataDeletionAllowedUntil,
+  dataDeletionPath,
+  dataDeletionPermission,
+  readDataDeletionPermission,
+  saveDataDeletionPermission,
+} from '../../src/installation/data-deletion.js';
 import { runSetupCli } from '../../src/installation/setup-cli.js';
 import { serverServiceXml, watchdogServiceXml, xmlText } from '../../src/installation/winsw.js';
 import { restoreRequestPath } from '../../src/service/service-host-main.js';
@@ -339,5 +349,147 @@ describe('[NFR-I02] the set-up tool', () => {
     expect(await run('postgres-register')).toBe(process.platform === 'win32' ? 0 : 1);
     expect(await run('nonsense')).toBe(2);
     expect(await runSetupCli([], {}, out)).toBe(2);
+  });
+});
+
+describe('[NFR-I02] the Owner’s permission to delete the data on uninstall', () => {
+  const allowedBy = { staffId: 'owner-1', deviceId: 'pos-1' };
+  const at = new Date('2026-10-05T10:00:00.000Z');
+  const minutes = (count: number) => new Date(at.getTime() + count * 60_000);
+
+  it('holds for half an hour from when the Owner gave it', () => {
+    const permission = dataDeletionPermission(allowedBy, at);
+    expect(DATA_DELETION_MINUTES).toBe(30);
+    expect(permission.until).toBe(minutes(30).toISOString());
+    expect(dataDeletionAllowedUntil(permission, minutes(29))).toEqual(minutes(30));
+    expect(dataDeletionAllowedUntil(permission, minutes(30))).toBeNull();
+    expect(dataDeletionAllowedUntil(null, at)).toBeNull();
+  });
+
+  it('ignores a permission the server did not write', () => {
+    const permission = dataDeletionPermission(allowedBy, at);
+    // Longer than half an hour.
+    expect(
+      dataDeletionAllowedUntil({ ...permission, until: minutes(24 * 60).toISOString() }, at),
+    ).toBeNull();
+    // Dated ahead of the clock.
+    expect(dataDeletionAllowedUntil(dataDeletionPermission(allowedBy, minutes(5)), at)).toBeNull();
+    // Ending before it starts.
+    expect(
+      dataDeletionAllowedUntil({ ...permission, until: minutes(-1).toISOString() }, at),
+    ).toBeNull();
+  });
+
+  it('is kept in the data folder’s run folder, and a damaged file is no permission', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'rp-deletion-'));
+    expect(await readDataDeletionPermission(dataDir)).toBeNull();
+    await saveDataDeletionPermission(dataDir, dataDeletionPermission(allowedBy, at));
+    expect(dataDeletionPath(dataDir)).toBe(join(dataDir, 'run', 'data-deletion.json'));
+    expect(await readDataDeletionPermission(dataDir)).toMatchObject({ allowedBy });
+    writeFileSync(dataDeletionPath(dataDir), '{"format":1,');
+    expect(await readDataDeletionPermission(dataDir)).toBeNull();
+  });
+
+  it('tells the set-up scripts the folders, ports and services, and the permission', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'rp-setup-'));
+    const file = join(folder, 'installation.json');
+    await writeInstallationFile(file, {
+      ...installation,
+      installDir: join(folder, 'program'),
+      dataDir: join(folder, 'data'),
+      secretStore: 'file',
+    });
+    const lines: string[] = [];
+    const run = (...args: string[]) =>
+      runSetupCli([...args, '--installation', file], {}, { write: (text) => lines.push(text) });
+    expect(await run('paths')).toBe(0);
+    const paths = JSON.parse(lines.join('')) as Record<string, unknown>;
+    expect(paths).toMatchObject({
+      installationFile: file,
+      programDataDir: folder,
+      dataDir: join(folder, 'data'),
+      setupCli: join(folder, 'program', 'server', 'dist', 'installation', 'setup-cli.js'),
+      pgData: join(folder, 'data', 'postgres'),
+      secretsDir: join(folder, 'data', 'secrets'),
+      tlsDir: join(folder, 'data', 'tls'),
+      walStaging: join(folder, 'data', 'backups', 'wal-staging'),
+      ports: { server: 8080, mqtt: 8883, postgres: 5432 },
+      services: { database: 'RPDatabase', server: 'RPServer', watchdog: 'RPWatchdog' },
+    });
+
+    lines.length = 0;
+    expect(await run('data-deletion')).toBe(3);
+    expect(JSON.parse(lines.join(''))).toEqual({ allowed: false, until: null, allowedBy: null });
+    const permission = dataDeletionPermission(allowedBy, new Date());
+    await saveDataDeletionPermission(join(folder, 'data'), permission);
+    lines.length = 0;
+    expect(await run('data-deletion')).toBe(0);
+    expect(JSON.parse(lines.join(''))).toEqual({
+      allowed: true,
+      until: permission.until,
+      allowedBy: 'owner-1',
+    });
+  });
+});
+
+describe('[ONB-001] [ONB-002] the Windows set-up scripts agree with the server', () => {
+  const folder = join(import.meta.dirname, '..', '..', '..', '..', 'infra', 'installer', 'windows');
+  const module = readFileSync(join(folder, 'RestaurantPlatform.Setup.psm1'), 'utf8');
+
+  it('name the same services', () => {
+    for (const [key, name] of Object.entries(SERVICE_NAMES)) {
+      const property = key[0]!.toUpperCase() + key.slice(1);
+      expect(module).toMatch(new RegExp(`\\n\\s+${property}\\s+= '${name}'`));
+    }
+  });
+
+  it('ask for the free space the settings catalogue gives as the default', () => {
+    const minimum = settingDefinition('onboarding.minFreeDiskGb')?.defaultValue;
+    expect(minimum).toBe(20);
+    expect(module).toContain(`$script:DefaultMinFreeGB = ${String(minimum)}`);
+    for (const script of ['Install-RestaurantPlatform.ps1', 'Get-DataDriveChoice.ps1']) {
+      expect(readFileSync(join(folder, script), 'utf8')).toContain(
+        `[int] $MinFreeGB = ${String(minimum)}`,
+      );
+    }
+  });
+
+  it('set permissions on the folders the server uses', () => {
+    const paths = installationPaths({ ...installation, dataDir: 'D:\\Data' });
+    const relative = (path: string) => path.slice('D:\\Data'.length + 1).split(/[\\/]/);
+    for (const path of [paths.pgData, paths.secretsDir, paths.tlsDir, paths.backupsDir]) {
+      expect(module).toContain(`Join-RPPath $data '${relative(path).join("', '")}'`);
+    }
+    expect(module).toContain(`Join-RPPath $data '${relative(paths.walStaging).join("', '")}'`);
+  });
+
+  it('call only commands the set-up tool has', async () => {
+    const lines: string[] = [];
+    await runSetupCli(['help'], {}, { write: (text) => lines.push(text) });
+    const usage = lines.join('');
+    const called = [...module.matchAll(/-ArgumentList (?:@\()?'([a-z-]+)'/g)].map(
+      (match) => match[1]!,
+    );
+    const commands = [...new Set(called)].filter(
+      (name) =>
+        !['sidtype', 'failure', 'failureflag', 'start', 'stop', 'delete', 'install'].includes(name),
+    );
+    expect(commands.sort()).toEqual(
+      [
+        'data-deletion',
+        'database',
+        'maintenance',
+        'migrate',
+        'paths',
+        'postgres-init',
+        'postgres-register',
+        'secrets',
+        'service-files',
+      ].sort(),
+    );
+    for (const command of commands) expect(usage).toMatch(new RegExp(`^${command}\\b`, 'm'));
+    // write-installation and status are called with arguments built elsewhere in the module.
+    expect(module).toContain("@('write-installation')");
+    expect(module).toContain("'status', '--installation'");
   });
 });
