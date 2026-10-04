@@ -34,7 +34,7 @@ Describe 'the script files' {
         $settings = Join-Path $script:Root 'PSScriptAnalyzerSettings.psd1'
         $shipped = @(Get-ChildItem -Path (Join-Path $script:Root '*') -File -Include '*.ps1', '*.psm1' |
                 Where-Object { $_.Name -ne 'Invoke-Tests.ps1' })
-        $shipped.Count | Should -Be 4
+        $shipped.Count | Should -Be 6
         $findings = @($shipped | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Settings $settings })
         $findings | ForEach-Object { '{0} {1}:{2} {3}' -f $_.RuleName, $_.ScriptName, $_.Line, $_.Message } | Should -BeNullOrEmpty
     }
@@ -47,6 +47,17 @@ Describe 'the scripts the installer runs' {
             -InstallDir (Join-Path $TestDrive 'program') -InstallationFile (Join-Path $TestDrive 'installation.json') -LogFile $log *> $null
         $LASTEXITCODE | Should -Be 1
         Get-Content -LiteralPath $log -Raw | Should -Match 'The set-up failed'
+    }
+
+    It '[UPD-007] Stop- and Start-RestaurantPlatform.ps1 log a failure and end with exit code 1' {
+        foreach ($name in @('Stop', 'Start')) {
+            $message = @{ Stop = 'Stopping the services failed'; Start = 'Starting the services failed' }[$name]
+            $log = Join-Path $TestDrive "$name.log"
+            & $script:Shell -NoProfile -NonInteractive -File (Join-Path $script:Root "$name-RestaurantPlatform.ps1") `
+                -InstallDir (Join-Path $TestDrive 'program') -InstallationFile (Join-Path $TestDrive 'installation.json') -LogFile $log *> $null
+            $LASTEXITCODE | Should -Be 1
+            Get-Content -LiteralPath $log -Raw | Should -Match $message
+        }
     }
 
     It '[NFR-I02] Uninstall-RestaurantPlatform.ps1 logs a failure and ends with exit code 1' {

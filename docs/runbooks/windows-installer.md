@@ -1,19 +1,116 @@
 # Installing, repairing and uninstalling on the restaurant PC
 
-What the installer's PowerShell does on the restaurant PC (ONB-001, ONB-002, NFR-I01, NFR-I02,
-SEC-008, P0-16c). The scripts are in `infra/installer/windows/`. The installer (P0-16d) copies the
-software, then runs them as an administrator. Support can run them by hand too.
+What the installer does on the restaurant PC (ONB-001, ONB-002, NFR-I01, NFR-I02, SEC-008, UPD-007,
+P0-16c, P0-16d). The installer copies the software, then runs the PowerShell in
+`infra/installer/windows/` as an administrator. Support can run the scripts by hand too.
 `windows-services.md` describes the services they set up and the set-up tool (`setup-cli`) they
 drive.
 
+## The installer
+
+`RestaurantPlatform-Setup-<version>.exe` is electron-builder's NSIS installer (P0-16d), built by
+the CI job "Windows installer". It installs for every user of the PC in
+`C:\Program Files\Restaurant Platform` and asks for administrator rights. Beside the POS window
+(`Restaurant Platform.exe`, P0-16a) it puts:
+
+| Folder      | What                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------- |
+| `node\`     | Node.js 24 for Windows: runs the server, the service host and the watchdog            |
+| `server\`   | the server: `dist`, `prisma\migrations`, its run-time packages, `THIRD-PARTY-NOTICES` |
+| `console\`  | the web console the server serves                                                     |
+| `postgres\` | PostgreSQL 16 (EDB's Windows binaries, without pgAdmin, StackBuilder or tests)        |
+| `services\` | WinSW 2 (.NET Framework 4.6.1 build) as `RPServer.exe` and `RPWatchdog.exe`           |
+| `setup\`    | the PowerShell below                                                                  |
+
+The pages: the data drive (below; skipped on a repair or an update, which keep the data where it
+is), the progress page while the set-up runs (a few minutes: `initdb`, the migrations, the server's
+first start), and the finish page, which opens the POS window. That first start makes the window a
+login item of the Windows user who ran it (P0-16a).
+
+The data-drive page runs `Get-DataDriveChoice.ps1 -IniFile`, lists the drives that fit with the
+default selected, shows the warning when only the Windows drive fits, and lists the other drives
+with the reason in words. When nothing fits, the installation cannot go on.
+
+What the installer does:
+
+1. **Before copying anything**, `Stop-RestaurantPlatform.ps1` (when the PC has an installation):
+   the maintenance flag, then the watchdog, the server and the database are stopped, so no file
+   is in use. The POS window is closed. If a service cannot be stopped, the services are started
+   again and the installer ends with exit code 1, changing nothing.
+2. **An installed version** (an update, or the same version run again to repair) is removed by its
+   own uninstaller, which leaves the services and the data alone when a newer installer runs it.
+   If its files cannot be removed, they stay, `Start-RestaurantPlatform.ps1` starts the old
+   version again and the installer ends with exit code 2.
+3. **The files are copied**, then `Install-RestaurantPlatform.ps1` installs or repairs (below). If
+   it fails, the installer says where the log is and ends with exit code 1. Run it again to repair.
+
+Uninstalling (Settings, Apps, or `Uninstall Restaurant Platform.exe`) shows a page that says the
+data stays, with a box to delete it too. It runs `Uninstall-RestaurantPlatform.ps1` before the
+files are removed. When the Owner has not allowed deleting the data, it asks whether to uninstall
+anyway and keep the data; without that, nothing is changed (exit code 3). When the services cannot
+be removed at all, it asks before removing the program files anyway.
+
+Options, for silent installs (`/S`), the update agent (P7-04c) and support:
+
+| Installer option            | Meaning                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `/S`                        | no pages                                                                                     |
+| `/DATADIR=<folder>`         | the data folder of a new installation (default: the default drive's)                         |
+| `/STAFFSUBNET=<cidr>[,...]` | the staff network the firewall admits (SEC-008; default: the PC's networks)                  |
+| `/MINFREEGB=<n>`            | the free space the data drive needs (default: 20)                                            |
+| Uninstaller: `/S`           | no pages; keeps the data                                                                     |
+| Uninstaller: `/DELETEDATA`  | deletes the data too, only while the Owner's permission holds (exit code 3 when it does not) |
+
+The vendor's addresses (Control Plane, relay, QR site, error reporting) are fixed when the
+installer is built and passed to `Install-RestaurantPlatform.ps1`.
+
+### Building it
+
+The installer is staged and built on Windows, because the server's packages include native
+modules (sharp, Argon2) for the system they are installed on. The CI job "Windows installer" does
+it on `windows-latest`, then installs it silently on the runner and checks it
+(`infra/installer/windows/ci/Test-Installer.ps1`): the services run and start at boot, the server
+answers, a killed server answers again within 10 seconds (NFR-A04), running it again repairs, an
+uninstall with `/DELETEDATA` but no permission changes nothing, an uninstall keeps the data, and
+installing again carries on with it. The installer and the logs are kept as artifacts.
+
+By hand, on a Windows PC with the repository:
+
+```text
+pnpm install
+pnpm turbo run build --filter=@rp/server --filter=@rp/console --filter=@rp/desktop
+pnpm --filter @rp/desktop package:stage     (apps/desktop/staging)
+pnpm --filter @rp/desktop package:win       (apps/desktop/release/RestaurantPlatform-Setup-<version>.exe)
+```
+
+- The version is `apps/desktop/package.json`'s, or `RP_PRODUCT_VERSION`.
+- The vendor's addresses come from `RP_CONTROL_PLANE_URL`, `RP_RELAY_URL`, `RP_QR_SITE_URL` and
+  `RP_ERROR_DSN` (https only; unset ones stay off on the PC). In CI they are repository variables,
+  and the DSN a secret.
+- Signing: electron-builder signs the executables, the installer and the uninstaller when
+  `WIN_CSC_LINK` (the certificate, a .p12 file or its base64) and `WIN_CSC_KEY_PASSWORD` are set.
+  In CI they are the secrets `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD`, which
+  wait for the code-signing certificate (Owner checklist). Without them the installer is unsigned
+  and Windows SmartScreen warns about it.
+- Node.js, PostgreSQL and WinSW are downloaded once into `node_modules/.cache/rp-installer` and
+  checked against the SHA-256 pinned in `apps/desktop/src/packaging/components.ts` every time. To
+  update one, change its version, address and hash together.
+- The stage step checks the payload against the server's own layout (`setup-cli paths`) and loads
+  every program the services start, and the native modules, with the staged packages.
+
+Staging on macOS or Linux works for checking the steps; `package:win --any-platform` then
+builds a test installer whose server would not run on Windows.
+
 ## The scripts
 
-| Script                             | What it does                                                                          | Exit codes                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `Install-RestaurantPlatform.ps1`   | Installs, or repairs when the installation file exists already.                       | 0 done, 1 failed                             |
-| `Uninstall-RestaurantPlatform.ps1` | Removes the services and firewall rules. Keeps the data unless `-DeleteData` (below). | 0 done, 1 failed, 3 deleting was not allowed |
-| `Get-DataDriveChoice.ps1`          | Prints the drives and the default data drive as JSON, for the installer's drive page. | 0                                            |
-| `RestaurantPlatform.Setup.psm1`    | The functions they call.                                                              |                                              |
+| Script                             | What it does                                                                                      | Exit codes                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `Install-RestaurantPlatform.ps1`   | Installs, or repairs when the installation file exists already.                                   | 0 done, 1 failed                             |
+| `Uninstall-RestaurantPlatform.ps1` | Removes the services and firewall rules. Keeps the data unless `-DeleteData` (below).             | 0 done, 1 failed, 3 deleting was not allowed |
+| `Get-DataDriveChoice.ps1`          | Prints the drives and the default data drive as JSON (and `-IniFile`: as INI for the drive page). | 0                                            |
+| `Stop-RestaurantPlatform.ps1`      | Stops the services before the installer replaces the files (update, repair).                      | 0 done, 1 failed                             |
+| `Start-RestaurantPlatform.ps1`     | Starts them again when an update could not replace the files.                                     | 0 done, 1 failed                             |
+| `RestaurantPlatform.Setup.psm1`    | The functions they call.                                                                          |                                              |
 
 They run on Windows PowerShell 5.1, which every Windows 10 and 11 PC has:
 
@@ -132,7 +229,7 @@ Windows firewall cannot filter by domain name. The site-readiness checklist (P8-
 ## Uninstalling and the data (NFR-I02)
 
 Uninstalling removes `RPWatchdog` first (or it would start the others again), then `RPServer`,
-then `RPDatabase`, then the firewall group. The installer then removes the program files (P0-16d).
+then `RPDatabase`, then the firewall group. The uninstaller then removes the program files.
 
 The data stays in `<data>`, and so does the installation file. Installing again finds the data
 (the default drive is the one that holds it) and carries on: same database, same secrets, same
@@ -170,8 +267,8 @@ Without the recovery key, the old folder's database cannot be opened by the new 
 
 ## Checking it on a PC
 
-The person's checklist for a clean Windows 11 PC is manual task 14 (P0-16d). For the scripts
-alone, an administrator can run:
+The person's checklist for a clean Windows 11 PC is manual task 14
+(`manual-tasks/14-windows-installer.md`). For the scripts alone, an administrator can run:
 
 1. `Get-DataDriveChoice.ps1`: the drives and the default, as JSON.
 2. `Install-RestaurantPlatform.ps1 ...` with the packaged software. Then follow "Checking a PC" in

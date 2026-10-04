@@ -1,12 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { app, BrowserWindow, session } from 'electron';
 import { createTranslator } from '@rp/i18n';
-import { shellConfig } from './config.js';
+import { installationFileOf, installationSettings, shellConfig } from './config.js';
 import { startShell } from './shell.js';
 
 // The shell's entry point (P0-16a): Electron's own objects, wired to `startShell`.
 const t = createTranslator();
-const config = shellConfig(process.env);
+
+/** The installation file, when this PC has one (P0-16d). */
+function readInstallationFile(): string | undefined {
+  try {
+    return readFileSync(installationFileOf(process.env), 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+const config = shellConfig(process.env, installationSettings(readInstallationFile()));
 
 void startShell({
   app,

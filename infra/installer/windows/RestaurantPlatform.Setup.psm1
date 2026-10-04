@@ -267,6 +267,76 @@ function Get-RPDriveRefusalMessage {
     }
 }
 
+function Get-RPDriveText {
+    <# An eligible drive as the installer's drive page lists it: 'D: Data (NTFS, 412.5 GB free)'. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Drive)
+    $name = $Drive.Letter
+    if ($Drive.Label) { $name = '{0} {1}' -f $Drive.Letter, $Drive.Label }
+    $text = '{0} ({1}, {2} GB free)' -f $name, $Drive.FileSystem, $Drive.FreeGB
+    if ($Drive.HasData) { $text += ', has the restaurant''s data' }
+    if ($Drive.System) { $text += ', the Windows drive' }
+    $text
+}
+
+function ConvertTo-RPDriveChoiceIni {
+    <#
+    .SYNOPSIS
+        Get-RPDataDriveChoice's answer as INI lines for the installer's data-drive page (P0-16d),
+        which reads them with NSIS's ReadINIStr.
+
+    .DESCRIPTION
+        [Choice]: MinFreeGB, Default, DefaultIndex (its place among the eligible drives, -1 when
+        there is none), Warning, EligibleCount and RefusedCount. Each [EligibleN]: Letter,
+        DataDir, System, HasData and Text (what the page lists). Each [RefusedN]: Letter, Reason
+        and Text (why not, in words).
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Choice)
+    $eligible = @($Choice.Drives | Where-Object { $_.Eligible })
+    $refused = @($Choice.Drives | Where-Object { -not $_.Eligible })
+    $defaultIndex = -1
+    for ($i = 0; $i -lt $eligible.Count; $i++) {
+        if ($eligible[$i].Letter -eq $Choice.Default) { $defaultIndex = $i }
+    }
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add('[Choice]')
+    $lines.Add(('MinFreeGB={0}' -f $Choice.MinFreeGB))
+    $lines.Add(('Default={0}' -f $Choice.Default))
+    $lines.Add(('DefaultIndex={0}' -f $defaultIndex))
+    $lines.Add(('Warning={0}' -f $Choice.Warning))
+    $lines.Add(('EligibleCount={0}' -f $eligible.Count))
+    $lines.Add(('RefusedCount={0}' -f $refused.Count))
+    for ($i = 0; $i -lt $eligible.Count; $i++) {
+        $drive = $eligible[$i]
+        $lines.Add(('[Eligible{0}]' -f $i))
+        $lines.Add(('Letter={0}' -f $drive.Letter))
+        $lines.Add(('DataDir={0}\{1}' -f $drive.Letter, $script:DataFolderName))
+        $lines.Add(('System={0}' -f [int][bool]$drive.System))
+        $lines.Add(('HasData={0}' -f [int][bool]$drive.HasData))
+        $lines.Add(('Text={0}' -f (Get-RPDriveText -Drive $drive)))
+    }
+    for ($i = 0; $i -lt $refused.Count; $i++) {
+        $drive = $refused[$i]
+        $lines.Add(('[Refused{0}]' -f $i))
+        $lines.Add(('Letter={0}' -f $drive.Letter))
+        $lines.Add(('Reason={0}' -f $drive.Reason))
+        $lines.Add(('Text={0}' -f (Get-RPDriveRefusalMessage -Drive $drive -MinFreeGB $Choice.MinFreeGB)))
+    }
+    , $lines.ToArray()
+}
+
+function ConvertTo-RPList {
+    <#
+    .SYNOPSIS
+        A list option as the installer passes it: powershell.exe -File hands '-StaffSubnet a,b' to
+        the script as one string, so commas (and spaces) separate the items.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()] [AllowEmptyCollection()] [string[]] $Value)
+    $Value | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ }
+}
+
 function Get-RPProtectedFolder {
     <# Windows' own folders: the data never goes in, over or around them. #>
     [CmdletBinding()]
@@ -1139,6 +1209,79 @@ function Invoke-RPUninstall {
     [pscustomobject]@{ DataKept = $true; DataDir = $kept }
 }
 
+# -------------------------------------------------------------------------------- updates
+
+function Invoke-RPStop {
+    <#
+    .SYNOPSIS
+        Stops the services before the installer replaces the software's files: an update, or the
+        installer run again to repair (P0-16d).
+
+    .DESCRIPTION
+        The maintenance flag first, so the watchdog leaves the services alone, then the watchdog,
+        the server and the database: every program in InstallDir must be closed before its file
+        can be replaced. Nothing to do on a PC that has no installation yet. The installer then
+        copies the files and runs Install-RestaurantPlatform.ps1 (repair), which starts them; if
+        the files cannot be replaced, it runs Start-RestaurantPlatform.ps1 instead.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $InstallDir,
+        [string] $InstallationFile = (Get-RPDefaultInstallationFile),
+        [string] $Reason = 'update'
+    )
+    Assert-RPAdministrator
+    if (-not (Test-Path -LiteralPath $InstallationFile)) {
+        Write-RPLog 'There is no installation on this PC yet; nothing to stop.'
+        return [pscustomobject]@{ Stopped = $false }
+    }
+    $cli = Get-RPSetupCli -InstallDir $InstallDir
+    try {
+        $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('maintenance', 'on', '--minutes', '60', '--reason', $Reason)
+    } catch {
+        # The watchdog is stopped first anyway; a damaged installation must still take an update.
+        Write-RPLog ('Could not set the maintenance flag: {0}' -f $_)
+    }
+    # The watchdog first, or it starts the others again.
+    Stop-RPService -Name $script:Services.Watchdog
+    Stop-RPService -Name $script:Services.Server
+    Stop-RPService -Name $script:Services.Database
+    Write-RPLog 'The services are stopped; the software''s files can be replaced.'
+    [pscustomobject]@{ Stopped = $true }
+}
+
+function Invoke-RPStart {
+    <#
+    .SYNOPSIS
+        Starts the services again when an update could not replace the files (P0-16d): the old
+        version carries on. Lifts the maintenance flag.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $InstallDir,
+        [string] $InstallationFile = (Get-RPDefaultInstallationFile)
+    )
+    Assert-RPAdministrator
+    $started = @()
+    foreach ($name in @($script:Services.Database, $script:Services.Server, $script:Services.Watchdog)) {
+        if ($null -eq (Get-RPServiceInfo -Name $name)) {
+            Write-RPLog ('{0} is not installed.' -f $name)
+            continue
+        }
+        Start-RPService -Name $name
+        $started += $name
+    }
+    if (Test-Path -LiteralPath $InstallationFile) {
+        try {
+            $cli = Get-RPSetupCli -InstallDir $InstallDir
+            $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('maintenance', 'off')
+        } catch {
+            Write-RPLog ('Could not lift the maintenance flag (it lapses by itself within an hour): {0}' -f $_)
+        }
+    }
+    [pscustomobject]@{ Started = $started }
+}
+
 function Get-RPExitCode {
     <# The exit code for a failure: 3 when deleting the data was not allowed, else 1. #>
     [CmdletBinding()]
@@ -1155,13 +1298,16 @@ Export-ModuleMember -Function @(
     'Assert-RPDeletableDataDir',
     'Assert-RPProgramResult',
     'ConvertTo-RPBusType',
+    'ConvertTo-RPDriveChoiceIni',
     'ConvertTo-RPDriveLetter',
+    'ConvertTo-RPList',
     'ConvertTo-RPRemoteAddress',
     'Get-RPCurrentUserSid',
     'Get-RPDataDriveChoice',
     'Get-RPDefaultInstallationFile',
     'Get-RPDriveRefusal',
     'Get-RPDriveRefusalMessage',
+    'Get-RPDriveText',
     'Get-RPExitCode',
     'Get-RPExplicitAceSid',
     'Get-RPExtraAceSid',
@@ -1180,6 +1326,8 @@ Export-ModuleMember -Function @(
     'Invoke-RPInstall',
     'Invoke-RPProgram',
     'Invoke-RPSetupCli',
+    'Invoke-RPStart',
+    'Invoke-RPStop',
     'Invoke-RPUninstall',
     'Join-RPPath',
     'Read-RPInstallationFile',

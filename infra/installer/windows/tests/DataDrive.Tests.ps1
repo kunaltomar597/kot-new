@@ -149,3 +149,39 @@ Describe '[ONB-002] [DATA-001] choosing the data drive' {
         { ConvertTo-RPDriveLetter '\\nas\share' } | Should -Throw
     }
 }
+
+Describe '[ONB-002] the installer''s drive page' {
+    It 'lists the drives that fit, with the default selected, and why the others do not' {
+        $choice = Get-RPDataDriveChoice -SystemDrive 'C:' -Volume @(
+            (New-TestVolume 'C:' -FreeGB 80 -Label 'Windows'),
+            (New-TestVolume 'D:' -FreeGB 412.5 -Label 'Data'),
+            (New-TestVolume 'E:' -FreeGB 300 -HasData $true),
+            (New-TestVolume 'U:' -BusType 'USB')
+        )
+        $ini = ConvertTo-RPDriveChoiceIni -Choice $choice
+        $ini[0..6] | Should -Be @(
+            '[Choice]', 'MinFreeGB=20', 'Default=E:', 'DefaultIndex=2', 'Warning=', 'EligibleCount=3', 'RefusedCount=1'
+        )
+        $ini | Should -Contain '[Eligible0]'
+        $ini | Should -Contain 'Text=C: Windows (NTFS, 80 GB free), the Windows drive'
+        $ini | Should -Contain 'Text=D: Data (NTFS, 412.5 GB free)'
+        $ini | Should -Contain 'Text=E: (NTFS, 300 GB free), has the restaurant''s data'
+        $ini | Should -Contain 'DataDir=E:\RestaurantPlatform'
+        $ini[-4..-1] | Should -Be @(
+            '[Refused0]', 'Letter=U:', 'Reason=REMOVABLE', 'Text=U: can be unplugged. The data must be on a disk inside this PC.'
+        )
+    }
+
+    It 'says when only the system drive fits, and when nothing does' {
+        $system = ConvertTo-RPDriveChoiceIni -Choice (Get-RPDataDriveChoice -SystemDrive 'C:' -Volume @((New-TestVolume 'C:' -FreeGB 50)))
+        $system | Should -Contain 'Warning=SYSTEM_DRIVE'
+        $system | Should -Contain 'DefaultIndex=0'
+        $system | Should -Contain 'System=1'
+
+        $none = ConvertTo-RPDriveChoiceIni -Choice (Get-RPDataDriveChoice -SystemDrive 'C:' -MinFreeGB 40 -Volume @((New-TestVolume 'C:' -FreeGB 10)))
+        $none[0..6] | Should -Be @(
+            '[Choice]', 'MinFreeGB=40', 'Default=', 'DefaultIndex=-1', 'Warning=NO_DRIVE', 'EligibleCount=0', 'RefusedCount=1'
+        )
+        $none | Should -Contain 'Text=C: has 10 GB free; the data needs at least 40 GB.'
+    }
+}

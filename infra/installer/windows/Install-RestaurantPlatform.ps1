@@ -24,6 +24,7 @@ param(
     [ValidateRange(1, 65535)] [int] $MqttPort,
     [ValidateRange(1, 65535)] [int] $PgPort,
     # The staff network, e.g. 192.168.10.0/24 (SEC-008); without one, the PC's own networks.
+    # Several are given with commas.
     [string[]] $StaffSubnet,
     [string[]] $TlsHostnames,
     [string] $ControlPlaneUrl,
@@ -40,6 +41,10 @@ Import-Module (Join-Path $PSScriptRoot 'RestaurantPlatform.Setup.psm1') -Force
 $arguments = @{}
 foreach ($key in $PSBoundParameters.Keys) {
     if ($key -ne 'LogFile') { $arguments[$key] = $PSBoundParameters[$key] }
+}
+# The installer passes lists as one argument ('-StaffSubnet 192.168.10.0/24,192.168.11.0/24').
+foreach ($key in @('StaffSubnet', 'TlsHostnames')) {
+    if ($arguments.ContainsKey($key)) { $arguments[$key] = @(ConvertTo-RPList -Value $arguments[$key]) }
 }
 if (-not $InstallationFile) { $arguments.InstallationFile = Get-RPDefaultInstallationFile }
 if (-not $LogFile) {
