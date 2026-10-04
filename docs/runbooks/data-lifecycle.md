@@ -84,7 +84,8 @@ nothing removed" with the reason. A server stopped mid-way marks the run failed 
 ### The purge login (installer, P0-16)
 
 Only members of `rp_purge` may delete those records (AUD-004); the application's role never can.
-The installer creates a login for it and gives the server its address:
+The installer creates a login for it (`setup-cli database`, P0-16b; see `windows-services.md`) and
+the service host gives the server its address:
 
 ```sql
 CREATE ROLE rp_purger LOGIN PASSWORD '<random, kept by the installer>' IN ROLE rp_purge;

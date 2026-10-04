@@ -107,6 +107,10 @@ Common causes:
 
 ## Configuration (installer, P0-16)
 
+On the restaurant PC the set-up tool and the service host do all of this (P0-16b; see
+`windows-services.md`): the settings below are given to the server by the service host, which also
+runs `restore-cli pending` before it starts the server and starts it again on exit code 75.
+
 - `RP_PG_BIN`: the folder with `pg_dump.exe` and `pg_restore.exe` (PostgreSQL 16), e.g.
   `C:\Program Files\PostgreSQL\16\bin`. Unset, they are looked up on the PATH.
 - `RP_BACKUPS=off`: turns the nightly backup off, for development and the end-to-end tests where
@@ -174,7 +178,8 @@ waiting, or pieces not yet at the second location) or "failing". Failing raises 
 
 ### Setting it up (installer, P0-16)
 
-In `postgresql.conf` (then restart PostgreSQL):
+`setup-cli postgres-init` and `setup-cli database` do this on the restaurant PC (P0-16b). By hand,
+in `postgresql.conf` (then restart PostgreSQL):
 
 ```conf
 wal_level = replica

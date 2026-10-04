@@ -543,6 +543,36 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `RP_SCENARIO_URL=... pnpm --filter @rp/server scenario:service-day`. See
   `test/scenario/real-install.scenario.test.ts` for the variables.
 
+## Windows services (P0-16b)
+
+On the restaurant PC the server runs under the **service host** (`src/service/service-host.ts`,
+started by the `RPServer` Windows service with `dist/service/service-host-main.js --installation
+<file>`). It reads the installation file and the database passwords from the secret store, waits for
+PostgreSQL, runs a restore requested on the System page (`restore-cli pending`, with the
+administrator's login, which the server never gets), applies pending migrations, then forks
+`dist/main.js` and keeps it running (NFR-A04): started again within 5 s when it ends, ended and
+started again after 20 s without answering `/api/v1/health` (60 s after a start; 2 minutes of
+503), prepared again on
+exit code 75. It stops the server over IPC (`rp:shutdown`), which `main.ts` handles; the server also
+stops when the channel closes. Its state file is `<data>/run/service-host.json`.
+
+The **watchdog** (`src/service/watchdog.ts`, the `RPWatchdog` service) starts the database and
+server services when they stop, and restarts the server service when its host stopped writing its
+heartbeat and the server does not answer, except while the maintenance flag is set.
+
+`src/installation/setup-cli.ts` is what the installer runs (each step can run again for repair):
+`write-installation`, `secrets`, `postgres-init`, `postgres-register`, `database` (the logins
+`rp_migrator`, `rp_server`, `rp_purger`, `rp_backup`), `migrate` (Prisma's migration files and its
+`_prisma_migrations` table, without the Prisma CLI), `service-files` (WinSW XML), `maintenance` and
+`status`.
+
+`RP_SECRET_STORE=dpapi` (required in production on Windows) keeps every local secret protected with
+Windows DPAPI under `<data>/secrets/<name>.dpapi`, unprotected in one PowerShell call per start;
+plain `.key` files from the development store are protected and removed. The store also holds the
+database logins' passwords, which backups leave out.
+
+See `docs/runbooks/windows-services.md`.
+
 ## Commands
 
 ```

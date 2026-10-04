@@ -37,6 +37,13 @@ describe('server configuration', () => {
     });
   });
 
+  it('reads on/off flags as the docs write them (RP_TLS=on)', () => {
+    expect(loadConfig({ ...base, RP_TLS: 'on' }).tls).toBe(true);
+    expect(loadConfig({ ...base, RP_TLS: 'off' }).tls).toBe(false);
+    expect(loadConfig({ ...base, RP_TLS: 'true' }).tls).toBe(true);
+    expect(() => loadConfig({ ...base, RP_TLS: 'yes' })).toThrow(/tls/);
+  });
+
   it('rejects invalid values with a readable message', () => {
     expect(() => loadConfig({})).toThrow(ConfigError);
     expect(() => loadConfig({ DATABASE_URL: 'mysql://x' })).toThrow(/postgresql/);

@@ -19,10 +19,11 @@ function withoutTrailingSlashes(url: string): string {
   return url.slice(0, end);
 }
 
+/** `true`/`false`, `1`/`0` or `on`/`off` (the form the docs use, e.g. `RP_TLS=on`). */
 const booleanFlag = z
-  .enum(['true', 'false', '1', '0'])
+  .enum(['true', 'false', '1', '0', 'on', 'off'])
   .optional()
-  .transform((value) => value === 'true' || value === '1');
+  .transform((value) => value === 'true' || value === '1' || value === 'on');
 
 export const AppConfigSchema = z.object({
   nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
@@ -131,6 +132,11 @@ export const AppConfigSchema = z.object({
     .string()
     .regex(/^postgres(ql)?:\/\//, 'RP_PURGE_DATABASE_URL must be a postgresql:// connection string')
     .optional(),
+  /**
+   * Where the local secrets are kept (SEC-006): `file` under `<dataDir>/secrets` for development
+   * and tests, `dpapi` on the restaurant PC (P0-16b), which production on Windows requires.
+   */
+  secretStore: z.enum(['file', 'dpapi']).default('file'),
   /** The pagers' MQTT broker (P2-04, PGR-005): on by default; over TLS when `tls` is on. */
   mqtt: z.enum(['on', 'off']).default('on'),
   /** MQTT port; 8883 is MQTTS. 0 picks a free port (tests). */
@@ -190,7 +196,10 @@ export function isLoopbackDatabaseUrl(databaseUrl: string): boolean {
 }
 
 /** Parses and validates configuration from environment variables. */
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+export function loadConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): AppConfig {
   const result = AppConfigSchema.safeParse({
     nodeEnv: env.NODE_ENV,
     host: env.HOST,
@@ -211,6 +220,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     adminDatabaseUrl: env.RP_ADMIN_DATABASE_URL === '' ? undefined : env.RP_ADMIN_DATABASE_URL,
     backupDatabaseUrl: env.RP_BACKUP_DATABASE_URL === '' ? undefined : env.RP_BACKUP_DATABASE_URL,
     purgeDatabaseUrl: env.RP_PURGE_DATABASE_URL === '' ? undefined : env.RP_PURGE_DATABASE_URL,
+    secretStore: env.RP_SECRET_STORE === '' ? undefined : env.RP_SECRET_STORE,
     mqtt: env.RP_MQTT,
     mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,
@@ -238,6 +248,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (config.nodeEnv === 'production' && config.qrSiteUrl?.startsWith('https://') === false) {
     throw new ConfigError('In production RP_QR_SITE_URL must use https://');
+  }
+  // SEC-006: on the restaurant PC the local secrets are protected by DPAPI, never plain files.
+  if (config.nodeEnv === 'production' && platform === 'win32' && config.secretStore !== 'dpapi') {
+    throw new ConfigError('In production on Windows RP_SECRET_STORE must be dpapi');
+  }
+  if (config.secretStore === 'dpapi' && platform !== 'win32') {
+    throw new ConfigError('RP_SECRET_STORE=dpapi needs Windows');
   }
   // DATA-002: backups are automatic in production.
   if (config.nodeEnv === 'production' && config.backups === 'off') {

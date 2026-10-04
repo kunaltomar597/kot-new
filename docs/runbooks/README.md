@@ -19,3 +19,6 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `data-lifecycle.md`: how long each kind of data is kept (BRD §9.3), the daily automatic
   retention (P7-06a), archive-then-purge of whole financial years with the purge login
   (P7-06b), the archive viewer and the full data export (P7-06c).
+- `windows-services.md`: the restaurant PC's services (database, server, watchdog), what happens
+  when something fails, the installation file, secrets in DPAPI, the database logins, the set-up
+  tool and the maintenance flag (P0-16b).

@@ -77,8 +77,10 @@ What exists:
   pager, phone and sections taken back at once) and reactivate, managers kept to the Owner with a
   fresh second factor (P4-02a); pager changes announced to every screen and the low-battery level
   with the pager list (P4-02b); the device list with live connections, rename, and device changes
-  announced, with every database session in UTC (P4-02c).
-  717 tests (4 skipped without a real install).
+  announced, with every database session in UTC (P4-02c); the Windows services' runtime: the
+  service host that prepares and supervises the server, the watchdog, the DPAPI secret store and
+  the installer's set-up commands with a migration runner that needs no Prisma CLI (P0-16b).
+  1071 tests (26 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -182,7 +184,7 @@ What exists:
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
   start-up page until the server answers, reopens a closed window and reloads a crashed page.
-  14 tests without Electron. Packaging is P0-16c.
+  14 tests without Electron. Packaging is P0-16d.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -199,9 +201,9 @@ Recommended next WPs (dependencies met):
 
 - Phase 7 (P7-01 onwards).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
-- P0-16b Windows services, watchdog and the DPAPI secret store, then P0-16c packaging (prepared
-  on this Mac, checked on the `windows-latest` CI runner; the final check on a real PC needs a
-  person).
+- P0-16c Windows set-up scripts (PowerShell and Pester, running `setup-cli`, see
+  `docs/runbooks/windows-services.md`), then P0-16d packaging (prepared on this Mac, checked on
+  the `windows-latest` CI runner; the final check on a real PC needs a person).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -226,8 +228,9 @@ Recommended next WPs (dependencies met):
 - [x] P0-15 LAN TLS decision and implementation
 - [ ] P0-16 Windows packaging (needs a Windows PC for the final check) [H]
   - [x] P0-16a Electron shell
-  - [ ] P0-16b Windows services, watchdog, DPAPI secret store
-  - [ ] P0-16c Packaging, the windows-latest CI job and the person's checklist [H]
+  - [x] P0-16b The services' runtime and set-up commands (service host, watchdog, DPAPI store)
+  - [ ] P0-16c Windows set-up scripts (PowerShell, Pester)
+  - [ ] P0-16d Packaging, the windows-latest CI job and the person's checklist [H]
 - [x] P0-17a Control Plane service (deployment waits for the hosting account)
 - [x] P0-17b Local server heartbeat client
 - [ ] P0-H1 Pager battery prototype [H]
@@ -651,6 +654,75 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P0-16b):
+
+607. P0-16b was split again: b is what runs on the PC and the set-up commands (in the server,
+     tested without Windows), c the PowerShell set-up scripts, d packaging and the
+     `windows-latest` workflow (was c). See `docs/build/phases/phase-0.md`.
+608. DPAPI goes through Windows PowerShell 5.1's `ProtectedData` (full path, `-EncodedCommand`,
+     values over the pipes), not a native module: nothing to build or ship, and every secret is
+     unprotected in one call per start. Machine scope with our own entropy, because the server's
+     service account, the restore tool the service runs and the installer (an administrator) all
+     read the same secrets; the secrets folder's permissions (P0-16c) keep everyone else out. The
+     files are useless on another PC. `RP_SECRET_STORE=dpapi` is required in production on Windows
+     and refused elsewhere.
+609. The database logins' passwords are secrets in the same store (`db-*-password`, base64url of 32
+     random bytes) but never in a backup, so a restore on a new PC keeps that PC's logins.
+610. A service host sits between WinSW and the server. It turns the installation file and the
+     secrets into the server's environment (no password in any XML). It runs a requested restore
+     with the administrator's login, which the server never gets, applies pending migrations at
+     every start, and then keeps the server running:
+     - a crash is restarted after 0.5 s, backing off to 5 s at most;
+     - a server that answered and then went 20 s without answering is ended and restarted, and so
+       is one that has not answered 60 s after starting;
+     - a server answering 503 for 2 minutes is restarted;
+     - on exit code 75 it prepares again;
+     - it stops the server over IPC, since Windows has no signals.
+
+     Its state file (PIDs, phase, heartbeat) replaces the PID file. The new host ends a server the
+     old one left running.
+
+611. The watchdog is a second line:
+     - it starts the database or server service when it is stopped;
+     - it restarts the server service when the host's heartbeat has been unchanged for 45 s **and**
+       the server does not answer, so a full disk that stops the heartbeat cannot take a working
+       server down;
+     - it restarts a server service stuck starting or stopping for 2 minutes;
+     - it never ends PostgreSQL;
+     - it does nothing while the maintenance flag is set (at most 4 hours, so a crashed installer
+       cannot leave the server down).
+
+     It runs as LocalSystem to control the other services. The server runs as the virtual account
+     `NT SERVICE\RPServer`, PostgreSQL as Network Service. The services are `RPDatabase`,
+     `RPServer` (depends on `RPDatabase`) and `RPWatchdog`, all automatic at boot.
+
+612. Migrations on the PC are applied by our own runner, not the Prisma CLI, so no schema engine is
+     shipped. It reads Prisma's migration folders, takes Prisma's advisory lock, runs each migration
+     in its own transaction and records it in `_prisma_migrations` with Prisma's checksum, so either
+     tool sees the other's work. A failed migration is undone whole; the server then stays stopped
+     and the host tries again every 30 s, saying why in its state file. Migrations missing from the
+     program (a newer database) are logged, not refused.
+613. `rp_migrator`'s sessions start as `rp_owner` (`ALTER ROLE ... SET role`), so `rp_owner` owns
+     every object and holds the default privileges that give `rp_app` each new table. That is the
+     same before and after a restore, which restores as `rp_owner`.
+614. PostgreSQL is set up with:
+     - `initdb --locale=C --encoding=UTF8 --data-checksums`, SCRAM, superuser `rp_admin`; C sorting
+       is stable across ICU versions, and Hindi has no case to fold;
+     - `listen_addresses = 'localhost'`, UTC, and the WAL archiving of P7-05c, in a marked block of
+       `postgresql.conf` that repair replaces;
+     - a `pg_hba.conf` written whole: SCRAM from this PC only, and replication only for `rp_backup`;
+     - port 5432 by default (`write-installation --pg-port` changes it).
+615. Fixed: on the PC the server's login could not read `_prisma_migrations`, so the nightly
+     `pg_dump` (and the backup's schema version) would have failed. The tests never saw it because
+     they connect as a superuser. Migration `20261004200000_migration_history_read` grants SELECT to
+     `rp_app`.
+616. Fixed: `RP_TLS=on`, as every doc writes it, was rejected (only `true`/`1` were accepted).
+     On/off flags now accept `on`/`off` too.
+617. The installation file is `%ProgramData%\RestaurantPlatform\installation.json`; it holds no
+     secret. The install folder's layout, which P0-16d packages, is `node\`, `server\` (with
+     `dist\` and `prisma\migrations\`), `console\`, `postgres\bin\` and `services\` (WinSW). The
+     data folder holds `postgres\`, `secrets\`, `logs\` (WinSW's and the server's) and `run\`.
 
 Decided 2026-10-04 (P0-16a):
 
@@ -3083,6 +3155,96 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P0-16b The services' runtime and set-up commands
+
+Split P0-16b in `phase-0.md`: b is the server side, c the PowerShell scripts, d packaging (was c).
+Built in `apps/server`:
+
+- `auth/dpapi.ts` and `DpapiSecretStore` (`RP_SECRET_STORE=dpapi`): Windows DPAPI through
+  PowerShell's `ProtectedData`, one batch call, exclusive creation through hard links, and the
+  development store's plain `.key` files protected and removed. `replace` serves restores.
+  `INSTALLATION_SECRET_NAMES` holds the database passwords, which backups leave out.
+- `installation/`:
+  - `installation.ts`: the installation file, the paths, the logins, and the environments of the
+    server and of the restore tool;
+  - `postgres-setup.ts`: `initdb`, the managed `postgresql.conf` block, `pg_hba.conf` and
+    `pg_ctl register`'s arguments;
+  - `database-setup.ts`: the logins and the database;
+  - `migrations.ts`: the runner without the Prisma CLI;
+  - `winsw.ts`: the two service definitions;
+  - `setup-cli.ts`: `write-installation`, `secrets`, `postgres-init`, `postgres-register`,
+    `database`, `migrate`, `service-files`, `maintenance`, `status`.
+- `service/`:
+  - `service-host.ts` and `service-host-main.ts`: preparing, then supervising the server;
+  - `health-watch.ts`: when to give up on a running server, and the restart delays;
+  - `health-probe.ts`: the health check over TLS, trusting only the installation's CA;
+  - `host-state.ts`: the state file;
+  - `watchdog.ts` and `watchdog-main.ts`: the second line;
+  - `windows-services.ts`: `sc.exe` and `taskkill`;
+  - `maintenance.ts`: the maintenance flag.
+- `main.ts` stops on the host's IPC message or when the channel closes.
+- Migration `20261004200000_migration_history_read` (decision 615). Boolean flags accept on/off
+  (decision 616).
+- Docs: `docs/runbooks/windows-services.md`; the installer, server and desktop READMEs; the
+  installer sections of `backups.md` and `data-lifecycle.md`.
+
+Tests: server unit 53 new:
+
+- DPAPI store 12 (+1 run on Windows only);
+- installation, PostgreSQL settings, WinSW and the set-up tool 17;
+- health watch, watchdog, `sc.exe` (also a service stuck starting) and the maintenance flag 14;
+- the service host with a stand-in server process 9: crash back within 10 s, hang, 503, exit 75,
+  failing preparation, stop over IPC, forced stop, a leftover server;
+- on/off flags 1.
+
+Integration 10 on a real PostgreSQL 16: `initdb` and its settings; repair; the logins and all 42
+migrations applied as the non-superuser migrator; idempotence; each login's rights; `pg_dump` as
+the server; a later migration's table reaching `rp_app`; a failed migration undone whole.
+
+Checked by hand on this Mac with the built server: set-up tool → `initdb` → logins → 42 migrations
+→ the service host starts the real server over HTTPS in 2 s. A killed server was back in 1 s, and
+SIGINT stopped it cleanly.
+
+Not done here, for P0-16c:
+
+- the PowerShell scripts: folder permissions, `pg_ctl register` through `setup-cli`, WinSW
+  install/refresh, the service accounts, firewall rules, repair and uninstall;
+- deleting the data on uninstall after the Owner's password and second factor (NFR-I02);
+- repairing a PC whose DPAPI key was lost (re-imaged with the data drive kept). The secrets cannot
+  be read there, so the installer must reset the logins through a temporary local `trust` line;
+  the backups then need the recovery key.
+
+Notes for P0-16c:
+
+- Run order: `write-installation`, `secrets`, `postgres-init`, folder permissions, then
+  `postgres-register` and start `RPDatabase`. Then `database`, `migrate`, `service-files`, WinSW
+  `install` (or `refresh` on repair) for `RPServer` and `RPWatchdog`, then start them. Wrap it in
+  `maintenance on` and `maintenance off`.
+- Permissions:
+  - `<data>`: full control for `NT SERVICE\RPServer`;
+  - `<data>\postgres`: full control for Network Service;
+  - `<data>\backups\wal-staging`: written by Network Service, read and deleted by `RPServer`;
+  - `<data>\secrets`: Administrators and `RPServer` only, nothing inherited;
+  - `%ProgramData%\RestaurantPlatform`: writable by Administrators only.
+- Accounts: `sc.exe config RPServer obj= "NT SERVICE\RPServer"`; the watchdog stays LocalSystem.
+- Firewall: inbound TCP on the server's port and the MQTT port, from the staff subnet only
+  (`LocalSubnet` unless the installer is given one, SEC-008).
+- After a restore, the restored database gives PUBLIC its default CONNECT again until
+  `setup-cli database` runs. Only our logins exist, so the risk is small. Run it on repair, or let
+  the restore revoke it.
+- The Windows-only DPAPI round trip (`it.runIf(win32)`) and the Pester tests belong in the
+  `windows-latest` job.
+
+Gotchas:
+
+- `fork` with `execArgv: []` and IPC is how the host runs the server. `child.kill()` on Windows
+  always ends the process abruptly, so a graceful stop has to go over IPC.
+- `@rp/test-postgres` now exports `findPgBin`; rebuild it (`pnpm --filter @rp/test-postgres
+build`) before running the server's integration tests on their own.
+- The server's integration tests connect as a superuser. The new installer test is the only one
+  that runs the server's login as it is on the PC; add checks there when a feature needs a new
+  grant.
 
 ### 2026-10-04: P0-16a Electron shell
 
