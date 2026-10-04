@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ReleaseChannel, ReleaseInfo } from '@rp/contracts/control-plane';
+import type { ReleaseChannel, VendorReleaseView } from '@rp/contracts/control-plane';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { CpError } from '../errors/cp-error.js';
@@ -157,7 +157,7 @@ export class AdminService {
     });
   }
 
-  publishRelease(input: PublishRelease, actor: string): Promise<ReleaseInfo> {
+  publishRelease(input: PublishRelease, actor: string): Promise<VendorReleaseView> {
     return this.releases.publish(input, actor);
   }
 

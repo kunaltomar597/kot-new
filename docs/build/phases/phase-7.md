@@ -116,6 +116,34 @@ Builds on: the offered release saved by the heartbeat (`control_plane.offered_up
 a manager's "Install now" saved by the System page (`updates.install_approval` in `system_meta`,
 P4-04); the update agent reads both.
 
+Split (2026-10-04):
+
+- **P7-04a Rollouts at the Control Plane (UPD-002, UPD-003, UPD-004 flag).** The rules in
+  `@rp/domain`, which are a PC's stable bucket, eligibility, pinning, hotfixes and the halt verdict.
+  On the Control Plane:
+  - a release's rollout by percentage and cohort, which can be paused, resumed or halted;
+  - a PC held at a version;
+  - a hotfix for one PC;
+  - security-critical releases;
+  - install outcomes reported in heartbeats (`updateReport`), and a silent PC after an install
+    counted as a failure;
+  - the rollout halted automatically and the vendor told when failures or errors spike.
+- **P7-04b Release management in the vendor web app (VCP-006).** Each release's rollout and its
+  installs and failures; start, widen, pause, resume or halt; publish with a starting percentage,
+  the security-critical flag, or as a hotfix for one PC; hold a PC at a version from its page.
+- **P7-04c The update agent on the restaurant PC (UPD-004, UPD-005, UPD-007).**
+  - Download in the background over HTTPS and verify it: SHA-256, and Authenticode on Windows.
+  - Install only in the maintenance window or on "Install now", never with open tables unless the
+    release is security-critical and a manager approved.
+  - Before installing: a full backup and an integrity check.
+  - Hand off to the installer (P0-16) and run a health check after.
+  - Automatic rollback of the application and the database.
+  - Report each outcome.
+  - The installer step and the S9 scenario on `windows-latest` wait for P0-16.
+- **P7-04d Phones, tablets and pagers (UPD-001, UPD-006).** EAS Update channels for the phones and
+  tablets, and the in-app APK updater. A component version matrix with every release, and the
+  server's N-1 check of clients. Pager firmware distribution is P2-04b.
+
 ## P7-05 Backup and restore
 
 Requirements: DATA-001 to DATA-005, SEC-007, OI-10.

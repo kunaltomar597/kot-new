@@ -1093,8 +1093,8 @@
     "/v1/vendor/fleet/alerts/{id}/resolve": {
       "post": {
         "operationId": "resolveFleetAlert",
-        "summary": "Close an audit chain alert after looking into it, with what was found",
-        "description": "Only chain alerts: the others close by themselves when the PC reports it is fixed. The PC’s chain then counts from its current head (a restore from backup, say). Audited.",
+        "summary": "Close an audit chain or failed-update alert after looking into it",
+        "description": "Chain alerts and failed updates only: the others close by themselves when the PC reports it is fixed. After a chain alert the PC’s chain counts from its current head (a restore from backup, say); a failed update closes by itself once the PC runs that version, or here when it will not (held at an older one, or replaced). Audited.",
         "tags": ["vendor"],
         "parameters": [
           {
@@ -1153,7 +1153,7 @@
           }
         },
         "x-capability": "SUPPORT_NOTES",
-        "x-requirements": ["AUD-003", "SEC-018"]
+        "x-requirements": ["AUD-003", "SEC-018", "UPD-003"]
       }
     },
     "/v1/vendor/installations/{id}": {
@@ -1872,6 +1872,70 @@
         },
         "x-capability": "LICENCE_REBIND",
         "x-requirements": ["VCP-002", "LIC-004"]
+      }
+    },
+    "/v1/vendor/installations/{id}/pin": {
+      "put": {
+        "operationId": "pinVendorInstallation",
+        "summary": "Hold a PC at a version, or let it follow its channel again",
+        "description": "UPD-002: a held PC is offered that version while it runs an older one, and nothing newer. It never goes back to an older version (migrations go forward only). Audited.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PinInstallationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The installation.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorInstallationView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "RELEASES_MANAGE",
+        "x-requirements": ["UPD-002", "VCP-006", "VCP-001"]
       }
     },
     "/v1/vendor/installations/{id}/remote-settings": {
@@ -2597,7 +2661,7 @@
           "201": {
             "description": "The release.",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/ReleaseInfo" } }
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorReleaseView" } }
             }
           },
           "400": {
@@ -2623,10 +2687,84 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "422": {
+            "description": "A hotfix for a PC that does not exist.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "RELEASES_MANAGE",
         "x-requirements": ["VCP-006", "UPD-002"]
+      }
+    },
+    "/v1/vendor/releases/{id}/rollout": {
+      "put": {
+        "operationId": "updateVendorRollout",
+        "summary": "Widen, narrow, pause, resume or halt a release’s rollout",
+        "description": "UPD-003: PCs keep their place as the share widens; paused or halted, nobody new is offered it, and the PCs already downloading it drop it. Audited with the reason.",
+        "tags": ["vendor"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateRolloutRequestInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The release.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VendorReleaseView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session ended.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The role does not allow this.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such release.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "A cohort PC that does not exist.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "RELEASES_MANAGE",
+        "x-requirements": ["UPD-003", "VCP-006", "VCP-001"]
       }
     },
     "/v1/vendor/remote-settings": {
@@ -4624,7 +4762,7 @@
       },
       "FleetAlertKind": {
         "type": "string",
-        "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH"]
+        "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH", "UPDATE_FAILED"]
       },
       "FleetAlertListResponse": {
         "type": "object",
@@ -5131,6 +5269,9 @@
             "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
           },
           "errorCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "updateReport": {
+            "anyOf": [{ "$ref": "#/components/schemas/UpdateReport" }, { "type": "null" }]
+          },
           "backup": {
             "anyOf": [{ "$ref": "#/components/schemas/HeartbeatBackup" }, { "type": "null" }]
           },
@@ -5279,7 +5420,7 @@
           },
           "nextHeartbeatSeconds": { "type": "integer", "minimum": 60, "maximum": 3600 },
           "update": {
-            "anyOf": [{ "$ref": "#/components/schemas/ReleaseInfo" }, { "type": "null" }]
+            "anyOf": [{ "$ref": "#/components/schemas/ReleaseInfoInput" }, { "type": "null" }]
           },
           "licence": {
             "default": null,
@@ -5711,6 +5852,15 @@
         "required": ["id", "requestedBy", "reason", "requestedAt", "expiresAt"],
         "additionalProperties": false
       },
+      "PinInstallationRequest": {
+        "type": "object",
+        "properties": {
+          "version": { "anyOf": [{ "$ref": "#/components/schemas/SemVer" }, { "type": "null" }] },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["version", "reason"],
+        "additionalProperties": false
+      },
       "PlanListResponse": {
         "type": "object",
         "properties": {
@@ -5828,9 +5978,33 @@
           "notes": {
             "default": null,
             "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }]
+          },
+          "securityCritical": { "default": false, "type": "boolean" },
+          "rolloutPercent": { "default": 100, "type": "integer", "minimum": 0, "maximum": 100 },
+          "targetInstallationId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
           }
         },
-        "required": ["component", "channel", "version", "url", "sha256", "sizeBytes", "notes"],
+        "required": [
+          "component",
+          "channel",
+          "version",
+          "url",
+          "sha256",
+          "sizeBytes",
+          "notes",
+          "securityCritical",
+          "rolloutPercent",
+          "targetInstallationId"
+        ],
         "additionalProperties": false
       },
       "PublishReleaseRequestInput": {
@@ -5848,6 +6022,19 @@
           "notes": {
             "default": null,
             "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }]
+          },
+          "securityCritical": { "default": false, "type": "boolean" },
+          "rolloutPercent": { "default": 100, "type": "integer", "minimum": 0, "maximum": 100 },
+          "targetInstallationId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              { "type": "null" }
+            ]
           }
         },
         "required": ["channel", "version", "url", "sha256", "sizeBytes"],
@@ -5965,7 +6152,38 @@
             "type": "string",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
-          }
+          },
+          "securityCritical": { "default": false, "type": "boolean" }
+        },
+        "required": [
+          "component",
+          "channel",
+          "version",
+          "url",
+          "sha256",
+          "sizeBytes",
+          "notes",
+          "publishedAt",
+          "securityCritical"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseInfoInput": {
+        "type": "object",
+        "properties": {
+          "component": { "$ref": "#/components/schemas/ReleaseComponent" },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "version": { "$ref": "#/components/schemas/SemVer" },
+          "url": { "type": "string", "format": "uri" },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "notes": { "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }] },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "securityCritical": { "default": false, "type": "boolean" }
         },
         "required": [
           "component",
@@ -5976,8 +6194,7 @@
           "sizeBytes",
           "notes",
           "publishedAt"
-        ],
-        "additionalProperties": false
+        ]
       },
       "RemoteSettingDefinition": {
         "type": "object",
@@ -6044,6 +6261,7 @@
         "required": ["code", "installationId", "expiresAt"],
         "additionalProperties": false
       },
+      "RolloutState": { "type": "string", "enum": ["ACTIVE", "PAUSED", "HALTED"] },
       "SemVer": {
         "type": "string",
         "maxLength": 64,
@@ -6312,6 +6530,64 @@
         "required": ["values", "reason"],
         "additionalProperties": false
       },
+      "UpdateReport": {
+        "type": "object",
+        "properties": {
+          "version": { "$ref": "#/components/schemas/SemVer" },
+          "outcome": {
+            "type": "string",
+            "enum": ["INSTALLING", "INSTALLED", "ROLLED_BACK", "FAILED"]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "error": { "anyOf": [{ "type": "string", "maxLength": 300 }, { "type": "null" }] }
+        },
+        "required": ["version", "outcome", "at", "error"],
+        "additionalProperties": false
+      },
+      "UpdateRolloutRequest": {
+        "type": "object",
+        "properties": {
+          "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "state": { "$ref": "#/components/schemas/RolloutState" },
+          "cohort": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["percent", "state", "cohort", "reason"],
+        "additionalProperties": false
+      },
+      "UpdateRolloutRequestInput": {
+        "type": "object",
+        "properties": {
+          "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "state": { "$ref": "#/components/schemas/RolloutState" },
+          "cohort": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["percent", "state", "reason"],
+        "additionalProperties": false
+      },
       "UpdateVendorUserRequest": {
         "type": "object",
         "properties": {
@@ -6356,6 +6632,16 @@
         },
         "required": ["channel", "update"],
         "additionalProperties": false
+      },
+      "UpdatesResponseInput": {
+        "type": "object",
+        "properties": {
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "update": {
+            "anyOf": [{ "$ref": "#/components/schemas/ReleaseInfoInput" }, { "type": "null" }]
+          }
+        },
+        "required": ["channel", "update"]
       },
       "VendorAccessReviewRequest": {
         "type": "object",
@@ -6545,6 +6831,69 @@
           "version": { "type": ["string", "null"] },
           "licenceState": {
             "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          },
+          "pinnedVersion": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/SemVer" }, { "type": "null" }]
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "status",
+          "channel",
+          "enrolledAt",
+          "lastSeenAt",
+          "version",
+          "licenceState",
+          "pinnedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "VendorInstallationViewInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "ACTIVE", "REVOKED"] },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "enrolledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "lastSeenAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "version": { "type": ["string", "null"] },
+          "licenceState": {
+            "anyOf": [{ "$ref": "#/components/schemas/LicenceState" }, { "type": "null" }]
+          },
+          "pinnedVersion": {
+            "default": null,
+            "anyOf": [{ "$ref": "#/components/schemas/SemVer" }, { "type": "null" }]
           }
         },
         "required": [
@@ -6557,8 +6906,7 @@
           "lastSeenAt",
           "version",
           "licenceState"
-        ],
-        "additionalProperties": false
+        ]
       },
       "VendorInvoiceListResponse": {
         "type": "object",
@@ -6751,10 +7099,227 @@
       "VendorReleaseListResponse": {
         "type": "object",
         "properties": {
-          "releases": { "type": "array", "items": { "$ref": "#/components/schemas/ReleaseInfo" } }
+          "releases": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorReleaseView" }
+          }
         },
         "required": ["releases"],
         "additionalProperties": false
+      },
+      "VendorReleaseListResponseInput": {
+        "type": "object",
+        "properties": {
+          "releases": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VendorReleaseViewInput" }
+          }
+        },
+        "required": ["releases"]
+      },
+      "VendorReleaseParams": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "VendorReleaseView": {
+        "type": "object",
+        "properties": {
+          "component": { "$ref": "#/components/schemas/ReleaseComponent" },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "version": { "$ref": "#/components/schemas/SemVer" },
+          "url": { "type": "string", "format": "uri" },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "notes": { "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }] },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "securityCritical": { "default": false, "type": "boolean" },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "rollout": {
+            "type": "object",
+            "properties": {
+              "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "state": { "$ref": "#/components/schemas/RolloutState" },
+              "cohort": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"],
+                  "additionalProperties": false
+                }
+              },
+              "haltReason": { "type": ["string", "null"] },
+              "changedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": ["percent", "state", "cohort", "haltReason", "changedAt"],
+            "additionalProperties": false
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "installs": {
+            "type": "object",
+            "properties": {
+              "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "installed": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "failures": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "errorSpikes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["attempts", "installed", "failures", "errorSpikes"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "component",
+          "channel",
+          "version",
+          "url",
+          "sha256",
+          "sizeBytes",
+          "notes",
+          "publishedAt",
+          "securityCritical",
+          "id",
+          "rollout",
+          "target",
+          "installs"
+        ],
+        "additionalProperties": false
+      },
+      "VendorReleaseViewInput": {
+        "type": "object",
+        "properties": {
+          "component": { "$ref": "#/components/schemas/ReleaseComponent" },
+          "channel": { "$ref": "#/components/schemas/ReleaseChannel" },
+          "version": { "$ref": "#/components/schemas/SemVer" },
+          "url": { "type": "string", "format": "uri" },
+          "sha256": { "$ref": "#/components/schemas/Sha256Hex" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "notes": { "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }] },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "securityCritical": { "default": false, "type": "boolean" },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "rollout": {
+            "type": "object",
+            "properties": {
+              "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "state": { "$ref": "#/components/schemas/RolloutState" },
+              "cohort": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"]
+                }
+              },
+              "haltReason": { "type": ["string", "null"] },
+              "changedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": ["percent", "state", "cohort", "haltReason", "changedAt"]
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"]
+              },
+              { "type": "null" }
+            ]
+          },
+          "installs": {
+            "type": "object",
+            "properties": {
+              "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "installed": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "failures": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "errorSpikes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["attempts", "installed", "failures", "errorSpikes"]
+          }
+        },
+        "required": [
+          "component",
+          "channel",
+          "version",
+          "url",
+          "sha256",
+          "sizeBytes",
+          "notes",
+          "publishedAt",
+          "id",
+          "rollout",
+          "target",
+          "installs"
+        ]
       },
       "VendorRole": {
         "type": "string",
@@ -6934,7 +7499,7 @@
           },
           "installationList": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/VendorInstallationView" }
+            "items": { "$ref": "#/components/schemas/VendorInstallationViewInput" }
           }
         },
         "required": [

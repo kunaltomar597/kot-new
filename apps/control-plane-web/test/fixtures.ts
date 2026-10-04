@@ -57,6 +57,7 @@ export function installation(
     lastSeenAt: '2026-10-02T03:55:00.000Z',
     version: '1.4.0',
     licenceState: 'ACTIVE',
+    pinnedVersion: null,
     ...overrides,
   };
 }

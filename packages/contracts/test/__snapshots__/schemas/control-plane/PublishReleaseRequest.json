@@ -15,6 +15,19 @@
       "notes": {
         "default": null,
         "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }]
+      },
+      "securityCritical": { "default": false, "type": "boolean" },
+      "rolloutPercent": { "default": 100, "type": "integer", "minimum": 0, "maximum": 100 },
+      "targetInstallationId": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          { "type": "null" }
+        ]
       }
     },
     "required": ["channel", "version", "url", "sha256", "sizeBytes"],
@@ -36,9 +49,33 @@
       "notes": {
         "default": null,
         "anyOf": [{ "type": "string", "maxLength": 2000 }, { "type": "null" }]
+      },
+      "securityCritical": { "default": false, "type": "boolean" },
+      "rolloutPercent": { "default": 100, "type": "integer", "minimum": 0, "maximum": 100 },
+      "targetInstallationId": {
+        "default": null,
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          { "type": "null" }
+        ]
       }
     },
-    "required": ["component", "channel", "version", "url", "sha256", "sizeBytes", "notes"],
+    "required": [
+      "component",
+      "channel",
+      "version",
+      "url",
+      "sha256",
+      "sizeBytes",
+      "notes",
+      "securityCritical",
+      "rolloutPercent",
+      "targetInstallationId"
+    ],
     "additionalProperties": false
   }
 }

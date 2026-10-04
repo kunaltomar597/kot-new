@@ -26,5 +26,16 @@ export function alertDetail(alert: FleetAlertView, t: Translator): string {
             : t('vendorApp.fleet.detail.rolledBack', { sequence });
       return details.byAuditCheck === true ? t('vendorApp.fleet.detail.byCheck', { text }) : text;
     }
+    case 'UPDATE_FAILED': {
+      const version = typeof details.version === 'string' ? details.version : '?';
+      const outcome =
+        details.outcome === 'ROLLED_BACK' || details.outcome === 'SILENT'
+          ? details.outcome
+          : 'FAILED';
+      const text = t(`vendorApp.fleet.detail.update.${outcome}`, { version });
+      return typeof details.error === 'string'
+        ? t('vendorApp.fleet.detail.updateWithError', { text, error: details.error })
+        : text;
+    }
   }
 }

@@ -57,6 +57,7 @@ function installationView(installation: InstallationRow): VendorInstallationView
     lastSeenAt: installation.lastSeenAt?.toISOString() ?? null,
     version: installedVersion(installation.lastHeartbeat),
     licenceState: installation.licence?.state ?? null,
+    pinnedVersion: installation.pinnedVersion,
   };
 }
 

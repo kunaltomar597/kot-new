@@ -35,6 +35,7 @@ const release = (version: string): ReleaseInfo => ({
   sizeBytes: 120_000_000,
   notes: 'Faster bills.',
   publishedAt: '2026-09-30T10:00:00.000Z',
+  securityCritical: false,
 });
 
 const server = () => request(httpServer(app));

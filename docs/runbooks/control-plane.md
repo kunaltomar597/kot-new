@@ -230,10 +230,42 @@ cli release:publish --channel PILOT --version 1.3.0-rc.1 \
 ```
 
 - Pilot restaurants follow `PILOT`, everyone else `STABLE` (UPD-002). A version can be
-  published once per channel.
-- Installations are offered the newest version on their channel that is newer than theirs, at
-  their next heartbeat.
-- Pinning single restaurants, staged rollout and halting come with P7-04.
+  published once per channel. The CLI publishes to every PC of the channel at once; the web app
+  (P7-04b) can start with a share.
+- A PC is offered, at its next heartbeat, the newest release newer than its own that the rollout
+  reaches. It is never offered an older version: migrations only go forward (UPD-005).
+
+### Staged rollout (UPD-003)
+
+Each release has a rollout: a percentage of the channel's PCs, plus a cohort of PCs that get it
+whatever the percentage (the pilot restaurants). The rollout is ACTIVE, PAUSED or HALTED.
+
+- **Which PCs.** Every PC has a fixed place from 0 to 99 for each release. Widening from 10 % to
+  30 % keeps the first 10 % and adds the next 20 %.
+- **Pausing or halting.** Either one stops new offers. PCs that are still downloading drop the
+  release at their next heartbeat. Halting needs a reason, which the release then shows.
+- **How installs go.** The PCs report each install: started, installed (after the health check),
+  rolled back, or failed. A PC that started and has sent no heartbeat for
+  `CP_ROLLOUT_SILENT_MINUTES` (45) counts as failed. More than `CP_ROLLOUT_ERROR_SPIKE` (100)
+  server errors in the day after an install count as an error spike.
+- **Failed installs.** Each one opens an "Update failed" fleet alert for its PC. The alert closes
+  when the PC runs that version or a newer one. Support can also close it with a reason, for
+  example when the PC was replaced.
+- **Automatic halt.** The rollout halts by itself once at least `CP_ROLLOUT_MIN_FAILURES` (2) of
+  its installs failed or spiked, and they are at least `CP_ROLLOUT_MAX_FAILURE_PERCENT` (20 %) of
+  those that installed it. This is audited as `release.rollout_halted` by `system:rollout`.
+- **After a halt.** Look at the failed PCs' alerts and diagnostics. Publish a fixed version, then
+  start its rollout. A halted release is never offered again unless resumed.
+
+### One restaurant (UPD-002)
+
+- **Hold a PC at a version** from its page. It is offered that version while it runs an older one,
+  whatever the rollout, and nothing newer. Release the hold to let it follow its channel again.
+- **A hotfix** is a release published for one PC only. That PC gets it ahead of its channel's
+  releases. Give it a pre-release version above the PC's own, for example `1.4.1-hotfix.1` for a
+  PC on 1.4.0.
+- **Security fixes.** A release marked security-critical (UPD-004) may install while tables are
+  open, once a manager approves it on the PC.
 
 ## Disconnecting an installation
 

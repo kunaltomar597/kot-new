@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareVersions, parseVersion } from '../../src/releases/semver.js';
+import { compareVersions, parseVersion } from '../src/semver.js';
 
 function compare(a: string, b: string): number {
   const [x, y] = [parseVersion(a), parseVersion(b)];

@@ -4417,6 +4417,7 @@ export const en = {
         DISK_FULL: 'Disk full',
         BACKUP_FAILED: 'Backup failed',
         AUDIT_CHAIN_MISMATCH: 'Audit log changed',
+        UPDATE_FAILED: 'Update failed',
       },
       detail: {
         offline: 'Silent for {minutes} minutes of opening hours',
@@ -4427,6 +4428,12 @@ export const en = {
         rewritten: 'Entry {sequence} was changed',
         emptied: 'The log was emptied',
         byCheck: '{text} (found by a check)',
+        update: {
+          ROLLED_BACK: 'The update to {version} failed its health check and was rolled back',
+          FAILED: 'The update to {version} did not start',
+          SILENT: 'Silent since it started installing {version}',
+        },
+        updateWithError: '{text}: {error}',
       },
     },
     remote: {

@@ -65,10 +65,14 @@ export const FLEET_ALERT_KINDS = [
   'DISK_FULL',
   'BACKUP_FAILED',
   'AUDIT_CHAIN_MISMATCH',
+  'UPDATE_FAILED',
 ] as const;
 export type FleetAlertKind = (typeof FLEET_ALERT_KINDS)[number];
 
-/** Alerts the Control Plane opens and closes by itself; a chain alert needs a person. */
+/**
+ * Alerts opened and closed from each heartbeat's state; a chain alert needs a person. A failed
+ * update (P7-04a) is opened by the rollout and closes when the PC runs that version or a newer one.
+ */
 export const SELF_RESOLVING_ALERTS: readonly FleetAlertKind[] = [
   'OFFLINE',
   'DISK_FULL',

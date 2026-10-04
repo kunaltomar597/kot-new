@@ -80,6 +80,17 @@
                 },
                 { "type": "null" }
               ]
+            },
+            "pinnedVersion": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                },
+                { "type": "null" }
+              ]
             }
           },
           "required": [
@@ -203,6 +214,17 @@
                 },
                 { "type": "null" }
               ]
+            },
+            "pinnedVersion": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                },
+                { "type": "null" }
+              ]
             }
           },
           "required": [
@@ -214,7 +236,8 @@
             "enrolledAt",
             "lastSeenAt",
             "version",
-            "licenceState"
+            "licenceState",
+            "pinnedVersion"
           ],
           "additionalProperties": false
         }

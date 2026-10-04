@@ -20,6 +20,8 @@ export function alertText(alert: FleetAlertView): string {
       return `${where}: the latest backup failed${typeof details.error === 'string' ? `: ${details.error}` : ''}.`;
     case 'AUDIT_CHAIN_MISMATCH':
       return `${where}: the local audit log no longer matches what it reported (${shown(details.reason)} at entry ${shown(details.sequence)}). Look into it before closing.`;
+    case 'UPDATE_FAILED':
+      return `${where}: the update to ${shown(details.version)} ${UPDATE_OUTCOME[String(details.outcome)] ?? 'failed'}${typeof details.error === 'string' ? `: ${details.error}` : ''}.`;
   }
 }
 
@@ -28,4 +30,11 @@ const RESOLVED = {
   DISK_FULL: 'disk use back below the threshold',
   BACKUP_FAILED: 'a backup succeeded',
   AUDIT_CHAIN_MISMATCH: 'closed',
+  UPDATE_FAILED: 'the PC runs that version now',
 } as const;
+
+const UPDATE_OUTCOME: Readonly<Record<string, string>> = {
+  ROLLED_BACK: 'failed its health check and was rolled back',
+  FAILED: 'did not start',
+  SILENT: 'went silent after it started installing',
+};

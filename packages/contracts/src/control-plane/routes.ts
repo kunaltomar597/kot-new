@@ -9,7 +9,6 @@ import {
   MenuExtractionParams,
   MenuExtractionRequest,
   MenuExtractionView,
-  ReleaseInfo,
   UpdatesQuery,
   UpdatesResponse,
 } from './schemas.js';
@@ -47,6 +46,7 @@ import {
   AuditQuery,
   CreateInstallationRequest,
   LicenceChangeRequest,
+  PinInstallationRequest,
   PublishReleaseRequest,
   ReactivationCodeRequest,
   ReactivationCodeView,
@@ -59,7 +59,10 @@ import {
   VendorInstallationParams,
   VendorInstallationView,
   VendorLicenceView,
+  UpdateRolloutRequest,
   VendorReleaseListResponse,
+  VendorReleaseParams,
+  VendorReleaseView,
   VendorTenantDetail,
   VendorTenantListResponse,
   VendorTenantParams,
@@ -649,9 +652,47 @@ export const CONTROL_PLANE_ROUTES = [
     capability: 'RELEASES_MANAGE',
     request: { body: PublishReleaseRequest },
     responses: {
-      201: { description: 'The release.', schema: ReleaseInfo },
+      201: { description: 'The release.', schema: VendorReleaseView },
       ...vendorErrors,
       409: { description: 'That version is already published.', schema: ApiError },
+      422: { description: 'A hotfix for a PC that does not exist.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateVendorRollout',
+    method: 'PUT',
+    path: '/v1/vendor/releases/:id/rollout',
+    summary: 'Widen, narrow, pause, resume or halt a release’s rollout',
+    description:
+      'UPD-003: PCs keep their place as the share widens; paused or halted, nobody new is ' +
+      'offered it, and the PCs already downloading it drop it. Audited with the reason.',
+    tags: ['vendor'],
+    requirements: ['UPD-003', 'VCP-006', 'VCP-001'],
+    capability: 'RELEASES_MANAGE',
+    request: { params: VendorReleaseParams, body: UpdateRolloutRequest },
+    responses: {
+      200: { description: 'The release.', schema: VendorReleaseView },
+      ...vendorErrors,
+      404: { description: 'No such release.', schema: ApiError },
+      422: { description: 'A cohort PC that does not exist.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'pinVendorInstallation',
+    method: 'PUT',
+    path: '/v1/vendor/installations/:id/pin',
+    summary: 'Hold a PC at a version, or let it follow its channel again',
+    description:
+      'UPD-002: a held PC is offered that version while it runs an older one, and nothing newer. ' +
+      'It never goes back to an older version (migrations go forward only). Audited.',
+    tags: ['vendor'],
+    requirements: ['UPD-002', 'VCP-006', 'VCP-001'],
+    capability: 'RELEASES_MANAGE',
+    request: { params: VendorInstallationParams, body: PinInstallationRequest },
+    responses: {
+      200: { description: 'The installation.', schema: VendorInstallationView },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
     },
   },
   {
@@ -919,12 +960,14 @@ export const CONTROL_PLANE_ROUTES = [
     operationId: 'resolveFleetAlert',
     method: 'POST',
     path: '/v1/vendor/fleet/alerts/:id/resolve',
-    summary: 'Close an audit chain alert after looking into it, with what was found',
+    summary: 'Close an audit chain or failed-update alert after looking into it',
     description:
-      'Only chain alerts: the others close by themselves when the PC reports it is fixed. The ' +
-      'PC’s chain then counts from its current head (a restore from backup, say). Audited.',
+      'Chain alerts and failed updates only: the others close by themselves when the PC reports ' +
+      'it is fixed. After a chain alert the PC’s chain counts from its current head (a restore ' +
+      'from backup, say); a failed update closes by itself once the PC runs that version, or ' +
+      'here when it will not (held at an older one, or replaced). Audited.',
     tags: ['vendor'],
-    requirements: ['AUD-003', 'SEC-018'],
+    requirements: ['AUD-003', 'SEC-018', 'UPD-003'],
     capability: 'SUPPORT_NOTES',
     request: { params: FleetAlertParams, body: ReasonRequest },
     responses: {
