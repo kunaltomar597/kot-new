@@ -9,6 +9,8 @@ import {
   type DeclineDiagnosticsRequest,
   type DiagnosticsUploadRequest,
   DiagnosticsUploadResponse,
+  type DigitalBillRequest,
+  DigitalBillView,
   CONTROL_PLANE_ERRORS,
   EnrolResponse,
   enrolmentProofMessage,
@@ -104,6 +106,17 @@ export class ControlPlaneClient {
       JSON.stringify(request),
       MenuExtractionView,
       UPLOAD_TIMEOUT_MS,
+    );
+  }
+
+  /** BILL-012: a settled bill for the diner, sent through the vendor's provider (P7-09b). */
+  sendDigitalBill(installationId: string, bill: DigitalBillRequest): Promise<DigitalBillView> {
+    return this.signed(
+      installationId,
+      'POST',
+      '/v1/digital-bills',
+      JSON.stringify(bill),
+      DigitalBillView,
     );
   }
 

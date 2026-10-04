@@ -443,6 +443,16 @@ export const SETTINGS = [
     requirements: ['BILL-008'],
   }),
   setting({
+    key: 'bills.digitalBillChannel',
+    schema: z.enum(['OFF', 'WHATSAPP', 'SMS']),
+    defaultValue: 'OFF',
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'Send a settled bill to the diner on WhatsApp or SMS when they gave their number with consent.',
+    requirements: ['BILL-012', 'BILL-011'],
+  }),
+  setting({
     key: 'bills.hostedCopyDays',
     schema: int(1, 365),
     defaultValue: 30,

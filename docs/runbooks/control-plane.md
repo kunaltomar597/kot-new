@@ -194,6 +194,20 @@ What happens to each bill:
 - **Daily limit.** At most `CP_DIGITAL_BILL_DAILY_LIMIT` bills a restaurant a day (default 3,000),
   because the vendor pays per message.
 
+On the restaurant PC (P7-09b):
+
+- **Turning it on.** A manager sets Settings, then Bills, "Digital bills" to WhatsApp. It is off by
+  default.
+- **Sending.** A bill is queued by itself when it is settled, if the diner's mobile number is in
+  the customer details with the consent box ticked (BILL-011). The cashier can send it again from
+  the bill.
+- **Waiting and giving up.** The PC sends within seconds. While the vendor or WhatsApp cannot be
+  reached, it tries again after 1, 5, 15 and 60 minutes, then every 3 hours. A day after the bill
+  was queued it gives up. The bill shows "Not sent" and the reason.
+- **The number.** It is cleared on the PC once the bill is sent or given up; only the masked
+  number stays. Erasing a diner's number (DATA-011) also stops a bill still waiting to go to it.
+- **Audit.** `DIGITAL_BILL_QUEUED`, without the number.
+
 When a restaurant says bills are not arriving:
 
 1. Look up `digital_bills` for its installation. The status, `error` and `retryable` say what

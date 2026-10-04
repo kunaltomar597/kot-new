@@ -30,6 +30,7 @@ const year = (table: string, where: string = IN_YEAR): YearTable => ({
 
 export const YEAR_TABLES: readonly YearTable[] = [
   year('payments', `invoice_id IN (${INVOICES})`),
+  year('digital_bills', `invoice_id IN (${INVOICES})`),
   year('tax_lines', `invoice_id IN (${INVOICES})`),
   year('invoice_lines', `invoice_id IN (${INVOICES})`),
   year('discounts', `invoice_id IN (${INVOICES}) OR (invoice_id IS NULL AND ${IN_YEAR})`),

@@ -7,6 +7,7 @@ import { useT } from '../app/i18n.js';
 import { messageOf } from '../app/messages.js';
 import { useLive } from '../app/use-live.js';
 import { CustomerDialog } from './CustomerDialog.js';
+import { DigitalBillLine } from './DigitalBillLine.js';
 import { DiscountDialog } from './DiscountDialog.js';
 import { OverrideCancelled, useOverride } from './override.js';
 import { ReasonDialog } from './ReasonDialog.js';
@@ -218,6 +219,10 @@ export function BillScreen({
                         >
                           {t('billing.void')}
                         </Button>
+                        <DigitalBillLine
+                          invoiceId={invoice.id}
+                          invoiceNumber={invoice.invoiceNumber}
+                        />
                       </>
                     )}
                   </li>
