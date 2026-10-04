@@ -106,6 +106,7 @@ import {
   VendorUserParams,
   VendorUserView,
 } from './vendor.js';
+import { DigitalBillPageParams, DigitalBillRequest, DigitalBillView } from './digital-bills.js';
 
 /**
  * Who may call a Control Plane endpoint: `INSTALLATION` needs a request signed by an enrolled
@@ -237,6 +238,47 @@ export const CONTROL_PLANE_ROUTES = [
       200: { description: 'The job.', schema: MenuExtractionView },
       ...signedErrors,
       404: { description: 'No such job for this restaurant.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'sendDigitalBill',
+    method: 'POST',
+    path: '/v1/digital-bills',
+    summary: 'Send a settled bill to the diner on WhatsApp or SMS',
+    description:
+      'BILL-012, P7-09a: only with the diner’s consent, which the restaurant PC checks before it ' +
+      'asks. Sent through the vendor’s provider account (SEC-002) with a link to the bill as ' +
+      'printed, kept until `keepDays` have passed. The full number is not stored. The same `id` ' +
+      'again answers with the first result and never sends twice; a FAILED one is tried again.',
+    tags: ['billing'],
+    requirements: ['BILL-012', 'BILL-011', 'SEC-002'],
+    capability: 'INSTALLATION',
+    request: { body: DigitalBillRequest },
+    responses: {
+      200: { description: 'Sent, or why not.', schema: DigitalBillView },
+      ...signedErrors,
+      429: { description: 'The daily number of digital bills is used up.', schema: ApiError },
+      503: { description: 'This channel is not set up by the vendor.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getDigitalBillPage',
+    method: 'GET',
+    path: '/v1/bills/:token',
+    summary: 'The bill behind a digital bill’s link, as a web page',
+    description:
+      'Public because the diner opens it from the message: the 256-bit token in the link is the ' +
+      'credential, and only its hash is stored. An HTML page with no scripts; 410 once the copy ' +
+      'has expired and been deleted. Not indexed by search engines.',
+    tags: ['billing'],
+    requirements: ['BILL-012'],
+    capability: 'PUBLIC',
+    request: { params: DigitalBillPageParams },
+    responses: {
+      200: { description: 'The bill, as a web page (text/html).' },
+      404: { description: 'No such link (text/html).' },
+      410: { description: 'The bill’s copy has expired (text/html).' },
+      429: { description: 'Too many pages from one address.' },
     },
   },
   {

@@ -13,6 +13,7 @@
   ],
   "tags": [
     { "name": "backups" },
+    { "name": "billing" },
     { "name": "diagnostics" },
     { "name": "installations" },
     { "name": "onboarding" },
@@ -70,6 +71,30 @@
         },
         "x-capability": "INSTALLATION",
         "x-requirements": ["DATA-003", "SEC-007"]
+      }
+    },
+    "/v1/bills/{token}": {
+      "get": {
+        "operationId": "getDigitalBillPage",
+        "summary": "The bill behind a digital bill’s link, as a web page",
+        "description": "Public because the diner opens it from the message: the 256-bit token in the link is the credential, and only its hash is stored. An HTML page with no scripts; 410 once the copy has expired and been deleted. Not indexed by search engines.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "The bill, as a web page (text/html)." },
+          "404": { "description": "No such link (text/html)." },
+          "410": { "description": "The bill’s copy has expired (text/html)." },
+          "429": { "description": "Too many pages from one address." }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["BILL-012"]
       }
     },
     "/v1/cloud-backups": {
@@ -443,6 +468,60 @@
         },
         "x-capability": "INSTALLATION",
         "x-requirements": ["UPD-008"]
+      }
+    },
+    "/v1/digital-bills": {
+      "post": {
+        "operationId": "sendDigitalBill",
+        "summary": "Send a settled bill to the diner on WhatsApp or SMS",
+        "description": "BILL-012, P7-09a: only with the diner’s consent, which the restaurant PC checks before it asks. Sent through the vendor’s provider account (SEC-002) with a link to the bill as printed, kept until `keepDays` have passed. The full number is not stored. The same `id` again answers with the first result and never sends twice; a FAILED one is tried again.",
+        "tags": ["billing"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/DigitalBillRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sent, or why not.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DigitalBillView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid signature, unknown installation, reused nonce, or a clock outside the window (`CLOCK_SKEW`, with `details.serverTime`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "The daily number of digital bills is used up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "This channel is not set up by the vendor.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "INSTALLATION",
+        "x-requirements": ["BILL-012", "BILL-011", "SEC-002"]
       }
     },
     "/v1/enrolments": {
@@ -4383,6 +4462,95 @@
         "required": ["id", "receivedAt"],
         "additionalProperties": false
       },
+      "DigitalBillChannel": { "type": "string", "enum": ["WHATSAPP", "SMS"] },
+      "DigitalBillPageParams": {
+        "type": "object",
+        "properties": { "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" } },
+        "required": ["token"],
+        "additionalProperties": false
+      },
+      "DigitalBillRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "channel": { "$ref": "#/components/schemas/DigitalBillChannel" },
+          "phone": { "$ref": "#/components/schemas/IndianMobile" },
+          "restaurantName": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "invoiceNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "invoiceDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "grandTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 600,
+            "type": "array",
+            "items": { "type": "string", "maxLength": 80 }
+          },
+          "keepDays": { "type": "integer", "minimum": 1, "maximum": 365 }
+        },
+        "required": [
+          "id",
+          "channel",
+          "phone",
+          "restaurantName",
+          "invoiceNumber",
+          "invoiceDate",
+          "grandTotal",
+          "lines",
+          "keepDays"
+        ],
+        "additionalProperties": false
+      },
+      "DigitalBillView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "channel": { "$ref": "#/components/schemas/DigitalBillChannel" },
+          "phone": { "type": "string" },
+          "status": { "type": "string", "enum": ["SENT", "FAILED"] },
+          "link": { "anyOf": [{ "type": "string", "format": "uri" }, { "type": "null" }] },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "sentAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "error": { "type": ["string", "null"] },
+          "retryable": { "type": "boolean" }
+        },
+        "required": [
+          "id",
+          "channel",
+          "phone",
+          "status",
+          "link",
+          "expiresAt",
+          "sentAt",
+          "error",
+          "retryable"
+        ],
+        "additionalProperties": false
+      },
       "EnrolRequest": {
         "type": "object",
         "properties": {
@@ -5171,6 +5339,7 @@
         },
         "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
       },
+      "IndianMobile": { "type": "string", "pattern": "^\\+91[6-9]\\d{9}$" },
       "InstallationRemoteSettingsView": {
         "type": "object",
         "properties": {

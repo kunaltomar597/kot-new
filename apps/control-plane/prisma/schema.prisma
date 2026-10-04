@@ -293,6 +293,7 @@ model Installation {
   diagnosticsRequests DiagnosticsRequest[]
   cloudBackups        CloudBackup[]
   backupKeyEscrows    BackupKeyEscrow[]
+  digitalBills        DigitalBill[]
   restoreCodes        RestoreCode[]
 
   @@index([tenantId])
@@ -641,4 +642,41 @@ model RestoreCode {
 
   @@index([installationId, issuedAt])
   @@map("restore_codes")
+}
+
+/// A digital bill sent for a restaurant (BILL-012, P7-09a): the bill as printed behind a link until
+/// it expires, then deleted. Only the number's last four digits are kept.
+model DigitalBill {
+  id                String    @id @db.Uuid
+  installationId    String    @map("installation_id") @db.Uuid
+  /// The PC's id for the send: the same one again never sends twice.
+  requestId         String    @map("request_id") @db.Uuid
+  channel           String
+  /// `+91 ******3210`.
+  phoneMasked       String    @map("phone_masked")
+  /// SHA-256 of the link's token; the token itself is derived and never stored.
+  tokenHash         String    @unique @map("token_hash")
+  restaurantName    String    @map("restaurant_name")
+  invoiceNumber     String    @map("invoice_number")
+  invoiceDate       DateTime  @map("invoice_date") @db.Date
+  grandTotal        Int       @map("grand_total")
+  /// The bill as printed, line by line; null once expired.
+  lines             Json?
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  /// SENT or FAILED.
+  status            String
+  providerMessageId String?   @map("provider_message_id")
+  error             String?
+  retryable         Boolean   @default(false)
+  attempts          Int       @default(1)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  sentAt            DateTime? @map("sent_at") @db.Timestamptz(3)
+  purgedAt          DateTime? @map("purged_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@unique([installationId, requestId])
+  @@index([installationId, createdAt])
+  @@index([expiresAt])
+  @@map("digital_bills")
 }

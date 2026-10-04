@@ -173,6 +173,38 @@ To switch AI menu import off for one restaurant while the AI provider has troubl
 `features.aiMenuImport` to Off on that PC. Its managers then see "Reading menus from photos is
 switched off by the vendor for now" and can still use the Excel template.
 
+## Digital bills (BILL-012)
+
+A restaurant PC asks the Control Plane to send a settled bill to the diner on WhatsApp, only after
+the diner gave consent on the bill. The vendor's WhatsApp number sends it with the approved
+`digital_bill` template. Its token is in the secret manager and never on a PC (SEC-002). Setting
+it up: `manual-tasks/28-digital-bills.md`.
+
+What happens to each bill:
+
+- **The link.** The message links to the bill as printed at
+  `<CP_PUBLIC_URL>/v1/bills/<token>`. The page has no scripts, is not indexed and is not cached.
+- **The token.** It is derived from `CP_DIGITAL_BILL_KEY`. Only its hash is stored, so a copy of
+  the database opens no bill.
+- **Expiry.** The link expires after the restaurant's `bills.hostedCopyDays` (default 30). The
+  hourly sweep then deletes the bill's lines, and the page answers "no longer available".
+- **The number.** Only its last four digits are stored (`+91 ******3210`).
+- **No duplicates.** Each send is the PC's id, so the same id again never sends a second message.
+  A failed send is tried again when the PC asks again: it backs off, for up to a day.
+- **Daily limit.** At most `CP_DIGITAL_BILL_DAILY_LIMIT` bills a restaurant a day (default 3,000),
+  because the vendor pays per message.
+
+When a restaurant says bills are not arriving:
+
+1. Look up `digital_bills` for its installation. The status, `error` and `retryable` say what
+   WhatsApp answered.
+2. Read the error:
+   - a number WhatsApp cannot deliver to (131026 and others) is the diner's, and only the printed
+     bill helps;
+   - "refused the message (HTTP 401, 190)" is the vendor's token, which has expired or been
+     revoked;
+   - an HTTP 132xxx error is the template: it was paused, or its variables changed.
+
 ## Publishing a release
 
 The release pipeline (P7-04) publishes signed installers. By hand:

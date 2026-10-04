@@ -26,6 +26,9 @@ import { BackupEscrowService, ESCROW_KEY } from './cloud-backups/backup-escrow.s
 import { escrowKeySourceFor } from './cloud-backups/escrow-keys.js';
 import { ALERT_NOTIFIER, alertNotifierFor } from './fleet/alert-notifier.js';
 import { DiagnosticsController } from './diagnostics/diagnostics.controller.js';
+import { BILL_SENDERS, billSendersFor } from './digital-bills/bill-sender.js';
+import { DigitalBillsController } from './digital-bills/digital-bills.controller.js';
+import { DigitalBillsService } from './digital-bills/digital-bills.service.js';
 import { DiagnosticsService } from './diagnostics/diagnostics.service.js';
 import { FleetController } from './fleet/fleet.controller.js';
 import { FleetService } from './fleet/fleet.service.js';
@@ -118,6 +121,7 @@ export class ControlPlaneModule {
         DiagnosticsController,
         RemoteSettingsController,
         CloudBackupsController,
+        DigitalBillsController,
       ],
       providers: [
         { provide: CP_CONFIG, useValue: config },
@@ -146,6 +150,8 @@ export class ControlPlaneModule {
         AdminService,
         MenuExtractionsService,
         { provide: MENU_EXTRACTOR, useValue: menuExtractorFor(config) },
+        DigitalBillsService,
+        { provide: BILL_SENDERS, useValue: billSendersFor(config) },
         { provide: APP_GUARD, useClass: InstallationGuard },
         { provide: APP_GUARD, useClass: VendorGuard },
         { provide: CP_ERROR_REPORTER, useValue: errorReporterFor(config) },

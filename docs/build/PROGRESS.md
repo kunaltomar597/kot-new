@@ -384,6 +384,8 @@ Recommended next WPs (dependencies met):
   - [x] P7-08c Remote configuration
   - [x] P7-08d Error reporting
 - [ ] P7-09 Digital bills
+  - [x] P7-09a Digital bills at the Control Plane
+  - [ ] P7-09b Digital bills on the restaurant PC
 - [ ] P7-10 Phase 7 exit test
 
 ### Phase 8: Hardening and pilot
@@ -636,6 +638,27 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P7-09a):
+
+583. Digital bills go through the Control Plane, with the vendor's provider account: its keys
+     never reach a PC (SEC-002), one WhatsApp number serves every restaurant, and the copy behind
+     the link needs a public address that a restaurant PC does not have. The bill's content leaves
+     the restaurant only for this (BILL-012).
+584. WhatsApp first (OI-06): Meta's Cloud API with one approved Utility template, `digital_bill`,
+     taking the restaurant, the invoice number, the amount, the link and the day it expires. SMS
+     sits behind the same adapter interface and needs TRAI DLT registration and a chosen provider
+     first (manual task 28).
+585. The link's token is an HMAC of the bill's id under `CP_DIGITAL_BILL_KEY`, and only its
+     SHA-256 is stored. The PC can be given the same link again when it retries, and a database
+     copy opens nothing. The page is plain HTML with the bill as printed, no scripts, not indexed,
+     and rate-limited to 60 an address a minute.
+586. The cloud keeps the number's last four digits only. The copy is deleted by an hourly sweep
+     once `keepDays` (the restaurant's `bills.hostedCopyDays`) have passed; the row stays for
+     support and the daily limit (3,000 a restaurant, `CP_DIGITAL_BILL_DAILY_LIMIT`).
+587. A send is idempotent on the PC's id. SENT answers again without a second message; FAILED is
+     tried again when asked. A number WhatsApp cannot deliver to (131026 and the like) and the
+     vendor's own set-up errors are not retryable; busy, rate-limited or unreachable are.
 
 Decided 2026-10-04 (P7-06d):
 
@@ -2961,6 +2984,24 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P7-09a Digital bills at the Control Plane
+
+Built:
+
+- domain `digital-bill.ts`: `indianMobile`, `maskPhone`, `nextDigitalBillAttempt` (1, 5, 15, 60
+  minutes, then every 3 hours, given up after a day).
+- contracts (control plane): `DigitalBillRequest`, `DigitalBillView`, `DigitalBillPageParams`;
+  routes `sendDigitalBill` (signed) and `getDigitalBillPage` (public).
+- Control Plane `src/digital-bills/`: `BillSender` and `WhatsAppCloudSender`,
+  `DigitalBillsService` (send, page, purge sweep), `bill-page.ts`, the controller; the
+  `digital_bills` table; `CP_PUBLIC_URL`, `CP_DIGITAL_BILL_*` and `CP_WHATSAPP_*` settings.
+- docs: the Control Plane runbook's digital bills section, `manual-tasks/28-digital-bills.md`.
+
+Tests: domain 5; CP unit 7 (the WhatsApp request, number rejected, busy and unreachable retried,
+set-up errors not, configuration, page escaping) and integration 5 (sent once with its link and
+only four digits stored, failed then retried, expiry and purge, unset channels and the daily
+limit, no signature and wrong links).
 
 ### 2026-10-04: P7-06d Data-volume test (P7-06 done)
 

@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "pattern": "^\\+91[6-9]\\d{9}$" },
+  "output": { "type": "string", "pattern": "^\\+91[6-9]\\d{9}$" }
+}
