@@ -51,6 +51,7 @@ import {
   SplitBillResponse,
   VoidInvoiceRequest,
 } from './billing.js';
+import { DigitalBillEntry, InvoiceDigitalBillsResponse } from './digital-bills.js';
 import {
   CurrentSessionResponse,
   LoginResponse,
@@ -4298,6 +4299,45 @@ export const ROUTES = [
       },
       ...standardErrors,
       422: { description: 'No bill printer is set, or no such printer.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listInvoiceDigitalBills',
+    method: 'GET',
+    path: '/api/v1/invoices/:id/digital-bills',
+    summary: 'The digital bills of an invoice, and whether one may be sent',
+    description:
+      'BILL-012: the restaurant’s channel, the consented number (masked) and each send, newest ' +
+      'first. Staff never see the whole number again.',
+    tags: ['billing'],
+    requirements: ['BILL-012', 'BILL-011'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { params: InvoiceParams },
+    responses: {
+      200: { description: 'The digital bills.', schema: InvoiceDigitalBillsResponse },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'sendInvoiceDigitalBill',
+    method: 'POST',
+    path: '/api/v1/invoices/:id/digital-bills',
+    summary: 'Send the bill to the diner on WhatsApp or SMS (again)',
+    description:
+      'BILL-012: only to a mobile number the diner gave with consent (BILL-011), through the ' +
+      'vendor’s Control Plane; queued while the internet is down. A settled bill goes by itself ' +
+      'when digital bills are on; this sends it again. Audited, without the number.',
+    tags: ['billing'],
+    requirements: ['BILL-012', 'BILL-011', 'AUD-001'],
+    capability: 'BILL_PRINT_AND_PAYMENT',
+    request: { params: InvoiceParams },
+    responses: {
+      202: { description: 'Queued.', schema: DigitalBillEntry },
+      ...standardErrors,
+      404: { description: 'No such invoice.', schema: ApiError },
+      409: { description: 'Digital bills are off, or the invoice is voided.', schema: ApiError },
+      422: { description: 'No mobile number given with consent.', schema: ApiError },
     },
   },
   {

@@ -194,6 +194,16 @@ export class FeedbackService {
           data: { dinerContactId: null },
         });
       }
+      // A digital bill still waiting to go to that number is not sent (BILL-012).
+      await tx.digitalBill.updateMany({
+        where: { restaurantId: principal.restaurantId, phone: number },
+        data: {
+          phone: null,
+          status: 'FAILED',
+          nextAttemptAt: null,
+          lastError: 'The diner asked for their number to be erased.',
+        },
+      });
       await this.audit.record(tx, {
         action: 'DINER_CONTACT_ERASED',
         entityType: 'diner_contact',

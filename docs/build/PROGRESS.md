@@ -383,9 +383,9 @@ Recommended next WPs (dependencies met):
   - [x] P7-08b Support asks for diagnostics
   - [x] P7-08c Remote configuration
   - [x] P7-08d Error reporting
-- [ ] P7-09 Digital bills
+- [x] P7-09 Digital bills
   - [x] P7-09a Digital bills at the Control Plane
-  - [ ] P7-09b Digital bills on the restaurant PC
+  - [x] P7-09b Digital bills on the restaurant PC
 - [ ] P7-10 Phase 7 exit test
 
 ### Phase 8: Hardening and pilot
@@ -638,6 +638,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-04 (P7-09b):
+
+588. `bills.digitalBillChannel` (OFF, WHATSAPP, SMS) is off by default. It costs the vendor per
+     message and needs the vendor's set-up (manual task 28), so a restaurant turns it on.
+589. A settled bill is queued by itself (a `BillSettled` consumer, once per invoice) when the
+     invoice has an Indian mobile number with the consent box ticked (BILL-011). Anything else
+     (no consent, a landline, a voided invoice) is never sent. The cashier can send it again from
+     the bill, as often as asked; each send is audited without the number.
+590. The queue is a table on the PC. Sends go one at a time, every 30 seconds or at once after
+     queueing. A bill is tried again after 1, 5, 15 and 60 minutes, then every 3 hours, while the
+     Control Plane or WhatsApp cannot be reached, is busy, or the day's limit is reached. It is
+     given up a day after it was queued. "Not set up" and a number WhatsApp cannot deliver to fail
+     at once.
+591. The whole number is kept on the PC only while the bill waits. It is cleared once sent or
+     given up, and erasing a diner's number (DATA-011) also stops a waiting bill. Digital bills go
+     with their invoice's year in archive-then-purge (DATA-008).
+592. The POS shows, under each invoice of a bill, what happened ("Sent on WhatsApp to
+     +91 ******3210 at 14:05", "Waiting to send…", "Not sent: …") and "Send again". The settle
+     toast says the bill goes to the diner. Nothing shows while digital bills are off.
 
 Decided 2026-10-04 (P7-09a):
 
@@ -2984,6 +3004,23 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-04: P7-09b Digital bills on the restaurant PC (P7-09 done)
+
+Built:
+
+- contracts: `DigitalBillEntry`, `InvoiceDigitalBillsResponse`, routes `listInvoiceDigitalBills`
+  and `sendInvoiceDigitalBill`, setting `bills.digitalBillChannel`.
+- server `src/digital-bills/`: `DigitalBillsService` (the `BillSettled` consumer, send again, the
+  queue with back-off, the request with the bill as printed), the controller and the module; the
+  `digital_bills` table (with `rp_purge` and the archive year); `ControlPlaneClient.sendDigitalBill`;
+  erasure stops waiting bills.
+- console: `DigitalBillLine` on the bill, the settle toast's note, the setting's labels and choices.
+- docs: the Control Plane runbook's restaurant-PC part.
+
+Tests: server integration 5, end to end through a real Control Plane and a stand-in WhatsApp
+(sent by itself once with the number forgotten, the link opening the bill, consent and channel
+refusals, retries then sent, given up after a day, an undeliverable number, erasure); console 3.
 
 ### 2026-10-04: P7-09a Digital bills at the Control Plane
 

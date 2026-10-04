@@ -1493,6 +1493,9 @@ export const en = {
       THREE: 'Three',
       ONE_SHORT: 'One short',
       LONG_SHORT: 'Long, then short',
+      OFF: 'Off',
+      WHATSAPP: 'WhatsApp',
+      SMS: 'SMS',
     },
     field: {
       READY: 'Food ready',
@@ -3171,6 +3174,7 @@ export const en = {
       printerId: 'Bill printer',
       cashDrawerKick: 'Open the cash drawer for cash payments',
       hostedCopyDays: 'Digital bill link lasts',
+      digitalBillChannel: 'Digital bills',
     },
     payments: {
       otherModes: 'Other payment modes',
@@ -3335,6 +3339,8 @@ export const en = {
       cashDrawerKick:
         'Open the cash drawer on the bill printer when cash is taken (a printer without one ignores it).',
       hostedCopyDays: 'How long a digital bill stays available on its link.',
+      digitalBillChannel:
+        'Send each settled bill to the diner on WhatsApp (or SMS) when they gave their mobile number and agreed. Needs the vendor to have set it up.',
     },
     payments: {
       otherModes: 'Names of payment modes offered besides cash, card and UPI.',
@@ -3691,6 +3697,18 @@ export const en = {
     },
   },
   billing: {
+    digitalBill: {
+      channel: { WHATSAPP: 'WhatsApp', SMS: 'SMS' },
+      send: 'Send on {channel}',
+      sendAgain: 'Send again',
+      sendFor: 'Send bill {number} on {channel}',
+      notYet: 'Not sent yet to {phone}',
+      queued: 'Waiting to send to {phone}',
+      retrying: 'Waiting to send to {phone}: {error}',
+      sent: 'Sent on {channel} to {phone} at {time}',
+      failed: 'Not sent to {phone}: {error}',
+      queuedToast: 'The bill goes to {phone} on {channel}.',
+    },
     bill: 'Bill',
     billFor: 'Bill for {target}',
     takeawayOrder: 'Takeaway order {number}',

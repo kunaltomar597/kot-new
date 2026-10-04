@@ -4056,6 +4056,126 @@
         "x-requirements": ["BILL-002", "BILL-014"]
       }
     },
+    "/api/v1/invoices/{id}/digital-bills": {
+      "get": {
+        "operationId": "listInvoiceDigitalBills",
+        "summary": "The digital bills of an invoice, and whether one may be sent",
+        "description": "BILL-012: the restaurant’s channel, the consented number (masked) and each send, newest first. Staff never see the whole number again.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The digital bills.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InvoiceDigitalBillsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-012", "BILL-011"]
+      },
+      "post": {
+        "operationId": "sendInvoiceDigitalBill",
+        "summary": "Send the bill to the diner on WhatsApp or SMS (again)",
+        "description": "BILL-012: only to a mobile number the diner gave with consent (BILL-011), through the vendor’s Control Plane; queued while the internet is down. A settled bill goes by itself when digital bills are on; this sends it again. Audited, without the number.",
+        "tags": ["billing"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DigitalBillEntry" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such invoice.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Digital bills are off, or the invoice is voided.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "No mobile number given with consent.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "BILL_PRINT_AND_PAYMENT",
+        "x-requirements": ["BILL-012", "BILL-011", "AUD-001"]
+      }
+    },
     "/api/v1/invoices/{id}/payments": {
       "get": {
         "operationId": "getInvoicePayments",
@@ -15837,6 +15957,46 @@
         "required": ["id"],
         "additionalProperties": false
       },
+      "DigitalBillChannelSetting": { "type": "string", "enum": ["OFF", "WHATSAPP", "SMS"] },
+      "DigitalBillEntry": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "invoiceId": { "$ref": "#/components/schemas/Id" },
+          "channel": { "type": "string", "enum": ["WHATSAPP", "SMS"] },
+          "phone": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/DigitalBillStatus" },
+          "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "nextAttemptAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastError": { "type": ["string", "null"] },
+          "link": { "anyOf": [{ "type": "string", "format": "uri" }, { "type": "null" }] },
+          "expiresAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "requestedBy": { "type": ["string", "null"] },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "sentAt": { "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }] }
+        },
+        "required": [
+          "id",
+          "invoiceId",
+          "channel",
+          "phone",
+          "status",
+          "attempts",
+          "nextAttemptAt",
+          "lastError",
+          "link",
+          "expiresAt",
+          "requestedBy",
+          "createdAt",
+          "sentAt"
+        ],
+        "additionalProperties": false
+      },
+      "DigitalBillStatus": { "type": "string", "enum": ["QUEUED", "SENT", "FAILED"] },
       "DiscountReportResponse": {
         "type": "object",
         "properties": {
@@ -16299,6 +16459,16 @@
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
       },
       "IndianMobile": { "type": "string", "maxLength": 20 },
+      "InvoiceDigitalBillsResponse": {
+        "type": "object",
+        "properties": {
+          "channel": { "$ref": "#/components/schemas/DigitalBillChannelSetting" },
+          "phone": { "type": ["string", "null"] },
+          "bills": { "type": "array", "items": { "$ref": "#/components/schemas/DigitalBillEntry" } }
+        },
+        "required": ["channel", "phone", "bills"],
+        "additionalProperties": false
+      },
       "InvoiceLineView": {
         "type": "object",
         "properties": {
