@@ -2,6 +2,7 @@
 export * from './billing.js';
 export * from './cloud-backups.js';
 export * from './diagnostics.js';
+export * from './digital-bills.js';
 export * from './fleet-admin.js';
 export * from './fleet.js';
 export * from './remote-settings.js';

@@ -269,6 +269,19 @@ Deliverables: provider adapter interface with a WhatsApp implementation first; s
 consent; offline queue; hosted bill copy expiring after 30 days.
 Acceptance: adapter tests with a fake provider; consent enforcement test.
 
+Split (2026-10-04):
+
+- **P7-09a Digital bills at the Control Plane.** The vendor's provider account sends, so its keys
+  never reach a restaurant PC (SEC-002): a signed `POST /v1/digital-bills` from the PC with the
+  bill as printed; a provider adapter interface with WhatsApp (Meta Cloud API, an approved
+  template) first and SMS behind the same interface later; the hosted copy at an unguessable
+  link that expires after the restaurant's `bills.hostedCopyDays`, then is deleted; the full
+  number is never stored in the cloud; idempotent per send; a daily limit per PC.
+- **P7-09b Digital bills on the restaurant PC.** `bills.digitalBillChannel` (off by default); a
+  settled bill with a consented number is queued automatically, and the cashier can send again;
+  the queue survives the internet being down and retries with back-off; the number is cleared
+  once sent or given up; audited; the POS shows what happened.
+
 ## P7-10 Phase 7 exit test: S8, S9, S10
 
 Depends on: P7-01 to P7-09.

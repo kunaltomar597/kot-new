@@ -88,6 +88,40 @@ export const CpConfigSchema = z
     errorDsn: z.url({ protocol: /^https?$/ }).optional(),
     /** Folder of the built vendor web app (`apps/control-plane-web/dist`), served at `/` when set. */
     webDir: z.string().min(1).optional(),
+    /**
+     * The Control Plane's public address, as diners open it from a digital bill (BILL-012), e.g.
+     * `https://cloud.vendor.in`. Unset: no digital bills.
+     */
+    publicUrl: z.url({ protocol: /^https?$/ }).optional(),
+    /**
+     * The secret digital bills' links derive from (32+ bytes, base64), from the secret manager.
+     * Only the links' hashes are stored, so a copy of the database opens no bill. Unset: no
+     * digital bills.
+     */
+    digitalBillKey: z
+      .string()
+      .refine((value) => Buffer.from(value, 'base64').length >= 32, 'at least 32 bytes')
+      .optional(),
+    /** Digital bills each restaurant may send in 24 hours (the vendor pays per message). */
+    digitalBillDailyLimit: z.coerce.number().int().min(1).max(20_000).default(3_000),
+    /** How often expired bills are deleted; 0 is off (tests). */
+    digitalBillSweepSeconds: z.coerce.number().int().min(0).max(86_400).default(3_600),
+    /**
+     * The WhatsApp Business Platform (Meta's Cloud API) for digital bills, from the secret
+     * manager: a system user's access token and the sending number's id. Unset: no WhatsApp.
+     */
+    whatsappToken: z.string().min(1).optional(),
+    whatsappPhoneNumberId: z
+      .string()
+      .regex(/^\d{5,20}$/)
+      .optional(),
+    /** The approved message template and its language (manual task 28). */
+    whatsappTemplate: z
+      .string()
+      .regex(/^[a-z0-9_]{1,512}$/)
+      .default('digital_bill'),
+    whatsappLanguage: z.string().min(2).max(10).default('en'),
+    whatsappApiUrl: z.url({ protocol: /^https?$/ }).default('https://graph.facebook.com/v21.0'),
     /** Days a restaurant has to pay an invoice (LIC-009: as the subscription agreement says). */
     billingPaymentTermsDays: z.coerce.number().int().min(0).max(90).default(7),
     /** Days past due before grace starts (LIC-005 ⚙ "overdue beyond N days"). */
@@ -162,6 +196,34 @@ export const CpConfigSchema = z
         code: 'custom',
         path: ['alertWebhookUrl'],
         message: 'staging and production need an https:// CP_ALERT_WEBHOOK_URL',
+      });
+    }
+    if ((config.whatsappToken === undefined) !== (config.whatsappPhoneNumberId === undefined)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['whatsappPhoneNumberId'],
+        message: 'CP_WHATSAPP_TOKEN and CP_WHATSAPP_PHONE_NUMBER_ID go together',
+      });
+    }
+    if (
+      config.whatsappToken !== undefined &&
+      (config.publicUrl === undefined || config.digitalBillKey === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['publicUrl'],
+        message: 'digital bills need CP_PUBLIC_URL and CP_DIGITAL_BILL_KEY for their links',
+      });
+    }
+    if (
+      config.env !== 'development' &&
+      config.publicUrl !== undefined &&
+      !config.publicUrl.startsWith('https://')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['publicUrl'],
+        message: 'staging and production need an https:// CP_PUBLIC_URL',
       });
     }
     if (config.backupStore === 'local' && config.backupLocalDir === undefined) {
@@ -290,6 +352,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     billingGraceAfterDays: env.CP_BILLING_GRACE_AFTER_DAYS,
     billingIntervalMinutes: env.CP_BILLING_INTERVAL_MINUTES,
     webDir: env.CP_WEB_DIR === '' ? undefined : env.CP_WEB_DIR,
+    publicUrl: env.CP_PUBLIC_URL === '' ? undefined : env.CP_PUBLIC_URL,
+    digitalBillKey: env.CP_DIGITAL_BILL_KEY === '' ? undefined : env.CP_DIGITAL_BILL_KEY,
+    digitalBillDailyLimit: env.CP_DIGITAL_BILL_DAILY_LIMIT,
+    digitalBillSweepSeconds: env.CP_DIGITAL_BILL_SWEEP_SECONDS,
+    whatsappToken: env.CP_WHATSAPP_TOKEN === '' ? undefined : env.CP_WHATSAPP_TOKEN,
+    whatsappPhoneNumberId:
+      env.CP_WHATSAPP_PHONE_NUMBER_ID === '' ? undefined : env.CP_WHATSAPP_PHONE_NUMBER_ID,
+    whatsappTemplate: env.CP_WHATSAPP_TEMPLATE === '' ? undefined : env.CP_WHATSAPP_TEMPLATE,
+    whatsappLanguage: env.CP_WHATSAPP_LANGUAGE === '' ? undefined : env.CP_WHATSAPP_LANGUAGE,
+    whatsappApiUrl: env.CP_WHATSAPP_API_URL === '' ? undefined : env.CP_WHATSAPP_API_URL,
     offlineAlertMinutes: env.CP_OFFLINE_ALERT_MINUTES,
     diskAlertPercent: env.CP_DISK_ALERT_PERCENT,
     fleetSweepSeconds: env.CP_FLEET_SWEEP_SECONDS,
