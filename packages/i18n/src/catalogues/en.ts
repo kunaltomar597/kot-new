@@ -2453,7 +2453,9 @@ export const en = {
     archive: 'Archive {year}…',
     started: 'The archive has started. It may take some minutes.',
     made: 'Archives made',
-    column: { year: 'Year', started: 'Started', status: 'Result', where: 'Folder' },
+    column: { year: 'Year', started: 'Started', status: 'Result', where: 'Folder', open: 'Open' },
+    open: 'Open',
+    openYear: 'Open the archive of {year}',
     status: {
       ARCHIVING: 'Archiving',
       VERIFYING: 'Checking',
@@ -2475,6 +2477,50 @@ export const en = {
       understood: 'I understand that {year} will be removed from this PC.',
       confirm: 'Archive and remove',
       cancel: 'Cancel',
+    },
+  },
+  archiveViewer: {
+    title: 'Archived year',
+    intro:
+      'Read from the archive file, without putting anything back into this PC’s records. Find an invoice by its date or its number to see it as printed.',
+    back: 'Back to System',
+    reading: 'Reading the archive…',
+    loadFailed: 'The archive could not be opened.',
+    summary:
+      'Financial year {year} ({restaurants}): {invoices, plural, one {# invoice} other {# invoices}}, sales {sales}, tax {tax}.',
+    days: 'Day by day',
+    date: 'Business date',
+    number: 'Invoice number',
+    find: 'Find',
+    found: 'Invoices found',
+    none: 'No invoice matches.',
+    column: {
+      date: 'Date',
+      invoices: 'Invoices',
+      voided: 'Voided',
+      sales: 'Sales',
+      tax: 'Tax',
+      number: 'Invoice',
+      status: 'Status',
+      total: 'Total',
+    },
+    invoiceTitle: 'Invoice {number}',
+    printed: 'The invoice as printed',
+    print: 'Print',
+    close: 'Close',
+  },
+  dataExport: {
+    intro:
+      'Export all the restaurant’s data in open formats (CSV and JSON, with the invoices as PDFs) into a folder, at any time.',
+    open: 'Export all data…',
+    title: 'Export all data',
+    description:
+      'Every table as CSV and JSON, the invoice register and every invoice as a PDF, into a folder. Passwords, PINs and keys are not included. It may take some minutes.',
+    confirm: 'Export',
+    status: {
+      RUNNING: 'Exporting into {folder}…',
+      DONE: 'The last export is in {folder}.',
+      FAILED: 'The last export failed: {error}',
     },
   },
   readiness: {

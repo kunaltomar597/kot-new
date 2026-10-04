@@ -1,8 +1,9 @@
-import { displayDateTime } from '@rp/domain';
+import { displayDateTime, formatRupees } from '@rp/domain';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
+import { invoiceView } from './billing-fixture.js';
 import { archivesView, backupsView, systemStatus } from './system-fixture.js';
 
 const PATH = '/manage/system';
@@ -15,7 +16,8 @@ function systemServer(...answers: ReturnType<typeof systemStatus>[]): FakeServer
       status: 200,
       body: systemStatus(),
     }))
-    .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView() }));
+    .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView() }))
+    .on('GET', '/api/v1/archives', () => ({ status: 200, body: archivesView() }));
 }
 
 const section = async (name: string) =>
@@ -398,8 +400,12 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     expect(backup.getByText('The base backup failed: disk full')).toBeVisible();
     expect(backup.queryByRole('button', { name: t('backups.restore.open') })).toBeNull();
     expect(backup.queryByRole('button', { name: t('backups.recovery.show') })).toBeNull();
-    // DATA-008: old years are the Owner's.
-    expect(screen.queryByRole('heading', { level: 3, name: t('archives.title') })).toBeNull();
+    // DATA-009: managers see the old years and open their archives; archiving them (DATA-008)
+    // and the full export (DATA-010) are the Owner's.
+    const archives = await section(t('archives.title'));
+    expect(await archives.findByText(t('archives.year', { year: '2023-24' }))).toBeVisible();
+    expect(archives.queryByRole('button', { name: /^Archive / })).toBeNull();
+    expect(archives.queryByRole('button', { name: t('dataExport.open') })).toBeNull();
   });
 
   it('[DATA-006] warns when the drive is getting full', async () => {
@@ -616,5 +622,150 @@ describe('[UPD-008] support asks for diagnostics', () => {
     expect(
       fake.callsTo('POST', `/api/v1/system/diagnostics/requests/${SECOND}/decline`),
     ).toHaveLength(1);
+  });
+});
+
+describe('[DATA-009] the archive viewer', () => {
+  const ARCHIVE = '0190a1b2-c3d4-7000-8000-00000000cc01';
+  const INVOICE = '0190a1b2-c3d4-7000-8000-00000000dd01';
+
+  it('opens an archived year read-only and shows an invoice as it was printed', async () => {
+    const fake = systemServer()
+      .on('GET', `/api/v1/archives/${ARCHIVE}/days`, () => ({
+        status: 200,
+        body: {
+          financialYear: '2023-24',
+          restaurants: ['Spice Route'],
+          days: [{ date: '2024-03-30', invoices: 2, voided: 1, sales: 125_000, tax: 6_000 }],
+          totals: { invoices: 2, voided: 1, sales: 125_000, tax: 6_000 },
+        },
+      }))
+      .on('GET', `/api/v1/archives/${ARCHIVE}/invoices`, () => ({
+        status: 200,
+        body: {
+          invoices: [
+            {
+              id: INVOICE,
+              invoiceNumber: 'INV/23-24/0412',
+              invoiceDate: '2024-03-30',
+              status: 'SETTLED',
+              customer: null,
+              grandTotal: 125_000,
+            },
+          ],
+        },
+      }))
+      .on('GET', `/api/v1/archives/${ARCHIVE}/invoices/${INVOICE}`, () => ({
+        status: 200,
+        body: {
+          invoice: invoiceView({ id: INVOICE, invoiceNumber: 'INV/23-24/0412' }),
+          printed: ['SPICE ROUTE', 'Invoice INV/23-24/0412', 'TOTAL Rs 1,250.00'],
+        },
+      }));
+    const { user, container } = await renderConsole({
+      fake,
+      path: `/manage/archives/${ARCHIVE}`,
+      signedIn: 'MANAGER',
+    });
+    expect(
+      await screen.findByText(
+        t('archiveViewer.summary', {
+          year: '2023-24',
+          restaurants: 'Spice Route',
+          invoices: 2,
+          sales: formatRupees(125_000),
+          tax: formatRupees(6_000),
+        }),
+      ),
+    ).toBeVisible();
+    const days = within(screen.getByRole('table', { name: t('archiveViewer.days') }));
+    expect(days.getByText('30-03-2024')).toBeVisible();
+
+    await user.type(
+      screen.getByRole('textbox', { name: t('archiveViewer.number') }),
+      'INV/23-24/0412',
+    );
+    await user.click(screen.getByRole('button', { name: t('archiveViewer.find') }));
+    const found = within(await screen.findByRole('table', { name: t('archiveViewer.found') }));
+    expect(found.getByText(t('reportsPage.invoiceStatus.SETTLED'))).toBeVisible();
+    expect(
+      fake.callsTo('GET', `/api/v1/archives/${ARCHIVE}/invoices?number=INV%2F23-24%2F0412`),
+    ).toHaveLength(1);
+    await expectNoAxeViolations(container);
+
+    await user.click(found.getByRole('button', { name: 'INV/23-24/0412' }));
+    const dialog = within(
+      await screen.findByRole('dialog', {
+        name: t('archiveViewer.invoiceTitle', { number: 'INV/23-24/0412' }),
+      }),
+    );
+    expect(dialog.getByRole('figure', { name: t('archiveViewer.printed') })).toHaveTextContent(
+      'TOTAL Rs 1,250.00',
+    );
+    const print = vi.fn();
+    vi.stubGlobal('print', print);
+    await user.click(dialog.getByRole('button', { name: t('archiveViewer.print') }));
+    expect(print).toHaveBeenCalledOnce();
+  });
+
+  it('says so when the archive file is not there', async () => {
+    const fake = systemServer().on('GET', `/api/v1/archives/${ARCHIVE}/days`, () => ({
+      status: 404,
+      body: {
+        code: 'ARCHIVE_FILE_MISSING',
+        message: 'The archive file is not at E:\\rp-archives. Connect the drive it is on.',
+      },
+    }));
+    await renderConsole({ fake, path: `/manage/archives/${ARCHIVE}`, signedIn: 'MANAGER' });
+    expect(await screen.findByText(t('archiveViewer.loadFailed'))).toBeVisible();
+  });
+});
+
+describe('[DATA-010] [LIC-005] the full data export', () => {
+  it('lets the Owner export everything into a folder and shows where it went', async () => {
+    const running = {
+      status: 'RUNNING' as const,
+      folder: 'E:\\exports\\rp-export-20261004T090000Z',
+      startedAt: '2026-10-04T09:00:00.000Z',
+      finishedAt: null,
+      tables: null,
+      error: null,
+    };
+    const fake = signsInAs(server(), 'OWNER')
+      .on('GET', '/api/v1/system', () => ({ status: 200, body: systemStatus() }))
+      .on('GET', '/api/v1/backups', () => ({ status: 200, body: backupsView() }))
+      .on('GET', '/api/v1/archives', () => ({ status: 200, body: archivesView() }))
+      .on(
+        'GET',
+        '/api/v1/data-export',
+        () => ({ status: 200, body: { last: null } }),
+        () => ({
+          status: 200,
+          body: {
+            last: {
+              ...running,
+              status: 'DONE',
+              finishedAt: '2026-10-04T09:04:00.000Z',
+              tables: 84,
+            },
+          },
+        }),
+      )
+      .on('POST', '/api/v1/data-export', () => ({ status: 202, body: running }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'OWNER' });
+    const archives = await section(t('archives.title'));
+    expect(await archives.findByText(t('dataExport.intro'))).toBeVisible();
+    await user.click(archives.getByRole('button', { name: t('dataExport.open') }));
+    const dialog = within(await screen.findByRole('dialog', { name: t('dataExport.title') }));
+    await user.type(
+      dialog.getByRole('textbox', { name: t('archives.dialog.folder') }),
+      'E:\\exports',
+    );
+    await expectNoAxeViolations(container);
+    await user.click(dialog.getByRole('button', { name: t('dataExport.confirm') }));
+    expect(
+      await archives.findByText(t('dataExport.status.RUNNING', { folder: running.folder })),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', '/api/v1/data-export')[0]?.body).toEqual({ folder: 'E:\\exports' });
   });
 });

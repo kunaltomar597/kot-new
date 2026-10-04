@@ -1,0 +1,22 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "folder": {
+        "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 260 }, { "type": "null" }]
+      }
+    },
+    "required": ["folder"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "folder": {
+        "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 260 }, { "type": "null" }]
+      }
+    },
+    "required": ["folder"],
+    "additionalProperties": false
+  }
+}

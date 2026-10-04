@@ -3,7 +3,15 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
-import { ApiError, ArchivesResponse, ArchiveRunView, type LoginResponse } from '@rp/contracts';
+import {
+  ApiError,
+  ArchivedDaysResponse,
+  ArchivedInvoiceListResponse,
+  ArchivedInvoiceResponse,
+  ArchivesResponse,
+  ArchiveRunView,
+  type LoginResponse,
+} from '@rp/contracts';
 import pg from 'pg';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -216,6 +224,58 @@ describe('[DATA-008] [AUD-004] archive-then-purge of a financial year', () => {
     });
     expect(record).toMatchObject({ actorId: kit.staff.OWNER, reason: 'The drive is getting full' });
     expect(await prisma.auditLog.count({ where: { action: 'ARCHIVE_REQUESTED' } })).toBe(1);
+  }, 120_000);
+
+  it('[DATA-009] opens the archived year read-only: days, invoices and one invoice as printed', async () => {
+    const manager = await signIn(app, kit, 'MANAGER');
+    const as = (path: string) =>
+      api().get(path).set(authHeaders(kit.deviceId, manager.accessToken));
+    const run = (await archives()).runs[0];
+    const id = run?.id ?? '';
+    const days = ArchivedDaysResponse.parse((await as(`/api/v1/archives/${id}/days`)).body);
+    expect(days.financialYear).toBe('2023-24');
+    expect(days.days.map((day) => day.date)).toEqual(['2024-03-29', '2024-03-30', '2024-03-31']);
+    expect(days.totals.invoices).toBe(run?.counts?.invoices);
+    expect(days.totals.sales).toBeGreaterThan(0);
+
+    const ofDay = ArchivedInvoiceListResponse.parse(
+      (await as(`/api/v1/archives/${id}/invoices?date=2024-03-30`)).body,
+    ).invoices;
+    expect(ofDay).toHaveLength(days.days[1]?.invoices ?? -1);
+    const first = ofDay[0];
+    const byNumber = ArchivedInvoiceListResponse.parse(
+      (
+        await as(
+          `/api/v1/archives/${id}/invoices?number=${encodeURIComponent(first?.invoiceNumber ?? '')}`,
+        )
+      ).body,
+    ).invoices;
+    expect(byNumber.map((invoice) => invoice.id)).toEqual([first?.id]);
+
+    const opened = ArchivedInvoiceResponse.parse(
+      (await as(`/api/v1/archives/${id}/invoices/${first?.id ?? ''}`)).body,
+    );
+    expect(opened.invoice).toMatchObject({
+      invoiceNumber: first?.invoiceNumber,
+      grandTotal: first?.grandTotal,
+    });
+    expect(opened.invoice.lines.length).toBeGreaterThan(0);
+    expect(opened.printed.join('\n')).toContain(first?.invoiceNumber ?? '?');
+    expect(opened.printed.join('\n')).toContain('TOTAL Rs');
+
+    expect((await as(`/api/v1/archives/${id}/invoices`)).status).toBe(400);
+    // A waiter does not read reports.
+    const waiter = await signIn(app, kit, 'WAITER');
+    const refused = await api()
+      .get(`/api/v1/archives/${id}/days`)
+      .set(authHeaders(kit.deviceId, waiter.accessToken));
+    expect(refused.status).toBe(403);
+    // A cashier's reports are their own shifts' (§4.2), not the restaurant's old years.
+    const cashier = await signIn(app, kit, 'CASHIER');
+    for (const path of ['/api/v1/archives', `/api/v1/archives/${id}/days`]) {
+      const own = await api().get(path).set(authHeaders(kit.deviceId, cashier.accessToken));
+      expect(own.status, path).toBe(403);
+    }
   }, 120_000);
 
   it('never lets the application role delete what the purge may (AUD-004)', async () => {

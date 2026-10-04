@@ -3,6 +3,9 @@ import { AuthModule } from '../auth/auth.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { ArchiveController } from './archive.controller.js';
 import { ArchiveService } from './archive.service.js';
+import { ArchiveViewerService } from './archive-viewer.service.js';
+import { DataExportController } from './data-export.controller.js';
+import { DataExportService } from './data-export.service.js';
 import {
   DEFAULT_RETENTION_OPTIONS,
   RETENTION_OPTIONS,
@@ -15,12 +18,14 @@ import {
  */
 @Module({
   imports: [AuthModule, SettingsModule],
-  controllers: [ArchiveController],
+  controllers: [ArchiveController, DataExportController],
   providers: [
     RetentionService,
     ArchiveService,
+    ArchiveViewerService,
+    DataExportService,
     { provide: RETENTION_OPTIONS, useValue: DEFAULT_RETENTION_OPTIONS },
   ],
-  exports: [RetentionService, ArchiveService],
+  exports: [RetentionService, ArchiveService, ArchiveViewerService, DataExportService],
 })
 export class LifecycleModule {}

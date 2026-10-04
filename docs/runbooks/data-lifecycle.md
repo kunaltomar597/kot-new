@@ -93,7 +93,47 @@ RP_PURGE_DATABASE_URL=postgresql://rp_purger:<password>@localhost:5432/<database
 
 Without it, the Owner sees "This PC has no purge login yet" and no year can be archived.
 
-### Reading an archive
+### Reading an archive (P7-06c)
 
-The archive viewer (P7-06c) opens an archive read-only. Until then the invoice register and the
-PDF books are readable as they are, and `verifyBusinessArchive` checks an archive end to end.
+The archive viewer opens an archived year read-only, straight from its file, without putting
+anything back into the live database (DATA-009): System, then "Old years", then "Open" beside a
+finished archive. The Owner and managers may open it; a cashier's reports are their own shifts'.
+
+- **Day by day**: invoices, voided invoices, sales and tax for each business date, and the year's
+  totals. Read once per server start, then kept.
+- **Find an invoice** by business date or invoice number; open it to see it as printed and print it
+  again.
+
+The archive file must be where it was written. If its drive is not connected the page says where it
+should be ("The archive file is not at …"); connect the drive and try again. An archive made on
+another PC is encrypted with that PC's backup key: open it there, or restore that PC's backup key
+from the vendor (key escrow, `backups.md`). The invoice register and the PDF books beside the
+archive are readable without the app, and `verifyBusinessArchive` checks an archive end to end.
+
+## The full data export (P7-06c)
+
+The restaurant's data belongs to the restaurant (DATA-010). The Owner exports all of it in open
+formats at any time, also while the licence restricts ordering (LIC-005 gates ordering only):
+System, then "Old years", then "Export all data…". It needs the Owner with a fresh second factor;
+it is audited (`DATA_EXPORTED`).
+
+It writes `rp-export-<time>` into the folder typed in (a whole path, like `E:\Exports`), or into
+the second backup location's `rp-exports` folder:
+
+```
+json\<table>.jsonl          every row of each table, one JSON object per line
+csv\<table>.csv             the same rows as CSV (lists and objects written as JSON)
+invoice-register.csv        every invoice: number, date, status, customer, taxable value, taxes
+                            by code, totals, in rupees
+invoices\FY<year>\<month>\<date>.pdf   every invoice of the day as printed
+README.txt                  what each file is
+```
+
+All tables are read in one read-only snapshot, so the files are one consistent moment however long
+the export takes. Amounts in the tables are paise; times are UTC; dates are business dates.
+Passwords, PINs, keys, sessions, one-time codes and every `*_hash` column are left out, as are the
+server's own bookkeeping tables (migrations, outbox, idempotency records).
+
+The System page shows the export running, then where it went or why it failed. A failed export
+leaves what it wrote; delete the folder and start again. Years already archived are not in the
+export: their archive and the human-readable files beside it are.

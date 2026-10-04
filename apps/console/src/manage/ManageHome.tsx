@@ -24,6 +24,7 @@ import { SetupScreen } from './setup/SetupScreen.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
 import { StaffArea } from './staff/StaffArea.js';
+import { ArchiveViewerScreen } from './system/ArchiveViewerScreen.js';
 import { SystemScreen } from './system/SystemScreen.js';
 
 /**
@@ -165,6 +166,7 @@ export function ManageHome() {
             <Route index element={<Navigate to={`/manage/${first}`} replace />} />
           )}
           {seesReports ? <Route path="reports/*" element={<ReportsArea />} /> : null}
+          {seesReports ? <Route path="archives/:id" element={<ArchiveViewerScreen />} /> : null}
           {viewsAudit ? <Route path="audit" element={<AuditScreen />} /> : null}
           {managesStaff ? <Route path="staff/*" element={<StaffArea />} /> : null}
           {managesStaff ? <Route path="floor" element={<FloorScreen />} /> : null}
