@@ -8,7 +8,7 @@ variant/modifier/combo selection components (MENU-012).
 
 - Actions: `Button`, `IconButton`, `Icon`, `Spinner`
 - Input: `PinPad` (login and manager overrides, AUTH-004), `NumberPad` (+ `applyNumberPadKey`),
-  `TextField`, `Select`
+  `TextField`, `TextArea` (P4-02d), `Select`
 - Overlays: `Dialog`, `Sheet`, `ConfirmDialog` (NFR-U04), `ToastProvider` + `useToast`
 - Navigation: `Tabs`
 - Display: `Badge`, `StatusChip` (order item states, `ORDER_ITEM_STATE_STYLES`), `Money` (paise via
