@@ -323,7 +323,12 @@ describe('[AUTH-012] [AUTH-010] people with a custom role', () => {
       .set(as(manager))
       .send({ customRoleId: runner.id });
     expect(changed.status).toBe(200);
-    expect(StaffView.parse(changed.body).customRole).toEqual({ id: runner.id, name: 'Runner' });
+    expect(StaffView.parse(changed.body).customRole).toEqual({
+      id: runner.id,
+      name: 'Runner',
+      added: [],
+      removed: ['ORDER_CREATE'],
+    });
     const entry = await prisma.auditLog.findFirstOrThrow({
       where: { action: 'STAFF_UPDATED', entityId: gopal.id },
     });

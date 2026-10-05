@@ -10315,26 +10315,7 @@
               "displayName": { "type": "string" },
               "role": { "$ref": "#/components/schemas/Role" },
               "customRole": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": { "$ref": "#/components/schemas/Id" },
-                      "name": { "type": "string" },
-                      "added": {
-                        "type": "array",
-                        "items": { "$ref": "#/components/schemas/Capability" }
-                      },
-                      "removed": {
-                        "type": "array",
-                        "items": { "$ref": "#/components/schemas/Capability" }
-                      }
-                    },
-                    "required": ["id", "name", "added", "removed"],
-                    "additionalProperties": false
-                  },
-                  { "type": "null" }
-                ]
+                "anyOf": [{ "$ref": "#/components/schemas/PersonCustomRole" }, { "type": "null" }]
               }
             },
             "required": ["id", "displayName", "role", "customRole"],
@@ -11934,26 +11915,7 @@
               "displayName": { "type": "string" },
               "role": { "$ref": "#/components/schemas/Role" },
               "customRole": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "id": { "$ref": "#/components/schemas/Id" },
-                      "name": { "type": "string" },
-                      "added": {
-                        "type": "array",
-                        "items": { "$ref": "#/components/schemas/Capability" }
-                      },
-                      "removed": {
-                        "type": "array",
-                        "items": { "$ref": "#/components/schemas/Capability" }
-                      }
-                    },
-                    "required": ["id", "name", "added", "removed"],
-                    "additionalProperties": false
-                  },
-                  { "type": "null" }
-                ]
+                "anyOf": [{ "$ref": "#/components/schemas/PersonCustomRole" }, { "type": "null" }]
               }
             },
             "required": ["id", "displayName", "role", "customRole"],
@@ -13860,6 +13822,17 @@
         ],
         "additionalProperties": false
       },
+      "PersonCustomRole": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "added": { "type": "array", "items": { "$ref": "#/components/schemas/Capability" } },
+          "removed": { "type": "array", "items": { "$ref": "#/components/schemas/Capability" } }
+        },
+        "required": ["id", "name", "added", "removed"],
+        "additionalProperties": false
+      },
       "PhoneNumber": { "type": "string", "pattern": "^\\+?\\d[\\d -]{4,18}\\d$" },
       "PhotoRendition": {
         "type": "object",
@@ -15387,12 +15360,6 @@
           "additionalProperties": false
         }
       },
-      "StaffCustomRole": {
-        "type": "object",
-        "properties": { "id": { "$ref": "#/components/schemas/Id" }, "name": { "type": "string" } },
-        "required": ["id", "name"],
-        "additionalProperties": false
-      },
       "StaffListResponse": {
         "type": "object",
         "properties": {
@@ -15440,7 +15407,7 @@
           "displayName": { "type": "string" },
           "role": { "$ref": "#/components/schemas/Role" },
           "customRole": {
-            "anyOf": [{ "$ref": "#/components/schemas/StaffCustomRole" }, { "type": "null" }]
+            "anyOf": [{ "$ref": "#/components/schemas/PersonCustomRole" }, { "type": "null" }]
           },
           "active": { "type": "boolean" },
           "phone": { "type": ["string", "null"] },

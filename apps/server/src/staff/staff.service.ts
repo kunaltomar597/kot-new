@@ -18,7 +18,12 @@ import {
 import { AuditService } from '../audit/audit.service.js';
 import { type AuthSettings, AuthSettingsService } from '../auth/auth-settings.js';
 import { CredentialHasher } from '../auth/credential-hasher.js';
-import { customisationOf, ROLE_GRANTS_SELECT, type RoleRow } from '../auth/custom-roles.js';
+import {
+  customisationOf,
+  ROLE_GRANTS_SELECT,
+  type RoleRow,
+  signedInCustomRole,
+} from '../auth/custom-roles.js';
 import type { Principal } from '../auth/principal.js';
 import { hasFreshStepUp } from '../auth/step-up.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
@@ -54,8 +59,8 @@ const BUILT_IN_ROLE_NAMES: Readonly<Record<AssignableRole, string>> = {
   KITCHEN: 'Kitchen',
 };
 
-/** A person's custom role by name, for their record and the audit; null for a built-in role. */
-function customRoleOf(role: RoleRow): StaffView['customRole'] {
+/** A person's custom role by name, for the audit; null for a built-in role. */
+function customRoleOf(role: RoleRow): { id: string; name: string } | null {
   return role.builtIn ? null : { id: role.id, name: role.name };
 }
 
@@ -91,7 +96,7 @@ function view(person: StaffRow, now: Date): StaffView {
     id: person.id,
     displayName: person.displayName,
     role: person.role.baseRole,
-    customRole: customRoleOf(person.role),
+    customRole: signedInCustomRole(person.role),
     active: person.active,
     phone: person.phone,
     email: person.email,

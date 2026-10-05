@@ -14,7 +14,7 @@ import { PairingScreen } from './screens/PairingScreen.js';
 /** Where the console opens: pairing, login, the kitchen's station, or the person's home mode. */
 export function landingPath(state: ConsoleSnapshot): string {
   if (state.phase !== 'paired') return '/pair';
-  if (state.person !== undefined) return `/${homeFor(state.person.role)}`;
+  if (state.person !== undefined) return `/${homeFor(state.person)}`;
   if (isStationMode(state.device)) return '/kds';
   return '/login';
 }

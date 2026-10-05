@@ -1,6 +1,6 @@
 import { ASSIGNABLE_ROLES } from '@rp/domain';
 import { z } from 'zod';
-import { Capability, Pin } from './auth.js';
+import { Capability, PersonCustomRole, Pin } from './auth.js';
 import { Id, Role, Timestamp } from './common.js';
 import { PhoneNumber } from './restaurant.js';
 
@@ -22,17 +22,13 @@ const Reason = z.string().trim().min(3).max(200);
 export const StaffParams = z.strictObject({ staffId: Id });
 export type StaffParams = z.infer<typeof StaffParams>;
 
-/** A person's custom role, by name (P4-02e, AUTH-012); null for a built-in role. */
-export const StaffCustomRole = z.object({ id: Id, name: z.string() });
-export type StaffCustomRole = z.infer<typeof StaffCustomRole>;
-
 /** A person as the Staff page shows them. A PIN is never shown, only whether one is set. */
 export const StaffView = z.object({
   id: Id,
   displayName: z.string(),
-  /** The base role: a custom role's own permissions are in `listRoles`. */
+  /** The base role; a custom role (P4-02e, AUTH-012) changes it, null for a built-in role. */
   role: Role,
-  customRole: StaffCustomRole.nullable(),
+  customRole: PersonCustomRole.nullable(),
   active: z.boolean(),
   phone: z.string().nullable(),
   email: z.string().nullable(),

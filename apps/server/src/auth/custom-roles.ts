@@ -55,7 +55,7 @@ export function holderOf(role: Omit<RoleRow, 'id' | 'name'>): PermissionHolder {
 
 export type SignedInCustomRole = LoginResponse['staff']['customRole'];
 
-/** The custom role as the person's own screens receive it at sign-in. */
+/** The custom role as screens receive it: at sign-in and on staff records (`PersonCustomRole`). */
 export function signedInCustomRole(role: RoleRow): SignedInCustomRole {
   const customisation = customisationOf(role);
   return customisation === null

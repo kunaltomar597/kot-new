@@ -1,4 +1,4 @@
-import type { Role } from '@rp/domain';
+import type { PermissionHolder } from '@rp/domain';
 import { Button, ConnectionBanner, ThemeRoot } from '@rp/ui-web';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
@@ -44,13 +44,16 @@ export function ModeLayout() {
     <ThemeRoot className="console-shell" {...(mode === 'kds' && { theme: 'kds' as const })}>
       <header className="console-header">
         <span className="console-header__app">{t('app.name')}</span>
-        {person === undefined ? null : <ModeLinks role={person.role} />}
+        {person === undefined ? null : <ModeLinks person={person} />}
         <AlertsButton />
         <span className="console-header__device">{state.device?.name}</span>
         {person === undefined ? null : (
           <>
             <span className="console-header__person">
-              {t('modes.signedInAs', { name: person.displayName, role: t(`roles.${person.role}`) })}
+              {t('modes.signedInAs', {
+                name: person.displayName,
+                role: person.customRole?.name ?? t(`roles.${person.role}`),
+              })}
             </span>
             <Button
               variant="secondary"
@@ -85,9 +88,9 @@ export function ModeLayout() {
   );
 }
 
-function ModeLinks({ role }: { role: Role }) {
+function ModeLinks({ person }: { person: PermissionHolder }) {
   const t = useT();
-  const modes = modesFor(role);
+  const modes = modesFor(person);
   if (modes.length < 2) return null;
   return (
     <nav aria-label={t('modes.navigation')} className="console-header__modes">

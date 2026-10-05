@@ -1,26 +1,41 @@
 import type { DeviceSummary } from '@rp/contracts';
-import { type Capability, grantFor, type Role } from '@rp/domain';
+import { type Capability, grantOf, type PermissionHolder } from '@rp/domain';
 
 /** The console's three modes (MGR-001, KDS-001); each is a route prefix. */
 export const MODES = ['pos', 'kds', 'manage'] as const;
 export type Mode = (typeof MODES)[number];
 
-/** What a role needs to open each mode, from the BRD §4.2 matrix (never DENY). */
-const MODE_CAPABILITY: Readonly<Record<Mode, Capability>> = {
-  pos: 'ORDER_CREATE',
-  kds: 'ITEM_MARK_PREPARING_READY',
-  manage: 'OPERATIONS_CONFIGURE',
+/**
+ * What opens each mode, from the BRD §4.2 matrix (anything but DENY): the dashboard opens for
+ * anyone who may use one of its pages, which a custom role can give without the rest (AUTH-012).
+ */
+const MODE_CAPABILITIES: Readonly<Record<Mode, readonly Capability[]>> = {
+  pos: ['ORDER_CREATE'],
+  kds: ['ITEM_MARK_PREPARING_READY'],
+  manage: ['OPERATIONS_CONFIGURE', 'MENU_MANAGE', 'STAFF_MANAGE', 'DEVICE_PAIR'],
 };
 
-/** The modes a role may open. The server still checks every call (AUTH-010). */
-export function modesFor(role: Role): Mode[] {
-  return MODES.filter((mode) => grantFor(role, MODE_CAPABILITY[mode]) !== 'DENY');
+/**
+ * The modes a person may open, with their custom role (P4-02e). The server still checks every
+ * call (AUTH-010).
+ */
+export function modesFor(person: PermissionHolder): Mode[] {
+  return MODES.filter((mode) =>
+    MODE_CAPABILITIES[mode].some((capability) => grantOf(person, capability) !== 'DENY'),
+  );
 }
 
-/** Where a person lands after signing in: managers manage, the kitchen cooks, others sell. */
-export function homeFor(role: Role): Mode {
-  const allowed = modesFor(role);
-  return (['manage', 'pos', 'kds'] as const).find((mode) => allowed.includes(mode)) ?? 'pos';
+/**
+ * Where a person lands after signing in: managers (who run operations) manage, the kitchen cooks,
+ * others sell, even when a custom role also opens a dashboard page for them.
+ */
+export function homeFor(person: PermissionHolder): Mode {
+  const allowed = modesFor(person);
+  const order: readonly Mode[] =
+    grantOf(person, 'OPERATIONS_CONFIGURE') === 'DENY'
+      ? ['pos', 'kds', 'manage']
+      : ['manage', 'pos', 'kds'];
+  return order.find((mode) => allowed.includes(mode)) ?? 'pos';
 }
 
 /**

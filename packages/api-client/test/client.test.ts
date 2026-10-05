@@ -30,7 +30,7 @@ function login(accessToken: string, refreshToken: string, minutes = 15): LoginRe
     accessTokenExpiresAt: inMinutes(minutes),
     refreshToken,
     session: { id: SESSION_ID, expiresAt: inMinutes(600), inactivityTimeoutSeconds: 600 },
-    staff: { id: STAFF_ID, displayName: 'Asha', role: 'CASHIER' },
+    staff: { id: STAFF_ID, displayName: 'Asha', role: 'CASHIER', customRole: null },
     secondFactorValidUntil: null,
   };
 }

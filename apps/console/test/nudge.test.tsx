@@ -10,6 +10,7 @@ const SUNITA: StaffTile = {
   staffId: '0199a0e0-0000-7000-8000-000000000106',
   displayName: 'Sunita',
   role: 'WAITER',
+  customRoleName: null,
   photoId: null,
 };
 
