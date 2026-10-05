@@ -3,7 +3,13 @@ import { DOMAIN_EVENT_TYPES } from '@rp/contracts';
 import { DEFAULT_PERMISSION_MATRIX, type PermissionMatrix } from '@rp/domain';
 import { describe, expect, it } from 'vitest';
 import type { AuthenticatedDevice } from '../../src/auth/device.js';
-import { reaches, rooms, roomsForConnection, roomsForEvent } from '../../src/realtime/rooms.js';
+import {
+  isLiveOnly,
+  reaches,
+  rooms,
+  roomsForConnection,
+  roomsForEvent,
+} from '../../src/realtime/rooms.js';
 import { domainEvent } from '../helpers/events.js';
 
 const rid = randomUUID();
@@ -338,6 +344,25 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     expect(targets).toContain(rooms.role(rid, 'CASHIER'));
   });
 
+  it('[MGR-006] asks only the device a manager is looking for, and never on replay', () => {
+    const kds = device({ type: 'KDS' });
+    const pos = device({ type: 'POS' });
+    const locate = domainEvent('DeviceLocateRequested', rid, {
+      deviceId: kds.deviceId,
+      deviceType: 'KDS',
+      name: 'Grill screen',
+    });
+    expect(roomsForEvent(locate)).toEqual([rooms.device(rid, kds.deviceId)]);
+    expect(reaches(roomsForEvent(locate), new Set(roomsForConnection({ device: kds })))).toBe(true);
+    const manager = roomsForConnection({
+      device: pos,
+      person: { staffId: randomUUID(), role: 'MANAGER' },
+    });
+    expect(reaches(roomsForEvent(locate), new Set(manager))).toBe(false);
+    expect(isLiveOnly(locate)).toBe(true);
+    expect(isLiveOnly(domainEvent('MenuPublished', rid, { menuVersion: 4 }))).toBe(false);
+  });
+
   it('never crosses restaurants', () => {
     const tablet = device({ type: 'TABLE_TABLET', tableId: table1, restaurantId: other });
     const joined = new Set(roomsForConnection({ device: tablet }));
@@ -441,6 +466,8 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', online: true });
     case 'DeviceRevoked':
       return domainEvent(type, rid, { deviceId: id(), deviceType: 'POS', reason: 'Lost' });
+    case 'DeviceLocateRequested':
+      return domainEvent(type, rid, { deviceId: id(), deviceType: 'KDS', name: 'Grill screen' });
     case 'PrinterStatusChanged':
       return domainEvent(type, rid, {
         printerId: id(),

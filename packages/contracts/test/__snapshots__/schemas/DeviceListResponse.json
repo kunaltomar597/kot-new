@@ -68,7 +68,14 @@
                 { "type": "null" }
               ]
             },
-            "appVersion": { "type": ["string", "null"] }
+            "appVersion": { "type": ["string", "null"] },
+            "online": { "type": "boolean" },
+            "batteryPercent": {
+              "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+            },
+            "batteryLow": { "type": "boolean" },
+            "firmwareVersion": { "type": ["string", "null"] },
+            "serial": { "type": ["string", "null"] }
           },
           "required": [
             "id",
@@ -80,7 +87,12 @@
             "staffId",
             "pairedAt",
             "lastSeenAt",
-            "appVersion"
+            "appVersion",
+            "online",
+            "batteryPercent",
+            "batteryLow",
+            "firmwareVersion",
+            "serial"
           ]
         }
       }
@@ -156,7 +168,14 @@
                 { "type": "null" }
               ]
             },
-            "appVersion": { "type": ["string", "null"] }
+            "appVersion": { "type": ["string", "null"] },
+            "online": { "type": "boolean" },
+            "batteryPercent": {
+              "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+            },
+            "batteryLow": { "type": "boolean" },
+            "firmwareVersion": { "type": ["string", "null"] },
+            "serial": { "type": ["string", "null"] }
           },
           "required": [
             "id",
@@ -168,7 +187,12 @@
             "staffId",
             "pairedAt",
             "lastSeenAt",
-            "appVersion"
+            "appVersion",
+            "online",
+            "batteryPercent",
+            "batteryLow",
+            "firmwareVersion",
+            "serial"
           ],
           "additionalProperties": false
         }

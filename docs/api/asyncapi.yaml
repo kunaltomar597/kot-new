@@ -141,6 +141,11 @@ channels:
     messages:
       DeviceRevoked:
         $ref: '#/components/messages/DeviceRevoked'
+  DeviceLocateRequested:
+    address: DeviceLocateRequested
+    messages:
+      DeviceLocateRequested:
+        $ref: '#/components/messages/DeviceLocateRequested'
   PrinterStatusChanged:
     address: PrinterStatusChanged
     messages:
@@ -165,6 +170,15 @@ channels:
     messages:
       PagerAlertMessage:
         $ref: '#/components/messages/PagerAlertMessage'
+  pagerLocate:
+    address: rp/{restaurantId}/pagers/{deviceId}/locate
+    description: 'Server → pager, QoS 0. A manager is looking for the pager (MGR-006 "Locate"): vibrate and light up for a few seconds. Only the pager itself may subscribe; nothing is queued.'
+    parameters:
+      restaurantId: {}
+      deviceId: {}
+    messages:
+      PagerLocateMessage:
+        $ref: '#/components/messages/PagerLocateMessage'
   pagerAck:
     address: rp/{restaurantId}/pagers/{deviceId}/ack
     description: 'Pager → server: the wearer pressed the button on this alert.'
@@ -346,6 +360,12 @@ operations:
       $ref: '#/channels/DeviceRevoked'
     messages:
       - $ref: '#/channels/DeviceRevoked/messages/DeviceRevoked'
+  receiveDeviceLocateRequested:
+    action: receive
+    channel:
+      $ref: '#/channels/DeviceLocateRequested'
+    messages:
+      - $ref: '#/channels/DeviceLocateRequested/messages/DeviceLocateRequested'
   receivePrinterStatusChanged:
     action: receive
     channel:
@@ -370,6 +390,12 @@ operations:
       $ref: '#/channels/pagerAlerts'
     messages:
       - $ref: '#/channels/pagerAlerts/messages/PagerAlertMessage'
+  sendpagerLocate:
+    action: send
+    channel:
+      $ref: '#/channels/pagerLocate'
+    messages:
+      - $ref: '#/channels/pagerLocate/messages/PagerLocateMessage'
   receivepagerAck:
     action: receive
     channel:
@@ -546,6 +572,12 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/DeviceRevoked'
+    DeviceLocateRequested:
+      name: DeviceLocateRequested
+      title: DeviceLocateRequested v1
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeviceLocateRequested'
     PrinterStatusChanged:
       name: PrinterStatusChanged
       title: PrinterStatusChanged v1
@@ -569,6 +601,11 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/PagerAlertMessage'
+    PagerLocateMessage:
+      name: PagerLocateMessage
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PagerLocateMessage'
     PagerAckMessage:
       name: PagerAckMessage
       contentType: application/json
@@ -915,6 +952,52 @@ components:
           required:
             - invoiceId
             - grandTotal
+          additionalProperties: false
+      required:
+        - eventId
+        - type
+        - version
+        - occurredAt
+        - restaurantId
+        - businessDate
+        - payload
+      additionalProperties: false
+    DeviceLocateRequested:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        type:
+          type: string
+          const: DeviceLocateRequested
+        version:
+          type: number
+          const: 1
+        occurredAt:
+          $ref: '#/components/schemas/Timestamp'
+        restaurantId:
+          $ref: '#/components/schemas/Id'
+        businessDate:
+          $ref: '#/components/schemas/IsoDate'
+        correlationId:
+          type: string
+          maxLength: 64
+        payload:
+          type: object
+          properties:
+            deviceId:
+              $ref: '#/components/schemas/Id'
+            deviceType:
+              $ref: '#/components/schemas/DeviceType'
+            name:
+              type: string
+              maxLength: 60
+          required:
+            - deviceId
+            - deviceType
+            - name
           additionalProperties: false
       required:
         - eventId
@@ -1581,6 +1664,14 @@ components:
         - battery
         - rssi
         - firmware
+      additionalProperties: false
+    PagerLocateMessage:
+      type: object
+      properties:
+        sentAt:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - sentAt
       additionalProperties: false
     Paise:
       type: integer

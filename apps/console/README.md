@@ -6,8 +6,8 @@ role-based modes:
 - POS (`/pos`): tables, order entry, billing, shifts, day-end (Phase 1);
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
 - Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c),
-  staff and the Owner's sign-in security (P4-02a), today's sections and pagers (P4-02b); more
-  management, configuration and reports (Phase 4).
+  staff and the Owner's sign-in security (P4-02a), today's sections and pagers (P4-02b), devices
+  (P4-02c); more management, configuration and reports (Phase 4).
 
 Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
 `@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
@@ -93,6 +93,24 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   issue a new credential after a warning. The credential shows once, in a dialog only "I have
   entered it" closes. The list follows `RestaurantChanged` and `DeviceStatusChanged`, and reads
   batteries again every minute.
+- Devices (`/manage/devices`, P4-02c, MGR-006, for those who may pair devices):
+  `src/manage/devices/`. `DevicesScreen.tsx` groups paired devices by type (POS, manager
+  browsers, kitchen screens, waiter phones, table tablets, pagers) and shows for each what it is
+  bound to (table, station, the person a phone alerts or who wears a pager), Connected or Not
+  connected, its battery (low by the level of its type), app or firmware version, serial and when
+  it was last seen (IST, "today" or the date). This console is marked and cannot be located or
+  unpaired from itself. `DeviceDialogs.tsx`: pair a device (type, name suggested as "Kitchen
+  screen N" or "Table T7 tablet", a tablet's table, a screen's station, a phone's holder), then the
+  one-time code with the server addresses, the CA fingerprint and, for the phone and tablet apps, a
+  QR code, until the device pairs (it appears in the list) or the code expires ("Get a new
+  code"); rename; move a tablet to another table. Unpairing asks for a reason. The list follows
+  `RestaurantChanged`, `DeviceStatusChanged` and `DeviceRevoked`, and reads connection and battery
+  states again every minute.
+- Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
+  `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
+  Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console
+  shows its new name at once: the controller reads its own device again on `RestaurantChanged`
+  `DEVICES`.
 - The Owner's second factor (`src/owner/second-factor.tsx`, AUTH-006): `useSecondFactor` tries an
   action and, when the server answers SECOND_FACTOR_REQUIRED, asks for the Owner password and an
   authenticator code (or a recovery code, typed like a pairing code), confirms them with

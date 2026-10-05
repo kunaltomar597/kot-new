@@ -1,11 +1,13 @@
 import type { INestApplication } from '@nestjs/common';
 import {
+  ApiError,
   DeviceAlertsResponse,
   type LoginResponse,
   MyPagerResponse,
   PagerAlertMessage,
   PagerCredentialResponse,
   PagerListResponse,
+  PagerLocateMessage,
   PagerView,
   TableSessionView,
 } from '@rp/contracts';
@@ -120,7 +122,8 @@ async function connect(
   });
   clients.push(client);
   const messages: PagerAlertMessage[] = [];
-  client.on('message', (_topic, payload) => {
+  client.on('message', (topic, payload) => {
+    if (topic !== credential.alertsTopic) return;
     messages.push(PagerAlertMessage.parse(JSON.parse(payload.toString())));
   });
   const granted = await client.subscribeAsync(credential.alertsTopic, { qos: 1 });
@@ -455,5 +458,76 @@ describe('[PGR-012] [PGR-014] re-assignment', () => {
     await expect(connect(pagerB)).rejects.toThrow();
     await connect(rotated);
     expect(await changesAnnounced(pagerB.deviceId)).toBe(announced + 1);
+  });
+});
+
+describe('[MGR-006] [AUTH-008] locating and unpairing a pager', () => {
+  it('vibrates the pager a manager is looking for, only while it is connected', async () => {
+    const pager = await register('WP-0010', null);
+    expect(pager.locateTopic).toBe(`rp/${kit.restaurantId}/pagers/${pager.deviceId}/locate`);
+    const offline = await server()
+      .post(`/api/v1/devices/${pager.deviceId}/locate`)
+      .set(as(manager));
+    expect(ApiError.parse(offline.body).code).toBe('DEVICE_NOT_CONNECTED');
+
+    const { client, messages } = await connect(pager);
+    const located: PagerLocateMessage[] = [];
+    client.on('message', (topic, payload) => {
+      if (topic === pager.locateTopic) {
+        located.push(PagerLocateMessage.parse(JSON.parse(payload.toString())));
+      }
+    });
+    await client.subscribeAsync(pager.locateTopic, { qos: 0 });
+    const response = await server()
+      .post(`/api/v1/devices/${pager.deviceId}/locate`)
+      .set(as(manager));
+    expect(response.status, JSON.stringify(response.body)).toBe(204);
+    const message = await until(() => located[0], 5_000, 'the locate message');
+    expect(message.sentAt).toBe(now.toISOString());
+    // It is not an alert: nothing to acknowledge, nothing queued.
+    expect(messages).toHaveLength(0);
+  });
+
+  it('disconnects an unpaired pager at once, ends its alerts and ignores what it still sends', async () => {
+    const pager = await register('WP-0011', null);
+    const { client } = await connect(pager);
+    await client.publishAsync(
+      pager.heartbeatTopic,
+      JSON.stringify({ battery: 5, rssi: -70, firmware: '1.0.3' }),
+      { qos: 1 },
+    );
+    const low = await until(
+      () =>
+        prisma.alert
+          .findFirst({ where: { dedupeKey: `device:${pager.deviceId}:low`, status: 'OPEN' } })
+          .then((found) => found ?? undefined),
+      5_000,
+      'the low battery alert',
+    );
+
+    const started = performance.now();
+    const revoked = await server()
+      .post(`/api/v1/devices/${pager.deviceId}/revoke`)
+      .set(as(manager))
+      .send({ reason: 'Strap broke' });
+    expect(revoked.status, JSON.stringify(revoked.body)).toBe(200);
+    // AUTH-008: its connection closes within 5 s, not at its next reconnect.
+    await until(() => !client.connected, 5_000, 'the pager to be disconnected');
+    expect(performance.now() - started).toBeLessThan(5_000);
+    await until(
+      async () =>
+        (await prisma.alert.findUniqueOrThrow({ where: { id: low.id } })).status !== 'OPEN',
+      5_000,
+      'the device alert to end',
+    );
+    await expect(connect(pager)).rejects.toThrow();
+    const stored = await prisma.device.findUniqueOrThrow({ where: { id: pager.deviceId } });
+    expect(stored).toMatchObject({ status: 'REVOKED', online: false });
+    const list = PagerListResponse.parse(
+      (await server().get('/api/v1/pagers').set(as(manager))).body,
+    );
+    expect(list.pagers.map((entry) => entry.deviceId)).not.toContain(pager.deviceId);
+    // Three missed heartbeats later it is not reported offline: it is gone, not lost.
+    expect(await app.get(PagerBroker).checkOffline(new Date(now.getTime() + 600_000))).toBe(0);
   });
 });

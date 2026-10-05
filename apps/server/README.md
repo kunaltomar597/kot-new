@@ -135,10 +135,21 @@ backup, updates and diagnostics.
 - Unpairing (AUTH-008): `POST /api/v1/devices/:deviceId/revoke` marks the device REVOKED, revokes
   every staff session on it and appends a `DeviceRevoked` event to the outbox; the real-time
   gateway closes the device's live connections when it publishes that event (P0-12). A manager
-  cannot unpair the device they are using.
+  cannot unpair the device they are using. An unpaired pager is disconnected from the broker at
+  once, its heartbeats and acknowledgements are ignored and its device alerts are cleared
+  (P4-02c).
 - Table tablets (AUTH-009): `PUT /api/v1/devices/:deviceId/table` (manager) moves a tablet to
   another table; `assertTableAccess(device, tableId)` (`src/devices/device-scope.ts`) is the
   object-level check every table-scoped endpoint must call.
+- Device management (P4-02c, MGR-006): `GET /api/v1/devices` lists every device with whether it
+  is connected now (a live connection in its device room, or a pager's heartbeats), its battery
+  against the low level of its type (`lowBatteryLevelFor` in `@rp/domain`), firmware and serial.
+  `PATCH /api/v1/devices/:deviceId` renames it (audited `DEVICE_RENAMED`). `POST
+/api/v1/devices/:deviceId/locate` appends `DeviceLocateRequested` (6 a minute per device, only
+  while connected): the gateway sends it to that device's room only and never replays it
+  (`isLiveOnly`), and the broker publishes it to a pager on `.../locate`. Pairing, renaming,
+  moving and unpairing are announced as `RestaurantChanged` `DEVICES`. `last_seen_at` is written
+  by device authentication (at most once a minute) and when a live connection closes.
 - Tests: `test/helpers/auth-kit.ts` registers devices with an Ed25519 key and gets real device
   tokens through the challenge flow; `authHeaders(deviceId, accessToken)` sends both.
 
@@ -523,7 +534,9 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `src/pagers/pager-broker.ts` embeds the MQTT broker (Aedes) on `RP_MQTT_PORT` (8883), over TLS
   when `RP_TLS` is on.
 - Each pager signs in with its device id and its own secret, and the ACL keeps it to its own
-  topics: `rp/<restaurant>/pagers/<device>/alerts|ack|heartbeat`.
+  topics: `rp/<restaurant>/pagers/<device>/alerts|locate|ack|heartbeat` (it reads `alerts` and
+  `locate`, and writes `ack` and `heartbeat`). "Locate" (P4-02c) is published at QoS 0: a pager
+  that is not connected is not asked later.
 - Alert events reach the recipients' pagers at QoS 1 (only the alerts `reachesPagerAndApp` lets
   through), and a pager that connects is sent its wearer's open alerts again. Heartbeats feed
   battery, signal and offline detection.

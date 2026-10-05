@@ -228,6 +228,45 @@ describe('[AUTH-001] [AUTH-005] signing in and out', () => {
   });
 });
 
+describe('[MGR-006] a manager renames this console', () => {
+  const devicesChanged = (sequence: number, part: 'DEVICES' | 'STAFF') => ({
+    sequence,
+    event: {
+      eventId: `0199a0e0-0000-4000-8000-00000000090${String(sequence)}`,
+      type: 'RestaurantChanged',
+      version: 1,
+      occurredAt: new Date().toISOString(),
+      restaurantId: RESTAURANT_ID,
+      businessDate: '2026-09-28',
+      payload: { part },
+    },
+  });
+
+  it('shows and keeps its new name as soon as the restaurant’s devices change', async () => {
+    const fake = server().on(
+      'GET',
+      '/api/v1/devices/current',
+      () => ({ status: 200, body: deviceSummary() }),
+      () => ({ status: 200, body: deviceSummary({ name: 'Bar POS' }) }),
+    );
+    const { controller, storage, sockets } = setup(fake);
+    await controller.start();
+    await controller.pair('ABCD-EFGH');
+    sockets.sync(0);
+
+    sockets.last.fire('event', devicesChanged(1, 'DEVICES'));
+    await expect.poll(() => controller.getSnapshot().device?.name).toBe('Bar POS');
+    await expect.poll(() => storage.device?.summary.name).toBe('Bar POS');
+    expect(storage.device?.device).toMatchObject({ deviceId: DEVICE_ID });
+
+    // Other changes to the setup do not read the device again.
+    const reads = fake.callsTo('GET', '/api/v1/devices/current').length;
+    sockets.last.fire('event', devicesChanged(2, 'STAFF'));
+    await Promise.resolve();
+    expect(fake.callsTo('GET', '/api/v1/devices/current')).toHaveLength(reads);
+  });
+});
+
 describe('[SEC-006] the device key stays a key object in IndexedDB', () => {
   it('stores and reloads the non-extractable key pair, the device and the session', async () => {
     const storage = new BrowserStorage(indexedDB, memoryStorage(), memoryStorage());

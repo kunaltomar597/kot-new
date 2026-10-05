@@ -750,7 +750,108 @@ test.describe.serial('the web console', () => {
     await expectAccessible(page);
   });
 
-  test('[SEC-003] a cashier cannot open the Staff page', async () => {
+  test('[MGR-006] [AUTH-007] [AUTH-008] a manager pairs a kitchen screen, locates and renames it, then unpairs it', async ({
+    browser,
+  }) => {
+    // Vikram is still signed in from the previous test.
+    await expect(page).toHaveURL(/\/manage/);
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.devices') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('devices.title') })).toBeVisible();
+    const row = (name: string) =>
+      page.getByRole('listitem').filter({
+        has: page.getByRole('heading', { level: 4, name: new RegExp(`^${escape(name)}`) }),
+      });
+    await expect(
+      row('Server POS').getByText(t('devices.thisDevice'), { exact: true }),
+    ).toBeVisible();
+    await expect(row('Pager 1').getByText(t('devices.wornBy', { name: 'Sunita' }))).toBeVisible();
+    await expectAccessible(page);
+
+    // Pair a kitchen screen for the whole kitchen.
+    await page.getByRole('button', { name: t('devices.pair') }).click();
+    const pair = page.getByRole('dialog', { name: t('devices.pairDialog.title') });
+    await pair
+      .getByLabel(t('devices.pairDialog.type'))
+      .selectOption({ label: t('devices.type.KDS') });
+    await expect(pair.getByLabel(/^Name( \*)?$/)).toHaveValue('Kitchen screen 1');
+    await pair
+      .getByLabel(t('devices.pairDialog.station'), { exact: false })
+      .selectOption({ label: 'Kitchen' });
+    await expectAccessible(page);
+    await pair.getByRole('button', { name: t('devices.pairDialog.create') }).click();
+    const issued = page.getByRole('dialog', {
+      name: t('devices.pairDialog.codeTitle', { name: 'Kitchen screen 1' }),
+    });
+    await expect(issued.getByRole('status')).toHaveText(t('devices.pairDialog.waiting'));
+    const code = await issued.locator('code').first().innerText();
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    await expectAccessible(page);
+
+    // Another browser is the kitchen screen: it pairs with the code and shows the kitchen.
+    const kitchen = await browser.newContext();
+    const screen = await kitchen.newPage();
+    await screen.goto(server.url);
+    await screen.getByLabel(t('pairing.codeLabel')).fill(code);
+    await screen.getByRole('button', { name: t('pairing.submit') }).click();
+    await expect(screen).toHaveURL(/\/kds$/);
+    await expect(screen.getByText('Kitchen screen 1')).toBeVisible();
+    await expect(issued.getByRole('status')).toHaveText(
+      t('devices.pairDialog.paired', { name: 'Kitchen screen 1' }),
+    );
+    await issued.getByRole('button', { name: t('devices.pairDialog.done') }).click();
+    const kds = row('Kitchen screen 1');
+    await expect(kds.getByText(t('devices.station', { station: 'Kitchen' }))).toBeVisible();
+    // Connection states are read again every minute; reading the page again shows it now.
+    await page.reload();
+    await expect(kds.getByText(t('devices.connected'))).toBeVisible();
+
+    // Locate: the screen shows its name.
+    await kds.getByRole('button', { name: t('devices.locate') }).click();
+    await expect(page.getByText(t('devices.located', { name: 'Kitchen screen 1' }))).toBeVisible();
+    const located = screen.getByRole('dialog', {
+      name: t('locate.title', { name: 'Kitchen screen 1' }),
+    });
+    await expect(located).toBeVisible();
+    await located.getByRole('button', { name: t('locate.dismiss') }).click();
+    await expect(located).toHaveCount(0);
+
+    // Rename: the screen's header follows at once.
+    await kds.getByRole('button', { name: t('devices.rename') }).click();
+    const rename = page.getByRole('dialog', {
+      name: t('devices.renameDialog.title', { name: 'Kitchen screen 1' }),
+    });
+    await rename.getByLabel(/^New name( \*)?$/).fill('Tandoor screen');
+    await rename.getByRole('button', { name: t('devices.renameDialog.confirm') }).click();
+    await expect(page.getByText(t('devices.renamed', { name: 'Tandoor screen' }))).toBeVisible();
+    await expect(screen.getByText('Tandoor screen')).toBeVisible();
+
+    // A 360 px phone: the Devices page fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(row('Tandoor screen')).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // Unpair: the screen is back on the pairing screen within seconds (AUTH-008).
+    await row('Tandoor screen')
+      .getByRole('button', { name: t('devices.unpair') })
+      .click();
+    const unpair = page.getByRole('dialog', {
+      name: t('devices.unpairDialog.title', { name: 'Tandoor screen' }),
+    });
+    await unpair.getByLabel(t('devices.unpairDialog.reason')).fill('Moved to the other branch');
+    await expectAccessible(page);
+    await unpair.getByRole('button', { name: t('devices.unpairDialog.confirm') }).click();
+    const unpaired = Date.now();
+    await expect(page.getByText(t('devices.unpaired', { name: 'Tandoor screen' }))).toBeVisible();
+    await expect(screen).toHaveURL(/\/pair$/, { timeout: 5_000 });
+    expect(Date.now() - unpaired).toBeLessThan(5_000);
+    await expect(screen.getByText(t('pairing.revoked'))).toBeVisible();
+    await expect(row('Tandoor screen')).toHaveCount(0);
+    await kitchen.close();
+  });
+
+  test('[SEC-003] a cashier cannot open the Staff or Devices pages', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
     await page.keyboard.type('3333');
@@ -758,5 +859,8 @@ test.describe.serial('the web console', () => {
     await page.goto(`${server.url}/manage/staff`);
     await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: t('staff.title') })).toHaveCount(0);
+    await page.goto(`${server.url}/manage/devices`);
+    await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: t('devices.title') })).toHaveCount(0);
   });
 });

@@ -75,6 +75,7 @@ import {
   DeviceChallengeRequest,
   DeviceChallengeResponse,
   DeviceListResponse,
+  DeviceParams,
   DeviceSummary,
   DeviceTokenRequest,
   DeviceTokenResponse,
@@ -82,6 +83,7 @@ import {
   PairedDevice,
   PairingCodeResponse,
   RevokeDeviceRequest,
+  UpdateDeviceRequest,
 } from './devices.js';
 import {
   FloorArchiveRequest,
@@ -958,21 +960,63 @@ export const ROUTES = [
     operationId: 'listDevices',
     method: 'GET',
     path: '/api/v1/devices',
-    summary: 'Paired and revoked devices of the restaurant',
+    summary: 'Paired and revoked devices of the restaurant, with their state now',
+    description:
+      'Each device with its binding, whether it is connected now, its battery against the low ' +
+      'level of its type, and its app and firmware versions (MGR-006). Keys are never listed.',
     tags: ['devices'],
-    requirements: ['AUTH-007', 'AUTH-008'],
+    requirements: ['AUTH-007', 'AUTH-008', 'MGR-006', 'TAB-015'],
     capability: 'DEVICE_PAIR',
     responses: { 200: { description: 'Devices.', schema: DeviceListResponse }, ...standardErrors },
+  },
+  {
+    operationId: 'renameDevice',
+    method: 'PATCH',
+    path: '/api/v1/devices/:deviceId',
+    summary: 'Rename a device',
+    description: 'Audited. The device and every device list hear of it (`RestaurantChanged`).',
+    tags: ['devices'],
+    requirements: ['MGR-006', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { params: DeviceParams, body: UpdateDeviceRequest },
+    responses: {
+      200: { description: 'Renamed.', schema: DeviceSummary },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+      409: { description: 'The device is unpaired.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'locateDevice',
+    method: 'POST',
+    path: '/api/v1/devices/:deviceId/locate',
+    summary: 'Make a device show itself: a screen sounds, a tablet beeps, a pager vibrates',
+    description:
+      'Only while the device is connected: the request is refused otherwise, and a device that ' +
+      'connects later does not hear it (`DeviceLocateRequested`, MGR-006).',
+    tags: ['devices'],
+    requirements: ['MGR-006'],
+    capability: 'DEVICE_PAIR',
+    request: { params: DeviceParams },
+    responses: {
+      204: { description: 'The device was asked to show itself.' },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+      409: { description: 'The device is unpaired or not connected.', schema: ApiError },
+    },
   },
   {
     operationId: 'revokeDevice',
     method: 'POST',
     path: '/api/v1/devices/:deviceId/revoke',
     summary: 'Unpair a device: its tokens and sessions stop working at once',
+    description:
+      'Its live connections close within 5 seconds, a pager is disconnected from the broker, and ' +
+      'its device alerts are cleared. Audited with the reason.',
     tags: ['devices'],
-    requirements: ['AUTH-008'],
+    requirements: ['AUTH-008', 'MGR-006'],
     capability: 'DEVICE_PAIR',
-    request: { params: z.object({ deviceId: Id }), body: RevokeDeviceRequest },
+    request: { params: DeviceParams, body: RevokeDeviceRequest },
     responses: { 200: { description: 'Revoked.', schema: DeviceSummary }, ...standardErrors },
   },
   {
@@ -980,11 +1024,13 @@ export const ROUTES = [
     method: 'PUT',
     path: '/api/v1/devices/:deviceId/table',
     summary: 'Move a table tablet to another table',
-    description: 'Needs a manager (AUTH-009); the tablet then serves only the new table.',
+    description:
+      'Needs a manager (AUTH-009); the tablet then serves only the new table, and its live ' +
+      'connection restarts in the new table’s rooms. Audited.',
     tags: ['devices'],
-    requirements: ['AUTH-009'],
+    requirements: ['AUTH-009', 'TAB-002'],
     capability: 'DEVICE_PAIR',
-    request: { params: z.object({ deviceId: Id }), body: BindTableRequest },
+    request: { params: DeviceParams, body: BindTableRequest },
     responses: { 200: { description: 'Rebound.', schema: DeviceSummary }, ...standardErrors },
   },
   {

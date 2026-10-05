@@ -18,6 +18,15 @@ low-battery alert at 20 %; restaurant branding (logo, accent colour).
 Acceptance: Maestro test for open → use → close → wiped; server rejects the tablet acting on
 another table.
 
+Built for it in P4-02c: the manager's Devices page lists tablets with their table, connection,
+battery (low at `devices.lowBatteryAlertPercent`), app version and last seen, moves a tablet to
+another table and unpairs it. The tablet still needs to: report battery and charging (a route for
+device health that stores them on the device, adds `charging` to `DeviceView` and emits
+`DeviceStatusChanged` on a change of state, so the low-battery alert fires); answer
+`DeviceLocateRequested` for itself (it arrives in the device's room) by beeping and showing its
+name for a few seconds; and follow `RestaurantChanged` `DEVICES` to show a new name, and restart
+in its new table's rooms after a move (the gateway ends its connection with `DEVICE_CHANGED`).
+
 ## P3-02 Service requests end to end
 
 Goal: the Water / Waiter / Bill / Cancel buttons work like a cabin call light.

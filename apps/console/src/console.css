@@ -1179,6 +1179,69 @@ body {
   user-select: all;
 }
 
+/* Devices (P4-02c, MGR-006): one group per type, the pairing code with its QR code. */
+.device-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  min-width: 0;
+}
+
+.device-group__heading {
+  margin: 0;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.pairing-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--rp-space-3);
+}
+
+.pairing-code .pager-credential {
+  width: 100%;
+}
+
+.pairing-code__addresses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+}
+
+.pairing-code__address,
+.pairing-code__fingerprint {
+  font-family: var(--rp-font-mono);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.pairing-code__hint {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  align-self: stretch;
+}
+
+.pairing-code__state {
+  margin: 0;
+  align-self: stretch;
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.pairing-code__state[data-state='paired'] {
+  color: var(--rp-color-success-text);
+}
+
+.pairing-code__state[data-state='expired'] {
+  color: var(--rp-color-danger-text);
+}
+
+/* A located console (MGR-006): its name large enough to read from across the room. */
+.locate-dialog .rp-dialog__title {
+  font-size: var(--rp-font-size-2xl);
+}
+
 /* The Owner's sign-in security (P4-02a, AUTH-006). */
 .security-cards {
   display: grid;

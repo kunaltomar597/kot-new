@@ -62,6 +62,8 @@ export class ConsoleController {
   private readonly listeners = new Set<() => void>();
   private readonly eventListeners = new Set<(event: DomainEvent) => void>();
   private client: ApiClient;
+  /** The device key of the paired client, to store its record again when the device changes. */
+  private keyPair: CryptoKeyPair | undefined;
   private connection: RealtimeConnection | undefined;
 
   constructor(private readonly options: ConsoleControllerOptions) {
@@ -95,6 +97,7 @@ export class ConsoleController {
       await this.keyFromPair(record.keyPair),
       record.keyPair,
     );
+    this.keyPair = record.keyPair;
     let device = record.summary;
     let person = session?.staff;
     let current = session?.session;
@@ -134,6 +137,7 @@ export class ConsoleController {
     this.options.storage.saveSession(undefined);
     this.options.storage.saveResume(undefined);
     this.client = client;
+    this.keyPair = keyPair;
     this.update({
       phase: 'paired',
       device: summary,
@@ -234,6 +238,7 @@ export class ConsoleController {
   private async forget(): Promise<void> {
     this.stop();
     this.client = this.createClient(undefined, undefined, undefined);
+    this.keyPair = undefined;
     this.options.storage.saveSession(undefined);
     this.options.storage.saveResume(undefined);
     this.update({
@@ -254,6 +259,9 @@ export class ConsoleController {
       ...(resume !== undefined && { resume }),
       ...(this.options.connect !== undefined && { connect: this.options.connect }),
       onEvent: (event) => {
+        if (event.type === 'RestaurantChanged' && event.payload.part === 'DEVICES') {
+          void this.refreshDevice();
+        }
         for (const listener of this.eventListeners) listener(event);
       },
       onStatus: (status) => {
@@ -267,6 +275,29 @@ export class ConsoleController {
     connection.start();
   }
 
+  /**
+   * Reads this device again after a manager changed the restaurant's devices (P4-02c), so a
+   * renamed console shows its new name at once. Unpairing is handled by `onDeviceRevoked`.
+   */
+  private async refreshDevice(): Promise<void> {
+    const current = this.snapshot.device;
+    if (this.snapshot.phase !== 'paired' || current === undefined) return;
+    let device: DeviceSummary;
+    try {
+      device = await this.client.api.getCurrentDevice();
+    } catch {
+      return; // Offline: the banner says so, and the next change reads it again.
+    }
+    const latest = this.snapshot.device;
+    if (latest?.id !== device.id || sameDevice(latest, device)) return;
+    this.update({ device });
+    const credentials = this.client.device;
+    if (this.keyPair === undefined || credentials === undefined) return;
+    this.options.storage
+      .saveDevice({ keyPair: this.keyPair, device: credentials, summary: device })
+      .catch((error: unknown) => this.options.onError?.(error));
+  }
+
   private async keyFromPair(keyPair: CryptoKeyPair): Promise<DeviceKey> {
     return (this.options.keyFromPair ?? webCryptoDeviceKey)(keyPair);
   }
@@ -275,4 +306,16 @@ export class ConsoleController {
     this.snapshot = { ...this.snapshot, ...changes };
     for (const listener of this.listeners) listener();
   }
+}
+
+/** What the console shows of its own device: its name and binding (not when it was last seen). */
+function sameDevice(a: DeviceSummary, b: DeviceSummary): boolean {
+  return (
+    a.name === b.name &&
+    a.type === b.type &&
+    a.status === b.status &&
+    a.tableId === b.tableId &&
+    a.stationId === b.stationId &&
+    a.staffId === b.staffId
+  );
 }

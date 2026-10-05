@@ -131,6 +131,17 @@ dialog shows the QR code (`qrPayload`), the code, the server addresses (`serverU
 fingerprint (`caSha256`), which phones typing an address compare (P2-01d).
 Acceptance: Playwright pair, rename and unpair flow.
 
+As built: `GET /api/v1/devices` returns `DeviceView` (connected now, battery, `batteryLow` by the
+level of the device's type, firmware, serial); `PATCH /api/v1/devices/:deviceId` renames
+(audited); `POST /api/v1/devices/:deviceId/locate` sends the live-only `DeviceLocateRequested` to
+that device's room, or to a pager over MQTT (`.../locate`), only while it is connected (409
+otherwise, 6 a minute). Pairing, renaming, moving and unpairing are announced as
+`RestaurantChanged` `DEVICES`. Unpairing a pager now disconnects it from the broker, ignores its
+heartbeats and acknowledgements and clears its device alerts. `last_seen_at` is also written when
+a live connection closes. The console's Devices page is `/manage/devices` (`DEVICE_PAIR`); a
+located console shows its name and chimes (`LocateOverlay`), and a renamed one shows its new name
+at once. The tablet's and pager's side of Locate are in P3-01 and P2-05.
+
 ### P4-02d Menu editor
 
 Requirements: MGR-005, MENU-001 to MENU-011 (the manager's side).
@@ -171,6 +182,14 @@ system screen (storage usage, backup status, licence status and reminders, updat
 dashboard's Alerts page (`/manage/alerts`, P4-01); this WP adds what the spec lists beyond it and
 the system screen as a fourth page.
 Acceptance: Playwright tests with seeded alerts.
+
+Device alerts for kitchen screens and table tablets (NTF-003) need a publisher: pagers report
+through heartbeats, but nothing yet says when a screen or tablet has been disconnected too long.
+Add it here: the gateway notes when a KDS or tablet's last live connection closes and, when it has
+not come back within a grace period (a new setting, e.g. `devices.offlineAfterSeconds`, default
+60 s, so a page reload raises nothing), publishes `DeviceStatusChanged` `online: false`, and
+`online: true` when it connects again (also after a server restart, from the stored `online`).
+The notification triggers already turn those into one alert per state.
 
 ## P4-05 Full report suite
 

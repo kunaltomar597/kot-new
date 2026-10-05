@@ -31,7 +31,7 @@ import { SessionService } from '../auth/session.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
 import { EventBus, type PublishedEvent } from '../events/event-bus.js';
-import { reaches, rooms, roomsForConnection, roomsForEvent } from './rooms.js';
+import { isLiveOnly, reaches, rooms, roomsForConnection, roomsForEvent } from './rooms.js';
 
 export const REALTIME_OPTIONS = Symbol('REALTIME_OPTIONS');
 
@@ -293,6 +293,9 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     socket.on(REALTIME_MESSAGES.resync, (request: unknown, ack: unknown) => {
       void this.resync(socket, request, ack);
     });
+    socket.on('disconnect', () => {
+      this.seen(socket.data.device);
+    });
     try {
       await this.bus.withPublishLock(async () => {
         const sync = await this.replay(socket, socket.data.resume);
@@ -305,6 +308,23 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
       // Transport-level close: the client reconnects and tries again.
       socket.conn.close();
     }
+  }
+
+  /**
+   * When an app or screen was last connected (MGR-006 "last seen"): the handshake and its requests
+   * record it (`DeviceTokenAuthenticator`), and this records when it left, so a screen that was
+   * connected all day is not shown as last seen in the morning. While connected, the device list
+   * says so instead.
+   */
+  private seen(device: AuthenticatedDevice): void {
+    this.prisma.device
+      .updateMany({
+        where: { id: device.deviceId, status: 'ACTIVE' },
+        data: { lastSeenAt: new Date() },
+      })
+      .catch((error: unknown) => {
+        this.logger.warn({ err: error }, 'Could not record when a device was last seen');
+      });
   }
 
   private async resync(socket: RealtimeSocket, request: unknown, ack: unknown): Promise<void> {
@@ -358,7 +378,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         limit: REPLAY_BATCH,
       });
       for (const { sequence, event, audience } of events) {
-        if (!reaches(roomsForEvent(event, audience), joined)) continue;
+        if (isLiveOnly(event) || !reaches(roomsForEvent(event, audience), joined)) continue;
         socket.emit(REALTIME_MESSAGES.event, { sequence, event });
         replayed += 1;
       }
@@ -378,6 +398,11 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     return [rooms.staff(restaurantId, staffId), rooms.alerts(restaurantId, staffId)].some(
       (name) => (joined?.get(name)?.size ?? 0) > 0,
     );
+  }
+
+  /** Whether the device has a live connection now (MGR-006: shown as connected, can be located). */
+  isDeviceConnected(restaurantId: string, deviceId: string): boolean {
+    return (this.namespace?.adapter.rooms.get(rooms.device(restaurantId, deviceId))?.size ?? 0) > 0;
   }
 
   /** Live listener: each published event goes to its rooms (ORD-010). */

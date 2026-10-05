@@ -141,6 +141,7 @@ export function credential(deviceId: string = PAGER_2): PagerCredentialResponse 
     // Not a real credential: plain and repetitive, so it never passes for one (SEC-002 scan).
     mqttPassword: 'pager-pass-pager-pass-pager-pass',
     alertsTopic: topic('alerts'),
+    locateTopic: topic('locate'),
     ackTopic: topic('ack'),
     heartbeatTopic: topic('heartbeat'),
     mqttPort: 8883,
