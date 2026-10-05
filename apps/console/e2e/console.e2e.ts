@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createTranslator } from '@rp/i18n';
 import pg from 'pg';
@@ -10,7 +11,7 @@ import { type RunningServer, startServer } from './server.js';
  * P0-14b acceptance: a real browser pairs with the real server, people sign in with their PIN and
  * land in their mode, and the offline banner shows while the server is down (NFR-P11). Later work
  * packages add their flows: the POS floor, orders, the kitchen display, the manager dashboard on a
- * desktop and a phone, billing and alerts.
+ * desktop and a phone, billing, alerts, staff, devices and the menu editor.
  */
 
 const t = createTranslator();
@@ -124,6 +125,39 @@ function authenticatorCode(key: string): string {
   const digest = createHmac('sha1', Buffer.from(bytes)).update(counter).digest();
   const offset = (digest.at(-1) ?? 0) & 0x0f;
   return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/**
+ * A 640 × 480 PNG in one colour, made here so the test needs no image file. The server re-encodes
+ * it, so its 480 px rendition really is 480 px wide (MENU-008).
+ */
+function photoPng(): Buffer {
+  const width = 640;
+  const height = 480;
+  const chunk = (type: string, data: Buffer): Buffer => {
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const framed = Buffer.alloc(body.length + 8);
+    framed.writeUInt32BE(data.length, 0);
+    body.copy(framed, 4);
+    framed.writeUInt32BE(crc32(body), body.length + 4);
+    return framed;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.writeUInt8(8, 8); // 8 bits per channel
+  header.writeUInt8(2, 9); // RGB, no palette or alpha
+  // Every row: filter type 0, then the pixels in saffron orange.
+  const row = Buffer.concat([
+    Buffer.from([0]),
+    Buffer.alloc(width * 3, Buffer.from([0xf0, 0x8c, 0x28])),
+  ]);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
 test.describe.serial('the web console', () => {
@@ -849,6 +883,129 @@ test.describe.serial('the web console', () => {
     await expect(screen.getByText(t('pairing.revoked'))).toBeVisible();
     await expect(row('Tandoor screen')).toHaveCount(0);
     await kitchen.close();
+  });
+
+  test('[MGR-005] [MENU-003] [MENU-004] [MENU-008] [MENU-013] a manager adds a dish with sizes, a new modifier group and a photo, publishes it and the POS sells it', async () => {
+    // Vikram is still signed in from the previous test.
+    await expect(page).toHaveURL(/\/manage/);
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    await nav.getByRole('link', { name: t('dashboard.section.menu') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('menuEditor.items.title') }),
+    ).toBeVisible();
+    // The demo menu was published as version 1 and nothing has changed since.
+    const publishing = page.getByRole('region', { name: t('menuEditor.publish.label') });
+    await expect(publishing.getByText(/^Version 1 is on every screen/)).toBeVisible();
+    await expect(publishing.getByText(t('menuEditor.publish.upToDate'))).toBeVisible();
+    await expectAccessible(page);
+
+    // A new modifier group: an optional dip, one of two, one of them extra.
+    const pages = page.getByRole('navigation', { name: t('menuEditor.pages.label') });
+    await pages.getByRole('link', { name: t('menuEditor.pages.modifiers') }).click();
+    await page.getByRole('button', { name: t('menuEditor.modifiers.add') }).click();
+    const group = page.getByRole('dialog', { name: t('menuEditor.modifiers.dialog.addTitle') });
+    await group.getByLabel(/^Name( \*)?$/).fill('Dip');
+    const option = (key: 'optionName' | 'optionPrice', number: number) =>
+      group.getByLabel(t(`menuEditor.modifiers.dialog.${key}`, { number }), { exact: true });
+    await option('optionName', 1).fill('Mint chutney');
+    await group.getByRole('button', { name: t('menuEditor.modifiers.dialog.addOption') }).click();
+    await option('optionName', 2).fill('Cheese dip');
+    await option('optionPrice', 2).fill('30');
+    await expectAccessible(page);
+    await group.getByRole('button', { name: t('menuEditor.modifiers.dialog.save') }).click();
+    await expect(page.getByText(t('menuEditor.modifiers.saved', { name: 'Dip' }))).toBeVisible();
+
+    // The dish: two sizes, the dip and a photo.
+    await pages.getByRole('link', { name: t('menuEditor.pages.items') }).click();
+    await page.getByRole('button', { name: t('menuEditor.items.add') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('menuEditor.editor.newTitle') }),
+    ).toBeVisible();
+    await page.getByLabel(/^Name( \*)?$/).fill('Paneer Kathi Roll');
+    await page.getByLabel(/^Category( \*)?$/).selectOption({ label: 'Starters' });
+    await page.getByRole('radio', { name: t('pos.menu.foodType.VEG'), exact: true }).check();
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: t('menuEditor.editor.choosePhoto') }).click();
+    await (
+      await chooser
+    ).setFiles({ name: 'kathi-roll.png', mimeType: 'image/png', buffer: photoPng() });
+    const photo = page.getByRole('img', {
+      name: t('menuEditor.editor.photoAlt', { name: 'Paneer Kathi Roll' }),
+    });
+    await expect(photo).toBeVisible();
+    // Stored, resized and served back to the browser.
+    await expect
+      .poll(() => photo.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBe(480);
+    await page.getByLabel(/^Price \(₹\)( \*)?$/).fill('160');
+    await page.getByLabel(/^Tax group( \*)?$/).selectOption({ label: 'GST 5 %' });
+    const size = (key: 'sizeName' | 'sizePrice', number: number) =>
+      page.getByLabel(t(`menuEditor.editor.${key}`, { number }), { exact: true });
+    await page.getByRole('button', { name: t('menuEditor.editor.addSize') }).click();
+    await size('sizeName', 1).fill('Regular');
+    await size('sizePrice', 1).fill('160');
+    await page.getByRole('button', { name: t('menuEditor.editor.addSize') }).click();
+    await size('sizeName', 2).fill('Jumbo');
+    await size('sizePrice', 2).fill('220');
+    await page.getByRole('checkbox', { name: /^Dip/ }).check();
+    await page.getByLabel(/^Kitchen station( \*)?$/).selectOption({ label: 'Kitchen' });
+    await expectAccessible(page);
+    // A 360 px phone: the editor fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.getByRole('button', { name: t('menuEditor.editor.save') }).click();
+    await expect(
+      page.getByText(t('menuEditor.editor.saved', { name: 'Paneer Kathi Roll' })),
+    ).toBeVisible();
+
+    // Back on the list: saved as a draft, not yet on any screen.
+    const row = page
+      .getByRole('listitem')
+      .filter({ has: page.getByText('Paneer Kathi Roll', { exact: true }) });
+    await expect(
+      row.getByText(t('menuEditor.items.priceRange', { low: '₹160.00', high: '₹220.00' })),
+    ).toBeVisible();
+    await expect(row.getByText(t('menuEditor.items.sizes', { count: 2 }))).toBeVisible();
+    await expect(publishing.getByText(t('menuEditor.publish.changes'))).toBeVisible();
+    await page.setViewportSize({ width: 360, height: 780 });
+    await expect(row).toBeVisible();
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // Publish: every screen gets version 2.
+    await publishing.getByRole('button', { name: t('menuEditor.publish.button') }).click();
+    const confirm = page.getByRole('dialog', { name: t('menuEditor.publish.confirmTitle') });
+    await expectAccessible(page);
+    await confirm
+      .getByRole('button', { name: t('menuEditor.publish.confirm'), exact: true })
+      .click();
+    await expect(page.getByText(t('menuEditor.publish.done', { version: 2 }))).toBeVisible();
+    await expect(publishing.getByText(/^Version 2 is on every screen/)).toBeVisible();
+    await expect(publishing.getByText(t('menuEditor.publish.upToDate'))).toBeVisible();
+
+    // The cashier's POS offers it with its sizes and the dip, and takes the order.
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
+    await page.keyboard.type('3333');
+    await expect(page).toHaveURL(/\/pos$/);
+    await page.getByRole('button', { name: t('pos.takeaway') }).click();
+    await page.getByRole('button', { name: 'Starters', exact: true }).click();
+    await page.getByRole('button', { name: /^Paneer Kathi Roll, / }).click();
+    const roll = page.getByRole('dialog', { name: 'Paneer Kathi Roll' });
+    await roll.getByRole('radio', { name: /Jumbo/ }).check();
+    await roll.getByRole('radio', { name: /^Cheese dip/ }).check();
+    await roll.getByRole('button', { name: t('pos.item.add') }).click();
+    const cart = page.getByRole('complementary', { name: t('pos.cart.title') });
+    await expect(cart.getByText('Jumbo · Cheese dip')).toBeVisible();
+    await page.getByLabel(t('pos.cart.customer')).fill('Meera');
+    await cart.getByRole('button', { name: t('pos.cart.send') }).click();
+    await expect(page.getByText(/^Token \d+: order \d+ sent to the kitchen$/)).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: t('pos.sent.openTakeaway') })
+        .getByText('1 × Paneer Kathi Roll (Jumbo)'),
+    ).toBeVisible();
   });
 
   test('[SEC-003] a cashier cannot open the Staff or Devices pages', async () => {
