@@ -1124,6 +1124,11 @@ export const en = {
   /** The dashboard's Settings area (P4-03, MGR-007): how the restaurant runs. */
   settings: {
     title: 'Settings',
+    pages: {
+      label: 'Settings pages',
+      general: 'General',
+      notifications: 'Notifications',
+    },
     general: {
       intro:
         'Timers, limits, alerts and formats. Every change is kept in the audit log with who made it.',
@@ -1365,7 +1370,7 @@ export const en = {
       },
       rules: {
         label: 'Notification rules',
-        hint: 'Who each alert goes to, on which screens, and whether it repeats and escalates.',
+        hint: 'Who each alert goes to, where it shows, what pagers show and how they buzz, and whether it repeats and escalates.',
       },
       nudgePresets: {
         label: 'Nudge messages',
@@ -1376,10 +1381,6 @@ export const en = {
       heartbeatSeconds: {
         label: 'Pager check-in',
         hint: 'How often a pager reports its battery and signal. After three missed check-ins it counts as offline.',
-      },
-      vibration: {
-        label: 'Pager vibrations',
-        hint: 'How the pager vibrates for each kind of alert.',
       },
     },
     kds: {
@@ -1580,6 +1581,136 @@ export const en = {
         label: 'Clock',
         hint: 'How times show on screens, bills and reports.',
         options: { '12h': '12-hour (2:30 PM)', '24h': '24-hour (14:30)' },
+      },
+    },
+  },
+  /**
+   * The Notifications page (P4-03b, NTF-002, NTF-003, PGR-006): a rule for each alert of Appendix C,
+   * with N, R and the nudge messages.
+   */
+  notificationRules: {
+    title: 'Notification rules',
+    intro:
+      'Who gets each alert, where it shows, what pagers show and how they buzz, and what happens when nobody acknowledges it. Every change is kept in the audit log.',
+    loadFailed: 'The notification rules could not be loaded.',
+    timing: 'Timing and quick messages',
+    groups: {
+      orders: 'Orders and the kitchen',
+      tables: 'Table requests',
+      staff: 'Staff',
+      system: 'Devices and the system',
+    },
+    /** When each alert is raised. */
+    events: {
+      ORDER_PENDING_APPROVAL:
+        'A guest’s order from the table tablet or the QR menu waits for a waiter to approve it.',
+      ITEM_READY: 'The kitchen marks a ticket ready.',
+      WATER_REQUEST: 'A guest asks for water.',
+      WAITER_REQUEST: 'A guest calls a waiter.',
+      BILL_REQUEST: 'A guest or a waiter asks for the bill.',
+      READY_NOT_COLLECTED: 'The kitchen presses “Notify manager” for food waiting at the pass.',
+      MANAGER_NUDGE: 'A manager sends waiters a message.',
+      ORDER_CHANGED: 'An order is cancelled or changed after it reached the kitchen.',
+      WAITER_UNREACHABLE:
+        'A waiter cannot be reached: they are on a break, or their pager and phone are both off.',
+      DEVICE_LOW_BATTERY_OR_OFFLINE:
+        'A pager, table tablet or kitchen screen is low on battery or not connected.',
+      PRINTER_OFFLINE: 'A printer stops answering.',
+      DISK_OR_BACKUP: 'The data drive is filling up or a backup fails.',
+      LICENSE_STATE: 'The licence changes state, for example when it is about to expire.',
+    },
+    /** Whom an alert can go to, as choices. */
+    recipients: {
+      RESPONSIBLE_WAITER: 'The table’s waiter',
+      SECTION_WAITERS: 'The waiters of the table’s section',
+      ALL_WAITERS: 'Every waiter',
+      MANAGERS_ON_DUTY: 'The managers on duty',
+      CASHIER: 'The cashier',
+      STATION: 'The kitchen station',
+      OWNER: 'The Owner',
+      WEARER: 'Whoever wears the pager',
+      SELECTED: 'The waiters the manager chooses',
+    },
+    /** The same people inside a sentence. */
+    people: {
+      RESPONSIBLE_WAITER: 'the table’s waiter',
+      SECTION_WAITERS: 'the waiters of the table’s section',
+      ALL_WAITERS: 'every waiter',
+      MANAGERS_ON_DUTY: 'the managers on duty',
+      CASHIER: 'the cashier',
+      STATION: 'the kitchen station',
+      OWNER: 'the Owner',
+      WEARER: 'whoever wears the pager',
+      SELECTED: 'the waiters the manager chooses',
+    },
+    /** Where an alert shows. */
+    places: {
+      PHONES: 'Pager and waiter app',
+      SCREENS: 'POS and dashboard',
+      TABLET: 'Table tablet',
+      KDS: 'Kitchen screen',
+      PRINTED_SLIP: 'Printed slip',
+      CONTROL_PLANE: 'Your provider',
+    },
+    vibration: {
+      ONE_LONG: 'One long buzz',
+      TWO_SHORT: 'Two short buzzes',
+      THREE: 'Three buzzes',
+      ONE_SHORT: 'One short buzz',
+    },
+    repeat: {
+      UNTIL_ACKED: 'Repeats every {every} until someone acknowledges it',
+      NONE: 'Does not repeat',
+      ONCE_PER_STATE: 'Once each time the device’s state changes',
+      UNTIL_RESOLVED: 'Repeats every {every} until it is put right',
+      DAILY: 'Repeats once a day until it is put right',
+    },
+    row: {
+      to: 'To {people}',
+      pager: 'Pager shows “{text}” · {vibration}',
+      escalates: 'Goes to the managers on duty too after {after} without an acknowledgement',
+      changed: 'Changed',
+      fixed: 'Always',
+      changeLabel: 'Change the rule for {name}',
+    },
+    /** Appendix C rows that always happen and are not changed here. */
+    fixed: {
+      ORDER_CHANGED:
+        'The kitchen always gets cancellations and changes on its screen and on a printed slip.',
+      WAITER_UNREACHABLE:
+        'Alerts for a waiter nobody can reach always go straight to the managers on duty.',
+    },
+    dialog: {
+      who: 'Who gets it',
+      onlyChosen: 'The waiters the manager chooses for each message.',
+      where: 'Where it shows',
+      alsoOn: 'Also always on: {places}',
+      pagerText: 'Pager text',
+      pagerTextHint: 'Up to {max} characters.',
+      pagerTextTable: 'Up to {max} characters. {placeholder} becomes the table, as {example}.',
+      pagerTextMessage: 'Up to {max} characters. {placeholder} becomes the manager’s message.',
+      preview: 'The pager shows “{text}”.',
+      vibration: 'Vibration',
+      vibrationHint: 'An alert sent on to the managers always buzzes three times.',
+      escalate: 'Send it on to the managers on duty after {after} without an acknowledgement',
+      repeat: 'When nobody acknowledges it',
+      factory: 'This is the factory rule.',
+      notFactory: 'This rule is changed from the factory rule.',
+      useFactory: 'Back to the factory rule',
+      saved: 'The rule for {name} is saved.',
+      exampleMessage: 'Come to counter',
+      problems: {
+        NO_RECIPIENT: 'Choose who gets it.',
+        RECIPIENT_NOT_ALLOWED: 'This alert cannot go to everyone chosen.',
+        NO_CHANNEL: 'Choose where it shows.',
+        CHANNEL_NOT_ALLOWED: 'This alert cannot show everywhere chosen.',
+        PAGER_TEXT_MISSING: 'Enter what the pager shows.',
+        PAGER_TEXT_TOO_LONG: 'Use at most {max} characters.',
+        PAGER_TEXT_PLACEHOLDER: 'Only {allowed} can be filled in.',
+        PAGER_TEXT_NO_PLACEHOLDER: 'This alert has nothing to fill in. Remove the braces.',
+        PAGER_TEXT_NEEDS_MESSAGE: 'Keep {placeholder} so the pager shows the manager’s message.',
+        REPEAT_NOT_ALLOWED: 'Choose when it repeats.',
+        FIXED_EVENT: 'This rule always applies and cannot be changed.',
       },
     },
   },
