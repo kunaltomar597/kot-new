@@ -232,9 +232,9 @@ describe('[WTR-007] [WTR-009] [ORD-011] what can be done with a sent line', () =
     });
     const ready = sentOrder('READY');
     const cooking = sentOrder('PREPARING', { id: 'second' });
-    expect(servableLines([ready, cooking], { role: 'WAITER' }, true).map((served) => served.state)).toEqual([
-      'READY',
-    ]);
+    expect(
+      servableLines([ready, cooking], { role: 'WAITER' }, true).map((served) => served.state),
+    ).toEqual(['READY']);
   });
 });
 

@@ -214,8 +214,7 @@ export class SettingsService {
       scope: definition.scope,
       capability: definition.capability,
       editable:
-        definition.scope === 'RESTAURANT' &&
-        grantOf(principal, definition.capability) === 'ALLOW',
+        definition.scope === 'RESTAURANT' && grantOf(principal, definition.capability) === 'ALLOW',
       description: definition.description,
       requirements: [...definition.requirements],
       ...(definition.unit !== undefined && { unit: definition.unit }),

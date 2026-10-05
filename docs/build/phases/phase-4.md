@@ -179,6 +179,38 @@ Deliverables: the Owner combines permissions into a named role on top of a base 
 permission guard applies it; the staff editor offers it.
 Acceptance: guard tests with a custom role; Playwright flow.
 
+As built:
+
+- Domain: a custom role is built on Manager, Cashier, Waiter or Kitchen and lists what it adds
+  (then allowed outright: no "own tables only", no manager's PIN) and what it takes away.
+  `grantOf(holder, capability)` applies it wherever permissions are decided; `checkCustomRole`
+  refuses what only the Owner may do (the matrix's rows a manager is denied), adding what the base
+  role already allows and taking away what it never allows. Someone whose base role is Manager, or
+  whose custom role lets them manage staff, counts as a manager (`isManagerRole`): only the Owner,
+  with a fresh second factor, adds them, changes their role or deactivates them. Discounts follow
+  the custom role (a role without its own limit uses the cashier's).
+- Server: the `roles` table gains `removed_capabilities` and `archived_at`; the roles API
+  (`listRoles` for people who manage staff; create, change, archive with a reason and restore for
+  the Owner with a fresh second factor, all audited and announced as `RestaurantChanged`
+  `STAFF`). Names are unique, ignoring case, among active custom roles and the built-in roles. A
+  role is archived only when no active person has it. People get a custom role like its base role
+  (`customRoleId` with `role`). The guard, the override approver check, the socket rooms (now
+  also per capability), order and table rules and discounts read the custom role; a change
+  reaches its people on their next request, their live connections close so their screens sign
+  in again, and people whose role stops taking orders leave today's sections. Sign-in and staff
+  records carry the custom role, and sign-in tiles its name.
+- Console: Staff → Roles lists the custom roles (what each is built on, adds and takes away, who
+  has it); the Owner creates and edits them on their own page (`/manage/staff/roles/new`,
+  `/manage/staff/roles/:roleId`) with one choice per permission, archives and restores them. The
+  add and edit dialog offers the custom roles a person may give; staff rows and tiles show
+  "Captain (Waiter)". Modes and dashboard pages follow the custom role: the overview and the order
+  feed need `OPERATIONS_CONFIGURE`, so a cashier whose role manages staff opens Manage on Staff.
+  The waiter app and `@rp/ordering` decide item actions and moving tables with the custom role.
+- Playwright: Asha (Owner) creates "Captain" (a waiter who also prints bills and takes payments)
+  after confirming her password and a recovery code, gives it to Ravi, and Ravi signs in as a
+  captain, seats a table, sends an order and settles its bill by UPI; the Roles page and the role
+  editor pass axe, and the editor fits a 360 px phone.
+
 ## P4-03 Configuration screens
 
 Requirements: MGR-007, NTF-002, REC-002, REC-009 (S), KDS-008, BILL-005, BILL-006, UPD-010.

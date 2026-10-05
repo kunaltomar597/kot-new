@@ -21,8 +21,11 @@ What exists:
   course order and reasons (P3-04), the live order feed's late dishes, filters and summary
   (P4-01), who may add, change, unlock or deactivate whom, with the roles each person may give
   (P4-02a), planning the day's sections: the assignments a plan gives, the tables without a
-  waiter and an earlier day's sections given again (P4-02b), and the low-battery level of each
-  device type and a pager's Locate topic (P4-02c). 226 tests.
+  waiter and an earlier day's sections given again (P4-02b), the low-battery level of each
+  device type and a pager's Locate topic (P4-02c), and custom roles: a base role with what it
+  adds and takes away, applied by `grantOf` to every permission decision, checked by
+  `checkCustomRole`, a custom role that manages staff counting as a manager's, and discounts that
+  follow it (P4-02e). 235 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -42,7 +45,8 @@ What exists:
   for devices and the low-battery level with the pager list (P4-02b); each device's state now
   (connected, battery, firmware, serial), renaming, and Locate with `DeviceLocateRequested` and the
   pager's locate message (P4-02c); the editor's draft with combos, stock counts and whether
-  publishing would show something new, and `MenuDraftChanged` (P4-02d). 545 tests.
+  publishing would show something new, and `MenuDraftChanged` (P4-02d); custom roles, their
+  routes and the custom role on sign-in, staff records and tiles (P4-02e). 554 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -84,8 +88,12 @@ What exists:
   against its type's level, renaming, Locate sent to that device alone, device changes announced,
   an unpaired pager cut off at once and when a screen was last connected (P4-02c); the menu
   editor's draft with combos, stock counts and its publish state, draft edits announced to the
-  other menu editors, and a combo choice's items kept from becoming combos (P4-02d).
-  730 tests (4 skipped without a real install).
+  other menu editors, and a combo choice's items kept from becoming combos (P4-02d); custom
+  roles: the Owner's roles API with a fresh second factor, audited and announced, given to people
+  like their base role, applied by the guard, the override approver check, socket rooms per
+  capability, order, table and discount rules, a change reaching its people on their next request
+  with their screens signed in again, and people who stop taking orders taken off today's
+  sections (P4-02e). 743 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -124,13 +132,15 @@ What exists:
   the lock screen; it asks for notifications at sign-in and says when they are off; the table
   tablet blocks those permissions (P2-06b). The tables screen lists the open requests from the
   tables shown, and each table's screen its own, with Acknowledge and Resolve (P2-06d). A pager
-  the manager gives shows on the waiter's phone at once (P4-02b). Waiter app 53 tests.
+  the manager gives shows on the waiter's phone at once (P4-02b). Item actions and Move follow
+  the person's custom role (P4-02e). Waiter app 53 tests.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
   line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a); the
   reason shown with a suggestion and the suggestion a cart line came from (P3-04); "my tables"
-  from the domain's planning helper (P4-02b). 38 tests.
+  from the domain's planning helper (P4-02b); a sent line's actions with the person's custom role
+  (P4-02e). 39 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -153,8 +163,10 @@ What exists:
   Locate notice with a chime on every console, and a console header that follows a rename
   (P4-02c); the menu editor: items by category with search, an item page with photo, sizes,
   modifier groups and combo, availability and stock counts, categories, modifier groups and
-  publishing, kept up to date while another manager edits (P4-02d). 246 tests, and 18
-  Playwright steps.
+  publishing, kept up to date while another manager edits (P4-02d); Staff → Roles with the
+  Owner's role editor, custom roles offered in the staff editor and shown on rows and tiles, and
+  modes and dashboard pages that follow the custom role (P4-02e). 269 tests, and 19 Playwright
+  steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -169,7 +181,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02e Custom roles (P4-02a to P4-02d done; P4-02 is split in five, see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -274,7 +285,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02b Sections and pagers
 - [x] P4-02c Devices
 - [x] P4-02d Menu editor
-- [ ] P4-02e Custom roles (S)
+- [x] P4-02e Custom roles (S)
 - [ ] P4-03 Configuration screens
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
@@ -561,6 +572,47 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P4-02e):
+
+232. A custom role is built on Manager, Cashier, Waiter or Kitchen, never the Owner, and lists
+     what it adds and what it takes away. What it adds is allowed outright: a waiter's custom
+     role that adds "Move and merge tables" moves any table, and one that adds "Void an item"
+     voids without a manager's PIN. What only the Owner may do (the matrix rows a manager is
+     denied: tax and invoice settings, data administration, the licence) is never added. Adding
+     what the base role already allows, or taking away what it never allows, is refused, so a
+     role lists only what it changes.
+233. Only the Owner creates, changes, archives and restores custom roles, with a fresh second
+     factor (AUTH-006): a role decides who manages staff and who counts as a manager. Everyone who
+     manages staff sees them and gives them to people.
+234. Someone counts as a manager when their base role is Manager or their custom role lets them
+     manage staff. Only the Owner, with a fresh second factor, adds such a person, gives or takes
+     away such a role, or deactivates and reactivates them; nobody changes their own role.
+235. A person gets a custom role like its base role (`customRoleId` with `role`). A manager's
+     approval with their PIN (AUTH-011) still needs an Owner or Manager base role whose grant,
+     custom role applied, allows the action: a custom role does not make a cashier an approver,
+     and a manager whose role takes an action away cannot approve it.
+236. A change to a role applies to its people from their next request; their live connections
+     close (`SESSION_ENDED`), so their screens sign in again with the new permissions. People
+     whose role no longer takes orders leave today's sections, as when someone is given such a
+     role (P4-02a).
+237. Role names are unique, ignoring case, among active custom roles and the built-in role names,
+     up to 40 characters.
+238. Custom roles are archived, never deleted (master data), and only when no active person has
+     one. Deactivated people keep theirs; reactivating someone whose role was archived since keeps
+     it (it still works, and the Roles page counts them). Restoring checks that the name is still
+     free.
+239. Discount limits are per base role: a custom role that adds "Give discounts within the
+     limit" uses the cashier's limit unless its base role has one; one that adds "Give discounts
+     above the limit" gives any discount, like a manager.
+240. Screens follow the custom role: modes and dashboard pages are decided with `grantOf`. The
+     overview and the order feed read the live order feed (`OPERATIONS_CONFIGURE`), so a cashier
+     whose custom role manages staff gets the Staff page, starts at the POS and opens Manage on
+     Staff. Sign-in tiles and staff rows show the custom role's name ("Captain (Waiter)").
+241. The role editor is its own page for the Owner (`/manage/staff/roles/new` and `/:roleId`), with
+     one choice per permission offering only what changes something, in four groups; changing the
+     base role keeps the changes that still mean something. It says when a role makes people
+     managers and how many people a change signs out of their screens.
 
 Decided 2026-10-05 (P4-02d):
 
@@ -1217,6 +1269,56 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P4-02e Custom roles
+
+Merged #75 (P4-02d) once green.
+
+Built: `@rp/domain` `RoleCustomisation`, `PermissionHolder`, `grantOf`, `checkCustomRole` and
+`OWNER_ONLY_CAPABILITIES`; staff rules with custom roles (`isManagerRole`, `mayGiveRole`,
+`rolesOffered` for a target with a custom role); `decideDiscount` for a holder. Contracts:
+`PersonCustomRole` on sign-in, the current session and staff records, `customRoleName` on tiles,
+`customRoleId` on the staff requests, and the roles routes (`listRoles`, `createRole`,
+`updateRole`, `archiveRole`, `restoreRole`). Server: migration `20261005010000_custom_roles`
+(`removed_capabilities`, `archived_at`), `src/auth/custom-roles.ts` (the principal's custom role
+and a permission key that includes its grants), `src/staff/roles.service.ts`, roles given and
+checked in the staff service (role rows locked while given or changed), `src/staff/sections.ts`
+shared by both, and the custom role applied by the guard, the override approver check, socket
+rooms (now per capability), table sessions, waiter assignments, item rules and discounts.
+Console: `modes.ts` with `managePagesFor` and `manageLandingOf`, `ManageHome` built from them,
+Staff → Roles (`RolesScreen.tsx`, `RoleEditor.tsx`, `roles-view.ts`), the staff dialog's custom
+roles (`roleOptions`, `roleLabel`), tiles and rows with the custom role's name, and `grantOf` in
+the alert centre, the POS floor and the sections page. `@rp/ordering` `lineActions` and the
+waiter app's Move take the person, custom role included. i18n: `capabilities.*` and
+`customRoles.*`.
+
+Tests: domain 235, contracts 554 (snapshots for the roles schemas and `PersonCustomRole`), server
+743 (12 new roles tests: Owner-only with the second factor, refused permissions, unique names, a
+custom role's guard on REST routes, giving and changing roles with audit, manager-tier custom
+roles, an approver whose role took the action away, live connections closed and sections left on
+a change, archiving and restoring), ordering 39, waiter app 53, console 269 (role editor logic,
+the Roles page for a manager and the Owner, creating with the second factor, editing, archiving
+and restoring, custom roles in the staff dialog, a head cashier's dashboard), and 19 Playwright
+steps (was 18): Asha creates "Captain" after confirming her password and a recovery code, gives
+it to Ravi, and Ravi signs in as a captain, seats table 3, sends an order and settles the bill by
+UPI; the Roles page and the editor pass axe, and the editor fits a 360 px phone.
+
+Gotchas:
+
+- The browser tests sign people in on one terminal far faster than people do, and the new flow
+  tipped them over the per-device sign-in limit (10 a minute, SEC-009): the step-up answered 429.
+  The global setup now raises `auth.attemptsPerMinutePerDevice` to its maximum for the run; the
+  limit itself is tested in `auth-login.int.test.ts`.
+- A cash payment needs an open shift; a captain without "Record cash and close a shift" pays by UPI
+  or card.
+- `StaffView.customRole` and the sign-in's custom role share `PersonCustomRole`; the audit keeps
+  only the role's id and name.
+- After editing `@rp/domain` or `@rp/contracts`, build them before typechecking apps that import
+  their `dist`.
+
+Deferred: none.
+
+Decisions: 232 to 241.
 
 ### 2026-10-05: P4-02d Menu editor
 
