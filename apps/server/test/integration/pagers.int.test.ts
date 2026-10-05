@@ -247,6 +247,27 @@ describe('[PGR-006] [PGR-008] [NFR-P03] alerts on the pager', () => {
     expect(message.state).toBe('ALERT');
   });
 
+  it('[NTF-002] shows and buzzes the way the restaurant changed the rule', async () => {
+    const rules = (value: unknown) =>
+      server()
+        .put('/api/v1/settings/notifications.rules')
+        .set(as(manager))
+        .send({ value, reason: 'Our word for the bill' });
+    const changed = await rules({
+      BILL_REQUEST: { pagerText: '{table} CHEQUE', vibration: 'THREE' },
+    });
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    const a = await connect(pagerA);
+    const alertId = await requestBill('7');
+    const message = await until(
+      () => a.messages.find((entry) => entry.alertId === alertId),
+      5_000,
+      'the pager message',
+    );
+    expect(message).toMatchObject({ lines: ['T7 CHEQUE', ''], vibration: 'THREE' });
+    expect((await rules({})).status).toBe(200);
+  });
+
   it('ignores a pager publishing where it may not', async () => {
     const b = await connect(pagerB);
     const open = await prisma.alert.findFirstOrThrow({

@@ -142,4 +142,24 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
     ]);
     expect(crossSettingProblems({ ...defaults, 'storage.criticalPercent': 80 })).toHaveLength(1);
   });
+
+  it('[NTF-002] [PGR-006] takes a rule change with its vibration, and refuses one that cannot work', () => {
+    const rules = settingDefinition('notifications.rules')?.schema;
+    const accepts = (value: unknown) => rules?.safeParse(value).success;
+    expect(accepts({ ITEM_READY: { recipients: ['SECTION_WAITERS'], vibration: 'THREE' } })).toBe(
+      true,
+    );
+    expect(accepts({ MANAGER_NUDGE: { pagerText: 'BOSS: {message}' } })).toBe(true);
+    // An Appendix C row that is not an alert, someone the event cannot reach, a nudge that
+    // loses the manager's message, a pattern the pager does not know.
+    expect(accepts({ ORDER_CHANGED: { escalate: true } })).toBe(false);
+    expect(accepts({ WATER_REQUEST: { recipients: ['SELECTED'] } })).toBe(false);
+    expect(accepts({ MANAGER_NUDGE: { pagerText: 'MGR CALLING' } })).toBe(false);
+    expect(accepts({ ITEM_READY: { vibration: 'BUZZ' } })).toBe(false);
+    const refused = rules?.safeParse({ ITEM_READY: { channels: ['TABLET'] } });
+    expect(refused?.error?.issues.map((issue) => [issue.path, issue.message])).toEqual([
+      [['ITEM_READY'], 'NO_CHANNEL'],
+    ]);
+    expect(settingDefinition('pagers.vibration')).toBeUndefined();
+  });
 });

@@ -26,7 +26,9 @@ describe('[PGR-001] [PGR-006] what the pager shows and how it buzzes', () => {
     expect(vibrationFor('WATER_REQUEST', false)).toBe('TWO_SHORT');
     expect(vibrationFor('MANAGER_NUDGE', false)).toBe('THREE');
     expect(vibrationFor('ITEM_READY', true)).toBe('THREE');
-    expect(vibrationFor('ITEM_READY', false, { ITEM_READY: 'ONE_SHORT' })).toBe('ONE_SHORT');
+    expect(vibrationFor('ITEM_READY', false, { ITEM_READY: { vibration: 'ONE_SHORT' } })).toBe(
+      'ONE_SHORT',
+    );
   });
 });
 

@@ -76,10 +76,12 @@ export function groupOf(key: SettingKey): SettingGroup {
   return GROUP_OF_AREA[key.slice(0, key.indexOf('.')) as SettingArea];
 }
 
-/** Settings with a page of their own (the notification rules, P4-03b), not on the General page. */
+/**
+ * Settings with a page of their own, not on the General page: the notification rules, a rule for
+ * each alert on the Notifications page (P4-03b). N, R and the nudge messages are on both pages.
+ */
 export const EDITED_ELSEWHERE: ReadonlySet<SettingKey> = new Set<SettingKey>([
   'notifications.rules',
-  'pagers.vibration',
 ]);
 
 export interface TimeWindowValue {
