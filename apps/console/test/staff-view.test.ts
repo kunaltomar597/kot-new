@@ -4,10 +4,14 @@ import {
   createRequestOf,
   emptyPersonForm,
   personFormOf,
+  roleLabel,
+  roleOptions,
   staffActions,
   updateRequestOf,
 } from '../src/manage/staff/staff-view.js';
 import { STAFF } from './fakes.js';
+import { t } from './harness.js';
+import { CAPTAIN, HEAD_CASHIER, personRole, RUNNER } from './roles-fixture.js';
 import { lockedRavi, PRIYA, staffView } from './staff-fixture.js';
 
 const owner = { staffId: STAFF.OWNER.staffId, role: 'OWNER' } as const;
@@ -94,5 +98,91 @@ describe('[AUTH-001] the add and edit form', () => {
     expect(updateRequestOf(ravi, { ...personFormOf(ravi), email: 'ravi@example.in' })).toEqual({
       email: 'ravi@example.in',
     });
+  });
+});
+
+describe('[AUTH-012] custom roles in the staff editor', () => {
+  const roles = [CAPTAIN, HEAD_CASHIER, RUNNER];
+  const values = (options: ReturnType<typeof roleOptions>) => options.map((option) => option.value);
+
+  it('offers the custom roles a person may give, a manager’s ones only to the Owner', () => {
+    expect(values(roleOptions(manager, undefined, roles))).toEqual([
+      'CASHIER',
+      'WAITER',
+      'KITCHEN',
+      `custom:${CAPTAIN.id}`,
+    ]);
+    expect(values(roleOptions(owner, undefined, roles))).toEqual([
+      'MANAGER',
+      'CASHIER',
+      'WAITER',
+      'KITCHEN',
+      `custom:${CAPTAIN.id}`,
+      `custom:${HEAD_CASHIER.id}`,
+    ]);
+  });
+
+  it('always offers the person’s own role, archived or not yet read', () => {
+    const runner = staffView('WAITER', { customRole: personRole(RUNNER) });
+    expect(roleOptions(owner, runner, roles).at(-1)).toMatchObject({
+      value: `custom:${RUNNER.id}`,
+      customName: 'Runner',
+      archived: true,
+    });
+    const captain = staffView('WAITER', { customRole: personRole(CAPTAIN) });
+    expect(roleOptions(manager, captain, [])).toContainEqual({
+      value: `custom:${CAPTAIN.id}`,
+      role: 'WAITER',
+      customRoleId: CAPTAIN.id,
+      customName: 'Captain',
+      archived: false,
+    });
+  });
+
+  it('[AUTH-006] leaves someone whose role manages staff to the Owner', () => {
+    const asha = staffView('CASHIER', { customRole: personRole(HEAD_CASHIER) });
+    expect(staffActions(manager, asha, now)).toEqual([]);
+    expect(staffActions(owner, asha, now)).toEqual(['EDIT', 'SET_PIN', 'DEACTIVATE']);
+    // A head cashier looks after the team like a manager, but not their own role.
+    const headCashier = {
+      staffId: asha.id,
+      role: 'CASHIER',
+      customRole: personRole(HEAD_CASHIER),
+    } as const;
+    expect(staffActions(headCashier, lockedRavi(), now)).toEqual([
+      'EDIT',
+      'SET_PIN',
+      'UNLOCK',
+      'DEACTIVATE',
+    ]);
+    expect(staffActions(headCashier, asha, now)).toEqual(['EDIT', 'SET_PIN']);
+  });
+
+  it('sends a custom role with its base role, and the built-in role alone', () => {
+    expect(
+      createRequestOf({
+        ...emptyPersonForm('WAITER', CAPTAIN.id),
+        displayName: 'Sunil',
+        pin: '1234',
+        pinAgain: '1234',
+      }),
+    ).toMatchObject({ role: 'WAITER', customRoleId: CAPTAIN.id });
+    const ravi = lockedRavi();
+    expect(updateRequestOf(ravi, { ...personFormOf(ravi), customRoleId: CAPTAIN.id })).toEqual({
+      role: 'WAITER',
+      customRoleId: CAPTAIN.id,
+    });
+    const captain = staffView('WAITER', { customRole: personRole(CAPTAIN) });
+    expect(personFormOf(captain).customRoleId).toBe(CAPTAIN.id);
+    expect(updateRequestOf(captain, personFormOf(captain))).toBeUndefined();
+    expect(updateRequestOf(captain, { ...personFormOf(captain), customRoleId: null })).toEqual({
+      role: 'WAITER',
+    });
+  });
+
+  it('names a custom role with the role it is built on', () => {
+    expect(roleLabel(t, 'WAITER', null)).toBe('Waiter');
+    expect(roleLabel(t, 'WAITER', { name: 'Captain' })).toBe('Captain (Waiter)');
+    expect(roleLabel(t, 'WAITER', { name: 'Runner' }, true)).toBe('Runner (Waiter, archived)');
   });
 });

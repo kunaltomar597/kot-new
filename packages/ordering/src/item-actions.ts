@@ -2,10 +2,10 @@ import type { OrderView } from '@rp/contracts';
 import {
   canTransition,
   type Capability,
-  grantFor,
+  grantOf,
   type OrderItemEvent,
   orderItemMachine,
-  type Role,
+  type PermissionHolder,
 } from '@rp/domain';
 
 type Line = OrderView['items'][number];
@@ -26,22 +26,22 @@ const NONE: LineActions = { pickUp: false, serve: false, cancel: false, void: nu
 
 /**
  * The steps a person may take on a line, from its own state (the server moves a combo line with
- * its parts) and their grants; `ownTable` says whether they are the table's waiter, for grants
- * held on their own tables only. Combo parts follow their combo and take no steps of their own.
- * The server checks again.
+ * its parts) and their grants, their custom role applied (AUTH-012); `ownTable` says whether they
+ * are the table's waiter, for grants held on their own tables only. Combo parts follow their combo
+ * and take no steps of their own. The server checks again.
  */
 export function lineActions(
   line: Pick<Line, 'state' | 'parentOrderItemId'>,
-  role: Role,
+  person: PermissionHolder,
   ownTable: boolean,
 ): LineActions {
   if (line.parentOrderItemId !== null) return NONE;
   const can = (event: OrderItemEvent) => canTransition(orderItemMachine, line.state, event);
   const may = (capability: Capability) => {
-    const grant = grantFor(role, capability);
+    const grant = grantOf(person, capability);
     return grant === 'ALLOW' || (grant === 'OWN' && ownTable);
   };
-  const voiding = grantFor(role, 'ITEM_VOID_AFTER_PREP');
+  const voiding = grantOf(person, 'ITEM_VOID_AFTER_PREP');
   return {
     pickUp: can('PICK_UP') && may('ITEM_MARK_PICKED_UP'),
     serve: can('SERVE') && may('ITEM_MARK_SERVED'),
@@ -51,8 +51,12 @@ export function lineActions(
 }
 
 /** The lines of these orders the person may mark served now, in order (WTR-007). */
-export function servableLines(orders: readonly OrderView[], role: Role, ownTable: boolean): Line[] {
+export function servableLines(
+  orders: readonly OrderView[],
+  person: PermissionHolder,
+  ownTable: boolean,
+): Line[] {
   return orders.flatMap((order) =>
-    order.items.filter((line) => lineActions(line, role, ownTable).serve),
+    order.items.filter((line) => lineActions(line, person, ownTable).serve),
   );
 }

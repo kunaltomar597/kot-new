@@ -148,6 +148,9 @@ describe('[TBL-005] [WTR-008] moving a table and asking for the bill', () => {
     expect(mayMove(entry('T5'), { id: RAVI, role: 'WAITER' })).toBe(false);
     expect(mayMove(entry('T5'), { id: RAVI, role: 'MANAGER' })).toBe(true);
     expect(mayMove(entry('T5'), { id: RAVI, role: 'KITCHEN' })).toBe(false);
+    // [AUTH-012] A custom role that moves any table.
+    const captain = { added: ['TABLE_MOVE_MERGE'] as const, removed: [] };
+    expect(mayMove(entry('T5'), { id: RAVI, role: 'WAITER', customRole: captain })).toBe(true);
 
     await signedInApp(restaurant);
     await fireEvent.press(await screen.findByRole('tab', { name: 'All tables' }));

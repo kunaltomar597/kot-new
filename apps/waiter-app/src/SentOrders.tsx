@@ -1,6 +1,6 @@
 import type { MenuSnapshot, OrderView } from '@rp/contracts';
 import { fontSize, fontWeight, radius, spacing } from '@rp/design-tokens';
-import type { Role } from '@rp/domain';
+import type { PermissionHolder } from '@rp/domain';
 import { type LiveData, messageOf, Note, useT } from '@rp/mobile-shell';
 import {
   displayState,
@@ -18,7 +18,8 @@ type SentLine = OrderView['items'][number];
 
 /** What the person may do with the sent items, and what to do when they do it. */
 export interface SentActions {
-  readonly role: Role;
+  /** Who is signed in: their role and custom role decide what they may do (AUTH-012). */
+  readonly person: PermissionHolder;
   /** Whether the person is this table's waiter (own-table grants). */
   readonly ownTable: boolean;
   /** Lines with a step in flight. */
@@ -102,7 +103,7 @@ export function SentOrders({
       </View>
     );
   }
-  const servable = servableLines(data.value, actions.role, actions.ownTable);
+  const servable = servableLines(data.value, actions.person, actions.ownTable);
   return (
     <View style={styles.section}>
       {heading}
@@ -169,7 +170,7 @@ export function SentOrders({
                     : blocked === 'OFF_MENU'
                       ? t('pos.cart.offMenu')
                       : undefined;
-              const can = lineActions(line, actions.role, actions.ownTable);
+              const can = lineActions(line, actions.person, actions.ownTable);
               const busy = actions.busy.has(line.id);
               return (
                 <View

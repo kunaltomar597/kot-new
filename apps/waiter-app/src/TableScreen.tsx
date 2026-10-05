@@ -463,7 +463,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
                 data={orders.data}
                 menu={menu}
                 actions={{
-                  role: person.role,
+                  person,
                   ownTable,
                   busy: busyLines,
                   onStep: step,
@@ -513,7 +513,7 @@ export function TableScreen({ sessionId, onBack }: { sessionId: string; onBack: 
         <EndItemSheet
           line={ending.line}
           ending={ending.ending}
-          managerNeeded={lineActions(ending.line, person.role, ownTable).void === 'OVERRIDE'}
+          managerNeeded={lineActions(ending.line, person, ownTable).void === 'OVERRIDE'}
           onClose={() => {
             setEnding(undefined);
           }}

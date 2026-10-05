@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { homeFor, isStationMode, modeOfPath, modesFor } from '../src/app/modes.js';
+import {
+  homeFor,
+  isStationMode,
+  manageLandingOf,
+  managePagesFor,
+  modeOfPath,
+  modesFor,
+} from '../src/app/modes.js';
 import { deviceSummary } from './fakes.js';
 
 describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
@@ -33,6 +40,40 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
     } as const;
     expect(modesFor(expediter)).toEqual(['kds', 'manage']);
     expect(homeFor(expediter)).toBe('manage');
+  });
+
+  it('[MGR-001] [AUTH-012] opens the dashboard pages a person may use', () => {
+    expect(managePagesFor({ role: 'OWNER' })).toEqual([
+      'overview',
+      'orders',
+      'alerts',
+      'menu',
+      'staff',
+      'devices',
+      'security',
+    ]);
+    expect(managePagesFor({ role: 'MANAGER' })).toEqual([
+      'overview',
+      'orders',
+      'alerts',
+      'menu',
+      'staff',
+      'devices',
+    ]);
+    expect(manageLandingOf(managePagesFor({ role: 'MANAGER' }))).toBe('overview');
+    // A head cashier manages staff, but the order feed is not theirs: Manage opens on Staff.
+    const headCashier = {
+      role: 'CASHIER',
+      customRole: { added: ['STAFF_MANAGE'], removed: [] },
+    } as const;
+    expect(managePagesFor(headCashier)).toEqual(['alerts', 'staff']);
+    expect(manageLandingOf(managePagesFor(headCashier))).toBe('staff');
+    const floorManager = {
+      role: 'MANAGER',
+      customRole: { added: [], removed: ['MENU_MANAGE', 'DEVICE_PAIR'] },
+    } as const;
+    expect(managePagesFor(floorManager)).toEqual(['overview', 'orders', 'alerts', 'staff']);
+    expect(manageLandingOf(['alerts'])).toBe('alerts');
   });
 
   it('runs kitchen screens in station mode', () => {

@@ -1409,6 +1409,20 @@ body {
   gap: var(--rp-space-2);
 }
 
+/* The role editor (P4-02e): one choice per permission, side by side on a wide screen. */
+.role-editor__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+}
+
+.role-editor__permissions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--rp-space-3);
+  align-items: start;
+}
+
 .menu-field-group {
   display: flex;
   flex-direction: column;

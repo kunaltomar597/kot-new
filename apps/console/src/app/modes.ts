@@ -38,6 +38,50 @@ export function homeFor(person: PermissionHolder): Mode {
   return order.find((mode) => allowed.includes(mode)) ?? 'pos';
 }
 
+/** The dashboard's pages (P4-01, P4-02), in the order the navigation shows them. */
+export const MANAGE_PAGES = [
+  'overview',
+  'orders',
+  'alerts',
+  'menu',
+  'staff',
+  'devices',
+  'security',
+] as const;
+export type ManagePage = (typeof MANAGE_PAGES)[number];
+
+/**
+ * Who may open each dashboard page: the overview and the order feed read the live order feed
+ * (OPERATIONS_CONFIGURE), the alert centre is everyone's, each setup page needs its permission
+ * outright, and sign-in security is the Owner's own (AUTH-006).
+ */
+const PAGE_RULES: Readonly<Record<ManagePage, (person: PermissionHolder) => boolean>> = {
+  overview: (person) => grantOf(person, 'OPERATIONS_CONFIGURE') !== 'DENY',
+  orders: (person) => grantOf(person, 'OPERATIONS_CONFIGURE') !== 'DENY',
+  alerts: () => true,
+  menu: (person) => grantOf(person, 'MENU_MANAGE') === 'ALLOW',
+  staff: (person) => grantOf(person, 'STAFF_MANAGE') === 'ALLOW',
+  devices: (person) => grantOf(person, 'DEVICE_PAIR') === 'ALLOW',
+  security: (person) => person.role === 'OWNER',
+};
+
+/**
+ * The dashboard pages a person may open, with their custom role (P4-02e): a cashier whose custom
+ * role manages staff gets the Staff page without the order feed. The server checks every call.
+ */
+export function managePagesFor(person: PermissionHolder): ManagePage[] {
+  return MANAGE_PAGES.filter((page) => PAGE_RULES[page](person));
+}
+
+/**
+ * The page `/manage` opens on: the overview, or else the setup page the person came for (the
+ * alert centre is also in the POS).
+ */
+export function manageLandingOf(pages: readonly ManagePage[]): ManagePage {
+  const order: readonly ManagePage[] = ['overview', 'menu', 'staff', 'devices', 'alerts'];
+  return order.find((page) => pages.includes(page)) ?? 'alerts';
+}
+
 /**
  * A kitchen screen works in station mode (AUTH-005): it shows its station without anybody signed
  * in, unless the restaurant has kitchen staff sign in individually.
