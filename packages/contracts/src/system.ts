@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SystemAppBuild } from './app-builds.js';
 import { ClientApiRange, ClientCompatibility } from './client-api.js';
 import { DeviceType, Id, IsoDate, Timestamp } from './common.js';
 import { PendingDiagnosticsRequest as PendingDiagnosticsRequestSchema } from './control-plane/diagnostics.js';
@@ -184,6 +185,11 @@ export const SystemStatusResponse = z.object({
   clients: z.object({
     api: ClientApiRange,
     counts: z.array(z.object({ compatibility: ClientCompatibility, devices: Bytes })),
+    /**
+     * The phone and tablet builds (APKs) this PC serves from its release (P7-04e2, WTR-001), with
+     * whether each passed its check; empty when the release carries none.
+     */
+    builds: z.array(SystemAppBuild),
   }),
   update: z.object({
     /** The release the Control Plane offers (UPD-002), or null when up to date. */

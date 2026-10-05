@@ -171,7 +171,8 @@ Split (2026-10-04):
     - `ExpoOtaUpdates` in `@rp/mobile-native`;
     - signed builds only;
     - the runbook `app-updates.md` and manual task 29.
-  - **P7-04e2 The in-app APK updater through the restaurant PC (WTR-001).**
+  - **P7-04e2 The in-app APK updater through the restaurant PC (WTR-001).** Built (2026-10-05,
+    ADR-0017 addendum; the device checks are in manual task 29):
     - The release's APKs (EAS Build, signed with the app-signing key) go into the installer's
       payload with `apps.json` (kind, version, SHA-256, size) at `package:stage --apk`.
     - The server serves the calling device's APK and its details. These routes are
@@ -186,6 +187,10 @@ Split (2026-10-04):
       - offered on the sign-in screen and on "Update this app";
       - installed between guests on a tablet.
     - The System page shows the app builds the PC serves.
+    - Also: the device token's challenge and renewal stay open to refused apps, the APK's
+      package and `versionName` are checked on the device, a tablet that is not device owner
+      offers the APK in its staff panel, and the Android CI job checks the permission and that
+      the install receivers are not exported.
 
 ## P7-05 Backup and restore
 

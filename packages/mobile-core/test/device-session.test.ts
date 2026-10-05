@@ -436,6 +436,21 @@ describe('[UPD-006] an app the server no longer serves', () => {
   });
 });
 
+describe('[WTR-001] a download Android makes for the app (P7-04e2)', () => {
+  it('gives the APK’s address on the paired server with the device’s token', async () => {
+    const { session } = await paired();
+    const request = await session.downloadRequest('downloadCurrentAppBuild');
+    expect(request.url).toMatch(/\/api\/v1\/devices\/current\/app-build\/apk$/);
+    expect(request.headers['x-device-token']).toBeDefined();
+  });
+
+  it('has none before the device is paired', async () => {
+    const { session } = setup();
+    await session.start();
+    await expect(session.downloadRequest('downloadCurrentAppBuild')).rejects.toThrow();
+  });
+});
+
 describe('server addresses', () => {
   it.each([
     ['192.168.1.20:8443', 'https://192.168.1.20:8443'],

@@ -23,7 +23,9 @@ What exists:
   (P4-02a), and planning the day's sections: the assignments a plan gives, the tables without a
   waiter and an earlier day's sections given again (P4-02b); when a software update may install
   (P7-04c); client API versions, N-1 and the component version matrix (P7-04d); which
-  over-the-air update a phone or tablet takes, and when it restarts on it (P7-04e1). 359 tests.
+  over-the-air update a phone or tablet takes, and when it restarts on it (P7-04e1); which APK
+  from the PC a phone or tablet takes, and when a kiosk tablet installs it by itself (P7-04e2).
+  364 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -44,7 +46,8 @@ What exists:
   the System page and the backup made before an update (P7-04c); the client API version, the
   `x-rp-client` identity, the version matrix with each release, the apps to update on the Devices
   and System pages, and `pnpm contracts:compat` with the frozen versions in `docs/api/compat/`
-  (P7-04d, ADR-0016). 930 tests.
+  (P7-04d, ADR-0016); the phone and tablet APKs a PC serves, `apps.json`, the device's own build
+  and its download, and the builds on the System page (P7-04e2). 941 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -93,8 +96,9 @@ What exists:
   watchdog, the database copy and the switch back after a failed update, and each outcome
   recorded, audited and reported (P7-04c); the N-1 check of apps (426 `CLIENT_TOO_OLD` over REST
   and the socket), each device's app version and client API, and the apps an offered update would
-  leave behind (P7-04d).
-  1123 tests (27 skipped: Windows only, a real install, or the performance runs).
+  leave behind (P7-04d); the release's phone and tablet APKs (`RP_APPS_DIR`), checked against
+  `apps.json` before a phone or tablet downloads its own, also when refused (P7-04e2).
+  1132 tests (27 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -106,7 +110,8 @@ What exists:
   waiter phone's alert centre (P2-06a), which tells the Android notifier whom to listen for on its
   first read and sends Acknowledge pressed on a notification (P2-06b); `OtaUpdater`, the apps'
   over-the-air updates: an EAS update only when the server speaks its client API, applied while
-  the device is free (P7-04e1, ADR-0017). 91 tests.
+  the device is free (P7-04e1, ADR-0017); `ApkUpdater`, new APKs from the restaurant PC: offered
+  to a person on a phone, installed by a kiosk tablet between guests (P7-04e2). 102 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
@@ -122,8 +127,11 @@ What exists:
   running a keep-alive JavaScript task, a notification per alert with Acknowledge, the ring and
   vibration in the foreground, and `POST_NOTIFICATIONS` (P2-06b); `ExpoOtaUpdates` (`expo-updates`
   with each update's client API) and the shell's `useAppUpdate`, `useAppUpdateWhenFree` and an
-  "Update this app" screen that says when an update is on its way (P7-04e1). Shell 43 tests,
-  mobile-native 38.
+  "Update this app" screen that says when an update is on its way (P7-04e1); the in-app APK
+  updater: `AndroidApkInstaller` (download over the pinned CA with the SHA-256, package and
+  version checked, Android's `PackageInstaller`, the reopening after `MY_PACKAGE_REPLACED`) and
+  the shell's `ApkOffer` on the sign-in screen and "Update this app" (P7-04e2). Shell 48 tests,
+  mobile-native 41.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
@@ -141,8 +149,10 @@ What exists:
   the manager gives shows on the waiter's phone at once (P4-02b). Both apps take EAS updates only
   when their server speaks the update's client API, never check by themselves, restart on one only
   when free (the phone with nobody signed in, the tablet between guests), and build for preview or
-  production only with the update signing certificate (P7-04e1). Waiter app 69 tests, table
-  tablet 30.
+  production only with the update signing certificate (P7-04e1). A new APK from the PC is offered
+  on the phone's sign-in screen and installed when the person confirms; a device-owner tablet
+  installs it between guests and opens again in kiosk mode, another tablet offers it in its staff
+  panel (P7-04e2). Waiter app 70 tests, table tablet 31.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
@@ -205,7 +215,8 @@ What exists:
   (P4-07b); "Removing the software" on the System page, where the Owner allows the uninstaller to
   delete the data for 30 minutes (P0-16c); the update agent's state and the last update's outcome
   on the System page (P7-04c); the apps to update on the Devices and System pages, and a console
-  older than its server that loads the new one (P7-04d). 370 tests, and 23 Playwright steps.
+  older than its server that loads the new one (P7-04d); the phone and tablet app versions the PC
+  serves, or a damaged one, on the System page (P7-04e2). 371 tests, and 23 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -215,7 +226,8 @@ What exists:
   server (`pnpm deploy`, trimmed, with third-party notices), the console, Node.js 24, PostgreSQL
   16.15 and WinSW 2.12 pinned by SHA-256, and hooks that run the set-up scripts on install,
   update, repair and uninstall; it keeps itself for going back after a failed update (P7-04c).
-  37 tests without Electron; the CI job "Windows installer" builds,
+  The release's APKs with `apps.json` in the payload's `apps` folder (`package:stage --apk`,
+  P7-04e2). 39 tests without Electron; the CI job "Windows installer" builds,
   installs, kills the server, repairs and uninstalls on `windows-latest`.
 - `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
   5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
@@ -241,8 +253,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P7-04e2 The in-app APK updater through the restaurant PC (APKs in the installer's payload, the
-  server's APK routes, Android's PackageInstaller; the spec is in `phase-7.md`).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -414,15 +424,17 @@ Recommended next WPs (dependencies met):
 - [x] P7-03 Fleet monitoring
   - [x] P7-03a Heartbeat health and alerts
   - [x] P7-03b Fleet dashboard
-- [ ] P7-04 Release management and remote updates
+- [x] P7-04 Release management and remote updates (S9 and the device checks wait for the first
+      push and manual task 29; pager firmware distribution is P2-04b)
   - [x] P7-04a Rollouts at the Control Plane
   - [x] P7-04b Release management in the vendor web app
   - [x] P7-04c The update agent on the restaurant PC (S9 runs in CI on the first push)
   - [x] P7-04d Client compatibility (N-1) and the version matrix
-  - [ ] P7-04e Phone and tablet updates (EAS Update, the in-app APK updater)
+  - [x] P7-04e Phone and tablet updates (EAS Update, the in-app APK updater)
     - [x] P7-04e1 EAS Update gated by the server's client API (manual task 29 for the account
           and keys)
-    - [ ] P7-04e2 The in-app APK updater through the restaurant PC
+    - [x] P7-04e2 The in-app APK updater through the restaurant PC (device checks: manual
+          task 29)
 - [x] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
   - [x] P7-05b Restore
@@ -698,6 +710,31 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P7-04e2), ADR-0017 addendum:
+
+661. The release's APKs travel in the restaurant PC's installer (`package:stage --apk`), each with
+     its app's `package.json` version, client API, size and SHA-256 in `apps.json`. The PC checks
+     each APK against `apps.json` before offering it, working the hash out again only when a file
+     changes; a damaged or missing APK is not offered and shows on the System page.
+662. `GET /api/v1/devices/current/app-build` and `…/apk` need the device token and no person. The
+     device's type picks the app (waiter phone, table tablet); other devices get none. Both, and
+     the device token's challenge and renewal, stay open to apps the server no longer serves
+     (N-1), so a refused app can update itself. Pairing stays closed.
+663. The device keeps a downloaded APK only if its size, SHA-256, package name and `versionName`
+     are the expected ones; Android refuses one signed with another key (UPD-007).
+664. A phone never installs by itself. The offer is on the sign-in screen and on "Update this app",
+     never while someone is signed in; the person presses Install, allows "Install unknown apps"
+     once, and confirms on Android's screen. A device-owner tablet installs by itself between
+     guests, or at once when refused, and opens again in kiosk mode; a tablet that is not device
+     owner offers it in the staff panel, after a manager's PIN.
+665. A build is offered when it is newer than the app installed (Android's `versionName`) and the
+     server speaks its client API. The device asks when it connects, when it is refused and every
+     30 minutes (`OTA_CHECK_INTERVAL_MS`, not a setting, as decision 659).
+666. A failed or cancelled install stays on offer ("Try again"); a kiosk tablet tries again at the
+     next check. Failures (not cancels) reach the vendor's error service.
+667. Both apps ask for `REQUEST_INSTALL_PACKAGES`; the install receivers are not exported. The
+     Android CI job checks both.
 
 Decided 2026-10-05 (P7-04e1), ADR-0017:
 
@@ -3474,6 +3511,85 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P7-04e2 The in-app APK updater through the restaurant PC (P7-04 done)
+
+Built new APKs of the waiter app and the table tablet from the restaurant PC (WTR-001, UPD-001,
+UPD-007; ADR-0017 addendum, `docs/runbooks/app-updates.md`, manual task 29 section 4; decisions
+661-667):
+
+- `@rp/domain` `app-update.ts`: `apkUpdateVerdict` (OFFER, UP_TO_DATE, NOT_SERVED, UNKNOWN) and
+  `mayInstallApkUnattended`.
+- `@rp/contracts` `app-builds.ts`: `AppBuildsFile` (`apps.json`), `AppBuildView`,
+  `CurrentAppBuildResponse`, `SystemAppBuild`; the routes `getCurrentAppBuild` and
+  `downloadCurrentAppBuild`; `SystemStatusResponse.clients.builds`.
+- server:
+  - `src/updates/app-builds.service.ts`: reads `RP_APPS_DIR/apps.json` and checks each APK's size
+    and SHA-256 (cached by file size and time): OK, MISSING or DAMAGED;
+  - `app-builds.controller.ts`: the device's own build and its download (`sendFile`, no-store);
+  - `client-version.ts`: those routes and the device token's challenge and renewal are open to
+    refused apps;
+  - `installationPaths().appsDir` and `RP_APPS_DIR` from the installation file; the System page's
+    builds.
+- api-client: `authorizedRequest(operationId)`, the address and headers for a download another
+  HTTP client makes.
+- mobile-core: `DeviceSession.downloadRequest`; `ApkUpdater` (checks on connect, refusal and every
+  30 minutes; `install()`; needs-permission; Android's answers; unattended on a device-owner tablet
+  while free or refused).
+- mobile-native:
+  - Kotlin `ApkInstalls`: OkHttp over `LanTrust`, size and SHA-256 while streaming, the package
+    and `versionName` read from the APK, a `PackageInstaller` session with a mutable explicit
+    pending intent;
+  - `RpApkInstallReceiver`, `RpPackageReplacedReceiver`, `RpApkInstallerModule`;
+    `REQUEST_INSTALL_PACKAGES`;
+  - the TypeScript `AndroidApkInstaller`.
+- mobile-shell: `ApkOffer`, `useApkUpdate`, `useApkUpdater`, `ShellProvider`'s `apkUpdater`;
+  `useAppUpdateWhenFree` tells it too; the sign-in screen and "Update this app" show the offer
+  (`mobile.update.fromPc`, `mobile.apk.*`).
+- apps: the waiter app's `apkUpdater()` in `session.ts`; the tablet's in `Root`, and `ApkOffer`
+  in its opened staff panel.
+- console: the System page lists the app versions the PC serves, or a damaged one.
+- desktop packaging: `app-builds.ts`, `package:stage --apk <folder>` (or `RP_APK_DIR`) with
+  `waiter-app.apk` and `table-tablet.apk`. The payload's `apps/apps.json` is required; it lists
+  none without APKs.
+- CI: the Android job checks `REQUEST_INSTALL_PACKAGES` and that the install receivers are not
+  exported.
+- docs: the ADR-0017 addendum, the runbook's "New APKs from the restaurant PC", manual task 29
+  section 4, the READMEs, the phase spec.
+
+Tests:
+
+- domain 364 (+5);
+- contracts 941 (+11, with the new schema snapshots);
+- api-client 41 (+2);
+- mobile-core 102 (+11);
+- mobile-native 41 (+3);
+- mobile-shell 48 (+5);
+- waiter app 70 (+1), table tablet 31 (+1);
+- console 371 (+1);
+- desktop 39 (+2);
+- server 1132 (+9, 27 skipped), 7 of them the new integration test with real APK files.
+
+Format, build, contract docs, `contracts:compat`, lint, typecheck and `test:coverage` of every
+touched package (the server's included) pass. The Control Plane's rollout test timed out once
+under four parallel suites; alone its 140 tests pass in 8 s.
+
+Not done or not verified:
+
+- The Kotlin is not compiled here (no Android SDK on this Mac). The Android CI job compiles it and
+  checks the manifest on the first push.
+- Nothing has run on a phone or tablet: manual task 29 section 4 (needs the Expo account and the
+  app-signing keystore). It also checks that `MY_PACKAGE_REPLACED` reaches the unexported receiver
+  and that a device owner may start its activity from the background.
+- No release pipeline passes `--apk` yet (no EAS account); the runbook gives the steps.
+
+Gotchas:
+
+- zsh does not split an unquoted `$files`: run file lists through `bash -c`. The server's
+  integration tests took about 36 s per half.
+- `vitest run <filter>` matches substrings: `restore.int` also runs `cloud-restore.int`.
+- A new exported schema writes its snapshot under `packages/contracts/test/__snapshots__/schemas/`
+  on the first local run; commit them (CI never writes snapshots).
 
 ### 2026-10-05: P7-04e1 Phone and tablet EAS updates gated by the server's client API
 

@@ -183,6 +183,11 @@ backup, updates and diagnostics.
 
 ## Web console and client support (P0-14b)
 
+- `RP_APPS_DIR` (`appsDir`, P7-04e2): the release's phone and tablet APKs and their `apps.json`
+  (`<install>\apps`, written by `package:stage --apk`). `src/updates/app-builds.*` checks each
+  APK's size and SHA-256 before offering it and serves a phone or tablet its own app
+  (`GET /api/v1/devices/current/app-build`, `…/apk`), also when the app is too old (N-1).
+
 - `RP_CONSOLE_DIR` (`consoleDir`): the built console (`apps/console/dist`) is served at `/` from
   the server's own origin, so the console, the API and the socket share one origin (no CORS) and
   one certificate (P0-15). `src/http/console-static.ts` answers every other page request with

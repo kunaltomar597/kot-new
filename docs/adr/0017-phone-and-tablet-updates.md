@@ -2,7 +2,7 @@
 
 Status: Accepted
 Date: 2026-10-05
-Work package: P7-04e1 (P7-04e2 builds the APK half)
+Work package: P7-04e1, P7-04e2 (the APK half)
 Requirements: UPD-001, UPD-006, UPD-007, WTR-001, NFR-A01
 
 ## Context
@@ -98,3 +98,39 @@ clashes with how the restaurant updates:
   was gated at download time.
 - Devices do not report which update they run yet. Support sees the app version (`x-rp-client`)
   and the error reports. Reporting the update id with the device can follow if support needs it.
+
+## Addendum (P7-04e2): new APKs from the restaurant PC
+
+Built as item 8 decided:
+
+- **Packaging.** `package:stage --apk <folder>` copies the release's `waiter-app.apk` and
+  `table-tablet.apk` (EAS production builds) into the installer's `apps` folder with `apps.json`:
+  each APK's kind, version (its app's `package.json`), client API, file, size and SHA-256. The
+  server finds the folder through `RP_APPS_DIR`, set from the installation file.
+- **The PC.** `GET /api/v1/devices/current/app-build` describes the calling device's own app
+  (waiter phone or table tablet) and `…/app-build/apk` sends it. Both need the device token, no
+  person. The server checks each APK's size and SHA-256 against `apps.json` before offering it
+  (worked out again only when a file changes); a damaged or missing one is not offered and shows
+  on the System page. These two routes, and the device token's challenge and renewal, are open to
+  apps the server no longer serves, so a refused app can update itself. Pairing stays closed.
+- **The device.** `ApkUpdater` (`@rp/mobile-core`) asks when the device connects, when it is
+  refused and every 30 minutes, and offers a build newer than itself whose client API the server
+  speaks (`apkUpdateVerdict`). `AndroidApkInstaller` (`@rp/mobile-native`, Kotlin
+  `ApkInstalls`) downloads it with the device token over the pinned CA (the same OkHttp trust as
+  every other request), checks size and SHA-256, then reads the APK's package and `versionName`:
+  only this same app at the described version is kept. Android's `PackageInstaller` installs it,
+  and refuses an APK signed with another key.
+- **Who installs.** A phone offers it on the sign-in screen and on "Update this app"; a person
+  presses Install, allows "Install unknown apps" once if Android asks, and confirms on Android's
+  screen. A table tablet that is device owner installs without asking between guests, or at once
+  when refused (`mayInstallApkUnattended`), and `MY_PACKAGE_REPLACED` opens it again in kiosk
+  mode. A tablet that is not device owner offers it in the staff panel.
+
+Alternatives considered for this half:
+
+- **MDM only:** no code, but every restaurant would need the MDM console to update phones, and
+  phones without MDM would never update. MDM stays possible alongside.
+- **Downloading APKs from the vendor's cloud:** devices would need the internet and a second
+  trust path; the PC already has the release and the devices already trust the PC's CA.
+- **Trusting the APK's file name for its version:** a preview build or a wrong file could slip
+  in. The phone reads the package and `versionName` from the APK itself before installing.

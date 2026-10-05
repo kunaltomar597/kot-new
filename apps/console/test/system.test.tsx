@@ -486,6 +486,7 @@ describe('[UPD-006] apps and the client API', () => {
           { compatibility: 'TOO_OLD', devices: 1 },
           { compatibility: 'NEWER', devices: 1 },
         ],
+        builds: [],
       },
     });
     await renderConsole({ fake: systemServer(status), path: PATH, signedIn: 'MANAGER' });
@@ -499,6 +500,28 @@ describe('[UPD-006] apps and the client API', () => {
       versions.getByText(
         t('systemPage.versions.clientApiValue', { current: '1.4', oldest: '1.3' }),
       ),
+    ).toBeVisible();
+  });
+
+  it('[WTR-001] lists the app versions phones and tablets install from this PC (P7-04e2)', async () => {
+    const base = systemStatus();
+    const build = { clientApi: '1.0', sha256: 'e'.repeat(64), sizeBytes: 61_000_000 };
+    const status = systemStatus({
+      clients: {
+        ...base.clients,
+        builds: [
+          { ...build, kind: 'waiter-app', version: '1.5.0', status: 'OK' },
+          { ...build, kind: 'table-tablet', version: '1.5.0', status: 'DAMAGED' },
+        ],
+      },
+    });
+    await renderConsole({ fake: systemServer(status), path: PATH, signedIn: 'MANAGER' });
+    const devices = await section(t('systemPage.devices.title'));
+    expect(devices.getByText(t('systemPage.devices.builds.intro'))).toBeVisible();
+    expect(devices.getByText(t('systemPage.devices.builds.kind.waiter-app'))).toBeVisible();
+    expect(devices.getByText(/^Version 1\.5\.0 \(/)).toBeVisible();
+    expect(
+      devices.getByText(t('systemPage.devices.builds.DAMAGED', { version: '1.5.0' })),
     ).toBeVisible();
   });
 

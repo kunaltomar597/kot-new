@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { mayApplyAppUpdate, otaUpdateVerdict } from '../src/app-update.js';
+import {
+  apkUpdateVerdict,
+  mayApplyAppUpdate,
+  mayInstallApkUnattended,
+  otaUpdateVerdict,
+} from '../src/app-update.js';
 
 const server = (current: string, oldest: string) => ({ current, oldest });
 
@@ -42,5 +47,37 @@ describe('[UPD-001] when a downloaded update restarts the app', () => {
 
   it('switches at once when the server refuses the app as it is', () => {
     expect(mayApplyAppUpdate({ refused: true, busy: true })).toBe(true);
+  });
+});
+
+describe('[WTR-001] [UPD-001] a new APK from the restaurant PC (P7-04e2)', () => {
+  const build = { version: '1.5.0', clientApi: '1.4' };
+
+  it('offers a newer build the server speaks', () => {
+    expect(apkUpdateVerdict(server('1.4', '1.3'), '1.4.2', build)).toBe('OFFER');
+    expect(apkUpdateVerdict(server('1.4', '1.3'), '1.5.0-rc.1', build)).toBe('OFFER');
+  });
+
+  it('leaves an app that is up to date, or newer, as it is', () => {
+    expect(apkUpdateVerdict(server('1.4', '1.3'), '1.5.0', build)).toBe('UP_TO_DATE');
+    expect(apkUpdateVerdict(server('1.4', '1.3'), '1.6.0', build)).toBe('UP_TO_DATE');
+  });
+
+  it('never installs a build whose client API the server does not serve', () => {
+    expect(apkUpdateVerdict(server('1.3', '1.2'), '1.4.2', build)).toBe('NOT_SERVED');
+    expect(apkUpdateVerdict(server('1.6', '1.5'), '1.4.2', build)).toBe('NOT_SERVED');
+    expect(apkUpdateVerdict(undefined, '1.4.2', build)).toBe('NOT_SERVED');
+  });
+
+  it('installs nothing when the app does not know its own version', () => {
+    expect(apkUpdateVerdict(server('1.4', '1.3'), undefined, build)).toBe('UNKNOWN');
+  });
+
+  it('[TAB-001] installs by itself only on a device-owner tablet, between guests or when refused', () => {
+    expect(mayInstallApkUnattended({ silent: true, refused: false, busy: false })).toBe(true);
+    expect(mayInstallApkUnattended({ silent: true, refused: true, busy: true })).toBe(true);
+    expect(mayInstallApkUnattended({ silent: true, refused: false, busy: true })).toBe(false);
+    // A phone, or a tablet without device owner: Android asks a person.
+    expect(mayInstallApkUnattended({ silent: false, refused: true, busy: false })).toBe(false);
   });
 });

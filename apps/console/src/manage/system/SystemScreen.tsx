@@ -144,6 +144,43 @@ function ClientLines({
   );
 }
 
+/**
+ * The phone and tablet builds this PC serves from its release (P7-04e2, WTR-001): what devices
+ * update to, or why one is not offered.
+ */
+function BuildLines({
+  builds,
+  t,
+}: {
+  builds: SystemStatusResponse['clients']['builds'];
+  t: Translate;
+}) {
+  if (builds.length === 0) return null;
+  return (
+    <>
+      <p className="dashboard-section__hint">{t('systemPage.devices.builds.intro')}</p>
+      <Facts
+        facts={builds.map(
+          (build) =>
+            [
+              t(`systemPage.devices.builds.kind.${build.kind}`),
+              build.status === 'OK' ? (
+                t('systemPage.devices.builds.OK', {
+                  version: build.version,
+                  size: bytesText(build.sizeBytes, t),
+                })
+              ) : (
+                <span className="console-notice">
+                  {t(`systemPage.devices.builds.${build.status}`, { version: build.version })}
+                </span>
+              ),
+            ] as const,
+        )}
+      />
+    </>
+  );
+}
+
 /** How the last update went (UPD-005): installed, rolled back with the backup, or not installed. */
 function OutcomeLines({
   outcome,
@@ -371,6 +408,7 @@ export function SystemScreen() {
             />
           )}
           <ClientLines counts={system.clients.counts} t={t} />
+          <BuildLines builds={system.clients.builds} t={t} />
         </section>
 
         <section className="device-group" aria-labelledby="system-update">

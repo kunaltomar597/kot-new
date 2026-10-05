@@ -1,4 +1,5 @@
 export * from './alerts.js';
+export * from './ApkOffer.js';
 export * from './context.js';
 export * from './ItemSheet.js';
 export * from './licence.js';

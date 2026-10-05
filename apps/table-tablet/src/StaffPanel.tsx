@@ -2,6 +2,7 @@ import type { StaffTile } from '@rp/contracts';
 import { spacing } from '@rp/design-tokens';
 import type { DeviceHealthSource, Kiosk, KioskMode } from '@rp/mobile-core';
 import {
+  ApkOffer,
   messageOf,
   Note,
   Screen,
@@ -124,6 +125,9 @@ export function StaffPanel({
             </Note>
           ))}
           {!state.deviceOwner && <Note tone="danger">{t('mobile.tablet.staff.notOwner')}</Note>}
+          {/* The PC's new version of the tablet app (P7-04e2): a device owner installs it by
+              itself between guests; staff can install it now, or here on any tablet. */}
+          <ApkOffer />
           <Button size="lg" fullWidth onPress={onClose}>
             {t('mobile.tablet.staff.lockAgain')}
           </Button>

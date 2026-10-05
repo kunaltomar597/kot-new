@@ -210,9 +210,35 @@
               },
               "required": ["compatibility", "devices"]
             }
+          },
+          "builds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "enum": ["waiter-app", "table-tablet"] },
+                "version": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                },
+                "clientApi": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$"
+                },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                "sizeBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "status": { "type": "string", "enum": ["OK", "MISSING", "DAMAGED"] }
+              },
+              "required": ["kind", "version", "clientApi", "sha256", "sizeBytes", "status"]
+            }
           }
         },
-        "required": ["api", "counts"]
+        "required": ["api", "counts", "builds"]
       },
       "update": {
         "type": "object",
@@ -667,9 +693,36 @@
               "required": ["compatibility", "devices"],
               "additionalProperties": false
             }
+          },
+          "builds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "enum": ["waiter-app", "table-tablet"] },
+                "version": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                },
+                "clientApi": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$"
+                },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                "sizeBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "status": { "type": "string", "enum": ["OK", "MISSING", "DAMAGED"] }
+              },
+              "required": ["kind", "version", "clientApi", "sha256", "sizeBytes", "status"],
+              "additionalProperties": false
+            }
           }
         },
-        "required": ["api", "counts"],
+        "required": ["api", "counts", "builds"],
         "additionalProperties": false
       },
       "update": {

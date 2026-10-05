@@ -123,6 +123,9 @@ describe('[SEC-002] [AUD-004] what the server is given', () => {
       licenceEnforce: true,
     });
     expect(config.adminDatabaseUrl).toBeUndefined();
+    // P7-04e2: the release's phone and tablet APKs beside the console.
+    expect(config.appsDir).toBe(installationPaths(installation).appsDir);
+    expect(config.appsDir).toBe(join(installation.installDir, 'apps'));
   });
 
   it("drops our variables from what a child inherits, keeping the system's", () => {

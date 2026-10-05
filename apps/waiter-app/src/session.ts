@@ -1,5 +1,6 @@
 import { createTranslator } from '@rp/i18n';
 import {
+  ApkUpdater,
   createDeviceErrorReporting,
   DeviceSession,
   OtaUpdater,
@@ -7,6 +8,7 @@ import {
 } from '@rp/mobile-core';
 import {
   AndroidAlertNotifier,
+  AndroidApkInstaller,
   AndroidServerTrust,
   ExpoOtaUpdates,
   installRandomValues,
@@ -90,4 +92,29 @@ export function appUpdater(): Promise<OtaUpdater> {
     return updater;
   });
   return updating;
+}
+
+let installing: Promise<ApkUpdater> | undefined;
+
+/**
+ * New APKs of the waiter app from the restaurant PC (P7-04e2, WTR-001): offered on the sign-in
+ * screen and on "Update this app"; a person installs one and Android asks them to confirm.
+ */
+export function apkUpdater(): Promise<ApkUpdater> {
+  installing ??= Promise.all([deviceSession(), AndroidApkInstaller.load()]).then(
+    ([session, installer]) => {
+      const updater = new ApkUpdater({
+        session,
+        installer,
+        onError: createDeviceErrorReporting(
+          session,
+          'waiter-app',
+          Constants.expoConfig?.version ?? null,
+        ),
+      });
+      updater.start();
+      return updater;
+    },
+  );
+  return installing;
 }

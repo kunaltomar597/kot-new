@@ -70,6 +70,7 @@ import {
   TotpEnrollmentResponse,
   UnlockStaffRequest,
 } from './auth.js';
+import { CurrentAppBuildResponse } from './app-builds.js';
 import { ApiError, Id } from './common.js';
 import {
   KdsTicket,
@@ -988,6 +989,43 @@ export const ROUTES = [
       204: { description: 'Taken.' },
       400: { description: 'The request does not match the contract.', schema: ApiError },
       401: { description: 'Unknown or unpaired device.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getCurrentAppBuild',
+    method: 'GET',
+    path: '/api/v1/devices/current/app-build',
+    summary: 'The APK of the calling phone’s or tablet’s app on this PC',
+    description:
+      'WTR-001, UPD-001 (P7-04e2): the build of the device’s own app (waiter app or table ' +
+      'tablet) in the PC’s release, with its version, client API, size and SHA-256; null when ' +
+      'the release has none, the APK failed the PC’s check, or the device is not a phone or ' +
+      'tablet. Open to apps the server no longer serves (N-1), so they can update.',
+    tags: ['devices'],
+    requirements: ['WTR-001', 'UPD-001', 'UPD-006'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The build, or null.', schema: CurrentAppBuildResponse },
+      401: { description: 'Unknown or unpaired device.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'downloadCurrentAppBuild',
+    method: 'GET',
+    path: '/api/v1/devices/current/app-build/apk',
+    summary: 'Download that APK',
+    description:
+      'WTR-001, UPD-007 (P7-04e2): the APK itself (application/vnd.android.package-archive), ' +
+      'downloaded by the device’s own HTTP client over the pinned LAN CA. The device checks ' +
+      'its size and SHA-256 against `getCurrentAppBuild` before Android installs it, and Android ' +
+      'refuses an APK signed with another key. Open to apps the server no longer serves.',
+    tags: ['devices'],
+    requirements: ['WTR-001', 'UPD-001', 'UPD-007'],
+    capability: 'DEVICE',
+    responses: {
+      200: { description: 'The APK.' },
+      401: { description: 'Unknown or unpaired device.', schema: ApiError },
+      404: { description: 'No build of this device’s app on this PC.', schema: ApiError },
     },
   },
   {

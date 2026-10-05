@@ -35,6 +35,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { RelayOrdersService } from '../relay/relay-orders.service.js';
 import { RelaySyncService } from '../relay/relay-sync.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { AppBuildsService } from '../updates/app-builds.service.js';
 import { UpdateAgentService } from '../updates/update-agent.service.js';
 import {
   CATEGORY_FOLDERS,
@@ -88,6 +89,7 @@ export class SystemService {
     private readonly audit: AuditService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly updates: UpdateAgentService,
+    private readonly appBuilds: AppBuildsService,
   ) {}
 
   async status(principal: Principal): Promise<SystemStatusResponse> {
@@ -106,6 +108,7 @@ export class SystemService {
       retention,
       deletion,
       agent,
+      builds,
     ] = await Promise.all([
       this.prisma.ping(),
       this.settings.snapshot(restaurantId),
@@ -120,6 +123,7 @@ export class SystemService {
       readRetentionRun(this.prisma),
       readDataDeletionPermission(this.config.dataDir).catch(() => null),
       this.updates.status(),
+      this.appBuilds.list(),
     ]);
     const approverId = approval?.approvedByStaffId ?? null;
     const approver =
@@ -184,6 +188,7 @@ export class SystemService {
           ).length;
           return count === 0 ? [] : [{ compatibility, devices: count }];
         }),
+        builds: builds.map((build) => ({ ...build.view, status: build.status })),
       },
       update: {
         offered:

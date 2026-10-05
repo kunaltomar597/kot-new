@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
-import { CLIENT_API_VERSION, PAGER_PROTOCOL_VERSION, settingDefinition } from '@rp/contracts';
+import {
+  AppBuildsFile,
+  CLIENT_API_VERSION,
+  PAGER_PROTOCOL_VERSION,
+  settingDefinition,
+} from '@rp/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   APP_ID,
@@ -10,6 +15,7 @@ import {
   ELECTRON_FUSES,
   PRODUCT_NAME,
 } from '../src/packaging/builder-config.js';
+import { apkFileName, stageAppBuilds } from '../src/packaging/app-builds.js';
 import { COMPONENTS, NODE, POSTGRES, WINSW } from '../src/packaging/components.js';
 import { cachePathOf, ChecksumError, fetchVerified, sha256Of } from '../src/packaging/download.js';
 import { noticesText, packageNotice } from '../src/packaging/notices.js';
@@ -182,6 +188,7 @@ describe('[ONB-001] the payload', () => {
       node: `${install}\\node\\node.exe`,
       serverDir: `${install}\\server`,
       consoleDir: `${install}\\console`,
+      appsDir: `${install}\\apps`,
       pgBin: `${install}\\postgres\\bin`,
       servicesDir: `${install}\\services`,
     });
@@ -193,6 +200,7 @@ describe('[ONB-001] the payload', () => {
         'server/dist/service/watchdog-main.js',
         'server/prisma/migrations/migration_lock.toml',
         'console/index.html',
+        'apps/apps.json',
         'postgres/bin/pg_ctl.exe',
         'postgres/bin/pg_basebackup.exe',
         'services/RPServer.exe',
@@ -208,6 +216,7 @@ describe('[ONB-001] the payload', () => {
       node: '/stage/payload/node/node',
       serverDir: '/stage/payload/server',
       consoleDir: '/stage/payload/console',
+      appsDir: '/stage/payload/apps',
       pgBin: '/stage/payload/postgres/bin',
       servicesDir: '/stage/payload/services',
     });
@@ -219,6 +228,7 @@ describe('[ONB-001] the payload', () => {
         node: 'C:\\Other\\node.exe',
         serverDir: 'C:\\RP\\server',
         consoleDir: 'C:\\RP\\console',
+        appsDir: 'C:\\RP\\apps',
         pgBin: 'C:\\RP\\postgres\\bin',
         servicesDir: 'C:\\RP\\services',
       }),
@@ -523,5 +533,78 @@ describe('[UPD-006] the component version matrix of each release', () => {
     ]);
     expect(matrix.pagerProtocol).toBe(PAGER_PROTOCOL_VERSION);
     expect(VERSION_MATRIX_FILE).toBe('version-matrix.json');
+  });
+});
+
+describe('[WTR-001] [UPD-007] the phone and tablet APKs in the installer (P7-04e2)', () => {
+  const versionOf = async (app: string) =>
+    (
+      JSON.parse(await readFile(join(repoRoot, 'apps', app, 'package.json'), 'utf8')) as {
+        version: string;
+      }
+    ).version;
+
+  it('copies each APK under its version, with its size and SHA-256 in apps.json', async () => {
+    const apkDir = join(scratch, 'apks');
+    await mkdir(apkDir);
+    await writeFile(join(apkDir, apkFileName('waiter-app')), 'waiter apk');
+    await writeFile(join(apkDir, apkFileName('table-tablet')), 'tablet apk!');
+    const target = join(scratch, 'payload', 'apps');
+    const manifest = await stageAppBuilds({ repoRoot, release: '2.3.0', apkDir, target });
+    const waiter = await versionOf('waiter-app');
+    expect(manifest.apps).toEqual([
+      {
+        kind: 'waiter-app',
+        version: waiter,
+        clientApi: CLIENT_API_VERSION,
+        file: `waiter-app-${waiter}.apk`,
+        sha256: sha256('waiter apk'),
+        sizeBytes: 10,
+      },
+      expect.objectContaining({
+        kind: 'table-tablet',
+        sha256: sha256('tablet apk!'),
+        sizeBytes: 11,
+      }),
+    ]);
+    const written = AppBuildsFile.parse(
+      JSON.parse(await readFile(join(target, 'apps.json'), 'utf8')),
+    );
+    expect(written).toEqual(manifest);
+    expect(await readFile(join(target, `waiter-app-${waiter}.apk`), 'utf8')).toBe('waiter apk');
+  });
+
+  it('lists none without APKs, takes one app alone, and refuses anything else', async () => {
+    const none = await stageAppBuilds({
+      repoRoot,
+      release: '2.3.0',
+      apkDir: undefined,
+      target: join(scratch, 'none'),
+    });
+    expect(none.apps).toEqual([]);
+    expect(await readFile(join(scratch, 'none', 'apps.json'), 'utf8')).toContain('"apps": []');
+
+    const one = join(scratch, 'one');
+    await mkdir(one);
+    await writeFile(join(one, 'table-tablet.apk'), 'tablet');
+    const tabletOnly = await stageAppBuilds({
+      repoRoot,
+      release: '2.3.0',
+      apkDir: one,
+      target: join(scratch, 'one-out'),
+    });
+    expect(tabletOnly.apps.map((app) => app.kind)).toEqual(['table-tablet']);
+
+    const odd = join(scratch, 'odd');
+    await mkdir(odd);
+    await writeFile(join(odd, 'app-release.apk'), 'x');
+    await expect(
+      stageAppBuilds({ repoRoot, release: '2.3.0', apkDir: odd, target: join(scratch, 'o') }),
+    ).rejects.toThrow(/Unknown APKs/);
+    const empty = join(scratch, 'empty');
+    await mkdir(empty);
+    await expect(
+      stageAppBuilds({ repoRoot, release: '2.3.0', apkDir: empty, target: join(scratch, 'e') }),
+    ).rejects.toThrow(/No APKs/);
   });
 });

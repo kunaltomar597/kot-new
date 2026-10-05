@@ -275,6 +275,26 @@ export const en = {
       guests: 'Please call a waiter to order.',
       onItsWay:
         'The restaurant’s server no longer works with this version of the app. An update is on its way: the app restarts by itself in a moment.',
+      fromPc:
+        'The restaurant’s server no longer works with this version of the app. The restaurant PC has the new version: install it below.',
+    },
+    apk: {
+      available: 'Version {version} of this app is on the restaurant PC ({megabytes} MB).',
+      install: 'Install the new version',
+      needsPermission:
+        'Android must allow this app to install its updates. Open the settings, turn on “Allow from this source”, come back and install again.',
+      openSettings: 'Open Android settings',
+      downloading: 'Downloading the new version from the restaurant PC…',
+      installing:
+        'Installing. Confirm on Android’s screen; the app closes while it updates, then open it again.',
+      installingSilent: 'Installing the new version. The app opens again by itself.',
+      failed: {
+        check: 'Could not ask the restaurant PC for the new version.',
+        download: 'The new version did not download or failed its check.',
+        cancelled: 'The new version was not installed.',
+        refused: 'Android did not install the new version. Tell a manager.',
+      },
+      tryAgain: 'Try again',
     },
     serverLabel: 'Server address',
     serverHint: 'Shown on the POS in Manage → Devices, for example 192.168.1.20:8443.',
@@ -2688,6 +2708,14 @@ export const en = {
         '{count, plural, one {# app works} other {# apps work}} but must be updated before the next update of this PC.',
       newer:
         '{count, plural, one {# app is} other {# apps are}} newer than this PC. Install the update on offer.',
+      builds: {
+        intro: 'New app versions on this PC: phones and tablets install them from here.',
+        kind: { 'waiter-app': 'Waiter app', 'table-tablet': 'Table tablet app' },
+        OK: 'Version {version} ({size})',
+        MISSING: 'Version {version}: its file is missing. Repair the installation.',
+        DAMAGED:
+          'Version {version}: its file is damaged and is not offered. Repair the installation.',
+      },
     },
     update: {
       title: 'Updates',

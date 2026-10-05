@@ -5,7 +5,8 @@
       "com.rp.mobilenative.RpDeviceKeyModule",
       "com.rp.mobilenative.RpLanTrustModule",
       "com.rp.mobilenative.RpAlertsModule",
-      "com.rp.mobilenative.RpKioskModule"
+      "com.rp.mobilenative.RpKioskModule",
+      "com.rp.mobilenative.RpApkInstallerModule"
     ]
   }
 }

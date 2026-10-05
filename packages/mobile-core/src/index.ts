@@ -1,4 +1,5 @@
 export * from './alert-center.js';
+export * from './apk-updates.js';
 export * from './app-updates.js';
 export * from './client.js';
 export * from './device-session.js';

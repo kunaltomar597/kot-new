@@ -145,6 +145,16 @@ export class DeviceSession {
     return this.client.api;
   }
 
+  /**
+   * The address and this device's credentials for a download Android's own HTTP client makes,
+   * e.g. the app's new APK from the PC (P7-04e2).
+   */
+  async downloadRequest(
+    operationId: 'downloadCurrentAppBuild',
+  ): Promise<{ readonly url: string; headers: Record<string, string> }> {
+    return this.requireClient().authorizedRequest(operationId);
+  }
+
   /** Loads the stored device and session and checks them with the server. */
   async start(): Promise<void> {
     const serverUrl = (await this.options.plainStore.getItem(SERVER_KEY)) ?? undefined;

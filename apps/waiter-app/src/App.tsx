@@ -1,5 +1,5 @@
 import type { Translator } from '@rp/i18n';
-import type { DeviceSession, OtaUpdater } from '@rp/mobile-core';
+import type { ApkUpdater, DeviceSession, OtaUpdater } from '@rp/mobile-core';
 import type { NotificationPermission } from '@rp/mobile-native';
 import {
   LoginScreen,
@@ -36,24 +36,28 @@ function Screens({ notifications }: { notifications: NotificationPermission | un
 /**
  * The waiter app: pair, sign in with a PIN, then "My tables" and each table's orders (WTR-001 to
  * WTR-003, WTR-012), with the waiter's alerts on every screen and, through `notifications`, outside
- * the app (WTR-005, WTR-006). `updater` brings over-the-air updates (P7-04e1).
+ * the app (WTR-005, WTR-006). `updater` brings over-the-air updates (P7-04e1), `apkUpdater` new APKs from the PC
+ * (P7-04e2).
  */
 export function App({
   session,
   translator,
   notifications,
   updater,
+  apkUpdater,
 }: {
   session: DeviceSession;
   translator: Translator;
   notifications?: NotificationPermission;
   updater?: OtaUpdater;
+  apkUpdater?: ApkUpdater;
 }) {
   return (
     <ShellProvider
       session={session}
       translator={translator}
       {...(updater !== undefined && { updater })}
+      {...(apkUpdater !== undefined && { apkUpdater })}
     >
       <ToastProvider>
         <StatusBar style="dark" />

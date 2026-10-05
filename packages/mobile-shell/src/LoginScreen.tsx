@@ -3,6 +3,7 @@ import { spacing } from '@rp/design-tokens';
 import { Button, PinPad } from '@rp/ui-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { ApkOffer } from './ApkOffer.js';
 import { useDeviceSession, useSessionState, useT } from './context.js';
 import { messageOf } from './messages.js';
 import { Note, Screen } from './Screen.js';
@@ -66,6 +67,8 @@ export function LoginScreen({ roles }: { roles?: readonly StaffTile['role'][] })
 
   return (
     <Screen title={t('mobile.staffTitle')}>
+      {/* A new version of the app on the restaurant PC, installed before anyone signs in (P7-04e2). */}
+      <ApkOffer />
       {noticeText !== null && <Note tone="danger">{noticeText}</Note>}
       {data.status === 'loading' && <Note>{t('states.loading')}</Note>}
       {data.status === 'error' && (

@@ -191,6 +191,26 @@ export class ApiClient implements RealtimeAuthority {
   }
 
   /**
+   * A request another HTTP client sends, with this client's credentials: the address and the
+   * headers (device token, the person's access token, `x-rp-client`, a correlation id). For a
+   * download Android's own client makes, e.g. a new APK from the PC (P7-04e2). The tokens last
+   * as long as they last; ask again for every download.
+   */
+  async authorizedRequest<Op extends OperationId>(
+    operationId: Op,
+    ...args: RequestArgs<Op>
+  ): Promise<{ readonly url: string; readonly method: string; headers: Record<string, string> }> {
+    const input: AnyInput = args[0] ?? {};
+    const prepared = this.prepare(routeFor(operationId), input);
+    const correlationId = input.correlationId ?? newCorrelationId();
+    return {
+      url: prepared.url,
+      method: prepared.route.method,
+      headers: await this.headers(accessOf(prepared.route), input, correlationId),
+    };
+  }
+
+  /**
    * Pairs this device with a manager's one-time code (AUTH-007): proves possession of the key,
    * stores the device identity and gets the first device token.
    */
