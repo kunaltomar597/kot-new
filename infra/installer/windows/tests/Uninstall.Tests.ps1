@@ -15,6 +15,7 @@ Describe '[NFR-I02] uninstalling' {
         Mock -ModuleName $ModuleName Remove-RPService { $null = $script:Calls.Add("remove service $Name") }
         Mock -ModuleName $ModuleName Remove-RPFirewallRule { $null = $script:Calls.Add('remove firewall rules') }
         Mock -ModuleName $ModuleName Remove-RPFolder { $null = $script:Calls.Add("delete $Path") }
+        Mock -ModuleName $ModuleName Unregister-RPUpdateTask { $null = $script:Calls.Add("remove the updater from $ProgramDataDir") }
         Mock -ModuleName $ModuleName Invoke-RPProgram {
             $command = @($ArgumentList | Select-Object -Skip 1 | Select-Object -SkipLast 2)
             $null = $script:Calls.Add('setup-cli ' + ($command -join ' '))
@@ -29,13 +30,14 @@ Describe '[NFR-I02] uninstalling' {
         }
     }
 
-    It 'keeps the data: removes the watchdog first, then the server and the database, and the firewall rules' {
+    It 'keeps the data: removes the updater, the watchdog, the server and the database, and the firewall rules' {
         $result = Invoke-RPUninstall -InstallDir $script:InstallDir -InstallationFile $script:InstallationFile
         $result.DataKept | Should -BeTrue
         $result.DataDir | Should -Be 'D:\RestaurantPlatform'
         @($script:Calls) | Should -Be @(
             'setup-cli paths',
             'setup-cli maintenance on --minutes 30 --reason uninstall',
+            'remove the updater from C:\ProgramData\RestaurantPlatform',
             'remove service RPWatchdog',
             'remove service RPServer',
             'remove service RPDatabase',
@@ -65,6 +67,7 @@ Describe '[NFR-I02] uninstalling' {
             'setup-cli paths',
             'setup-cli data-deletion',
             'setup-cli maintenance on --minutes 30 --reason uninstall',
+            'remove the updater from C:\ProgramData\RestaurantPlatform',
             'remove service RPWatchdog',
             'remove service RPServer',
             'remove service RPDatabase',
@@ -93,7 +96,13 @@ Describe '[NFR-I02] uninstalling' {
         $result = Invoke-RPUninstall -InstallDir $script:InstallDir -InstallationFile $script:InstallationFile
         $result.DataKept | Should -BeTrue
         $result.DataDir | Should -BeNullOrEmpty
-        @($script:Calls) | Should -Be @('remove service RPWatchdog', 'remove service RPServer', 'remove service RPDatabase', 'remove firewall rules')
+        @($script:Calls) | Should -Be @(
+            'remove the updater from C:\ProgramData\RestaurantPlatform',
+            'remove service RPWatchdog',
+            'remove service RPServer',
+            'remove service RPDatabase',
+            'remove firewall rules'
+        )
 
         $script:Calls.Clear()
         { Invoke-RPUninstall -InstallDir $script:InstallDir -InstallationFile $script:InstallationFile -DeleteData } |

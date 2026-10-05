@@ -5,7 +5,8 @@ import { Id, Timestamp } from './common.js';
 export const BackupHealth = z.enum(['OK', 'FAILED', 'OVERDUE', 'NONE']);
 export type BackupHealth = z.infer<typeof BackupHealth>;
 
-export const BackupKind = z.enum(['NIGHTLY', 'MANUAL']);
+/** UPDATE: made by the update agent before it installs a new version (UPD-005, P7-04c). */
+export const BackupKind = z.enum(['NIGHTLY', 'MANUAL', 'UPDATE']);
 export type BackupKind = z.infer<typeof BackupKind>;
 
 /** PARTIAL: made and checked on the data drive, but not copied to the second location. */

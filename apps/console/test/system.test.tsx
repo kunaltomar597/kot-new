@@ -475,6 +475,141 @@ describe('[UPD-004] "Install now"', () => {
   });
 });
 
+describe('[UPD-005] how updates go', () => {
+  const withAgent = (
+    agent: Partial<ReturnType<typeof systemStatus>['update']['agent']>,
+    update: Partial<ReturnType<typeof systemStatus>['update']> = {},
+  ) => {
+    const base = systemStatus();
+    return systemStatus({
+      update: { ...base.update, ...update, agent: { ...base.update.agent, ...agent } },
+    });
+  };
+
+  it('says a rollback happened, names the backup, and offers "Install now" again', async () => {
+    const status = withAgent(
+      {
+        waitingFor: 'RETRY_APPROVAL',
+        lastOutcome: {
+          version: '1.2.0',
+          previousVersion: '1.1.0',
+          outcome: 'ROLLED_BACK',
+          at: '2026-10-01T22:10:00.000Z',
+          error: 'The new version did not pass its health check.',
+          backupFileName: 'rp-backup-20261001T220000Z-update.rpbk',
+        },
+      },
+      {
+        openTables: 0,
+        installApproval: {
+          version: '1.2.0',
+          approvedAt: '2026-10-01T21:00:00.000Z',
+          approvedBy: 'Vikram',
+        },
+      },
+    );
+    const { container } = await renderConsole({
+      fake: systemServer(status),
+      path: PATH,
+      signedIn: 'MANAGER',
+    });
+    const update = await section(t('systemPage.update.title'));
+    expect(
+      update.getByText(
+        t('systemPage.update.outcome.ROLLED_BACK', {
+          version: '1.2.0',
+          previous: '1.1.0',
+          error: 'The new version did not pass its health check.',
+          date: '02-10-2026',
+          time: '03:40',
+        }),
+      ),
+    ).toBeVisible();
+    expect(
+      update.getByText(
+        t('systemPage.update.outcome.backup', { file: 'rp-backup-20261001T220000Z-update.rpbk' }),
+      ),
+    ).toBeVisible();
+    expect(update.getByText(t('systemPage.update.agent.RETRY_APPROVAL'))).toBeVisible();
+    expect(update.getByRole('button', { name: t('systemPage.update.installNow') })).toBeVisible();
+    await expectNoAxeViolations(container);
+  });
+
+  it('shows an update installing, with nothing to press', async () => {
+    await renderConsole({
+      fake: systemServer(withAgent({ state: 'INSTALLING', waitingFor: null })),
+      path: PATH,
+      signedIn: 'MANAGER',
+    });
+    const update = await section(t('systemPage.update.title'));
+    expect(update.getByRole('status')).toHaveTextContent(
+      t('systemPage.update.agent.INSTALLING', { version: '1.2.0' }),
+    );
+    expect(update.queryByRole('button', { name: t('systemPage.update.installNow') })).toBeNull();
+    expect(update.queryByText(t('systemPage.update.openTables', { count: 2 }))).toBeNull();
+  });
+
+  it('says why the download failed and when it is tried again', async () => {
+    await renderConsole({
+      fake: systemServer(
+        withAgent({
+          state: 'DOWNLOAD_FAILED',
+          waitingFor: null,
+          error: 'The download does not match the release’s SHA-256.',
+          retryAt: '2026-10-01T09:40:00.000Z',
+        }),
+      ),
+      path: PATH,
+      signedIn: 'MANAGER',
+    });
+    const update = await section(t('systemPage.update.title'));
+    expect(
+      update.getByText(
+        t('systemPage.update.agent.DOWNLOAD_FAILED', {
+          error: 'The download does not match the release’s SHA-256.',
+          time: '15:10',
+        }),
+      ),
+    ).toBeVisible();
+  });
+
+  it('says when the last update installed, and that this PC is up to date', async () => {
+    await renderConsole({
+      fake: systemServer(
+        withAgent(
+          {
+            state: 'IDLE',
+            version: null,
+            waitingFor: null,
+            lastOutcome: {
+              version: '1.2.0',
+              previousVersion: '1.1.0',
+              outcome: 'INSTALLED',
+              at: '2026-10-01T22:10:00.000Z',
+              error: null,
+              backupFileName: 'rp-backup-20261001T220000Z-update.rpbk',
+            },
+          },
+          { offered: null },
+        ),
+      ),
+      path: PATH,
+      signedIn: 'MANAGER',
+    });
+    const update = await section(t('systemPage.update.title'));
+    expect(
+      update.getByText(
+        t('systemPage.update.outcome.INSTALLED', {
+          version: '1.2.0',
+          date: '02-10-2026',
+          time: '03:40',
+        }),
+      ),
+    ).toBeVisible();
+    expect(update.getByText(t('systemPage.update.upToDate'))).toBeVisible();
+  });
+});
+
 const BUNDLE = {
   format: 1,
   generatedAt: '2026-10-02T09:30:00.000Z',

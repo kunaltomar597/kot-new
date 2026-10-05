@@ -6,7 +6,8 @@
 .DESCRIPTION
     Run by the installer (P0-16d) as an administrator, after it has copied the software into
     InstallDir. When the installation file exists already this is a repair: the data stays where
-    it is and every step runs again. See docs/runbooks/windows-installer.md.
+    it is and every step runs again. It also registers the updater's scheduled task and keeps the
+    installer for going back after a failed update (P7-04c). See docs/runbooks/windows-installer.md.
 
     Exit codes: 0 done, 1 failed (see the log).
 
@@ -32,6 +33,12 @@ param(
     [string] $QrSiteUrl,
     [string] $ErrorDsn,
     [ValidateRange(1, 100000)] [int] $MinFreeGB = 20,
+    # The installer itself, kept to go back to after a failed update (P7-04c).
+    [string] $InstallerPath,
+    # UPD-007: the Authenticode signer updates must carry (the code-signing certificate's subject).
+    [string] $UpdatePublisher,
+    # A test build only: updates may be unsigned.
+    [switch] $AllowUnsignedUpdates,
     [string] $InstallationFile,
     [string] $LogFile
 )

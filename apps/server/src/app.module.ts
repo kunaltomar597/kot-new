@@ -38,6 +38,7 @@ import { SettingsModule } from './settings/settings.module.js';
 import { LicensingModule } from './licensing/licensing.module.js';
 import { StaffModule } from './staff/staff.module.js';
 import { SystemModule } from './system/system.module.js';
+import { UpdatesModule } from './updates/updates.module.js';
 import { TlsModule } from './tls/tls.module.js';
 
 /**
@@ -84,6 +85,7 @@ export class AppModule {
         RelayModule,
         SystemModule,
         BackupsModule,
+        UpdatesModule,
         LifecycleModule,
         DigitalBillsModule,
         HealthModule,

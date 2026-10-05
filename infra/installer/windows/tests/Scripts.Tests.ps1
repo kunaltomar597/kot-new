@@ -34,7 +34,7 @@ Describe 'the script files' {
         $settings = Join-Path $script:Root 'PSScriptAnalyzerSettings.psd1'
         $shipped = @(Get-ChildItem -Path (Join-Path $script:Root '*') -File -Include '*.ps1', '*.psm1' |
                 Where-Object { $_.Name -ne 'Invoke-Tests.ps1' })
-        $shipped.Count | Should -Be 6
+        $shipped.Count | Should -Be 7
         $findings = @($shipped | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Settings $settings })
         $findings | ForEach-Object { '{0} {1}:{2} {3}' -f $_.RuleName, $_.ScriptName, $_.Line, $_.Message } | Should -BeNullOrEmpty
     }
@@ -58,6 +58,14 @@ Describe 'the scripts the installer runs' {
             $LASTEXITCODE | Should -Be 1
             Get-Content -LiteralPath $log -Raw | Should -Match $message
         }
+    }
+
+    It '[UPD-005] Update-RestaurantPlatform.ps1 logs a failure and ends with exit code 1' {
+        $log = Join-Path $TestDrive 'update.log'
+        & $script:Shell -NoProfile -NonInteractive -File (Join-Path $script:Root 'Update-RestaurantPlatform.ps1') `
+            -InstallationFile (Join-Path $TestDrive 'none.json') -LogFile $log *> $null
+        $LASTEXITCODE | Should -Be 1
+        Get-Content -LiteralPath $log -Raw | Should -Match 'The updater failed'
     }
 
     It '[NFR-I02] Uninstall-RestaurantPlatform.ps1 logs a failure and ends with exit code 1' {

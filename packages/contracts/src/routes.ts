@@ -667,8 +667,9 @@ export const ROUTES = [
     path: '/api/v1/system/update/approve',
     summary: '"Install now" for the update on offer',
     description:
-      'UPD-004: the update installs at once instead of in the maintenance window (the updater, ' +
-      'P7-04, still waits for open tables unless it is security-critical). Audited.',
+      'UPD-004: the update installs at once instead of in the maintenance window (the update ' +
+      'agent, P7-04c, still waits for open tables unless it is security-critical). After a ' +
+      'failed update, it tries that version again. Audited.',
     tags: ['system'],
     requirements: ['UPD-004', 'AUD-001'],
     capability: 'UPDATE_INSTALL_NOW',

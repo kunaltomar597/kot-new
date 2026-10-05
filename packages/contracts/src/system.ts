@@ -60,6 +60,61 @@ export type StorageLevel = z.infer<typeof StorageLevel>;
 const Bytes = z.int().nonnegative();
 
 /**
+ * What the update agent on the restaurant PC is doing (UPD-004, UPD-005, P7-04c):
+ * - `IDLE`: nothing on offer that is newer than this PC's version;
+ * - `DOWNLOADING`, then `WAITING` once the download passed its checks (see `waitingFor`);
+ * - `DOWNLOAD_FAILED`: the download failed or did not pass its checks; tried again at `retryAt`;
+ * - `PREPARING`: the backup and integrity check before the update;
+ * - `PREPARE_FAILED`: they failed; nothing was changed and they are tried again at `retryAt`;
+ * - `INSTALLING`: handed to the installer; the server restarts;
+ * - `UNAVAILABLE`: this PC cannot install updates (see `error`).
+ */
+export const UpdateAgentState = z.enum([
+  'IDLE',
+  'DOWNLOADING',
+  'DOWNLOAD_FAILED',
+  'WAITING',
+  'PREPARING',
+  'PREPARE_FAILED',
+  'INSTALLING',
+  'UNAVAILABLE',
+]);
+export type UpdateAgentState = z.infer<typeof UpdateAgentState>;
+
+/** `updateTiming`'s reasons in `@rp/domain`: the window, open tables, a retry after a failure. */
+export const UpdateWait = z.enum(['WINDOW', 'OPEN_TABLES', 'RETRY_APPROVAL']);
+export type UpdateWait = z.infer<typeof UpdateWait>;
+
+/** How an update ended (UPD-005): the new version runs, the old one is back, or neither ran it. */
+export const SoftwareUpdateOutcome = z.enum(['INSTALLED', 'ROLLED_BACK', 'FAILED']);
+export type SoftwareUpdateOutcome = z.infer<typeof SoftwareUpdateOutcome>;
+
+export const UpdateAgentStatus = z.object({
+  state: UpdateAgentState,
+  /** The version it is working on, or null. */
+  version: z.string().nullable(),
+  waitingFor: UpdateWait.nullable(),
+  /** Why the download or the preparation failed, or why updates are unavailable here. */
+  error: z.string().nullable(),
+  /** When a failed download or preparation is tried again. */
+  retryAt: Timestamp.nullable(),
+  /** The last update this PC tried, or null. */
+  lastOutcome: z
+    .object({
+      version: z.string(),
+      previousVersion: z.string().nullable(),
+      outcome: SoftwareUpdateOutcome,
+      at: Timestamp,
+      /** Why it failed, in plain words. */
+      error: z.string().nullable(),
+      /** The backup made before it, in the backups list. */
+      backupFileName: z.string().nullable(),
+    })
+    .nullable(),
+});
+export type UpdateAgentStatus = z.infer<typeof UpdateAgentStatus>;
+
+/**
  * Everything the System page shows (MGR-010, NFR-I03): versions, the services, the data drive by
  * category, the devices, the update on offer with its approval, and the backup and licence state.
  * The backup (P7-05) and licence (P7-01) parts are null until those exist.
@@ -134,6 +189,8 @@ export const SystemStatusResponse = z.object({
     maintenanceWindow: z.object({ start: z.string(), end: z.string() }),
     /** Updates wait while tables are open, unless security-critical and approved (UPD-004). */
     openTables: Bytes,
+    /** What the update agent is doing, and how the last update went (P7-04c). */
+    agent: UpdateAgentStatus,
   }),
   backup: z
     .object({ lastSuccessAt: Timestamp.nullable(), lastError: z.string().nullable() })

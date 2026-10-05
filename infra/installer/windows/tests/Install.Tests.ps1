@@ -37,6 +37,8 @@ Describe '[ONB-001] [NFR-I01] installing on a new PC' {
         Mock -ModuleName $ModuleName Get-RPVolume {
             @((New-TestVolume 'C:' -FreeGB 90), (New-TestVolume 'D:' -FreeGB 400), (New-TestVolume 'E:' -BusType 'USB'))
         }
+        Mock -ModuleName $ModuleName Register-RPUpdateTask { $null = $script:Calls.Add("updater task from $SetupDir into $ProgramDataDir") }
+        Mock -ModuleName $ModuleName Save-RPInstaller { $null = $script:Calls.Add("keep $InstallerPath as $ProductVersion") }
         Mock -ModuleName $ModuleName Get-RPExplicitAceSid { @() }
         # The installer's own account is on the data folder until the permissions are set in full.
         Mock -ModuleName $ModuleName Get-RPExplicitAceSid -ParameterFilter { $Path -eq 'D:\RestaurantPlatform' } {
@@ -88,7 +90,7 @@ Describe '[ONB-001] [NFR-I01] installing on a new PC' {
         $result.Port | Should -Be 8080
 
         Get-SetupCalls | Should -Be @(
-            "setup-cli write-installation --install-dir $($script:InstallDir) --data-dir D:\RestaurantPlatform --product-version 1.0.0",
+            "setup-cli write-installation --install-dir $($script:InstallDir) --data-dir D:\RestaurantPlatform --product-version 1.0.0 --allow-unsigned-updates off",
             'setup-cli maintenance on --minutes 60 --reason install',
             'setup-cli paths',
             'setup-cli secrets',
@@ -125,10 +127,29 @@ Describe '[ONB-001] [NFR-I01] installing on a new PC' {
             -DataDir 'C:\RestaurantPlatform\' -Port 9443 -MqttPort 8884 -StaffSubnet '192.168.10.0/24' `
             -ControlPlaneUrl 'https://cp.example.com' -TlsHostnames 'pos.local', 'counter' | Out-Null
         (Get-SetupCalls)[0] | Should -Be ("setup-cli write-installation --install-dir $($script:InstallDir) --data-dir C:\RestaurantPlatform " +
-            '--product-version 1.0.0 --port 9443 --mqtt-port 8884 --control-plane-url https://cp.example.com --tls-hostnames pos.local,counter')
+            '--product-version 1.0.0 --port 9443 --mqtt-port 8884 --control-plane-url https://cp.example.com --tls-hostnames pos.local,counter ' +
+            '--allow-unsigned-updates off')
         @($script:Calls) | Should -Contain 'firewall: add RP-Server-HTTPS port 8080 from 192.168.10.0/24'
         # [ONB-002] The system drive is allowed when chosen, with a warning in the log.
         Should -Invoke -ModuleName $ModuleName Write-RPLog -ParameterFilter { $Message -like 'Warning: the data goes on the system drive C:*' } -Times 1
+    }
+
+    It '[UPD-005] [UPD-007] registers the updater and keeps the installer to go back to' {
+        $script:InstallationRead = 0
+        Mock -ModuleName $ModuleName Read-RPInstallationFile {
+            $script:InstallationRead++
+            if ($script:InstallationRead -eq 1) { return $null }
+            [pscustomobject]@{ dataDir = 'D:\RestaurantPlatform'; productVersion = '1.0.0' }
+        }
+        Invoke-RPInstall -InstallDir $script:InstallDir -ProductVersion '1.0.0' -InstallationFile $script:InstallationFile `
+            -InstallerPath 'C:\Users\owner\Downloads\RestaurantPlatform-Setup-1.0.0.exe' `
+            -UpdatePublisher 'CN=Restaurant Platform Pvt Ltd, C=IN' -AllowUnsignedUpdates | Out-Null
+        (Get-SetupCalls)[0] | Should -BeLike '* --update-publisher CN=Restaurant Platform Pvt Ltd, C=IN --allow-unsigned-updates on'
+        $task = Get-CallIndex "updater task from $($script:InstallDir)\setup into C:\ProgramData\RestaurantPlatform"
+        $kept = Get-CallIndex 'keep C:\Users\owner\Downloads\RestaurantPlatform-Setup-1.0.0.exe as 1.0.0'
+        # Both before the server starts, so a failed step leaves no half-set-up updater behind it.
+        $task | Should -BeLessThan (Get-CallIndex 'sc.exe start RPServer')
+        $kept | Should -BeLessThan (Get-CallIndex 'sc.exe start RPServer')
     }
 
     It '[ONB-002] refuses a removable drive before changing anything' {
@@ -180,6 +201,8 @@ Describe '[NFR-I02] repairing an installation' {
         Mock -ModuleName $ModuleName Get-RPCurrentUserSid { $script:UserSid }
         Mock -ModuleName $ModuleName Read-RPInstallationFile { [pscustomobject]@{ dataDir = 'F:\Old data' } }
         Mock -ModuleName $ModuleName Get-RPVolume { throw 'the drives are not looked at on repair' }
+        Mock -ModuleName $ModuleName Register-RPUpdateTask { $null = $script:Calls.Add("updater task from $SetupDir into $ProgramDataDir") }
+        Mock -ModuleName $ModuleName Save-RPInstaller { $null = $script:Calls.Add("keep $InstallerPath as $ProductVersion") }
         Mock -ModuleName $ModuleName Get-RPExplicitAceSid { @() }
         Mock -ModuleName $ModuleName Remove-RPFirewallRule { $null = $script:Calls.Add('firewall: remove the group') }
         Mock -ModuleName $ModuleName Add-RPFirewallRule { $null = $script:Calls.Add("firewall: add $($Spec.Name)") }
@@ -209,7 +232,7 @@ Describe '[NFR-I02] repairing an installation' {
         $result = Invoke-RPInstall -InstallDir $script:InstallDir -ProductVersion '1.1.0' -InstallationFile $script:InstallationFile
         $result.Mode | Should -Be 'repair'
         $result.DataDir | Should -Be 'F:\Old data'
-        (Get-SetupCalls)[0] | Should -Be "setup-cli write-installation --install-dir $($script:InstallDir) --data-dir F:\Old data --product-version 1.1.0"
+        (Get-SetupCalls)[0] | Should -Be "setup-cli write-installation --install-dir $($script:InstallDir) --data-dir F:\Old data --product-version 1.1.0 --allow-unsigned-updates off"
         (Get-SetupCalls)[1] | Should -Be 'setup-cli maintenance on --minutes 60 --reason repair'
         (Get-CallIndex 'sc.exe stop RPWatchdog') | Should -BeLessThan (Get-CallIndex 'sc.exe stop RPServer')
         (Get-CallIndex 'sc.exe stop RPServer') | Should -BeLessThan (Get-CallIndex 'setup-cli secrets')

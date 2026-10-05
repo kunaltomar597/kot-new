@@ -42,6 +42,33 @@ export function cloudSettingsFrom(
   return settings;
 }
 
+/**
+ * How the installed PC checks updates (UPD-007, P7-04c): the Authenticode signer every update
+ * must carry (`RP_UPDATE_PUBLISHER`, the code-signing certificate's subject), or, for a test build
+ * only, unsigned updates (`RP_ALLOW_UNSIGNED_UPDATES=1`). Neither: the PC refuses updates.
+ */
+export interface UpdateSettings {
+  readonly publisher?: string;
+  readonly allowUnsigned: boolean;
+}
+
+export function updateSettingsFrom(
+  env: Readonly<Record<string, string | undefined>>,
+): UpdateSettings {
+  const publisher = env.RP_UPDATE_PUBLISHER?.trim();
+  const allowUnsigned = env.RP_ALLOW_UNSIGNED_UPDATES?.trim() === '1';
+  if (publisher !== undefined && publisher !== '') {
+    if (allowUnsigned) {
+      throw new Error('A build with an update publisher never accepts unsigned updates');
+    }
+    if (!/^[^\r\n]{3,500}$/.test(publisher)) {
+      throw new Error('RP_UPDATE_PUBLISHER is the certificate subject, e.g. CN=..., O=..., C=IN');
+    }
+    return { publisher, allowUnsigned: false };
+  }
+  return { allowUnsigned };
+}
+
 /** A value inside an NSIS string in double quotes. */
 export function nsisString(value: string): string {
   if (/[\r\n]/.test(value)) throw new Error('An NSIS string cannot hold a line break');
@@ -54,6 +81,7 @@ export interface NsisDefinesOptions {
   /** The settings catalogue's `onboarding.minFreeDiskGb` default (the settings do not exist yet). */
   readonly minFreeGb: number;
   readonly cloud: CloudSettings;
+  readonly updates?: UpdateSettings;
 }
 
 export function nsisDefines(options: NsisDefinesOptions): string {
@@ -70,5 +98,10 @@ export function nsisDefines(options: NsisDefinesOptions): string {
     const value = options.cloud[key as keyof CloudSettings];
     if (value !== undefined) lines.push(`!define ${define} "${nsisString(value)}"`);
   }
+  const updates = options.updates;
+  if (updates?.publisher !== undefined) {
+    lines.push(`!define RP_UPDATE_PUBLISHER "${nsisString(updates.publisher)}"`);
+  }
+  if (updates?.allowUnsigned === true) lines.push('!define RP_ALLOW_UNSIGNED_UPDATES');
   return `${lines.join('\n')}\n`;
 }

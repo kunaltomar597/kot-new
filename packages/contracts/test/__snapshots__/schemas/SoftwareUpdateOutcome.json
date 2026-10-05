@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["INSTALLED", "ROLLED_BACK", "FAILED"] },
+  "output": { "type": "string", "enum": ["INSTALLED", "ROLLED_BACK", "FAILED"] }
+}

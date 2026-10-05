@@ -8,7 +8,9 @@ is right on real disks, and that a newer version installs over an older one.
 
 Ready to run: **after the first push to GitHub** (manual task 1). Each CI run keeps the installer
 as the artifact `windows-installer` for 14 days. Until the code-signing certificate exists, the
-installer is unsigned and Windows warns about it; that is expected for this test.
+installer is unsigned and Windows warns about it; that is expected for this test. An unsigned
+build also accepts unsigned updates (for the CI job's update test): use it on a test PC only,
+never at a restaurant.
 
 ## What you need
 
@@ -49,7 +51,10 @@ installer is unsigned and Windows warns about it; that is expected for this test
 9. **Repair.** Run the same installer again. It skips the drive page and finishes; the POS window
    shows the same restaurant and data.
 10. **Update.** When a newer CI build exists (or ask Claude for one), run its installer over this
-    one: no drive page, the same data afterwards, and Settings → Apps shows the new version.
+    one: no drive page, the same data afterwards, and Settings → Apps shows the new version. Then
+    check the updater is set up: `schtasks /Query /TN \RestaurantPlatform\Update` lists the task,
+    and `C:\ProgramData\RestaurantPlatform\installers` holds both installers (P7-04c; automatic
+    updates and their rollback are tested by the CI job, scenario S9).
 11. **Uninstall keeps the data.** Settings → Apps → Restaurant Platform → Uninstall. The page says
     the data stays; leave the box unticked. Afterwards `services.msc` no longer lists the three
     services, and the data folder (for example `D:\RestaurantPlatform`) is still there.

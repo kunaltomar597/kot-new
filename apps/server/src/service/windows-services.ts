@@ -65,6 +65,7 @@ export class WindowsServiceControl implements ServiceControl {
   private readonly run: RunCommand;
   private readonly sc: string;
   private readonly taskkill: string;
+  private readonly schtasks: string;
 
   constructor(private readonly options: WindowsServiceControlOptions = {}) {
     this.run = options.run ?? runCommand;
@@ -74,6 +75,14 @@ export class WindowsServiceControl implements ServiceControl {
     );
     this.sc = join(system32, 'sc.exe');
     this.taskkill = join(system32, 'taskkill.exe');
+    this.schtasks = join(system32, 'schtasks.exe');
+  }
+
+  /** Starts a scheduled task now (the updater's, P7-04c); one already running is left alone. */
+  async runTask(name: string): Promise<void> {
+    const { code, output } = await this.run(this.schtasks, ['/Run', '/TN', name]);
+    if (code !== 0)
+      throw new Error(`schtasks /Run ${name} failed (${String(code)}): ${output.trim()}`);
   }
 
   async state(name: string): Promise<ServiceState> {

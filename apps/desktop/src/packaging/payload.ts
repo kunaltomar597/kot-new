@@ -32,6 +32,7 @@ export const SETUP_SCRIPTS = [
   'Get-DataDriveChoice.ps1',
   'Stop-RestaurantPlatform.ps1',
   'Start-RestaurantPlatform.ps1',
+  'Update-RestaurantPlatform.ps1',
 ] as const;
 
 /** Where the stage step puts everything (`apps/desktop/staging`). */

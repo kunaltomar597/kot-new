@@ -13,7 +13,13 @@ import {
 import { COMPONENTS, NODE, POSTGRES, WINSW } from '../src/packaging/components.js';
 import { cachePathOf, ChecksumError, fetchVerified, sha256Of } from '../src/packaging/download.js';
 import { noticesText, packageNotice } from '../src/packaging/notices.js';
-import { cloudSettingsFrom, MIN_FREE_GB, nsisDefines, nsisString } from '../src/packaging/nsis.js';
+import {
+  cloudSettingsFrom,
+  MIN_FREE_GB,
+  nsisDefines,
+  nsisString,
+  updateSettingsFrom,
+} from '../src/packaging/nsis.js';
 import {
   INSTALL_FOLDERS,
   isDeclarationFile,
@@ -334,6 +340,34 @@ describe('[ONB-002] the installer script’s settings', () => {
     expect(() => cloudSettingsFrom({ RP_QR_SITE_URL: 'menu' })).toThrow(/not an address/);
   });
 
+  it('[UPD-007] names the signer updates must carry, or allows unsigned ones on a test build only', () => {
+    expect(updateSettingsFrom({})).toEqual({ allowUnsigned: false });
+    expect(updateSettingsFrom({ RP_ALLOW_UNSIGNED_UPDATES: '1' })).toEqual({ allowUnsigned: true });
+    expect(
+      updateSettingsFrom({ RP_UPDATE_PUBLISHER: ' CN=Restaurant Platform Pvt Ltd, C=IN ' }),
+    ).toEqual({ publisher: 'CN=Restaurant Platform Pvt Ltd, C=IN', allowUnsigned: false });
+    expect(() =>
+      updateSettingsFrom({ RP_UPDATE_PUBLISHER: 'CN=Vendor', RP_ALLOW_UNSIGNED_UPDATES: '1' }),
+    ).toThrow(/never accepts unsigned updates/);
+    expect(() => updateSettingsFrom({ RP_UPDATE_PUBLISHER: 'CN' })).toThrow(/certificate subject/);
+    expect(
+      nsisDefines({
+        setupDir: 'x',
+        minFreeGb: 20,
+        cloud: {},
+        updates: { publisher: 'CN=Vendor "Ltd" $1', allowUnsigned: false },
+      }),
+    ).toContain('!define RP_UPDATE_PUBLISHER "CN=Vendor $\\"Ltd$\\" $$1"');
+    const test = nsisDefines({
+      setupDir: 'x',
+      minFreeGb: 20,
+      cloud: {},
+      updates: { allowUnsigned: true },
+    });
+    expect(test).toContain('!define RP_ALLOW_UNSIGNED_UPDATES\n');
+    expect(test).not.toContain('RP_UPDATE_PUBLISHER');
+  });
+
   it('writes NSIS defines, escaping what NSIS would read as variables or quotes', () => {
     expect(nsisString('a$b"c')).toBe('a$$b$\\"c');
     expect(() => nsisString('a\nb')).toThrow(/line break/);
@@ -375,6 +409,13 @@ describe('[ONB-002] the installer script’s settings', () => {
             qrSiteUrl: 'https://c.in',
             errorDsn: 'https://d.in',
           },
+          updates: { publisher: 'CN=Vendor', allowUnsigned: false },
+        }).matchAll(/!define (RP_[A-Z_]+)/g),
+        ...nsisDefines({
+          setupDir: 'x',
+          minFreeGb: 1,
+          cloud: {},
+          updates: { allowUnsigned: true },
         }).matchAll(/!define (RP_[A-Z_]+)/g),
       ].map((match) => match[1]),
     ]);
@@ -389,6 +430,11 @@ describe('[ONB-002] the installer script’s settings', () => {
     ]) {
       expect(script).toContain(name);
     }
+    // Every define the script tests for is one the stage step may write.
+    const tested = [...script.matchAll(/!ifn?def (RP_[A-Z_]+)/g)].map((match) => match[1]);
+    for (const name of tested) expect(defined, name).toContain(name);
+    // P7-04c: the install step keeps this installer to go back to after a failed update.
+    expect(script).toContain('-InstallerPath "$EXEPATH"');
     expect(script).toContain('staging/installer-defines.nsh');
     expect(stagingLayout('/s').nsisDefines).toBe(join('/s', 'installer-defines.nsh'));
   });

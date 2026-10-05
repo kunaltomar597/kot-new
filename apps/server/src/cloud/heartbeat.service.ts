@@ -31,6 +31,7 @@ import { ErrorCounter } from '../observability/error-reporter.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { readRelayCredential, saveRelayCredential } from '../relay/relay-credential.js';
 import { installationKey } from './installation-key.js';
+import { markUpdateReportDelivered, readUpdateReport } from '../updates/update-state.js';
 
 export const CONTROL_PLANE_OPTIONS = Symbol('CONTROL_PLANE_OPTIONS');
 
@@ -164,6 +165,9 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       const errorsNow = this.errors.total;
       const heartbeat = await this.collect(errorsNow);
       const answer = await this.client.heartbeat(enrolment.installationId, heartbeat);
+      // The install outcome rode on this heartbeat: it is not sent again (P7-04c).
+      const report = heartbeat.updateReport ?? null;
+      if (report !== null) await markUpdateReportDelivered(this.prisma, report);
       this.intervalMs = answer.nextHeartbeatSeconds * 1_000;
       this.errorsDelivered = errorsNow;
       this.auditCheck = answer.auditCheck;
@@ -264,6 +268,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       cloud,
       cloudEnabled,
       restoreCodesSeen,
+      updateReport,
     ] = await Promise.all([
       this.audit.chainHead(),
       this.deviceHealth(),
@@ -278,6 +283,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       cloudBackupSummary(this.prisma),
       this.cloudBackupEnabled(),
       readRestoreCodesSeen(this.prisma),
+      readUpdateReport(this.prisma),
     ]);
     const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
@@ -317,6 +323,8 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       // The backup key to escrow (P7-05e): none while the Owner opted out of the cloud backup.
       backupKeyId: cloudEnabled ? backupKeyId(await this.secrets.get('backup-key')) : null,
       restoreCodesSeen,
+      // How the last update went (UPD-003, P7-04c), until a heartbeat carrying it is answered.
+      ...(updateReport !== null && { updateReport }),
       ...licence,
       relay: {
         credentialDigest:

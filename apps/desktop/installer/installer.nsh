@@ -10,6 +10,8 @@
 ;             cannot be removed, Start-RestaurantPlatform.ps1 starts the old version again.
 ;   Uninstall Uninstall-RestaurantPlatform.ps1 before the files go: the services and firewall
 ;             rules are removed; the data stays unless the Owner allowed deleting it.
+;   Updates   the updater (P7-04c) runs this installer silently as SYSTEM; the install step
+;             keeps a copy of it to go back to, and registers the updater's scheduled task.
 ;
 ; Installer options (silent installs, the update agent and CI):
 ;   /S                         no pages
@@ -296,6 +298,15 @@
   !ifdef RP_ERROR_DSN
     StrCpy $0 '$0 -ErrorDsn "${RP_ERROR_DSN}"'
   !endif
+  ; UPD-007: how this PC checks updates; and this installer, kept to go back to after a failed
+  ; update (P7-04c).
+  !ifdef RP_UPDATE_PUBLISHER
+    StrCpy $0 '$0 -UpdatePublisher "${RP_UPDATE_PUBLISHER}"'
+  !endif
+  !ifdef RP_ALLOW_UNSIGNED_UPDATES
+    StrCpy $0 '$0 -AllowUnsignedUpdates'
+  !endif
+  StrCpy $0 '$0 -InstallerPath "$EXEPATH"'
   DetailPrint "${RP_TEXT_SETTING_UP}"
   !insertmacro RPRunScript "$INSTDIR\setup\Install-RestaurantPlatform.ps1" '$0'
   Pop $1

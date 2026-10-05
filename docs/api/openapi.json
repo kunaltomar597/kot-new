@@ -11654,7 +11654,7 @@
       "post": {
         "operationId": "approveUpdateInstall",
         "summary": "\"Install now\" for the update on offer",
-        "description": "UPD-004: the update installs at once instead of in the maintenance window (the updater, P7-04, still waits for open tables unless it is security-critical). Audited.",
+        "description": "UPD-004: the update installs at once instead of in the maintenance window (the update agent, P7-04c, still waits for open tables unless it is security-critical). After a failed update, it tries that version again. Audited.",
         "tags": ["system"],
         "requestBody": {
           "required": true,
@@ -14137,7 +14137,7 @@
         "pattern": "^rp-backup-\\d{8}T\\d{6}Z-(nightly|manual)\\.rpbk$"
       },
       "BackupHealth": { "type": "string", "enum": ["OK", "FAILED", "OVERDUE", "NONE"] },
-      "BackupKind": { "type": "string", "enum": ["NIGHTLY", "MANUAL"] },
+      "BackupKind": { "type": "string", "enum": ["NIGHTLY", "MANUAL", "UPDATE"] },
       "BackupLocation": { "type": "string", "enum": ["DATA_DRIVE", "SECOND"] },
       "BackupRunView": {
         "type": "object",
@@ -22428,6 +22428,7 @@
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
       },
+      "SoftwareUpdateOutcome": { "type": "string", "enum": ["INSTALLED", "ROLLED_BACK", "FAILED"] },
       "SourceSalesResponse": {
         "type": "object",
         "properties": {
@@ -23229,9 +23230,10 @@
                 "required": ["start", "end"],
                 "additionalProperties": false
               },
-              "openTables": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              "openTables": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "agent": { "$ref": "#/components/schemas/UpdateAgentStatus" }
             },
-            "required": ["offered", "installApproval", "maintenanceWindow", "openTables"],
+            "required": ["offered", "installApproval", "maintenanceWindow", "openTables", "agent"],
             "additionalProperties": false
           },
           "backup": {
@@ -24186,6 +24188,60 @@
         "required": ["staffId"],
         "additionalProperties": false
       },
+      "UpdateAgentState": {
+        "type": "string",
+        "enum": [
+          "IDLE",
+          "DOWNLOADING",
+          "DOWNLOAD_FAILED",
+          "WAITING",
+          "PREPARING",
+          "PREPARE_FAILED",
+          "INSTALLING",
+          "UNAVAILABLE"
+        ]
+      },
+      "UpdateAgentStatus": {
+        "type": "object",
+        "properties": {
+          "state": { "$ref": "#/components/schemas/UpdateAgentState" },
+          "version": { "type": ["string", "null"] },
+          "waitingFor": {
+            "anyOf": [{ "$ref": "#/components/schemas/UpdateWait" }, { "type": "null" }]
+          },
+          "error": { "type": ["string", "null"] },
+          "retryAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "lastOutcome": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": { "type": "string" },
+                  "previousVersion": { "type": ["string", "null"] },
+                  "outcome": { "$ref": "#/components/schemas/SoftwareUpdateOutcome" },
+                  "at": { "$ref": "#/components/schemas/Timestamp" },
+                  "error": { "type": ["string", "null"] },
+                  "backupFileName": { "type": ["string", "null"] }
+                },
+                "required": [
+                  "version",
+                  "previousVersion",
+                  "outcome",
+                  "at",
+                  "error",
+                  "backupFileName"
+                ],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["state", "version", "waitingFor", "error", "retryAt", "lastOutcome"],
+        "additionalProperties": false
+      },
       "UpdateRestaurantLegalRequest": {
         "type": "object",
         "properties": {
@@ -24249,6 +24305,7 @@
         },
         "additionalProperties": false
       },
+      "UpdateWait": { "type": "string", "enum": ["WINDOW", "OPEN_TABLES", "RETRY_APPROVAL"] },
       "UpdateWaiterAssignmentsRequest": {
         "type": "object",
         "properties": {

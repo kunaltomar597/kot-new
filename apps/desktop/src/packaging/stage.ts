@@ -7,7 +7,7 @@ import { build as bundle } from 'esbuild';
 import { PRODUCT_NAME } from './builder-config.js';
 import { type Component, COMPONENTS, NODE, POSTGRES, WINSW, WINSW_LICENCE } from './components.js';
 import { fetchVerified } from './download.js';
-import { cloudSettingsFrom, MIN_FREE_GB, nsisDefines } from './nsis.js';
+import { cloudSettingsFrom, MIN_FREE_GB, nsisDefines, updateSettingsFrom } from './nsis.js';
 import {
   INSTALL_FOLDERS,
   type InstallationPathsJson,
@@ -211,6 +211,7 @@ export async function stage(options: StageOptions): Promise<StageManifest> {
   const folder = (name: keyof typeof INSTALL_FOLDERS) =>
     join(layout.payload, INSTALL_FOLDERS[name]);
   const cloud = cloudSettingsFrom(options.env);
+  const updates = updateSettingsFrom(options.env);
   if (process.platform !== 'win32') {
     log(`Staging on ${process.platform}: the server's native modules will not run on Windows.`);
   }
@@ -254,7 +255,7 @@ export async function stage(options: StageOptions): Promise<StageManifest> {
     for (const name of SETUP_SCRIPTS) await cp(join(scripts, name), join(folder('setup'), name));
     await writeFile(
       layout.nsisDefines,
-      nsisDefines({ setupDir: folder('setup'), minFreeGb: MIN_FREE_GB, cloud }),
+      nsisDefines({ setupDir: folder('setup'), minFreeGb: MIN_FREE_GB, cloud, updates }),
     );
 
     log('Checking the payload against the server’s own layout.');

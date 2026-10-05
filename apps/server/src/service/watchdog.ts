@@ -12,7 +12,10 @@ import type { HostLog } from './service-host.js';
  *   while the server does not answer either, or the service stuck starting or stopping: stopped,
  *   ended if it will not stop, and started. A server that answers is never restarted (a full disk
  *   that stops the heartbeat must not take the restaurant's server down);
- * - nothing while the installer or the updater has the maintenance flag set.
+ * - nothing while the installer or the updater has the maintenance flag set;
+ * - an update request the server left (P7-04c): the updater's scheduled task started, once per
+ *   request. The server's account cannot install software; the watchdog, as LocalSystem, can
+ *   start the task, which runs as SYSTEM outside every service, so the installer may stop them.
  *
  * It never ends PostgreSQL: a database that is slow to start is recovering after a power cut.
  */
@@ -66,6 +69,11 @@ export const DEFAULT_WATCHDOG_LIMITS: WatchdogLimits = {
 };
 
 const PENDING: readonly ServiceState[] = ['START_PENDING', 'STOP_PENDING'];
+
+/** After the updater's task could not be started, the next try. */
+export const UPDATER_RETRY_MS = 60_000;
+/** Started, but the request not taken this long after: started again. */
+export const UPDATER_PICKUP_MS = 120_000;
 
 /** Decides what to do from what it sees; remembers only times. */
 export class WatchdogPolicy {
@@ -149,6 +157,12 @@ export interface WatchdogOptions {
   readHost(): Promise<HostState | null>;
   probe(): Promise<ProbeResult>;
   maintenance(): Promise<boolean>;
+  /** The id of an update request waiting for the updater, or null (P7-04c). */
+  pendingUpdate?(): Promise<string | null>;
+  /** Whether the updater has taken that request (its outcome names it). */
+  updateTaken?(requestId: string): Promise<boolean>;
+  /** Starts the updater's scheduled task. */
+  runUpdater?(): Promise<void>;
   readonly log: HostLog;
   readonly intervalMs?: number;
   readonly limits?: Partial<WatchdogLimits>;
@@ -163,6 +177,10 @@ export class Watchdog {
   private checking: Promise<void> | undefined;
   private stopped = false;
   private reportedMissing = new Set<string>();
+  /** The update request the updater was last started for, when, and the last failure's time. */
+  private updaterStartedFor: string | null = null;
+  private updaterStartedAt = -Infinity;
+  private updaterFailedAt = -Infinity;
 
   constructor(private readonly options: WatchdogOptions) {
     this.policy = new WatchdogPolicy(options.limits);
@@ -206,6 +224,7 @@ export class Watchdog {
       serverAnswers: probe !== 'unanswered',
       maintenance,
     });
+    if (!maintenance) await this.startUpdater();
     for (const action of actions) {
       const name = services[action.service];
       log('warn', action.kind === 'start' ? 'Starting a service' : 'Restarting a service', {
@@ -223,6 +242,39 @@ export class Watchdog {
       }
     }
     return actions;
+  }
+
+  /**
+   * Starts the updater for a request it has not taken. Started but not taken two minutes later
+   * (the task did not start, or an instance still running ignored the start): started again.
+   * After a failure to start, tries again a minute later.
+   */
+  private async startUpdater(): Promise<void> {
+    const options = this.options;
+    if (options.pendingUpdate === undefined || options.runUpdater === undefined) return;
+    const requestId = await options.pendingUpdate().catch(() => null);
+    if (requestId === null) return;
+    if (options.updateTaken !== undefined) {
+      if (await options.updateTaken(requestId).catch(() => false)) return;
+    } else if (requestId === this.updaterStartedFor) {
+      return;
+    }
+    const at = this.clock();
+    if (requestId === this.updaterStartedFor && at - this.updaterStartedAt < UPDATER_PICKUP_MS) {
+      return;
+    }
+    if (at - this.updaterFailedAt < UPDATER_RETRY_MS) return;
+    options.log('info', 'Starting the updater for the update the server asked for', { requestId });
+    try {
+      await options.runUpdater();
+      this.updaterStartedFor = requestId;
+      this.updaterStartedAt = at;
+    } catch (error) {
+      this.updaterFailedAt = at;
+      options.log('error', 'The updater could not be started', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   start(): void {

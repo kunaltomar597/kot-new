@@ -10,12 +10,18 @@ import {
   defaultInstallationFile,
   inheritedEnvironment,
   type InstallationFile,
+  programDataDir,
   readDatabasePasswords,
   readInstallationFile,
   restoreEnvironment,
   serverEnvironment,
 } from '../installation/installation.js';
 import { migrate } from '../installation/migrations.js';
+import {
+  pendingUpdateRollback,
+  runUpdateRollback,
+  updateRollbackRequestPath,
+} from '../installation/update-snapshot.js';
 import { probeHealth } from './health-probe.js';
 import { hostStatePath } from './host-state.js';
 import { type HostLog, jsonLog, type PrepareContext, ServiceHost } from './service-host.js';
@@ -93,16 +99,50 @@ function runTool(
   });
 }
 
-/** Wait for the database, run a requested restore, apply the migrations. */
+/**
+ * Wait for the database, go back to the database copied before a failed update (P7-04c), run a
+ * requested restore, apply the migrations.
+ */
 export function prepareSteps(
   installation: InstallationFile,
-  env: { readonly restore: Readonly<Record<string, string>>; readonly migratorUrl: string },
+  env: {
+    readonly restore: Readonly<Record<string, string>>;
+    readonly migratorUrl: string;
+    /** The administrator's login, for switching the database back after a failed update. */
+    readonly adminUrl: string;
+    /** The updater's rollback request, in `%ProgramData%\RestaurantPlatform` (P7-04c). */
+    readonly rollbackRequestFile: string;
+  },
 ) {
   return async ({ signal, phase, log }: PrepareContext): Promise<void> => {
     const stopping = () => signal.aborted;
     phase('WAITING_FOR_DATABASE');
     await waitForDatabase(env.migratorUrl, signal, log);
     if (stopping()) return;
+    const rollback = await pendingUpdateRollback({
+      requestFile: env.rollbackRequestFile,
+      dataDir: installation.dataDir,
+    });
+    if (rollback !== null) {
+      phase('RESTORING');
+      const outcome = await runUpdateRollback(rollback, {
+        dataDir: installation.dataDir,
+        adminUrl: env.adminUrl,
+        database: installation.postgres.database,
+      });
+      if (outcome.ok) {
+        log('warn', 'Switched back to the database from before the failed update', {
+          version: outcome.version,
+          failedDatabase: outcome.failedDatabase,
+        });
+      } else {
+        log('error', 'The database could not be switched back after the failed update', {
+          version: outcome.version,
+          error: outcome.error,
+        });
+      }
+      if (stopping()) return;
+    }
     const requested = await access(restoreRequestPath(installation.dataDir)).then(
       () => true,
       () => false,
@@ -139,7 +179,8 @@ async function main(): Promise<void> {
     allowPositionals: false,
   });
   const log = jsonLog();
-  const installation = await readInstallationFile(values.installation ?? defaultInstallationFile());
+  const installationFile = values.installation ?? defaultInstallationFile();
+  const installation = await readInstallationFile(installationFile);
   const secrets = createSecretStore(installation);
   const passwords = await readDatabasePasswords(secrets);
   const inherited = inheritedEnvironment(process.env);
@@ -155,6 +196,8 @@ async function main(): Promise<void> {
     prepare: prepareSteps(installation, {
       restore: { ...inherited, ...restoreEnvironment(installation, passwords) },
       migratorUrl: databaseUrl(installation, 'migrator', passwords),
+      adminUrl: databaseUrl(installation, 'admin', passwords, 'postgres'),
+      rollbackRequestFile: updateRollbackRequestPath(programDataDir(installationFile)),
     }),
     execArgv: ['--enable-source-maps'],
     log,

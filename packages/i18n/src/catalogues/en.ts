@@ -2356,6 +2356,7 @@ export const en = {
     kind: {
       NIGHTLY: 'Nightly',
       MANUAL: 'Back up now',
+      UPDATE: 'Before an update',
     },
     kindBy: '{kind} ({name})',
     status: {
@@ -2670,6 +2671,24 @@ export const en = {
       confirmDescription:
         'The server restarts for a minute or two while it installs; screens reconnect by themselves.',
       done: 'Version {version} will install now.',
+      agent: {
+        DOWNLOADING: 'Downloading version {version} in the background…',
+        DOWNLOAD_FAILED: 'The download failed: {error} It is tried again at {time}.',
+        READY: 'Downloaded and checked.',
+        RETRY_APPROVAL:
+          'This version did not install here before. Press “Install now” to try it again.',
+        PREPARING: 'Backing up before the update…',
+        PREPARE_FAILED: 'The update waits: {error} It is tried again at {time}.',
+        INSTALLING:
+          'Installing version {version}. The server restarts; screens reconnect by themselves.',
+      },
+      outcome: {
+        INSTALLED: 'Version {version} was installed on {date} at {time}.',
+        ROLLED_BACK:
+          'The update to version {version} on {date} at {time} failed its checks, so version {previous} was put back with its data: {error}',
+        FAILED: 'The update to version {version} on {date} at {time} did not install: {error}',
+        backup: 'The backup from just before it: {file}.',
+      },
     },
     backup: {
       title: 'Backups',

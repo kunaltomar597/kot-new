@@ -12,13 +12,29 @@ import { readManifest } from './stage.js';
  * apps/desktop/staging, into apps/desktop/release. It signs when the certificate is given
  * (WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD, from a CI secret). A payload staged off Windows has
  * native modules Windows cannot load, so it is refused unless --any-platform (to check that the
- * installer script builds).
+ * installer script builds). `--product-version` builds the same payload as another version.
  */
 
 const projectDir = fileURLToPath(new URL('../../', import.meta.url));
-const { values } = parseArgs({ options: { 'any-platform': { type: 'boolean' } } });
+const { values } = parseArgs({
+  options: { 'any-platform': { type: 'boolean' }, 'product-version': { type: 'string' } },
+});
 const staging = stagingLayout(join(projectDir, 'staging'));
 const manifest = await readManifest(staging.root);
+// UPD-007: a signed build checks its updates' signer and never takes unsigned ones.
+const defines = readFileSync(staging.nsisDefines, 'utf8');
+if ((process.env.WIN_CSC_LINK ?? '') !== '') {
+  if (defines.includes('RP_ALLOW_UNSIGNED_UPDATES')) {
+    throw new Error(
+      'A signed installer cannot accept unsigned updates: stage it without RP_ALLOW_UNSIGNED_UPDATES.',
+    );
+  }
+  if (!defines.includes('RP_UPDATE_PUBLISHER')) {
+    throw new Error(
+      'Stage a signed installer with RP_UPDATE_PUBLISHER, the certificate’s subject, or the PCs will refuse every update.',
+    );
+  }
+}
 if (manifest.platform !== 'win32' && values['any-platform'] !== true) {
   throw new Error(
     `The payload was staged on ${manifest.platform}; stage it on Windows, or pass --any-platform to build a test installer.`,
@@ -37,7 +53,8 @@ const artifacts = await build({
     projectDir,
     staging,
     outputDir: join(projectDir, 'release'),
-    version: manifest.productVersion,
+    // `--product-version`: the same payload as another version (the CI job's update test, P7-04c).
+    version: values['product-version'] ?? manifest.productVersion,
     electronVersion,
     editExecutable: process.platform === 'win32',
   }),

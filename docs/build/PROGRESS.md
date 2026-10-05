@@ -21,7 +21,8 @@ What exists:
   course order and reasons (P3-04), the live order feed's late dishes, filters and summary
   (P4-01), who may add, change, unlock or deactivate whom, with the roles each person may give
   (P4-02a), and planning the day's sections: the assignments a plan gives, the tables without a
-  waiter and an earlier day's sections given again (P4-02b). 224 tests.
+  waiter and an earlier day's sections given again (P4-02b); when a software update may install
+  (P7-04c). 337 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -38,7 +39,8 @@ What exists:
   suggestions, their tracking, the rules and the suggestion an order line came from (P3-04);
   the manager dashboard's live order feed (P4-01); staff records, PINs, deactivation and the
   Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a); `RestaurantChanged`
-  for devices and the low-battery level with the pager list (P4-02b). 539 tests.
+  for devices and the low-battery level with the pager list (P4-02b); the update agent's state on
+  the System page and the backup made before an update (P7-04c). 891 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -81,8 +83,12 @@ What exists:
   service host that prepares and supervises the server, the watchdog, the DPAPI secret store and
   the installer's set-up commands with a migration runner that needs no Prisma CLI (P0-16b); the
   Owner's audited permission for the uninstaller to delete the data, and `setup-cli paths` and
-  `data-deletion` for the set-up scripts (P0-16c).
-  1081 tests (26 skipped: Windows only, a real install, or the performance runs).
+  `data-deletion` for the set-up scripts (P0-16c); the update agent: the download in the
+  background with its SHA-256 and Authenticode checks, the maintenance window and "Install now",
+  the backup and integrity check before an update, the hand-off to the updater through the
+  watchdog, the database copy and the switch back after a failed update, and each outcome
+  recorded, audited and reported (P7-04c).
+  1111 tests (27 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -182,7 +188,8 @@ What exists:
   as CSV, Excel or PDF (P4-06); the audit trail with filters, paging, export and the chain check
   (P4-07a); the Suspicious activity report and the POS shift screen's "Open the drawer (no sale)"
   (P4-07b); "Removing the software" on the System page, where the Owner allows the uninstaller to
-  delete the data for 30 minutes (P0-16c). 355 tests, and 23 Playwright steps.
+  delete the data for 30 minutes (P0-16c); the update agent's state and the last update's outcome
+  on the System page (P7-04c). 359 tests, and 23 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -191,13 +198,17 @@ What exists:
   electron-builder's NSIS installer, per machine, with Electron's fuses, the data-drive page, the
   server (`pnpm deploy`, trimmed, with third-party notices), the console, Node.js 24, PostgreSQL
   16.15 and WinSW 2.12 pinned by SHA-256, and hooks that run the set-up scripts on install,
-  update, repair and uninstall. 35 tests without Electron; the CI job "Windows installer" builds,
+  update, repair and uninstall; it keeps itself for going back after a failed update (P7-04c).
+  36 tests without Electron; the CI job "Windows installer" builds,
   installs, kills the server, repairs and uninstalls on `windows-latest`.
 - `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
   5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
   recovery, firewall rules for the staff network (SEC-008), install and repair, and uninstall that
   keeps the data unless the Owner allowed deleting it (NFR-I02). The drive page's INI file, and
-  stopping and starting the services around an update (P0-16d). 102 Pester tests anywhere
+  stopping and starting the services around an update (P0-16d). The updater (P7-04c): a SYSTEM
+  scheduled task that installs a checked update and goes back to the previous version and its
+  database when the new one fails its health check (scenario S9 in the CI job). 138 Pester tests
+  anywhere
   (`pnpm installer:test`, needs `pwsh`), 7 more on Windows only (CI job "Windows set-up scripts");
   `windows/ci/Test-Installer.ps1` checks the built installer in the CI job "Windows installer".
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
@@ -214,8 +225,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P7-04c The update agent on the restaurant PC: the installer it hands off to exists now (P0-16d;
-  silent `/S`, exit codes 0, 1, 2 in `docs/runbooks/windows-installer.md`).
 - P7-04d Phones, tablets and pagers; the version matrix.
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
@@ -391,7 +400,7 @@ Recommended next WPs (dependencies met):
 - [ ] P7-04 Release management and remote updates
   - [x] P7-04a Rollouts at the Control Plane
   - [x] P7-04b Release management in the vendor web app
-  - [ ] P7-04c The update agent on the restaurant PC (installer step waits for P0-16)
+  - [x] P7-04c The update agent on the restaurant PC (S9 runs in CI on the first push)
   - [ ] P7-04d Phones, tablets and pagers; the version matrix
 - [x] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
@@ -668,6 +677,80 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P7-04c):
+
+635. The update hand-off: the server's update agent (`NT SERVICE\RPServer`, which cannot install
+     software) leaves `<data>\run\update-request.json`. The watchdog (LocalSystem) starts the
+     scheduled task `\RestaurantPlatform\Update`, which runs `Update-RestaurantPlatform.ps1` as
+     SYSTEM outside every service, since the installer stops them all. The updater is Windows
+     PowerShell from `%ProgramData%\RestaurantPlatform\updater`, not Node.js from the install
+     folder: nothing it runs is a file the installer replaces. No path lets the server's account
+     start the task itself.
+636. The updater trusts nothing the server's account wrote, and only reads in the data folder:
+     that account could turn a folder there into a link and steer what SYSTEM writes or deletes.
+     - It checks the request's shape and copies the installer to
+       `%ProgramData%\RestaurantPlatform\installers`, where only administrators and SYSTEM may
+       write or read.
+     - It checks the SHA-256 and the Authenticode signer there (decision 641), and runs only that
+       copy. It never installs an older version than the installed one, except the one it goes
+       back to.
+     - It writes its outcome (`RUNNING`, then how it ended) and its rollback request in
+       `%ProgramData%\RestaurantPlatform`, which the server reads.
+     - Each request runs once, by its id (`updater\taken.json`). A run cut short by a restart ends
+       as FAILED at the next start.
+     - The watchdog starts the task again only when the request is not taken two minutes later.
+637. UPD-005's safety net has two parts:
+     - Before the hand-off, the agent makes a full encrypted backup (kind UPDATE, checked end to
+       end like the nightly one). The integrity check is that backup's check plus "no migration
+       left half done".
+     - With the server stopped, the updater copies the database (`CREATE DATABASE ... TEMPLATE ...
+STRATEGY FILE_COPY`) as the rollback point, so going back loses nothing written before the
+       update.
+       To go back, the updater runs the previous version's kept installer. That version's service
+       host swaps the copy back in before its server starts. The failed version's database is kept
+       as `restaurant_failed_update` (one at a time) for support, since orders taken while it ran are
+       there. The service host cannot remove the request, so it records the request id it ran in
+       `<data>\backups\update-rollback-outcome.json`.
+638. The health check after an update:
+     - `setup-cli health` says the host runs the server, the server answers over TLS (trusting the
+       installation's CA), and the installed version is the one expected;
+     - it then stays so for 2 minutes with the same process and no restart;
+     - the updater waits up to 10 minutes for the first good answer.
+       These are the updater's parameters, not settings: the BRD gives no value.
+639. UPD-004 timing (`updateTiming` in `@rp/domain`):
+     - an update installs in the window or after "Install now" for that version;
+     - open tables block it unless the release is security-critical and a manager approved;
+     - after a ROLLED_BACK or FAILED outcome the same version is not tried again by itself, and a
+       manager's "Install now" given after the failure tries again;
+     - after the backup, the timing is checked again, because tables may have opened meanwhile.
+640. Waits:
+     - a failed download is tried again after 5 minutes, then twice as long each time, up to 6
+       hours;
+     - a failed backup or integrity check after 30 minutes (5 while another backup runs);
+     - a request the updater never took fails after 10 minutes, and an update without an outcome
+       after 5 hours (the maintenance flag lasts 4).
+641. Update signing (UPD-007):
+     - The installer's build names the signer (`RP_UPDATE_PUBLISHER`, the certificate's subject),
+       stored in the installation file's `updates.publisher`.
+     - `RP_ALLOW_UNSIGNED_UPDATES=1` is for test builds only. A build signed with the certificate
+       refuses to package with it, or without a publisher.
+     - Without either, the PC refuses updates (System page: unavailable).
+     - The server checks Authenticode right after the download on Windows, so the System page can
+       say why an update waits. The updater checks again before running anything.
+     - CI builds are unsigned and accept unsigned updates while the repository variable is unset,
+       for scenario S9. Never install them at a restaurant (manual task 14, runbook).
+642. The installer keeps itself in `installers` at every install and repair (`-InstallerPath
+$EXEPATH`), so the first update can go back. After a successful update, only the new and the
+     previous installers are kept.
+643. Outcomes are recorded in `system_meta`, audited (UPDATE_STARTED with the approving manager as
+     actor or none for the window; UPDATE_INSTALLED, UPDATE_ROLLED_BACK, UPDATE_FAILED) and
+     reported with every heartbeat until one is answered. There is no restaurant alert beyond the
+     System page: the vendor gets the Control Plane's fleet alert and the rollout halts on
+     repeated failures (P7-04a).
+644. Known limitation: the installer closes the POS window on the restaurant PC; it opens again at
+     the next Windows sign-in, or from the Start menu. Reopening it in the signed-in user's session
+     after an update is left for P8-04 (UX polish).
 
 Decided 2026-10-05 (P0-16d):
 
@@ -3267,12 +3350,115 @@ Security-sensitive PRs for the P8-03 human review:
   (arguments built from the command line), the pinned downloads and their checksums, the signing
   secrets' use in CI, and what the uninstaller does with `/DELETEDATA`.
 
+- P7-04c (merged locally): the update hand-off from the server's account to SYSTEM (the request,
+  the watchdog starting the scheduled task, the task's principal and XML), the updater reading
+  only in the data folder and checking the installer's hash and Authenticode signer in an
+  administrators-only folder, run-once by request id, the update-signing settings and the CI
+  build's unsigned-update allowance, the database copy and swap with the administrator's login.
+
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
 - Set `main` as the repository's default branch (GitHub → Settings → General → Default branch) and
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P7-04c The update agent on the restaurant PC
+
+Built the restaurant PC's software updates (`docs/runbooks/software-updates.md`; decisions
+635-644):
+
+- `@rp/domain` `software-update.ts`:
+  - `updateTiming`: UPD-004's window, "Install now", open tables, security-critical releases and
+    no retry by itself after a failure;
+  - `isNewerVersion`;
+  - the download back-off.
+- contracts:
+  - `SystemStatusResponse.update.agent` (state, waiting reason, error, retry time, last outcome);
+  - `BackupKind` UPDATE (migration `20261005100000_update_backups`).
+- server `src/updates/`:
+  - `UpdateAgentService`, every minute and after each heartbeat answer or "Install now":
+    - the outcome of a hand-off;
+    - the download over HTTPS with size, SHA-256 and Authenticode (`authenticode.ts`, PowerShell
+      on Windows);
+    - the timing;
+    - the full backup (`BackupService.backUpForUpdate`) and the half-done-migration check;
+    - then INSTALLING reported and the request written.
+  - It records, audits and reports the outcome (`update-state.ts`: `updates.agent`, and
+    `updates.report`, sent with the heartbeat until answered).
+  - `update-files.ts`: the request (`<data>\run`), the outcome (`%ProgramData%\RestaurantPlatform`).
+- installation:
+  - `update-snapshot.ts`: the database copy, its drop and the switch back, run once per request
+    by the service host before its server starts;
+  - `setup-cli health` and `setup-cli update-snapshot create|drop`;
+  - the installation file's `updates` (publisher, allowUnsigned) and `RP_UPDATE_PUBLISHER` /
+    `RP_UPDATE_ALLOW_UNSIGNED` for the server;
+  - `UPDATER_TASK`, `programDataDir`, `updatesDir`.
+- watchdog: starts the updater's task for a request the updater has not taken (again after 2
+  minutes if still not taken; a minute after a failed start); `WindowsServiceControl.runTask`.
+- console System page:
+  - the agent's state (downloading, failed with the retry time, downloaded, backing up,
+    installing, unavailable);
+  - the last update's outcome with the backup's name;
+  - "Install now" again after a failure.
+  - Backup kind "Before an update".
+- `infra/installer/windows`:
+  - `Update-RestaurantPlatform.ps1` with `Invoke-RPUpdate` in the module:
+    - copies and checks the installer in `installers` (administrators only);
+    - run once by request id;
+    - maintenance, the services stopped and the database copied;
+    - the installer and the health check;
+    - going back through the previous installer;
+    - the outcome in ProgramData.
+  - Install registers the task (`Register-RPUpdateTask`: scripts to `updater`, both folders
+    closed, `schtasks /Create /XML`) and keeps its own installer (`-InstallerPath`). Uninstall
+    removes the task. `-UpdatePublisher` and `-AllowUnsignedUpdates` reach `write-installation`.
+- packaging: `RP_UPDATE_PUBLISHER` / `RP_ALLOW_UNSIGNED_UPDATES` defines (refused together; a
+  signed build needs the publisher), the updater script in the payload, `-InstallerPath
+"$EXEPATH"` from NSIS, and `package:win --product-version`.
+- CI job "Windows installer" (90 minutes):
+  - builds the next version from the same payload;
+  - `ci/Test-Update.ps1` installs, runs S9 (a forced failed health check, rolled back with the
+    database, the restaurant still answering), then updates for real through the watchdog and
+    the task, and uninstalls.
+- docs: `software-updates.md`, `windows-installer.md`, `windows-services.md`, manual task 14 and
+  the signing item in `MANUAL_TASKS.md` (the repository variable `RP_UPDATE_PUBLISHER`).
+
+Tests:
+
+- domain 9;
+- server unit +17 (downloads, signatures, hand-off files, the watchdog's trigger and retry,
+  `schtasks`, the set-up tool's update options and `health` against a TLS stand-in, the scripts
+  agreeing with the server);
+- server integration:
+  - the agent 10 (real backups);
+  - the database copy and switch back 4 (real cluster);
+  - the report reaching a real Control Plane 1;
+- console 4;
+- desktop 1;
+- Pester 102 → 138 (the updater 28 and the install, uninstall and script changes).
+
+Self-review changed the design before merging. The first version had the updater (SYSTEM) remove
+the request and write its outcome and rollback request in the data folder, which the server's
+account controls: a link there could steer SYSTEM's writes and deletes. Now it only reads there.
+
+Not done or not verified:
+
+- The CI job has not run (`gh` not logged in, manual task 1): `Test-Update.ps1`, the task
+  registration and the real `Get-AuthenticodeSignature` run on the first push. Expect small
+  Windows-only fixes.
+- Signing waits for the certificate; until then CI builds take unsigned updates (test PCs only).
+- The POS window is not reopened after an update (decision 644, P8-04).
+
+Gotchas:
+
+- Pester cannot mock provider parameters (`Get-Content -Raw`, `Get-ChildItem -File`): wrap them
+  in module functions (`Read-RPTextFile`, `Get-RPInstallerFile`). `Test-Path -LiteralPath` binds a
+  list: mocks must compare `[string]$LiteralPath`. `Split-Path` turns `\` into `/` off Windows:
+  use `Get-RPParentPath`.
+- The Write tool turned `\uFEFF` in TypeScript into a literal byte order mark, which ESLint
+  rejects; write the escape from a script.
+- Approvals are stamped with the real clock; agent tests on a fake clock re-save them with it.
 
 ### 2026-10-05: P0-16d Packaging and the windows-latest CI job
 

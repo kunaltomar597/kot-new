@@ -30,6 +30,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { RelayOrdersService } from '../relay/relay-orders.service.js';
 import { RelaySyncService } from '../relay/relay-sync.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { UpdateAgentService } from '../updates/update-agent.service.js';
 import {
   CATEGORY_FOLDERS,
   directoryBytes,
@@ -64,6 +65,7 @@ export class SystemService {
     private readonly realtime: RealtimeGateway,
     private readonly audit: AuditService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly updates: UpdateAgentService,
   ) {}
 
   async status(principal: Principal): Promise<SystemStatusResponse> {
@@ -81,6 +83,7 @@ export class SystemService {
       backup,
       retention,
       deletion,
+      agent,
     ] = await Promise.all([
       this.prisma.ping(),
       this.settings.snapshot(restaurantId),
@@ -94,6 +97,7 @@ export class SystemService {
       backupSummary(this.prisma),
       readRetentionRun(this.prisma),
       readDataDeletionPermission(this.config.dataDir).catch(() => null),
+      this.updates.status(),
     ]);
     const approverId = approval?.approvedByStaffId ?? null;
     const approver =
@@ -172,6 +176,7 @@ export class SystemService {
               },
         maintenanceWindow: settings.get('updates.maintenanceWindow'),
         openTables: open,
+        agent,
       },
       backup: {
         lastSuccessAt: backup.lastSuccessAt?.toISOString() ?? null,
@@ -244,6 +249,8 @@ export class SystemService {
         reason: request.reason ?? null,
       });
     });
+    // The update agent acts on it at once (P7-04c).
+    this.updates.soon();
     return this.status(principal);
   }
 
