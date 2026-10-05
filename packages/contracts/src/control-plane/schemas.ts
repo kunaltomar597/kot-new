@@ -17,8 +17,12 @@ export const RELEASE_CHANNELS = ['STABLE', 'PILOT'] as const;
 export const ReleaseChannel = z.enum(RELEASE_CHANNELS);
 export type ReleaseChannel = z.infer<typeof ReleaseChannel>;
 
-/** What a release installs: `RESTAURANT_PC` is the Windows installer (server, console, shell). */
-export const RELEASE_COMPONENTS = ['RESTAURANT_PC'] as const;
+/**
+ * What a release installs: `RESTAURANT_PC` is the Windows installer (server, console, shell);
+ * `PAGER_FIRMWARE` the pagers' signed ESP-IDF image, which each PC passes on to its pagers
+ * (PGR-011, P2-04b).
+ */
+export const RELEASE_COMPONENTS = ['RESTAURANT_PC', 'PAGER_FIRMWARE'] as const;
 export const ReleaseComponent = z.enum(RELEASE_COMPONENTS);
 export type ReleaseComponent = z.infer<typeof ReleaseComponent>;
 
@@ -288,10 +292,29 @@ export const HeartbeatRequest = z.looseObject({
     .optional(),
   /** The restore code notices the PC has shown its Owner. */
   restoreCodesSeen: z.array(Id).max(20).optional(),
+  /**
+   * The pager firmware this PC passes on to its pagers (PGR-011, P2-04b); absent from PCs before
+   * P2-04b, which are offered none.
+   */
+  pagerFirmware: z
+    .object({
+      /** The version it serves, checked; null while it has none. */
+      version: SemVer.nullable(),
+      /**
+       * Until the Control Plane has seen it: INSTALLED when a release was checked and is served,
+       * FAILED when the PC refused it (hash, image or signature), ROLLED_BACK when a pager booted
+       * it and went back to its previous firmware.
+       */
+      report: UpdateReport.nullable(),
+    })
+    .optional(),
 });
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
 
-/** A published release (UPD-002, UPD-007): the artefact is Authenticode-signed; check its SHA-256. */
+/**
+ * A published release (UPD-002, UPD-007): the artefact is signed (Authenticode for the PC's
+ * installer, ESP-IDF secure boot for pager firmware); check its SHA-256 and the signature.
+ */
 export const ReleaseInfo = z.object({
   component: ReleaseComponent,
   channel: ReleaseChannel,
@@ -345,6 +368,15 @@ export const HeartbeatResponse = z.object({
   backupKeyEscrow: EscrowOffer.nullable().default(null),
   /** Restore codes issued in the last 7 days for this restaurant's backups: the Owner is told. */
   restoreCodes: z.array(RestoreCodeNotice).max(20).default([]),
+  /**
+   * Pager firmware (PGR-011, UPD-002, UPD-003), for a PC that said which it serves: a newer
+   * release to fetch and pass on, or null; and whether the vendor halted the rollout of the one it
+   * serves, so its pagers are offered it no more.
+   */
+  pagerFirmware: z
+    .object({ update: ReleaseInfo.nullable(), halted: z.boolean() })
+    .nullable()
+    .default(null),
 });
 export type HeartbeatResponse = z.infer<typeof HeartbeatResponse>;
 

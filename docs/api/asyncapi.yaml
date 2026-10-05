@@ -180,6 +180,15 @@ channels:
     messages:
       PagerAlertMessage:
         $ref: '#/components/messages/PagerAlertMessage'
+  pagerOta:
+    address: rp/{restaurantId}/pagers/{deviceId}/ota
+    description: 'Server → pager, QoS 1 (PGR-011). Only the pager itself may subscribe. Firmware to update to: download it over HTTPS from the broker’s host on port and path before expiresAt, check size and SHA-256, write the other OTA partition (secure boot checks the signature), boot it, and mark it valid once connected to the broker again, else roll back. Report progress in the heartbeat’s ota.'
+    parameters:
+      restaurantId: {}
+      deviceId: {}
+    messages:
+      PagerFirmwareOffer:
+        $ref: '#/components/messages/PagerFirmwareOffer'
   pagerAck:
     address: rp/{restaurantId}/pagers/{deviceId}/ack
     description: 'Pager → server: the wearer pressed the button on this alert.'
@@ -191,7 +200,7 @@ channels:
         $ref: '#/components/messages/PagerAckMessage'
   pagerHeartbeat:
     address: rp/{restaurantId}/pagers/{deviceId}/heartbeat
-    description: 'Pager → server every 30 s ⚙: battery, signal and firmware.'
+    description: 'Pager → server every 30 s ⚙: battery, signal, firmware, on its charger, and its last firmware offer (ota) until it runs that version.'
     parameters:
       restaurantId: {}
       deviceId: {}
@@ -403,6 +412,12 @@ operations:
       $ref: '#/channels/pagerAlerts'
     messages:
       - $ref: '#/channels/pagerAlerts/messages/PagerAlertMessage'
+  sendpagerOta:
+    action: send
+    channel:
+      $ref: '#/channels/pagerOta'
+    messages:
+      - $ref: '#/channels/pagerOta/messages/PagerFirmwareOffer'
   receivepagerAck:
     action: receive
     channel:
@@ -620,6 +635,11 @@ components:
       contentType: application/json
       payload:
         $ref: '#/components/schemas/PagerAlertMessage'
+    PagerFirmwareOffer:
+      name: PagerFirmwareOffer
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/PagerFirmwareOffer'
     PagerAckMessage:
       name: PagerAckMessage
       contentType: application/json
@@ -1774,6 +1794,42 @@ components:
         - vibration
         - sentAt
       additionalProperties: false
+    PagerFirmwareOffer:
+      type: object
+      properties:
+        version:
+          type: string
+          minLength: 1
+          maxLength: 32
+        attempt:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        path:
+          type: string
+          pattern: ^\/api\/v1\/pager-firmware\/[A-Za-z0-9_-]{43}$
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        sizeBytes:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        expiresAt:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - version
+        - attempt
+        - port
+        - path
+        - sha256
+        - sizeBytes
+        - expiresAt
+      additionalProperties: false
     PagerHeartbeat:
       type: object
       properties:
@@ -1789,10 +1845,38 @@ components:
           type: string
           minLength: 1
           maxLength: 32
+        charging:
+          type: boolean
+        ota:
+          $ref: '#/components/schemas/PagerOtaReport'
       required:
         - battery
         - rssi
         - firmware
+      additionalProperties: false
+    PagerOtaReport:
+      type: object
+      properties:
+        version:
+          type: string
+          minLength: 1
+          maxLength: 32
+        attempt:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        state:
+          type: string
+          enum:
+            - DOWNLOADING
+            - FAILED
+            - ROLLED_BACK
+        error:
+          type: string
+          maxLength: 120
+      required:
+        - version
+        - state
       additionalProperties: false
     Paise:
       type: integer

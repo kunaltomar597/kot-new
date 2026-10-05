@@ -1,0 +1,14 @@
+{
+  "input": {
+    "type": "object",
+    "properties": { "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" } },
+    "required": ["token"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": { "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" } },
+    "required": ["token"],
+    "additionalProperties": false
+  }
+}

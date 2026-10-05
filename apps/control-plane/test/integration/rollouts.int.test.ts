@@ -302,3 +302,90 @@ describe('[UPD-006] the component version matrix published with every release', 
     expect(plain.matrix).toBeNull();
   });
 });
+
+describe('[PGR-011] [UPD-003] pager firmware released through each PC', () => {
+  const firmware = (version: string, extra: Record<string, unknown> = {}) =>
+    publish({
+      component: 'PAGER_FIRMWARE',
+      version,
+      url: `https://downloads.example.com/rp/pager/rp-pager-${version}.bin`,
+      sizeBytes: 1_500_000,
+      ...extra,
+    });
+  const serving = (version: string | null, report: Record<string, unknown> | null = null) =>
+    heartbeatBody({
+      components: [{ name: 'RESTAURANT_PC', version: '1.0.0' }],
+      pagerFirmware: {
+        version,
+        report: report === null ? null : { at: new Date().toISOString(), error: null, ...report },
+      },
+    });
+
+  it('offers firmware only to PCs that pass it on, by its rollout, whatever the PC is held at', async () => {
+    const release = await firmware('2.0.0');
+    const pc = await enrolledInstallation(app, 'STABLE');
+    // A PC before P2-04b says nothing about firmware and is offered none.
+    expect((await heartbeat(pc, at('1.0.0'))).pagerFirmware).toBeNull();
+    // Holding the PC at a version holds its installer, not its pagers' firmware.
+    await app.get(ReleasesService).pin(pc.id ?? '', '1.0.0', 'Pilot', 'cli:test');
+    const answer = await heartbeat(pc, serving(null));
+    expect(answer.pagerFirmware).toEqual({
+      update: expect.objectContaining({
+        component: 'PAGER_FIRMWARE',
+        version: '2.0.0',
+        url: 'https://downloads.example.com/rp/pager/rp-pager-2.0.0.bin',
+      }) as unknown,
+      halted: false,
+    });
+    expect(answer.update?.component ?? null).not.toBe('PAGER_FIRMWARE');
+    // Serving it: nothing newer, and the PC counts as having taken it.
+    expect((await heartbeat(pc, serving('2.0.0'))).pagerFirmware).toEqual({
+      update: null,
+      halted: false,
+    });
+    expect((await releaseView(release.id)).installs).toMatchObject({ attempts: 1, installed: 1 });
+    // A rollout at 0 % reaches no PC.
+    await firmware('2.0.1', { rolloutPercent: 0 });
+    expect((await heartbeat(pc, serving('2.0.0'))).pagerFirmware?.update).toBeNull();
+  });
+
+  it('halts the rollout when pagers roll back from it, and tells the PCs serving it to stop', async () => {
+    const release = await firmware('3.0.0');
+    const [first, second, third] = [
+      await enrolledInstallation(app, 'STABLE'),
+      await enrolledInstallation(app, 'STABLE'),
+      await enrolledInstallation(app, 'STABLE'),
+    ];
+    for (const pc of [first, second, third]) {
+      expect((await heartbeat(pc, serving('2.0.0'))).pagerFirmware?.update?.version).toBe('3.0.0');
+      await heartbeat(pc, serving('3.0.0', { version: '3.0.0', outcome: 'INSTALLED' }));
+    }
+    // A PC that refused the image (its signature, say) counts as a failure too.
+    const refusing = await enrolledInstallation(app, 'STABLE');
+    await heartbeat(
+      refusing,
+      serving('2.0.0', { version: '3.0.0', outcome: 'FAILED', error: 'BAD_SIGNATURE' }),
+    );
+    expect((await releaseView(release.id)).rollout.state).toBe('ACTIVE');
+    await heartbeat(first, serving('3.0.0', { version: '3.0.0', outcome: 'ROLLED_BACK' }));
+    // Reported again until answered: counted once.
+    await heartbeat(first, serving('3.0.0', { version: '3.0.0', outcome: 'ROLLED_BACK' }));
+
+    const halted = await releaseView(release.id);
+    expect(halted.rollout.state).toBe('HALTED');
+    expect(halted.installs).toEqual({ attempts: 4, installed: 2, failures: 2, errorSpikes: 0 });
+    expect((await heartbeat(second, serving('3.0.0'))).pagerFirmware).toEqual({
+      update: null,
+      halted: true,
+    });
+    // Firmware failures count in the rollout only: no fleet alert about the PCs' own updates.
+    expect(
+      await prisma.fleetAlert.count({
+        where: {
+          kind: 'UPDATE_FAILED',
+          installationId: { in: [first.id ?? '', refusing.id ?? ''] },
+        },
+      }),
+    ).toBe(0);
+  });
+});

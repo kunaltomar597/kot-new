@@ -241,3 +241,145 @@ describe('[PGR-012] [PGR-013] the pagers', () => {
     ).toBeVisible();
   });
 });
+
+describe('[PGR-011] [UPD-004] pager firmware on the Pagers page', () => {
+  const FIRMWARE = `${PAGERS}/firmware`;
+  const served = {
+    version: '1.2.0',
+    sha256: 'a'.repeat(64),
+    sizeBytes: 1_500_000,
+    acceptedAt: '2026-10-05T04:00:00.000Z',
+    halted: false,
+  };
+  const update = (overrides: Record<string, unknown> = {}) => ({
+    deviceId: PAGER_1,
+    status: 'WAITING',
+    waitFor: 'IN_SERVICE',
+    attempts: 0,
+    rolledBack: false,
+    error: null,
+    requested: false,
+    ...overrides,
+  });
+  const twoPagers = () =>
+    pagerList([
+      pager(),
+      pager({ deviceId: PAGER_2, name: 'Pager 2', serial: 'WP-0002', staffId: null }),
+    ]);
+
+  it('says which firmware the PC serves and why each pager waits, with "Update now"', async () => {
+    const refused = 'The image is signed with a key the pagers do not trust.';
+    const fake = pagersServer(twoPagers())
+      .on('GET', FIRMWARE, () => ({
+        status: 200,
+        body: {
+          firmware: served,
+          incoming: {
+            version: '1.3.0',
+            problem: {
+              code: 'UNTRUSTED_KEY',
+              message: refused,
+              at: '2026-10-05T05:00:00.000Z',
+              refused: true,
+            },
+          },
+          pagers: [
+            update(),
+            update({
+              deviceId: PAGER_2,
+              status: 'GAVE_UP',
+              waitFor: null,
+              attempts: 1,
+              rolledBack: true,
+              error: 'No connection after the update',
+            }),
+          ],
+        },
+      }))
+      .on('POST', `${PAGERS}/${PAGER_1}/firmware-update`, () => ({
+        status: 200,
+        body: update({ status: 'UPDATING', waitFor: null, attempts: 1, requested: true }),
+      }));
+    const { user, container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    expect(await screen.findByText(t('pagers.update.served', { version: '1.2.0' }))).toBeVisible();
+    expect(
+      screen.getByText(
+        t('pagers.update.incomingProblem', { version: '1.3.0', refused: 'true', message: refused }),
+      ),
+    ).toBeVisible();
+    const first = await rowOf('Pager 1');
+    expect(
+      await within(first).findByText(
+        t('pagers.update.waiting', { version: '1.2.0', reason: 'IN_SERVICE' }),
+      ),
+    ).toBeVisible();
+    const second = await rowOf('Pager 2');
+    expect(
+      within(second).getByText(t('pagers.update.gaveUp', { version: '1.2.0', rolledBack: 'true' })),
+    ).toBeVisible();
+    expect(
+      within(second).getByText(
+        t('pagers.update.lastError', { error: 'No connection after the update' }),
+      ),
+    ).toBeVisible();
+
+    await user.click(
+      within(await actionsFor('Pager 1')).getByRole('button', {
+        name: t('pagers.update.nowFor', { pager: 'Pager 1' }),
+      }),
+    );
+    expect(
+      await screen.findByText(t('pagers.update.requested', { pager: 'Pager 1', version: '1.2.0' })),
+    ).toBeVisible();
+    expect(fake.callsTo('POST', `${PAGERS}/${PAGER_1}/firmware-update`)).toHaveLength(1);
+    await expectNoAxeViolations(container);
+  });
+
+  it('offers no "Update now" while a pager updates or runs it, nor once the rollout is halted', async () => {
+    const fake = pagersServer(twoPagers()).on(
+      'GET',
+      FIRMWARE,
+      () => ({
+        status: 200,
+        body: {
+          firmware: served,
+          incoming: null,
+          pagers: [
+            update({ status: 'UPDATING', waitFor: null, attempts: 1 }),
+            update({ deviceId: PAGER_2, status: 'UP_TO_DATE', waitFor: null }),
+          ],
+        },
+      }),
+      () => ({
+        status: 200,
+        body: { firmware: { ...served, halted: true }, incoming: null, pagers: [update()] },
+      }),
+    );
+    const { sockets } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    expect(
+      await within(await rowOf('Pager 1')).findByText(
+        t('pagers.update.updating', { version: '1.2.0' }),
+      ),
+    ).toBeVisible();
+    const noUpdateButton = async (name: string) =>
+      within(await actionsFor(name))
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+        .includes(t('pagers.update.now'));
+    expect(await noUpdateButton('Pager 1')).toBe(false);
+    expect(await noUpdateButton('Pager 2')).toBe(false);
+    act(() => {
+      sockets.sync(0);
+      sockets.last.fire('event', changed(1, 'DEVICES'));
+    });
+    expect(await screen.findByText(t('pagers.update.halted', { version: '1.2.0' }))).toBeVisible();
+    expect(await noUpdateButton('Pager 1')).toBe(false);
+  });
+
+  it('keeps the pagers when the firmware cannot be read', async () => {
+    const fake = pagersServer();
+    await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    expect(await screen.findByText(t('pagers.update.loadFailed'))).toBeVisible();
+    expect(await rowOf('Pager 1')).toBeVisible();
+  });
+});

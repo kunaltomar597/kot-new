@@ -9,7 +9,9 @@ import {
   DeviceLimits,
   LicenceState,
   RELEASE_CHANNELS,
+  RELEASE_COMPONENTS,
   type ReleaseChannel,
+  type ReleaseComponent,
   VersionMatrix,
 } from '@rp/contracts/control-plane';
 import { AdminService } from './admin/admin.service.js';
@@ -36,6 +38,7 @@ Commands:
   installations:list
   release:publish --channel STABLE|PILOT --version <x.y.z> --url <https url>
                   --sha256 <hex> --size <bytes> [--notes <text>]
+                  [--component RESTAURANT_PC|PAGER_FIRMWARE] (default RESTAURANT_PC)
                   [--matrix <version-matrix.json from the packaging step>]
   vendor-user:create --email <email> --name <name> --role SUPER_ADMIN|ONBOARDING|SUPPORT|FINANCE|READ_ONLY
                      the first Super Admin; prints the one-time setup token
@@ -61,6 +64,7 @@ const OPTIONS = {
   size: { type: 'string' },
   notes: { type: 'string' },
   matrix: { type: 'string' },
+  component: { type: 'string' },
   state: { type: 'string' },
   plan: { type: 'string' },
   limits: { type: 'string' },
@@ -100,6 +104,19 @@ function channelOf(value: unknown): ReleaseChannel | undefined {
     400,
     'VALIDATION_FAILED',
     `--channel must be one of ${RELEASE_CHANNELS.join(', ')}.`,
+  );
+}
+
+/** What a release installs (PGR-011: pager firmware too); the installer by default. */
+function componentOf(value: unknown): ReleaseComponent {
+  if (value === undefined) return 'RESTAURANT_PC';
+  if (typeof value === 'string' && (RELEASE_COMPONENTS as readonly string[]).includes(value)) {
+    return value as ReleaseComponent;
+  }
+  throw new CpError(
+    400,
+    'VALIDATION_FAILED',
+    `--component must be one of ${RELEASE_COMPONENTS.join(', ')}.`,
   );
 }
 
@@ -222,7 +239,7 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
       const size = Number(required(values, 'size'));
       const release = await admin.publishRelease(
         {
-          component: 'RESTAURANT_PC',
+          component: componentOf(values.component),
           channel: channelOf(required(values, 'channel')) ?? 'STABLE',
           version: required(values, 'version'),
           url: required(values, 'url'),

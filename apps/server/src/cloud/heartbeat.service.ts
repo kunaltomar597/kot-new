@@ -32,6 +32,11 @@ import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { readRelayCredential, saveRelayCredential } from '../relay/relay-credential.js';
 import { installationKey } from './installation-key.js';
 import { markUpdateReportDelivered, readUpdateReport } from '../updates/update-state.js';
+import {
+  firmwareHeartbeat,
+  markFirmwareReportDelivered,
+  saveOfferedFirmware,
+} from '../pager-firmware/firmware-state.js';
 
 export const CONTROL_PLANE_OPTIONS = Symbol('CONTROL_PLANE_OPTIONS');
 
@@ -168,6 +173,15 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       // The install outcome rode on this heartbeat: it is not sent again (P7-04c).
       const report = heartbeat.updateReport ?? null;
       if (report !== null) await markUpdateReportDelivered(this.prisma, report);
+      // So did the pager firmware's (P2-04b); and the firmware on offer is kept for the service.
+      const firmwareReport = heartbeat.pagerFirmware?.report ?? null;
+      if (firmwareReport !== null) await markFirmwareReportDelivered(this.prisma, firmwareReport);
+      if (answer.pagerFirmware !== null) {
+        await saveOfferedFirmware(this.prisma, {
+          ...answer.pagerFirmware,
+          forVersion: heartbeat.pagerFirmware?.version ?? null,
+        });
+      }
       this.intervalMs = answer.nextHeartbeatSeconds * 1_000;
       this.errorsDelivered = errorsNow;
       this.auditCheck = answer.auditCheck;
@@ -269,6 +283,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       cloudEnabled,
       restoreCodesSeen,
       updateReport,
+      pagerFirmware,
     ] = await Promise.all([
       this.audit.chainHead(),
       this.deviceHealth(),
@@ -284,6 +299,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       this.cloudBackupEnabled(),
       readRestoreCodesSeen(this.prisma),
       readUpdateReport(this.prisma),
+      firmwareHeartbeat(this.prisma),
     ]);
     const hours = BusinessHours.safeParse(restaurant?.businessHours);
     return {
@@ -325,6 +341,8 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       restoreCodesSeen,
       // How the last update went (UPD-003, P7-04c), until a heartbeat carrying it is answered.
       ...(updateReport !== null && { updateReport }),
+      // The pager firmware this PC passes on, and how its last release went (PGR-011, P2-04b).
+      pagerFirmware,
       ...licence,
       relay: {
         credentialDigest:

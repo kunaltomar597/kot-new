@@ -1,4 +1,10 @@
-import { CreatePagerRequest, type PagerView, type StaffView } from '@rp/contracts';
+import {
+  CreatePagerRequest,
+  type PagerFirmwarePagerView,
+  type ServedPagerFirmware,
+  type PagerView,
+  type StaffView,
+} from '@rp/contracts';
 import { pagerWarning } from '@rp/domain';
 
 /** Pagers (P4-02b, PGR-012 to PGR-014): the register form and what a pager's row says. */
@@ -68,4 +74,16 @@ export function wearersFor(people: readonly StaffView[], pager?: PagerView): Sta
   return people
     .filter((person) => person.active && person.id !== pager?.staffId)
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+/**
+ * Whether "Update now" makes sense for a pager (UPD-004, P2-04b): the PC has firmware whose
+ * rollout goes on, and the pager waits for it or was given up on. Not while it updates or runs it.
+ */
+export function mayUpdateNow(
+  served: ServedPagerFirmware | null,
+  update: PagerFirmwarePagerView | undefined,
+): boolean {
+  if (served === null || served.halted || update === undefined) return false;
+  return update.status === 'GAVE_UP' || (update.status === 'WAITING' && !update.requested);
 }

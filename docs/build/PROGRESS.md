@@ -24,8 +24,8 @@ What exists:
   waiter and an earlier day's sections given again (P4-02b); when a software update may install
   (P7-04c); client API versions, N-1 and the component version matrix (P7-04d); which
   over-the-air update a phone or tablet takes, and when it restarts on it (P7-04e1); which APK
-  from the PC a phone or tablet takes, and when a kiosk tablet installs it by itself (P7-04e2).
-  364 tests.
+  from the PC a phone or tablet takes, and when a kiosk tablet installs it by itself (P7-04e2);
+  when the PC offers its pager firmware to a pager, and when it gives up (P2-04b1). 376 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -47,7 +47,10 @@ What exists:
   `x-rp-client` identity, the version matrix with each release, the apps to update on the Devices
   and System pages, and `pnpm contracts:compat` with the frozen versions in `docs/api/compat/`
   (P7-04d, ADR-0016); the phone and tablet APKs a PC serves, `apps.json`, the device's own build
-  and its download, and the builds on the System page (P7-04e2). 941 tests.
+  and its download, and the builds on the System page (P7-04e2); pager firmware: the
+  `PAGER_FIRMWARE` release component, what the heartbeat says and hears about it, the offer on the
+  pager's own `ota` topic and its answer in the pager's heartbeat, and the Pagers page's firmware
+  with "Update now" (P2-04b1). 949 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -97,12 +100,18 @@ What exists:
   recorded, audited and reported (P7-04c); the N-1 check of apps (426 `CLIENT_TOO_OLD` over REST
   and the socket), each device's app version and client API, and the apps an offered update would
   leave behind (P7-04d); the release's phone and tablet APKs (`RP_APPS_DIR`), checked against
-  `apps.json` before a phone or tablet downloads its own, also when refused (P7-04e2).
-  1132 tests (27 skipped: Windows only, a real install, or the performance runs).
+  `apps.json` before a phone or tablet downloads its own, also when refused (P7-04e2); pager
+  firmware through the PC: the vendor's release downloaded and checked (the ESP-IDF image and its
+  secure boot v2 signature against the keys built in), offered on each free pager's `ota` topic,
+  downloaded with a one-time token, progress and rollbacks from the heartbeats, "Update now"
+  (P2-04b1, ADR-0018).
+  1151 tests (27 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
-  release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
-  account pending).
+  release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
+  rollouts, backups, diagnostics and more (Phase 7); pager firmware is a release component with
+  the same rollouts, and PCs report what their pagers did with it (P2-04b1). 142 tests. Not
+  deployed yet (hosting account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
@@ -216,7 +225,9 @@ What exists:
   delete the data for 30 minutes (P0-16c); the update agent's state and the last update's outcome
   on the System page (P7-04c); the apps to update on the Devices and System pages, and a console
   older than its server that loads the new one (P7-04d); the phone and tablet app versions the PC
-  serves, or a damaged one, on the System page (P7-04e2). 371 tests, and 23 Playwright steps.
+  serves, or a damaged one, on the System page (P7-04e2); on the Pagers page, the firmware this PC
+  passes on to its pagers, a release on its way or refused, each pager's update and "Update now"
+  (P2-04b1). 376 tests, and 23 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -253,7 +264,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
+- P2-04b2 Scan a pager's QR code with a camera on the Pagers page.
+- P7-10 Phase 7 exit test (S8, S9, S10 automated).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -331,6 +343,9 @@ Recommended next WPs (dependencies met):
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
 - [x] P2-04a Pager broker, credentials, delivery and heartbeats
 - [ ] P2-04b Pager firmware OTA distribution
+  - [x] P2-04b1 Firmware distribution through the PC (the pager's side is P2-05; the signing key
+        is manual task 30)
+  - [ ] P2-04b2 Scan a pager's QR code with a camera on the Pagers page
 - [ ] P2-05 Pager firmware [H]
 - [x] P2-06a Alerts in the waiter app
 - [x] P2-06b Background alerts on Android
@@ -710,6 +725,41 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P2-04b1), ADR-0018:
+
+668. P2-04b split: P2-04b1 (firmware distribution through the PC) and P2-04b2 (scanning a pager's
+     QR code with a camera on the Pagers page; typing or a barcode scanner works today).
+669. Pager firmware is a Control Plane release component (`PAGER_FIRMWARE`) with the PC's rollout
+     rules: channel, percentage, cohort, pause, halt, hotfix. Holding a PC at a version holds its
+     installer only. The security-critical flag means nothing for firmware (the web app hides it):
+     pagers update only when free.
+670. The signature is ESP-IDF secure boot v2 (RSA-3072), which the pagers' bootloader checks; the
+     PC checks it first against the key digests built into the software (`firmware-keys.ts`,
+     empty until manual task 30). `RP_PAGER_FIRMWARE_KEYS` adds keys outside production only. No
+     second vendor signature.
+671. A release that fails a check is refused for good and reported FAILED to the Control Plane; a
+     failed download is tried again with the update agent's back-off; without a trusted key the PC
+     waits for a software update. Firmware failures and rollbacks count in the rollout's health
+     (it halts by itself) but open no `UPDATE_FAILED` fleet alert, which is about the PC itself.
+672. A pager is free for an update when it is connected, has at least 30 % battery or is charging,
+     has no unacknowledged alert, and nobody wears it, or the maintenance window
+     (`updates.maintenanceWindow`) is open, or a manager pressed "Update now". Two at a time;
+     an offer unanswered for 15 minutes fails; a failure is tried again after 30 minutes, three
+     times; a rollback is never tried again by itself. Fixed values (`PAGER_FIRMWARE_RULES`), not
+     settings: the BRD gives no ⚙ for them.
+673. "Update now" needs `UPDATE_INSTALL_NOW` (Owner, Manager), like the PC's "Install now". It
+     starts a pager that was given up on again, is refused while the rollout is halted, and is
+     audited.
+674. The pager downloads from the PC with a random 256-bit token in the path, valid 15 minutes and
+     kept in memory (a restart drops it; the pager is offered again). The route is public because
+     pagers have no device token. Each offer of a version to a pager has a number that never
+     restarts (`offers`), which the pager echoes, so a stale report cannot change a newer offer;
+     a rollback counts only for a version the PC offered that pager, once.
+675. A halted rollout stops the PC offering that version to more pagers; a paused one does not
+     (the PC already holds it). Pagers already updated keep it.
+676. The pager's heartbeat may say it is charging; it is stored on its device row, as tablets'
+     are (TAB-015).
 
 Decided 2026-10-05 (P7-04e2), ADR-0017 addendum:
 
@@ -3504,6 +3554,10 @@ Security-sensitive PRs for the P8-03 human review:
   only in the data folder and checking the installer's hash and Authenticode signer in an
   administrators-only folder, run-once by request id, the update-signing settings and the CI
   build's unsigned-update allowance, the database copy and swap with the administrator's login.
+- P2-04b1 (merged locally): the secure boot v2 signature check of pager firmware
+  (`firmware-image.ts`) and the trusted key list, the public firmware download with its one-time
+  token, the pager's new `ota` topic in the broker's ACL, and the reports a pager may send about
+  offers (only for versions offered to it, once).
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -3511,6 +3565,78 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P2-04b1 Pager firmware through the restaurant PC
+
+Split P2-04b: P2-04b1 (this one) and P2-04b2, scanning a pager's QR code with a camera (spec in
+`phase-2.md`). Built over-the-air pager firmware through the PC (PGR-011, UPD-001, UPD-003,
+UPD-004, UPD-007; ADR-0018, `docs/runbooks/pager-firmware.md`, manual task 30; decisions
+668-676):
+
+- `@rp/domain` `pager-firmware.ts`: `pagerFirmwareVerdict` (UP_TO_DATE, OFFER, IN_PROGRESS, WAIT
+  with the reason, GAVE_UP), `pagerFirmwareTimedOut`, `PAGER_FIRMWARE_RULES`; `pager.ts`: the `ota`
+  topic, which a pager may subscribe to and never publish on.
+- `@rp/contracts`: `PAGER_FIRMWARE` in `RELEASE_COMPONENTS`; the heartbeat's `pagerFirmware`
+  (served version, report) and the answer's `pagerFirmware` (newer release, halted);
+  `PagerFirmwareOffer`, `PagerOtaReport`, `charging` and `ota` in `PagerHeartbeat`;
+  `PagerFirmwareResponse` and friends; the routes `getPagerFirmware`, `updatePagerFirmwareNow`,
+  `downloadPagerFirmware`; the AsyncAPI channel `pagerOta`.
+- Control Plane: the enum migration; `ReleasesService.recordHeartbeat` by component (the PC's
+  report or its pagers', no fleet alert or error spike for firmware); `pagerFirmwareFor`; offers
+  ignore a PC's hold for firmware; `release:publish --component`; the vendor web app's "What it
+  updates" and the releases' component column.
+- server `src/pager-firmware/`:
+  - `firmware-image.ts`: the ESP-IDF header and app description, and the secure boot v2 blocks
+    (magic, CRC-32, image digest, key digest, RSA-PSS with the little-endian numbers);
+  - `firmware-keys.ts` (empty), `RP_PAGER_FIRMWARE_KEYS` (refused in production);
+  - `firmware-state.ts` (`system_meta`: served, offered with the version it was for, problem,
+    report);
+  - `PagerFirmwareService`: fetch and check, refuse or retry, offer to free pagers one decision at
+    a time, tokens, reports from heartbeats, "Update now", the Pagers page's view;
+  - the controllers; the `pager_firmware_updates` table (`attempts` since "Update now", `offers`
+    ever).
+    The broker: `onHeartbeat`, `connectedPagers`, `offerFirmware`, `charging` stored. The heartbeat
+    sends `pagerFirmware` and keeps the answer. `TlsService.listeningPort` is public (the offer's
+    port).
+- console: the Pagers page's firmware notice, each pager's update in words, "Update now" for
+  those with `UPDATE_INSTALL_NOW`.
+- docs: ADR-0018, the runbook, manual task 30, `firmware/pager/README.md` (what P2-05 must do),
+  the phase spec.
+
+Checked against Espressif's own tool: `rp-pager-1.0.0.bin` in `apps/server/test/fixtures` was
+signed by espsecure 5.4 and verifies with the server's check against espsecure's key digest; an
+image signed by the tests' TypeScript signer verifies with `espsecure verify-signature`, with the
+same key digest. esptool reads the test images' app description.
+
+Tests:
+
+- domain 376 (+12);
+- contracts 949 (+8, with the new schema snapshots);
+- Control Plane 142 (+2: firmware offers by rollout and hold; rollbacks halt it and tell PCs);
+- vendor web app 73 (+1);
+- console 376 (+5);
+- server 1151 (+19, 27 skipped): the image check (7, the espsecure fixture), the config, the
+  firmware integration test (10, a real MQTT client as the pager, a real download), and the PC
+  and Control Plane together (1).
+
+Format, build, contract docs, `contracts:compat`, lint, typecheck, the tests of every package and
+`test:coverage` of every touched package pass. The relay's suite failed once under four parallel
+suites (a connection terminated as its database was dropped, after all its tests passed); alone
+its 140 tests pass.
+
+Not done or not verified:
+
+- Nothing has run on a pager: the pager's side is P2-05 (`firmware/pager/README.md`), and a pager
+  can be updated only after manual task 30 builds the signing key's digest into the software.
+- P2-04b2: scanning a pager's QR code with a camera.
+
+Gotchas:
+
+- A pager at or below 15 % battery raises the wearer's low-battery alert, and an open alert keeps
+  the pager from updating; tests of the battery rule use 20 %.
+- The Control Plane's Prisma client must be generated before its build after a schema change, or
+  `tsc` fails on the new enum value.
+- vitest drops `console.log` from code running between a test's awaits; trace to a file instead.
 
 ### 2026-10-05: P7-04e2 The in-app APK updater through the restaurant PC (P7-04 done)
 

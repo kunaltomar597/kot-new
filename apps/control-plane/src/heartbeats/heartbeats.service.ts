@@ -68,7 +68,8 @@ export class HeartbeatsService {
           });
         }
       }
-      // UPD-003: how installing releases went, for the rollouts' health (P7-04a).
+      // UPD-003: how installing releases went, for the rollouts' health (P7-04a), and the pager
+      // firmware the PC took or its pagers rolled back from (P2-04b).
       await this.releases.recordHeartbeat(
         tx,
         installation,
@@ -76,6 +77,15 @@ export class HeartbeatsService {
         heartbeat,
         receivedAt,
       );
+      if (heartbeat.pagerFirmware !== undefined) {
+        await this.releases.recordHeartbeat(
+          tx,
+          installation,
+          'PAGER_FIRMWARE',
+          heartbeat,
+          receivedAt,
+        );
+      }
       // VCP-005, AUD-003: the chain head and audit check, and the alerts the report calls for.
       return this.fleet.onHeartbeat(tx, installation.id, heartbeat, receivedAt);
     });
@@ -88,6 +98,11 @@ export class HeartbeatsService {
       installed === undefined
         ? null
         : await this.releases.offerFor(installation.id, INSTALLER_COMPONENT, installed.version);
+    // Pager firmware for a PC that passes it on (PGR-011, P2-04b).
+    const pagerFirmware =
+      heartbeat.pagerFirmware === undefined
+        ? null
+        : await this.releases.pagerFirmwareFor(installation, heartbeat.pagerFirmware.version);
     // A new licence when one is due (LIC-002), and every minute while it is not active (LIC-006).
     const licence = await this.licences.forHeartbeat(installation, heartbeat.licence, receivedAt);
     // The QR relay credential, until the PC holds it (VCP-002).
@@ -119,6 +134,7 @@ export class HeartbeatsService {
         heartbeat.restoreCodesSeen,
         receivedAt,
       ),
+      pagerFirmware,
     };
   }
 }

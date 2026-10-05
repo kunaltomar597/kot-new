@@ -8,7 +8,7 @@
           {
             "type": "object",
             "properties": {
-              "component": { "type": "string", "enum": ["RESTAURANT_PC"] },
+              "component": { "type": "string", "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"] },
               "channel": { "type": "string", "enum": ["STABLE", "PILOT"] },
               "version": {
                 "type": "string",
@@ -126,7 +126,7 @@
           {
             "type": "object",
             "properties": {
-              "component": { "type": "string", "enum": ["RESTAURANT_PC"] },
+              "component": { "type": "string", "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"] },
               "channel": { "type": "string", "enum": ["STABLE", "PILOT"] },
               "version": {
                 "type": "string",

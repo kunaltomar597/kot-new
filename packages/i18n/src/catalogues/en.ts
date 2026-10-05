@@ -811,6 +811,24 @@ export const en = {
     lastSeen: 'Last seen {time}',
     neverSeen: 'Not seen yet',
     firmware: 'Firmware {version}',
+    update: {
+      served: 'Pager firmware {version} is on this PC. Pagers update to it when they are free.',
+      halted:
+        'The vendor halted the rollout of pager firmware {version}: no pager is offered it any more.',
+      incoming: 'Pager firmware {version} is on its way to this PC.',
+      incomingProblem:
+        '{refused, select, true {Pager firmware {version} was refused: {message}} other {Pager firmware {version} could not be fetched yet: {message}}}',
+      loadFailed: 'The pager firmware could not be loaded.',
+      waiting:
+        'Firmware {version} waits {reason, select, NOT_CONNECTED {until the pager connects} BATTERY {for its battery to charge} ALERTS {until its alerts are acknowledged} IN_SERVICE {for the maintenance window, as someone wears it} RETRY_LATER {to try again after a failed attempt} OTHERS_UPDATING {while other pagers update} other {for its turn}}',
+      updating: 'Updating to firmware {version}',
+      gaveUp:
+        '{rolledBack, select, true {Firmware {version} did not start on this pager, which went back to its own} other {Firmware {version} failed on this pager every time}}',
+      lastError: 'Last problem: {error}',
+      now: 'Update now',
+      nowFor: 'Update {pager} now',
+      requested: '{pager} gets firmware {version} as soon as it is free.',
+    },
     actionsFor: 'Actions for {name}',
     give: 'Give',
     giveOther: 'Give to someone else',
@@ -4411,6 +4429,16 @@ export const en = {
       noInstalls: 'None yet',
       securityBadge: 'Security fix',
       haltReason: 'Why: {reason}',
+      component: 'What it updates',
+      componentName: {
+        RESTAURANT_PC: 'Restaurant PC',
+        PAGER_FIRMWARE: 'Pager firmware',
+      },
+      componentHint: {
+        RESTAURANT_PC: 'The signed Windows installer: server, console and shell.',
+        PAGER_FIRMWARE:
+          'The pagers’ ESP-IDF image signed for secure boot. Each PC checks it and passes it on to its pagers when they are free.',
+      },
     },
     updates: {
       title: 'Updates',

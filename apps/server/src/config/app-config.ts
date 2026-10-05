@@ -168,6 +168,25 @@ export const AppConfigSchema = z.object({
     )
     .pipe(z.array(z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, 'RP_LICENCE_KEYS must be base64'))),
   /**
+   * Pager firmware signing keys besides those built in (P2-04b, PGR-011): the SHA-256 digests of
+   * ESP-IDF secure boot v2 public keys (`espsecure digest-sbv2-public-key`), hex, comma-separated.
+   * Development and tests only, never production (like `licenceKeys`).
+   */
+  pagerFirmwareKeys: z
+    .string()
+    .optional()
+    .transform((value) =>
+      (value ?? '')
+        .split(',')
+        .map((key) => key.trim().toLowerCase())
+        .filter((key) => key !== ''),
+    )
+    .pipe(
+      z.array(
+        z.string().regex(/^[0-9a-f]{64}$/, 'RP_PAGER_FIRMWARE_KEYS must be SHA-256 digests in hex'),
+      ),
+    ),
+  /**
    * The Authenticode signer every update installer must carry (UPD-007, P7-04c): the vendor's
    * code-signing certificate's subject, from the installer's build. Unset: updates are refused
    * unless `updateAllowUnsigned` (test builds only).
@@ -243,6 +262,7 @@ export function loadConfig(
     updateAllowUnsigned: env.RP_UPDATE_ALLOW_UNSIGNED,
     licenceEnforce: env.RP_LICENCE_ENFORCE,
     licenceKeys: env.RP_LICENCE_KEYS,
+    pagerFirmwareKeys: env.RP_PAGER_FIRMWARE_KEYS,
   });
   if (!result.success) {
     const problems = result.error.issues
@@ -283,6 +303,10 @@ export function loadConfig(
     }
     if (config.licenceKeys.length > 0) {
       throw new ConfigError('In production only the licence keys built into the software count');
+    }
+    // PGR-011: pagers get firmware signed only with the keys built into the software.
+    if (config.pagerFirmwareKeys.length > 0) {
+      throw new ConfigError('In production only the firmware keys built into the software count');
     }
     return Object.freeze({ ...config, licenceEnforce: true });
   }
