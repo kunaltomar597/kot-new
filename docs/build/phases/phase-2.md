@@ -347,7 +347,7 @@ As built:
   counts as reachable (NTF-007).
 - Routes, all `DEVICE_PAIR`: `GET/POST /api/v1/pagers`, `POST /api/v1/pagers/:id/credential` and
   `PUT /api/v1/pagers/:id/wearer`. A person wears one pager, and every change is audited.
-- `@rp/domain` `pager.ts`: 2×12 line wrapping, vibration per type (setting `pagers.vibration`),
+- `@rp/domain` `pager.ts`: 2×12 line wrapping, vibration per type (each notification rule's `vibration`, P4-03b),
   topics, ACL checks and offline detection.
 - Contracts `pagers.ts`. The pager topics are documented in `docs/api/asyncapi.yaml`.
 

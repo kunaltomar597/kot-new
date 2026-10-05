@@ -162,8 +162,21 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   catalogue's schema before sending it, offers "Use the default" and an optional reason for the
   audit log, and asks the Owner for the second factor when the server wants it. The server's
   checks across settings come back as the dialog's message. The page follows `SettingsChanged`
-  and `RestaurantChanged`. The notification rules and pager vibrations get their own page
-  (P4-03b), so they are not listed here.
+  and `RestaurantChanged`. The notification rules have their own page, so they are not listed
+  here; `SettingsArea.tsx` links the two pages. A row is `SettingRow.tsx`, shared with the
+  Notifications page.
+- Notifications (`/manage/settings/notifications`, P4-03b, NTF-002, NTF-003, PGR-006):
+  `NotificationsScreen.tsx`, with the logic in `notification-rules-view.ts` (tested on its own)
+  over `@rp/domain`'s rule helpers. N, R and the nudge messages come first (the General page's
+  rows and editor), then a rule per alert of Appendix C in four groups: whom it alerts, where it
+  shows (badges), what the pager shows for table 7 and how it buzzes, how it repeats, whether it
+  goes on to the managers after N, and "Changed". The kitchen's order changes and the unreachable
+  waiter always happen and have no Change button. `RuleDialog.tsx` edits one rule: who gets it
+  (the event's choices), where it shows (pager and waiter app; POS and dashboard; the event's own
+  extras kept), the pager text with a live preview, the vibration, "send it on to the managers
+  after N", the repeat, "Back to the factory rule" and an optional reason. The rule is checked
+  with `ruleProblems` before it is sent; saving reads `notifications.rules` again and changes only
+  this event's entry (`withRule`), keeping only what differs from the factory rule.
 - Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
   `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
   Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console
@@ -207,9 +220,11 @@ computes the authenticator's code from the key shown) and adding a manager with 
 a manager giving waiters their sections and a pager at shift start (registered, its credential
 shown once, then handed to another waiter well within 30 s), a cashier refused the Staff,
 Devices and Settings pages, and the Owner creating a "Captain" role (a waiter who also takes payments) after confirming
-a recovery code, giving it to Ravi, and Ravi settling a table's bill by UPI, and a manager
+a recovery code, giving it to Ravi, and Ravi settling a table's bill by UPI, a manager
 changing the kitchen's amber age and the cashier's discount limit on the Settings page while the
-Owner turns on the service charge after a recovery code. The tabs share one browser context, so
+Owner turns on the service charge after a recovery code, and a manager sending water requests to
+the cashier too with a new pager text and three buzzes, setting N to 90 seconds and putting the
+factory rule back on the Notifications page. The tabs share one browser context, so
 they share the device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
 since the server's Content Security Policy refuses inline scripts, after entrance animations end
 (a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium

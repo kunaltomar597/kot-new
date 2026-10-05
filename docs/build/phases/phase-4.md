@@ -252,8 +252,9 @@ As built:
 
 - Catalogue: one pager heartbeat (`pagers.heartbeatSeconds`, now set by the vendor, 10 to 300 s,
   because the pager firmware and the broker must agree on it), one vibration setting
-  (`pagers.vibration`, edited with the notification rules in P4-03b) and one disk warning level
-  (`storage.warnPercent`, which the hourly disk check now reads). 74 settings.
+  (`pagers.vibration`, which P4-03b then moved into each notification rule) and one disk warning
+  level (`storage.warnPercent`, which the hourly disk check now reads). 74 settings (73 after
+  P4-03b).
 - Console: Settings (`/manage/settings`) for people who configure operations
   (`OPERATIONS_CONFIGURE`, custom role applied). The settings are grouped by area (orders, bills
   and payments; kitchen; alerts; tablets and pagers; sign-in and security; suggestions; QR menu;
@@ -277,13 +278,52 @@ As built:
   on the service charge after her password and a recovery code; Neha (Cashier) cannot open
   Settings. The page and the dialog pass axe.
 
-### P4-03b Notification rules
+### P4-03b Notification rules (done)
 
 Requirements: NTF-002, NTF-003, PGR-006, NTF-008 (nudge presets).
 Deliverables: the Notifications page: per event type (Appendix C), recipients, channels, pager
 text, escalation and repeat, with the factory rule shown and "back to the factory rule"; pager
-vibration per event; N and R. Stored in `notifications.rules` and `pagers.vibration`.
-Acceptance: a changed rule changes who is alerted (server test exists from P2-03); Playwright.
+vibration per event; N, R and the nudge messages. Stored in `notifications.rules`, which now
+carries each event's vibration too (`pagers.vibration` is gone).
+Acceptance: a changed rule changes who is alerted and what the pager shows and how it buzzes
+(server tests); a rule that cannot work is refused; Playwright.
+
+As built:
+
+- Domain (`notifications.ts`): each rule has a `vibration` (PGR-006: ready one long, a request two
+  short, the manager three, devices and the system one short), and the pager broker takes it from
+  the rule (`vibrationFor(event, escalated, rules)`; an escalated alert still buzzes three times).
+  What a manager may choose per event: `recipientChoices` (a table's alerts: its waiter, its
+  section's waiters, every waiter, the managers on duty, the cashier; a nudge: the waiters the
+  manager picks; a device: the managers, the wearer, the cashier, the Owner; the system: the
+  managers, the cashier, the Owner), `reachOf` / `channelsFor` (pager and waiter app as one
+  choice, POS and dashboard as the other, the event's own extras such as the table tablet kept),
+  `repeatChoices` (the factory way, every R until acknowledged, or never) and
+  `pagerPlaceholders` (`{table}` for a table's alerts, `{message}` for a nudge). `ruleProblems`
+  says what stops a rule from working (nobody, nowhere, a pager with no text or with a
+  placeholder the event does not fill, a nudge without `{message}`, a repeat the event does not
+  offer); `overrideFor` / `withRule` keep only what differs from the factory rule.
+  `FIXED_EVENTS`: the kitchen's order changes and the unreachable waiter always happen as
+  Appendix C says and have no rule to change.
+- Contracts: `notifications.rules` takes `vibration` and refuses a change with a problem (422
+  `SETTING_INVALID` naming the event and the problem); `pagers.vibration` removed. 73 settings.
+- Console: Settings has two pages, General and Notifications (`/manage/settings/notifications`).
+  The Notifications page shows N, R and the nudge messages first (the General page's rows and
+  editor; they stay on the General page too), then a rule per alert in four groups (orders and
+  the kitchen, table requests, staff, devices and the system): whom it alerts, badges for where
+  it shows, what the pager shows for table 7 and how it buzzes, how it repeats and whether it goes
+  on to the managers after N, and "Changed". The two fixed rows say what always happens and have
+  no Change button. The rule editor: who gets it (checkboxes from the event's choices), where it
+  shows (pager and waiter app; POS and dashboard; the extras named), the pager text with what it
+  fills in and a live preview, the vibration, "send it on to the managers after N", the repeat,
+  "Back to the factory rule" and an optional reason. A rule is checked before it is sent; saving
+  reads the rules again and changes only this event's entry, so another manager's change to a
+  different alert is kept.
+- Server: no new routes; the pager broker reads the vibration from the rules.
+- Playwright: Vikram (Manager) opens Notifications, sends water requests to the cashier too with
+  the pager text "{table} JAL" (preview "T7 JAL") and three buzzes, sees the rule changed, sets N
+  to 90 seconds and the rules say so, the page fits a 360 px phone, and he puts the factory rule
+  back. The page and the dialog pass axe.
 
 ### P4-03c Recommendation rules with boost, pin and block
 
