@@ -93,6 +93,9 @@ import {
   CreatePagerRequest,
   MyPagerResponse,
   PagerCredentialResponse,
+  PagerFirmwareDownloadParams,
+  PagerFirmwarePagerView,
+  PagerFirmwareResponse,
   PagerListResponse,
   PagerParams,
   PagerView,
@@ -3727,6 +3730,68 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such pager.', schema: ApiError },
       422: { description: 'The wearer is not active staff here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getPagerFirmware',
+    method: 'GET',
+    path: '/api/v1/pagers/firmware',
+    summary: 'The firmware this PC passes on to its pagers, and each pager’s update',
+    description:
+      'PGR-011, UPD-001 (P2-04b): the vendor’s signed firmware release this PC fetched and ' +
+      'checked (size, SHA-256, the image, the secure boot signature against the keys built into ' +
+      'the software), a newer one on its way or refused, and for each pager whether it runs it, ' +
+      'waits (and for what), is updating, or was given up on.',
+    tags: ['pagers'],
+    requirements: ['PGR-011', 'UPD-001', 'UPD-007'],
+    capability: 'DEVICE_PAIR',
+    responses: {
+      200: { description: 'The firmware and the pagers.', schema: PagerFirmwareResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'updatePagerFirmwareNow',
+    method: 'POST',
+    path: '/api/v1/pagers/:deviceId/firmware-update',
+    summary: '"Update now": offer the firmware to this pager even while someone wears it',
+    description:
+      'UPD-004 (P2-04b): the pager is offered the firmware outside the maintenance window, as soon ' +
+      'as it is connected, charged enough and has no alert waiting. A pager that rolled back or ' +
+      'failed every attempt is tried again. Audited.',
+    tags: ['pagers'],
+    requirements: ['PGR-011', 'UPD-004', 'AUD-001'],
+    capability: 'UPDATE_INSTALL_NOW',
+    request: { params: PagerParams },
+    responses: {
+      200: { description: 'The pager’s update.', schema: PagerFirmwarePagerView },
+      ...standardErrors,
+      404: { description: 'No such pager.', schema: ApiError },
+      409: {
+        description:
+          'No firmware to update to (`NO_PAGER_FIRMWARE`), its rollout was halted ' +
+          '(`PAGER_FIRMWARE_HALTED`), or the pager runs it already (`PAGER_FIRMWARE_CURRENT`).',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'downloadPagerFirmware',
+    method: 'GET',
+    path: '/api/v1/pager-firmware/:token',
+    summary: 'The firmware image a pager was offered',
+    description:
+      'PGR-011, UPD-007 (P2-04b): application/octet-stream. Public because a pager has no device ' +
+      'token: the path carries a random token sent to that pager alone on its own MQTT topic ' +
+      '(its broker credential and the ACL), valid 15 minutes. The pager checks the size and ' +
+      'SHA-256 of the offer, and its bootloader the secure boot signature.',
+    tags: ['pagers'],
+    requirements: ['PGR-011', 'UPD-007', 'SEC-012'],
+    capability: 'PUBLIC',
+    request: { params: PagerFirmwareDownloadParams },
+    responses: {
+      200: { description: 'The firmware image.' },
+      404: { description: 'Unknown or expired token.', schema: ApiError },
     },
   },
   {

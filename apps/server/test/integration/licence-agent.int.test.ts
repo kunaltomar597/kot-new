@@ -79,6 +79,7 @@ function answer(overrides: Partial<HeartbeatResponse> = {}): HeartbeatResponse {
     vendorSettings: null,
     backupKeyEscrow: null,
     restoreCodes: [],
+    pagerFirmware: null,
     ...overrides,
   };
 }

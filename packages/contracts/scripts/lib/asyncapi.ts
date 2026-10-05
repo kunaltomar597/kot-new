@@ -26,6 +26,18 @@ const PAGER_CHANNELS = [
       'again only for a higher seq; ACKNOWLEDGED or CLEARED removes it.',
   },
   {
+    id: 'pagerOta',
+    address: 'rp/{restaurantId}/pagers/{deviceId}/ota',
+    action: 'send',
+    schema: 'PagerFirmwareOffer',
+    description:
+      'Server → pager, QoS 1 (PGR-011). Only the pager itself may subscribe. Firmware to update ' +
+      'to: download it over HTTPS from the broker’s host on port and path before expiresAt, ' +
+      'check size and SHA-256, write the other OTA partition (secure boot checks the signature), ' +
+      'boot it, and mark it valid once connected to the broker again, else roll back. Report ' +
+      'progress in the heartbeat’s ota.',
+  },
+  {
     id: 'pagerAck',
     address: 'rp/{restaurantId}/pagers/{deviceId}/ack',
     action: 'receive',
@@ -37,7 +49,9 @@ const PAGER_CHANNELS = [
     address: 'rp/{restaurantId}/pagers/{deviceId}/heartbeat',
     action: 'receive',
     schema: 'PagerHeartbeat',
-    description: 'Pager → server every 30 s ⚙: battery, signal and firmware.',
+    description:
+      'Pager → server every 30 s ⚙: battery, signal, firmware, on its charger, and its last ' +
+      'firmware offer (ota) until it runs that version.',
   },
 ] as const;
 

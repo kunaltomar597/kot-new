@@ -80,6 +80,7 @@ describe('[UPD-003] [VCP-006] rollouts in the vendor web app', () => {
 
   it('builds a hotfix for one PC whatever the share, and a channel release with its share', () => {
     const base = {
+      component: 'RESTAURANT_PC' as const,
       channel: 'STABLE' as const,
       version: '1.5.1-hotfix.1',
       url: 'https://downloads.example/x.exe',
@@ -101,6 +102,26 @@ describe('[UPD-003] [VCP-006] rollouts in the vendor web app', () => {
       targetInstallationId: null,
     });
     expect(releaseRequestOf({ ...base, target: '', percent: 'all' }).success).toBe(false);
+  });
+
+  it('[PGR-011] publishes pager firmware, never as a security exception to the window', () => {
+    const firmware = releaseRequestOf({
+      component: 'PAGER_FIRMWARE',
+      channel: 'STABLE',
+      version: '1.2.0',
+      url: 'https://downloads.example/rp-pager-1.2.0.bin',
+      sha256: 'A'.repeat(64),
+      sizeBytes: '1024',
+      notes: '',
+      percent: '10',
+      securityCritical: true,
+      target: '',
+    });
+    expect(firmware.success && firmware.data).toMatchObject({
+      component: 'PAGER_FIRMWARE',
+      securityCritical: false,
+      rolloutPercent: 10,
+    });
   });
 
   it('lets the Super Admin widen a rollout with a pilot PC and a reason', async () => {

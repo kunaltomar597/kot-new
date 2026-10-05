@@ -322,7 +322,10 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
     });
   }
 
-  /** The release this PC should move to, or null (UPD-002, UPD-003). */
+  /**
+   * The release this PC should move to, or null (UPD-002, UPD-003). Holding a PC at a version
+   * holds its installer; pager firmware follows the channel and its rollout.
+   */
   async offerFor(
     installationId: string,
     component: ReleaseComponent,
@@ -335,7 +338,11 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
     if (installation === null || parseVersion(currentVersion) === undefined) return null;
     const releases = await this.candidates(installation, component);
     const offer = releaseToOffer(
-      { id: installation.id, version: currentVersion, pinnedVersion: installation.pinnedVersion },
+      {
+        id: installation.id,
+        version: currentVersion,
+        pinnedVersion: component === 'RESTAURANT_PC' ? installation.pinnedVersion : null,
+      },
       releases.map((release) => ({
         release,
         id: release.id,
@@ -349,11 +356,27 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
     return offer === undefined ? null : toInfo(offer.release);
   }
 
+  /**
+   * Pager firmware for a PC's heartbeat answer (PGR-011, P2-04b): a newer release to fetch, and
+   * whether the vendor halted the rollout of the one it serves, so that it stops passing it on.
+   */
+  async pagerFirmwareFor(
+    installation: { readonly id: string; readonly channel: ReleaseChannel },
+    served: string | null,
+  ): Promise<{ update: ReleaseInfo | null; halted: boolean }> {
+    const update = await this.offerFor(installation.id, 'PAGER_FIRMWARE', served ?? '0.0.0');
+    const current =
+      served === null
+        ? null
+        : await this.releaseOf(this.prisma, installation, 'PAGER_FIRMWARE', served);
+    return { update, halted: current !== null && stateOf(current) === 'HALTED' };
+  }
+
   // ------------------------------------------------------------ how installs go
 
   /** The release a PC means by a version: its channel's, or a hotfix for it. */
   private async releaseOf(
-    tx: TransactionClient,
+    tx: TransactionClient | PrismaService,
     installation: { readonly id: string; readonly channel: ReleaseChannel },
     component: ReleaseComponent,
     version: string,
@@ -374,7 +397,9 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
 
   /**
    * From a heartbeat: the PC's update report, the version it runs and its server errors, for the
-   * rollouts' health. Returns the releases whose health changed.
+   * rollouts' health. Returns the releases whose health changed. For pager firmware the version
+   * is the one the PC serves its pagers, and the report says whether it took the release or a
+   * pager rolled back from it (P2-04b).
    */
   async recordHeartbeat(
     tx: TransactionClient,
@@ -384,7 +409,10 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
     now: Date,
   ): Promise<string[]> {
     const changed = new Set<string>();
-    const report = heartbeat.updateReport ?? null;
+    const installer = component === 'RESTAURANT_PC';
+    const report = installer
+      ? (heartbeat.updateReport ?? null)
+      : (heartbeat.pagerFirmware?.report ?? null);
     if (report !== null) {
       const release = await this.releaseOf(tx, installation, component, report.version);
       if (release !== null) {
@@ -392,7 +420,9 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
         changed.add(release.id);
       }
     }
-    const running = heartbeat.components.find((entry) => entry.name === component)?.version;
+    const running = installer
+      ? heartbeat.components.find((entry) => entry.name === component)?.version
+      : (heartbeat.pagerFirmware?.version ?? undefined);
     if (running !== undefined) {
       const release = await this.releaseOf(tx, installation, component, running);
       if (release !== null) {
@@ -418,10 +448,10 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
           changed.add(release.id);
         }
       }
-      await this.closeFailures(tx, installation.id, running, now);
+      if (installer) await this.closeFailures(tx, installation.id, running, now);
     }
-    // Server errors in the day after an install (UPD-003: an error spike).
-    const errors = heartbeat.errorCount ?? 0;
+    // Server errors in the day after an install (UPD-003: an error spike); not the firmware's.
+    const errors = installer ? (heartbeat.errorCount ?? 0) : 0;
     if (errors > 0) {
       const recent = await tx.releaseInstall.findMany({
         where: {
@@ -481,7 +511,11 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
       },
       update: data,
     });
-    if (report.outcome === 'ROLLED_BACK' || report.outcome === 'FAILED') {
+    // The PC's own failed update opens a fleet alert; pager firmware counts in its rollout only.
+    if (
+      release.component === 'RESTAURANT_PC' &&
+      (report.outcome === 'ROLLED_BACK' || report.outcome === 'FAILED')
+    ) {
       await this.fleet.updateFailed(tx, installationId, now, {
         version: release.version,
         outcome: report.outcome,

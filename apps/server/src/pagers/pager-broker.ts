@@ -12,6 +12,7 @@ import {
   type NotificationEventType,
   PagerAckMessage,
   type PagerAlertMessage,
+  type PagerFirmwareOffer,
   PagerHeartbeat,
 } from '@rp/contracts';
 import {
@@ -47,11 +48,17 @@ export interface PagerOptions {
 
 export const DEFAULT_PAGER_OPTIONS: PagerOptions = { offlineCheckMs: 10_000 };
 
-interface ConnectedPager {
+export interface ConnectedPager {
   readonly restaurantId: string;
   readonly deviceId: string;
   staffId: string | null;
 }
+
+/** Called after each heartbeat is stored (the firmware service listens, P2-04b). */
+export type PagerHeartbeatListener = (
+  pager: Readonly<ConnectedPager>,
+  beat: PagerHeartbeat,
+) => Promise<void>;
 
 const NOT_AUTHORIZED = 5;
 
@@ -66,7 +73,9 @@ function refused(): AuthenticateError {
  * - it may subscribe only to its own alerts topic and publish only its own ack and heartbeat;
  * - alerts reach the wearer's pager at QoS 1, and a reconnecting pager is sent every open alert of
  *   its wearer again (it de-duplicates by alert id and repeat number);
- * - heartbeats keep battery, signal and firmware; three missed heartbeats mark it offline.
+ * - heartbeats keep battery, signal, firmware and charging; three missed heartbeats mark it
+ *   offline;
+ * - it may also subscribe to its own `ota` topic, where firmware offers come (PGR-011, P2-04b).
  */
 @Injectable()
 export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
@@ -78,6 +87,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
   private stopRenewals: (() => void) | undefined;
   private timer: NodeJS.Timeout | undefined;
   private stopPresence: (() => void) | undefined;
+  private readonly heartbeatListeners: PagerHeartbeatListener[] = [];
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -226,6 +236,27 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     return false;
   }
 
+  /** The pagers connected now. */
+  connectedPagers(): readonly Readonly<ConnectedPager>[] {
+    return [...this.connected.values()];
+  }
+
+  /** Hears every pager heartbeat once it is stored. */
+  onHeartbeat(listener: PagerHeartbeatListener): void {
+    this.heartbeatListeners.push(listener);
+  }
+
+  /**
+   * Sends a firmware offer to a connected pager on its own `ota` topic, QoS 1 (PGR-011). False
+   * when the pager is not connected.
+   */
+  async offerFirmware(deviceId: string, offer: PagerFirmwareOffer): Promise<boolean> {
+    const pager = this.connected.get(deviceId);
+    if (pager === undefined || this.broker === undefined) return false;
+    await this.publishTo(pager, 'ota', offer);
+    return true;
+  }
+
   /** A pager changed hands (PGR-012): route to the new wearer and send them the open alerts. */
   async reassigned(deviceId: string, staffId: string | null): Promise<void> {
     const pager = this.connected.get(deviceId);
@@ -349,6 +380,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
           batteryPercent: beat.battery,
           rssi: beat.rssi,
           firmwareVersion: beat.firmware,
+          charging: beat.charging ?? false,
         },
       });
       const wasLow = isLowBattery(before.batteryPercent, threshold);
@@ -361,6 +393,11 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
         });
       }
     });
+    for (const listener of this.heartbeatListeners) {
+      await listener(pager, beat).catch((error: unknown) => {
+        this.logger.error(`A pager heartbeat listener failed: ${String(error)}`);
+      });
+    }
   }
 
   /** Managers see every pager's status; the wearer hears about their own (WTR-014). */
@@ -473,13 +510,21 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private publish(pager: ConnectedPager, message: PagerAlertMessage): Promise<void> {
+    return this.publishTo(pager, 'alerts', message);
+  }
+
+  private publishTo(
+    pager: ConnectedPager,
+    kind: 'alerts' | 'ota',
+    message: PagerAlertMessage | PagerFirmwareOffer,
+  ): Promise<void> {
     const broker = this.broker;
     if (broker === undefined) return Promise.resolve();
     return new Promise((resolve, reject) => {
       broker.publish(
         {
           cmd: 'publish',
-          topic: pagerTopic(pager.restaurantId, pager.deviceId, 'alerts'),
+          topic: pagerTopic(pager.restaurantId, pager.deviceId, kind),
           payload: Buffer.from(JSON.stringify(message)),
           qos: 1,
           retain: false,

@@ -528,7 +528,7 @@ To try a real printer on a PC: add it under Printers with its IP address and por
 - `src/pagers/pager-broker.ts` embeds the MQTT broker (Aedes) on `RP_MQTT_PORT` (8883), over TLS
   when `RP_TLS` is on.
 - Each pager signs in with its device id and its own secret, and the ACL keeps it to its own
-  topics: `rp/<restaurant>/pagers/<device>/alerts|ack|heartbeat`.
+  topics: `rp/<restaurant>/pagers/<device>/alerts|ota|ack|heartbeat`.
 - Alert events reach the recipients' pagers at QoS 1 (only the alerts `reachesPagerAndApp` lets
   through), and a pager that connects is sent its wearer's open alerts again. Heartbeats feed
   battery, signal and offline detection.
@@ -537,6 +537,20 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   Pagers page and the wearer's own pager card follow; the list carries `pager.lowBatteryPercent`.
 - Tests start the broker with `config: { mqtt: 'on', mqttPort: 0 }`. See
   `test/integration/pagers.int.test.ts`.
+
+## Pager firmware (P2-04b1, ADR-0018)
+
+- `src/pager-firmware/pager-firmware.service.ts` fetches the `PAGER_FIRMWARE` release the Control
+  Plane offers (heartbeat answer, kept in `system_meta`), checks it (`firmware-image.ts`: the
+  ESP-IDF image and its secure boot v2 signature against `firmware-keys.ts` plus
+  `RP_PAGER_FIRMWARE_KEYS` outside production) and keeps it in `<data>/firmware/pager`.
+- It offers it on each free pager's `ota` topic (`pagerFirmwareVerdict`), with a 15-minute token
+  for `GET /api/v1/pager-firmware/:token`, and follows each pager's `ota` reports in
+  `pager_firmware_updates`. `GET /api/v1/pagers/firmware` and
+  `POST /api/v1/pagers/:deviceId/firmware-update` serve the Pagers page.
+- Signed test images come from `test/helpers/pager-firmware.ts`; the espsecure-signed fixture is
+  in `test/fixtures/pager-firmware/`. See `test/integration/pager-firmware.int.test.ts` and
+  `docs/runbooks/pager-firmware.md`.
 
 ## Phase 1 exit scenario (P1-14)
 

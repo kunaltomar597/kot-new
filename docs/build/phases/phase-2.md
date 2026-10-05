@@ -358,6 +358,32 @@ As built:
 - Pair a pager by scanning its QR code in the manager UI (P4). The API from P2-04a takes the
   serial.
 
+Split (2026-10-05):
+
+- **P2-04b1 Firmware distribution through the PC (done, ADR-0018,
+  `docs/runbooks/pager-firmware.md`).** As built:
+  - Control Plane: `PAGER_FIRMWARE` releases (channel, staged rollout, pause, halt, hotfix; a
+    held PC holds its installer only); heartbeats carry the firmware a PC serves and its report
+    (INSTALLED, FAILED, ROLLED_BACK, counted in the rollout's health); answers carry a newer
+    release and whether the served one was halted; `release:publish --component`; the vendor web
+    app's "What it updates".
+  - The PC: downloads over HTTPS, checks size, SHA-256, the ESP-IDF image (ESP32-S3, `rp-pager`,
+    the version) and the secure boot v2 signature against the key digests built in
+    (`firmware-keys.ts`, empty until manual task 30); refuses for good or retries a download.
+  - Offers on the pager's own `ota` topic (ACL), when the pager is free (`pagerFirmwareVerdict`:
+    connected, battery ≥ 30 % or charging, no open alert, unworn or in the maintenance window or
+    "Update now"), two at a time; the image from `GET /api/v1/pager-firmware/<token>` (public,
+    15-minute token); progress and rollbacks from the heartbeat's `ota`.
+  - The Pagers page: the firmware served, a release on its way or refused, each pager's update
+    and "Update now" (`UPDATE_INSTALL_NOW`, audited).
+- **P2-04b2 Scan a pager's QR code with a camera on the Pagers page (PGR-012).** The serial is
+  typed or scanned with a barcode scanner today (P4-02b). Add a "Scan" button in the register
+  dialog that reads the pager's QR code with the device's camera (a phone browser, or the PC's
+  camera in the Electron shell, which allows the camera for its own server, decision 604). Windows
+  Chromium has no `BarcodeDetector`, so it needs a small decoder library (licence check, ADR if it
+  is a new kind of dependency). The QR content format is set with P2-05's pairing screen; accept
+  the bare serial too.
+
 ## P2-05 Pager firmware
 
 Goal: production pager firmware on ESP32-S3.

@@ -42,6 +42,14 @@ describe('[PGR-005] [SEC-012] topics', () => {
     expect(pagerMayPublish(pagerTopic(r, a, 'alerts'), r, a)).toBe(false);
     expect(pagerMayPublish(pagerTopic(r, b, 'ack'), r, a)).toBe(false);
   });
+
+  it('[PGR-011] lets a pager read its own firmware offers, never write them', () => {
+    expect(pagerTopic(r, a, 'ota')).toBe('rp/r1/pagers/pager-a/ota');
+    expect(pagerMaySubscribe(pagerTopic(r, a, 'ota'), r, a)).toBe(true);
+    expect(pagerMaySubscribe(pagerTopic(r, b, 'ota'), r, a)).toBe(false);
+    expect(pagerMaySubscribe('rp/r1/pagers/+/ota', r, a)).toBe(false);
+    expect(pagerMayPublish(pagerTopic(r, a, 'ota'), r, a)).toBe(false);
+  });
 });
 
 describe('[PGR-007] offline after three missed heartbeats', () => {

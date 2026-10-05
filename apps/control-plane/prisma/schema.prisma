@@ -31,6 +31,7 @@ enum ReleaseChannel {
 /// @rp/contracts/control-plane RELEASE_COMPONENTS.
 enum ReleaseComponent {
   RESTAURANT_PC
+  PAGER_FIRMWARE
 }
 
 /// The licence states of LIC-005 (`@rp/domain` `licenseMachine`).

@@ -3,6 +3,7 @@ import {
   batteryOf,
   checkPager,
   createPagerRequestOf,
+  mayUpdateNow,
   pagerStateOf,
   suggestedName,
   wearersFor,
@@ -62,5 +63,39 @@ describe('[PGR-013] [PGR-014] a pager’s row', () => {
     ]);
     expect(wearersFor(crew()).map((person) => person.id)).toContain(RAVI);
     expect(wearersFor(crew()).map((person) => person.id)).toContain(SUNIL.id);
+  });
+});
+
+describe('[PGR-011] [UPD-004] "Update now" for a pager', () => {
+  const served = {
+    version: '1.2.0',
+    sha256: 'a'.repeat(64),
+    sizeBytes: 1_500_000,
+    acceptedAt: '2026-10-05T04:00:00.000Z',
+    halted: false,
+  };
+  const update = (overrides: Partial<Parameters<typeof mayUpdateNow>[1] & object> = {}) => ({
+    deviceId: 'p1',
+    status: 'WAITING' as const,
+    waitFor: 'IN_SERVICE' as const,
+    attempts: 0,
+    rolledBack: false,
+    error: null,
+    requested: false,
+    ...overrides,
+  });
+
+  it('is offered for a pager that waits or was given up on', () => {
+    expect(mayUpdateNow(served, update())).toBe(true);
+    expect(mayUpdateNow(served, update({ status: 'GAVE_UP', waitFor: null }))).toBe(true);
+  });
+
+  it('is not offered while it updates, runs the firmware, was asked already, or is halted', () => {
+    expect(mayUpdateNow(served, update({ status: 'UPDATING', waitFor: null }))).toBe(false);
+    expect(mayUpdateNow(served, update({ status: 'UP_TO_DATE', waitFor: null }))).toBe(false);
+    expect(mayUpdateNow(served, update({ requested: true, waitFor: 'BATTERY' }))).toBe(false);
+    expect(mayUpdateNow({ ...served, halted: true }, update())).toBe(false);
+    expect(mayUpdateNow(null, update())).toBe(false);
+    expect(mayUpdateNow(served, undefined)).toBe(false);
   });
 });

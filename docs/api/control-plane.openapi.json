@@ -755,7 +755,11 @@
             "name": "component",
             "in": "query",
             "required": false,
-            "schema": { "default": "RESTAURANT_PC", "type": "string", "enum": ["RESTAURANT_PC"] }
+            "schema": {
+              "default": "RESTAURANT_PC",
+              "type": "string",
+              "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"]
+            }
           },
           {
             "name": "version",
@@ -5310,6 +5314,19 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             }
+          },
+          "pagerFirmware": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "anyOf": [{ "$ref": "#/components/schemas/SemVer" }, { "type": "null" }]
+              },
+              "report": {
+                "anyOf": [{ "$ref": "#/components/schemas/UpdateReport" }, { "type": "null" }]
+              }
+            },
+            "required": ["version", "report"],
+            "additionalProperties": false
           }
         },
         "required": ["heartbeatId", "sentAt", "components", "disk", "auditChainHead", "devices"],
@@ -5387,6 +5404,23 @@
             "maxItems": 20,
             "type": "array",
             "items": { "$ref": "#/components/schemas/RestoreCodeNotice" }
+          },
+          "pagerFirmware": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "update": {
+                    "anyOf": [{ "$ref": "#/components/schemas/ReleaseInfo" }, { "type": "null" }]
+                  },
+                  "halted": { "type": "boolean" }
+                },
+                "required": ["update", "halted"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
           }
         },
         "required": [
@@ -5401,7 +5435,8 @@
           "diagnosticsRequests",
           "vendorSettings",
           "backupKeyEscrow",
-          "restoreCodes"
+          "restoreCodes",
+          "pagerFirmware"
         ],
         "additionalProperties": false
       },
@@ -5476,6 +5511,25 @@
             "maxItems": 20,
             "type": "array",
             "items": { "$ref": "#/components/schemas/RestoreCodeNotice" }
+          },
+          "pagerFirmware": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "update": {
+                    "anyOf": [
+                      { "$ref": "#/components/schemas/ReleaseInfoInput" },
+                      { "type": "null" }
+                    ]
+                  },
+                  "halted": { "type": "boolean" }
+                },
+                "required": ["update", "halted"]
+              },
+              { "type": "null" }
+            ]
           }
         },
         "required": ["receivedAt", "serverTime", "nextHeartbeatSeconds", "update"]
@@ -6146,7 +6200,7 @@
         "additionalProperties": false
       },
       "ReleaseChannel": { "type": "string", "enum": ["STABLE", "PILOT"] },
-      "ReleaseComponent": { "type": "string", "enum": ["RESTAURANT_PC"] },
+      "ReleaseComponent": { "type": "string", "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"] },
       "ReleaseInfo": {
         "type": "object",
         "properties": {

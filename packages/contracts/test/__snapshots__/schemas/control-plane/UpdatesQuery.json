@@ -2,7 +2,11 @@
   "input": {
     "type": "object",
     "properties": {
-      "component": { "default": "RESTAURANT_PC", "type": "string", "enum": ["RESTAURANT_PC"] },
+      "component": {
+        "default": "RESTAURANT_PC",
+        "type": "string",
+        "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"]
+      },
       "version": {
         "type": "string",
         "maxLength": 64,
@@ -15,7 +19,11 @@
   "output": {
     "type": "object",
     "properties": {
-      "component": { "default": "RESTAURANT_PC", "type": "string", "enum": ["RESTAURANT_PC"] },
+      "component": {
+        "default": "RESTAURANT_PC",
+        "type": "string",
+        "enum": ["RESTAURANT_PC", "PAGER_FIRMWARE"]
+      },
       "version": {
         "type": "string",
         "maxLength": 64,

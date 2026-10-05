@@ -1,0 +1,10 @@
+{
+  "input": {
+    "type": "string",
+    "enum": ["NOT_CONNECTED", "BATTERY", "ALERTS", "IN_SERVICE", "RETRY_LATER", "OTHERS_UPDATING"]
+  },
+  "output": {
+    "type": "string",
+    "enum": ["NOT_CONNECTED", "BATTERY", "ALERTS", "IN_SERVICE", "RETRY_LATER", "OTHERS_UPDATING"]
+  }
+}

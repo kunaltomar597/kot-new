@@ -80,6 +80,20 @@ describe('server configuration', () => {
     ]);
   });
 
+  it('[PGR-011] trusts only the firmware keys built in, in production', () => {
+    const digest = 'AB'.repeat(32);
+    expect(
+      loadConfig({ ...base, RP_PAGER_FIRMWARE_KEYS: ` ${digest}, ` }).pagerFirmwareKeys,
+    ).toEqual(['ab'.repeat(32)]);
+    expect(loadConfig(base).pagerFirmwareKeys).toEqual([]);
+    expect(() => loadConfig({ ...base, RP_PAGER_FIRMWARE_KEYS: 'not-a-digest' })).toThrow(
+      /SHA-256/,
+    );
+    expect(() =>
+      loadConfig({ ...base, NODE_ENV: 'production', RP_PAGER_FIRMWARE_KEYS: digest }),
+    ).toThrow(/firmware keys/);
+  });
+
   it('[DATA-002] keeps the nightly backup on in production, with the PostgreSQL programs', () => {
     expect(loadConfig(base).backups).toBe('on');
     expect(loadConfig({ ...base, RP_BACKUPS: 'off' }).backups).toBe('off');

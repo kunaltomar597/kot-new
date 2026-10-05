@@ -2,7 +2,9 @@ import {
   type FleetInstallationView,
   PublishReleaseRequest,
   RELEASE_CHANNELS,
+  RELEASE_COMPONENTS,
   type ReleaseChannel,
+  type ReleaseComponent,
   type VendorReleaseView,
 } from '@rp/contracts/control-plane';
 import {
@@ -40,6 +42,8 @@ export function megabytes(bytes: number): string {
 }
 
 interface ReleaseDraft {
+  /** The restaurant PC's installer, or the pagers' firmware (PGR-011). */
+  readonly component: ReleaseComponent;
   readonly channel: ReleaseChannel;
   readonly version: string;
   readonly url: string;
@@ -55,14 +59,15 @@ interface ReleaseDraft {
 /** The form as a publish request; the checksum is compared in lower case. */
 export function releaseRequestOf(draft: ReleaseDraft) {
   return PublishReleaseRequest.safeParse({
-    component: 'RESTAURANT_PC',
+    component: draft.component,
     channel: draft.channel,
     version: draft.version.trim(),
     url: draft.url.trim(),
     sha256: draft.sha256.trim().toLowerCase(),
     sizeBytes: /^\d+$/.test(draft.sizeBytes.trim()) ? Number(draft.sizeBytes.trim()) : Number.NaN,
     notes: draft.notes.trim() === '' ? null : draft.notes.trim(),
-    securityCritical: draft.securityCritical,
+    // UPD-004's exception is for the PC's installer: pagers update only when free.
+    securityCritical: draft.component === 'RESTAURANT_PC' && draft.securityCritical,
     // A hotfix goes to its PC whatever the share.
     rolloutPercent: draft.target === '' ? (percentOf(draft.percent) ?? Number.NaN) : 100,
     targetInstallationId: draft.target === '' ? null : draft.target,
@@ -81,6 +86,7 @@ function PublishDialog({
   const t = useT();
   const api = useApi();
   const [draft, setDraft] = useState<ReleaseDraft>({
+    component: 'RESTAURANT_PC',
     channel: 'PILOT',
     version: '',
     url: '',
@@ -144,6 +150,18 @@ function PublishDialog({
     >
       <div className="cp-form">
         <Select
+          label={t('vendorApp.releases.component')}
+          hint={t(`vendorApp.releases.componentHint.${draft.component}`)}
+          value={draft.component}
+          options={RELEASE_COMPONENTS.map((value) => ({
+            value,
+            label: t(`vendorApp.releases.componentName.${value}`),
+          }))}
+          onChange={(event) => {
+            setDraft({ ...draft, component: event.target.value as ReleaseComponent });
+          }}
+        />
+        <Select
           label={t('vendorApp.installation.channel')}
           value={draft.channel}
           options={RELEASE_CHANNELS.map((value) => ({
@@ -188,15 +206,17 @@ function PublishDialog({
             }}
           />
         ) : null}
-        <ChoiceGroup
-          legend={t('vendorApp.releases.securityBadge')}
-          mode="multiple"
-          options={[{ id: 'security', label: t('vendorApp.releases.securityCritical') }]}
-          value={draft.securityCritical ? ['security'] : []}
-          onChange={(value) => {
-            setDraft({ ...draft, securityCritical: value.includes('security') });
-          }}
-        />
+        {draft.component === 'RESTAURANT_PC' ? (
+          <ChoiceGroup
+            legend={t('vendorApp.releases.securityBadge')}
+            mode="multiple"
+            options={[{ id: 'security', label: t('vendorApp.releases.securityCritical') }]}
+            value={draft.securityCritical ? ['security'] : []}
+            onChange={(value) => {
+              setDraft({ ...draft, securityCritical: value.includes('security') });
+            }}
+          />
+        ) : null}
         <TextArea
           label={t('vendorApp.releases.notes')}
           value={draft.notes}
@@ -280,6 +300,11 @@ export function ReleasesScreen() {
                       ) : null}
                     </>
                   ),
+                },
+                {
+                  key: 'component',
+                  header: t('vendorApp.releases.component'),
+                  cell: (release) => t(`vendorApp.releases.componentName.${release.component}`),
                 },
                 {
                   key: 'channel',

@@ -421,6 +421,7 @@ model Device {
   online                 Boolean      @default(false)
   staff                  Staff?       @relation(fields: [staffId], references: [id])
   sessions               Session[]
+  firmwareUpdates        PagerFirmwareUpdate[]
   createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -2096,4 +2097,32 @@ model DigitalBill {
   @@index([status, nextAttemptAt])
   @@index([invoiceId])
   @@map("digital_bills")
+}
+
+/// A pager's update to one firmware version (PGR-011, P2-04b): offered over MQTT when the pager is
+/// free, downloaded from this PC, then run, failed or rolled back. Operational: kept with the pager.
+model PagerFirmwareUpdate {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  restaurantId  String    @map("restaurant_id") @db.Uuid
+  deviceId      String    @map("device_id") @db.Uuid
+  device        Device    @relation(fields: [deviceId], references: [id])
+  version       String
+  /// `@rp/domain` PAGER_FIRMWARE_STATES: WAITING, OFFERED, DOWNLOADING, UPDATED, FAILED, ROLLED_BACK.
+  state         String
+  /// Offers made since the last "Update now" (`@rp/domain` gives up after a few).
+  attempts      Int       @default(0)
+  /// Every offer of this version to this pager: the offer's `attempt`, which the pager echoes.
+  offers        Int       @default(0)
+  /// The pager's or the server's last reason; null without one.
+  lastError     String?   @map("last_error")
+  /// A manager's "Update now" (UPD-004), who pressed it and when.
+  requestedAt   DateTime? @map("requested_at") @db.Timestamptz(3)
+  requestedById String?   @map("requested_by_id") @db.Uuid
+  changedAt     DateTime  @default(now()) @map("changed_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([deviceId, version])
+  @@index([restaurantId, version])
+  @@map("pager_firmware_updates")
 }

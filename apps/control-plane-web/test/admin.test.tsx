@@ -130,6 +130,7 @@ describe('[VCP-006] releases', () => {
   it('reads sizes and checks the request', () => {
     expect(megabytes(1_572_864)).toBe('1.5');
     const draft = {
+      component: 'RESTAURANT_PC',
       channel: 'STABLE',
       version: '1.0.0',
       url: 'https://x.example/a',

@@ -7304,6 +7304,33 @@
         "x-requirements": ["TBL-008", "ORD-010"]
       }
     },
+    "/api/v1/pager-firmware/{token}": {
+      "get": {
+        "operationId": "downloadPagerFirmware",
+        "summary": "The firmware image a pager was offered",
+        "description": "PGR-011, UPD-007 (P2-04b): application/octet-stream. Public because a pager has no device token: the path carries a random token sent to that pager alone on its own MQTT topic (its broker credential and the ACL), valid 15 minutes. The pager checks the size and SHA-256 of the offer, and its bootloader the secure boot signature.",
+        "tags": ["pagers"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "The firmware image." },
+          "404": {
+            "description": "Unknown or expired token.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "PUBLIC",
+        "x-requirements": ["PGR-011", "UPD-007", "SEC-012"]
+      }
+    },
     "/api/v1/pagers": {
       "get": {
         "operationId": "listPagers",
@@ -7448,6 +7475,68 @@
         "x-requirements": ["SEC-012", "AUD-001"]
       }
     },
+    "/api/v1/pagers/{deviceId}/firmware-update": {
+      "post": {
+        "operationId": "updatePagerFirmwareNow",
+        "summary": "\"Update now\": offer the firmware to this pager even while someone wears it",
+        "description": "UPD-004 (P2-04b): the pager is offered the firmware outside the maintenance window, as soon as it is connected, charged enough and has no alert waiting. A pager that rolled back or failed every attempt is tried again. Audited.",
+        "tags": ["pagers"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pager’s update.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PagerFirmwarePagerView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such pager.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "No firmware to update to (`NO_PAGER_FIRMWARE`), its rollout was halted (`PAGER_FIRMWARE_HALTED`), or the pager runs it already (`PAGER_FIRMWARE_CURRENT`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "UPDATE_INSTALL_NOW",
+        "x-requirements": ["PGR-011", "UPD-004", "AUD-001"]
+      }
+    },
     "/api/v1/pagers/{deviceId}/wearer": {
       "put": {
         "operationId": "assignPager",
@@ -7512,6 +7601,44 @@
         },
         "x-capability": "DEVICE_PAIR",
         "x-requirements": ["PGR-012", "PGR-014", "AUD-001"]
+      }
+    },
+    "/api/v1/pagers/firmware": {
+      "get": {
+        "operationId": "getPagerFirmware",
+        "summary": "The firmware this PC passes on to its pagers, and each pager’s update",
+        "description": "PGR-011, UPD-001 (P2-04b): the vendor’s signed firmware release this PC fetched and checked (size, SHA-256, the image, the secure boot signature against the keys built into the software), a newer one on its way or refused, and for each pager whether it runs it, waits (and for what), is updating, or was given up on.",
+        "tags": ["pagers"],
+        "responses": {
+          "200": {
+            "description": "The firmware and the pagers.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PagerFirmwareResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["PGR-011", "UPD-001", "UPD-007"]
       }
     },
     "/api/v1/pagers/mine": {
@@ -20366,12 +20493,134 @@
         ],
         "additionalProperties": false
       },
+      "PagerFirmwareDownloadParams": {
+        "type": "object",
+        "properties": { "token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" } },
+        "required": ["token"],
+        "additionalProperties": false
+      },
+      "PagerFirmwareOffer": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "attempt": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "path": {
+            "type": "string",
+            "pattern": "^\\/api\\/v1\\/pager-firmware\\/[A-Za-z0-9_-]{43}$"
+          },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "expiresAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["version", "attempt", "port", "path", "sha256", "sizeBytes", "expiresAt"],
+        "additionalProperties": false
+      },
+      "PagerFirmwarePagerView": {
+        "type": "object",
+        "properties": {
+          "deviceId": { "$ref": "#/components/schemas/Id" },
+          "status": { "type": "string", "enum": ["UP_TO_DATE", "WAITING", "UPDATING", "GAVE_UP"] },
+          "waitFor": {
+            "anyOf": [{ "$ref": "#/components/schemas/PagerFirmwareWait" }, { "type": "null" }]
+          },
+          "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "rolledBack": { "type": "boolean" },
+          "error": { "type": ["string", "null"] },
+          "requested": { "type": "boolean" }
+        },
+        "required": [
+          "deviceId",
+          "status",
+          "waitFor",
+          "attempts",
+          "rolledBack",
+          "error",
+          "requested"
+        ],
+        "additionalProperties": false
+      },
+      "PagerFirmwareProblem": {
+        "type": "string",
+        "enum": [
+          "NOT_HTTPS",
+          "HTTP_STATUS",
+          "NETWORK",
+          "SIZE",
+          "HASH",
+          "TOO_LARGE",
+          "NOT_AN_IMAGE",
+          "WRONG_CHIP",
+          "WRONG_PROJECT",
+          "VERSION_MISMATCH",
+          "NOT_SIGNED",
+          "UNTRUSTED_KEY",
+          "BAD_SIGNATURE",
+          "NO_TRUSTED_KEY"
+        ]
+      },
+      "PagerFirmwareResponse": {
+        "type": "object",
+        "properties": {
+          "firmware": {
+            "anyOf": [{ "$ref": "#/components/schemas/ServedPagerFirmware" }, { "type": "null" }]
+          },
+          "incoming": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": { "type": "string" },
+                  "problem": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "code": { "$ref": "#/components/schemas/PagerFirmwareProblem" },
+                          "message": { "type": "string" },
+                          "at": { "$ref": "#/components/schemas/Timestamp" },
+                          "refused": { "type": "boolean" }
+                        },
+                        "required": ["code", "message", "at", "refused"],
+                        "additionalProperties": false
+                      },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["version", "problem"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "pagers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PagerFirmwarePagerView" }
+          }
+        },
+        "required": ["firmware", "incoming", "pagers"],
+        "additionalProperties": false
+      },
+      "PagerFirmwareWait": {
+        "type": "string",
+        "enum": [
+          "NOT_CONNECTED",
+          "BATTERY",
+          "ALERTS",
+          "IN_SERVICE",
+          "RETRY_LATER",
+          "OTHERS_UPDATING"
+        ]
+      },
       "PagerHeartbeat": {
         "type": "object",
         "properties": {
           "battery": { "type": "integer", "minimum": 0, "maximum": 100 },
           "rssi": { "type": "integer", "minimum": -127, "maximum": 0 },
-          "firmware": { "type": "string", "minLength": 1, "maxLength": 32 }
+          "firmware": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "charging": { "type": "boolean" },
+          "ota": { "$ref": "#/components/schemas/PagerOtaReport" }
         },
         "required": ["battery", "rssi", "firmware"],
         "additionalProperties": false
@@ -20383,6 +20632,17 @@
           "lowBatteryPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
         },
         "required": ["pagers", "lowBatteryPercent"],
+        "additionalProperties": false
+      },
+      "PagerOtaReport": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "attempt": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "state": { "type": "string", "enum": ["DOWNLOADING", "FAILED", "ROLLED_BACK"] },
+          "error": { "type": "string", "maxLength": 120 }
+        },
+        "required": ["version", "state"],
         "additionalProperties": false
       },
       "PagerParams": {
@@ -22072,6 +22332,18 @@
           "sentAt": { "$ref": "#/components/schemas/Timestamp" }
         },
         "required": ["id", "sentAt"],
+        "additionalProperties": false
+      },
+      "ServedPagerFirmware": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string" },
+          "sha256": { "type": "string" },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "acceptedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "halted": { "type": "boolean" }
+        },
+        "required": ["version", "sha256", "sizeBytes", "acceptedAt", "halted"],
         "additionalProperties": false
       },
       "ServerUrl": { "type": "string", "maxLength": 200, "format": "uri" },

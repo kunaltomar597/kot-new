@@ -66,11 +66,12 @@ export function vibrationFor(
   return overrides[event] ?? DEFAULT_VIBRATION[event];
 }
 
-export type PagerTopicKind = 'alerts' | 'ack' | 'heartbeat';
+export type PagerTopicKind = 'alerts' | 'ack' | 'heartbeat' | 'ota';
 
 /**
- * Topics: `rp/<restaurant>/pagers/<device>/alerts` (server → pager, QoS 1),
- * `.../ack` and `.../heartbeat` (pager → server). Nothing else is allowed (PGR-005, SEC-012).
+ * Topics: `rp/<restaurant>/pagers/<device>/alerts` and `.../ota` (server → pager, QoS 1: alerts,
+ * and firmware offers, PGR-011), `.../ack` and `.../heartbeat` (pager → server). Nothing else is
+ * allowed (PGR-005, SEC-012).
  */
 export function pagerTopic(restaurantId: string, deviceId: string, kind: PagerTopicKind): string {
   return `rp/${restaurantId}/pagers/${deviceId}/${kind}`;
@@ -85,7 +86,10 @@ export function pagerMayPublish(topic: string, restaurantId: string, deviceId: s
 }
 
 export function pagerMaySubscribe(topic: string, restaurantId: string, deviceId: string): boolean {
-  return topic === pagerTopic(restaurantId, deviceId, 'alerts');
+  return (
+    topic === pagerTopic(restaurantId, deviceId, 'alerts') ||
+    topic === pagerTopic(restaurantId, deviceId, 'ota')
+  );
 }
 
 /** PGR-007: offline after 3 missed heartbeats. */

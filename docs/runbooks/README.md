@@ -35,3 +35,6 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `app-updates.md`: over-the-air updates of the waiter app and the table tablet: publishing with
   EAS Update, which updates a device takes (only those its server speaks), when it restarts on
   them, rolling back, and support (P7-04e1, ADR-0017).
+- `pager-firmware.md`: pager firmware through the restaurant PC: releasing signed firmware in the
+  Control Plane, the PC's checks, when a pager is offered it, "Update now", what the pager does
+  (P2-05) and support (P2-04b1, ADR-0018).

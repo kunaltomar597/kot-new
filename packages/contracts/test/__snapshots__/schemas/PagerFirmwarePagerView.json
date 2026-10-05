@@ -1,0 +1,67 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "deviceId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "status": { "type": "string", "enum": ["UP_TO_DATE", "WAITING", "UPDATING", "GAVE_UP"] },
+      "waitFor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "NOT_CONNECTED",
+              "BATTERY",
+              "ALERTS",
+              "IN_SERVICE",
+              "RETRY_LATER",
+              "OTHERS_UPDATING"
+            ]
+          },
+          { "type": "null" }
+        ]
+      },
+      "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "rolledBack": { "type": "boolean" },
+      "error": { "type": ["string", "null"] },
+      "requested": { "type": "boolean" }
+    },
+    "required": ["deviceId", "status", "waitFor", "attempts", "rolledBack", "error", "requested"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "deviceId": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "status": { "type": "string", "enum": ["UP_TO_DATE", "WAITING", "UPDATING", "GAVE_UP"] },
+      "waitFor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "NOT_CONNECTED",
+              "BATTERY",
+              "ALERTS",
+              "IN_SERVICE",
+              "RETRY_LATER",
+              "OTHERS_UPDATING"
+            ]
+          },
+          { "type": "null" }
+        ]
+      },
+      "attempts": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "rolledBack": { "type": "boolean" },
+      "error": { "type": ["string", "null"] },
+      "requested": { "type": "boolean" }
+    },
+    "required": ["deviceId", "status", "waitFor", "attempts", "rolledBack", "error", "requested"],
+    "additionalProperties": false
+  }
+}

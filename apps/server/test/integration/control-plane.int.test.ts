@@ -21,6 +21,12 @@ import { AuditService } from '../../src/audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../../src/auth/secret-store.js';
 import { readOfferedUpdate } from '../../src/cloud/control-plane-state.js';
 import { readUpdateReport, saveUpdateReport } from '../../src/updates/update-state.js';
+import {
+  firmwareHeartbeat,
+  readOfferedFirmware,
+  saveFirmwareReport,
+  saveServedFirmware,
+} from '../../src/pager-firmware/firmware-state.js';
 import { enrolInstallation } from '../../src/cloud/enrolment.js';
 import {
   CONTROL_PLANE_OPTIONS,
@@ -429,6 +435,60 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     }
     // Delivered: the next heartbeat no longer carries it.
     expect(await readUpdateReport(prisma)).toBeNull();
+  });
+
+  it('[PGR-011] [UPD-003] hears of pager firmware, and reports what its pagers did with it', async () => {
+    await controlPlane.get(AdminService).publishRelease(
+      {
+        component: 'PAGER_FIRMWARE',
+        channel: 'STABLE',
+        version: '2.0.0',
+        url: 'https://downloads.example.com/rp/pager/rp-pager-2.0.0.bin',
+        sha256: 'f'.repeat(64),
+        sizeBytes: 1_500_000,
+      },
+      ACTOR,
+    );
+    expect((await heartbeats.beat()).lastError).toBeNull();
+    expect(await readOfferedFirmware(prisma)).toMatchObject({
+      update: { component: 'PAGER_FIRMWARE', version: '2.0.0' },
+      halted: false,
+      forVersion: null,
+    });
+    // The firmware service checked and served it; then a pager rolled back from it.
+    await saveServedFirmware(prisma, {
+      version: '2.0.0',
+      sha256: 'f'.repeat(64),
+      sizeBytes: 1_500_000,
+      fileName: 'rp-pager-2.0.0.bin',
+      keyDigest: 'a'.repeat(64),
+      acceptedAt: new Date().toISOString(),
+    });
+    await saveFirmwareReport(prisma, {
+      version: '2.0.0',
+      outcome: 'ROLLED_BACK',
+      at: new Date().toISOString(),
+      error: 'No connection after the update',
+    });
+    expect((await heartbeats.beat()).lastError).toBeNull();
+    const client = new pg.Client({ connectionString: cpDatabase.url });
+    await client.connect();
+    try {
+      const { rows } = await client.query<{ outcome: string; error: string | null }>(
+        `SELECT i.outcome, i.error FROM release_installs i JOIN releases r ON r.id = i.release_id
+          WHERE i.installation_id = $1 AND r.component = 'PAGER_FIRMWARE'`,
+        [installationId],
+      );
+      expect(rows).toEqual([{ outcome: 'ROLLED_BACK', error: 'No connection after the update' }]);
+    } finally {
+      await client.end();
+    }
+    expect((await firmwareHeartbeat(prisma)).report).toBeNull();
+    expect(await readOfferedFirmware(prisma)).toEqual({
+      update: null,
+      halted: false,
+      forVersion: '2.0.0',
+    });
   });
 
   it('stops being accepted once the vendor revokes the installation', async () => {
