@@ -350,10 +350,14 @@ export function ruleProblems(event: NotificationEvent, rule: NotificationRule): 
       problems.push('PAGER_TEXT_MISSING');
     } else {
       if (text.length > PAGER_TEXT_MAX) problems.push('PAGER_TEXT_TOO_LONG');
-      const used = text.match(/\{[^}]*\}/g) ?? [];
-      if (used.some((placeholder) => !placeholders.includes(placeholder))) {
-        problems.push('PAGER_TEXT_PLACEHOLDER');
-      }
+      // Whatever braces are left once the event's own placeholders are taken out would show on
+      // the pager as they are. Checked without a regular expression, which a text of many '{'
+      // could make slow.
+      const rest = placeholders.reduce(
+        (left, placeholder) => left.replaceAll(placeholder, ''),
+        text,
+      );
+      if (rest.includes('{') || rest.includes('}')) problems.push('PAGER_TEXT_PLACEHOLDER');
       if (placeholders.includes('{message}') && !text.includes('{message}')) {
         problems.push('PAGER_TEXT_NEEDS_MESSAGE');
       }

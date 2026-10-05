@@ -301,8 +301,8 @@ As built:
   `repeatChoices` (the factory way, every R until acknowledged, or never) and
   `pagerPlaceholders` (`{table}` for a table's alerts, `{message}` for a nudge). `ruleProblems`
   says what stops a rule from working (nobody, nowhere, a pager with no text or with a
-  placeholder the event does not fill, a nudge without `{message}`, a repeat the event does not
-  offer); `overrideFor` / `withRule` keep only what differs from the factory rule.
+  placeholder the event does not fill or a stray brace, checked without a regular expression, a
+  nudge without `{message}`, a repeat the event does not offer); `overrideFor` / `withRule` keep only what differs from the factory rule.
   `FIXED_EVENTS`: the kitchen's order changes and the unreachable waiter always happen as
   Appendix C says and have no rule to change.
 - Contracts: `notifications.rules` takes `vibration` and refuses a change with a problem (422

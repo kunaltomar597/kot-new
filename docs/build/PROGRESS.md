@@ -617,10 +617,10 @@ Decided 2026-10-05 (P4-03b):
 257. The pager text has up to 20 characters; `{table}` fills in the table for a table's alerts and
      `{message}` the manager's words for a nudge, which must keep it. The editor previews it for
      table 7. A rule that does not reach pagers or the waiter app asks for no text.
-258. A rule that cannot work (nobody, nowhere, a pager with no text or a placeholder the alert
-     does not fill, a repeat the alert does not offer, a fixed row) is refused by the server
-     (422 `SETTING_INVALID`, naming the alert and the problem) and stopped in the editor beside
-     the field it is about.
+258. A rule that cannot work (nobody, nowhere, a pager with no text, a placeholder the alert
+     does not fill or a stray brace, a repeat the alert does not offer, a fixed row) is refused
+     by the server (422 `SETTING_INVALID`, naming the alert and the problem) and stopped in the
+     editor beside the field it is about.
 259. Saving a rule reads the rules again and changes only that alert's entry, keeping only what
      differs from the factory rule: another manager's change to a different alert is kept, and a
      rule put back to the factory one is no longer "Changed".

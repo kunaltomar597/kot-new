@@ -308,6 +308,17 @@ describe('[NTF-002] [PGR-006] what a manager may change in a rule', () => {
         pagerText: '{table} PRINTER',
       }),
     ).toEqual(['PAGER_TEXT_PLACEHOLDER']);
+    // A stray or doubled brace would reach the pager as it is.
+    expect(problems('WATER_REQUEST', { pagerText: '{table WATER' })).toEqual([
+      'PAGER_TEXT_PLACEHOLDER',
+    ]);
+    expect(problems('WATER_REQUEST', { pagerText: '{{table}} WATER' })).toEqual([
+      'PAGER_TEXT_PLACEHOLDER',
+    ]);
+    expect(problems('WATER_REQUEST', { pagerText: '{'.repeat(5000) })).toEqual([
+      'PAGER_TEXT_TOO_LONG',
+      'PAGER_TEXT_PLACEHOLDER',
+    ]);
     expect(problems('MANAGER_NUDGE', { pagerText: 'MGR CALLING' })).toEqual([
       'PAGER_TEXT_NEEDS_MESSAGE',
     ]);
