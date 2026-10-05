@@ -12,7 +12,7 @@ import {
 import {
   businessDateOf,
   canonicalJson,
-  grantFor,
+  grantOf,
   OWNER_SECOND_FACTOR_CAPABILITIES,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
@@ -127,7 +127,7 @@ export class SettingsService {
       );
     }
     const snapshot = await this.snapshot(principal.restaurantId);
-    if (grantFor(principal.role, definition.capability) !== 'ALLOW') throw authErrors.forbidden();
+    if (grantOf(principal, definition.capability) !== 'ALLOW') throw authErrors.forbidden();
     if (
       OWNER_SECOND_FACTOR_CAPABILITIES.has(definition.capability) &&
       !hasFreshStepUp(principal, snapshot.get('auth.stepUpMinutes'))
@@ -215,7 +215,7 @@ export class SettingsService {
       capability: definition.capability,
       editable:
         definition.scope === 'RESTAURANT' &&
-        grantFor(principal.role, definition.capability) === 'ALLOW',
+        grantOf(principal, definition.capability) === 'ALLOW',
       description: definition.description,
       requirements: [...definition.requirements],
       ...(definition.unit !== undefined && { unit: definition.unit }),

@@ -1,6 +1,6 @@
 import { ASSIGNABLE_ROLES } from '@rp/domain';
 import { z } from 'zod';
-import { Pin } from './auth.js';
+import { Capability, Pin } from './auth.js';
 import { Id, Role, Timestamp } from './common.js';
 import { PhoneNumber } from './restaurant.js';
 
@@ -22,11 +22,17 @@ const Reason = z.string().trim().min(3).max(200);
 export const StaffParams = z.strictObject({ staffId: Id });
 export type StaffParams = z.infer<typeof StaffParams>;
 
+/** A person's custom role, by name (P4-02e, AUTH-012); null for a built-in role. */
+export const StaffCustomRole = z.object({ id: Id, name: z.string() });
+export type StaffCustomRole = z.infer<typeof StaffCustomRole>;
+
 /** A person as the Staff page shows them. A PIN is never shown, only whether one is set. */
 export const StaffView = z.object({
   id: Id,
   displayName: z.string(),
+  /** The base role: a custom role's own permissions are in `listRoles`. */
   role: Role,
+  customRole: StaffCustomRole.nullable(),
   active: z.boolean(),
   phone: z.string().nullable(),
   email: z.string().nullable(),
@@ -50,6 +56,8 @@ export type StaffListResponse = z.infer<typeof StaffListResponse>;
 export const CreateStaffRequest = z.strictObject({
   displayName: DisplayName,
   role: AssignableRole,
+  /** A custom role on top of `role` (its base role must be `role`); none for the built-in role. */
+  customRoleId: Id.nullable().optional(),
   /** Exactly `pinLength` digits; PINs need not be unique, as people pick their name first. */
   pin: Pin,
   phone: PhoneNumber.nullable().optional(),
@@ -62,6 +70,11 @@ export const UpdateStaffRequest = z
   .strictObject({
     displayName: DisplayName.optional(),
     role: AssignableRole.optional(),
+    /**
+     * A custom role (P4-02e), whose base role is `role` when both are given; null gives the
+     * built-in role. With `role` alone the person gets the built-in role.
+     */
+    customRoleId: Id.nullable().optional(),
     phone: PhoneNumber.nullable().optional(),
     email: Email.nullable().optional(),
   })
@@ -74,3 +87,45 @@ export type DeactivateStaffRequest = z.infer<typeof DeactivateStaffRequest>;
 
 export const SetStaffPinRequest = z.strictObject({ pin: Pin });
 export type SetStaffPinRequest = z.infer<typeof SetStaffPinRequest>;
+
+// ---------------------------------------------------------------- custom roles (P4-02e)
+
+/**
+ * Custom roles (AUTH-012): the Owner combines permissions into a named role on top of a base role,
+ * adding what a manager may do (used outright, without "own tables only" or a manager's PIN) or
+ * taking away what the base role may do. What only the Owner may do is never added
+ * (`checkCustomRole` in `@rp/domain`). People get a custom role like its base role.
+ */
+export const RoleParams = z.strictObject({ roleId: Id });
+export type RoleParams = z.infer<typeof RoleParams>;
+
+export const CustomRoleView = z.object({
+  id: Id,
+  name: z.string(),
+  baseRole: AssignableRole,
+  /** What it may do on top of the base role. */
+  added: z.array(Capability),
+  /** What the base role may do that it may not. */
+  removed: z.array(Capability),
+  /** Active people who have it. */
+  staffCount: z.int().nonnegative(),
+  archivedAt: Timestamp.nullable(),
+  updatedAt: Timestamp,
+});
+export type CustomRoleView = z.infer<typeof CustomRoleView>;
+
+/** Every custom role, archived ones included, by name. */
+export const RoleListResponse = z.object({ roles: z.array(CustomRoleView) });
+export type RoleListResponse = z.infer<typeof RoleListResponse>;
+
+export const CustomRoleRequest = z.strictObject({
+  name: z.string().trim().min(1).max(40),
+  baseRole: AssignableRole,
+  added: z.array(Capability).max(40),
+  removed: z.array(Capability).max(40),
+});
+export type CustomRoleRequest = z.infer<typeof CustomRoleRequest>;
+
+/** Only a role nobody active has can be archived; it says why. */
+export const ArchiveRoleRequest = z.strictObject({ reason: Reason });
+export type ArchiveRoleRequest = z.infer<typeof ArchiveRoleRequest>;

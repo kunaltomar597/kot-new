@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OVERRIDE_TOKEN_HEADER } from '@rp/contracts';
-import { grantFor, OWNER_SECOND_FACTOR_CAPABILITIES } from '@rp/domain';
+import { grantFor, grantOf, OWNER_SECOND_FACTOR_CAPABILITIES } from '@rp/domain';
 import { authErrors } from './auth-errors.js';
 import { AuthSettingsService } from './auth-settings.js';
 import { AuthService } from './auth.service.js';
@@ -19,7 +19,7 @@ import type { AuthenticatedRequest, Principal } from './principal.js';
  *   act for the kitchen (station mode, AUTH-005), when kitchen staff do not sign in individually
  *   and the kitchen role is granted `c`; the guard sets `request.station`.
  * - `@RequireCapability(c)` needs a signed-in person whose role is granted `c` in the BRD §4.2
- *   matrix. ALLOW passes, and Owner-only capabilities (AUTH-006) also need a fresh password + TOTP
+ *   matrix, with their custom role's changes (AUTH-012). ALLOW passes, and Owner-only capabilities (AUTH-006) also need a fresh password + TOTP
  *   step-up. OWN passes with `request.ownershipRequired` set, so the service checks the table or
  *   shift belongs to the person. OVERRIDE needs a manager's single-use override token in the
  *   `x-override-token` header (AUTH-011). DENY is refused.
@@ -99,7 +99,8 @@ export class PermissionGuard implements CanActivate {
     capability: Extract<RouteAccess, { kind: 'CAPABILITY' }>['capability'],
   ): Promise<boolean> {
     const principal = this.principal(request);
-    switch (grantFor(principal.role, capability)) {
+    // The person's custom role applies (AUTH-012, P4-02e).
+    switch (grantOf(principal, capability)) {
       case 'ALLOW':
         if (OWNER_SECOND_FACTOR_CAPABILITIES.has(capability)) {
           const settings = await this.settings.get(principal.restaurantId);

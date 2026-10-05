@@ -131,6 +131,86 @@ export function canApproveOverride(role: Role): boolean {
   return OVERRIDE_APPROVER_ROLES.has(role);
 }
 
+/**
+ * What only the Owner may ever do (BRD §4.2): tax and invoice settings, data administration and
+ * the licence. No custom role can be given these (AUTH-012).
+ */
+export const OWNER_ONLY_CAPABILITIES: ReadonlySet<Capability> = new Set<Capability>(
+  CAPABILITIES.filter((capability) => DEFAULT_PERMISSION_MATRIX[capability].MANAGER === 'DENY'),
+);
+
+/**
+ * What a custom role changes on top of its base role (AUTH-012, P4-02e): capabilities it adds,
+ * which it may then use outright (no "own tables only", no manager's PIN), and capabilities it
+ * takes away.
+ */
+export interface RoleCustomisation {
+  readonly added: readonly Capability[];
+  readonly removed: readonly Capability[];
+}
+
+/** Whoever permissions are checked for: a base role and, with a custom role, what it changes. */
+export interface PermissionHolder {
+  readonly role: Role;
+  readonly customRole?: RoleCustomisation | null;
+}
+
+/** The grant `holder` has for `capability`, their custom role applied (AUTH-012). */
+export function grantOf(holder: PermissionHolder, capability: Capability): Grant {
+  const custom = holder.customRole;
+  if (custom !== undefined && custom !== null) {
+    if (custom.removed.includes(capability)) return 'DENY';
+    if (custom.added.includes(capability)) return 'ALLOW';
+  }
+  return grantFor(holder.role, capability);
+}
+
+/**
+ * Why a custom role's permissions are refused:
+ * - OWNER_ONLY: only the Owner may ever do it;
+ * - ALREADY_ALLOWED: the base role already allows it outright, so there is nothing to add;
+ * - NOT_GRANTED: the base role cannot do it, so there is nothing to take away;
+ * - BOTH: added and taken away at once;
+ * - REPEATED: listed twice.
+ */
+export type CustomRoleProblem =
+  'OWNER_ONLY' | 'ALREADY_ALLOWED' | 'NOT_GRANTED' | 'BOTH' | 'REPEATED';
+
+export interface CustomRoleIssue {
+  readonly capability: Capability;
+  readonly problem: CustomRoleProblem;
+}
+
+/**
+ * Checks what a custom role adds to and takes from its base role (AUTH-012). Anything a manager
+ * may do can be added, never what only the Owner may do; anything the base role may do can be
+ * taken away. Each capability is listed once, where it changes something.
+ */
+export function checkCustomRole(
+  baseRole: Exclude<Role, 'OWNER'>,
+  customisation: RoleCustomisation,
+): readonly CustomRoleIssue[] {
+  const issues: CustomRoleIssue[] = [];
+  const seen = new Set<Capability>();
+  const note = (capability: Capability, problem: CustomRoleProblem) => {
+    issues.push({ capability, problem });
+  };
+  for (const capability of customisation.added) {
+    if (seen.has(capability)) note(capability, 'REPEATED');
+    else if (OWNER_ONLY_CAPABILITIES.has(capability)) note(capability, 'OWNER_ONLY');
+    else if (grantFor(baseRole, capability) === 'ALLOW') note(capability, 'ALREADY_ALLOWED');
+    seen.add(capability);
+  }
+  const removed = new Set<Capability>();
+  for (const capability of customisation.removed) {
+    if (removed.has(capability)) note(capability, 'REPEATED');
+    else if (customisation.added.includes(capability)) note(capability, 'BOTH');
+    else if (grantFor(baseRole, capability) === 'DENY') note(capability, 'NOT_GRANTED');
+    removed.add(capability);
+  }
+  return issues;
+}
+
 /** Decides whether `role` may perform `capability` in `context` (deny by default, SEC-003). */
 export function evaluatePermission(
   role: Role,

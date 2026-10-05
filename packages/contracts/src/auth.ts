@@ -32,6 +32,8 @@ export const StaffTile = z.object({
   staffId: Id,
   displayName: z.string().min(1),
   role: Role,
+  /** The name of the person's custom role, shown instead of the base role's (P4-02e). */
+  customRoleName: z.string().nullable(),
   photoId: Id.nullable(),
 });
 export type StaffTile = z.infer<typeof StaffTile>;
@@ -67,7 +69,20 @@ export const LoginResponse = z.object({
     /** The session ends after this many seconds without activity. */
     inactivityTimeoutSeconds: z.int().positive(),
   }),
-  staff: z.object({ id: Id, displayName: z.string(), role: Role }),
+  staff: z.object({
+    id: Id,
+    displayName: z.string(),
+    role: Role,
+    /** A custom role's changes to the base role, so screens offer what it may do (P4-02e). */
+    customRole: z
+      .object({
+        id: Id,
+        name: z.string(),
+        added: z.array(Capability),
+        removed: z.array(Capability),
+      })
+      .nullable(),
+  }),
   /** Until when the Owner's password + TOTP step-up is valid, if it was done. */
   secondFactorValidUntil: Timestamp.nullable(),
 });

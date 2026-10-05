@@ -8,6 +8,13 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { authErrors } from './auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
 import type { AuthenticatedDevice } from './device.js';
+import {
+  customisationOf,
+  holderOf,
+  permissionKey,
+  type SignedInCustomRole,
+  signedInCustomRole,
+} from './custom-roles.js';
 import type { Principal } from './principal.js';
 import { AccessTokenError, randomToken, sha256Hex, TokenService } from './tokens.js';
 
@@ -21,6 +28,7 @@ export interface SessionStaff {
   readonly id: string;
   readonly displayName: string;
   readonly role: Role;
+  readonly customRole: SignedInCustomRole;
 }
 
 interface SessionRow {
@@ -142,7 +150,12 @@ export class SessionService {
         expiresAt: session.expiresAt.toISOString(),
         inactivityTimeoutSeconds: this.inactivityMs(settings, input.device) / 1000,
       },
-      staff: { id: input.staff.id, displayName: input.staff.displayName, role: input.staff.role },
+      staff: {
+        id: input.staff.id,
+        displayName: input.staff.displayName,
+        role: input.staff.role,
+        customRole: input.staff.customRole,
+      },
       secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
     };
   }
@@ -168,6 +181,7 @@ export class SessionService {
         id: session.staffId,
         displayName: session.staff.displayName,
         role: session.staff.role.baseRole,
+        customRole: signedInCustomRole(session.staff.role),
       },
       secondFactorValidUntil: this.stepUpValidUntil(session.secondFactorAt, settings, now),
     };
@@ -220,6 +234,7 @@ export class SessionService {
         staffId: session.staffId,
         // The current role applies at once, even if it changed since the token was issued.
         role: session.staff.role.baseRole,
+        customRole: customisationOf(session.staff.role),
         restaurantId: session.restaurantId,
         deviceId: session.deviceId,
         sessionId: session.id,
@@ -229,15 +244,16 @@ export class SessionService {
   }
 
   /**
-   * The sessions among `entries` that can still be used, with the person's current role. Live
-   * sockets are re-checked with this (P0-12): a sign-out, revocation, expiry, inactivity timeout or
-   * role change ends them. Does not count as activity.
+   * The sessions among `entries` that can still be used, with the `permissionKey` of the person's
+   * current role. Live sockets are re-checked with this (P0-12): a sign-out, revocation, expiry,
+   * inactivity timeout, role change or change to their custom role (P4-02e) ends them. Does not
+   * count as activity.
    */
   async liveSessions(
     entries: readonly { readonly sessionId: string; readonly device: AuthenticatedDevice }[],
     now: Date = new Date(),
-  ): Promise<Map<string, Role>> {
-    const live = new Map<string, Role>();
+  ): Promise<Map<string, string>> {
+    const live = new Map<string, string>();
     if (entries.length === 0) return live;
     const sessions = await this.prisma.session.findMany({
       where: { id: { in: [...new Set(entries.map((entry) => entry.sessionId))] } },
@@ -254,7 +270,7 @@ export class SessionService {
         settingsOf.set(session.restaurantId, settings);
       }
       if ((await this.check(session, device, settings, now)) === undefined) {
-        live.set(sessionId, session.staff.role.baseRole);
+        live.set(sessionId, permissionKey(holderOf(session.staff.role)));
       }
     }
     return live;
@@ -344,6 +360,7 @@ export class SessionService {
         id: session.staffId,
         displayName: session.staff.displayName,
         role: session.staff.role.baseRole,
+        customRole: signedInCustomRole(session.staff.role),
       },
       device,
       settings,
