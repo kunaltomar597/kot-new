@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ComboView, MenuSnapshot } from '@rp/contracts';
+import { type ComboView, MenuSnapshot } from '@rp/contracts';
 import { calendarDateOf, canonicalJson, inTimeWindow, timeOfDayOf } from '@rp/domain';
 import { isoDateOf } from '../common/business-dates.js';
 import type { TransactionClient } from '../database/prisma.service.js';
@@ -46,6 +46,32 @@ export function comboView(combo: ComboRow): ComboView {
 /** The checksum that tells whether the draft changed since the last version. */
 export function menuChecksum(content: unknown): string {
   return createHash('sha256').update(canonicalJson(content)).digest('hex');
+}
+
+/**
+ * Whether publishing the draft would show something new (P4-02d): it differs from the published
+ * version in anything but availability and stock counts, which are live (MENU-006) and never wait
+ * for publishing. The draft goes through the same parse as a published version, so both compare
+ * alike.
+ */
+export function differsFromPublished(
+  content: Awaited<ReturnType<typeof buildMenuContent>>,
+  published: MenuSnapshot,
+): boolean {
+  const draft = MenuSnapshot.safeParse({
+    ...content,
+    version: published.version,
+    publishedAt: published.publishedAt,
+  });
+  return !draft.success || shapeOf(draft.data) !== shapeOf(published);
+}
+
+function shapeOf(snapshot: MenuSnapshot): string {
+  const { version: _version, publishedAt: _publishedAt, items, ...rest } = snapshot;
+  return menuChecksum({
+    ...rest,
+    items: items.map(({ available: _available, stockCount: _stockCount, ...item }) => item),
+  });
 }
 
 /** Everything a menu snapshot holds except its version and time: active entries only. */

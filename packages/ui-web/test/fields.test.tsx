@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Select, TextField } from '../src/index.js';
+import { Select, TextArea, TextField } from '../src/index.js';
 import { expectNoAxeViolations, renderUi } from './render.js';
 
 describe('[NFR-U05] TextField', () => {
@@ -32,6 +32,27 @@ describe('[NFR-U05] TextField', () => {
     expect(input).toHaveAttribute('id', 'name');
     expect(input).not.toHaveAttribute('aria-describedby');
     expect(input).not.toHaveAttribute('aria-invalid');
+  });
+});
+
+describe('[NFR-U05] TextArea', () => {
+  it('labels the text and links hint and error', async () => {
+    const { user, container } = renderUi(
+      <TextArea
+        label="Description"
+        hint="Shown on the menu"
+        error="Keep it to 500 characters."
+        maxLength={500}
+      />,
+    );
+    const area = screen.getByRole('textbox', { name: 'Description' });
+    expect(area.tagName).toBe('TEXTAREA');
+    expect(area).toHaveAttribute('rows', '3');
+    expect(area).toHaveAttribute('aria-invalid', 'true');
+    expect(area).toHaveAccessibleDescription('Shown on the menu Keep it to 500 characters.');
+    await user.type(area, 'Slow-cooked black lentils');
+    expect(area).toHaveValue('Slow-cooked black lentils');
+    await expectNoAxeViolations(container);
   });
 });
 

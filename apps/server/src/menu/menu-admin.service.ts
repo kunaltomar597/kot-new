@@ -15,12 +15,21 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import type { Category, Prisma } from '../generated/prisma/client.js';
 import { lockSetup } from '../restaurant/setup-changes.js';
+import {
+  buildMenuContent,
+  COMBO_INCLUDE,
+  comboView,
+  differsFromPublished,
+} from './menu-content.js';
+import { announceDraftChange, type DraftPart } from './menu-draft-events.js';
+import { MenuPublishService } from './menu-publish.service.js';
 
 const ITEM_INCLUDE = {
   variants: { orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }] },
   modifierGroups: { orderBy: { displayOrder: 'asc' }, select: { groupId: true } },
   tags: { include: { tag: { select: { name: true } } }, orderBy: { id: 'asc' } },
   synonyms: { orderBy: { id: 'asc' }, select: { text: true } },
+  stockLevel: { select: { quantity: true } },
 } as const satisfies Prisma.ItemInclude;
 
 const GROUP_INCLUDE = {
@@ -95,14 +104,15 @@ function toItemView(item: ItemRow): ItemView {
     externalId: item.externalId,
     available: item.available,
     trackStock: item.trackStock,
+    stockCount: item.trackStock ? (item.stockLevel?.quantity ?? 0) : null,
     archivedAt: iso(item.archivedAt),
     updatedAt: item.updatedAt.toISOString(),
   };
 }
 
-/** What the audit log keeps of an item: everything but its timestamps. */
+/** What the audit log keeps of an item: everything but its timestamps and live stock count. */
 function itemSnapshot(view: ItemView) {
-  const { updatedAt: _updatedAt, archivedAt: _archivedAt, ...rest } = view;
+  const { updatedAt: _updatedAt, archivedAt: _archivedAt, stockCount: _stockCount, ...rest } = view;
   return { ...rest, variants: view.variants.filter((variant) => variant.archivedAt === null) };
 }
 
@@ -138,10 +148,15 @@ export class MenuAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly publisher: MenuPublishService,
   ) {}
 
+  /**
+   * Everything the editor shows (P4-02d): the draft, archived entries included, every combo, and
+   * whether publishing would show something new.
+   */
   async draft(restaurantId: string): Promise<MenuDraftResponse> {
-    const [categories, groups, items] = await Promise.all([
+    const [categories, groups, items, combos, content, published] = await Promise.all([
       this.prisma.category.findMany({
         where: { restaurantId },
         orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
@@ -156,18 +171,33 @@ export class MenuAdminService {
         include: ITEM_INCLUDE,
         orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
       }),
+      this.prisma.combo.findMany({
+        where: { restaurantId },
+        include: COMBO_INCLUDE,
+        orderBy: { createdAt: 'asc' },
+      }),
+      buildMenuContent(this.prisma, restaurantId),
+      this.publisher.published(restaurantId),
     ]);
     return {
       categories: categories.map(toCategoryView),
       modifierGroups: groups.map(toGroupView),
       items: items.map(toItemView),
+      combos: combos.map(comboView),
+      published:
+        published === null
+          ? null
+          : { version: published.version, publishedAt: published.publishedAt },
+      unpublished: published === null || differsFromPublished(content, published),
     };
   }
 
   // ---------------------------------------------------------------- categories
 
   createCategory(principal: Principal, request: CategoryRequest): Promise<CategoryView> {
-    return this.change((tx) => this.createCategoryIn(tx, principal, request));
+    return this.change(principal, 'CATEGORIES', (tx) =>
+      this.createCategoryIn(tx, principal, request),
+    );
   }
 
   /** Inside a transaction that holds the setup lock (the menu import writes several at once). */
@@ -193,7 +223,7 @@ export class MenuAdminService {
     id: string,
     request: CategoryRequest,
   ): Promise<CategoryView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'CATEGORIES', async (tx) => {
       const existing = await this.findCategory(tx, principal.restaurantId, id);
       if (existing.archivedAt !== null) {
         throw conflict('CATEGORY_ARCHIVED', 'This category is archived. Restore it first.');
@@ -216,7 +246,7 @@ export class MenuAdminService {
   }
 
   archiveCategory(principal: Principal, id: string, reason: string): Promise<CategoryView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'CATEGORIES', async (tx) => {
       const existing = await this.findCategory(tx, principal.restaurantId, id);
       if (existing.archivedAt !== null) return toCategoryView(existing);
       const [items, children] = await Promise.all([
@@ -244,7 +274,7 @@ export class MenuAdminService {
   }
 
   restoreCategory(principal: Principal, id: string): Promise<CategoryView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'CATEGORIES', async (tx) => {
       const existing = await this.findCategory(tx, principal.restaurantId, id);
       if (existing.archivedAt === null) return toCategoryView(existing);
       if (existing.parentId !== null) {
@@ -269,7 +299,9 @@ export class MenuAdminService {
     principal: Principal,
     request: ModifierGroupRequest,
   ): Promise<ModifierGroupView> {
-    return this.change((tx) => this.createModifierGroupIn(tx, principal, request));
+    return this.change(principal, 'MODIFIER_GROUPS', (tx) =>
+      this.createModifierGroupIn(tx, principal, request),
+    );
   }
 
   /** Inside a transaction that holds the setup lock. */
@@ -313,7 +345,7 @@ export class MenuAdminService {
     id: string,
     request: ModifierGroupRequest,
   ): Promise<ModifierGroupView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'MODIFIER_GROUPS', async (tx) => {
       const existing = await this.findGroup(tx, principal.restaurantId, id);
       if (existing.archivedAt !== null) {
         throw conflict(
@@ -382,7 +414,7 @@ export class MenuAdminService {
     id: string,
     reason: string,
   ): Promise<ModifierGroupView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'MODIFIER_GROUPS', async (tx) => {
       const existing = await this.findGroup(tx, principal.restaurantId, id);
       if (existing.archivedAt !== null) return toGroupView(existing);
       if (existing._count.items > 0) {
@@ -404,7 +436,7 @@ export class MenuAdminService {
   }
 
   restoreModifierGroup(principal: Principal, id: string): Promise<ModifierGroupView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'MODIFIER_GROUPS', async (tx) => {
       const existing = await this.findGroup(tx, principal.restaurantId, id);
       if (existing.archivedAt === null) return toGroupView(existing);
       await this.assertGroupNameFree(tx, principal.restaurantId, existing.name, id);
@@ -420,7 +452,7 @@ export class MenuAdminService {
   // ---------------------------------------------------------------- items
 
   createItem(principal: Principal, request: ItemRequest): Promise<ItemView> {
-    return this.change((tx) => this.createItemIn(tx, principal, request));
+    return this.change(principal, 'ITEMS', (tx) => this.createItemIn(tx, principal, request));
   }
 
   /** Inside a transaction that holds the setup lock. */
@@ -448,7 +480,7 @@ export class MenuAdminService {
   }
 
   updateItem(principal: Principal, id: string, request: ItemRequest): Promise<ItemView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'ITEMS', async (tx) => {
       const existing = await this.findItem(tx, principal.restaurantId, id);
       if (existing.archivedAt !== null) {
         throw conflict('ITEM_ARCHIVED', 'This item is archived. Restore it first.');
@@ -483,7 +515,7 @@ export class MenuAdminService {
   }
 
   archiveItem(principal: Principal, id: string, reason: string): Promise<ItemView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'ITEMS', async (tx) => {
       const existing = await this.findItem(tx, principal.restaurantId, id);
       if (existing.archivedAt !== null) return toItemView(existing);
       await tx.item.update({ where: { id }, data: { archivedAt: new Date() } });
@@ -498,7 +530,7 @@ export class MenuAdminService {
   }
 
   restoreItem(principal: Principal, id: string): Promise<ItemView> {
-    return this.change(async (tx) => {
+    return this.change(principal, 'ITEMS', async (tx) => {
       const existing = await this.findItem(tx, principal.restaurantId, id);
       if (existing.archivedAt === null) return toItemView(existing);
       const [category, taxGroup, station] = await Promise.all([
@@ -528,10 +560,17 @@ export class MenuAdminService {
 
   // ---------------------------------------------------------------- helpers
 
-  private change<T>(work: (tx: TransactionClient) => Promise<T>): Promise<T> {
+  /** One edit: under the setup lock, announced to every open menu editor. */
+  private change<T>(
+    principal: Principal,
+    part: DraftPart,
+    work: (tx: TransactionClient) => Promise<T>,
+  ): Promise<T> {
     return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      return work(tx);
+      const result = await work(tx);
+      await announceDraftChange(tx, principal.restaurantId, part);
+      return result;
     });
   }
 

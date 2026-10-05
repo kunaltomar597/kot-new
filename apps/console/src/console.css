@@ -1242,6 +1242,232 @@ body {
   font-size: var(--rp-font-size-2xl);
 }
 
+/* The menu editor (P4-02d, MGR-005): the publishing bar, the item list and the item page. */
+.menu-publish {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-3);
+  padding: var(--rp-space-3) var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+}
+
+.menu-publish__state {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2) var(--rp-space-3);
+  min-width: 0;
+}
+
+.menu-publish__version {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.menu-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--rp-space-2) var(--rp-space-4);
+}
+
+.menu-filter .rp-field {
+  flex: 1 1 16rem;
+}
+
+.menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  min-width: 0;
+}
+
+.menu-group__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+  margin: var(--rp-space-2) 0 0;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.menu-group[data-sub] .menu-group__heading {
+  font-size: var(--rp-font-size-md);
+}
+
+.menu-group__empty {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-style: italic;
+}
+
+.menu-row__photo {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--rp-radius-md);
+  object-fit: cover;
+}
+
+.menu-row__code {
+  padding: 0 var(--rp-space-2);
+  border-radius: var(--rp-radius-sm);
+  background: var(--rp-color-surface-sunken);
+  color: var(--rp-color-text-muted);
+  font-family: var(--rp-font-mono);
+  font-size: var(--rp-font-size-sm);
+  font-weight: var(--rp-font-weight-medium);
+}
+
+/* Facts on one line that wrap on a phone, such as the price and the number of sizes. */
+.menu-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--rp-space-4);
+}
+
+.staff-row[data-sub] {
+  margin-inline-start: var(--rp-space-6);
+}
+
+.menu-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-1) var(--rp-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu-options__price {
+  margin-inline-start: var(--rp-space-1);
+  color: var(--rp-color-text-muted);
+}
+
+.menu-editor__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--rp-space-4);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-lg);
+  background: var(--rp-color-surface);
+}
+
+.menu-editor__subsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--rp-space-3);
+  border: 1px solid var(--rp-color-border);
+  border-radius: var(--rp-radius-md);
+}
+
+.menu-editor__legend {
+  padding: 0 var(--rp-space-1);
+  font-size: var(--rp-font-size-md);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+/* Fields side by side on a wide screen, one under the other on a phone. */
+.menu-editor__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--rp-space-3);
+  align-items: start;
+}
+
+.menu-editor__row--removable {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)) var(--rp-touch-target);
+  align-items: end;
+}
+
+.menu-editor__short {
+  max-width: 14rem;
+}
+
+.menu-editor__note {
+  margin: 0;
+  font-weight: var(--rp-font-weight-medium);
+}
+
+.menu-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--rp-space-2);
+}
+
+.menu-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+}
+
+.menu-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--rp-space-3);
+}
+
+.menu-photo__image {
+  width: min(100%, 15rem);
+  aspect-ratio: 4 / 3;
+  border-radius: var(--rp-radius-md);
+  object-fit: cover;
+}
+
+.menu-photo__none {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  font-style: italic;
+}
+
+.menu-photo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+}
+
+.menu-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rp-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu-chips__chip {
+  display: flex;
+  align-items: center;
+  gap: var(--rp-space-1);
+  padding-inline-start: var(--rp-space-3);
+  border: 1px solid var(--rp-color-border-strong);
+  border-radius: var(--rp-radius-md);
+  background: var(--rp-color-surface-sunken);
+}
+
+.menu-option-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+  padding-block-end: var(--rp-space-2);
+  border-block-end: 1px solid var(--rp-color-border);
+}
+
 /* The Owner's sign-in security (P4-02a, AUTH-006). */
 .security-cards {
   display: grid;

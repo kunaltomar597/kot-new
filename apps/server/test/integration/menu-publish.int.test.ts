@@ -4,6 +4,7 @@ import {
   ComboView,
   ItemAvailabilityView,
   type LoginResponse,
+  MenuDraftResponse,
   MenuPublishResponse,
   MenuSnapshot,
 } from '@rp/contracts';
@@ -116,7 +117,7 @@ describe('[MENU-005] combos', () => {
     expect(await prisma.auditLog.count({ where: { action: 'COMBO_CHANGED' } })).toBe(1);
   });
 
-  it('refuses combos inside combos, itself, and a combo part becoming a combo', async () => {
+  it('refuses combos inside combos, itself, and a combo part or choice becoming a combo', async () => {
     const nested = await server()
       .put(`/api/v1/menu/items/${id('Lassi')}/combo`)
       .set(as(manager))
@@ -127,6 +128,11 @@ describe('[MENU-005] combos', () => {
       .set(as(manager))
       .send({ ...thali(), components: [{ kind: 'FIXED', itemId: id('Lassi'), quantity: 1 }] });
     expect([part.status, codeOf(part)]).toEqual([422, 'COMBO_COMPONENT_INVALID']);
+    const choice = await server()
+      .put(`/api/v1/menu/items/${id('Chaas')}/combo`)
+      .set(as(manager))
+      .send({ ...thali(), components: [{ kind: 'FIXED', itemId: id('Dal'), quantity: 1 }] });
+    expect([choice.status, codeOf(choice)]).toEqual([422, 'COMBO_COMPONENT_INVALID']);
     const backwards = await server()
       .put(`/api/v1/menu/items/${id('Veg Thali')}/combo`)
       .set(as(manager))
@@ -265,5 +271,75 @@ describe('[MENU-006] availability and stock', () => {
     expect(
       await prisma.auditLog.count({ where: { action: 'ITEM_AVAILABILITY_CHANGED' } }),
     ).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('[MGR-005] the editor’s draft', () => {
+  const draft = async () => {
+    const response = await server().get('/api/v1/menu/draft').set(as(manager));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    return MenuDraftResponse.parse(response.body);
+  };
+
+  it('[MENU-005] [MENU-006] holds every combo and what is left of counted items', async () => {
+    const current = await draft();
+    expect(current.combos).toEqual([
+      expect.objectContaining({
+        itemId: id('Veg Thali'),
+        timeWindow: { start: '11:00', end: '16:00' },
+      }),
+    ]);
+    const item = (name: string) => current.items.find((entry) => entry.id === id(name));
+    expect(item('Roti')).toMatchObject({ trackStock: true, stockCount: 0, available: false });
+    expect(item('Dal')).toMatchObject({ trackStock: false, stockCount: null });
+  });
+
+  it('[MENU-013] says whether publishing would show something new, live availability aside', async () => {
+    // Chaas came back after version 2 was published.
+    expect(await draft()).toMatchObject({ published: { version: 2 }, unpublished: true });
+    expect((await server().post('/api/v1/menu/publish').set(as(manager))).status).toBe(200);
+    expect(await draft()).toMatchObject({ published: { version: 3 }, unpublished: false });
+
+    // Availability and stock are live: they never wait for publishing.
+    const availability = await server()
+      .put(`/api/v1/menu/items/${id('Lassi')}/availability`)
+      .set(as(manager))
+      .send({ available: false, stockCount: 5 });
+    expect(availability.status).toBe(200);
+    expect((await draft()).unpublished).toBe(false);
+
+    await prisma.item.update({ where: { id: id('Lassi') }, data: { basePrice: 9_500 } });
+    expect((await draft()).unpublished).toBe(true);
+  });
+
+  it('tells every open menu editor about each edit, and nothing about a refused one', async () => {
+    const drafts = () =>
+      prisma.outboxEvent.findMany({
+        where: { eventType: 'MenuDraftChanged' },
+        orderBy: { writeOrder: 'asc' },
+      });
+    const before = (await drafts()).length;
+    const category = { name: 'Desserts', parentId: null, displayOrder: 9 };
+    const created = await server().post('/api/v1/menu/categories').set(as(manager)).send(category);
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const twice = await server().post('/api/v1/menu/categories').set(as(manager)).send(category);
+    expect(twice.status).toBe(409);
+    const combo = await server()
+      .put(`/api/v1/menu/items/${id('Veg Thali')}/combo`)
+      .set(as(manager))
+      .send({
+        components: [{ kind: 'FIXED', itemId: id('Dal'), quantity: 1 }],
+        activeFrom: null,
+        activeUntil: null,
+        timeWindow: null,
+      });
+    expect(combo.status, JSON.stringify(combo.body)).toBe(200);
+
+    const events = await drafts();
+    expect(events).toHaveLength(before + 2);
+    expect(events.slice(-2).map((event) => event.payload)).toEqual([
+      expect.objectContaining({ payload: { part: 'CATEGORIES' } }),
+      expect.objectContaining({ payload: { part: 'ITEMS' } }),
+    ]);
   });
 });

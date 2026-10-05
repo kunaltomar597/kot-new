@@ -18,6 +18,7 @@ import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
 import { lockSetup } from '../restaurant/setup-changes.js';
 import { buildMenuContent, COMBO_INCLUDE, comboView, menuChecksum } from './menu-content.js';
+import { announceDraftChange } from './menu-draft-events.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 /**
@@ -42,7 +43,9 @@ export class MenuPublishService {
   setCombo(principal: Principal, itemId: string, request: ComboRequest): Promise<ComboView> {
     return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      return this.setComboIn(tx, principal, itemId, request);
+      const combo = await this.setComboIn(tx, principal, itemId, request);
+      await announceDraftChange(tx, principal.restaurantId, 'ITEMS');
+      return combo;
     });
   }
 
@@ -82,7 +85,11 @@ export class MenuPublishService {
         { itemIds: refused },
       );
     }
-    if ((await tx.comboComponent.count({ where: { itemId } })) > 0) {
+    // A fixed part or one of a choice's items (P4-02d: choices were not checked before).
+    const partOf =
+      (await tx.comboComponent.count({ where: { itemId } })) +
+      (await tx.comboChoiceOption.count({ where: { itemId } }));
+    if (partOf > 0) {
       throw new AppError(
         422,
         'COMBO_COMPONENT_INVALID',

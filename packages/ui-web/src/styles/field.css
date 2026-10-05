@@ -77,6 +77,12 @@
   padding-inline-end: calc(var(--rp-touch-target) + var(--rp-space-2));
 }
 
+.rp-textarea__input {
+  padding-block: var(--rp-space-2);
+  line-height: var(--rp-line-height-normal);
+  resize: vertical;
+}
+
 .rp-select__input {
   appearance: none;
   padding-inline-end: var(--rp-space-10);

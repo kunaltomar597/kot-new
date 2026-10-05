@@ -317,6 +317,18 @@ backup, updates and diagnostics.
   - live availability and stock, with `decrementStock` for the order engine;
   - publishing `menu_versions`, with a checksum so an unchanged draft is not published again;
   - the device-facing menu with live availability.
+- The editor's draft (P4-02d, `GET /api/v1/menu/draft`) also carries every combo, the stock count
+  of counted items, the published version and `unpublished`: whether publishing would show
+  something new. `differsFromPublished` in `src/menu/menu-content.ts` compares the draft with the
+  published snapshot through the same parse, leaving out availability and stock counts, which are
+  live (MENU-006) and never wait for publishing.
+- Every draft edit appends `MenuDraftChanged` (`src/menu/menu-draft-events.ts`) in its own
+  transaction, with the part that changed (categories, modifier groups or items, combos included).
+  Only roles that manage the menu hear it (`rooms.ts`), so a second manager's editor keeps up;
+  ordering surfaces wait for `MenuPublished`. The import publishes at once, so it announces nothing
+  of its own, and a refused edit announces nothing.
+- An item that is a fixed part of a combo or one of a choice's items cannot become a combo itself
+  (`COMBO_COMPONENT_INVALID`); before P4-02d only fixed parts were checked.
 
 ## Menu import (P1-05)
 

@@ -11,7 +11,14 @@ import {
   type TypedApi,
   webCryptoDeviceKey,
 } from '@rp/api-client';
-import type { DeviceSummary, DomainEvent, LoginResponse, StaffTile } from '@rp/contracts';
+import {
+  type DeviceSummary,
+  type DomainEvent,
+  type LoginResponse,
+  photoUrl,
+  type PhotoWidth,
+  type StaffTile,
+} from '@rp/contracts';
 import type { ConsoleStorage } from './storage.js';
 
 /** A message for the next screen, e.g. why the person is back on the login screen. */
@@ -78,6 +85,11 @@ export class ConsoleController {
   };
 
   readonly getSnapshot = (): ConsoleSnapshot => this.snapshot;
+
+  /** Where an `<img>` loads one rendition of a photo from the local server (MENU-008). */
+  photoSrc(id: string, width: PhotoWidth): string {
+    return `${this.options.baseUrl}${photoUrl(id, width)}`;
+  }
 
   /** The typed REST API with this device's and person's credentials, for the screens. */
   get api(): TypedApi {
