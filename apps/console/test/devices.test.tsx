@@ -59,6 +59,9 @@ afterEach(() => {
 
 describe('[MGR-006] the devices', () => {
   it('lists every paired device by type with its binding, state in words, details and actions', async () => {
+    // 11:30 in the restaurant (IST) on 28 September, the day the fixtures were last seen.
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-28T06:00:00.000Z'));
     const fake = devicesServer();
     const { container } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     expect(

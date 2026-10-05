@@ -430,7 +430,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     }
     if (event.type === 'DeviceLocateRequested') {
       const pager = this.connected.get(event.payload.deviceId);
-      if (pager === undefined || pager.restaurantId !== event.restaurantId) return;
+      if (pager?.restaurantId !== event.restaurantId) return;
       const message: PagerLocateMessage = { sentAt: this.clock.now().toISOString() };
       // QoS 0: a pager that is not connected now has nothing to catch up on.
       await this.publish(pager, 'locate', message, 0);

@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-09-28.
+Last updated: 2026-10-05.
 
 What exists:
 
@@ -20,8 +20,9 @@ What exists:
   who is not alerted (P2-06d), recommendations: rules, best sellers by daypart, filters,
   course order and reasons (P3-04), the live order feed's late dishes, filters and summary
   (P4-01), who may add, change, unlock or deactivate whom, with the roles each person may give
-  (P4-02a), and planning the day's sections: the assignments a plan gives, the tables without a
-  waiter and an earlier day's sections given again (P4-02b). 224 tests.
+  (P4-02a), planning the day's sections: the assignments a plan gives, the tables without a
+  waiter and an earlier day's sections given again (P4-02b), and the low-battery level of each
+  device type and a pager's Locate topic (P4-02c). 226 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -38,7 +39,9 @@ What exists:
   suggestions, their tracking, the rules and the suggestion an order line came from (P3-04);
   the manager dashboard's live order feed (P4-01); staff records, PINs, deactivation and the
   Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a); `RestaurantChanged`
-  for devices and the low-battery level with the pager list (P4-02b). 539 tests.
+  for devices and the low-battery level with the pager list (P4-02b); each device's state now
+  (connected, battery, firmware, serial), renaming, and Locate with `DeviceLocateRequested` and the
+  pager's locate message (P4-02c). 544 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -76,8 +79,10 @@ What exists:
   (P4-01); staff management with audit: add, change, new PIN, unlock, deactivate (sessions,
   pager, phone and sections taken back at once) and reactivate, managers kept to the Owner with a
   fresh second factor (P4-02a); pager changes announced to every screen and the low-battery level
-  with the pager list (P4-02b).
-  717 tests (4 skipped without a real install).
+  with the pager list (P4-02b); device management: whether each device is connected, its battery
+  against its type's level, renaming, Locate sent to that device alone, device changes announced,
+  an unpaired pager cut off at once and when a screen was last connected (P4-02c).
+  726 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -140,8 +145,10 @@ What exists:
   second factor asked for when an action needs it, and sign-in tiles that follow staff changes
   (P4-02a); the Staff area's Today's sections page (sections and single tables per person, the
   tables nobody looks after, the last day's sections given again) and Pagers page (register,
-  give, take back, a new credential, connection and battery) (P4-02b). 169 tests, and 16
-  Playwright steps.
+  give, take back, a new credential, connection and battery) (P4-02b); the Devices page (pair
+  with a one-time code and QR code, rename, move a tablet, Locate, unpair with a reason), the
+  Locate notice with a chime on every console, and a console header that follows a rename
+  (P4-02c). 195 tests, and 17 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -1195,10 +1202,10 @@ fingerprint until the device pairs, rename, move a tablet, locate, unpair with a
 `LocateOverlay` on every screen of a paired console (name and chime), and the controller reading
 its own device again after device changes, so a renamed console's header follows.
 
-Tests: domain DOMAIN_COUNT, contracts CONTRACTS_COUNT (snapshots for the new schemas), server
-SERVER_COUNT (device management: connected state and battery levels, last seen, rename, locate
+Tests: domain 226, contracts 544 (snapshots for the new schemas), server
+726 (device management: connected state and battery levels, last seen, rename, locate
 only to its device and never replayed, the announcements; pagers: locate over MQTT, an unpaired
-pager disconnected and refused), console CONSOLE_COUNT (Devices page, pairing, locate, live
+pager disconnected and refused), console 195 (Devices page, pairing, locate, live
 rename), and 17 Playwright steps (was 16): a manager pairs a kitchen screen in a second browser,
 locates it (the screen shows its name), renames it (its header follows) and unpairs it (it is back
 on the pairing screen within 5 s), on a 360 px screen too, with no axe violations; a cashier can
@@ -1216,6 +1223,9 @@ Gotchas:
 - The dialog's own close button is named "Close": do not give a footer button the same name.
 - A new device's connection can come a moment after the list re-read on its pairing, so it shows
   Not connected until the next minute's read; the e2e test reloads the page.
+- A screen test that shows "today" or a date must fix the clock, or it passes only on the day it
+  was written: `vi.useFakeTimers({ toFake: ['Date'] })` with `vi.setSystemTime`. The Devices list
+  test did not, and failed a week later.
 
 Deferred: offline alerts for kitchen screens and tablets (P4-04), the tablet's battery, charging
 and its side of Locate (P3-01), the pager's side of Locate (P2-05).
