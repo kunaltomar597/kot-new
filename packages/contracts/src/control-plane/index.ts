@@ -13,3 +13,4 @@ export * from './vendor.js';
 // Shared schemas the Control Plane's routes answer with, so its document names them.
 export { ApiError } from '../common.js';
 export { HealthResponse } from '../system.js';
+export { VersionMatrix } from '../client-api.js';

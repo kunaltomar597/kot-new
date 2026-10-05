@@ -26,6 +26,11 @@ export interface ConsoleSnapshot {
   /** For the connection banner. */
   readonly connection: ConnectionStatus;
   readonly notice: Notice | undefined;
+  /**
+   * The server was updated past this console (UPD-006, 426 `CLIENT_TOO_OLD`): the page must be
+   * loaded again to get the server's own console.
+   */
+  readonly clientTooOld: boolean;
 }
 
 export interface ConsoleControllerOptions {
@@ -38,6 +43,8 @@ export interface ConsoleControllerOptions {
   readonly generateKey?: () => Promise<{ keyPair: CryptoKeyPair; key: DeviceKey }>;
   readonly keyFromPair?: (keyPair: CryptoKeyPair) => Promise<DeviceKey>;
   readonly appVersion?: string;
+  /** The server no longer serves this console: reload the page (UPD-006). */
+  readonly onClientTooOld?: () => void;
   /** Where background failures (saving to storage) are reported. */
   readonly onError?: (error: unknown) => void;
 }
@@ -49,6 +56,7 @@ const INITIAL: ConsoleSnapshot = {
   session: undefined,
   connection: 'stopped',
   notice: undefined,
+  clientTooOld: false,
 };
 
 /**
@@ -197,6 +205,10 @@ export class ConsoleController {
   ): ApiClient {
     return new ApiClient({
       baseUrl: this.options.baseUrl,
+      client: { kind: 'console', version: this.options.appVersion ?? '0.0.0' },
+      onClientTooOld: () => {
+        this.clientTooOld();
+      },
       ...(this.options.fetch !== undefined && { fetch: this.options.fetch }),
       ...(credentials !== undefined && { credentials }),
       ...(key !== undefined && { signer: key }),
@@ -210,6 +222,13 @@ export class ConsoleController {
         void this.forget();
       },
     });
+  }
+
+  private clientTooOld(): void {
+    if (this.snapshot.clientTooOld) return;
+    this.stop();
+    this.update({ clientTooOld: true, connection: 'stopped' });
+    this.options.onClientTooOld?.();
   }
 
   private persist(credentials: StoredCredentials, keyPair: CryptoKeyPair | undefined): void {

@@ -18,7 +18,7 @@ import {
   type PairingQrPayload,
   pairingProofMessage,
 } from '@rp/contracts';
-import { businessDateOf } from '@rp/domain';
+import { type ClientIdentity, businessDateOf, formatClientApiVersion } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { AuthSettingsService } from '../auth/auth-settings.js';
 import {
@@ -37,6 +37,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { appendEvent } from '../events/outbox.js';
+import { compatibilityOf } from '../http/client-version.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { announceSetupChange } from '../restaurant/setup-changes.js';
 import { TlsService } from '../tls/tls.service.js';
@@ -160,7 +161,17 @@ function view(device: DeviceRow, connected: ReadonlySet<string>): DeviceView {
     firmwareVersion: device.firmwareVersion,
     serial: device.serial,
     revokedAt: device.revokedAt?.toISOString() ?? null,
+    clientApi: device.clientApi,
+    // Pagers speak MQTT, not the client API (their firmware is P2-04b).
+    compatibility: device.type === 'PAGER' ? 'UNKNOWN' : compatibilityOf(device.clientApi),
   };
+}
+
+/** What an app says about itself (`x-rp-client`), as the device row keeps it (UPD-006). */
+function clientColumns(identity: ClientIdentity | undefined) {
+  return identity === undefined
+    ? {}
+    : { appVersion: identity.version, clientApi: formatClientApiVersion(identity.api) };
 }
 
 const deviceAggregate = (id: string) => ({ type: 'device', id });
@@ -221,7 +232,11 @@ export class DevicesService {
     });
   }
 
-  async pair(request: PairDeviceRequest, clientKey: string): Promise<PairedDevice> {
+  async pair(
+    request: PairDeviceRequest,
+    clientKey: string,
+    identity?: ClientIdentity,
+  ): Promise<PairedDevice> {
     this.throttle(`pair:${clientKey}`, 10);
     const now = new Date();
     const outcome = await this.prisma.transaction(async (tx): Promise<PairOutcome> => {
@@ -260,7 +275,8 @@ export class DevicesService {
           keyAlgorithm: request.algorithm,
           pairedAt: now,
           pairedById: code.createdById,
-          appVersion: request.appVersion ?? null,
+          appVersion: request.appVersion ?? identity?.version ?? null,
+          clientApi: identity === undefined ? null : formatClientApiVersion(identity.api),
           tableId: code.tableId,
           stationId: code.stationId,
           extraStationIds: code.extraStationIds,
@@ -312,7 +328,15 @@ export class DevicesService {
     return { challenge, expiresAt: expiresAt.toISOString() };
   }
 
-  async issueToken(request: DeviceTokenRequest, clientKey: string): Promise<DeviceTokenResponse> {
+  /**
+   * A new device token, about hourly. The app's version and client API are kept from its
+   * `x-rp-client` (UPD-006), so the manager sees which devices need updating.
+   */
+  async issueToken(
+    request: DeviceTokenRequest,
+    clientKey: string,
+    identity?: ClientIdentity,
+  ): Promise<DeviceTokenResponse> {
     this.throttle(`device-auth:${clientKey}`, 60);
     this.throttle(`device-auth:${request.deviceId}`, 30);
     if (!this.tokens.consumeChallenge(request.challenge, request.deviceId)) {
@@ -336,7 +360,10 @@ export class DevicesService {
       settings.deviceTokenMinutes * 60,
       now,
     );
-    await this.prisma.device.update({ where: { id: device.id }, data: { lastSeenAt: now } });
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: { lastSeenAt: now, ...clientColumns(identity) },
+    });
     return { deviceToken: token, expiresAt: expiresAt.toISOString() };
   }
 

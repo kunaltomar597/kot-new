@@ -43,6 +43,11 @@ export interface DeviceSessionSnapshot {
   readonly session: LoginResponse['session'] | undefined;
   readonly connection: ConnectionStatus;
   readonly notice: SessionNotice | undefined;
+  /**
+   * The server no longer serves this build of the app (UPD-006, 426 `CLIENT_TOO_OLD`): nothing
+   * works until it is updated, so the app says so instead of failing screen by screen.
+   */
+  readonly clientTooOld: boolean;
 }
 
 export interface DeviceSessionOptions {
@@ -63,6 +68,8 @@ export interface DeviceSessionOptions {
   readonly followAlerts?: boolean;
   /** Where followed alerts go besides the screen: Android notifications (P2-06b). */
   readonly alertNotifier?: AlertNotifier;
+  /** Which app this is, sent with its version on every request (UPD-006). */
+  readonly appKind?: 'waiter-app' | 'table-tablet';
   readonly appVersion?: string;
   readonly fetch?: typeof fetch;
   /** Socket.io's `io`; tests pass a fake. */
@@ -82,6 +89,7 @@ const INITIAL: DeviceSessionSnapshot = {
   session: undefined,
   connection: 'stopped',
   notice: undefined,
+  clientTooOld: false,
 };
 
 /**
@@ -300,6 +308,15 @@ export class DeviceSession {
       },
       onDeviceRevoked: () => {
         if (generation === this.generation) void this.forget();
+      },
+      ...(this.options.appKind !== undefined &&
+        this.options.appVersion !== undefined && {
+          client: { kind: this.options.appKind, version: this.options.appVersion },
+        }),
+      onClientTooOld: () => {
+        if (generation !== this.generation || this.snapshot.clientTooOld) return;
+        this.stop();
+        this.update({ clientTooOld: true, connection: 'stopped' });
       },
     });
     return generation;

@@ -226,8 +226,14 @@ The release pipeline (P7-04) publishes signed installers. By hand:
 ```
 cli release:publish --channel PILOT --version 1.3.0-rc.1 \
     --url https://<downloads host>/rp/1.3.0-rc.1/setup.exe \
-    --sha256 <SHA-256 of the signed file> --size <bytes> --notes "..."
+    --sha256 <SHA-256 of the signed file> --size <bytes> --notes "..." \
+    --matrix apps/desktop/staging/version-matrix.json
 ```
+
+- `--matrix` is the release's component version matrix (UPD-006, P7-04d), which the packaging step
+  writes. PCs offered the release see how many of their apps it would leave behind, and vendor
+  staff see which apps it serves. Its `release` must be the version published.
+  `client-compatibility.md` covers freezing the client API before a release.
 
 - Pilot restaurants follow `PILOT`, everyone else `STABLE` (UPD-002). A version can be
   published once per channel. The CLI publishes to every PC of the channel at once; the web app

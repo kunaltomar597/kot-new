@@ -1,7 +1,13 @@
 import type { VendorReleaseView } from '@rp/contracts/control-plane';
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { installsLabel, percentOf, rolloutLabel } from '../src/releases/release-view.js';
+import {
+  installsLabel,
+  matrixLabel,
+  matrixParts,
+  percentOf,
+  rolloutLabel,
+} from '../src/releases/release-view.js';
 import { releaseRequestOf } from '../src/releases/ReleasesScreen.js';
 import { fleetPc, INSTALLATION_ID, installation } from './fixtures.js';
 import { createTranslator } from '@rp/i18n';
@@ -33,6 +39,7 @@ function releaseView(overrides: Partial<VendorReleaseView> = {}): VendorReleaseV
     },
     target: null,
     installs: { attempts: 5, installed: 4, failures: 1, errorSpikes: 0 },
+    matrix: null,
     ...overrides,
   };
 }
@@ -152,6 +159,39 @@ describe('[UPD-003] [VCP-006] rollouts in the vendor web app', () => {
     expect(await screen.findByText('Rolling out to 10 %')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Change the rollout/ })).toBeNull();
     expect(cp.callsOf('getFleet')).toHaveLength(0);
+  });
+});
+
+describe('[UPD-006] the version matrix of each release', () => {
+  const matrix = (oldest: string, minimumVersion: string | null) => ({
+    release: '1.5.0',
+    clientApi: { current: '1.3', oldest },
+    components: [
+      { name: 'server', version: '1.5.0' },
+      { name: 'node', version: '24.21.0' },
+    ],
+    clients: [{ kind: 'waiter-app', version: '1.5.0', minimumVersion }],
+    pagerProtocol: 1,
+  });
+
+  it('says which apps a release serves and what it contains', async () => {
+    expect(matrixLabel(releaseView(), t)).toBe('No version matrix');
+    expect(matrixParts(releaseView(), t)).toBeUndefined();
+    expect(matrixLabel(releaseView({ matrix: matrix('1.2', '1.3.0') }), t)).toBe(
+      'App API 1.3 and 1.2 · apps from 1.3.0',
+    );
+    expect(matrixLabel(releaseView({ matrix: matrix('1.3', null) }), t)).toBe('App API 1.3');
+    expect(matrixParts(releaseView({ matrix: matrix('1.2', null) }), t)).toBe(
+      'In this release: server 1.5.0, node 24.21.0, waiter-app 1.5.0',
+    );
+    const cp = controlPlane('SUPPORT').on('listVendorReleases', () => ({
+      releases: [releaseView({ matrix: matrix('1.2', '1.3.0') })],
+    }));
+    renderApp({ cp, path: '/releases' });
+    expect(await screen.findByText('App API 1.3 and 1.2 · apps from 1.3.0')).toHaveAttribute(
+      'title',
+      'In this release: server 1.5.0, node 24.21.0, waiter-app 1.5.0',
+    );
   });
 });
 

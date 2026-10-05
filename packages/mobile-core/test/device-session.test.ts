@@ -1,3 +1,4 @@
+import { CLIENT_API_VERSION, CLIENT_HEADER } from '@rp/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   DeviceSession,
@@ -386,6 +387,52 @@ describe('[AUTH-001] [AUTH-005] staff on the device', () => {
     stop();
     sockets.last.fire('event', itemReadyFrame(2));
     expect(seen).toEqual(['ItemStatusChanged']);
+  });
+});
+
+describe('[UPD-006] an app the server no longer serves', () => {
+  it('says which app and build it is on every request and the live connection', async () => {
+    const fake = server();
+    const sockets = new SocketFactory();
+    const session = new DeviceSession({
+      ...newDevice(),
+      fetch: fake.fetch,
+      connect: sockets.connect,
+      appKind: 'waiter-app',
+      appVersion: '1.4.2',
+    });
+    await session.start();
+    await session.pair(ADDRESS, 'abcd-efgh');
+    const identity = `waiter-app/1.4.2 api/${CLIENT_API_VERSION}`;
+    expect(fake.calls.map((call) => call.headers[CLIENT_HEADER])).toEqual(
+      fake.calls.map(() => identity),
+    );
+    await expect(sockets.last.handshake()).resolves.toMatchObject({ client: identity });
+  });
+
+  it('stops and asks for the app to be updated when the server refuses its build', async () => {
+    const fake = server().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 426,
+      body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+    }));
+    const { session } = setup(fake);
+    await session.start();
+    await session.pair(ADDRESS, 'abcd-efgh');
+    expect(session.getSnapshot().clientTooOld).toBe(false);
+    await expect(session.staffTiles()).rejects.toMatchObject({ code: 'CLIENT_TOO_OLD' });
+    expect(session.getSnapshot()).toMatchObject({ clientTooOld: true, connection: 'stopped' });
+  });
+
+  it('also when the live connection is refused for it', async () => {
+    const { session, sockets } = await paired();
+    sockets.last.fire(
+      'connect_error',
+      Object.assign(new Error('CLIENT_TOO_OLD'), {
+        data: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(session.getSnapshot()).toMatchObject({ clientTooOld: true, connection: 'stopped' });
   });
 });
 

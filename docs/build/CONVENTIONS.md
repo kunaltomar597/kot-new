@@ -47,7 +47,12 @@ code is written, organised, tested and committed.
 - Errors use the `ApiError` shape with a stable `code` (from `DomainErrorCode` or a module-specific
   code) and a plain-language message that says what to do next.
 - Breaking a contract requires a new version; the server supports the current and previous minor
-  version (UPD-006).
+  version (UPD-006). The client API version is `CLIENT_API_VERSION` in `@rp/contracts`;
+  `pnpm contracts:compat` (in `pnpm check`) fails when a change breaks a frozen version still
+  served. Add beside the old shape instead of changing it (ADR-0016,
+  `docs/runbooks/client-compatibility.md`).
+- Apps pass their kind and version to `ApiClient` (`client`), which sends `x-rp-client`; a 426
+  `CLIENT_TOO_OLD` means the app must be updated.
 - Money in APIs is integer paise; dates `YYYY-MM-DD`; instants ISO-8601 UTC with `Z`.
 
 ## Persistence

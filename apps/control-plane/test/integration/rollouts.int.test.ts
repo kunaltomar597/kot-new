@@ -246,3 +246,59 @@ describe('[UPD-003] [UPD-002] staged rollout', () => {
     expect(view.rollout.haltReason).toMatch(/2 with an error spike/);
   });
 });
+
+describe('[UPD-006] the component version matrix published with every release', () => {
+  const matrix = (release: string) => ({
+    release,
+    clientApi: { current: '1.3', oldest: '1.2' },
+    components: [
+      { name: 'server', version: release },
+      { name: 'node', version: '24.21.0' },
+    ],
+    clients: [{ kind: 'waiter-app', version: release, minimumVersion: '1.6.0' }],
+    pagerProtocol: 1,
+  });
+
+  it('keeps the matrix with the release and sends it to the PCs offered it', async () => {
+    const pc = pcs.at(-1);
+    if (pc === undefined) throw new Error('PCs');
+    const published = await publish({
+      version: '9.0.0-matrix.1',
+      targetInstallationId: pc.id,
+      matrix: matrix('9.0.0-matrix.1'),
+    });
+    expect(published.matrix).toEqual(matrix('9.0.0-matrix.1'));
+    expect((await releaseView(published.id)).matrix?.clientApi).toEqual({
+      current: '1.3',
+      oldest: '1.2',
+    });
+    const answer = await heartbeat(pc, at('1.0.0'));
+    expect(answer.update).toMatchObject({
+      version: '9.0.0-matrix.1',
+      matrix: { clientApi: { current: '1.3', oldest: '1.2' } },
+    });
+    const audit = await prisma.auditEntry.findFirst({
+      where: { action: 'release.published', targetId: published.id },
+    });
+    expect(audit?.details).toMatchObject({ clientApi: { current: '1.3', oldest: '1.2' } });
+  });
+
+  it('refuses a matrix of another release, and publishes a release without one', async () => {
+    const mismatch = await server()
+      .post('/v1/vendor/releases')
+      .set(bearer(token))
+      .send({
+        component: 'RESTAURANT_PC',
+        channel: 'PILOT',
+        version: '9.1.0',
+        url: 'https://downloads.example.com/rp/9.1.0/setup.exe',
+        sha256: 'e'.repeat(64),
+        sizeBytes: 150_000_000,
+        matrix: matrix('9.0.0'),
+      });
+    expect(mismatch.status).toBe(422);
+    expect(mismatch.body).toMatchObject({ code: 'MATRIX_MISMATCH' });
+    const plain = await publish({ version: '9.1.0', channel: 'PILOT' });
+    expect(plain.matrix).toBeNull();
+  });
+});

@@ -101,6 +101,11 @@
           },
           { "type": "null" }
         ]
+      },
+      "clientApi": { "type": ["string", "null"] },
+      "compatibility": {
+        "type": "string",
+        "enum": ["CURRENT", "PREVIOUS", "TOO_OLD", "NEWER", "UNKNOWN"]
       }
     },
     "required": [
@@ -121,7 +126,9 @@
       "rssi",
       "firmwareVersion",
       "serial",
-      "revokedAt"
+      "revokedAt",
+      "clientApi",
+      "compatibility"
     ]
   },
   "output": {
@@ -226,6 +233,11 @@
           },
           { "type": "null" }
         ]
+      },
+      "clientApi": { "type": ["string", "null"] },
+      "compatibility": {
+        "type": "string",
+        "enum": ["CURRENT", "PREVIOUS", "TOO_OLD", "NEWER", "UNKNOWN"]
       }
     },
     "required": [
@@ -247,7 +259,9 @@
       "rssi",
       "firmwareVersion",
       "serial",
-      "revokedAt"
+      "revokedAt",
+      "clientApi",
+      "compatibility"
     ],
     "additionalProperties": false
   }

@@ -21,7 +21,7 @@ import {
   RealtimeResyncRequest,
   type RealtimeSync,
 } from '@rp/contracts';
-import { businessDateOf } from '@rp/domain';
+import { businessDateOf, clientCompatibility, parseClientIdentity } from '@rp/domain';
 import { type Namespace, Server, type Socket } from 'socket.io';
 import { authErrors } from '../auth/auth-errors.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
@@ -31,6 +31,7 @@ import { SessionService } from '../auth/session.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
 import { EventBus, type PublishedEvent } from '../events/event-bus.js';
+import { clientTooOld, SERVER_CLIENT_API } from '../http/client-version.js';
 import { reaches, rooms, roomsForConnection, roomsForEvent } from './rooms.js';
 
 export const REALTIME_OPTIONS = Symbol('REALTIME_OPTIONS');
@@ -232,6 +233,11 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         REALTIME_CONNECT_ERRORS.handshakeInvalid,
         'Connect with the device token in the connection auth.',
       );
+    }
+    // N-1 (UPD-006): an app older than the server serves is told to update, as over REST.
+    const client = parseClientIdentity(handshake.data.client);
+    if (client !== undefined && clientCompatibility(SERVER_CLIENT_API, client.api) === 'TOO_OLD') {
+      throw ConnectRefusal.from(clientTooOld(client));
     }
     const device = await this.devices.authenticateToken(handshake.data.deviceToken);
     if (device === undefined) throw ConnectRefusal.from(authErrors.deviceNotRecognised());

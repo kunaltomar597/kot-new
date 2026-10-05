@@ -36,6 +36,7 @@ async function createSession(): Promise<DeviceSession> {
     // also with the screen off or the app closed (P2-06b, WTR-005).
     followAlerts: true,
     alertNotifier: notifier,
+    appKind: 'waiter-app',
     ...(Constants.expoConfig?.version !== undefined && {
       appVersion: Constants.expoConfig.version,
     }),

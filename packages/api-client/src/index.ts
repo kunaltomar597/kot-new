@@ -1,6 +1,8 @@
 export {
   ApiClient,
   type ApiClientOptions,
+  type ClientApp,
+  clientIdentityText,
   CORRELATION_HEADER,
   type StoredCredentials,
   type StoredDevice,

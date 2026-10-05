@@ -48,6 +48,8 @@ export function deviceView(overrides: Partial<DeviceView> = {}): DeviceView {
     firmwareVersion: null,
     serial: null,
     revokedAt: null,
+    clientApi: '1.0',
+    compatibility: 'CURRENT',
     ...overrides,
   };
 }

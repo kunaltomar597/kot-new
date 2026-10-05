@@ -52,6 +52,11 @@ export const RealtimeHandshake = z.object({
   lastSequence: Sequence.optional(),
   /** The stream `lastSequence` belongs to. */
   streamId: z.uuid().optional(),
+  /**
+   * Who is connecting, as in the `x-rp-client` header: `<kind>/<version> api/<major>.<minor>`
+   * (UPD-006). An app the server no longer serves is refused with `CLIENT_TOO_OLD`.
+   */
+  client: z.string().max(100).optional(),
 });
 export type RealtimeHandshake = z.infer<typeof RealtimeHandshake>;
 
@@ -111,4 +116,6 @@ export const REALTIME_CONNECT_ERRORS = {
   starting: 'SERVER_STARTING',
   /** The server could not check the connection (for example, the database is busy); retry. */
   internalError: 'INTERNAL_ERROR',
+  /** The app's client API is older than the server serves (UPD-006): update the app; no retry. */
+  clientTooOld: 'CLIENT_TOO_OLD',
 } as const;

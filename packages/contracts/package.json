@@ -29,7 +29,9 @@
     "test:coverage": "vitest run --coverage",
     "clean": "rm -rf dist coverage",
     "docs": "tsx scripts/generate-docs.ts",
-    "docs:check": "tsx scripts/generate-docs.ts --check"
+    "docs:check": "tsx scripts/generate-docs.ts --check",
+    "compat": "tsx scripts/api-compat.ts",
+    "freeze": "tsx scripts/api-compat.ts --freeze"
   },
   "dependencies": {
     "@rp/domain": "workspace:*",

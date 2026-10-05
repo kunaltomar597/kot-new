@@ -113,6 +113,37 @@ function agentLine(agent: UpdateStatus['agent'], t: Translate): ReactNode {
   }
 }
 
+/**
+ * The apps to update (UPD-006): the ones the server no longer serves, the ones it serves until its
+ * next update, and the ones newer than the PC.
+ */
+function ClientLines({
+  counts,
+  t,
+}: {
+  counts: SystemStatusResponse['clients']['counts'];
+  t: Translate;
+}) {
+  const count = (compatibility: string) =>
+    counts.find((entry) => entry.compatibility === compatibility)?.devices ?? 0;
+  const [tooOld, previous, newer] = [count('TOO_OLD'), count('PREVIOUS'), count('NEWER')];
+  return (
+    <>
+      {tooOld > 0 ? (
+        <p className="console-notice">{t('systemPage.devices.tooOld', { count: tooOld })}</p>
+      ) : null}
+      {previous > 0 ? (
+        <p className="dashboard-section__hint">
+          {t('systemPage.devices.previous', { count: previous })}
+        </p>
+      ) : null}
+      {newer > 0 ? (
+        <p className="dashboard-section__hint">{t('systemPage.devices.newer', { count: newer })}</p>
+      ) : null}
+    </>
+  );
+}
+
 /** How the last update went (UPD-005): installed, rolled back with the backup, or not installed. */
 function OutcomeLines({
   outcome,
@@ -339,6 +370,7 @@ export function SystemScreen() {
               )}
             />
           )}
+          <ClientLines counts={system.clients.counts} t={t} />
         </section>
 
         <section className="device-group" aria-labelledby="system-update">
@@ -365,6 +397,11 @@ export function SystemScreen() {
               {offered.notes === null ? null : (
                 <p className="dashboard-section__hint">{offered.notes}</p>
               )}
+              {offered.leavesBehind !== null && offered.leavesBehind > 0 ? (
+                <p className="console-notice">
+                  {t('systemPage.update.leavesBehind', { count: offered.leavesBehind })}
+                </p>
+              ) : null}
               <p className="dashboard-section__hint">
                 {t('systemPage.update.window', update.maintenanceWindow)}
               </p>
@@ -416,7 +453,17 @@ export function SystemScreen() {
           <h3 id="system-versions" className="device-group__heading">
             {t('systemPage.versions.title')}
           </h3>
-          <Facts facts={system.versions.map((entry) => [entry.name, entry.version] as const)} />
+          <Facts
+            facts={[
+              ...system.versions.map((entry) => [entry.name, entry.version] as const),
+              [
+                t('systemPage.versions.clientApi'),
+                system.clients.api.oldest === system.clients.api.current
+                  ? t('systemPage.versions.clientApiOnly', system.clients.api)
+                  : t('systemPage.versions.clientApiValue', system.clients.api),
+              ] as const,
+            ]}
+          />
         </section>
 
         <DiagnosticsPanel connected={system.controlPlane.enrolled} />

@@ -24,7 +24,14 @@ import { useApi, useMay } from '../app/services.js';
 import { useLoad } from '../app/use-load.js';
 import { LoadView } from '../components/LoadView.js';
 import { Page } from '../components/Page.js';
-import { defaultPercent, installsLabel, percentOf, rolloutLabel } from './release-view.js';
+import {
+  defaultPercent,
+  installsLabel,
+  matrixLabel,
+  matrixParts,
+  percentOf,
+  rolloutLabel,
+} from './release-view.js';
 import { RolloutDialog } from './RolloutDialog.js';
 
 /** Bytes as megabytes with one decimal, for people. */
@@ -319,6 +326,13 @@ export function ReleasesScreen() {
                   header: t('vendorApp.releases.sha256'),
                   cell: (release) => (
                     <code title={release.sha256}>{release.sha256.slice(0, 12)}…</code>
+                  ),
+                },
+                {
+                  key: 'matrix',
+                  header: t('vendorApp.releases.matrix'),
+                  cell: (release) => (
+                    <span title={matrixParts(release, t)}>{matrixLabel(release, t)}</span>
                   ),
                 },
                 {

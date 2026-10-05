@@ -1,13 +1,19 @@
 import type { Translator } from '@rp/i18n';
 import type { DeviceSession } from '@rp/mobile-core';
-import { PairingScreen, ShellProvider, useSessionState } from '@rp/mobile-shell';
+import {
+  PairingScreen,
+  ShellProvider,
+  UpdateRequiredScreen,
+  useSessionState,
+} from '@rp/mobile-shell';
 import { ToastProvider } from '@rp/ui-native';
 import { StatusBar } from 'expo-status-bar';
 import { type TabletDevice, TabletHome } from './TabletHome';
 
 function Screens({ device }: { device: TabletDevice }) {
-  const { phase } = useSessionState();
+  const { phase, clientTooOld } = useSessionState();
   if (phase === 'loading') return null;
+  if (clientTooOld) return <UpdateRequiredScreen />;
   if (phase === 'unpaired') return <PairingScreen />;
   return <TabletHome {...device} />;
 }

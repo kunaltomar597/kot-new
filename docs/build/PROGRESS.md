@@ -22,7 +22,7 @@ What exists:
   (P4-01), who may add, change, unlock or deactivate whom, with the roles each person may give
   (P4-02a), and planning the day's sections: the assignments a plan gives, the tables without a
   waiter and an earlier day's sections given again (P4-02b); when a software update may install
-  (P7-04c). 337 tests.
+  (P7-04c); client API versions, N-1 and the component version matrix (P7-04d). 352 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -40,7 +40,10 @@ What exists:
   the manager dashboard's live order feed (P4-01); staff records, PINs, deactivation and the
   Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a); `RestaurantChanged`
   for devices and the low-battery level with the pager list (P4-02b); the update agent's state on
-  the System page and the backup made before an update (P7-04c). 891 tests.
+  the System page and the backup made before an update (P7-04c); the client API version, the
+  `x-rp-client` identity, the version matrix with each release, the apps to update on the Devices
+  and System pages, and `pnpm contracts:compat` with the frozen versions in `docs/api/compat/`
+  (P7-04d, ADR-0016). 916 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -87,8 +90,10 @@ What exists:
   background with its SHA-256 and Authenticode checks, the maintenance window and "Install now",
   the backup and integrity check before an update, the hand-off to the updater through the
   watchdog, the database copy and the switch back after a failed update, and each outcome
-  recorded, audited and reported (P7-04c).
-  1111 tests (27 skipped: Windows only, a real install, or the performance runs).
+  recorded, audited and reported (P7-04c); the N-1 check of apps (426 `CLIENT_TOO_OLD` over REST
+  and the socket), each device's app version and client API, and the apps an offered update would
+  leave behind (P7-04d).
+  1123 tests (27 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -189,7 +194,8 @@ What exists:
   (P4-07a); the Suspicious activity report and the POS shift screen's "Open the drawer (no sale)"
   (P4-07b); "Removing the software" on the System page, where the Owner allows the uninstaller to
   delete the data for 30 minutes (P0-16c); the update agent's state and the last update's outcome
-  on the System page (P7-04c). 359 tests, and 23 Playwright steps.
+  on the System page (P7-04c); the apps to update on the Devices and System pages, and a console
+  older than its server that loads the new one (P7-04d). 367 tests, and 23 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -199,7 +205,7 @@ What exists:
   server (`pnpm deploy`, trimmed, with third-party notices), the console, Node.js 24, PostgreSQL
   16.15 and WinSW 2.12 pinned by SHA-256, and hooks that run the set-up scripts on install,
   update, repair and uninstall; it keeps itself for going back after a failed update (P7-04c).
-  36 tests without Electron; the CI job "Windows installer" builds,
+  37 tests without Electron; the CI job "Windows installer" builds,
   installs, kills the server, repairs and uninstalls on `windows-latest`.
 - `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
   5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
@@ -225,7 +231,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P7-04d Phones, tablets and pagers; the version matrix.
+- P7-04e Phone and tablet updates (EAS Update gated by the server's client API, the in-app APK
+  updater).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -401,7 +408,8 @@ Recommended next WPs (dependencies met):
   - [x] P7-04a Rollouts at the Control Plane
   - [x] P7-04b Release management in the vendor web app
   - [x] P7-04c The update agent on the restaurant PC (S9 runs in CI on the first push)
-  - [ ] P7-04d Phones, tablets and pagers; the version matrix
+  - [x] P7-04d Client compatibility (N-1) and the version matrix
+  - [ ] P7-04e Phone and tablet updates (EAS Update, the in-app APK updater)
 - [x] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
   - [x] P7-05b Restore
@@ -677,6 +685,66 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P7-04d), ADR-0016:
+
+645. The client API has its own version, `<major>.<minor>` (`CLIENT_API_VERSION`, `1.0` now). It
+     is not the product's version: a minor release without contract changes must not narrow the
+     window. The minor goes up at a release whose contracts changed since the last frozen version;
+     `pnpm contracts:freeze` says so. A server serves its own minor and the one before (N-1). A
+     new major serves only itself (it would come with `/api/v2`).
+646. Every app sends `x-rp-client: <kind>/<version> api/<N>` (and `client` in the socket
+     handshake). The server refuses an app older than N-1 with 426 `CLIENT_TOO_OLD`, before
+     anything else runs.
+     - `/version`, `/health`, `/tls/ca` and `/client-errors` stay open, so an old app can still
+       find the server and report its errors.
+     - An app that does not say (tools, devices paired before P7-04d), and a malformed identity,
+       are served.
+     - An app newer than the server is served too. The server checks every request against its own
+       contracts, so the app cannot harm data. Refusing it would idle a phone updated in the
+       evening until the PC's maintenance window.
+647. A refused app:
+     - The phones show one "Update this app" screen. A table tablet asks its guests to call a
+       waiter.
+     - The console reloads itself, since the server serves the newer console. It does so at most
+       once in 10 minutes (session storage), then shows "This screen is out of date" with "Load
+       again".
+648. Each device's app version and client API are kept from its pairing and its hourly
+     device-token request, not from every request. The Devices page marks an app "Update soon"
+     (N-1), "Update needed" (refused) or "Newer than the server". Pagers show nothing: their
+     firmware reports no protocol yet (P2-04b, P2-05).
+649. The System page counts the apps by how they stand. Before an update, it says how many paired
+     apps the offered release would leave behind, from the release's matrix. It does not block the
+     update (UPD-004's timing is unchanged): the manager decides, and blocking could hold back a
+     security fix.
+650. The component version matrix of a release:
+     - what it contains: server, console, desktop, Node.js, PostgreSQL and WinSW;
+     - the client API it serves (current and oldest);
+     - each app's build, with the oldest build still served;
+     - the pagers' MQTT protocol (`PAGER_PROTOCOL_VERSION` 1).
+
+     How it is made and kept:
+     - Each app's version is its `package.json`'s; the Expo apps read it in `app.config.ts`, and
+       the release pipeline sets it.
+     - The oldest build served comes from `CLIENT_API_HISTORY` (the release that first spoke each
+       API), so it is null until the first release.
+     - The stage step writes `version-matrix.json`, and CI keeps it with the installer.
+     - The Control Plane stores it as JSONB. A release without one is still accepted, for
+       pipelines before P7-04d. A matrix of another version is refused (422 `MATRIX_MISMATCH`).
+
+651. `pnpm contracts:compat` compares the contracts with each frozen client API version still
+     served (`docs/api/compat/client-api-<N>.json`, minified and left out of Prettier):
+     - Requests must accept everything the old contract allowed; answers and events must read under
+       it. Zod drops unknown answer properties, so new ones are fine.
+     - Removed routes and events, new required inputs and new success statuses fail.
+     - Schemas it cannot reason about must be unchanged.
+     - Nothing is frozen before the first release. The release runbook freezes `1.0` then
+       (P8-06's pilot release).
+652. `VersionResponse.clientApi` is optional: an app newer than a server from before P7-04d must
+     still read `/version`. Other new fields are only read by the console, which the same server
+     serves.
+653. P7-04 split again: P7-04d (this one) and P7-04e (phone and tablet updates: EAS Update channels
+     gated by the server's client API, and the in-app APK updater through the local server).
 
 Decided 2026-10-05 (P7-04c):
 
@@ -3350,6 +3418,10 @@ Security-sensitive PRs for the P8-03 human review:
   (arguments built from the command line), the pinned downloads and their checksums, the signing
   secrets' use in CI, and what the uninstaller does with `/DELETEDATA`.
 
+- P7-04d (merged locally): the client-version check that runs before authentication (it reveals
+  only the client API range `/version` already shows), the parsing of `x-rp-client` (strict
+  pattern, bounded lengths) and what is stored from it, and the Control Plane CLI reading a
+  matrix file.
 - P7-04c (merged locally): the update hand-off from the server's account to SYSTEM (the request,
   the watchdog starting the scheduled task, the task's principal and XML), the updater reading
   only in the data folder and checking the installer's hash and Authenticode signer in an
@@ -3362,6 +3434,86 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P7-04d Client compatibility (N-1) and the version matrix
+
+Split P7-04d: phone and tablet updates (EAS Update, the in-app APK updater) move to P7-04e. Built
+the N-1 rule and the version matrix (ADR-0016, `docs/runbooks/client-compatibility.md`; decisions
+645-653):
+
+- `@rp/domain` `client-api.ts`:
+  - client API versions and N-1 (`oldestServedClientApi`);
+  - `clientCompatibility` (CURRENT, PREVIOUS, TOO_OLD, NEWER, UNKNOWN);
+  - the `x-rp-client` identity;
+  - `buildVersionMatrix`.
+- `@rp/contracts` `client-api.ts`:
+  - `CLIENT_API_VERSION` 1.0, `CLIENT_API_HISTORY` (empty until the first release),
+    `CLIENT_HEADER` and `CLIENT_TOO_OLD`;
+  - `VersionMatrix`, `ClientCompatibility` and `PAGER_PROTOCOL_VERSION`;
+  - the server's range on `/version`, `RealtimeHandshake.client`, `DeviceView.clientApi` and
+    `.compatibility`, `SystemStatusResponse.clients` and the offered release's `clientApi` and
+    `leavesBehind`;
+  - `ReleaseInfo.matrix` and `PublishReleaseRequest.matrix`.
+- The compatibility check, `packages/contracts/scripts/lib/compat.ts` and `api-compat.ts`:
+  - `pnpm contracts:compat` runs in `pnpm check` and in a CI step;
+  - `pnpm contracts:freeze --release <x.y.z>` freezes a version;
+  - frozen versions go in `docs/api/compat/`.
+- server:
+  - `http/client-version.ts`: the 426 check before everything else, the open paths, and the
+    socket refusal;
+  - devices keep `client_api` (migration `20261005120000_device_client_api`) and the app version
+    from pairing and the hourly token;
+  - the Devices list and the System page judge them.
+- api-client: the `client` option, `x-rp-client` on every call and in the handshake,
+  `onClientTooOld` (REST 426 and the socket refusal, which stops the socket).
+- mobile-core and mobile-shell: `appKind`, `clientTooOld` in the session snapshot, and
+  `UpdateRequiredScreen` (staff, or a table's guests). Both apps show it.
+- console:
+  - the controller sends `console/<version>`;
+  - `reloadForNewConsole` reloads once in 10 minutes, otherwise "This screen is out of date"
+    with "Load again";
+  - Devices: "Update soon", "Update needed", "Newer than the server";
+  - System: the apps to update, the apps an offered update leaves behind, and the "App
+    connection version" fact.
+- Control Plane:
+  - `releases.matrix` (JSONB, migration `20261005120000_release_matrix`), sent with offers;
+  - `MATRIX_MISMATCH`;
+  - the audit records the client API;
+  - `release:publish --matrix <file>`.
+- Vendor web app: the Releases page's "Apps it serves" column, with the matrix on hover.
+- desktop packaging: `version-matrix.ts`. The stage step writes `version-matrix.json` beside the
+  staged installer and in the payload; the CI job keeps it with the installer. The Expo apps take
+  their version from `package.json`.
+- docs: ADR-0016, the runbook, `docs/api/compat/README.md`, CONVENTIONS, the Control Plane
+  runbook's `--matrix`.
+
+Tests: `pnpm check` passes, run in parts (format, build, contract docs, `contracts:compat`, lint,
+typecheck, every package's tests). Domain 352 (+15), contracts 916 (+25), api-client 39,
+mobile-core 76, mobile-shell 36, console 367 (+8), server 1123 (+12, 27 skipped), Control Plane
+140, vendor web app 72, desktop 37 (+1), waiter app 64, table tablet 22. Playwright: console 24,
+vendor web app 2.
+
+Not done:
+
+- Nothing is frozen yet: the first release runs `pnpm contracts:freeze --release <x.y.z>`
+  (P8-06), and the check compares nothing until then.
+- Pagers report no protocol version (P2-04b, P2-05). The matrix records the protocol, and pagers
+  show as UNKNOWN.
+- No release pipeline publishes yet (no Control Plane deployment, manual tasks). The runbook gives
+  the CLI command with `--matrix`.
+
+Gotchas:
+
+- The 426 middleware runs before routing, so a refused app gets 426 even for a path that does not
+  exist. Tests must use real paths to see the served case.
+- A new required field in a response schema is a break for apps one version ahead reading an
+  older server: `VersionResponse.clientApi` is optional for that reason. The compat check covers
+  the other direction (old apps, new server).
+- The vendor web app's publish form parses with `PublishReleaseRequest`, so it now sends
+  `matrix: null`; only the release CLI sends a matrix.
+- The headless autorun ends its process when the turn ends, which kills a background
+  `pnpm check`. The first run of this WP stopped that way, uncommitted. Run the check's parts in
+  the foreground instead (each under the 10-minute tool limit).
 
 ### 2026-10-05: P7-04c The update agent on the restaurant PC
 

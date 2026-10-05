@@ -122,6 +122,8 @@ describe('[VCP-006] releases', () => {
       securityCritical: false,
       rolloutPercent: 100,
       targetInstallationId: null,
+      // The web form publishes no version matrix; the release CLI sends it (UPD-006).
+      matrix: null,
     });
   });
 

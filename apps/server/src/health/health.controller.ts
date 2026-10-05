@@ -5,6 +5,7 @@ import { Public } from '../auth/decorators.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { clientApiRange } from '../http/client-version.js';
 
 const PACKAGE = SERVER_PACKAGE;
 
@@ -44,6 +45,7 @@ export class HealthController {
       name: PACKAGE.name,
       version: PACKAGE.version,
       apiVersion: 'v1',
+      clientApi: clientApiRange(),
       node: process.version,
       ...(this.config.buildId !== undefined && { buildId: this.config.buildId }),
     };

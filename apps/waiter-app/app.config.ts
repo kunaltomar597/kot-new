@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
@@ -32,6 +32,13 @@ function appEnv(): AppEnv {
 
 const UPDATE_CERTIFICATE = './certs/update-signing-certificate.pem';
 
+function packageVersion(projectRoot: string): string {
+  const pkg = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8')) as {
+    version: string;
+  };
+  return pkg.version;
+}
+
 export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
   const env = appEnv();
   const { suffix, label } = ENVIRONMENTS[env];
@@ -41,7 +48,8 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
     ...config,
     name: `RP Waiter${label}`,
     slug: 'rp-waiter',
-    version: '0.1.0',
+    // The release pipeline sets package.json; the version matrix reads it there too (UPD-006).
+    version: packageVersion(projectRoot),
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',

@@ -9,13 +9,14 @@ import {
   messageOf,
   PairingScreen,
   Screen,
+  UpdateRequiredScreen,
   useLive,
   useMenu,
   useNow,
   useUnsentOrders,
 } from '../src/index.js';
 import { ADDRESS, fakeServer, newSession, renderShell, translator } from './harness.js';
-import { itemReadyFrame, STAFF } from '@rp/mobile-core/testing';
+import { fakeLocalServer, itemReadyFrame, STAFF } from '@rp/mobile-core/testing';
 import { IDS, MENU } from '@rp/ordering/testing';
 
 async function pressDigits(pin: string) {
@@ -61,6 +62,38 @@ describe('[AUTH-007] pairing screen', () => {
     await fireEvent.changeText(screen.getByLabelText('Server address'), ADDRESS);
     await fireEvent.press(screen.getByTestId('pairing-submit'));
     expect(await screen.findByText('That code has expired. Ask for a new one.')).toBeOnTheScreen();
+  });
+});
+
+describe('[UPD-006] an app the server no longer serves', () => {
+  const tooOld = () => ({
+    status: 426,
+    body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+  });
+
+  it('asks staff to have the app updated', async () => {
+    const { session } = newSession(fakeServer().on('GET', '/api/v1/auth/staff-tiles', tooOld));
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    await session.staffTiles().catch(() => undefined);
+    expect(session.getSnapshot().clientTooOld).toBe(true);
+    await renderShell(session, <UpdateRequiredScreen />);
+    expect(screen.getByRole('header')).toHaveTextContent(translator('mobile.update.title'));
+    expect(screen.getByTestId('update-required')).toHaveTextContent(
+      translator('mobile.update.staff'),
+    );
+  });
+
+  it('asks a table’s guests to call a waiter', async () => {
+    const server = fakeLocalServer({ type: 'TABLE_TABLET', name: 'Table 4 tablet' });
+    const { session } = newSession(server.on('GET', '/api/v1/auth/staff-tiles', tooOld));
+    await session.start();
+    await session.pair(ADDRESS, 'ABCD-EFGH');
+    await session.staffTiles().catch(() => undefined);
+    await renderShell(session, <UpdateRequiredScreen />);
+    expect(screen.getByTestId('update-required')).toHaveTextContent(
+      translator('mobile.update.guests'),
+    );
   });
 });
 

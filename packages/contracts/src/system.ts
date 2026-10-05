@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ClientApiRange, ClientCompatibility } from './client-api.js';
 import { DeviceType, Id, IsoDate, Timestamp } from './common.js';
 import { PendingDiagnosticsRequest as PendingDiagnosticsRequestSchema } from './control-plane/diagnostics.js';
 
@@ -21,6 +22,11 @@ export const VersionResponse = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
   apiVersion: z.literal('v1'),
+  /**
+   * The client API it speaks and the oldest it still serves (N-1, UPD-006). Absent from servers
+   * before P7-04d, which a newer app must still read.
+   */
+  clientApi: ClientApiRange.optional(),
   node: z.string().min(1),
   buildId: z.string().optional(),
 });
@@ -171,6 +177,14 @@ export const SystemStatusResponse = z.object({
   }),
   /** Paired (active) and connected devices of each type. */
   devices: z.array(z.object({ type: DeviceType, paired: Bytes, connected: Bytes })),
+  /**
+   * The apps against the client API this server serves (UPD-006): paired apps (not pagers) by how
+   * they stand, so the ones to update are seen (P7-04d).
+   */
+  clients: z.object({
+    api: ClientApiRange,
+    counts: z.array(z.object({ compatibility: ClientCompatibility, devices: Bytes })),
+  }),
   update: z.object({
     /** The release the Control Plane offers (UPD-002), or null when up to date. */
     offered: z
@@ -180,6 +194,10 @@ export const SystemStatusResponse = z.object({
         notes: z.string().nullable(),
         publishedAt: Timestamp,
         sizeBytes: z.int().positive(),
+        /** The client API its server will serve, from its version matrix; null if it has none. */
+        clientApi: ClientApiRange.nullable(),
+        /** Paired apps it would no longer serve: update them first (UPD-006); null if unknown. */
+        leavesBehind: Bytes.nullable(),
       })
       .nullable(),
     /** A manager pressed "Install now" for this version (UPD-004); the updater (P7-04) acts on it. */

@@ -36,6 +36,7 @@ async function createSession(): Promise<{ session: DeviceSession; device: Tablet
     plainStore: store,
     keys: new KeystoreDeviceKeys(),
     trust: new AndroidServerTrust(),
+    appKind: 'table-tablet',
     ...(appVersion !== undefined && { appVersion }),
   });
   // NFR-O02: uncaught errors reach the vendor through the restaurant's server, scrubbed.

@@ -1,4 +1,7 @@
 import {
+  CLIENT_API_VERSION,
+  CLIENT_HEADER,
+  CLIENT_TOO_OLD,
   DEVICE_TOKEN_HEADER,
   deviceTokenMessage,
   type LoginResponse,
@@ -67,9 +70,37 @@ export interface StoredCredentials {
   readonly session?: LoginResponse;
 }
 
+/** Which app this is (UPD-006): `waiter-app` and its version, e.g. `1.4.2`. */
+export interface ClientApp {
+  readonly kind: string;
+  readonly version: string;
+}
+
+const CLIENT_KIND = /^[a-z][a-z0-9-]{0,39}$/;
+const CLIENT_VERSION = /^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$/;
+
+/**
+ * The `x-rp-client` text for an app: `<kind>/<version> api/<client API>`, the client API being
+ * the one this build's contracts describe. Undefined for a kind or version it cannot carry.
+ */
+export function clientIdentityText(app: ClientApp): string | undefined {
+  if (!CLIENT_KIND.test(app.kind) || !CLIENT_VERSION.test(app.version)) return undefined;
+  return `${app.kind}/${app.version} api/${CLIENT_API_VERSION}`;
+}
+
 export interface ApiClientOptions {
   /** The local server, e.g. `https://pos.local:8443`; empty for the page's own origin. */
   readonly baseUrl: string;
+  /**
+   * The app, sent with every request and the live connection (UPD-006), so the server can refuse
+   * a build it no longer serves and the manager sees which devices need updating.
+   */
+  readonly client?: ClientApp;
+  /**
+   * The server no longer serves this build (426 `CLIENT_TOO_OLD`, also on the live connection):
+   * ask for the app to be updated. Requests keep failing until it is.
+   */
+  readonly onClientTooOld?: (error: ApiRequestError) => void;
   /** Default: the global `fetch`. */
   readonly fetch?: typeof fetch;
   readonly credentials?: StoredCredentials;
@@ -119,9 +150,11 @@ export class ApiClient implements RealtimeAuthority {
   private clockSkewMs = 0;
   private readonly fetcher: typeof fetch;
   private readonly baseUrl: string;
+  private readonly identity: string | undefined;
 
   constructor(private readonly options: ApiClientOptions) {
     this.stored = options.credentials ?? {};
+    this.identity = options.client === undefined ? undefined : clientIdentityText(options.client);
     this.signer = options.signer;
     this.fetcher = options.fetch ?? ((input, init) => fetch(input, init));
     this.baseUrl = withoutTrailingSlashes(options.baseUrl);
@@ -267,7 +300,7 @@ export class ApiClient implements RealtimeAuthority {
 
   // RealtimeAuthority: the socket shares this client's credentials and recovery.
 
-  async handshake(): Promise<{ deviceToken: string; accessToken?: string }> {
+  async handshake(): Promise<{ deviceToken: string; accessToken?: string; client?: string }> {
     const deviceToken = await this.deviceToken();
     let accessToken: string | undefined;
     try {
@@ -276,10 +309,24 @@ export class ApiClient implements RealtimeAuthority {
       if (!(error instanceof ApiUnavailableError)) throw error;
       accessToken = this.stored.session?.accessToken;
     }
-    return { deviceToken, ...(accessToken !== undefined && { accessToken }) };
+    return {
+      deviceToken,
+      ...(accessToken !== undefined && { accessToken }),
+      ...(this.identity !== undefined && { client: this.identity }),
+    };
   }
 
   async recover(code: string): Promise<RecoveryDecision> {
+    if (code === CLIENT_TOO_OLD) {
+      // Nothing to retry until the app is updated.
+      this.options.onClientTooOld?.(
+        new ApiRequestError(426, {
+          code,
+          message: 'This app is too old for the restaurant’s server. Update the app.',
+        }),
+      );
+      return 'stop';
+    }
     try {
       if (code === 'TOKEN_EXPIRED') {
         // Refreshed, or the session ended and the device reconnects on its own.
@@ -342,6 +389,7 @@ export class ApiClient implements RealtimeAuthority {
       if (response.status === 401 && access === 'session' && SESSION_OVER.has(error.code)) {
         this.endSession(error.code);
       }
+      if (error.code === CLIENT_TOO_OLD) this.options.onClientTooOld?.(error);
       throw error;
     }
   }
@@ -401,6 +449,7 @@ export class ApiClient implements RealtimeAuthority {
     const headers: Record<string, string> = {
       accept: 'application/json',
       [CORRELATION_HEADER]: correlationId,
+      ...(this.identity !== undefined && { [CLIENT_HEADER]: this.identity }),
     };
     if (access !== 'public') headers[DEVICE_TOKEN_HEADER] = await this.deviceToken();
     if (access === 'session') {

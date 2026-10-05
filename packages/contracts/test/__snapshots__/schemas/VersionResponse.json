@@ -5,6 +5,14 @@
       "name": { "type": "string", "minLength": 1 },
       "version": { "type": "string", "minLength": 1 },
       "apiVersion": { "type": "string", "const": "v1" },
+      "clientApi": {
+        "type": "object",
+        "properties": {
+          "current": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+          "oldest": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" }
+        },
+        "required": ["current", "oldest"]
+      },
       "node": { "type": "string", "minLength": 1 },
       "buildId": { "type": "string" }
     },
@@ -16,6 +24,15 @@
       "name": { "type": "string", "minLength": 1 },
       "version": { "type": "string", "minLength": 1 },
       "apiVersion": { "type": "string", "const": "v1" },
+      "clientApi": {
+        "type": "object",
+        "properties": {
+          "current": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+          "oldest": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" }
+        },
+        "required": ["current", "oldest"],
+        "additionalProperties": false
+      },
       "node": { "type": "string", "minLength": 1 },
       "buildId": { "type": "string" }
     },

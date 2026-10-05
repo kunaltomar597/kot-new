@@ -405,6 +405,8 @@ model Release {
   rolloutChangedAt     DateTime         @default(now()) @map("rollout_changed_at") @db.Timestamptz(3)
   /// A hotfix for one PC (UPD-002).
   targetInstallationId String?          @map("target_installation_id") @db.Uuid
+  /// The component version matrix published with it (UPD-006, P7-04d); null when none was given.
+  matrix               Json?
 
   targetInstallation Installation?    @relation("Hotfixes", fields: [targetInstallationId], references: [id], onDelete: Restrict)
   installs           ReleaseInstall[]

@@ -392,6 +392,8 @@ model Device {
   revokedAt              DateTime?    @map("revoked_at") @db.Timestamptz(3)
   lastSeenAt             DateTime?    @map("last_seen_at") @db.Timestamptz(3)
   appVersion             String?      @map("app_version")
+  /// The client API the app last said it speaks (`x-rp-client`, UPD-006), e.g. `1.0`.
+  clientApi              String?      @map("client_api")
   /// Table a table tablet is bound to (AUTH-009).
   tableId                String?      @map("table_id") @db.Uuid
   table                  DiningTable? @relation(fields: [tableId], references: [id])
