@@ -1,8 +1,9 @@
 # 29. Phone and tablet updates: the Expo project and the update signing key
 
 What it unblocks: over-the-air updates of the waiter app and the table tablet (UPD-001, UPD-007,
-P7-04e1). The code is done. Without an Expo project, updates are off and every change needs a new
-APK. Background: `docs/runbooks/app-updates.md` and ADR-0017.
+P7-04e1), and new APKs installed from the restaurant PC (WTR-001, P7-04e2). The code is done.
+Without an Expo project, updates are off and every change needs a new APK. Background:
+`docs/runbooks/app-updates.md` and ADR-0017.
 
 Never paste the private key, the keystore or their passwords into a Claude session or a commit.
 
@@ -58,6 +59,39 @@ it.
    - Publish with that private key.
    - The phone does not take the update. The vendor's error service shows a code signing error
      from `waiter-app` (manual task 24).
+
+## 4. New APKs from the restaurant PC (45 minutes)
+
+You need two production APKs of each app, the second with a higher version in its
+`package.json` (`npx eas-cli build -p android --profile production`), and a test restaurant PC
+whose installer was staged with the second ones (`package:stage --apk <folder>`, see
+`docs/runbooks/app-updates.md`, "New APKs from the restaurant PC"). Install the first APKs on a
+phone and on a tablet that is device owner (MDM, or `adb shell dpm set-device-owner` as in
+P3-01b), and pair them.
+
+1. **A phone.**
+   - On the sign-in screen the phone says the new version is on the PC, with its size.
+   - Press "Install the new version". The first time, Android asks to allow installs from this
+     app: allow it, come back, press it again.
+   - Android asks to confirm the update. Press Install. The app closes and is replaced; open it.
+     Manage → Devices shows the new app version.
+   - Repeat with Cancel on Android's screen: the app says the new version was not installed and
+     offers to try again.
+2. **A kiosk tablet.**
+   - With a table open, nothing happens. Close the table.
+   - Within a few seconds the tablet installs the new version without asking, and opens again by
+     itself, locked in kiosk mode on its table (this checks `MY_PACKAGE_REPLACED`).
+3. **A tablet that is not device owner.** Open the staff panel with a manager's PIN: it offers
+   the new version; Android asks to confirm.
+4. **Checks that must refuse.**
+   - Stage an installer whose APK is signed with another keystore (a preview build renamed is
+     not enough: it is another package, which the phone refuses itself). Android refuses the
+     update; the phone says so and the vendor's error service shows it.
+   - On the PC, change one byte of the APK in `<install>\apps`. The System page shows it as
+     damaged and the phone offers nothing.
+5. **A phone the server no longer serves.** With an app older than N-1 (a build from a branch
+   with a lower `CLIENT_API_VERSION`), the phone shows "Update this app" with the install button,
+   and installs from there.
 
 Write down the phone and tablet models, the build ids and what each step showed, and tell
 Claude.

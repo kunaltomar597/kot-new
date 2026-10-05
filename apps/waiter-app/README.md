@@ -151,4 +151,8 @@ update only when the server speaks the update's client API (`extra.clientApi`, f
 `@rp/contracts`), and restarts on it only while nobody is signed in (P7-04e1, ADR-0017).
 Publishing and rolling back: `docs/runbooks/app-updates.md`.
 
+A new APK (native changes) comes from the restaurant PC (P7-04e2, `apkUpdater` in
+`src/session.ts`): the sign-in screen and "Update this app" offer it, the person presses Install
+and confirms on Android's screen (the first time Android asks to allow installs from the app).
+
 Then `eas build -p android --profile preview` gives an installable APK.

@@ -1,5 +1,5 @@
 import type { Translator } from '@rp/i18n';
-import type { DeviceSession, OtaUpdater } from '@rp/mobile-core';
+import type { ApkUpdater, DeviceSession, OtaUpdater } from '@rp/mobile-core';
 import {
   PairingScreen,
   ShellProvider,
@@ -27,18 +27,22 @@ export function App({
   translator,
   device,
   updater,
+  apkUpdater,
 }: {
   session: DeviceSession;
   translator: Translator;
   device: TabletDevice;
   /** Over-the-air updates (P7-04e1). */
   updater?: OtaUpdater;
+  /** New APKs from the restaurant PC (P7-04e2). */
+  apkUpdater?: ApkUpdater;
 }) {
   return (
     <ShellProvider
       session={session}
       translator={translator}
       {...(updater !== undefined && { updater })}
+      {...(apkUpdater !== undefined && { apkUpdater })}
     >
       <ToastProvider>
         <StatusBar hidden />

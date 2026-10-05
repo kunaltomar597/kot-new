@@ -3,6 +3,7 @@ export * from './audit.js';
 export * from './auth.js';
 export * from './common.js';
 export * from './client-api.js';
+export * from './app-builds.js';
 export * from './devices.js';
 export * from './floor.js';
 export * from './table-qr.js';

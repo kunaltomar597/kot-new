@@ -662,3 +662,53 @@ describe('[UPD-006] the app says which build it is', () => {
     expect(tooOld.mock.calls[1]?.[0]).toMatchObject({ status: 426, code: 'CLIENT_TOO_OLD' });
   });
 });
+
+describe('[WTR-001] a download another HTTP client makes (P7-04e2)', () => {
+  it('gives the address and this device’s credentials, without sending anything', async () => {
+    const server = new FakeServer();
+    const client = new ApiClient({
+      baseUrl: `${BASE}/`,
+      fetch: server.fetch,
+      credentials: PAIRED,
+      client: { kind: 'waiter-app', version: '1.4.2' },
+    });
+    const request = await client.authorizedRequest('downloadCurrentAppBuild');
+    expect(request.url).toBe(`${BASE}/api/v1/devices/current/app-build/apk`);
+    expect(request.method).toBe('GET');
+    expect(request.headers).toMatchObject({
+      'x-device-token': 'device-1',
+      [CLIENT_HEADER]: `waiter-app/1.4.2 api/${CLIENT_API_VERSION}`,
+    });
+    expect(request.headers[CORRELATION_HEADER]).toMatch(UUID);
+    expect(request.headers).not.toHaveProperty('authorization');
+    expect(server.calls).toHaveLength(0);
+  });
+
+  it('renews an expiring device token first, and adds the person for a session route', async () => {
+    const server = new FakeServer()
+      .on('POST', '/api/v1/devices/challenge', () => ({
+        status: 200,
+        body: { challenge: 'c'.repeat(43), expiresAt: inMinutes(5) },
+      }))
+      .on('POST', '/api/v1/devices/token', () => ({
+        status: 200,
+        body: { deviceToken: 'device-2', expiresAt: inMinutes(60) },
+      }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: {
+        device: {
+          deviceId: DEVICE_ID,
+          deviceToken: 'device-1',
+          deviceTokenExpiresAt: inMinutes(0),
+        },
+        session: login('access-1', 'refresh-token-number-1'),
+      },
+      signer: { algorithm: 'Ed25519', sign: () => Promise.resolve('c2ln') },
+    });
+    const request = await client.authorizedRequest('getCurrentSession');
+    expect(request.headers['x-device-token']).toBe('device-2');
+    expect(request.headers.authorization).toBe('Bearer access-1');
+  });
+});

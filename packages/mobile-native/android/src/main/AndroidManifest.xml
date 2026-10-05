@@ -14,6 +14,12 @@
   <!-- The kind of network a tablet reports with its battery (P3-01b, TAB-015). -->
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+  <!--
+    The in-app updater (P7-04e2, WTR-001): the app installs its own new APK from the restaurant
+    PC. Android asks the person on a phone; a device-owner tablet installs without asking.
+  -->
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
   <application>
     <service
       android:name="com.rp.mobilenative.RpAlertService"
@@ -27,6 +33,20 @@
     <receiver
       android:name="com.rp.mobilenative.RpAlertActionReceiver"
       android:exported="false" />
+
+    <!-- Android's answer to an install of the app's new APK (P7-04e2). -->
+    <receiver
+      android:name="com.rp.mobilenative.RpApkInstallReceiver"
+      android:exported="false" />
+
+    <!-- The app was replaced by its new APK: a kiosk tablet opens it again (P7-04e2). -->
+    <receiver
+      android:name="com.rp.mobilenative.RpPackageReplacedReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
 
     <!--
       The table tablet's device owner (P3-01b, TAB-001): only the system may bind it; it does

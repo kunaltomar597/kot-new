@@ -35,7 +35,9 @@ Where things are:
 - `src/Root.tsx`: wires the device session and `MenuCache` to the Keystore key, the stores, the
   LAN CA pinning and the kiosk module (`AndroidKiosk`), and over-the-air updates (`OtaUpdater`,
   P7-04e1). An EAS update the server speaks restarts the tablet only between guests, with staff
-  mode closed (`docs/runbooks/app-updates.md`).
+  mode closed (`docs/runbooks/app-updates.md`). A new APK from the restaurant PC (`ApkUpdater`,
+  P7-04e2) installs by itself between guests on a device-owner tablet, which then opens again in
+  kiosk mode; otherwise the staff panel offers it.
 - `app.config.ts`, `eas.json`, `.maestro/`: as in `apps/waiter-app` (packages `in.rp.tablet.dev`,
   `.preview`, `in.rp.tablet`). A tablet alerts nobody, so it blocks the notification, foreground
   service and vibration permissions that `@rp/mobile-native` brings for the waiter phone's

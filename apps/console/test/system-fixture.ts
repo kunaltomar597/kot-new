@@ -53,6 +53,7 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
         { compatibility: 'CURRENT', devices: 4 },
         { compatibility: 'UNKNOWN', devices: 1 },
       ],
+      builds: [],
     },
     update: {
       offered: {

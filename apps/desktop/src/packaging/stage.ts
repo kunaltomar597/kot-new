@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { build as bundle } from 'esbuild';
 import { PRODUCT_NAME } from './builder-config.js';
+import { stageAppBuilds } from './app-builds.js';
 import { type Component, COMPONENTS, NODE, POSTGRES, WINSW, WINSW_LICENCE } from './components.js';
 import { fetchVerified } from './download.js';
 import { cloudSettingsFrom, MIN_FREE_GB, nsisDefines, updateSettingsFrom } from './nsis.js';
@@ -39,6 +40,11 @@ export interface StageOptions {
   /** Where downloads are kept between builds (CI caches it). */
   readonly cacheDir: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  /**
+   * The release's phone and tablet APKs (`waiter-app.apk`, `table-tablet.apk`, P7-04e2); without
+   * it the installer carries none.
+   */
+  readonly apkDir?: string;
   readonly log: (message: string) => void;
 }
 
@@ -230,6 +236,17 @@ export async function stage(options: StageOptions): Promise<StageManifest> {
     log('Deploying the server with its run-time packages.');
     await stageServer(repoRoot, folder('server'), log);
     await cp(join(repoRoot, 'apps', 'console', 'dist'), folder('console'), { recursive: true });
+    const builds = await stageAppBuilds({
+      repoRoot,
+      release: options.version,
+      apkDir: options.apkDir,
+      target: folder('apps'),
+    });
+    log(
+      builds.apps.length === 0
+        ? 'No phone or tablet APKs given (--apk): the PC will offer none.'
+        : `APKs: ${builds.apps.map((app) => `${app.kind} ${app.version}`).join(', ')}.`,
+    );
 
     log('Fetching Node.js, PostgreSQL and WinSW (checked against their pinned SHA-256).');
     const [nodeZip, postgresZip, winsw, winswLicence] = await Promise.all(

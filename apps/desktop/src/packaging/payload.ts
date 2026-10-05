@@ -1,4 +1,5 @@
 import { join, posix, win32 } from 'node:path';
+import { APP_BUILDS_FILE } from '@rp/contracts';
 
 /**
  * What the installer puts beside the POS window's own files (P0-16d): the layout the server's
@@ -8,6 +9,7 @@ import { join, posix, win32 } from 'node:path';
  *   <install>\node\node.exe        Node.js, for the server, the service host and the watchdog
  *   <install>\server\              the server: dist, prisma\migrations, node_modules
  *   <install>\console\             the web console the server serves
+ *   <install>\apps\                the release's phone and tablet APKs and apps.json (P7-04e2)
  *   <install>\postgres\            PostgreSQL 16: bin, lib, share
  *   <install>\services\            WinSW as RPServer.exe and RPWatchdog.exe
  *   <install>\setup\               the PowerShell set-up scripts
@@ -16,6 +18,7 @@ export const INSTALL_FOLDERS = {
   node: 'node',
   server: 'server',
   console: 'console',
+  apps: 'apps',
   postgres: 'postgres',
   services: 'services',
   setup: 'setup',
@@ -117,6 +120,7 @@ export interface InstallationPathsJson {
   readonly node: string;
   readonly serverDir: string;
   readonly consoleDir: string;
+  readonly appsDir: string;
   readonly pgBin: string;
   readonly servicesDir: string;
 }
@@ -146,6 +150,7 @@ export function requiredPayloadFiles(paths: InstallationPathsJson): string[] {
     posix.join(relative(paths.serverDir), 'dist', 'backups', 'wal-stage.js'),
     posix.join(relative(paths.serverDir), 'prisma', 'migrations', 'migration_lock.toml'),
     posix.join(relative(paths.consoleDir), 'index.html'),
+    posix.join(relative(paths.appsDir), APP_BUILDS_FILE),
     ...['postgres', 'pg_ctl', 'initdb', 'pg_dump', 'pg_restore', 'pg_basebackup', 'psql'].map(
       (program) => posix.join(relative(paths.pgBin), `${program}.exe`),
     ),

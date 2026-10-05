@@ -29,6 +29,9 @@ installation file the installer writes (`%ProgramData%\RestaurantPlatform\instal
   - `app/`: the shell bundled with esbuild into one `main.js`, so app.asar has no node_modules;
   - `payload/`: the server (`pnpm deploy` with a hoisted layout, trimmed to what it loads, with its
     third-party notices), the console, Node.js, PostgreSQL 16, WinSW and the set-up scripts;
+  - `payload/apps/`: the release's phone and tablet APKs with `apps.json` (kind, version, client
+    API, size, SHA-256), from `--apk <folder>` holding `waiter-app.apk` and `table-tablet.apk`
+    (or `RP_APK_DIR`, `app-builds.ts`, P7-04e2). Without it `apps.json` lists none;
   - `installer-defines.nsh`: the build's settings for the NSIS script.
 
   Node.js, PostgreSQL and WinSW are pinned by SHA-256 in `components.ts`. The step checks the

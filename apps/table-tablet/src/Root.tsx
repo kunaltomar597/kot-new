@@ -1,5 +1,6 @@
 import { createTranslator } from '@rp/i18n';
 import {
+  ApkUpdater,
   createDeviceErrorReporting,
   DeviceSession,
   type KeyValueStore,
@@ -7,6 +8,7 @@ import {
   watchUncaughtErrors,
 } from '@rp/mobile-core';
 import {
+  AndroidApkInstaller,
   AndroidKiosk,
   AndroidServerTrust,
   ExpoOtaUpdates,
@@ -27,6 +29,7 @@ interface Created {
   session: DeviceSession;
   device: TabletDevice;
   updater: OtaUpdater | undefined;
+  apkUpdater: ApkUpdater | undefined;
 }
 
 /**
@@ -34,7 +37,8 @@ interface Created {
  * the menu cache in AsyncStorage (P2-01c). The restaurant's LAN certificate is pinned at pairing
  * (P2-01d, ADR-0011). Secure random values first: every request carries a random correlation id.
  * The kiosk module gives lock-task mode and the tablet's health (P3-01b). Over-the-air updates
- * follow the session (P7-04e1); without them the tablet still works.
+ * follow the session (P7-04e1), and so do new APKs from the PC (P7-04e2); without them the tablet
+ * still works.
  */
 async function createSession(): Promise<Created> {
   await installRandomValues();
@@ -55,9 +59,16 @@ async function createSession(): Promise<Created> {
     (source) => new OtaUpdater({ session, source, onError: report }),
     () => undefined,
   );
+  // New native code comes as an APK from the restaurant PC (P7-04e2); as device owner the tablet
+  // installs it by itself between guests.
+  const apkUpdater = await AndroidApkInstaller.load().then(
+    (installer) => new ApkUpdater({ session, installer, onError: report }),
+    () => undefined,
+  );
   return {
     session,
     updater,
+    apkUpdater,
     device: {
       store,
       kiosk,
@@ -75,10 +86,12 @@ export function Root() {
       current = made;
       setCreated(made);
       made.updater?.start();
+      made.apkUpdater?.start();
       return made.session.start();
     });
     return () => {
       current?.updater?.stop();
+      current?.apkUpdater?.stop();
       current?.session.stop();
     };
   }, []);
@@ -88,6 +101,7 @@ export function Root() {
       translator={translator}
       device={created.device}
       {...(created.updater !== undefined && { updater: created.updater })}
+      {...(created.apkUpdater !== undefined && { apkUpdater: created.apkUpdater })}
     />
   );
 }

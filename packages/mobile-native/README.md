@@ -66,6 +66,16 @@ The Android pieces shared by the waiter app and the table tablet (P2-01c, P2-01d
   `OtaUpdateSource`. It reads the client API an update was published with from its manifest
   (`extra.expoClient.extra.clientApi`), and says when a downloaded update failed to start.
   `expo-updates` checks each update's code signature against the certificate in the APK.
+- The in-app APK updater (P7-04e2, WTR-001, UPD-007), a local Expo module:
+  - `ApkInstalls.kt`: downloads the APK from the restaurant PC with the device's token over the
+    pinned CA (`LanTrust`), keeps it only if its size, SHA-256, package and `versionName` are the
+    expected ones, and hands it to Android's `PackageInstaller` (`REQUEST_INSTALL_PACKAGES`).
+    Android installs it only over an app signed with the same key.
+  - `RpApkInstallReceiver.kt`: Android's answer; it opens Android's confirmation on a phone and
+    passes on a cancel or a refusal. `RpPackageReplacedReceiver.kt`: after the update a
+    device-owner tablet opens the app again, in kiosk mode. Neither is exported.
+  - `RpApkInstallerModule.kt` and `AndroidApkInstaller`: the app's own version, whether it owns
+    its device, Android's "Install unknown apps" setting, as `@rp/mobile-core`'s `ApkInstaller`.
 
 Tests run with Vitest and fake native modules; the Kotlin is compiled by the Android CI job.
 Background alerts are checked on a phone or emulator with the waiter app's Maestro flow

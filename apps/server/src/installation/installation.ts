@@ -17,7 +17,10 @@ const HttpsUrl = z.url({ protocol: /^https$/ });
 
 export const InstallationFile = z.strictObject({
   format: z.literal(1),
-  /** The product's programs (Program Files): `node`, `server`, `console`, `postgres`, `services`. */
+  /**
+   * The product's programs (Program Files): `node`, `server`, `console`, `apps`, `postgres`,
+   * `services`.
+   */
   installDir: z.string().min(1),
   /** The folder on the data drive (ONB-002): database, photos, backups, logs, secrets. */
   dataDir: z.string().min(1),
@@ -85,6 +88,8 @@ export interface InstallationPaths {
   readonly node: string;
   readonly serverDir: string;
   readonly consoleDir: string;
+  /** The release's phone and tablet APKs and their `apps.json` (P7-04e2). */
+  readonly appsDir: string;
   readonly pgBin: string;
   readonly pgData: string;
   readonly servicesDir: string;
@@ -107,6 +112,7 @@ export function installationPaths(installation: InstallationFile): InstallationP
     node: join(installDir, 'node', `node${exe}`),
     serverDir: join(installDir, 'server'),
     consoleDir: join(installDir, 'console'),
+    appsDir: join(installDir, 'apps'),
     pgBin: join(installDir, 'postgres', 'bin'),
     pgData: join(dataDir, 'postgres'),
     servicesDir: join(installDir, 'services'),
@@ -229,6 +235,7 @@ export function serverEnvironment(
     DATABASE_URL: databaseUrl(installation, 'server', passwords),
     RP_DATA_DIR: installation.dataDir,
     RP_CONSOLE_DIR: paths.consoleDir,
+    RP_APPS_DIR: paths.appsDir,
     RP_PG_BIN: paths.pgBin,
     RP_TLS: 'on',
     RP_MQTT_PORT: String(installation.server.mqttPort),

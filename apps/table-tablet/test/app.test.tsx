@@ -1,8 +1,16 @@
-import type { MenuSnapshot, ServiceRequestView, TabletTableView } from '@rp/contracts';
+import {
+  CLIENT_API_VERSION,
+  type MenuSnapshot,
+  type ServiceRequestView,
+  type TabletTableView,
+} from '@rp/contracts';
 import { createTranslator } from '@rp/i18n';
 import {
+  type ApkInstaller,
+  ApkUpdater,
   type DeviceHealthReading,
   DeviceSession,
+  type DownloadedApk,
   type Kiosk,
   type KioskMode,
   MemoryStore,
@@ -26,6 +34,67 @@ import { cancelPlan, requestButtonState } from '../src/service-view';
 import { orderableCount, type TabletDevice } from '../src/TabletHome';
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+
+/** Android's PackageInstaller as the APK updater sees it (P7-04e2). */
+class FakeInstaller implements ApkInstaller {
+  readonly enabled = true;
+  readonly installedVersion = '0.1.0';
+  readonly calls: string[] = [];
+  constructor(private readonly owner: boolean) {}
+  silent(): boolean {
+    return this.owner;
+  }
+  mayRequestInstall(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+  openInstallSettings(): Promise<void> {
+    return Promise.resolve();
+  }
+  download(): Promise<DownloadedApk> {
+    this.calls.push('download');
+    return Promise.resolve({ path: '/cache/rp-apk/new.apk' });
+  }
+  install(): Promise<void> {
+    this.calls.push('install');
+    return Promise.resolve();
+  }
+  onResult(): () => void {
+    return () => undefined;
+  }
+}
+
+/** The PC's newer build of the app, and the client API its server speaks. */
+const appBuildRoutes = (kind: 'waiter-app' | 'table-tablet') =>
+  [
+    [
+      '/api/v1/devices/current/app-build',
+      {
+        status: 200,
+        body: {
+          build: {
+            kind,
+            version: '9.0.0',
+            clientApi: CLIENT_API_VERSION,
+            sha256: 'd'.repeat(64),
+            sizeBytes: 40_000_000,
+          },
+        },
+      },
+    ],
+    [
+      '/api/v1/version',
+      {
+        status: 200,
+        body: {
+          name: 'rp-server',
+          version: '2.3.0',
+          apiVersion: 'v1',
+          node: '24.12.0',
+          clientApi: { current: CLIENT_API_VERSION, oldest: CLIENT_API_VERSION },
+        },
+      },
+    ],
+  ] as const;
 
 const translator = createTranslator();
 const ID = '0199a0e0-0000-7000-8000-0000000071a1';
@@ -429,6 +498,45 @@ describe('[UPD-001] over-the-air updates on a table tablet', () => {
     });
     expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
     expect(reload).toHaveBeenCalledTimes(1);
+    Object.assign(AppState, { currentState: undefined });
+  });
+});
+
+describe('[TAB-001] [WTR-001] a new APK from the restaurant PC on a kiosk tablet (P7-04e2)', () => {
+  it('installs by itself as device owner, only once the guests have left', async () => {
+    const context = setup(true);
+    for (const [path, answer] of appBuildRoutes('table-tablet')) {
+      context.server.on('GET', path, () => answer);
+    }
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    const installer = new FakeInstaller(true);
+    const apkUpdater = new ApkUpdater({ session: context.session, installer });
+    Object.assign(AppState, { currentState: 'active' });
+    await render(
+      <App
+        session={context.session}
+        translator={translator}
+        device={context.device}
+        apkUpdater={apkUpdater}
+      />,
+    );
+    await online(context.sockets);
+    expect(await screen.findByTestId('open-table')).toBeOnTheScreen();
+    await act(() => apkUpdater.check());
+    expect(apkUpdater.getSnapshot().status).toBe('available');
+    expect(installer.calls).toEqual([]);
+
+    context.setOpen(false);
+    await act(async () => {
+      context.sockets.last.fire(
+        'event',
+        frame(1, 'TableClosed', { tableId: TABLE_ID, tableSessionId: SESSION_ID }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    expect(installer.calls).toEqual(['download', 'install']);
     Object.assign(AppState, { currentState: undefined });
   });
 });

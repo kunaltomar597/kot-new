@@ -69,13 +69,18 @@ export function clientTooOld(identity: ClientIdentity): AppError {
 
 /**
  * Paths every app may call whatever its version: finding and checking the server (version, health,
- * the CA) and reporting its own errors.
+ * the CA), reporting its own errors, and fetching its new APK from the PC with a fresh device
+ * token (P7-04e2). Pairing stays closed: an app is updated before it pairs.
  */
 const OPEN_PATHS = new Set([
   '/api/v1/version',
   '/api/v1/health',
   '/api/v1/tls/ca',
   '/api/v1/client-errors',
+  '/api/v1/devices/challenge',
+  '/api/v1/devices/token',
+  '/api/v1/devices/current/app-build',
+  '/api/v1/devices/current/app-build/apk',
 ]);
 
 /**
