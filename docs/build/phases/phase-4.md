@@ -150,6 +150,28 @@ variants, modifiers, combos, tags, synonyms), availability and stock counts, dra
 Acceptance: Playwright flow creating an item with a variant, a modifier and a photo, publishing it
 and seeing it on the POS.
 
+As built:
+
+- Contracts and server: the draft (`getMenuDraft`) also carries every combo, the stock count of
+  counted items, the published version and `unpublished` (whether publishing would show
+  something new; availability and stock are live, so they do not count). Every draft edit
+  appends `MenuDraftChanged` with the part that changed, heard only by roles that manage the menu,
+  so two managers editing at once keep up; ordering surfaces still wait for `MenuPublished`. An
+  item offered in a combo's choice can no longer become a combo (only fixed parts were checked).
+- Console: Manage → Menu (`/manage/menu`, `MENU_MANAGE`) with Items, Categories and Modifier
+  groups pages under a publishing bar (version on every screen, "Changes not published", Publish
+  menu after a confirmation). Items are grouped by category with search; each has a page
+  (`/manage/menu/items/:itemId`) with every MENU-002 field, the photo (uploaded when chosen),
+  sizes, modifier groups, the combo (fixed parts and choices, dates and hours) and a reason when
+  a price changes; availability and stock counts apply at once. Categories and modifier groups
+  are added, edited, archived with a reason and restored. ui-web gains `TextArea`.
+- MENU-007 (time-based availability for single items) stays in P6-05 as planned; combos already
+  have their dates and hours.
+- Playwright: Vikram adds the "Dip" modifier group and a "Paneer Kathi Roll" with two sizes, the
+  dip and a photo (the 480 px rendition comes back 480 px wide), publishes version 2, and Neha's
+  POS sells it with the Jumbo size and the cheese dip; the editor and the list pass axe and fit a
+  360 px phone.
+
 ### P4-02e Custom roles (S)
 
 Requirements: AUTH-012 (S).

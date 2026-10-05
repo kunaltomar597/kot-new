@@ -106,6 +106,26 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   code"); rename; move a tablet to another table. Unpairing asks for a reason. The list follows
   `RestaurantChanged`, `DeviceStatusChanged` and `DeviceRevoked`, and reads connection and battery
   states again every minute.
+- Menu (`/manage/menu`, P4-02d, MGR-005, for the Owner and managers, `MENU_MANAGE`):
+  `src/manage/menu/`, with the form logic in `menu-view.ts` (tested on its own). `MenuArea.tsx`
+  reads the draft, tax groups and stations once for its three pages (Items, Categories, Modifier
+  groups) and again on `MenuDraftChanged`, `MenuPublished`, `ItemAvailabilityChanged` and
+  `RestaurantChanged`, so two managers editing at once see each other's changes. Its publishing
+  bar names the version every screen shows and says "Changes not published" until Publish menu
+  (after a confirmation). `ItemsScreen.tsx` groups items by category and sub-category with a
+  search over names, short codes, tags and search words, and shows price or price range, sizes,
+  food type, combo, out of stock, what is left of a counted item and the channels it is missing,
+  in words. Availability (`AvailabilityDialog.tsx`) applies at once without publishing; archive
+  asks for a reason, restore does not. The item page (`/manage/menu/items/new` and `/:itemId`,
+  `ItemEditor.tsx`) covers every MENU-002 field: photo (uploaded when chosen, shown from the
+  server's 480 px rendition), sizes, modifier groups, kitchen station, channels, tags and search
+  words, and a reason when a price changes. Food type is never preselected. `ComboSection.tsx`
+  makes the item a combo of fixed parts and choices with optional dates and hours; an item that is
+  part of a combo cannot be one, and a combo is stopped by archiving it. When the item saves but
+  its combo does not, the page stays on the saved item and says so. `CategoriesScreen.tsx` and
+  `ModifierGroupsScreen.tsx` add, edit, archive with a reason and restore categories (one level of
+  sub-categories) and modifier groups (fewest and most to choose, options with price changes and
+  availability). An empty place puts a new entry last.
 - Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
   `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
   Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console

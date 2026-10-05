@@ -41,7 +41,8 @@ What exists:
   Owner's sign-in security summary, with `RestaurantChanged` for staff (P4-02a); `RestaurantChanged`
   for devices and the low-battery level with the pager list (P4-02b); each device's state now
   (connected, battery, firmware, serial), renaming, and Locate with `DeviceLocateRequested` and the
-  pager's locate message (P4-02c). 544 tests.
+  pager's locate message (P4-02c); the editor's draft with combos, stock counts and whether
+  publishing would show something new, and `MenuDraftChanged` (P4-02d). 545 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -81,8 +82,10 @@ What exists:
   fresh second factor (P4-02a); pager changes announced to every screen and the low-battery level
   with the pager list (P4-02b); device management: whether each device is connected, its battery
   against its type's level, renaming, Locate sent to that device alone, device changes announced,
-  an unpaired pager cut off at once and when a screen was last connected (P4-02c).
-  726 tests (4 skipped without a real install).
+  an unpaired pager cut off at once and when a screen was last connected (P4-02c); the menu
+  editor's draft with combos, stock counts and its publish state, draft edits announced to the
+  other menu editors, and a combo choice's items kept from becoming combos (P4-02d).
+  730 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -148,14 +151,17 @@ What exists:
   give, take back, a new credential, connection and battery) (P4-02b); the Devices page (pair
   with a one-time code and QR code, rename, move a tablet, Locate, unpair with a reason), the
   Locate notice with a chime on every console, and a console header that follows a rename
-  (P4-02c). 195 tests, and 17 Playwright steps.
+  (P4-02c); the menu editor: items by category with search, an item page with photo, sizes,
+  modifier groups and combo, availability and stock counts, categories, modifier groups and
+  publishing, kept up to date while another manager edits (P4-02d). 246 tests, and 18
+  Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
 - `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
   React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
-  Storybook 10 workbench (P0-13, ADR-0009); QR codes drawn in the browser (P4-02a, ADR-0014).
-  ui-web 102 tests.
+  Storybook 10 workbench (P0-13, ADR-0009); QR codes drawn in the browser (P4-02a, ADR-0014);
+  a text area (P4-02d). ui-web 103 tests.
 - CI security baseline: secret scan, dependency audit, licence policy, SBOM, CodeQL, Dependabot,
   generated OpenAPI/AsyncAPI docs (P0-06, ADR-0010).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
@@ -163,8 +169,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-02d Menu editor and P4-02e Custom roles (P4-02a to P4-02c done; P4-02 is split in five, see
-  phase-4.md).
+- P4-02e Custom roles (P4-02a to P4-02d done; P4-02 is split in five, see phase-4.md).
 - P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
@@ -268,7 +273,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02a Staff and the Owner's sign-in security
 - [x] P4-02b Sections and pagers
 - [x] P4-02c Devices
-- [ ] P4-02d Menu editor
+- [x] P4-02d Menu editor
 - [ ] P4-02e Custom roles (S)
 - [ ] P4-03 Configuration screens
 - [ ] P4-04 Alert centre and system screen
@@ -556,6 +561,38 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P4-02d):
+
+222. The menu editor is its own dashboard page (`/manage/menu`) for the roles that manage the menu
+     (Owner and managers, `MENU_MANAGE`), with Items, Categories and Modifier groups under one
+     publishing bar. An item opens on its own page (`/manage/menu/items/:itemId`), not a dialog:
+     it has too many fields for a dialog on a phone, and a page can be linked to.
+223. Every draft edit is announced as `MenuDraftChanged` (which part changed), only to the roles
+     that manage the menu, so two managers editing at once see each other's changes. Ordering
+     surfaces keep waiting for `MenuPublished` (decision 26). The import publishes at once, so it
+     announces no draft changes of its own; a refused edit announces nothing.
+224. "Changes not published" compares the draft with the published version without availability
+     and stock counts, which are live (decision 28). Publishing asks for a confirmation, because
+     every screen changes at once; an unchanged draft keeps its version and the editor says so.
+225. Food type is never preselected for a new item: veg, non-veg or egg is a statement the
+     restaurant makes to its guests, so an item cannot be saved until someone chooses it.
+226. A photo is uploaded as soon as it is chosen and belongs to the item once the item is saved. A
+     photo chosen and then abandoned is used by nothing, so the photo sweep removes it after
+     `retention.operationalDays` (P1-04).
+227. An empty place (display order) puts a new item or category after the others in its
+     category or level; the number can be changed later.
+228. The editor cannot turn a combo back into a plain item (the API has no such change, and
+     orders already refer to its parts): to stop selling a combo, archive it. An item that is a
+     fixed part of a combo or one of a choice's items cannot become a combo; the server now
+     checks choices too (decision 29 only checked fixed parts).
+229. The reason for a price change is optional, as in the API; when given it goes into the
+     `ITEM_PRICE_CHANGED` audit entry (MENU-009). The field shows only when a price changes.
+230. When an item saves but its combo does not (for example because another manager made the
+     item part of a combo meanwhile), the editor keeps the saved item, stays on its page and says
+     what failed, instead of trying to undo the item.
+231. MENU-007 (time-based availability for single items) stays in P6-05; combos already have dates
+     and hours.
 
 Decided 2026-09-28 (P4-02c):
 
@@ -1180,6 +1217,52 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P4-02d Menu editor
+
+Merged #73 (P4-02c) and #74 (two development-only advisories with no fixed release accepted in the
+dependency audit, with a review date in `infra/ci/README.md`) once green.
+
+Built: contracts `ItemView.stockCount`, a `MenuDraftResponse` with every combo, the published
+version and `unpublished`, and `MenuDraftChanged` (which part changed). Server: the draft's new
+fields (`differsFromPublished` compares the draft and the published snapshot through the same
+parse, without availability and stock), `MenuDraftChanged` appended by every draft edit in its
+transaction and heard only in `MENU_MANAGE` rooms, and choices checked when an item becomes a
+combo. ui-web: `TextArea`. Console: Manage → Menu (`src/manage/menu/`, form logic in
+`menu-view.ts`): the publishing bar, Items (grouped by category and sub-category, search,
+availability and stock counts, archive and restore), the item page (every MENU-002 field, the
+photo uploaded when chosen and shown from its 480 px rendition, sizes, modifier groups, the combo
+with fixed parts, choices, dates and hours, a reason when a price changes), Categories and Modifier
+groups (add, edit, archive with a reason, restore), and the controller's `photoSrc`.
+
+Tests: domain 226 (unchanged), contracts 545 (snapshots for the draft and the new event), server
+730 (each edit announced once to menu editors and a refused one not at all, a choice's item
+cannot become a combo, the draft's combos, stock and publish state, the menu editors' rooms),
+ui-web 103 (`TextArea`), console 246 (the editor's logic; the list, publishing, availability,
+archiving, adding an item with sizes, a modifier group and a photo, a price change with its
+reason, combos including one saved without its combo, categories and modifier groups), and 18
+Playwright steps (was 17): Vikram adds a "Dip" modifier group and a "Paneer Kathi Roll" with two
+sizes, the dip and a photo (the server's 480 px rendition comes back 480 px wide), publishes
+version 2, and Neha's POS sells it with the Jumbo size and the cheese dip; the editor, the list and
+the publish dialog pass axe, and the editor and the list fit a 360 px phone.
+
+Gotchas:
+
+- Labels with regex characters, such as "Price (₹)", must be escaped in `getByLabel` regexes, and
+  required fields carry a marker, so match them with `^Label( \*)?$`.
+- Playwright matches role names as case-insensitive substrings: "Veg" also finds "Non-veg". Pass
+  `exact: true`.
+- The console's `FakeServer` checks responses against the contracts, so a fake `setCombo` must
+  return a valid `ComboView`; `{}` makes the call fail.
+- The browser test makes its photo in code (a PNG from `node:zlib` `deflateSync` and `crc32`), so
+  no binary fixture is committed. The server reads the content with sharp, so it must be a real
+  image.
+- A cashier never reaches `/manage` (`OPERATIONS_CONFIGURE`), so who may edit the menu is tested on
+  the server, not in the console's screen tests.
+
+Deferred: MENU-007 for single items (P6-05), bulk photo upload (P6-04).
+
+Decisions: 222 to 231.
 
 ### 2026-09-28: P4-02c Devices
 
