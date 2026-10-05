@@ -374,6 +374,10 @@ People needed: flashing and on-device tests.
 Acceptance: CI build green; person confirms on devices: alert → vibrate ≤ 2 s, ack round trip, OTA
 update and rollback, 14 h battery with production firmware.
 
+The firmware also subscribes to `rp/<restaurant>/pagers/<device>/locate` (QoS 0, a
+`PagerLocateMessage` with `sentAt`, P4-02c): a manager pressing "Locate" on the Devices page makes
+the pager vibrate three times and show its name, without adding anything to the alert queue.
+
 ## P2-06 Waiter alerts, service-request inbox, manager nudge, "Notify manager"
 
 Goal: nothing is missed on the floor.
