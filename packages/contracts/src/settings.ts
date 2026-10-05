@@ -107,7 +107,6 @@ const NotificationRuleOverrides = z.partialRecord(
 export const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 /** A daily window; `end` before `start` means it runs past midnight. */
 export const TimeWindow = z.strictObject({ start: TimeOfDay, end: TimeOfDay });
-const PAGER_PATTERNS = ['ONE_LONG', 'TWO_SHORT', 'THREE_SHORT', 'LONG_SHORT'] as const;
 
 export const SETTINGS = [
   // Authentication and devices (§4, AUTH, SEC-009)
@@ -426,22 +425,14 @@ export const SETTINGS = [
     requirements: ['NTF-008'],
   }),
   setting({
-    key: 'notifications.diskAlertPercent',
-    schema: int(50, 99),
-    defaultValue: 80,
-    scope: 'RESTAURANT',
-    capability: 'OPERATIONS_CONFIGURE',
-    description: 'The data drive this full raises a disk alert for the Owner and managers.',
-    requirements: ['NTF-003', 'DATA-005'],
-    unit: 'percent',
-  }),
-  setting({
     key: 'pagers.heartbeatSeconds',
-    schema: int(10, 120),
+    schema: int(10, 300),
     defaultValue: 30,
-    scope: 'RESTAURANT',
+    // Tuned with the pager's battery life (PGR-002), so the vendor's (UPD-010).
+    scope: 'VENDOR',
     capability: 'OPERATIONS_CONFIGURE',
-    description: 'How often a pager reports in; three missed heartbeats and it counts as offline.',
+    description:
+      'How often a pager reports its battery and signal; three missed heartbeats and it counts as offline.',
     requirements: ['PGR-007'],
     unit: 'seconds',
   }),
@@ -530,19 +521,6 @@ export const SETTINGS = [
     requirements: ['SEC-009', 'TAB-004'],
   }),
   setting({
-    key: 'pager.vibrationPatterns',
-    schema: z.strictObject({
-      READY: z.enum(PAGER_PATTERNS),
-      SERVICE_REQUEST: z.enum(PAGER_PATTERNS),
-      MANAGER: z.enum(PAGER_PATTERNS),
-    }),
-    defaultValue: { READY: 'ONE_LONG', SERVICE_REQUEST: 'TWO_SHORT', MANAGER: 'THREE_SHORT' },
-    scope: 'RESTAURANT',
-    capability: 'OPERATIONS_CONFIGURE',
-    description: 'How the pager vibrates for each kind of alert.',
-    requirements: ['PGR-006'],
-  }),
-  setting({
     key: 'pager.lowBatteryPercent',
     schema: int(5, 50),
     defaultValue: 15,
@@ -552,16 +530,6 @@ export const SETTINGS = [
       'Battery level at or below which a pager alerts its wearer and the manager, and the waiter app warns.',
     requirements: ['PGR-013', 'WTR-014', 'NTF-003'],
     unit: 'percent',
-  }),
-  setting({
-    key: 'pager.heartbeatSeconds',
-    schema: int(10, 300),
-    defaultValue: 30,
-    scope: 'VENDOR',
-    capability: 'OPERATIONS_CONFIGURE',
-    description: 'How often a pager reports battery and signal; tuned with battery life (PGR-002).',
-    requirements: ['PGR-007'],
-    unit: 'seconds',
   }),
   setting({
     key: 'qr.submissionsPerWindow',
@@ -787,8 +755,9 @@ export const SETTINGS = [
     defaultValue: 80,
     scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
-    description: 'Data-drive use that raises a warning.',
-    requirements: ['DATA-006'],
+    description:
+      'Data-drive use that raises a disk alert for the Owner and managers, daily until space is freed.',
+    requirements: ['DATA-006', 'NTF-003'],
     unit: 'percent',
   }),
   setting({

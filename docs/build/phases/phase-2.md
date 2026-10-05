@@ -290,7 +290,7 @@ As built:
 
 ### P2-03b Nudges, breaks, device, printer and system alerts (done)
 
-As built: `POST /api/v1/alerts/nudge` (`STAFF_MANAGE`; one alert per person, presets in `notifications.nudgePresets`), `POST /api/v1/staff/me/break` (`staff.on_break_since`, migration `20260928020000_staff_break`; `recipientContext` fills `onBreak`), triggers for `DeviceStatusChanged` (pager, tablet, KDS: offline, and low battery at `pager.lowBatteryPercent` for pagers or `devices.lowBatteryAlertPercent` for tablets and kitchen screens, one alert per state; one shared level until P2-02a) and `PrinterStatusChanged` (until back online), and `SystemAlerts.checkDisk` hourly (`notifications.diskAlertPercent`). Backup and licence alerts use the same engine when P7 adds them; the UI parts are P2-06 and P4.
+As built: `POST /api/v1/alerts/nudge` (`STAFF_MANAGE`; one alert per person, presets in `notifications.nudgePresets`), `POST /api/v1/staff/me/break` (`staff.on_break_since`, migration `20260928020000_staff_break`; `recipientContext` fills `onBreak`), triggers for `DeviceStatusChanged` (pager, tablet, KDS: offline, and low battery at `pager.lowBatteryPercent` for pagers or `devices.lowBatteryAlertPercent` for tablets and kitchen screens, one alert per state; one shared level until P2-02a) and `PrinterStatusChanged` (until back online), and `SystemAlerts.checkDisk` hourly (`storage.warnPercent` since P4-03a, which removed the duplicate `notifications.diskAlertPercent`). Backup and licence alerts use the same engine when P7 adds them; the UI parts are P2-06 and P4.
 
 Original scope:
 

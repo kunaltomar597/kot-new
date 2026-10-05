@@ -461,7 +461,7 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `devices.lowBatteryAlertPercent` for the others; one alert per change of state) and printer
   alerts from `PrinterStatusChanged`, open until the printer is back.
 - `system-alerts.ts` (`SystemAlerts.checkDisk`) checks the data drive every hour and raises
-  `DISK_OR_BACKUP` at `notifications.diskAlertPercent` until space is freed. Backup and licence
+  `DISK_OR_BACKUP` at `storage.warnPercent` until space is freed. Backup and licence
   alerts will use the same engine (P7).
 
 ## Alerts on the waiter phone (P2-06a)
