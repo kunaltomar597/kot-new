@@ -21,7 +21,7 @@ export const FILES_PREFIX = 'files/';
 export const BackupInfo = z.object({
   format: z.literal(1),
   createdAt: z.iso.datetime(),
-  kind: z.enum(['NIGHTLY', 'MANUAL']),
+  kind: z.enum(['NIGHTLY', 'MANUAL', 'UPDATE']),
   appVersion: z.string(),
   /** The last database migration applied: a restore needs a server at least this new. */
   schemaVersion: z.string().nullable(),

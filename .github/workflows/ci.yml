@@ -191,17 +191,24 @@ jobs:
     # The restaurant PC's installer (P0-16d). Staged and built on Windows, so the server's native
     # modules are Windows' own; then installed silently here: the three services run, a killed
     # server answers again within 10 s (NFR-A04), running the installer again repairs, and
-    # uninstalling keeps the data unless the Owner allowed deleting it (NFR-I02). Signed only when
-    # the code-signing certificate's secrets exist; the vendor's addresses come from repository
-    # variables (unset ones stay off on the PC).
+    # uninstalling keeps the data unless the Owner allowed deleting it (NFR-I02). Then scenario S9
+    # (P7-04c, UPD-005): an update that fails its health check is rolled back, application and
+    # database, and a good one installs through the watchdog and the updater's task. Signed only
+    # when the code-signing certificate's secrets exist; the vendor's addresses come from
+    # repository variables (unset ones stay off on the PC).
     name: Windows installer
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       RP_CONTROL_PLANE_URL: ${{ vars.RP_CONTROL_PLANE_URL }}
       RP_RELAY_URL: ${{ vars.RP_RELAY_URL }}
       RP_QR_SITE_URL: ${{ vars.RP_QR_SITE_URL }}
       RP_ERROR_DSN: ${{ secrets.RP_ERROR_DSN }}
+      # UPD-007: the signer updates must carry, set with the certificate. Without it the builds
+      # are unsigned test builds that take unsigned updates (for S9 here); a signed build never
+      # does (the build step refuses it). Never install an unsigned build at a restaurant.
+      RP_UPDATE_PUBLISHER: ${{ vars.RP_UPDATE_PUBLISHER }}
+      RP_ALLOW_UNSIGNED_UPDATES: ${{ vars.RP_UPDATE_PUBLISHER == '' && '1' || '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -238,6 +245,27 @@ jobs:
         run: |
           $installer = (Get-Item apps/desktop/release/RestaurantPlatform-Setup-*.exe).FullName
           ./infra/installer/windows/ci/Test-Installer.ps1 -Installer $installer -ResultDir installer-results
+
+      - name: Build the next version's installer from the same payload (scenario S9)
+        env:
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
+          $core = $version.Split('-')[0].Split('.')
+          $next = '{0}.{1}.{2}' -f $core[0], $core[1], ([int]$core[2] + 1)
+          pnpm --filter @rp/desktop run package:win --product-version $next
+          New-Item -ItemType Directory -Force update-test | Out-Null
+          Move-Item "apps/desktop/release/RestaurantPlatform-Setup-$next.exe" update-test/
+
+      - name: Update, roll back (S9) and update again on this runner
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
+          $next = (Get-Item update-test/RestaurantPlatform-Setup-*.exe).FullName
+          ./infra/installer/windows/ci/Test-Update.ps1 -Installer (Resolve-Path "apps/desktop/release/RestaurantPlatform-Setup-$version.exe").Path `
+            -NextInstaller $next -ResultDir installer-results
 
       - name: Keep the logs
         if: always()

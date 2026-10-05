@@ -139,7 +139,15 @@ Split (2026-10-04):
   - Hand off to the installer (P0-16) and run a health check after.
   - Automatic rollback of the application and the database.
   - Report each outcome.
-  - The installer step and the S9 scenario on `windows-latest` wait for P0-16.
+  - The S9 scenario on `windows-latest`.
+  - As built (`docs/runbooks/software-updates.md`):
+    - the server's agent leaves a request;
+    - the watchdog (LocalSystem) starts a SYSTEM scheduled task;
+    - the PowerShell updater checks the installer again from an administrators-only folder;
+    - it copies the database with the server stopped, which is the rollback point;
+    - it runs the installer and checks health;
+    - to go back, it runs the previous version's kept installer, whose service host swaps the
+      database copy back in.
 - **P7-04d Phones, tablets and pagers (UPD-001, UPD-006).** EAS Update channels for the phones and
   tablets, and the in-app APK updater. A component version matrix with every release, and the
   server's N-1 check of clients. Pager firmware distribution is P2-04b.

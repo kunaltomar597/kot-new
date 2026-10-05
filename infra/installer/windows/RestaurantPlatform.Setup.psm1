@@ -109,6 +109,16 @@ function Join-RPPath {
     $result
 }
 
+function Get-RPParentPath {
+    <# A Windows path's folder, the same wherever the tests run (Split-Path turns \ into / off Windows). #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Path)
+    $trimmed = $Path.TrimEnd('\')
+    $at = $trimmed.LastIndexOf('\')
+    if ($at -le 0) { return $trimmed }
+    $trimmed.Substring(0, $at)
+}
+
 # --------------------------------------------------------------------------- running programs
 
 function Invoke-RPProgram {
@@ -952,6 +962,14 @@ function Get-RPWriteInstallationArgument {
     if ($Option.ContainsKey('TlsHostnames') -and @($Option.TlsHostnames).Count -gt 0) {
         $arguments += @('--tls-hostnames', (@($Option.TlsHostnames) -join ','))
     }
+    # UPD-007: the signer updates must carry (kept on repair when not given); unsigned updates
+    # only when this run says so (a test build), never left on from an earlier one.
+    if ($Option.ContainsKey('UpdatePublisher') -and [string]$Option.UpdatePublisher -ne '') {
+        $arguments += @('--update-publisher', [string]$Option.UpdatePublisher)
+    }
+    $unsigned = 'off'
+    if ($Option.ContainsKey('AllowUnsignedUpdates') -and [bool]$Option.AllowUnsignedUpdates) { $unsigned = 'on' }
+    $arguments += @('--allow-unsigned-updates', $unsigned)
     $arguments
 }
 
@@ -973,8 +991,9 @@ function Invoke-RPInstall {
         4. PostgreSQL's data folder (initdb runs with a restricted copy of the installer's account,
            which may write the data folder until the permissions are set in full).
         5. Every folder's permissions; the database service, started; the logins; the migrations.
-        6. The server and watchdog services; the firewall rules; the services started, and the
-           server answering.
+        6. The server and watchdog services; the firewall rules; the updater's scheduled task and
+           this installer kept for going back (P7-04c); the services started, and the server
+           answering.
         The maintenance flag is lifted at the end, also when a step failed.
     #>
     [CmdletBinding()]
@@ -992,6 +1011,10 @@ function Invoke-RPInstall {
         [string] $QrSiteUrl,
         [string] $ErrorDsn,
         [int] $MinFreeGB = $script:DefaultMinFreeGB,
+        # The installer that is running, kept to go back to after a failed update (P7-04c).
+        [string] $InstallerPath,
+        [string] $UpdatePublisher,
+        [switch] $AllowUnsignedUpdates,
         [string] $InstallationFile = (Get-RPDefaultInstallationFile),
         [int] $StartTimeoutSeconds = 180
     )
@@ -1031,7 +1054,7 @@ function Invoke-RPInstall {
     }
     $DataDir = $DataDir.TrimEnd('\')
 
-    $programDataDir = Split-Path -Parent $InstallationFile
+    $programDataDir = Get-RPParentPath $InstallationFile
     $plan = Get-RPFolderAclPlan -DataDir $DataDir -ProgramDataDir $programDataDir
     $early = @($plan | Where-Object { $_.Path -eq (Join-RPPath $DataDir 'secrets') -or $_.Path -eq $programDataDir.TrimEnd('\') })
 
@@ -1078,6 +1101,12 @@ function Invoke-RPInstall {
         $rules = Get-RPFirewallRuleSpec -Port $paths.ports.server -MqttPort $paths.ports.mqtt -NodePath $paths.node -StaffSubnet $StaffSubnet
         Set-RPFirewallRule -Spec $rules
         Write-RPLog ('Opened ports {0} and {1} to {2}.' -f $paths.ports.server, $paths.ports.mqtt, (@($rules[0].RemoteAddress) -join ', '))
+        Register-RPUpdateTask -SetupDir (Join-RPPath $InstallDir 'setup') -ProgramDataDir $programDataDir
+        if ($InstallerPath) {
+            $installed = [string](Get-RPProperty (Read-RPInstallationFile -Path $InstallationFile) 'productVersion')
+            if (-not $installed) { $installed = $ProductVersion }
+            Save-RPInstaller -InstallerPath $InstallerPath -ProductVersion $installed -ProgramDataDir $programDataDir
+        }
 
         Start-RPService -Name $script:Services.Server
         Wait-RPServerRunning -Cli $cli -InstallationFile $InstallationFile -TimeoutSeconds $StartTimeoutSeconds
@@ -1183,7 +1212,12 @@ function Invoke-RPUninstall {
             Write-RPLog ('Could not set the maintenance flag: {0}' -f $_)
         }
     }
-    # The watchdog first, or it starts the others again.
+    # The updater's task first, so no update starts; then the watchdog, or it starts the others.
+    try {
+        Unregister-RPUpdateTask -ProgramDataDir (Get-RPParentPath $InstallationFile)
+    } catch {
+        Write-RPLog ('Could not remove the updater''s scheduled task: {0}' -f $_)
+    }
     Remove-RPService -Name $script:Services.Watchdog
     Remove-RPService -Name $script:Services.Server
     Remove-RPService -Name $script:Services.Database
@@ -1282,6 +1316,761 @@ function Invoke-RPStart {
     [pscustomobject]@{ Started = $started }
 }
 
+# ------------------------------------------------------------------- software updates (P7-04c)
+
+# The updater's scheduled task (the server's UPDATER_TASK): runs Update-RestaurantPlatform.ps1 as
+# SYSTEM. The watchdog service starts it when the server leaves an update request.
+$script:UpdaterTask = '\RestaurantPlatform\Update'
+$script:UpdaterScripts = @('Update-RestaurantPlatform.ps1', 'RestaurantPlatform.Setup.psm1')
+$script:SemVer = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
+
+function Get-RPUpdaterPath {
+    <#
+    .SYNOPSIS
+        The updater's files in ProgramData, which only administrators write: the scripts the task
+        runs and the installers kept to go back to (no one else may even read these two), the
+        outcome and the rollback request (the server reads them).
+
+    .DESCRIPTION
+        The updater runs as SYSTEM, so it never writes or deletes in the data folder: the server's
+        account could turn a folder there into a link to anywhere. It only reads there.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $ProgramDataDir)
+    $root = $ProgramDataDir.TrimEnd('\')
+    [pscustomobject]@{
+        UpdaterDir    = Join-RPPath $root 'updater'
+        Script        = Join-RPPath $root 'updater', 'Update-RestaurantPlatform.ps1'
+        TakenFile     = Join-RPPath $root 'updater', 'taken.json'
+        InstallersDir = Join-RPPath $root 'installers'
+        LogsDir       = Join-RPPath $root 'setup-logs'
+        OutcomeFile   = Join-RPPath $root 'update-outcome.json'
+        RollbackFile  = Join-RPPath $root 'update-rollback.json'
+    }
+}
+
+function Get-RPUpdaterAclPlan {
+    <# The updater's scripts and the kept installers: administrators and SYSTEM only. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $ProgramDataDir)
+    $paths = Get-RPUpdaterPath -ProgramDataDir $ProgramDataDir
+    $owners = @(
+        (New-RPGrant $script:Sid.System '(OI)(CI)F'),
+        (New-RPGrant $script:Sid.Administrators '(OI)(CI)F')
+    )
+    @(
+        [pscustomobject]@{ Path = $paths.UpdaterDir; Protect = $true; Grants = $owners },
+        [pscustomobject]@{ Path = $paths.InstallersDir; Protect = $true; Grants = $owners }
+    )
+}
+
+function Get-RPInstallerFileName {
+    <# Installers are named by their version, as the CI job names them. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Version)
+    'RestaurantPlatform-Setup-{0}.exe' -f $Version
+}
+
+function Get-RPWindowsPowerShell {
+    <# The 64-bit Windows PowerShell 5.1, by its full path. #>
+    [CmdletBinding()]
+    param()
+    $root = $env:SystemRoot
+    if ([string]::IsNullOrEmpty($root)) { $root = 'C:\Windows' }
+    Join-RPPath $root 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'
+}
+
+function ConvertTo-RPXmlText {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [AllowEmptyString()] [string] $Text)
+    [System.Security.SecurityElement]::Escape($Text)
+}
+
+function Get-RPUpdateTaskXml {
+    <#
+    .SYNOPSIS
+        The updater's task: SYSTEM, highest rights, no trigger (the watchdog starts it), one at a
+        time, at most four hours (the maintenance flag's longest), also on battery.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $ScriptPath,
+        [string] $PowerShell = (Get-RPWindowsPowerShell)
+    )
+    $arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}"' -f $ScriptPath
+    @(
+        '<?xml version="1.0" encoding="UTF-16"?>',
+        '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">',
+        '  <RegistrationInfo>',
+        '    <Description>Installs a Restaurant Platform update the server downloaded and checked, and goes back to the previous version when the new one fails its health check. The RPWatchdog service starts it.</Description>',
+        ('    <URI>{0}</URI>' -f (ConvertTo-RPXmlText $script:UpdaterTask)),
+        '  </RegistrationInfo>',
+        '  <Principals>',
+        '    <Principal id="System">',
+        '      <UserId>S-1-5-18</UserId>',
+        '      <RunLevel>HighestAvailable</RunLevel>',
+        '    </Principal>',
+        '  </Principals>',
+        '  <Settings>',
+        '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>',
+        '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>',
+        '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>',
+        '    <AllowHardTerminate>true</AllowHardTerminate>',
+        '    <StartWhenAvailable>false</StartWhenAvailable>',
+        '    <AllowStartOnDemand>true</AllowStartOnDemand>',
+        '    <Enabled>true</Enabled>',
+        '    <Hidden>false</Hidden>',
+        '    <ExecutionTimeLimit>PT4H</ExecutionTimeLimit>',
+        '    <Priority>5</Priority>',
+        '  </Settings>',
+        '  <Actions Context="System">',
+        '    <Exec>',
+        ('      <Command>{0}</Command>' -f (ConvertTo-RPXmlText $PowerShell)),
+        ('      <Arguments>{0}</Arguments>' -f (ConvertTo-RPXmlText $arguments)),
+        '    </Exec>',
+        '  </Actions>',
+        '</Task>'
+    ) -join "`r`n"
+}
+
+function Register-RPUpdateTask {
+    <#
+    .SYNOPSIS
+        Copies the updater's scripts to ProgramData, where only administrators may change them,
+        and registers its scheduled task (again on repair and on every update).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $SetupDir,
+        [Parameter(Mandatory)] [string] $ProgramDataDir
+    )
+    $paths = Get-RPUpdaterPath -ProgramDataDir $ProgramDataDir
+    # Makes the folders and closes them before anything goes in.
+    Set-RPFolderPermission -Plan (Get-RPUpdaterAclPlan -ProgramDataDir $ProgramDataDir)
+    foreach ($name in $script:UpdaterScripts) {
+        Copy-Item -LiteralPath (Join-RPPath $SetupDir $name) -Destination (Join-RPPath $paths.UpdaterDir $name) -Force
+    }
+    $xmlFile = Join-RPPath $paths.UpdaterDir 'update-task.xml'
+    # schtasks reads a task's XML as UTF-16.
+    Write-RPTextFile -Path $xmlFile -Text (Get-RPUpdateTaskXml -ScriptPath $paths.Script) -Utf16
+    $result = Invoke-RPProgram -FilePath 'schtasks.exe' -ArgumentList @('/Create', '/TN', $script:UpdaterTask, '/XML', $xmlFile, '/F')
+    Assert-RPProgramResult -Result $result -What 'Registering the updater''s scheduled task'
+    Write-RPLog 'Registered the updater''s scheduled task.'
+}
+
+function Unregister-RPUpdateTask {
+    <# Removes the updater's task and scripts; the installers kept stay with the installation file. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $ProgramDataDir)
+    $result = Invoke-RPProgram -FilePath 'schtasks.exe' -ArgumentList @('/Delete', '/TN', $script:UpdaterTask, '/F')
+    # 1: there was no such task.
+    Assert-RPProgramResult -Result $result -What 'Removing the updater''s scheduled task' -AllowExitCode @(0, 1)
+    Remove-RPFolder -Path (Get-RPUpdaterPath -ProgramDataDir $ProgramDataDir).UpdaterDir
+    Write-RPLog 'Removed the updater''s scheduled task.'
+}
+
+function Save-RPInstaller {
+    <#
+    .SYNOPSIS
+        Keeps the installer that installed this version in ProgramData\RestaurantPlatform\
+        installers, so a failed update can go back to it (UPD-005).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $InstallerPath,
+        [Parameter(Mandatory)] [string] $ProductVersion,
+        [Parameter(Mandatory)] [string] $ProgramDataDir
+    )
+    $folder = (Get-RPUpdaterPath -ProgramDataDir $ProgramDataDir).InstallersDir
+    $target = Join-RPPath $folder (Get-RPInstallerFileName $ProductVersion)
+    if ($InstallerPath.TrimEnd('\') -eq $target) { return }
+    if (-not (Test-Path -LiteralPath $InstallerPath)) {
+        Write-RPLog ('Warning: the installer {0} is not there to keep; an update from this version could not go back to it.' -f $InstallerPath)
+        return
+    }
+    if (-not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
+    Copy-Item -LiteralPath $InstallerPath -Destination $target -Force
+    Write-RPLog ('Kept the installer of version {0} for going back to it: {1}' -f $ProductVersion, $target)
+}
+
+function Get-RPInstallerFile {
+    <# The kept installers in a folder. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Folder)
+    @(Get-ChildItem -LiteralPath $Folder -Filter 'RestaurantPlatform-Setup-*.exe' -File)
+}
+
+function Read-RPTextFile {
+    <# A whole text file, UTF-8. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Path)
+    Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+}
+
+function Remove-RPOldInstaller {
+    <# Removes kept installers of versions other than these (after a successful update). #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $InstallersDir,
+        [Parameter(Mandatory)] [string[]] $Keep
+    )
+    if (-not (Test-Path -LiteralPath $InstallersDir)) { return }
+    $names = @($Keep | ForEach-Object { Get-RPInstallerFileName $_ })
+    foreach ($file in @(Get-RPInstallerFile -Folder $InstallersDir)) {
+        if ($names -notcontains $file.Name) {
+            Remove-Item -LiteralPath $file.FullName -Force
+            Write-RPLog ('Removed the installer {0}.' -f $file.Name)
+        }
+    }
+}
+
+function ConvertTo-RPSemVer {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Version)
+    $match = [regex]::Match($Version, $script:SemVer)
+    if (-not $match.Success) { throw ('{0} is not a version.' -f $Version) }
+    $pre = @()
+    if ($match.Groups[4].Success) { $pre = $match.Groups[4].Value.Split('.') }
+    [pscustomobject]@{
+        Core       = @([decimal]$match.Groups[1].Value, [decimal]$match.Groups[2].Value, [decimal]$match.Groups[3].Value)
+        Prerelease = $pre
+    }
+}
+
+function Compare-RPVersion {
+    <# -1, 0 or 1 as Left is older, the same or newer than Right (semantic versions). #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Left,
+        [Parameter(Mandatory)] [string] $Right
+    )
+    $a = ConvertTo-RPSemVer $Left
+    $b = ConvertTo-RPSemVer $Right
+    for ($i = 0; $i -lt 3; $i++) {
+        if ($a.Core[$i] -lt $b.Core[$i]) { return -1 }
+        if ($a.Core[$i] -gt $b.Core[$i]) { return 1 }
+    }
+    # A release is newer than its pre-releases.
+    if ($a.Prerelease.Count -eq 0 -and $b.Prerelease.Count -eq 0) { return 0 }
+    if ($a.Prerelease.Count -eq 0) { return 1 }
+    if ($b.Prerelease.Count -eq 0) { return -1 }
+    $length = [Math]::Max($a.Prerelease.Count, $b.Prerelease.Count)
+    for ($i = 0; $i -lt $length; $i++) {
+        if ($i -ge $a.Prerelease.Count) { return -1 }
+        if ($i -ge $b.Prerelease.Count) { return 1 }
+        $x = $a.Prerelease[$i]
+        $y = $b.Prerelease[$i]
+        $xNumber = $x -match '^\d+$'
+        $yNumber = $y -match '^\d+$'
+        if ($xNumber -and $yNumber) {
+            if ([decimal]$x -lt [decimal]$y) { return -1 }
+            if ([decimal]$x -gt [decimal]$y) { return 1 }
+        } elseif ($xNumber -ne $yNumber) {
+            if ($xNumber) { return -1 }
+            return 1
+        } else {
+            $order = [string]::CompareOrdinal($x, $y)
+            if ($order -lt 0) { return -1 }
+            if ($order -gt 0) { return 1 }
+        }
+    }
+    0
+}
+
+function Get-RPProperty {
+    <# A property of a parsed JSON object, or $null when it has none (strict mode throws). #>
+    [CmdletBinding()]
+    param(
+        [AllowNull()] $Object,
+        [Parameter(Mandatory)] [string] $Name
+    )
+    if ($null -eq $Object) { return $null }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    $property.Value
+}
+
+function ConvertTo-RPUpdateRequest {
+    <#
+    .SYNOPSIS
+        The server's update request (apps/server src/updates/update-files.ts), checked. The
+        server's account wrote it, so nothing in it is trusted beyond these checks: the
+        installer is checked again before it runs.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Json)
+    $request = $Json.TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $version = [string](Get-RPProperty $request 'version')
+    $problems = @()
+    if ((Get-RPProperty $request 'format') -ne 1) { $problems += 'format' }
+    if ([string](Get-RPProperty $request 'requestId') -notmatch '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') { $problems += 'requestId' }
+    if ($version -notmatch $script:SemVer) { $problems += 'version' }
+    elseif ([string](Get-RPProperty $request 'fileName') -cne (Get-RPInstallerFileName $version)) { $problems += 'fileName' }
+    if ([string](Get-RPProperty $request 'sha256') -cnotmatch '^[0-9a-f]{64}$') { $problems += 'sha256' }
+    if ($problems.Count -gt 0) { throw ('The update request is not valid ({0}).' -f ($problems -join ', ')) }
+    $request
+}
+
+function Get-RPFileSha256 {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Path)
+    (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-RPAuthenticode {
+    <# What Windows says about a file's signature. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Path)
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    $subject = $null
+    if ($null -ne $signature.SignerCertificate) { $subject = $signature.SignerCertificate.Subject }
+    [pscustomobject]@{ Status = [string]$signature.Status; Subject = $subject }
+}
+
+function Test-RPInstallerSignature {
+    <#
+    .SYNOPSIS
+        UPD-007: the installer must carry a valid Authenticode signature by the vendor (the
+        publisher this installation's build named). A test build may take unsigned installers;
+        a damaged signature never passes. The server applies the same rules
+        (src/updates/authenticode.ts).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [AllowNull()] [AllowEmptyString()] [string] $Publisher,
+        [switch] $AllowUnsigned
+    )
+    $fail = { param($Reason) [pscustomobject]@{ Ok = $false; Signer = $null; Reason = $Reason } }
+    if ([string]::IsNullOrEmpty($Publisher) -and -not $AllowUnsigned) {
+        return (& $fail 'This installation cannot check an update''s signature: it was built without a code-signing certificate.')
+    }
+    $seen = Get-RPAuthenticode -Path $Path
+    if ($seen.Status -eq 'Valid') {
+        if ([string]::IsNullOrEmpty($Publisher) -or $seen.Subject -ceq $Publisher) {
+            return [pscustomobject]@{ Ok = $true; Signer = $seen.Subject; Reason = $null }
+        }
+        return (& $fail ('The installer is signed by {0}, not by the vendor.' -f $seen.Subject))
+    }
+    if ($seen.Status -eq 'NotSigned') {
+        if ($AllowUnsigned) { return [pscustomobject]@{ Ok = $true; Signer = $null; Reason = $null } }
+        return (& $fail 'The installer is not signed.')
+    }
+    & $fail ('The installer''s signature is not valid ({0}).' -f $seen.Status)
+}
+
+function Get-RPUpdatePolicy {
+    <# The installation file's update settings; an older file checks nothing and allows nothing. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Installation)
+    $updates = Get-RPProperty $Installation 'updates'
+    [pscustomobject]@{
+        Publisher     = [string](Get-RPProperty $updates 'publisher')
+        AllowUnsigned = [bool](Get-RPProperty $updates 'allowUnsigned')
+    }
+}
+
+function Invoke-RPInstallerProgram {
+    <# Runs an installer silently and waits for it (and what it starts) to end; its exit code. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [string[]] $ArgumentList = @('/S')
+    )
+    $process = Start-Process -FilePath $Path -ArgumentList $ArgumentList -Wait -PassThru -WindowStyle Hidden
+    [int]$process.ExitCode
+}
+
+function Get-RPTimestamp {
+    [CmdletBinding()]
+    param()
+    (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Write-RPTextFile {
+    <# Text to a file: UTF-8 without a byte order mark, or UTF-16 (with one). #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $Text,
+        [switch] $Utf16
+    )
+    $encoding = New-Object System.Text.UTF8Encoding $false
+    if ($Utf16) { $encoding = [System.Text.Encoding]::Unicode }
+    [System.IO.File]::WriteAllText($Path, $Text, $encoding)
+}
+
+function Write-RPJsonFile {
+    <# JSON in UTF-8 without a byte order mark, written beside the file, then moved over it. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] $Value
+    )
+    $folder = Split-Path -Parent $Path
+    if ($folder -and -not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
+    Write-RPTextFile -Path ('{0}.new' -f $Path) -Text ($Value | ConvertTo-Json -Depth 5 -Compress)
+    Move-Item -LiteralPath ('{0}.new' -f $Path) -Destination $Path -Force
+}
+
+function Wait-RPHealthyServer {
+    <#
+    .SYNOPSIS
+        The health check after an update (UPD-005): `setup-cli health` says the service host
+        runs the server and it answers its health check over TLS, with the version expected;
+        then it stays so for StableSeconds: the same server process, no restart.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Cli,
+        [Parameter(Mandatory)] [string] $InstallationFile,
+        [Parameter(Mandatory)] [string] $Version,
+        [int] $TimeoutSeconds = 600,
+        [int] $StableSeconds = 120,
+        [ValidateRange(1, 60)] [int] $IntervalSeconds = 5
+    )
+    $first = $null
+    $steady = 0
+    $last = 'no answer'
+    $checks = [Math]::Ceiling($TimeoutSeconds / $IntervalSeconds)
+    for ($check = 0; $check -le $checks; $check++) {
+        $result = Invoke-RPProgram -FilePath $Cli.Node -ArgumentList @($Cli.Script, 'health', '--installation', $InstallationFile)
+        $report = $null
+        try { $report = $result.Output | ConvertFrom-Json } catch { $report = $null }
+        $installed = [string](Get-RPProperty $report 'productVersion')
+        if ($result.ExitCode -eq 0 -and $installed -eq $Version) {
+            if ($null -eq $first) {
+                $first = $report
+                Write-RPLog ('Version {0} answers its health check.' -f $Version)
+            } elseif ((Get-RPProperty $report 'serverPid') -ne (Get-RPProperty $first 'serverPid') -or (Get-RPProperty $report 'restarts') -ne (Get-RPProperty $first 'restarts')) {
+                return [pscustomobject]@{ Healthy = $false; Reason = ('Version {0} answered, then its server restarted (it crashed).' -f $Version) }
+            }
+            if ($steady * $IntervalSeconds -ge $StableSeconds) {
+                return [pscustomobject]@{ Healthy = $true; Reason = $null }
+            }
+            $steady++
+        } else {
+            if ($null -ne $first) {
+                return [pscustomobject]@{ Healthy = $false; Reason = ('Version {0} answered, then stopped answering its health check.' -f $Version) }
+            }
+            if ($null -ne $report) {
+                $last = 'version {0}, server {1}, health {2}' -f $installed, (Get-RPProperty $report 'phase'), (Get-RPProperty $report 'health')
+                $hostError = Get-RPProperty $report 'lastError'
+                if ($hostError) { $last = '{0}: {1}' -f $last, $hostError }
+            } elseif ($result.Output) {
+                $last = $result.Output
+            }
+        }
+        if ($check -lt $checks) { Start-Sleep -Seconds $IntervalSeconds }
+    }
+    [pscustomobject]@{ Healthy = $false; Reason = ('Version {0} did not pass its health check within {1} seconds ({2}).' -f $Version, $TimeoutSeconds, $last) }
+}
+
+function Invoke-RPUpdateRollback {
+    <#
+    .SYNOPSIS
+        Goes back to the version that ran before (UPD-005): asks for the database copied before
+        the update (ProgramData\RestaurantPlatform\update-rollback.json), then runs that version's
+        installer, whose service host switches the copy back in before its server starts. Returns
+        $null when the old version runs again with its database, else what went wrong.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $DataDir,
+        [Parameter(Mandatory)] [string] $InstallDir,
+        [Parameter(Mandatory)] [string] $InstallationFile,
+        [Parameter(Mandatory)] [string] $RequestId,
+        [Parameter(Mandatory)] [string] $FailedVersion,
+        [Parameter(Mandatory)] [string] $PreviousVersion,
+        [Parameter(Mandatory)] [string] $PreviousInstaller,
+        [int] $HealthTimeoutSeconds = 600,
+        [int] $StableSeconds = 120
+    )
+    $paths = Get-RPUpdaterPath -ProgramDataDir (Get-RPParentPath $InstallationFile)
+    # Written by the service host; only read here.
+    $outcomeFile = Join-RPPath $DataDir 'backups', 'update-rollback-outcome.json'
+    Write-RPJsonFile -Path $paths.RollbackFile -Value ([ordered]@{ format = 1; requestId = $RequestId; version = $FailedVersion; requestedAt = (Get-RPTimestamp) })
+    Write-RPLog ('Going back to version {0}.' -f $PreviousVersion)
+    try {
+        $code = Invoke-RPInstallerProgram -Path $PreviousInstaller
+        if ($code -ne 0) {
+            return ('the installer of version {0} ended with {1}' -f $PreviousVersion, $code)
+        }
+        $health = Wait-RPHealthyServer -Cli (Get-RPSetupCli -InstallDir $InstallDir) -InstallationFile $InstallationFile -Version $PreviousVersion -TimeoutSeconds $HealthTimeoutSeconds -StableSeconds $StableSeconds
+        if (-not $health.Healthy) { return $health.Reason }
+        $rollback = $null
+        if (Test-Path -LiteralPath $outcomeFile) {
+            try { $rollback = Read-RPTextFile -Path $outcomeFile | ConvertFrom-Json } catch { $rollback = $null }
+        }
+        if ([string](Get-RPProperty $rollback 'requestId') -ne $RequestId) {
+            return 'the database was not switched back (the server did not run the rollback)'
+        }
+        if (-not [bool](Get-RPProperty $rollback 'ok')) {
+            $why = [string](Get-RPProperty $rollback 'error')
+            if ($why.Length -gt 300) { $why = $why.Substring(0, 300) }
+            return ('version {0} runs, but on the database the update changed: {1}' -f $PreviousVersion, $why)
+        }
+        Write-RPLog ('Version {0} runs again with the database from before the update; the failed version''s database is kept for support.' -f $PreviousVersion)
+        $null
+    } finally {
+        # Run once: the service host has acted on it, or the installer did not get that far.
+        if (Test-Path -LiteralPath $paths.RollbackFile) { Remove-Item -LiteralPath $paths.RollbackFile -Force }
+    }
+}
+
+function Invoke-RPUpdate {
+    <#
+    .SYNOPSIS
+        Installs the update the server asked for, and goes back when it fails (UPD-005, UPD-007).
+
+    .DESCRIPTION
+        Runs as SYSTEM from the updater's scheduled task, which the watchdog starts when the
+        server leaves <data>\run\update-request.json; the server has downloaded and checked the
+        installer and made a full backup. Each request runs once: its id is kept in
+        ProgramData\RestaurantPlatform\updater\taken.json, and the outcome says RUNNING until the
+        end. A request taken before whose run never ended (the PC restarted) ends as FAILED. Then:
+        1. the installer is copied to ProgramData\RestaurantPlatform\installers (administrators
+           only) and checked there: SHA-256 and Authenticode, against the publisher this
+           installation names; the version must be newer than the installed one;
+        2. the installer of the installed version must be there, to go back to;
+        3. the maintenance flag, the watchdog and the server stopped, the database copied
+           (setup-cli update-snapshot create);
+        4. the installer runs silently; the new version must pass its health check;
+        5. healthy: the copy is dropped and older installers removed. Not: the previous version's
+           installer runs again and its service host switches the database copy back in.
+        The outcome goes to ProgramData\RestaurantPlatform\update-outcome.json for the server to
+        report, and is returned. Nothing is written or deleted in the data folder.
+        ForceHealthCheckFailure fails step 4 on purpose (scenario S9 in CI).
+    #>
+    [CmdletBinding()]
+    param(
+        [string] $InstallationFile = (Get-RPDefaultInstallationFile),
+        [switch] $ForceHealthCheckFailure,
+        [int] $HealthTimeoutSeconds = 600,
+        [int] $StableSeconds = 120,
+        [string] $LogFile
+    )
+    Assert-RPAdministrator
+    $installation = Read-RPInstallationFile -Path $InstallationFile
+    if ($null -eq $installation) { throw ('There is no installation file at {0}.' -f $InstallationFile) }
+    $dataDir = ([string]$installation.dataDir).TrimEnd('\')
+    $installDir = ([string]$installation.installDir).TrimEnd('\')
+    $current = [string]$installation.productVersion
+    $paths = Get-RPUpdaterPath -ProgramDataDir (Get-RPParentPath $InstallationFile)
+    $requestFile = Join-RPPath $dataDir 'run', 'update-request.json'
+    if (-not (Test-Path -LiteralPath $requestFile)) {
+        Write-RPLog 'No update is waiting.'
+        return $null
+    }
+    $json = Read-RPTextFile -Path $requestFile
+    $requestId = ''
+    $version = ''
+    try {
+        $raw = $json.TrimStart([char]0xFEFF) | ConvertFrom-Json
+        # Only what looks like an id and a version goes into the outcome the server reads.
+        $id = [string](Get-RPProperty $raw 'requestId')
+        if ($id -match '^[0-9a-fA-F-]{36}$') { $requestId = $id }
+        $named = [string](Get-RPProperty $raw 'version')
+        if ($named -match $script:SemVer) { $version = $named }
+    } catch {
+        Write-RPLog 'The update request could not be read.'
+    }
+    $outcome = [ordered]@{
+        format          = 1
+        requestId       = $requestId
+        version         = $version
+        previousVersion = $current
+        outcome         = 'RUNNING'
+        error           = $null
+        startedAt       = (Get-RPTimestamp)
+        finishedAt      = $null
+        logFile         = $null
+    }
+    if ($LogFile) { $outcome.logFile = $LogFile }
+
+    # Each request once.
+    $taken = $null
+    if (Test-Path -LiteralPath $paths.TakenFile) {
+        try { $taken = Read-RPTextFile -Path $paths.TakenFile | ConvertFrom-Json } catch { $taken = $null }
+    }
+    if ($requestId -ne '' -and [string](Get-RPProperty $taken 'requestId') -eq $requestId) {
+        $last = $null
+        if (Test-Path -LiteralPath $paths.OutcomeFile) {
+            try { $last = Read-RPTextFile -Path $paths.OutcomeFile | ConvertFrom-Json } catch { $last = $null }
+        }
+        if ([string](Get-RPProperty $last 'requestId') -eq $requestId -and [string](Get-RPProperty $last 'outcome') -ne 'RUNNING') {
+            Write-RPLog ('The update request {0} was handled already.' -f $requestId)
+            return $null
+        }
+        $outcome.outcome = 'FAILED'
+        $outcome.error = 'The updater was interrupted (the PC restarted?) and did not finish this update. Check the PC, then run the installer of the version wanted, or ask support.'
+        $outcome.startedAt = [string](Get-RPProperty $taken 'takenAt')
+        if (-not $outcome.startedAt) { $outcome.startedAt = Get-RPTimestamp }
+        $outcome.finishedAt = Get-RPTimestamp
+        Write-RPJsonFile -Path $paths.OutcomeFile -Value $outcome
+        Write-RPLog $outcome.error
+        return [pscustomobject]$outcome
+    }
+    if ($requestId -ne '') {
+        Write-RPJsonFile -Path $paths.TakenFile -Value ([ordered]@{ requestId = $requestId; takenAt = $outcome.startedAt })
+    }
+    Write-RPJsonFile -Path $paths.OutcomeFile -Value $outcome
+
+    $steps = @{
+        DataDir          = $dataDir
+        InstallDir       = $installDir
+        InstallationFile = $InstallationFile
+        Current          = $current
+        Json             = $json
+        Installation     = $installation
+        Force            = [bool]$ForceHealthCheckFailure
+        HealthTimeout    = $HealthTimeoutSeconds
+        Stable           = $StableSeconds
+    }
+    try {
+        $result = Invoke-RPUpdateStep @steps
+        $outcome.outcome = $result.Outcome
+        $outcome.error = $result.Error
+    } catch {
+        $outcome.outcome = 'FAILED'
+        $outcome.error = ('The updater stopped: {0}' -f $_)
+    } finally {
+        # Whatever happened, the watchdog looks after the services again.
+        try {
+            $null = Invoke-RPSetupCli -Cli (Get-RPSetupCli -InstallDir $installDir) -InstallationFile $InstallationFile -ArgumentList @('maintenance', 'off')
+        } catch {
+            Write-RPLog ('Could not lift the maintenance flag (it lapses by itself): {0}' -f $_)
+        }
+    }
+    $outcome.finishedAt = Get-RPTimestamp
+    if ($null -ne $outcome.error -and $outcome.error.Length -gt 1000) { $outcome.error = $outcome.error.Substring(0, 1000) }
+    Write-RPJsonFile -Path $paths.OutcomeFile -Value $outcome
+    Write-RPLog ('The update to {0} ended: {1}{2}' -f $outcome.version, $outcome.outcome, $(if ($outcome.error) { ': ' + $outcome.error } else { '' }))
+    [pscustomobject]$outcome
+}
+
+function Invoke-RPUpdateStep {
+    <# Invoke-RPUpdate's steps; returns the outcome and the reason. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $DataDir,
+        [Parameter(Mandatory)] [string] $InstallDir,
+        [Parameter(Mandatory)] [string] $InstallationFile,
+        [Parameter(Mandatory)] [string] $Current,
+        [Parameter(Mandatory)] [string] $Json,
+        [Parameter(Mandatory)] $Installation,
+        [bool] $Force,
+        [int] $HealthTimeout = 600,
+        [int] $Stable = 120
+    )
+    $failed = { param($Reason) [pscustomobject]@{ Outcome = 'FAILED'; Error = $Reason } }
+    try {
+        $request = ConvertTo-RPUpdateRequest -Json $Json
+    } catch {
+        return (& $failed ('{0} Nothing was changed.' -f $_))
+    }
+    $version = [string]$request.version
+    if ((Compare-RPVersion -Left $version -Right $Current) -le 0) {
+        return (& $failed ('Version {0} is not newer than the installed {1}. Nothing was changed.' -f $version, $Current))
+    }
+    Write-RPLog ('Updating from version {0} to {1}.' -f $Current, $version)
+
+    # 1. The installer, copied where only administrators write, and checked there.
+    $folders = Get-RPUpdaterPath -ProgramDataDir (Get-RPParentPath $InstallationFile)
+    if (-not (Test-Path -LiteralPath $folders.InstallersDir)) {
+        Set-RPFolderPermission -Plan (Get-RPUpdaterAclPlan -ProgramDataDir (Get-RPParentPath $InstallationFile))
+    }
+    $installer = Join-RPPath $folders.InstallersDir (Get-RPInstallerFileName $version)
+    $download = Join-RPPath $DataDir 'updates', ([string]$request.fileName)
+    if (-not (Test-Path -LiteralPath $download)) {
+        return (& $failed ('The downloaded installer {0} is not there. Nothing was changed.' -f $download))
+    }
+    Copy-Item -LiteralPath $download -Destination $installer -Force
+    if ((Get-RPFileSha256 -Path $installer) -ne [string]$request.sha256) {
+        Remove-Item -LiteralPath $installer -Force
+        return (& $failed 'The installer does not match the SHA-256 the server checked. Nothing was changed.')
+    }
+    $policy = Get-RPUpdatePolicy -Installation $Installation
+    $signature = Test-RPInstallerSignature -Path $installer -Publisher $policy.Publisher -AllowUnsigned:$policy.AllowUnsigned
+    if (-not $signature.Ok) {
+        Remove-Item -LiteralPath $installer -Force
+        return (& $failed ('{0} Nothing was changed.' -f $signature.Reason))
+    }
+    if ($signature.Signer) { Write-RPLog ('The installer is signed by {0}.' -f $signature.Signer) }
+
+    # 2. The way back.
+    $previous = Join-RPPath $folders.InstallersDir (Get-RPInstallerFileName $Current)
+    if (-not (Test-Path -LiteralPath $previous)) {
+        return (& $failed ('The installer of the installed version {0} is not kept in {1}, so a failed update could not go back. Nothing was changed; run that installer once to keep it, or ask support.' -f $Current, $folders.InstallersDir))
+    }
+
+    # 3. The services stopped and the database copied.
+    $cli = Get-RPSetupCli -InstallDir $InstallDir
+    $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('maintenance', 'on', '--minutes', '240', '--reason', ('update to {0}' -f $version))
+    try {
+        Stop-RPService -Name $script:Services.Watchdog
+        Stop-RPService -Name $script:Services.Server
+        $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('update-snapshot', 'create')
+    } catch {
+        $reason = [string]$_
+        Write-RPLog ('The update cannot go ahead: {0}' -f $reason)
+        try {
+            Start-RPService -Name $script:Services.Server
+            Start-RPService -Name $script:Services.Watchdog
+        } catch {
+            Write-RPLog ('Starting the services again failed: {0}' -f $_)
+        }
+        return (& $failed ('{0} Nothing was changed.' -f $reason))
+    }
+
+    # 4. The installer, then the health check.
+    Write-RPLog ('Running the installer of version {0}.' -f $version)
+    $code = Invoke-RPInstallerProgram -Path $installer
+    if ($code -eq 2) {
+        # The installed version's files could not be replaced; the installer started it again.
+        try { $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('update-snapshot', 'drop') } catch { Write-RPLog ('Could not drop the database copy: {0}' -f $_) }
+        return (& $failed ('The installed version''s files could not be replaced, so version {0} carries on. Restart the PC and try again.' -f $Current))
+    }
+    $reason = $null
+    if ($code -ne 0) {
+        $reason = 'The installer of version {0} failed (exit {1}).' -f $version, $code
+    } elseif ($Force) {
+        $reason = 'The health check was made to fail on purpose (scenario S9).'
+    } else {
+        $health = Wait-RPHealthyServer -Cli (Get-RPSetupCli -InstallDir $InstallDir) -InstallationFile $InstallationFile -Version $version -TimeoutSeconds $HealthTimeout -StableSeconds $Stable
+        if (-not $health.Healthy) { $reason = $health.Reason }
+    }
+
+    # 5. Done, or back.
+    if ($null -eq $reason) {
+        try {
+            $null = Invoke-RPSetupCli -Cli (Get-RPSetupCli -InstallDir $InstallDir) -InstallationFile $InstallationFile -ArgumentList @('update-snapshot', 'drop')
+        } catch {
+            Write-RPLog ('Could not drop the database copy (it can be dropped later): {0}' -f $_)
+        }
+        Remove-RPOldInstaller -InstallersDir $folders.InstallersDir -Keep @($version, $Current)
+        Write-RPLog ('Version {0} is installed and healthy.' -f $version)
+        return [pscustomobject]@{ Outcome = 'INSTALLED'; Error = $null }
+    }
+    Write-RPLog ('The update failed: {0}' -f $reason)
+    $rollback = @{
+        DataDir              = $DataDir
+        InstallDir           = $InstallDir
+        InstallationFile     = $InstallationFile
+        RequestId            = [string]$request.requestId
+        FailedVersion        = $version
+        PreviousVersion      = $Current
+        PreviousInstaller    = $previous
+        HealthTimeoutSeconds = $HealthTimeout
+        StableSeconds        = $Stable
+    }
+    $back = Invoke-RPUpdateRollback @rollback
+    if ($null -eq $back) {
+        return [pscustomobject]@{ Outcome = 'ROLLED_BACK'; Error = $reason }
+    }
+    & $failed ('{0} Going back to version {1} failed too: {2}. Call support.' -f $reason, $Current, $back)
+}
+
 function Get-RPExitCode {
     <# The exit code for a failure: 3 when deleting the data was not allowed, else 1. #>
     [CmdletBinding()]
@@ -1293,6 +2082,31 @@ function Get-RPExitCode {
 
 Export-ModuleMember -Function @(
     'Add-RPFirewallRule',
+    'Compare-RPVersion',
+    'ConvertTo-RPUpdateRequest',
+    'Get-RPAuthenticode',
+    'Get-RPFileSha256',
+    'Get-RPInstallerFile',
+    'Get-RPParentPath',
+    'Get-RPInstallerFileName',
+    'Get-RPProperty',
+    'Get-RPUpdatePolicy',
+    'Get-RPUpdaterAclPlan',
+    'Get-RPUpdaterPath',
+    'Get-RPUpdateTaskXml',
+    'Get-RPWindowsPowerShell',
+    'Invoke-RPInstallerProgram',
+    'Invoke-RPUpdate',
+    'Invoke-RPUpdateRollback',
+    'Invoke-RPUpdateStep',
+    'Register-RPUpdateTask',
+    'Remove-RPOldInstaller',
+    'Save-RPInstaller',
+    'Test-RPInstallerSignature',
+    'Unregister-RPUpdateTask',
+    'Wait-RPHealthyServer',
+    'Write-RPJsonFile',
+    'Write-RPTextFile',
     'Assert-RPAdministrator',
     'Assert-RPDataDir',
     'Assert-RPDeletableDataDir',
@@ -1331,6 +2145,7 @@ Export-ModuleMember -Function @(
     'Invoke-RPUninstall',
     'Join-RPPath',
     'Read-RPInstallationFile',
+    'Read-RPTextFile',
     'Remove-RPFirewallRule',
     'Remove-RPFolder',
     'Remove-RPService',

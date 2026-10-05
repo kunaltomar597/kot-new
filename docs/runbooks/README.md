@@ -25,3 +25,7 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `windows-installer.md`: the installer's PowerShell: the data drive, folder permissions, the
   services' accounts and recovery, the firewall for the staff network, repair, and uninstalling
   with the data kept or deleted with the Owner's permission (P0-16c).
+- `software-updates.md`: how an update reaches the restaurant PC and installs itself: the
+  download and its checks, the maintenance window and "Install now", the backup, the hand-off to
+  the updater (SYSTEM), the health check, going back to the previous version and its database,
+  signing, and what to do when something fails (P7-04c).

@@ -92,6 +92,13 @@ pnpm --filter @rp/desktop package:win       (apps/desktop/release/RestaurantPlat
   In CI they are the secrets `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD`, which
   wait for the code-signing certificate (Owner checklist). Without them the installer is unsigned
   and Windows SmartScreen warns about it.
+- Updates (UPD-007, P7-04c): `RP_UPDATE_PUBLISHER`, the certificate's subject, is the signer every
+  update must carry on the PCs this installer sets up; `RP_ALLOW_UNSIGNED_UPDATES=1` lets a test
+  build take unsigned updates. A signed build refuses to build without the publisher or with
+  unsigned updates allowed. In CI the publisher is the repository variable of that name, and the
+  builds allow unsigned updates while it is unset (`software-updates.md`, "Signing").
+- `package:win --product-version <v>` builds the staged payload as another version: the CI job's
+  update test (scenario S9) installs one version and updates it to the next.
 - Node.js, PostgreSQL and WinSW are downloaded once into `node_modules/.cache/rp-installer` and
   checked against the SHA-256 pinned in `apps/desktop/src/packaging/components.ts` every time. To
   update one, change its version, address and hash together.
@@ -103,14 +110,15 @@ builds a test installer whose server would not run on Windows.
 
 ## The scripts
 
-| Script                             | What it does                                                                                      | Exit codes                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `Install-RestaurantPlatform.ps1`   | Installs, or repairs when the installation file exists already.                                   | 0 done, 1 failed                             |
-| `Uninstall-RestaurantPlatform.ps1` | Removes the services and firewall rules. Keeps the data unless `-DeleteData` (below).             | 0 done, 1 failed, 3 deleting was not allowed |
-| `Get-DataDriveChoice.ps1`          | Prints the drives and the default data drive as JSON (and `-IniFile`: as INI for the drive page). | 0                                            |
-| `Stop-RestaurantPlatform.ps1`      | Stops the services before the installer replaces the files (update, repair).                      | 0 done, 1 failed                             |
-| `Start-RestaurantPlatform.ps1`     | Starts them again when an update could not replace the files.                                     | 0 done, 1 failed                             |
-| `RestaurantPlatform.Setup.psm1`    | The functions they call.                                                                          |                                              |
+| Script                             | What it does                                                                                           | Exit codes                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `Install-RestaurantPlatform.ps1`   | Installs, or repairs when the installation file exists already.                                        | 0 done, 1 failed                             |
+| `Uninstall-RestaurantPlatform.ps1` | Removes the services and firewall rules. Keeps the data unless `-DeleteData` (below).                  | 0 done, 1 failed, 3 deleting was not allowed |
+| `Get-DataDriveChoice.ps1`          | Prints the drives and the default data drive as JSON (and `-IniFile`: as INI for the drive page).      | 0                                            |
+| `Stop-RestaurantPlatform.ps1`      | Stops the services before the installer replaces the files (update, repair).                           | 0 done, 1 failed                             |
+| `Start-RestaurantPlatform.ps1`     | Starts them again when an update could not replace the files.                                          | 0 done, 1 failed                             |
+| `Update-RestaurantPlatform.ps1`    | The updater (P7-04c): installs a requested update and goes back when it fails (`software-updates.md`). | 0 ran (see its outcome), 1 failed            |
+| `RestaurantPlatform.Setup.psm1`    | The functions they call.                                                                               |                                              |
 
 They run on Windows PowerShell 5.1, which every Windows 10 and 11 PC has:
 
@@ -119,8 +127,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File Install-RestaurantPlatfo
   -InstallDir "C:\Program Files\Restaurant Platform" -ProductVersion 1.0.0 ^
   [-DataDir D:\RestaurantPlatform] [-StaffSubnet 192.168.10.0/24] [-Port 8080] [-MqttPort 8883] ^
   [-PgPort 5432] [-TlsHostnames pos.local] [-ControlPlaneUrl https://...] [-RelayUrl https://...] ^
-  [-QrSiteUrl https://...] [-ErrorDsn https://...] [-MinFreeGB 20] [-LogFile ...]
+  [-QrSiteUrl https://...] [-ErrorDsn https://...] [-MinFreeGB 20] [-LogFile ...] ^
+  [-InstallerPath <the installer>] [-UpdatePublisher "CN=..."] [-AllowUnsignedUpdates]
 ```
+
+The installer passes `-InstallerPath` (itself) and the update settings its build was given.
 
 Each run writes a log. An install or repair writes it to
 `%ProgramData%\RestaurantPlatform\setup-logs\install-<time>.log`. An uninstall writes it to
@@ -181,7 +192,10 @@ a changed letter) rather than start an empty restaurant; both change nothing. Ev
    - `RPWatchdog` stays LocalSystem, so it can start and stop the other services.
    - Both start at boot. Windows restarts them 1, 2 and 5 seconds after a failure, also when they
      stop with an error (`failureflag`).
-9. The firewall rules (below).
+9. The firewall rules (below). Then the updater (P7-04c): its scripts are copied to
+   `%ProgramData%\RestaurantPlatform\updater` and its scheduled task `\RestaurantPlatform\Update`
+   (SYSTEM, started only by the watchdog) is registered again; the installer that is running is
+   kept in `%ProgramData%\RestaurantPlatform\installers`, so a failed update can go back to it.
 10. `RPServer` is started, and the run waits up to 3 minutes for `setup-cli status` to say
     `RUNNING`. If the server does not get there, the run fails with the host's last error. Then
     `RPWatchdog` is started.
@@ -228,8 +242,10 @@ Windows firewall cannot filter by domain name. The site-readiness checklist (P8-
 
 ## Uninstalling and the data (NFR-I02)
 
-Uninstalling removes `RPWatchdog` first (or it would start the others again), then `RPServer`,
-then `RPDatabase`, then the firewall group. The uninstaller then removes the program files.
+Uninstalling removes the updater's scheduled task first (so no update starts), then `RPWatchdog`
+(or it would start the others again), then `RPServer`, then `RPDatabase`, then the firewall group.
+The uninstaller then removes the program files. The kept installers stay with the installation
+file.
 
 The data stays in `<data>`, and so does the installation file. Installing again finds the data
 (the default drive is the one that holds it) and carries on: same database, same secrets, same

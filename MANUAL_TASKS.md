@@ -26,8 +26,10 @@ code from going live:
 - [ ] Cloud hosting in India + cloud KMS / secrets manager (Control Plane, licence-signing key).
 - [ ] Windows code-signing certificate (signed installer and updates). Put it into the repository's
       Actions secrets as `WINDOWS_CERTIFICATE_P12` (the .p12 file in base64) and
-      `WINDOWS_CERTIFICATE_PASSWORD`; the CI job "Windows installer" then signs
-      (`docs/runbooks/windows-installer.md`, "Building it").
+      `WINDOWS_CERTIFICATE_PASSWORD`, and its subject (`certutil -dump`, "Subject:") into the
+      repository variable `RP_UPDATE_PUBLISHER`; the CI job "Windows installer" then signs, and the
+      installed PCs accept only updates signed with it (`docs/runbooks/windows-installer.md`,
+      "Building it"; `docs/runbooks/software-updates.md`, "Signing").
 - [ ] Supabase organisation, Mumbai region (QR relay), then deploy the relay schema and give the
       edge functions their login: [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).
 - [ ] Host the QR menu site (Next.js, India region) on its domain:

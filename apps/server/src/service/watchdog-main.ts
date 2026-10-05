@@ -3,9 +3,12 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
   defaultInstallationFile,
+  programDataDir,
   readInstallationFile,
   SERVICE_NAMES,
+  UPDATER_TASK,
 } from '../installation/installation.js';
+import { readUpdateOutcome, readUpdateRequest } from '../updates/update-files.js';
 import { probeHealth } from './health-probe.js';
 import { hostStatePath, readHostState } from './host-state.js';
 import { maintenancePath, readMaintenance } from './maintenance.js';
@@ -25,9 +28,11 @@ async function main(): Promise<void> {
   });
   if (process.platform !== 'win32') throw new Error('The watchdog runs on Windows only');
   const log = jsonLog('watchdog');
-  const installation = await readInstallationFile(values.installation ?? defaultInstallationFile());
+  const installationFile = values.installation ?? defaultInstallationFile();
+  const installation = await readInstallationFile(installationFile);
+  const control = new WindowsServiceControl();
   const watchdog = new Watchdog({
-    control: new WindowsServiceControl(),
+    control,
     services: { database: SERVICE_NAMES.database, server: SERVICE_NAMES.server },
     readHost: () => readHostState(hostStatePath(installation.dataDir)),
     probe: () =>
@@ -37,6 +42,10 @@ async function main(): Promise<void> {
       }),
     maintenance: async () =>
       (await readMaintenance(maintenancePath(installation.dataDir), new Date())) !== null,
+    pendingUpdate: async () => (await readUpdateRequest(installation.dataDir))?.requestId ?? null,
+    updateTaken: async (requestId) =>
+      (await readUpdateOutcome(programDataDir(installationFile)))?.requestId === requestId,
+    runUpdater: () => control.runTask(UPDATER_TASK),
     log,
   });
   const stop = () => {

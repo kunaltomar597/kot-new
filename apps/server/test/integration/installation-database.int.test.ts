@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,6 +29,18 @@ import {
   readMigrations,
 } from '../../src/installation/migrations.js';
 import { initPostgres } from '../../src/installation/postgres-setup.js';
+import {
+  createUpdateSnapshot,
+  dropUpdateSnapshot,
+  failedDatabaseName,
+  runPendingUpdateRollback,
+  snapshotDatabaseName,
+  UpdateRollbackOutcome,
+  updateRollbackOutcomePath,
+  updateRollbackRequestPath,
+  UpdateSnapshotError,
+} from '../../src/installation/update-snapshot.js';
+import { prepareSteps } from '../../src/service/service-host-main.js';
 
 /**
  * The installer's database steps on a real PostgreSQL 16 (P0-16b): `initdb` with the settings it
@@ -290,5 +310,191 @@ describe.skipIf(asRoot)('[ONB-001] [DATA-001] [AUD-004] the installer sets up Po
         `SELECT count(*)::int AS n FROM _prisma_migrations WHERE migration_name LIKE '%broken'`,
       ),
     ).toEqual([{ n: 0 }]);
+  });
+  const databases = async () =>
+    (
+      await query<{ name: string }>(
+        url('admin', 'postgres'),
+        "SELECT datname AS name FROM pg_database WHERE datname LIKE 'restaurant%' ORDER BY 1",
+      )
+    ).map((row) => row.name);
+  const snapshotCode = (promise: Promise<unknown>) =>
+    promise.then(
+      () => 'none',
+      (error: unknown) => (error instanceof UpdateSnapshotError ? error.code : String(error)),
+    );
+
+  it('[UPD-005] copies the database before an update, only with the server stopped', async () => {
+    const admin = url('admin', 'postgres');
+    expect(snapshotDatabaseName('restaurant')).toBe('restaurant_before_update');
+    expect(snapshotDatabaseName('r'.repeat(63))).toHaveLength(63);
+    const server = new pg.Client({ connectionString: url('server') });
+    await server.connect();
+    try {
+      expect(
+        await snapshotCode(
+          createUpdateSnapshot({ adminUrl: admin, database: 'restaurant', freeBytes: null }),
+        ),
+      ).toBe('DATABASE_IN_USE');
+    } finally {
+      await server.end();
+    }
+    expect(
+      await snapshotCode(
+        createUpdateSnapshot({ adminUrl: admin, database: 'restaurant', freeBytes: 1_000 }),
+      ),
+    ).toBe('NOT_ENOUGH_SPACE');
+    expect(
+      await snapshotCode(
+        createUpdateSnapshot({ adminUrl: admin, database: 'nowhere', freeBytes: null }),
+      ),
+    ).toBe('NO_DATABASE');
+    const made = await createUpdateSnapshot({
+      adminUrl: admin,
+      database: 'restaurant',
+      freeBytes: null,
+    });
+    expect(made.snapshot).toBe('restaurant_before_update');
+    expect(made.sizeBytes).toBeGreaterThan(1_000_000);
+    expect(await databases()).toEqual(['restaurant', 'restaurant_before_update']);
+    // The copy is the restaurant's: same owner, same tables, the server may read it.
+    const [owner] = await query<{ owner: string }>(
+      admin,
+      "SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = 'restaurant_before_update'",
+    );
+    const [original] = await query<{ owner: string }>(
+      admin,
+      "SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = 'restaurant'",
+    );
+    expect(owner).toEqual(original);
+    expect(
+      await query(
+        url('server', 'restaurant_before_update'),
+        'SELECT count(*)::int AS n FROM later_things',
+      ),
+    ).toEqual([{ n: 1 }]);
+    // Taken again, it replaces the older copy; dropped once the new version is healthy.
+    await createUpdateSnapshot({ adminUrl: admin, database: 'restaurant', freeBytes: null });
+    expect(await dropUpdateSnapshot({ adminUrl: admin, database: 'restaurant' })).toBe(true);
+    expect(await dropUpdateSnapshot({ adminUrl: admin, database: 'restaurant' })).toBe(false);
+    expect(await databases()).toEqual(['restaurant']);
+  });
+
+  it('[UPD-005] refuses to copy a database with a migration left half done', async () => {
+    await query(
+      url('migrator'),
+      `INSERT INTO _prisma_migrations (id, checksum, migration_name, started_at)
+       VALUES ('half-done', 'x', '29991231000002_half_done', now())`,
+    );
+    try {
+      expect(
+        await snapshotCode(
+          createUpdateSnapshot({
+            adminUrl: url('admin', 'postgres'),
+            database: 'restaurant',
+            freeBytes: null,
+          }),
+        ),
+      ).toBe('MIGRATION_HALF_DONE');
+    } finally {
+      await query(url('admin'), `DELETE FROM _prisma_migrations WHERE id = 'half-done'`);
+    }
+  });
+
+  it('[UPD-005] goes back to the copy before the server starts, keeping the failed database', async () => {
+    const dataDir = installation.dataDir;
+    await createUpdateSnapshot({
+      adminUrl: url('admin', 'postgres'),
+      database: 'restaurant',
+      freeBytes: null,
+    });
+    // The new version migrates and writes before it fails its health check.
+    await query(url('migrator'), 'CREATE TABLE "from_new_version" ("id" TEXT PRIMARY KEY)');
+    await query(
+      url('admin'),
+      `INSERT INTO later_things VALUES ('new', 'written after the update')`,
+    );
+    // The updater writes the request where only administrators write (ProgramData).
+    const programData = mkdtempSync(join(tmpdir(), 'rp-programdata-'));
+    const requestFile = updateRollbackRequestPath(programData);
+    writeFileSync(
+      requestFile,
+      // As Windows PowerShell 5.1 writes UTF-8.
+      `\uFEFF${JSON.stringify({ format: 1, requestId: 'rollback-1', version: '1.1.0', requestedAt: new Date().toISOString() })}`,
+    );
+    const prepare = async () => {
+      const phases: string[] = [];
+      const logged: string[] = [];
+      await prepareSteps(installation, {
+        restore: {},
+        migratorUrl: url('migrator'),
+        adminUrl: url('admin', 'postgres'),
+        rollbackRequestFile: requestFile,
+      })({
+        signal: new AbortController().signal,
+        phase: (phase) => phases.push(phase),
+        log: (_level, message) => logged.push(message),
+      });
+      return { phases, logged };
+    };
+    const { phases, logged } = await prepare();
+    expect(phases).toEqual(['WAITING_FOR_DATABASE', 'RESTORING', 'MIGRATING']);
+    expect(logged).toContain('Switched back to the database from before the failed update');
+    expect(await databases()).toEqual(['restaurant', failedDatabaseName('restaurant')]);
+    expect(
+      await query(url('server'), `SELECT to_regclass('public.from_new_version') IS NULL AS gone`),
+    ).toEqual([{ gone: true }]);
+    expect(await query(url('server'), 'SELECT id FROM later_things ORDER BY id')).toEqual([
+      { id: 'a' },
+    ]);
+    // Support finds what the failed version wrote.
+    expect(
+      await query(
+        url('admin', failedDatabaseName('restaurant')),
+        'SELECT id FROM later_things ORDER BY id',
+      ),
+    ).toEqual([{ id: 'a' }, { id: 'new' }]);
+    expect(
+      UpdateRollbackOutcome.parse(
+        JSON.parse(readFileSync(updateRollbackOutcomePath(dataDir), 'utf8')),
+      ),
+    ).toMatchObject({
+      requestId: 'rollback-1',
+      version: '1.1.0',
+      ok: true,
+      failedDatabase: 'restaurant_failed_update',
+    });
+    // The service host cannot remove the request; it runs it once, by its id.
+    expect(existsSync(requestFile)).toBe(true);
+    expect((await prepare()).phases).toEqual(['WAITING_FOR_DATABASE', 'MIGRATING']);
+    expect(await databases()).toEqual(['restaurant', failedDatabaseName('restaurant')]);
+  });
+
+  it('[UPD-005] says so when there is no copy to go back to, and does not try again', async () => {
+    const requestFile = updateRollbackRequestPath(mkdtempSync(join(tmpdir(), 'rp-programdata-')));
+    const options = {
+      requestFile,
+      dataDir: installation.dataDir,
+      adminUrl: url('admin', 'postgres'),
+      database: 'restaurant',
+    };
+    expect(await runPendingUpdateRollback(options)).toBeNull();
+    writeFileSync(
+      requestFile,
+      JSON.stringify({
+        format: 1,
+        requestId: 'rollback-2',
+        version: '1.1.0',
+        requestedAt: new Date().toISOString(),
+      }),
+    );
+    const outcome = await runPendingUpdateRollback(options);
+    expect(outcome).toMatchObject({
+      requestId: 'rollback-2',
+      ok: false,
+      error: expect.stringMatching(/no copy of the database/) as unknown,
+    });
+    expect(await databases()).toEqual(['restaurant', failedDatabaseName('restaurant')]);
+    expect(await runPendingUpdateRollback(options)).toBeNull();
   });
 });

@@ -1970,6 +1970,8 @@ model RelayServiceRequest {
 enum BackupKind {
   NIGHTLY
   MANUAL
+  /// Before a software update (UPD-005, P7-04c).
+  UPDATE
 }
 
 enum BackupStatus {

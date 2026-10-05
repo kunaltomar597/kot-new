@@ -20,6 +20,7 @@ import pg from 'pg';
 import { AuditService } from '../../src/audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../../src/auth/secret-store.js';
 import { readOfferedUpdate } from '../../src/cloud/control-plane-state.js';
+import { readUpdateReport, saveUpdateReport } from '../../src/updates/update-state.js';
 import { enrolInstallation } from '../../src/cloud/enrolment.js';
 import {
   CONTROL_PLANE_OPTIONS,
@@ -401,6 +402,33 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     const back = await heartbeats.beat();
     expect(back.lastError).toBeNull();
     expect(back.offeredUpdate).toMatchObject({ version: '1.1.0' });
+  });
+
+  it('[UPD-003] [UPD-005] reports how an update went until the Control Plane has it', async () => {
+    const at = new Date().toISOString();
+    await saveUpdateReport(prisma, {
+      version: '1.1.0',
+      outcome: 'ROLLED_BACK',
+      at,
+      error: 'Version 1.1.0 did not pass its health check.',
+    });
+    expect((await heartbeats.beat()).lastError).toBeNull();
+    const client = new pg.Client({ connectionString: cpDatabase.url });
+    await client.connect();
+    try {
+      const { rows } = await client.query<{ outcome: string; error: string | null }>(
+        `SELECT i.outcome, i.error FROM release_installs i JOIN releases r ON r.id = i.release_id
+          WHERE i.installation_id = $1 AND r.version = '1.1.0'`,
+        [installationId],
+      );
+      expect(rows).toEqual([
+        { outcome: 'ROLLED_BACK', error: 'Version 1.1.0 did not pass its health check.' },
+      ]);
+    } finally {
+      await client.end();
+    }
+    // Delivered: the next heartbeat no longer carries it.
+    expect(await readUpdateReport(prisma)).toBeNull();
   });
 
   it('stops being accepted once the vendor revokes the installation', async () => {

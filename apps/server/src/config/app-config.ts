@@ -162,6 +162,14 @@ export const AppConfigSchema = z.object({
         .filter((key) => key !== ''),
     )
     .pipe(z.array(z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, 'RP_LICENCE_KEYS must be base64'))),
+  /**
+   * The Authenticode signer every update installer must carry (UPD-007, P7-04c): the vendor's
+   * code-signing certificate's subject, from the installer's build. Unset: updates are refused
+   * unless `updateAllowUnsigned` (test builds only).
+   */
+  updatePublisher: z.string().min(3).max(500).optional(),
+  /** Accept unsigned update installers (`RP_UPDATE_ALLOW_UNSIGNED=on`): test builds only. */
+  updateAllowUnsigned: booleanFlag,
   /** Extra host names for the server certificate, e.g. `pos.local` (comma-separated). */
   tlsHostnames: z
     .string()
@@ -225,6 +233,8 @@ export function loadConfig(
     mqttPort: env.RP_MQTT_PORT,
     tls: env.RP_TLS,
     tlsHostnames: env.RP_TLS_HOSTNAMES,
+    updatePublisher: env.RP_UPDATE_PUBLISHER === '' ? undefined : env.RP_UPDATE_PUBLISHER,
+    updateAllowUnsigned: env.RP_UPDATE_ALLOW_UNSIGNED,
     licenceEnforce: env.RP_LICENCE_ENFORCE,
     licenceKeys: env.RP_LICENCE_KEYS,
   });

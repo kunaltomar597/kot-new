@@ -19,7 +19,7 @@ import {
 } from './wal-archive.js';
 
 /** Full backup files (P7-05a), for the photos, TLS files and secrets. */
-const FULL_PATTERN = /^rp-backup-(\d{8}T\d{6}Z)-(nightly|manual)\.rpbk$/;
+const FULL_PATTERN = /^rp-backup-(\d{8}T\d{6}Z)-(nightly|manual|update)\.rpbk$/;
 /** How long the temporary PostgreSQL may take to replay the log. */
 const RECOVERY_TIMEOUT_MS = 2 * 60 * 60_000;
 const BEYOND_ARCHIVE = 'recovery ended before configured recovery target was reached';

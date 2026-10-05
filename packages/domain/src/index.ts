@@ -12,6 +12,7 @@ export * from './retention.js';
 export * from './digital-bill.js';
 export * from './semver.js';
 export * from './rollout.js';
+export * from './software-update.js';
 export * from './archive.js';
 export * from './tax.js';
 export * from './discount.js';

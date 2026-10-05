@@ -1,4 +1,4 @@
 {
-  "input": { "type": "string", "enum": ["NIGHTLY", "MANUAL"] },
-  "output": { "type": "string", "enum": ["NIGHTLY", "MANUAL"] }
+  "input": { "type": "string", "enum": ["NIGHTLY", "MANUAL", "UPDATE"] },
+  "output": { "type": "string", "enum": ["NIGHTLY", "MANUAL", "UPDATE"] }
 }

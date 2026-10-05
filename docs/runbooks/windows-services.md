@@ -39,16 +39,25 @@ then would only make that longer. It never restarts a server that answers its he
 To stop the services on purpose, set the maintenance flag first (below), or stop `RPWatchdog`
 before the others.
 
+The watchdog also starts the updater (P7-04c). When the server leaves an update request in
+`<data>\run\update-request.json`, the watchdog starts the scheduled task
+`\RestaurantPlatform\Update` once for that request; if the task cannot be started, it tries again
+a minute later. The task runs as SYSTEM, outside every service, because the installer stops them
+all (`software-updates.md`).
+
 ## Before the server starts
 
 Each time `RPServer` starts, and each time the server asks for a restart (exit code 75, a restore
 requested on the System page), the service host:
 
 1. waits for PostgreSQL to accept connections (at boot it may still be starting);
-2. runs the restore asked for on the System page, if there is one, with the administrator's login
+2. after a failed update, switches back to the database copied before it, when the updater asked
+   for it (`%ProgramData%\RestaurantPlatform\update-rollback.json`, P7-04c; once per request). The
+   failed version's database is kept as `restaurant_failed_update`;
+3. runs the restore asked for on the System page, if there is one, with the administrator's login
    (`restore-cli pending`). The server itself never gets that login;
-3. applies the migrations that are pending, as `rp_migrator`;
-4. starts the server.
+4. applies the migrations that are pending, as `rp_migrator`;
+5. starts the server.
 
 If a migration fails, the migration is undone whole, the server is not started, and the host tries
 again every 30 seconds. Its state file says why (`lastError`). Restore the last backup or ask
@@ -120,6 +129,14 @@ Other commands:
   watchdog leaves the services alone. It always expires (at most 4 hours), so an installer that
   crashed cannot leave the server down.
 - `status`: the service host's state and the maintenance flag, as JSON.
+- `health`: the server's health check over TLS (trusting only the installation's CA) with the
+  host's phase, server process and restarts, as JSON. Exit code 0 when the host runs the server and
+  it answers ok. The updater's health check after an update (P7-04c).
+- `update-snapshot create` and `update-snapshot drop`: the copy of the database the updater makes
+  before an update (the server must be stopped; it checks that no migration was left half done and
+  that the drive has room), and drops once the new version is healthy (`software-updates.md`).
+- `write-installation --update-publisher <subject> --allow-unsigned-updates on|off`: the signer
+  updates must carry (UPD-007); repair keeps the publisher when not given.
 - `paths`: the folders, ports and service names, as JSON, for the set-up scripts.
 - `data-deletion`: whether the Owner allowed the uninstaller to delete the data (exit code 0 when
   allowed, 3 when not; `windows-installer.md`).

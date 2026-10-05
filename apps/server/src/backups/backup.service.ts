@@ -76,8 +76,8 @@ export const DEFAULT_BACKUP_OPTIONS: BackupOptions = {
   now: () => new Date(),
 };
 
-/** Backup files: `rp-backup-20261003T043000Z-nightly.rpbk`. */
-const FILE_PATTERN = /^rp-backup-(\d{8}T\d{6}Z)-(nightly|manual)\.rpbk$/;
+/** Backup files: `rp-backup-20261003T043000Z-nightly.rpbk` (also `-manual`, `-update`). */
+const FILE_PATTERN = /^rp-backup-(\d{8}T\d{6}Z)-(nightly|manual|update)\.rpbk$/;
 /** The folder backups go in, under the data folder and under the second location. */
 const FULL_FOLDER = join('backups', 'full');
 const SECOND_FOLDER = 'rp-backups';
@@ -228,6 +228,17 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
   async backUpNow(principal: Principal): Promise<BackupRunView> {
     const run = await this.start('MANUAL', principal);
     return this.viewOf(run, await this.namesOf([run]));
+  }
+
+  /**
+   * The full backup before a software update (UPD-005, P7-04c): made and checked end to end like
+   * the nightly one, and waited for. Returns the finished run: SUCCEEDED or PARTIAL (checked on
+   * the data drive) lets the update go ahead.
+   */
+  async backUpForUpdate(): Promise<BackupRun> {
+    const run = await this.start('UPDATE');
+    await this.settled();
+    return this.prisma.backupRun.findUniqueOrThrow({ where: { id: run.id } });
   }
 
   /** Records the run as RUNNING (one at a time) and makes the backup in the background. */

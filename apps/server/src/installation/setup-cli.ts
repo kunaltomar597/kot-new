@@ -1,8 +1,9 @@
-import { access } from 'node:fs/promises';
+import { access, statfs } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createSecretStore } from '../auth/secret-store.js';
+import { probeHealth } from '../service/health-probe.js';
 import { hostStatePath, readHostState } from '../service/host-state.js';
 import {
   endMaintenance,
@@ -25,6 +26,7 @@ import {
 } from './installation.js';
 import { migrate } from './migrations.js';
 import { initPostgres, pgCtlRegisterArgs, runProgram } from './postgres-setup.js';
+import { createUpdateSnapshot, dropUpdateSnapshot } from './update-snapshot.js';
 import { writeServiceDefinitions } from './winsw.js';
 
 const USAGE = `Usage: node dist/installation/setup-cli.js <command> [--installation <file>] [options]
@@ -33,8 +35,9 @@ The installer runs these in order; each can run again (repair) without losing da
 
 write-installation  writes the installation file. Options: --install-dir, --data-dir,
                     --product-version, --port, --mqtt-port, --pg-port, --control-plane-url,
-                    --relay-url, --qr-site-url, --error-dsn, --tls-hostnames (comma-separated).
-                    On repair, values not given are kept.
+                    --relay-url, --qr-site-url, --error-dsn, --tls-hostnames (comma-separated),
+                    --update-publisher (the signer updates must carry), --allow-unsigned-updates
+                    on|off (test builds only). On repair, values not given are kept.
 secrets             makes the secrets that are missing (Windows DPAPI on the restaurant PC).
 postgres-init       creates PostgreSQL's data folder on the data drive if there is none, and
                     writes its settings (localhost only, UTC, WAL archiving) and pg_hba.conf.
@@ -45,6 +48,11 @@ service-files       writes the WinSW definitions of the server and watchdog serv
 maintenance on|off  while on (--minutes, at most 240; --reason), the watchdog leaves the services
                     alone.
 status              prints the service host's state and the maintenance flag.
+health              asks the server for its health check over TLS; prints it with the host's
+                    state as JSON. Exit code 0 when the server runs and answers ok, 1 when not.
+update-snapshot create|drop
+                    copies the database before an update (the server must be stopped), or drops
+                    the copy once the new version is healthy (the updater, P7-04c).
 paths               prints the folders, ports and service names as JSON (the set-up scripts').
 data-deletion       whether the Owner allowed the uninstaller to delete the data (System page),
                     as JSON; exit code 0 when allowed, 3 when not.
@@ -69,6 +77,8 @@ const OPTIONS = {
   'qr-site-url': { type: 'string' },
   'error-dsn': { type: 'string' },
   'tls-hostnames': { type: 'string' },
+  'update-publisher': { type: 'string' },
+  'allow-unsigned-updates': { type: 'string' },
   'secret-store': { type: 'string' },
   minutes: { type: 'string' },
   reason: { type: 'string' },
@@ -79,6 +89,12 @@ type Values = ReturnType<
 >['values'];
 
 const port = (value: string | undefined) => (value === undefined ? undefined : Number(value));
+
+function onOff(value: string, option: string): boolean {
+  if (value === 'on') return true;
+  if (value === 'off') return false;
+  throw new Error(`${option} takes on or off`);
+}
 
 /** The installation file from the options, over the one already there (repair). */
 async function installationFrom(path: string, values: Values): Promise<InstallationFile> {
@@ -118,6 +134,13 @@ async function installationFrom(path: string, values: Values): Promise<Installat
       database: existing?.postgres.database,
     },
     cloud,
+    updates: {
+      publisher: values['update-publisher'] ?? existing?.updates.publisher,
+      allowUnsigned:
+        values['allow-unsigned-updates'] === undefined
+          ? existing?.updates.allowUnsigned
+          : onOff(values['allow-unsigned-updates'], '--allow-unsigned-updates'),
+    },
   });
   if (!parsed.success) {
     const problems = parsed.error.issues
@@ -279,6 +302,47 @@ export async function runSetupCli(
         })}\n`,
       );
       return until === null ? 3 : 0;
+    }
+    case 'health': {
+      const [health, host] = await Promise.all([
+        probeHealth({ port: installation.server.port, caFile: join(paths.tlsDir, 'ca.crt') }),
+        readHostState(hostStatePath(installation.dataDir)),
+      ]);
+      out.write(
+        `${JSON.stringify({
+          productVersion: installation.productVersion,
+          health,
+          phase: host?.phase ?? null,
+          serverPid: host?.serverPid ?? null,
+          restarts: host?.restarts ?? null,
+          lastError: host?.lastError ?? null,
+        })}\n`,
+      );
+      return health === 'ok' && host?.phase === 'RUNNING' ? 0 : 1;
+    }
+    case 'update-snapshot': {
+      const passwords = await readDatabasePasswords(secrets);
+      const adminUrl = databaseUrl(installation, 'admin', passwords, 'postgres');
+      const database = installation.postgres.database;
+      if (argument === 'create') {
+        const space = await statfs(installation.dataDir).then(
+          (stats) => stats.bavail * stats.bsize,
+          () => null,
+        );
+        const result = await createUpdateSnapshot({ adminUrl, database, freeBytes: space, log });
+        log(`Copied the database to ${result.snapshot}.`);
+        return 0;
+      }
+      if (argument === 'drop') {
+        log(
+          (await dropUpdateSnapshot({ adminUrl, database }))
+            ? 'Dropped the copy from before the update.'
+            : 'There was no copy from before the update.',
+        );
+        return 0;
+      }
+      out.write(USAGE);
+      return 2;
     }
     case 'status': {
       const [host, maintenance] = await Promise.all([

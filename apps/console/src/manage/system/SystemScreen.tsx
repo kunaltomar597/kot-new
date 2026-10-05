@@ -72,6 +72,82 @@ function relayText(relay: SystemStatusResponse['qrRelay'], t: Translate): string
   return `${inStep}. ${t(relay.realtime ? 'systemPage.services.qrRelayRealtime' : 'systemPage.services.qrRelayPolling')}`;
 }
 
+type UpdateStatus = SystemStatusResponse['update'];
+
+/** What the update agent is doing (P7-04c), or null when there is nothing to say. */
+function agentLine(agent: UpdateStatus['agent'], t: Translate): ReactNode {
+  const version = agent.version ?? '';
+  const retry = agent.retryAt === null ? '' : displayDateTime(new Date(agent.retryAt)).time;
+  switch (agent.state) {
+    case 'DOWNLOADING':
+      return (
+        <p className="dashboard-section__hint">
+          {t('systemPage.update.agent.DOWNLOADING', { version })}
+        </p>
+      );
+    case 'DOWNLOAD_FAILED':
+    case 'PREPARE_FAILED':
+      return (
+        <p className="console-notice">
+          {t(`systemPage.update.agent.${agent.state}`, { error: agent.error ?? '', time: retry })}
+        </p>
+      );
+    case 'WAITING':
+      return agent.waitingFor === 'RETRY_APPROVAL' ? (
+        <p className="console-notice">{t('systemPage.update.agent.RETRY_APPROVAL')}</p>
+      ) : (
+        <p className="dashboard-section__hint">{t('systemPage.update.agent.READY')}</p>
+      );
+    case 'PREPARING':
+      return <p className="dashboard-section__hint">{t('systemPage.update.agent.PREPARING')}</p>;
+    case 'INSTALLING':
+      return (
+        <p className="console-notice" role="status">
+          {t('systemPage.update.agent.INSTALLING', { version })}
+        </p>
+      );
+    case 'UNAVAILABLE':
+      return <p className="console-notice">{agent.error}</p>;
+    case 'IDLE':
+      return null;
+  }
+}
+
+/** How the last update went (UPD-005): installed, rolled back with the backup, or not installed. */
+function OutcomeLines({
+  outcome,
+  t,
+}: {
+  outcome: NonNullable<UpdateStatus['agent']['lastOutcome']>;
+  t: Translate;
+}) {
+  const when = displayDateTime(new Date(outcome.at));
+  if (outcome.outcome === 'INSTALLED') {
+    return (
+      <p className="dashboard-section__hint">
+        {t('systemPage.update.outcome.INSTALLED', { version: outcome.version, ...when })}
+      </p>
+    );
+  }
+  return (
+    <>
+      <p className="console-notice">
+        {t(`systemPage.update.outcome.${outcome.outcome}`, {
+          version: outcome.version,
+          previous: outcome.previousVersion ?? '',
+          error: outcome.error ?? '',
+          ...when,
+        })}
+      </p>
+      {outcome.backupFileName === null ? null : (
+        <p className="dashboard-section__hint">
+          {t('systemPage.update.outcome.backup', { file: outcome.backupFileName })}
+        </p>
+      )}
+    </>
+  );
+}
+
 function Facts({ facts }: { facts: readonly (readonly [string, ReactNode])[] }) {
   return (
     <dl className="restaurant-facts">
@@ -269,6 +345,9 @@ export function SystemScreen() {
           <h3 id="system-update" className="device-group__heading">
             {t('systemPage.update.title')}
           </h3>
+          {update.agent.lastOutcome === null ? null : (
+            <OutcomeLines outcome={update.agent.lastOutcome} t={t} />
+          )}
           {offered === null ? (
             <p className="dashboard-section__hint">{t('systemPage.update.upToDate')}</p>
           ) : (
@@ -289,12 +368,14 @@ export function SystemScreen() {
               <p className="dashboard-section__hint">
                 {t('systemPage.update.window', update.maintenanceWindow)}
               </p>
-              {update.openTables > 0 ? (
+              {agentLine(update.agent, t)}
+              {update.openTables > 0 && update.agent.state !== 'INSTALLING' ? (
                 <p className="console-notice">
                   {t('systemPage.update.openTables', { count: update.openTables })}
                 </p>
               ) : null}
-              {update.installApproval === null ? (
+              {update.agent.state === 'INSTALLING' ? null : update.installApproval === null ||
+                update.agent.waitingFor === 'RETRY_APPROVAL' ? (
                 canInstall ? (
                   <div className="staff-row__actions">
                     <Button

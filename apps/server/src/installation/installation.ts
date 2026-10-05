@@ -52,6 +52,18 @@ export const InstallationFile = z.strictObject({
       errorDsn: HttpsUrl.optional(),
     })
     .prefault({}),
+  /**
+   * How updates are checked before they install (UPD-007, P7-04c), from the build that made the
+   * installer: the Authenticode signer every installer must carry (the code-signing certificate's
+   * subject). A build without a certificate has none; its updates are refused unless
+   * `allowUnsigned` (test builds only, never a signed release).
+   */
+  updates: z
+    .strictObject({
+      publisher: z.string().min(3).max(500).nullable().default(null),
+      allowUnsigned: z.boolean().default(false),
+    })
+    .prefault({}),
 });
 export type InstallationFile = z.infer<typeof InstallationFile>;
 
@@ -61,6 +73,12 @@ export const SERVICE_NAMES = {
   server: 'RPServer',
   watchdog: 'RPWatchdog',
 } as const;
+
+/**
+ * The updater's scheduled task (P7-04c): runs `Update-RestaurantPlatform.ps1` as SYSTEM. The
+ * installer registers it; the watchdog starts it when the server leaves an update request.
+ */
+export const UPDATER_TASK = '\\RestaurantPlatform\\Update';
 
 /** Where everything is, from the installation file (the layout P0-16d packages). */
 export interface InstallationPaths {
@@ -78,6 +96,8 @@ export interface InstallationPaths {
   readonly tlsDir: string;
   readonly backupsDir: string;
   readonly walStaging: string;
+  /** Downloaded updates, written by the server and checked again by the updater (P7-04c). */
+  readonly updatesDir: string;
 }
 
 export function installationPaths(installation: InstallationFile): InstallationPaths {
@@ -96,12 +116,21 @@ export function installationPaths(installation: InstallationFile): InstallationP
     tlsDir: join(dataDir, 'tls'),
     backupsDir: join(dataDir, 'backups'),
     walStaging: join(dataDir, 'backups', 'wal-staging'),
+    updatesDir: join(dataDir, 'updates'),
   };
 }
 
 /** The installation file's usual place. */
 export function defaultInstallationFile(env: NodeJS.ProcessEnv = process.env): string {
   return join(env.ProgramData ?? 'C:\\ProgramData', 'RestaurantPlatform', 'installation.json');
+}
+
+/**
+ * `%ProgramData%\RestaurantPlatform`, beside the installation file: administrators write it,
+ * everyone reads it. The updater's outcome and rollback request are there (P7-04c).
+ */
+export function programDataDir(installationFile: string = defaultInstallationFile()): string {
+  return dirname(installationFile);
 }
 
 export async function readInstallationFile(path: string): Promise<InstallationFile> {
@@ -129,7 +158,7 @@ export async function readInstallationFile(path: string): Promise<InstallationFi
 /** Written beside it, then renamed over it, so a reader never sees half a file. */
 export async function writeInstallationFile(
   path: string,
-  installation: InstallationFile,
+  installation: z.input<typeof InstallationFile>,
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const checked = InstallationFile.parse(installation);
@@ -212,6 +241,10 @@ export function serverEnvironment(
   if (installation.server.tlsHostnames.length > 0) {
     env.RP_TLS_HOSTNAMES = installation.server.tlsHostnames.join(',');
   }
+  if (installation.updates.publisher !== null) {
+    env.RP_UPDATE_PUBLISHER = installation.updates.publisher;
+  }
+  if (installation.updates.allowUnsigned) env.RP_UPDATE_ALLOW_UNSIGNED = 'on';
   const { controlPlaneUrl, relayUrl, qrSiteUrl, errorDsn } = installation.cloud;
   if (controlPlaneUrl !== undefined) env.RP_CONTROL_PLANE_URL = controlPlaneUrl;
   if (relayUrl !== undefined) env.RP_RELAY_URL = relayUrl;
