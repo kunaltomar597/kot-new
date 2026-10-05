@@ -4,7 +4,15 @@ import {
   type Kiosk,
   type KeyValueStore,
 } from '@rp/mobile-core';
-import { Note, Screen, useDeviceSession, useLive, useMenu, useT } from '@rp/mobile-shell';
+import {
+  Note,
+  Screen,
+  useAppUpdateWhenFree,
+  useDeviceSession,
+  useLive,
+  useMenu,
+  useT,
+} from '@rp/mobile-shell';
 import { ThemeProvider } from '@rp/ui-native';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -46,6 +54,8 @@ export function TabletHome({ store, kiosk, health, appVersion }: TabletDevice) {
   const closeStaff = useCallback(() => {
     setStaff(false);
   }, []);
+  // An over-the-air update restarts the app only between guests, never with staff at it (P7-04e1).
+  useAppUpdateWhenFree(staff || (tablet.table?.session ?? null) !== null);
 
   useEffect(() => {
     kiosk.keepScreenOn(true).catch(ignore);

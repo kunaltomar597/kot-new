@@ -33,7 +33,9 @@ Where things are:
 - `src/StaffPanel.tsx`: the hidden corner and leaving the kiosk with a manager's PIN.
 - `src/use-tablet.ts`, `src/branding.ts`: the table session hook; accent colours and photos.
 - `src/Root.tsx`: wires the device session and `MenuCache` to the Keystore key, the stores, the
-  LAN CA pinning and the kiosk module (`AndroidKiosk`).
+  LAN CA pinning and the kiosk module (`AndroidKiosk`), and over-the-air updates (`OtaUpdater`,
+  P7-04e1). An EAS update the server speaks restarts the tablet only between guests, with staff
+  mode closed (`docs/runbooks/app-updates.md`).
 - `app.config.ts`, `eas.json`, `.maestro/`: as in `apps/waiter-app` (packages `in.rp.tablet.dev`,
   `.preview`, `in.rp.tablet`). A tablet alerts nobody, so it blocks the notification, foreground
   service and vibration permissions that `@rp/mobile-native` brings for the waiter phone's

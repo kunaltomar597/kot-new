@@ -35,7 +35,9 @@ code from going live:
 - [ ] Host the QR menu site (Next.js, India region) on its domain:
       [`manual-tasks/21-qr-site.md`](manual-tasks/21-qr-site.md).
 - [ ] Legal review of the QR site's privacy notice and terms (drafts at `/privacy` and `/terms`).
-- [ ] Expo account + Android app-signing keystore (signed APKs, OTA updates).
+- [ ] Expo account + Android app-signing keystore (signed APKs, OTA updates), and the update
+      signing key of each app, then a check on a phone and a tablet:
+      [`manual-tasks/29-mobile-updates.md`](manual-tasks/29-mobile-updates.md).
 - [ ] MDM subscription (kiosk tablets, APK distribution).
 - [ ] Backup storage in India (S3-compatible), error monitoring (Sentry), transactional e-mail.
 - [ ] AI provider account and its key in the Control Plane's secret manager (AI menu import):

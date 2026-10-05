@@ -1,12 +1,14 @@
-import { DeviceSession, MemoryStore } from '@rp/mobile-core';
+import { DeviceSession, MemoryStore, OtaUpdater } from '@rp/mobile-core';
 import {
   alertRaisedFrame,
   alertView,
   FakeKeys,
   itemReadyFrame,
   SocketFactory,
+  STAFF,
 } from '@rp/mobile-core/testing';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import { App } from '../src/App';
 import { Restaurant, signedInApp, T2_SESSION, translator } from './restaurant';
 
@@ -26,6 +28,37 @@ function setup() {
   });
   return { restaurant, server, session, sockets };
 }
+
+describe('[UPD-001] over-the-air updates on a waiter phone', () => {
+  it('restart the app on a downloaded update only once nobody is signed in', async () => {
+    const { session } = setup();
+    await session.start();
+    await session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    await session.signIn(STAFF.WAITER.staffId, '4444');
+    const reload = jest.fn(() => Promise.resolve());
+    // The vendor's rollback to the APK's JavaScript: nothing to ask the server first.
+    const updater = new OtaUpdater({
+      session,
+      source: {
+        enabled: true,
+        emergencyLaunchReason: null,
+        check: () => Promise.resolve({ kind: 'rollback' }),
+        fetch: () => Promise.resolve({ kind: 'rollback' }),
+        reload,
+      },
+    });
+    Object.assign(AppState, { currentState: 'active' });
+    await render(<App session={session} translator={translator} updater={updater} />);
+    await act(() => updater.check());
+    expect(updater.getSnapshot().status).toBe('ready');
+    expect(reload).not.toHaveBeenCalled();
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByText('Tap your name')).toBeOnTheScreen();
+    expect(reload).toHaveBeenCalledTimes(1);
+    Object.assign(AppState, { currentState: undefined });
+  });
+});
 
 describe('[WTR-001] waiter app smoke flow', () => {
   it('pairs, signs a waiter in, shows live tables and signs out', async () => {

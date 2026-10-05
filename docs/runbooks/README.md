@@ -32,3 +32,6 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
   download and its checks, the maintenance window and "Install now", the backup, the hand-off to
   the updater (SYSTEM), the health check, going back to the previous version and its database,
   signing, and what to do when something fails (P7-04c).
+- `app-updates.md`: over-the-air updates of the waiter app and the table tablet: publishing with
+  EAS Update, which updates a device takes (only those its server speaks), when it restarts on
+  them, rolling back, and support (P7-04e1, ADR-0017).

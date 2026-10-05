@@ -6,6 +6,7 @@ import {
   type Kiosk,
   type KioskMode,
   MemoryStore,
+  OtaUpdater,
   TABLET_GUEST_KEYS,
 } from '@rp/mobile-core';
 import {
@@ -17,6 +18,7 @@ import {
   STAFF,
 } from '@rp/mobile-core/testing';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import { App } from '../src/App';
 import { accentColorsOf, STAFF_TAPS } from '../src/branding';
 import { locateRequest } from '../src/LocateOverlay';
@@ -381,6 +383,53 @@ describe('[TAB-001] [TAB-003] [TAB-015] the tablet at its table', () => {
     expect(accentColorsOf('#F2C94C')).toEqual({ accent: '#F2C94C', onAccent: '#000000' });
     expect(accentColorsOf(null)).toBeUndefined();
     expect(accentColorsOf('red')).toBeUndefined();
+  });
+});
+
+describe('[UPD-001] over-the-air updates on a table tablet', () => {
+  it('restart the app on a downloaded update only between guests', async () => {
+    const context = setup(true);
+    await context.session.start();
+    await context.session.pair('http://pos.test:3000', 'ABCD-EFGH');
+    const reload = jest.fn(() => Promise.resolve());
+    // The vendor's rollback to the APK's JavaScript: nothing to ask the server first.
+    const updater = new OtaUpdater({
+      session: context.session,
+      source: {
+        enabled: true,
+        emergencyLaunchReason: null,
+        check: () => Promise.resolve({ kind: 'rollback' }),
+        fetch: () => Promise.resolve({ kind: 'rollback' }),
+        reload,
+      },
+    });
+    Object.assign(AppState, { currentState: 'active' });
+    await render(
+      <App
+        session={context.session}
+        translator={translator}
+        device={context.device}
+        updater={updater}
+      />,
+    );
+    await online(context.sockets);
+    expect(await screen.findByTestId('open-table')).toBeOnTheScreen();
+    await act(() => updater.check());
+    expect(updater.getSnapshot().status).toBe('ready');
+    expect(reload).not.toHaveBeenCalled();
+
+    // The guests pay and leave: the tablet restarts on the update before the next ones sit down.
+    context.setOpen(false);
+    await act(async () => {
+      context.sockets.last.fire(
+        'event',
+        frame(1, 'TableClosed', { tableId: TABLE_ID, tableSessionId: SESSION_ID }),
+      );
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('idle-screen')).toBeOnTheScreen();
+    expect(reload).toHaveBeenCalledTimes(1);
+    Object.assign(AppState, { currentState: undefined });
   });
 });
 

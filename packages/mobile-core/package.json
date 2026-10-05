@@ -28,6 +28,7 @@
   "dependencies": {
     "@rp/api-client": "workspace:*",
     "@rp/contracts": "workspace:*",
+    "@rp/domain": "workspace:*",
     "@rp/ordering": "workspace:*"
   }
 }

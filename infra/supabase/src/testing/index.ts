@@ -190,6 +190,16 @@ export async function startRelay(options: {
     await lock.end();
   }
   const admin = new pg.Pool({ connectionString: database.url, max: 6 });
+  // `end()` resolves before the last clients have closed their sockets, and dropping the database
+  // then terminates them (57P01). Once stopping, that is expected; before it, it still fails.
+  let stopping = false;
+  const unlessStopping = (error: Error) => {
+    if (!stopping) throw error;
+  };
+  admin.on('error', unlessStopping);
+  admin.on('connect', (client) => {
+    client.on('error', unlessStopping);
+  });
   // The port is known only once listening, so the photo store learns its address after.
   let origin = '';
   const files = new Map<string, Uint8Array>();
@@ -290,6 +300,7 @@ export async function startRelay(options: {
       cutOff = null;
     },
     async stop() {
+      stopping = true;
       await realtime?.close();
       http.closeAllConnections();
       await new Promise<void>((resolve) => {
