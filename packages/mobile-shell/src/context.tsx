@@ -1,11 +1,27 @@
 import type { Translator } from '@rp/i18n';
-import type { DeviceSession, DeviceSessionSnapshot } from '@rp/mobile-core';
+import type {
+  DeviceSession,
+  DeviceSessionSnapshot,
+  OtaSnapshot,
+  OtaUpdater,
+} from '@rp/mobile-core';
 import { ThemeProvider, type UiStrings, UiStringsProvider } from '@rp/ui-native';
-import { createContext, type ReactNode, use, useMemo, useSyncExternalStore } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+import { AppState } from 'react-native';
 
 interface Shell {
   readonly session: DeviceSession;
   readonly t: Translator;
+  /** The app's over-the-air updates (P7-04e1); absent in tests and tools. */
+  readonly updater: OtaUpdater | undefined;
 }
 
 const ShellContext = createContext<Shell | null>(null);
@@ -25,17 +41,22 @@ export function uiStrings(t: Translator): UiStrings {
   };
 }
 
-/** Gives the screens the device session, the catalogue and the theme. */
+/** Gives the screens the device session, the catalogue, the app's updates and the theme. */
 export function ShellProvider({
   session,
   translator,
+  updater,
   children,
 }: {
   session: DeviceSession;
   translator: Translator;
+  updater?: OtaUpdater;
   children: ReactNode;
 }) {
-  const shell = useMemo(() => ({ session, t: translator }), [session, translator]);
+  const shell = useMemo(
+    () => ({ session, t: translator, updater }),
+    [session, translator, updater],
+  );
   const strings = useMemo(() => uiStrings(translator), [translator]);
   return (
     <ShellContext value={shell}>
@@ -66,4 +87,37 @@ export function useSessionState(): DeviceSessionSnapshot {
 /** The `t()` of the current catalogue. */
 export function useT(): Translator {
   return useShell().t;
+}
+
+const noUpdates = () => () => undefined;
+const noSnapshot = () => undefined;
+
+/** What the app's over-the-air updates are doing (P7-04e1); undefined without an updater. */
+export function useAppUpdate(): OtaSnapshot | undefined {
+  const { updater } = useShell();
+  return useSyncExternalStore(updater?.subscribe ?? noUpdates, updater?.getSnapshot ?? noSnapshot);
+}
+
+/**
+ * Tells the app's updates whether the device is in use (UPD-001): `inUse` from the app (a person
+ * signed in, guests at the table), and the app off the screen. A downloaded update restarts the
+ * app only while it is free; once the screen is gone, it counts as in use.
+ */
+export function useAppUpdateWhenFree(inUse: boolean): void {
+  const { updater } = useShell();
+  const [onScreen, setOnScreen] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setOnScreen(state === 'active');
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+  useEffect(() => {
+    updater?.setBusy(inUse || !onScreen);
+    return () => {
+      updater?.setBusy(true);
+    };
+  }, [updater, inUse, onScreen]);
 }

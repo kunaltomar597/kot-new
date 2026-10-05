@@ -1,11 +1,12 @@
 import type { Translator } from '@rp/i18n';
-import type { DeviceSession } from '@rp/mobile-core';
+import type { DeviceSession, OtaUpdater } from '@rp/mobile-core';
 import type { NotificationPermission } from '@rp/mobile-native';
 import {
   LoginScreen,
   PairingScreen,
   ShellProvider,
   UpdateRequiredScreen,
+  useAppUpdateWhenFree,
   useSessionState,
 } from '@rp/mobile-shell';
 import { ToastProvider } from '@rp/ui-native';
@@ -18,6 +19,8 @@ const WAITER_APP_ROLES = ['WAITER', 'MANAGER', 'OWNER'] as const;
 
 function Screens({ notifications }: { notifications: NotificationPermission | undefined }) {
   const { phase, person, clientTooOld } = useSessionState();
+  // An over-the-air update restarts the app only while nobody is signed in on it (P7-04e1).
+  useAppUpdateWhenFree(person !== undefined);
   if (phase === 'loading') return null;
   if (clientTooOld) return <UpdateRequiredScreen />;
   if (phase === 'unpaired') return <PairingScreen />;
@@ -33,19 +36,25 @@ function Screens({ notifications }: { notifications: NotificationPermission | un
 /**
  * The waiter app: pair, sign in with a PIN, then "My tables" and each table's orders (WTR-001 to
  * WTR-003, WTR-012), with the waiter's alerts on every screen and, through `notifications`, outside
- * the app (WTR-005, WTR-006).
+ * the app (WTR-005, WTR-006). `updater` brings over-the-air updates (P7-04e1).
  */
 export function App({
   session,
   translator,
   notifications,
+  updater,
 }: {
   session: DeviceSession;
   translator: Translator;
   notifications?: NotificationPermission;
+  updater?: OtaUpdater;
 }) {
   return (
-    <ShellProvider session={session} translator={translator}>
+    <ShellProvider
+      session={session}
+      translator={translator}
+      {...(updater !== undefined && { updater })}
+    >
       <ToastProvider>
         <StatusBar style="dark" />
         <Screens notifications={notifications} />

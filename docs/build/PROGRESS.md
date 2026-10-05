@@ -22,7 +22,8 @@ What exists:
   (P4-01), who may add, change, unlock or deactivate whom, with the roles each person may give
   (P4-02a), and planning the day's sections: the assignments a plan gives, the tables without a
   waiter and an earlier day's sections given again (P4-02b); when a software update may install
-  (P7-04c); client API versions, N-1 and the component version matrix (P7-04d). 352 tests.
+  (P7-04c); client API versions, N-1 and the component version matrix (P7-04d); which
+  over-the-air update a phone or tablet takes, and when it restarts on it (P7-04e1). 359 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -43,7 +44,7 @@ What exists:
   the System page and the backup made before an update (P7-04c); the client API version, the
   `x-rp-client` identity, the version matrix with each release, the apps to update on the Devices
   and System pages, and `pnpm contracts:compat` with the frozen versions in `docs/api/compat/`
-  (P7-04d, ADR-0016). 916 tests.
+  (P7-04d, ADR-0016). 930 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -103,7 +104,9 @@ What exists:
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
   the server from the pairing QR code and pinning its CA before the code is sent (P2-01d); the
   waiter phone's alert centre (P2-06a), which tells the Android notifier whom to listen for on its
-  first read and sends Acknowledge pressed on a notification (P2-06b). 61 tests.
+  first read and sends Acknowledge pressed on a notification (P2-06b); `OtaUpdater`, the apps'
+  over-the-air updates: an EAS update only when the server speaks its client API, applied while
+  the device is free (P7-04e1, ADR-0017). 91 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
@@ -117,7 +120,10 @@ What exists:
   and the fingerprint check for a typed address (P2-01d); the alert banner and list on every
   screen (P2-06a); the waiter phone's background alerts: a `specialUse` foreground service
   running a keep-alive JavaScript task, a notification per alert with Acknowledge, the ring and
-  vibration in the foreground, and `POST_NOTIFICATIONS` (P2-06b). Shell 34 tests, mobile-native 29.
+  vibration in the foreground, and `POST_NOTIFICATIONS` (P2-06b); `ExpoOtaUpdates` (`expo-updates`
+  with each update's client API) and the shell's `useAppUpdate`, `useAppUpdateWhenFree` and an
+  "Update this app" screen that says when an update is on its way (P7-04e1). Shell 43 tests,
+  mobile-native 38.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
@@ -132,7 +138,11 @@ What exists:
   the lock screen; it asks for notifications at sign-in and says when they are off; the table
   tablet blocks those permissions (P2-06b). The tables screen lists the open requests from the
   tables shown, and each table's screen its own, with Acknowledge and Resolve (P2-06d). A pager
-  the manager gives shows on the waiter's phone at once (P4-02b). Waiter app 53 tests.
+  the manager gives shows on the waiter's phone at once (P4-02b). Both apps take EAS updates only
+  when their server speaks the update's client API, never check by themselves, restart on one only
+  when free (the phone with nobody signed in, the tablet between guests), and build for preview or
+  production only with the update signing certificate (P7-04e1). Waiter app 69 tests, table
+  tablet 30.
 - `packages/ordering`: the ordering helpers the POS and the phones share (floor sections and tiles,
   "my tables", cart lines, the menu tree), moved out of the console (P2-02a); choices in words,
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
@@ -195,7 +205,7 @@ What exists:
   (P4-07b); "Removing the software" on the System page, where the Owner allows the uninstaller to
   delete the data for 30 minutes (P0-16c); the update agent's state and the last update's outcome
   on the System page (P7-04c); the apps to update on the Devices and System pages, and a console
-  older than its server that loads the new one (P7-04d). 367 tests, and 23 Playwright steps.
+  older than its server that loads the new one (P7-04d). 370 tests, and 23 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -231,8 +241,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P7-04e Phone and tablet updates (EAS Update gated by the server's client API, the in-app APK
-  updater).
+- P7-04e2 The in-app APK updater through the restaurant PC (APKs in the installer's payload, the
+  server's APK routes, Android's PackageInstaller; the spec is in `phase-7.md`).
 - P2-04b Pager firmware OTA distribution (needs the Control Plane firmware release, P7).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -410,6 +420,9 @@ Recommended next WPs (dependencies met):
   - [x] P7-04c The update agent on the restaurant PC (S9 runs in CI on the first push)
   - [x] P7-04d Client compatibility (N-1) and the version matrix
   - [ ] P7-04e Phone and tablet updates (EAS Update, the in-app APK updater)
+    - [x] P7-04e1 EAS Update gated by the server's client API (manual task 29 for the account
+          and keys)
+    - [ ] P7-04e2 The in-app APK updater through the restaurant PC
 - [x] P7-05 Backup and restore
   - [x] P7-05a Encrypted local backups
   - [x] P7-05b Restore
@@ -685,6 +698,33 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P7-04e1), ADR-0017:
+
+654. Phones and tablets never look for an EAS update by themselves (`checkAutomatically:
+NEVER`). The `OtaUpdater` checks when the device connects to its server, when the server
+     refuses it, and every 30 minutes. It downloads an update only when the server serves the
+     update's client API (its own or N-1), and judges again what the download brought. An update
+     for a newer server waits for the PC. One the server no longer serves, or one published
+     without its client API, is never taken.
+655. A downloaded update restarts the app only while the device is free:
+     - a waiter phone: nobody signed in and the app on screen;
+     - a table tablet: no guests at its table and staff mode closed;
+     - either: at once when the server refuses the app as it is.
+
+     Otherwise it launches at the next cold start, which was gated at download time.
+
+656. A channel's "roll back to embedded" is followed without asking the server: it is the
+     vendor's own undo, and a refused app then shows "Update this app".
+657. A preview or production build with EAS Update (`EAS_PROJECT_ID`) refuses to configure without
+     `certs/update-signing-certificate.pem`, so no release build takes unsigned updates (UPD-007).
+658. Each update carries its client API in `extra.clientApi`. The app config reads it from
+     `@rp/contracts`' source, and the apps' config tests check it against `CLIENT_API_VERSION`.
+659. The 30-minute check is a constant (`OTA_CHECK_INTERVAL_MS`), not a setting: the BRD gives no
+     ⚙ value, and a check costs one request to Expo and one to the PC.
+660. P7-04e split: P7-04e1 (this one) and P7-04e2 (the in-app APK updater). The APKs travel in
+     the restaurant PC's installer, so each PC serves the builds of its own release, and phones
+     update after their PC (ADR-0017, item 8).
 
 Decided 2026-10-05 (P7-04d), ADR-0016:
 
@@ -3434,6 +3474,90 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P7-04e1 Phone and tablet EAS updates gated by the server's client API
+
+Split P7-04e: P7-04e1 (this one) and P7-04e2, the in-app APK updater through the restaurant PC
+(spec in `phase-7.md`). Built over-the-air updates of the waiter app and the table tablet
+(ADR-0017, `docs/runbooks/app-updates.md`, manual task 29; decisions 654-660):
+
+- `@rp/domain` `app-update.ts`:
+  - `otaUpdateVerdict`: APPLY, WAIT_FOR_SERVER, NOT_SERVED or UNKNOWN, from the server's range
+    and the update's client API;
+  - `mayApplyAppUpdate`.
+- `@rp/mobile-core` `app-updates.ts`, `OtaUpdater`:
+  - checks on connecting, on a 426 refusal and every 30 minutes;
+  - reads `/version` before downloading, and judges again what the download brought;
+  - restarts the app when `setBusy(false)`, or at once when refused;
+  - reports failures and an emergency launch;
+  - a snapshot for the screens.
+- `@rp/mobile-native` `ota-updates.ts`: `ExpoOtaUpdates` over `expo-updates` (now its peer and
+  dev dependency), reading `extra.expoClient.extra.clientApi` from the manifest.
+- `@rp/mobile-shell`:
+  - `ShellProvider`'s `updater`;
+  - `useAppUpdate` and `useAppUpdateWhenFree` (the app's own "in use", plus `AppState`);
+  - "Update this app" says when an update is on its way (`mobile.update.onItsWay`).
+- Apps:
+  - `app.config.ts`:
+    - `checkAutomatically: NEVER`;
+    - `extra.clientApi`, read from the contracts' source;
+    - a preview or production build with `EAS_PROJECT_ID` and no signing certificate fails.
+  - The waiter app creates the updater with the screen (`appUpdater` in `session.ts`). It is in
+    use while someone is signed in.
+  - The tablet creates it in `Root`. It is in use while guests are at its table or staff mode is
+    open.
+- Docs: ADR-0017 (also decides the APK route for P7-04e2), the runbook, manual task 29, the
+  READMEs, and the phase spec split.
+
+CI's coverage step (`pnpm test:coverage`, which `pnpm check` does not run) would have failed on
+the first push, from gaps that built up while CI could not run. Fixed in this WP with tests only:
+
+- contracts functions 70.6 % → 98.8 %: `refinements.test.ts`, every multi-field refinement taken
+  and refused;
+- mobile-shell 82.8 % → 96.7 %: `ordering.test.tsx`, the item sheet, the suggestion row and
+  `useSuggestions`;
+- table tablet functions 79 % → 83.4 %: `cart.test.tsx`, the diners' cart;
+- console functions 79.77 % → 80.12 %: the page error watcher, and opening a table's bill from
+  its details.
+
+The server's coverage run also failed once on an unhandled `57P01` from the relay test harness
+(`@rp/relay/testing`). There, `pool.end()` resolves before the last client's socket closes, and
+`DROP DATABASE … WITH (FORCE)` then terminates it. The harness now ignores connection errors once
+it is stopping; before that they still fail the run.
+
+Tests:
+
+- domain 359 (+7);
+- contracts 930 (+14);
+- mobile-core 91 (+15);
+- mobile-native 38 (+6);
+- mobile-shell 43 (+7);
+- waiter app 69 (+5);
+- table tablet 30 (+8);
+- console 370 (+3);
+- Control Plane 140;
+- relay 140 (2 skipped);
+- server 1123 (27 skipped), with coverage.
+
+Format, build, contract docs, `contracts:compat`, lint and typecheck pass. `test:coverage` passes
+in every package.
+
+Not done:
+
+- No EAS project or update signing key yet (manual task 29). Updates stay off, and nothing has
+  run on a phone. The check on devices is in the manual task.
+- Devices do not report which update they run (ADR-0017, consequences). Add it with P7-04e2 if
+  support needs it.
+
+Gotchas:
+
+- React Native's Jest preset mocks `AppState.currentState` as a function. Tests that need the app
+  on screen set it (`Object.assign(AppState, { currentState: 'active' })`) and take the change
+  listener from `jest.spyOn(AppState, 'addEventListener')`.
+- `rerender` in React Native Testing Library replaces the whole tree. Wrap the new element in
+  `ShellProvider` again.
+- Run `pnpm test:coverage` (or each package's `test:coverage`) before merging. The console's
+  function coverage is at 80.1 % against 80 %, so new console code needs its tests.
 
 ### 2026-10-05: P7-04d Client compatibility (N-1) and the version matrix
 

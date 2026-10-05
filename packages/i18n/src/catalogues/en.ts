@@ -273,6 +273,8 @@ export const en = {
         'The restaurant’s server no longer works with this version of the app. Ask a manager to update it, then open it again.',
       guestsTitle: 'This tablet needs an update',
       guests: 'Please call a waiter to order.',
+      onItsWay:
+        'The restaurant’s server no longer works with this version of the app. An update is on its way: the app restarts by itself in a moment.',
     },
     serverLabel: 'Server address',
     serverHint: 'Shown on the POS in Manage → Devices, for example 192.168.1.20:8443.',

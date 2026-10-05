@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createErrorReporting } from '../src/app/error-reporting.js';
+import { createErrorReporting, watchPageErrors } from '../src/app/error-reporting.js';
 
 function fakeController(phase: 'paired' | 'unpaired') {
   const reportClientError = vi.fn(() => Promise.resolve(undefined));
@@ -41,6 +41,26 @@ describe('[NFR-O02] the console’s errors', () => {
     }).not.toThrow();
     expect(failing.reportClientError.mock.calls[0]).toMatchObject([
       { body: { message: 'Unknown error' } },
+    ]);
+  });
+
+  it('reports uncaught errors and rejected promises in the page', () => {
+    const report = vi.fn();
+    watchPageErrors(report);
+    const error = new Error('render failed');
+    globalThis.dispatchEvent(new ErrorEvent('error', { error, message: 'render failed' }));
+    globalThis.dispatchEvent(new ErrorEvent('error', { message: 'Script error.' }));
+    const rejection = new Event('unhandledrejection');
+    Object.assign(rejection, { reason: 'offline' });
+    globalThis.dispatchEvent(rejection);
+    expect(report.mock.calls).toEqual([[error], ['Script error.'], ['offline']]);
+  });
+
+  it('uses the page address for where an error happened', () => {
+    const { controller, reportClientError } = fakeController('paired');
+    createErrorReporting(controller, '1.4.0')(new Error('x'));
+    expect(reportClientError.mock.calls[0]).toMatchObject([
+      { body: { path: globalThis.location.pathname } },
     ]);
   });
 });

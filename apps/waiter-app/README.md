@@ -142,5 +142,13 @@ Nothing secret is in this folder (SEC-002):
 --certificate-validity-duration-years 10 --certificate-common-name "RP Waiter"`, commit only
   `certs/update-signing-certificate.pem` (the public half; `.gitignore` lets it through), and keep
   the private key out of the repository (an EAS secret for `eas update --private-key-path`).
+  A preview or production build with `EAS_PROJECT_ID` refuses to build without the certificate
+  (UPD-007). Step by step: `manual-tasks/29-mobile-updates.md`.
+
+The app never looks for an update by itself (`checkAutomatically: NEVER`). `@rp/mobile-core`'s
+`OtaUpdater` (`src/session.ts`, `appUpdater`) asks the restaurant's server first. It takes an
+update only when the server speaks the update's client API (`extra.clientApi`, from
+`@rp/contracts`), and restarts on it only while nobody is signed in (P7-04e1, ADR-0017).
+Publishing and rolling back: `docs/runbooks/app-updates.md`.
 
 Then `eas build -p android --profile preview` gives an installable APK.

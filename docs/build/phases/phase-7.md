@@ -161,7 +161,31 @@ Split (2026-10-04):
     version that is still supported (frozen at each release with `pnpm contracts:freeze`).
 - **P7-04e Phone and tablet updates (UPD-001, UPD-007).** EAS Update channels for the phones and
   tablets, applied only when the server speaks the update's client API, and the in-app APK
-  updater through the local server. Pager firmware distribution is P2-04b.
+  updater through the local server. Pager firmware distribution is P2-04b. Split (2026-10-05,
+  ADR-0017):
+  - **P7-04e1 EAS Update gated by the server's client API.** Built:
+    - `checkAutomatically: NEVER`, and each update's `extra.clientApi`;
+    - `otaUpdateVerdict` and `mayApplyAppUpdate` in `@rp/domain`;
+    - `OtaUpdater` in `@rp/mobile-core`. It checks on connecting, on refusal and every 30
+      minutes; downloads only what the server serves; and restarts when the device is free;
+    - `ExpoOtaUpdates` in `@rp/mobile-native`;
+    - signed builds only;
+    - the runbook `app-updates.md` and manual task 29.
+  - **P7-04e2 The in-app APK updater through the restaurant PC (WTR-001).**
+    - The release's APKs (EAS Build, signed with the app-signing key) go into the installer's
+      payload with `apps.json` (kind, version, SHA-256, size) at `package:stage --apk`.
+    - The server serves the calling device's APK and its details. These routes are
+      device-authenticated and open to refused apps (the N-1 check lets them through). The
+      server checks each APK's SHA-256 before offering it.
+    - A `PackageInstaller` module in `@rp/mobile-native`:
+      - the download over the pinned CA with the device's token, and the SHA-256 check;
+      - Android's confirmation on a phone (`REQUEST_INSTALL_PACKAGES`);
+      - silent as device owner on a tablet, reopened after `MY_PACKAGE_REPLACED`;
+      - Android itself refuses an APK signed with another key.
+    - `ApkUpdater` in `@rp/mobile-core`:
+      - offered on the sign-in screen and on "Update this app";
+      - installed between guests on a tablet.
+    - The System page shows the app builds the PC serves.
 
 ## P7-05 Backup and restore
 

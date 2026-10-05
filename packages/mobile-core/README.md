@@ -39,6 +39,12 @@ here with Vitest:
   orders go only while the person who took them is signed in; a refused order stays with the
   server's reasons until it is taken back to change or discarded. Tested against the real server
   in `apps/server/test/integration/order-outbox.int.test.ts`.
+- `OtaUpdater` (P7-04e1, UPD-001, ADR-0017): over-the-air updates. It looks for an EAS update
+  when the device connects, when the server refuses it, and every 30 minutes. It downloads one
+  only when the server speaks the update's client API (`otaUpdateVerdict` in `@rp/domain`); an
+  update for a newer server waits for the PC. It restarts the app on it only while the device is
+  free (`setBusy`), or at once when the app is refused. `OtaUpdateSource` is `expo-updates` in the
+  apps (`@rp/mobile-native` `ExpoOtaUpdates`).
 
 `@rp/mobile-core/testing` holds the test doubles (a fake local server behind `fetch`, a fake
 Socket.io client, a fake Keystore, a fake trust module with sample CAs, a fake alert notifier and

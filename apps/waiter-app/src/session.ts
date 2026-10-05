@@ -1,8 +1,14 @@
 import { createTranslator } from '@rp/i18n';
-import { createDeviceErrorReporting, DeviceSession, watchUncaughtErrors } from '@rp/mobile-core';
+import {
+  createDeviceErrorReporting,
+  DeviceSession,
+  OtaUpdater,
+  watchUncaughtErrors,
+} from '@rp/mobile-core';
 import {
   AndroidAlertNotifier,
   AndroidServerTrust,
+  ExpoOtaUpdates,
   installRandomValues,
   KeystoreDeviceKeys,
   plainStore,
@@ -61,4 +67,27 @@ export function deviceSession(): Promise<DeviceSession> {
     return session;
   });
   return created;
+}
+
+let updating: Promise<OtaUpdater> | undefined;
+
+/**
+ * The phone's over-the-air updates (P7-04e1, UPD-001), started with the screen and never stopped:
+ * EAS updates its server speaks, applied while nobody is signed in and the app is on screen.
+ */
+export function appUpdater(): Promise<OtaUpdater> {
+  updating ??= Promise.all([deviceSession(), ExpoOtaUpdates.load()]).then(([session, source]) => {
+    const updater = new OtaUpdater({
+      session,
+      source,
+      onError: createDeviceErrorReporting(
+        session,
+        'waiter-app',
+        Constants.expoConfig?.version ?? null,
+      ),
+    });
+    updater.start();
+    return updater;
+  });
+  return updating;
 }

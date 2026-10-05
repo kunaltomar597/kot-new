@@ -5,3 +5,4 @@ export * from './lan-trust.js';
 export * from './random.js';
 export * from './stores.js';
 export * from './kiosk.js';
+export * from './ota-updates.js';

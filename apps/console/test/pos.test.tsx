@@ -2,6 +2,7 @@ import type { FloorResponse, TableOverviewEntry, TableOverviewResponse } from '@
 import { IDS, sentOrder } from '@rp/ordering/testing';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { billView } from './billing-fixture.js';
 import type { FakeServer } from './fake-server.js';
 import { RESTAURANT_ID, STAFF } from './fakes.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
@@ -280,6 +281,36 @@ describe('[TBL-005] moving a table', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
     expect(await tile(/^T3, Occupied/)).toBeInTheDocument();
+  });
+
+  it('[BILL-001] opens the table’s bill from its details, and says when it cannot', async () => {
+    let refuse = true;
+    const fake = posServer(overview(entry(T1, 'T1', HALL, {}))).on('POST', '/api/v1/bills', () =>
+      refuse
+        ? {
+            status: 409,
+            body: { code: 'NOTHING_TO_BILL', message: 'Nothing on this table to bill yet.' },
+          }
+        : { status: 200, body: billView() },
+    );
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos' });
+    await user.click(await tile(/^T1, Occupied/));
+    const details = await screen.findByRole('dialog', {
+      name: t('pos.table.title', { table: 'T1' }),
+    });
+    await user.click(within(details).getByRole('button', { name: t('pos.billTable') }));
+    expect(await screen.findByText('Nothing on this table to bill yet.')).toBeInTheDocument();
+    expect(fake.callsTo('POST', '/api/v1/bills')[0]?.body).toEqual({ tableSessionId: SESSION });
+
+    refuse = false;
+    await user.click(within(details).getByRole('button', { name: t('pos.billTable') }));
+    // The bill screen takes over from the floor.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: t('pos.table.title', { table: 'T1' }) }),
+      ).toBeNull();
+    });
+    expect(fake.callsTo('POST', '/api/v1/bills')).toHaveLength(2);
   });
 
   it('keeps roles without the POS off the floor', async () => {
