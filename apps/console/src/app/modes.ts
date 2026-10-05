@@ -38,7 +38,7 @@ export function homeFor(person: PermissionHolder): Mode {
   return order.find((mode) => allowed.includes(mode)) ?? 'pos';
 }
 
-/** The dashboard's pages (P4-01, P4-02), in the order the navigation shows them. */
+/** The dashboard's pages (P4-01 to P4-03), in the order the navigation shows them. */
 export const MANAGE_PAGES = [
   'overview',
   'orders',
@@ -46,6 +46,7 @@ export const MANAGE_PAGES = [
   'menu',
   'staff',
   'devices',
+  'settings',
   'security',
 ] as const;
 export type ManagePage = (typeof MANAGE_PAGES)[number];
@@ -53,7 +54,8 @@ export type ManagePage = (typeof MANAGE_PAGES)[number];
 /**
  * Who may open each dashboard page: the overview and the order feed read the live order feed
  * (OPERATIONS_CONFIGURE), the alert centre is everyone's, each setup page needs its permission
- * outright, and sign-in security is the Owner's own (AUTH-006).
+ * outright (the settings, OPERATIONS_CONFIGURE), and sign-in security is the Owner's own
+ * (AUTH-006).
  */
 const PAGE_RULES: Readonly<Record<ManagePage, (person: PermissionHolder) => boolean>> = {
   overview: (person) => grantOf(person, 'OPERATIONS_CONFIGURE') !== 'DENY',
@@ -62,6 +64,7 @@ const PAGE_RULES: Readonly<Record<ManagePage, (person: PermissionHolder) => bool
   menu: (person) => grantOf(person, 'MENU_MANAGE') === 'ALLOW',
   staff: (person) => grantOf(person, 'STAFF_MANAGE') === 'ALLOW',
   devices: (person) => grantOf(person, 'DEVICE_PAIR') === 'ALLOW',
+  settings: (person) => grantOf(person, 'OPERATIONS_CONFIGURE') === 'ALLOW',
   security: (person) => person.role === 'OWNER',
 };
 

@@ -42,7 +42,7 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
     expect(homeFor(expediter)).toBe('manage');
   });
 
-  it('[MGR-001] [AUTH-012] opens the dashboard pages a person may use', () => {
+  it('[MGR-001] [MGR-007] [AUTH-012] opens the dashboard pages a person may use', () => {
     expect(managePagesFor({ role: 'OWNER' })).toEqual([
       'overview',
       'orders',
@@ -50,6 +50,7 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
       'menu',
       'staff',
       'devices',
+      'settings',
       'security',
     ]);
     expect(managePagesFor({ role: 'MANAGER' })).toEqual([
@@ -59,6 +60,7 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
       'menu',
       'staff',
       'devices',
+      'settings',
     ]);
     expect(manageLandingOf(managePagesFor({ role: 'MANAGER' }))).toBe('overview');
     // A head cashier manages staff, but the order feed is not theirs: Manage opens on Staff.
@@ -72,7 +74,19 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
       role: 'MANAGER',
       customRole: { added: [], removed: ['MENU_MANAGE', 'DEVICE_PAIR'] },
     } as const;
-    expect(managePagesFor(floorManager)).toEqual(['overview', 'orders', 'alerts', 'staff']);
+    expect(managePagesFor(floorManager)).toEqual([
+      'overview',
+      'orders',
+      'alerts',
+      'staff',
+      'settings',
+    ]);
+    // Without OPERATIONS_CONFIGURE, no live feed and no settings.
+    const menuManager = {
+      role: 'MANAGER',
+      customRole: { added: [], removed: ['OPERATIONS_CONFIGURE'] },
+    } as const;
+    expect(managePagesFor(menuManager)).toEqual(['alerts', 'menu', 'staff', 'devices']);
     expect(manageLandingOf(['alerts'])).toBe('alerts');
   });
 

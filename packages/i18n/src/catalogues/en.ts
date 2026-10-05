@@ -317,6 +317,7 @@ export const en = {
       staff: 'Staff',
       devices: 'Devices',
       menu: 'Menu',
+      settings: 'Settings',
       security: 'Security',
     },
     overview: {
@@ -1117,6 +1118,468 @@ export const en = {
           'Items that offer it stop offering it when you next publish. You can restore it later.',
         reason: 'Why is it archived?',
         confirm: 'Archive group',
+      },
+    },
+  },
+  /** The dashboard's Settings area (P4-03, MGR-007): how the restaurant runs. */
+  settings: {
+    title: 'Settings',
+    general: {
+      intro:
+        'Timers, limits, alerts and formats. Every change is kept in the audit log with who made it.',
+      search: 'Find a setting',
+      searchHint: 'By name or what it does',
+      changedOnly: 'Only settings changed from their default',
+      noMatch: 'No setting matches “{query}”.',
+      noneChanged: 'Every setting has its default value.',
+      loadFailed: 'The settings could not be loaded.',
+    },
+    groups: {
+      ordersAndBills: 'Orders, bills and payments',
+      kitchen: 'Kitchen',
+      notifications: 'Alerts',
+      devices: 'Tablets and pagers',
+      signIn: 'Sign-in and security',
+      recommendations: 'Suggestions',
+      qrMenu: 'QR menu',
+      data: 'Audit, backups and storage',
+      updates: 'Updates and licence',
+      formats: 'Formats',
+    },
+    row: {
+      default: 'Default: {value}',
+      changed: 'Changed',
+      vendor: 'Set by your provider',
+      ownerOnly: 'Only the Owner changes this',
+      notYours: 'You cannot change this',
+      change: 'Change',
+      changeLabel: 'Change {name}',
+    },
+    values: {
+      on: 'On',
+      off: 'Off',
+      none: 'None',
+      printerEachTime: 'Choose a printer each time',
+      printerGone: 'A printer that is no longer set up',
+      printerArchived: '{name} (archived)',
+      window: '{start} to {end}',
+      windowOvernight: '{start} to {end} the next day',
+      part: '{part}: {window}',
+    },
+    /** A value with its unit. */
+    units: {
+      minutes: '{value, plural, one {# minute} other {# minutes}}',
+      seconds: '{value, plural, one {# second} other {# seconds}}',
+      hours: '{value, plural, one {# hour} other {# hours}}',
+      days: '{value, plural, one {# day} other {# days}}',
+      months: '{value, plural, one {# month} other {# months}}',
+      percent: '{value} %',
+      GB: '{value} GB',
+      characters: '{value, plural, one {# character} other {# characters}}',
+      orders: '{value, plural, one {# order} other {# orders}}',
+    },
+    /** The unit beside a number being typed. */
+    unitShort: {
+      minutes: 'minutes',
+      seconds: 'seconds',
+      hours: 'hours',
+      days: 'days',
+      months: 'months',
+      percent: '%',
+      GB: 'GB',
+      characters: 'characters',
+      orders: 'orders',
+      rupees: '₹',
+    },
+    dialog: {
+      range: 'From {min} to {max}.',
+      default: 'The default is {value}.',
+      useDefault: 'Use the default',
+      lines: 'One per line, up to {max} lines of {length} characters each.',
+      linesRequired: 'One per line, at least one, up to {max} lines of {length} characters each.',
+      textHint: 'Up to {length} characters. Leave it empty for none.',
+      start: 'From',
+      end: 'To',
+      overnight: 'A window that ends before it starts runs past midnight.',
+      reason: 'Reason (optional)',
+      reasonHint: 'Kept in the audit log with the change.',
+      secondFactor: 'Saving asks for your password and authenticator code.',
+      save: 'Save',
+      cancel: 'Cancel',
+      saved: '{name} is saved.',
+      problems: {
+        number: 'Enter a number from {min} to {max}.',
+        required: 'Enter a value.',
+        tooManyLines: 'Use at most {max} lines.',
+        tooFewLines: 'Enter at least one line.',
+        lineTooLong: 'Each line can have at most {length} characters.',
+        tooLong: 'Use at most {length} characters.',
+        time: 'Enter a time such as 07:30.',
+        invalid: 'This value is not allowed.',
+      },
+    },
+  },
+  /**
+   * What each catalogue setting is called and does (P4-03a, MGR-007), by its key
+   * (`settingItems.auth.pinLength.label` for `auth.pinLength`), with the words for its choices.
+   */
+  settingItems: {
+    auth: {
+      pinLength: {
+        label: 'PIN length',
+        hint: 'Digits in every staff PIN.',
+        options: { '4': '4 digits', '6': '6 digits' },
+      },
+      lockoutMaxFailures: {
+        label: 'Wrong PINs before a lock',
+        hint: 'Wrong PINs within the counting window that lock a person’s login.',
+      },
+      lockoutWindowMinutes: {
+        label: 'Counting window for wrong PINs',
+        hint: 'Wrong PINs within this time count towards a lock.',
+      },
+      lockoutMinutes: {
+        label: 'Lock lasts',
+        hint: 'How long a locked login stays locked, unless a manager unlocks it.',
+      },
+      attemptsPerMinutePerDevice: {
+        label: 'Sign-in attempts per device',
+        hint: 'PIN and approval attempts one device may make in a minute.',
+      },
+      accessTokenMinutes: {
+        label: 'Sign-in renewal',
+        hint: 'How often a signed-in screen renews its access (at most every 15 minutes).',
+      },
+      inactivityMinutes: {
+        label: 'Sign out idle POS and phones after',
+        hint: 'Idle time after which the POS and waiter phones sign the person out.',
+      },
+      managerBrowserInactivityMinutes: {
+        label: 'Sign out idle manager browsers after',
+        hint: 'Idle time after which a manager’s own browser signs them out.',
+      },
+      sessionMaxHours: {
+        label: 'Longest sign-in',
+        hint: 'A sign-in ends after this long, however busy (one long shift).',
+      },
+      stepUpMinutes: {
+        label: 'Owner confirmation lasts',
+        hint: 'How long the Owner’s password and authenticator stay confirmed for Owner-only actions.',
+      },
+      overrideSeconds: {
+        label: 'Manager approval lasts',
+        hint: 'How long a manager’s PIN approval can be used for the action it approved.',
+      },
+      kitchenIndividualLogins: {
+        label: 'Kitchen staff sign in one by one',
+        hint: 'Off: a kitchen screen works for its station. On: each cook signs in with their PIN.',
+      },
+      pairingCodeMinutes: {
+        label: 'Pairing code lasts',
+        hint: 'How long a code for pairing a device can be used.',
+      },
+      deviceTokenMinutes: {
+        label: 'Device key check',
+        hint: 'How often a paired device proves its key again.',
+      },
+    },
+    stock: {
+      kitchenMayManage: {
+        label: 'Kitchen manages stock',
+        hint: 'Kitchen staff may mark dishes out of stock and set how many are left.',
+      },
+    },
+    devices: {
+      lowBatteryAlertPercent: {
+        label: 'Low battery alert for tablets and kitchen screens',
+        hint: 'A table tablet or kitchen screen at or below this level raises a low-battery alert.',
+      },
+    },
+    orders: {
+      specialInstructionsMaxLength: {
+        label: 'Longest special instruction',
+        hint: 'What a guest or waiter may write on one dish.',
+      },
+    },
+    billing: {
+      priceMode: {
+        label: 'Menu prices',
+        hint: 'Whether menu prices leave GST to be added on the bill or already include it.',
+        options: { TAX_EXCLUSIVE: 'Exclude GST', TAX_INCLUSIVE: 'Include GST' },
+      },
+      roundingUnitPaise: {
+        label: 'Round bill totals',
+        hint: 'Grand totals round to the nearest multiple of this.',
+        options: {
+          '0': 'No rounding',
+          '10': 'To 10 paise',
+          '50': 'To 50 paise',
+          '100': 'To the rupee',
+        },
+      },
+      cashierDiscountLimitBp: {
+        label: 'Cashier’s discount limit',
+        hint: 'The largest discount a cashier gives without a manager’s PIN. Free dishes always need one.',
+      },
+      serviceChargeEnabled: {
+        label: 'Service charge',
+        hint: 'A voluntary service charge on bills, which a diner can ask to remove. Off unless turned on.',
+      },
+      serviceChargeRateBp: {
+        label: 'Service charge rate',
+        hint: 'On the taxable value of the dishes, when the service charge is on.',
+      },
+    },
+    bills: {
+      headerLines: {
+        label: 'Bill header',
+        hint: 'Lines printed under the restaurant’s details on every bill.',
+      },
+      footerLines: {
+        label: 'Bill footer',
+        hint: 'Lines printed at the foot of every bill, such as a thank-you note.',
+      },
+      printerId: {
+        label: 'Bill printer',
+        hint: 'The printer bills print on, usually the one at the cash counter.',
+      },
+      hostedCopyDays: {
+        label: 'Digital bill link lasts',
+        hint: 'How long a digital bill stays available on its link.',
+      },
+    },
+    payments: {
+      otherModes: {
+        label: 'Other payment modes',
+        hint: 'Names offered besides cash, card and UPI, such as a meal card.',
+      },
+    },
+    notifications: {
+      escalationSeconds: {
+        label: 'Escalate unanswered alerts after',
+        hint: 'An alert nobody acknowledges within this time goes to the managers on duty too.',
+      },
+      repeatSeconds: {
+        label: 'Repeat unanswered alerts every',
+        hint: 'An unacknowledged alert or table request alerts again this often.',
+      },
+      rules: {
+        label: 'Notification rules',
+        hint: 'Who each alert goes to, on which screens, and whether it repeats and escalates.',
+      },
+      nudgePresets: {
+        label: 'Nudge messages',
+        hint: 'Messages a manager sends to waiters with one tap.',
+      },
+    },
+    pagers: {
+      heartbeatSeconds: {
+        label: 'Pager check-in',
+        hint: 'How often a pager reports its battery and signal. After three missed check-ins it counts as offline.',
+      },
+      vibration: {
+        label: 'Pager vibrations',
+        hint: 'How the pager vibrates for each kind of alert.',
+      },
+    },
+    kds: {
+      ageAmberMinutes: {
+        label: 'Tickets turn amber after',
+        hint: 'A kitchen ticket this old turns amber.',
+      },
+      ageRedMinutes: {
+        label: 'Tickets turn red after',
+        hint: 'A kitchen ticket this old turns red. Later than amber.',
+      },
+      readyNotCollectedMinutes: {
+        label: 'Ready dishes waiting after',
+        hint: 'A ready dish not picked up after this long makes its ticket flash.',
+      },
+      autoEscalateNotCollected: {
+        label: 'Tell the manager about waiting dishes',
+        hint: 'Alert the manager on duty without the kitchen pressing “Notify manager”.',
+      },
+      soundVolumePercent: {
+        label: 'Kitchen sound volume',
+        hint: 'Volume of the new-ticket chime and the cancellation sound.',
+      },
+    },
+    tablet: {
+      idleShowsPromotions: {
+        label: 'Promotions on idle tablets',
+        hint: 'A table tablet nobody is using shows promotions.',
+      },
+      serviceRequestsPerMinute: {
+        label: 'Table requests per minute',
+        hint: 'Water, waiter and bill requests one table tablet may send in a minute. More wait for the next minute.',
+      },
+    },
+    pager: {
+      lowBatteryPercent: {
+        label: 'Low battery alert for pagers',
+        hint: 'A pager at or below this level alerts its wearer and the manager, and the waiter app warns.',
+      },
+    },
+    qr: {
+      submissionsPerWindow: {
+        label: 'QR orders per table',
+        hint: 'Orders one table or browser may send within the rate-limit window.',
+      },
+      rateLimitWindowMinutes: {
+        label: 'QR rate-limit window',
+        hint: 'The time QR orders are counted over.',
+      },
+      pickupTimeoutSeconds: {
+        label: 'Unreceived QR orders expire after',
+        hint: 'A QR order the restaurant has not received by then expires.',
+      },
+      presenceIntervalSeconds: {
+        label: 'QR presence signal',
+        hint: 'How often this server tells the QR menu it is open.',
+      },
+      readOnlyAfterSeconds: {
+        label: 'QR menu stops taking orders after',
+        hint: 'Without a presence signal for this long, the QR menu only shows the menu.',
+      },
+    },
+    reco: {
+      learningWindowDays: {
+        label: 'Learn pairs from',
+        hint: 'Days of orders the “often ordered together” suggestions learn from.',
+      },
+      minSupportBp: {
+        label: 'Least share of orders for a pair',
+        hint: 'A pair must be in at least this share of all orders to be suggested.',
+      },
+      minConfidenceBp: {
+        label: 'Least confidence for a pair',
+        hint: 'Of the orders with the first dish, at least this share must also have the second.',
+      },
+      minLiftPercent: {
+        label: 'Least lift for a pair',
+        hint: 'How much more often a pair is ordered together than by chance: 120 % is 1.2 times.',
+      },
+      minOrders: {
+        label: 'Orders before learning',
+        hint: 'Learned suggestions start once there are this many orders.',
+      },
+      bestSellerDays: {
+        label: 'Best sellers from',
+        hint: 'Days of orders that rank the best sellers.',
+      },
+      dayparts: {
+        label: 'Times of day',
+        hint: 'The windows best sellers are counted in.',
+        parts: {
+          BREAKFAST: 'Breakfast',
+          LUNCH: 'Lunch',
+          EVENING: 'Evening',
+          DINNER: 'Dinner',
+        },
+      },
+      courseSequence: {
+        label: 'Course order',
+        hint: 'Suggestions favour the next course in this order. Menu categories carry a course.',
+      },
+    },
+    audit: {
+      dailyReportEnabled: {
+        label: 'Daily suspicious-activity report',
+        hint: 'Sends the Owner a daily report of unusual discounts, voids and cash differences.',
+      },
+      discountFlagBp: {
+        label: 'Report discounts above',
+        hint: 'Discounts above this rate appear in the daily report.',
+      },
+      cashVarianceFlagPaise: {
+        label: 'Report cash differences above',
+        hint: 'Cash differences above this appear in the daily report.',
+      },
+    },
+    backups: {
+      walMode: {
+        label: 'Back up changes',
+        hint: 'How often changes are backed up between the nightly backups.',
+        options: { CONTINUOUS: 'Continuously', HOURLY: 'Every hour' },
+      },
+      secondLocation: {
+        label: 'Second backup location',
+        hint: 'A folder on a second disk, a USB drive or a network drive for the nightly backup.',
+      },
+      keepDaily: {
+        label: 'Daily backups kept',
+        hint: 'How many daily backups are kept.',
+      },
+      keepWeekly: {
+        label: 'Weekly backups kept',
+        hint: 'How many weekly backups are kept.',
+      },
+      cloudEnabled: {
+        label: 'Cloud backup',
+        hint: 'Uploads an encrypted backup to the cloud every night.',
+      },
+    },
+    storage: {
+      warnPercent: {
+        label: 'Disk warning level',
+        hint: 'Data-drive use that alerts the Owner and managers, daily until space is freed.',
+      },
+      criticalPercent: {
+        label: 'Disk critical level',
+        hint: 'Data-drive use shown as critical. Above the warning level.',
+      },
+    },
+    retention: {
+      operationalDays: {
+        label: 'Keep alerts and logs for',
+        hint: 'Alerts, device check-ins, logs and temporary files are removed after this.',
+      },
+      dinerContactMonths: {
+        label: 'Keep diner contacts for',
+        hint: 'A diner’s contact details are anonymised after this long without a visit.',
+      },
+      feedbackMonths: {
+        label: 'Keep feedback for',
+        hint: 'Feedback is anonymised after this long.',
+      },
+    },
+    updates: {
+      maintenanceWindow: {
+        label: 'Update window',
+        hint: 'Updates install only in this window, unless a manager presses “Install now”.',
+      },
+    },
+    licence: {
+      validityDays: {
+        label: 'Licence validity',
+        hint: 'A licence lasts this long from issue and renews while online.',
+      },
+      overdueToGraceDays: {
+        label: 'Unpaid invoice before grace',
+        hint: 'An unpaid invoice moves the licence to its grace period after this long.',
+      },
+      graceDays: {
+        label: 'Grace period',
+        hint: 'Days of grace, shown on every staff screen, before the licence is restricted.',
+      },
+    },
+    controlPlane: {
+      heartbeatSeconds: {
+        label: 'Report to your provider',
+        hint: 'How often this PC reports its health to your provider.',
+      },
+    },
+    onboarding: {
+      minFreeDiskGb: {
+        label: 'Free disk space needed',
+        hint: 'Free space the installer needs on the data drive.',
+      },
+    },
+    ui: {
+      timeFormat: {
+        label: 'Clock',
+        hint: 'How times show on screens, bills and reports.',
+        options: { '12h': '12-hour (2:30 PM)', '24h': '24-hour (14:30)' },
       },
     },
   },

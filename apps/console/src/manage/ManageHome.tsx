@@ -10,6 +10,7 @@ import { DevicesScreen } from './devices/DevicesScreen.js';
 import { MenuArea } from './menu/MenuArea.js';
 import { OrderFeedScreen } from './OrderFeedScreen.js';
 import { Overview } from './Overview.js';
+import { SettingsArea } from './settings/SettingsArea.js';
 import { StaffArea } from './staff/StaffArea.js';
 
 /** Each page's address under `/manage`, its link text and what it shows. */
@@ -25,6 +26,7 @@ const PAGES: Readonly<
   menu: { path: 'menu', label: 'dashboard.section.menu', element: <MenuArea /> },
   staff: { path: 'staff', label: 'dashboard.section.staff', element: <StaffArea /> },
   devices: { path: 'devices', label: 'dashboard.section.devices', element: <DevicesScreen /> },
+  settings: { path: 'settings', label: 'dashboard.section.settings', element: <SettingsArea /> },
   security: {
     path: 'security',
     label: 'dashboard.section.security',
@@ -33,17 +35,18 @@ const PAGES: Readonly<
 };
 
 /** Pages with pages of their own below them. */
-const NESTED: ReadonlySet<ManagePage> = new Set(['menu', 'staff']);
+const NESTED: ReadonlySet<ManagePage> = new Set(['menu', 'staff', 'settings']);
 
 /**
  * The manager dashboard (P4-01, MGR-001): the overview, the live order feed and the alert centre,
  * one at a time under `/manage`, then the setup pages: the menu editor for people who manage the
  * menu (P4-02d, MGR-005), Staff for people who manage staff (people, today's sections, pagers and
  * custom roles; P4-02a, P4-02b, P4-02e, MGR-004), Devices for people who pair them (P4-02c,
- * MGR-006) and the Owner's own sign-in security (AUTH-006). The navigation sits beside them on a
- * wide screen and above them on a phone (MGR-011); the page shown is marked for screen readers,
- * not by colour alone. Pages a person cannot use, their custom role applied (AUTH-012), are
- * neither linked nor opened; the server refuses their calls anyway.
+ * MGR-006), Settings for people who configure operations (P4-03, MGR-007) and the Owner's own
+ * sign-in security (AUTH-006). The navigation sits beside them on a wide screen and above them on
+ * a phone (MGR-011); the page shown is marked for screen readers, not by colour alone. Pages a
+ * person cannot use, their custom role applied (AUTH-012), are neither linked nor opened; the
+ * server refuses their calls anyway.
  */
 export function ManageHome() {
   const t = useT();
