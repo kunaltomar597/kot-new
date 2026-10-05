@@ -17,6 +17,7 @@
               "type": "string",
               "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"]
             },
+            "customRoleName": { "type": ["string", "null"] },
             "photoId": {
               "anyOf": [
                 {
@@ -28,7 +29,7 @@
               ]
             }
           },
-          "required": ["staffId", "displayName", "role", "photoId"]
+          "required": ["staffId", "displayName", "role", "customRoleName", "photoId"]
         }
       }
     },
@@ -52,6 +53,7 @@
               "type": "string",
               "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"]
             },
+            "customRoleName": { "type": ["string", "null"] },
             "photoId": {
               "anyOf": [
                 {
@@ -63,7 +65,7 @@
               ]
             }
           },
-          "required": ["staffId", "displayName", "role", "photoId"],
+          "required": ["staffId", "displayName", "role", "customRoleName", "photoId"],
           "additionalProperties": false
         }
       }

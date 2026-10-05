@@ -6,7 +6,7 @@ import type {
   TableSessionView,
 } from '@rp/contracts';
 import {
-  grantFor,
+  grantOf,
   isBillable,
   OPEN_SERVICE_REQUEST_STATES,
   ORDER_ITEM_STATES,
@@ -17,8 +17,9 @@ import {
   transition,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
-import type { Principal } from '../auth/principal.js';
 import { authErrors } from '../auth/auth-errors.js';
+import { holderOf, ROLE_GRANTS_SELECT } from '../auth/custom-roles.js';
+import type { Principal } from '../auth/principal.js';
 import { currentBusinessDate, dbDate, isoDateOf } from '../common/business-dates.js';
 import { newId } from '../common/ids.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
@@ -368,9 +369,9 @@ export class TableSessionsService {
   ): Promise<void> {
     const person = await tx.staff.findFirst({
       where: { id: staffId, restaurantId, active: true, archivedAt: null },
-      select: { role: { select: { baseRole: true } } },
+      select: { role: { select: ROLE_GRANTS_SELECT } },
     });
-    if (person === null || grantFor(person.role.baseRole, 'ORDER_CREATE') === 'DENY') {
+    if (person === null || grantOf(holderOf(person.role), 'ORDER_CREATE') === 'DENY') {
       throw new AppError(
         422,
         'STAFF_NOT_ASSIGNABLE',

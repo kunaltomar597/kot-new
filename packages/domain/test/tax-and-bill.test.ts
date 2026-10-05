@@ -115,6 +115,32 @@ describe('[BILL-005] discounts', () => {
     expect(decideDiscount('WAITER', 100)).toBe('DENIED');
     expect(decideDiscount('KITCHEN', 100)).toBe('DENIED');
   });
+
+  it('[AUTH-012] follows what a custom role adds to or takes from the discount permissions', () => {
+    const seniorCashier = {
+      role: 'CASHIER',
+      customRole: { added: ['DISCOUNT_ABOVE_LIMIT'], removed: [] },
+    } as const;
+    expect(decideDiscount(seniorCashier, 10_000)).toBe('ALLOWED');
+    // A waiter allowed to discount has the cashier's limit; above it they cannot ask for a PIN.
+    const captain = {
+      role: 'WAITER',
+      customRole: { added: ['DISCOUNT_WITHIN_LIMIT'], removed: [] },
+    } as const;
+    expect(decideDiscount(captain, 1000)).toBe('ALLOWED');
+    expect(decideDiscount(captain, 1001)).toBe('DENIED');
+    const shiftLead = {
+      role: 'MANAGER',
+      customRole: { added: [], removed: ['DISCOUNT_ABOVE_LIMIT'] },
+    } as const;
+    expect(decideDiscount(shiftLead, 500, { CASHIER: 1000 })).toBe('ALLOWED');
+    expect(decideDiscount(shiftLead, 5000)).toBe('DENIED');
+    const cashierNeedingPin = {
+      role: 'CASHIER',
+      customRole: { added: [], removed: ['DISCOUNT_WITHIN_LIMIT'] },
+    } as const;
+    expect(decideDiscount(cashierNeedingPin, 100)).toBe('REQUIRES_MANAGER_OVERRIDE');
+  });
 });
 
 function baseBill(overrides: Partial<BillInput> = {}): BillInput {

@@ -1409,6 +1409,20 @@ body {
   gap: var(--rp-space-2);
 }
 
+/* The role editor (P4-02e): one choice per permission, side by side on a wide screen. */
+.role-editor__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-1);
+}
+
+.role-editor__permissions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--rp-space-3);
+  align-items: start;
+}
+
 .menu-field-group {
   display: flex;
   flex-direction: column;
@@ -1521,6 +1535,62 @@ body {
   gap: var(--rp-space-2) var(--rp-space-4);
   margin: 0;
   padding-left: var(--rp-space-6);
+}
+
+/* Settings (P4-03a, MGR-007): a group per area, a row per setting with its value in words. */
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-3);
+  min-width: 0;
+}
+
+.settings-group__heading {
+  margin: var(--rp-space-2) 0 0;
+  font-size: var(--rp-font-size-lg);
+  font-weight: var(--rp-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.settings-row__value {
+  margin: 0;
+  font-weight: var(--rp-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.settings-default {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rp-space-2) var(--rp-space-3);
+}
+
+.settings-default__text {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.settings-window {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rp-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings-window__legend {
+  padding: 0;
+  font-weight: var(--rp-font-weight-semibold);
+}
+
+.settings-window__times {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: var(--rp-space-2) var(--rp-space-3);
 }
 
 /* A phone's width is for content, not margins (MGR-011). */

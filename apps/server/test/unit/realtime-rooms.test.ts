@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { DOMAIN_EVENT_TYPES } from '@rp/contracts';
-import { DEFAULT_PERMISSION_MATRIX, type PermissionMatrix } from '@rp/domain';
+import { DOMAIN_EVENT_TYPES, type DomainEvent } from '@rp/contracts';
+import type { Role, RoleCustomisation } from '@rp/domain';
 import { describe, expect, it } from 'vitest';
 import type { AuthenticatedDevice } from '../../src/auth/device.js';
 import {
@@ -31,6 +31,17 @@ function device(overrides: Partial<AuthenticatedDevice>): AuthenticatedDevice {
     ...overrides,
   };
 }
+
+/** Whether someone signed in on a POS with `role` (and a custom role) hears `event`. */
+function hears(event: DomainEvent, role: Role, customRole: RoleCustomisation | null = null) {
+  const joined = roomsForConnection({
+    device: device({ type: 'POS' }),
+    person: { staffId: randomUUID(), role, customRole },
+  });
+  return reaches(roomsForEvent(event), new Set(joined));
+}
+
+const FLOOR = ['OWNER', 'MANAGER', 'CASHIER', 'WAITER'] as const;
 
 describe('[AUTH-009] [SEC-003] rooms a connection joins', () => {
   it('puts a table tablet in its own table room only, even with a person signed in', () => {
@@ -83,7 +94,24 @@ describe('[AUTH-009] [SEC-003] rooms a connection joins', () => {
       rooms.role(rid, 'WAITER'),
       rooms.staff(rid, waiter),
       rooms.section(rid, section),
+      rooms.capability(rid, 'ORDER_CREATE'),
+      rooms.capability(rid, 'BILL_REQUEST'),
     ]);
+  });
+
+  it('[AUTH-012] puts a person with a custom role in the rooms of what it allows', () => {
+    const phone = device({ type: 'WAITER_PHONE' });
+    const joined = roomsForConnection({
+      device: phone,
+      person: {
+        staffId: waiter,
+        role: 'WAITER',
+        customRole: { added: ['BILL_PRINT_AND_PAYMENT'], removed: ['BILL_REQUEST'] },
+      },
+    });
+    expect(joined).toContain(rooms.capability(rid, 'BILL_PRINT_AND_PAYMENT'));
+    expect(joined).toContain(rooms.capability(rid, 'ORDER_CREATE'));
+    expect(joined).not.toContain(rooms.capability(rid, 'BILL_REQUEST'));
   });
 
   it('gives a device without a signed-in person no role room', () => {
@@ -109,6 +137,8 @@ describe('[AUTH-009] [SEC-003] rooms a connection joins', () => {
       rooms.alerts(rid, waiter),
       rooms.role(rid, 'WAITER'),
       rooms.staff(rid, waiter),
+      rooms.capability(rid, 'ORDER_CREATE'),
+      rooms.capability(rid, 'BILL_REQUEST'),
     ]);
     // A pager's wearer or a phone nobody holds joins no alert room here.
     expect(roomsForConnection({ device: device({ type: 'WAITER_PHONE' }) })).toHaveLength(2);
@@ -134,29 +164,27 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
   });
 
   it('[MGR-005] tells only menu editors that the draft changed, not the ordering surfaces', () => {
-    const targets = roomsForEvent(domainEvent('MenuDraftChanged', rid, { part: 'CATEGORIES' }));
-    expect(targets.sort()).toEqual([rooms.role(rid, 'MANAGER'), rooms.role(rid, 'OWNER')].sort());
+    const event = domainEvent('MenuDraftChanged', rid, { part: 'CATEGORIES' });
+    expect(roomsForEvent(event)).toEqual([rooms.capability(rid, 'MENU_MANAGE')]);
+    expect(hears(event, 'OWNER')).toBe(true);
+    expect(hears(event, 'MANAGER')).toBe(true);
+    expect(hears(event, 'CASHIER')).toBe(false);
+    expect(hears(event, 'WAITER')).toBe(false);
   });
 
   it('sends table events to the floor roles and that table, not the kitchen', () => {
-    const targets = roomsForEvent(
-      domainEvent('TableOpened', rid, {
-        tableId: table1,
-        tableSessionId: randomUUID(),
-        covers: 2,
-        waiterId: waiter,
-      }),
-    );
+    const event = domainEvent('TableOpened', rid, {
+      tableId: table1,
+      tableSessionId: randomUUID(),
+      covers: 2,
+      waiterId: waiter,
+    });
+    const targets = roomsForEvent(event);
     expect(targets).toEqual(
-      expect.arrayContaining([
-        rooms.role(rid, 'OWNER'),
-        rooms.role(rid, 'MANAGER'),
-        rooms.role(rid, 'CASHIER'),
-        rooms.role(rid, 'WAITER'),
-        rooms.table(rid, table1),
-      ]),
+      expect.arrayContaining([rooms.capability(rid, 'ORDER_CREATE'), rooms.table(rid, table1)]),
     );
-    expect(targets).not.toContain(rooms.role(rid, 'KITCHEN'));
+    for (const role of FLOOR) expect(hears(event, role)).toBe(true);
+    expect(hears(event, 'KITCHEN')).toBe(false);
     expect(targets).not.toContain(rooms.table(rid, table2));
     expect(targets).not.toContain(rooms.all(rid));
   });
@@ -222,29 +250,30 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
   });
 
   it('keeps device events for the roles that manage devices', () => {
-    const targets = roomsForEvent(
-      domainEvent('DeviceStatusChanged', rid, {
-        deviceId: randomUUID(),
-        deviceType: 'KDS',
-        online: false,
-      }),
-    );
-    expect(targets.sort()).toEqual([rooms.role(rid, 'MANAGER'), rooms.role(rid, 'OWNER')].sort());
+    const event = domainEvent('DeviceStatusChanged', rid, {
+      deviceId: randomUUID(),
+      deviceType: 'KDS',
+      online: false,
+    });
+    expect(roomsForEvent(event)).toEqual([rooms.capability(rid, 'DEVICE_PAIR')]);
+    expect(hears(event, 'OWNER')).toBe(true);
+    expect(hears(event, 'MANAGER')).toBe(true);
+    expect(hears(event, 'CASHIER')).toBe(false);
   });
 
   it('[KDS-008] [NTF-003] alerts the POS and managers when a printer goes offline', () => {
-    const targets = roomsForEvent(
-      domainEvent('PrinterStatusChanged', rid, {
-        printerId: randomUUID(),
-        printerName: 'Kitchen',
-        online: false,
-        error: 'No answer',
-        queued: 3,
-      }),
-    );
-    expect(targets.sort()).toEqual(
-      [rooms.role(rid, 'OWNER'), rooms.role(rid, 'MANAGER'), rooms.role(rid, 'CASHIER')].sort(),
-    );
+    const event = domainEvent('PrinterStatusChanged', rid, {
+      printerId: randomUUID(),
+      printerName: 'Kitchen',
+      online: false,
+      error: 'No answer',
+      queued: 3,
+    });
+    expect(roomsForEvent(event)).toEqual([rooms.capability(rid, 'BILL_PRINT_AND_PAYMENT')]);
+    for (const role of ['OWNER', 'MANAGER', 'CASHIER'] as const) {
+      expect(hears(event, role)).toBe(true);
+    }
+    expect(hears(event, 'WAITER')).toBe(false);
   });
 
   it('[KDS-005] sends a bump to its station and managers, not to other stations', () => {
@@ -263,23 +292,19 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
   });
 
   it('[WTR-012] tells the floor whether a ticket was printed, not the kitchen screens', () => {
-    const targets = roomsForEvent(
-      domainEvent('KotPrintStatusChanged', rid, {
-        kotId: randomUUID(),
-        kotNumber: 12,
-        orderId: randomUUID(),
-        stationId: randomUUID(),
-        printStatus: 'FAILED',
-      }),
-    );
-    expect(targets.sort()).toEqual(
-      [
-        rooms.role(rid, 'OWNER'),
-        rooms.role(rid, 'MANAGER'),
-        rooms.role(rid, 'CASHIER'),
-        rooms.role(rid, 'WAITER'),
-      ].sort(),
-    );
+    const event = domainEvent('KotPrintStatusChanged', rid, {
+      kotId: randomUUID(),
+      kotNumber: 12,
+      orderId: randomUUID(),
+      stationId: randomUUID(),
+      printStatus: 'FAILED',
+    });
+    expect(roomsForEvent(event)).toEqual([rooms.capability(rid, 'ORDER_CREATE')]);
+    for (const role of FLOOR) expect(hears(event, role)).toBe(true);
+    expect(hears(event, 'KITCHEN')).toBe(false);
+    // A kitchen screen in station mode does not hear it either.
+    const kds = roomsForConnection({ device: device({ type: 'KDS', stationId: stationA }) });
+    expect(reaches(roomsForEvent(event), new Set(kds))).toBe(false);
   });
 
   it('sends an escalation to managers and the people it names', () => {
@@ -335,18 +360,27 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     expect(reaches(roomsForEvent(moved), phone)).toBe(false);
   });
 
-  it('follows the permission matrix: a role denied the capability hears nothing', () => {
-    const matrix: PermissionMatrix = {
-      ...DEFAULT_PERMISSION_MATRIX,
-      BILL_REQUEST: { ...DEFAULT_PERMISSION_MATRIX.BILL_REQUEST, WAITER: 'DENY' },
-    };
-    const targets = roomsForEvent(
-      domainEvent('BillSettled', rid, { invoiceId: randomUUID(), grandTotal: 10_000 }),
-      {},
-      matrix,
-    );
-    expect(targets).not.toContain(rooms.role(rid, 'WAITER'));
-    expect(targets).toContain(rooms.role(rid, 'CASHIER'));
+  it('[AUTH-012] follows custom roles: what a role takes away goes quiet, what it adds is heard', () => {
+    const settled = domainEvent('BillSettled', rid, { invoiceId: randomUUID(), grandTotal: 0 });
+    expect(hears(settled, 'WAITER')).toBe(true);
+    expect(hears(settled, 'WAITER', { added: [], removed: ['BILL_REQUEST'] })).toBe(false);
+    expect(hears(settled, 'CASHIER')).toBe(true);
+
+    const printer = domainEvent('PrinterStatusChanged', rid, {
+      printerId: randomUUID(),
+      printerName: 'Bar',
+      online: false,
+      error: null,
+      queued: 0,
+    });
+    expect(hears(printer, 'WAITER', { added: ['BILL_PRINT_AND_PAYMENT'], removed: [] })).toBe(true);
+    const revoked = domainEvent('DeviceRevoked', rid, {
+      deviceId: randomUUID(),
+      deviceType: 'POS',
+      reason: 'Lost',
+    });
+    expect(hears(revoked, 'MANAGER', { added: [], removed: ['DEVICE_PAIR'] })).toBe(false);
+    expect(hears(revoked, 'CASHIER', { added: ['DEVICE_PAIR'], removed: [] })).toBe(true);
   });
 
   it('[MGR-006] asks only the device a manager is looking for, and never on replay', () => {

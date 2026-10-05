@@ -73,7 +73,7 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
       'kds.autoEscalateNotCollected': false, // KDS-006 (S)
       'devices.lowBatteryAlertPercent': 20, // TAB-015
       'pager.lowBatteryPercent': 15, // PGR-013
-      'pager.heartbeatSeconds': 30, // PGR-007
+      'pagers.heartbeatSeconds': 30, // PGR-007
       'qr.submissionsPerWindow': 5, // QR-006
       'qr.rateLimitWindowMinutes': 10, // QR-006
       'qr.pickupTimeoutSeconds': 60, // QR-007
@@ -109,6 +109,7 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
         'licence.graceDays',
         'qr.pickupTimeoutSeconds',
         'controlPlane.heartbeatSeconds',
+        'pagers.heartbeatSeconds',
       ]),
     );
   });

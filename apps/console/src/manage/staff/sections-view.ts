@@ -8,7 +8,7 @@ import type {
 import {
   type AssignmentScope,
   type FloorTable,
-  grantFor,
+  grantOf,
   type PlannedAssignment,
   reapplyAssignments,
   type Role,
@@ -58,12 +58,12 @@ const ROLE_ORDER: Readonly<Record<Role, number>> = {
 };
 
 /**
- * The people who may be given tables today: active and taking orders (the server's rule), waiters
- * first, then by name.
+ * The people who may be given tables today: active and taking orders (the server's rule, their
+ * custom role applied), waiters first, then by name.
  */
 export function assignablePeople(staff: readonly StaffView[]): StaffView[] {
   return staff
-    .filter((person) => person.active && grantFor(person.role, 'ORDER_CREATE') !== 'DENY')
+    .filter((person) => person.active && grantOf(person, 'ORDER_CREATE') !== 'DENY')
     .sort(
       (a, b) =>
         ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.displayName.localeCompare(b.displayName),

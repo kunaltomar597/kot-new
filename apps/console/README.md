@@ -7,7 +7,15 @@ role-based modes:
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
 - Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c),
   staff and the Owner's sign-in security (P4-02a), today's sections and pagers (P4-02b), devices
-  (P4-02c); more management, configuration and reports (Phase 4).
+  (P4-02c), the menu editor (P4-02d), custom roles (P4-02e) and settings (P4-03a); more
+  configuration and reports (Phase 4).
+
+Which modes and dashboard pages a person gets comes from the permission matrix with their custom
+role applied (`src/app/modes.ts`, `grantOf` in `@rp/domain`, AUTH-012): the POS for those who
+take orders, the KDS for those who cook, and the dashboard for anyone who may use one of its
+pages. The overview and the order feed need `OPERATIONS_CONFIGURE`; the setup pages need their own
+permission; Security is the Owner's. A cashier whose custom role manages staff starts at the POS
+and opens Manage on Staff. The server checks every call anyway.
 
 Opened in Electron on the restaurant PC (P0-16) and in browsers on paired devices. Uses
 `@rp/ui-web`, `@rp/api-client`, `@rp/i18n` and `@rp/domain`. Built by P0-14b (shell); the mode
@@ -77,8 +85,22 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   again): add, edit, set or change the PIN (typed twice), unlock, deactivate with a reason, and
   reactivate. The add and edit form is checked with the contract schemas before it is sent and
   sends only what changed. The list follows `RestaurantChanged` from any screen. `StaffArea.tsx`
-  puts People, Today's sections and Pagers (for those who may pair devices) under one row of
-  links.
+  puts People, Today's sections, Pagers (for those who may pair devices) and Roles under one row
+  of links. Custom roles show as "Captain (Waiter)" on rows and the tiles show their name; the
+  dialog offers the custom roles the signed-in person may give (`roleOptions`: one that makes
+  someone a manager is the Owner's to give) and sends `customRoleId` with the role it is built on.
+- Roles (`/manage/staff/roles`, P4-02e, AUTH-012): `RolesScreen.tsx` lists the custom roles,
+  active first, with what each is built on, adds and takes away (permissions in words from
+  `capabilities.*`), how many active people have it, and "Counts as a manager" when it does.
+  Everyone who manages staff sees them; only the Owner gets New role, Edit, Archive (with a
+  reason, only for a role nobody active has) and Restore, each behind the second factor when it
+  is not fresh. `RoleEditor.tsx` (`/manage/staff/roles/new` and `/:roleId`, the Owner only) has
+  the name, the role it is built on and one choice per permission in four groups, each offering
+  only what changes something (`roles-view.ts`: what the base role allows can be taken away, what
+  it never allows added, own-tables and manager's-PIN grants given outright or taken away; what
+  only the Owner may do is not offered). Changing the base role keeps the changes that still mean
+  something. It says when the role makes people managers and how many people a change signs out
+  of their screens.
 - Today's sections (`/manage/staff/sections`, P4-02b, TBL-002): `SectionsScreen.tsx` lists the
   people who take orders, waiters first, with their sections, their own tables and how many
   tables that makes, and names the tables nobody looks after yet. A dialog per person ticks whole
@@ -126,6 +148,22 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   `ModifierGroupsScreen.tsx` add, edit, archive with a reason and restore categories (one level of
   sub-categories) and modifier groups (fewest and most to choose, options with price changes and
   availability). An empty place puts a new entry last.
+- Settings (`/manage/settings`, P4-03a, MGR-007, for people who configure operations,
+  `OPERATIONS_CONFIGURE`): `src/manage/settings/`, with the logic in `settings-view.ts` (tested on
+  its own). `SettingsScreen.tsx` lists every setting of the catalogue (`SETTINGS` in
+  `@rp/contracts`) in its group, with its name and what it does (`settingItems.*` in `@rp/i18n`),
+  its value in its unit (basis points as a percent, paise as rupees), its default when changed
+  and who changes it: "Set by your provider" for vendor settings (UPD-010), "Only the Owner
+  changes this" for the Owner's tax, invoice and data settings, "You cannot change this" for a
+  custom role without the permission. A search over names and descriptions and "Only settings
+  changed from their default" narrow the list. `SettingDialog.tsx` edits one setting with the
+  editor its schema calls for (`fieldOf`: a number with its range, a switch, a choice, lines,
+  text, the bill printer, a daily window, the daypart windows), checks the draft with the
+  catalogue's schema before sending it, offers "Use the default" and an optional reason for the
+  audit log, and asks the Owner for the second factor when the server wants it. The server's
+  checks across settings come back as the dialog's message. The page follows `SettingsChanged`
+  and `RestaurantChanged`. The notification rules and pager vibrations get their own page
+  (P4-03b), so they are not listed here.
 - Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
   `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
   Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console
@@ -167,9 +205,12 @@ the alert centre, a manager adding a waiter who signs in on a second tab and is 
 within 5 s of being deactivated, the Owner setting up password and authenticator (the test
 computes the authenticator's code from the key shown) and adding a manager with a recovery code,
 a manager giving waiters their sections and a pager at shift start (registered, its credential
-shown once, then handed to another waiter well within 30 s), and a cashier refused the Staff
-page. The tabs share one browser context, so they share the
-device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
+shown once, then handed to another waiter well within 30 s), a cashier refused the Staff,
+Devices and Settings pages, and the Owner creating a "Captain" role (a waiter who also takes payments) after confirming
+a recovery code, giving it to Ravi, and Ravi settling a table's bill by UPI, and a manager
+changing the kitchen's amber age and the cashier's discount limit on the Settings page while the
+Owner turns on the service charge after a recovery code. The tabs share one browser context, so
+they share the device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
 since the server's Content Security Policy refuses inline scripts, after entrance animations end
 (a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium
 (`/opt/pw-browsers`); CI installs Playwright's own.

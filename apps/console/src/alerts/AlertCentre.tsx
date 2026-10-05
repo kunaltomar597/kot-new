@@ -1,5 +1,5 @@
 import type { AlertView } from '@rp/contracts';
-import { grantFor } from '@rp/domain';
+import { grantOf } from '@rp/domain';
 import { alertAge, describeAlert } from '@rp/ordering';
 import {
   Badge,
@@ -33,7 +33,7 @@ export function AlertCentre() {
   const now = useNow(AGE_REFRESH_MS);
   if (state === null) return null;
   const { alerts, person, reload, setPanel } = state;
-  const canNudge = grantFor(person.role, 'STAFF_MANAGE') !== 'DENY';
+  const canNudge = grantOf(person, 'STAFF_MANAGE') !== 'DENY';
 
   let content;
   if (alerts.status === 'loading') {

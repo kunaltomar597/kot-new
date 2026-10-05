@@ -56,7 +56,7 @@ export class SystemAlerts implements OnApplicationBootstrap, OnModuleDestroy {
     const restaurants = await this.prisma.restaurant.findMany({ select: { id: true } });
     for (const { id } of restaurants) {
       const settings = await this.notifications.settingsOf(id);
-      const full = usedPercent >= settings.get('notifications.diskAlertPercent');
+      const full = usedPercent >= settings.get('storage.warnPercent');
       await this.prisma.transaction(async (tx) => {
         if (full) {
           await this.notifications.raise(tx, {

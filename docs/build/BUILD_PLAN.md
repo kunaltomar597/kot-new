@@ -114,7 +114,9 @@ Exit: all Must reports verified against test data.
 - P4-01 Dashboard shell and live views
 - P4-02 Staff, device and menu management UI (in five parts: P4-02a staff and Owner security,
   P4-02b sections and pagers, P4-02c devices, P4-02d menu editor, P4-02e custom roles)
-- P4-03 Configuration screens
+- P4-03 Configuration screens (in five parts: P4-03a settings from the catalogue, P4-03b
+  notification rules, P4-03c recommendation rules with boost, pin and block, P4-03d floor,
+  stations and printers, P4-03e tax and invoice)
 - P4-04 Alert centre and system screen
 - P4-05 Full report suite
 - P4-06 Report exports (PDF, XLSX, CSV)

@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   CAPABILITIES,
   canApproveOverride,
+  checkCustomRole,
   DEFAULT_PERMISSION_MATRIX,
   evaluatePermission,
   grantFor,
+  grantOf,
+  OWNER_ONLY_CAPABILITIES,
   OWNER_SECOND_FACTOR_CAPABILITIES,
   ROLES,
 } from '../src/index.js';
@@ -83,5 +86,60 @@ describe('[AUTH-011] permission evaluation', () => {
     });
     expect(canApproveOverride('OWNER')).toBe(true);
     expect(canApproveOverride('WAITER')).toBe(false);
+  });
+});
+
+describe('[AUTH-012] custom roles', () => {
+  const captain = {
+    role: 'WAITER' as const,
+    customRole: {
+      added: ['BILL_PRINT_AND_PAYMENT', 'ORDER_APPROVE_CUSTOMER'] as const,
+      removed: ['ITEM_CANCEL_BEFORE_PREP'] as const,
+    },
+  };
+
+  it('adds capabilities outright, takes others away and leaves the rest to the base role', () => {
+    expect(grantOf(captain, 'BILL_PRINT_AND_PAYMENT')).toBe('ALLOW');
+    // A waiter approves orders for their own tables only; the captain approves them for any.
+    expect(grantOf(captain, 'ORDER_APPROVE_CUSTOMER')).toBe('ALLOW');
+    expect(grantOf(captain, 'ITEM_CANCEL_BEFORE_PREP')).toBe('DENY');
+    expect(grantOf(captain, 'ITEM_VOID_AFTER_PREP')).toBe('OVERRIDE');
+    expect(grantOf(captain, 'MENU_MANAGE')).toBe('DENY');
+    expect(grantOf({ role: 'CASHIER' }, 'INVOICE_VOID')).toBe('OVERRIDE');
+    expect(grantOf({ role: 'CASHIER', customRole: null }, 'INVOICE_VOID')).toBe('OVERRIDE');
+  });
+
+  it('keeps tax and invoice settings, data administration and the licence to the Owner', () => {
+    expect([...OWNER_ONLY_CAPABILITIES].sort()).toEqual([
+      'DATA_ADMIN',
+      'LICENSE_MANAGE',
+      'TAX_AND_INVOICE_SETTINGS',
+    ]);
+    expect(
+      checkCustomRole('MANAGER', { added: ['TAX_AND_INVOICE_SETTINGS'], removed: [] }),
+    ).toEqual([{ capability: 'TAX_AND_INVOICE_SETTINGS', problem: 'OWNER_ONLY' }]);
+  });
+
+  it('accepts anything a manager may do, and taking away anything the base role may do', () => {
+    expect(checkCustomRole('WAITER', captain.customRole)).toEqual([]);
+    expect(
+      checkCustomRole('CASHIER', { added: ['STAFF_MANAGE', 'DAY_END_CLOSE'], removed: [] }),
+    ).toEqual([]);
+    expect(checkCustomRole('MANAGER', { added: [], removed: ['DAY_END_CLOSE'] })).toEqual([]);
+  });
+
+  it('refuses changes that change nothing, contradict each other or repeat', () => {
+    expect(
+      checkCustomRole('WAITER', {
+        added: ['ORDER_CREATE', 'MENU_MANAGE', 'MENU_MANAGE'],
+        removed: ['DAY_END_CLOSE', 'MENU_MANAGE', 'BILL_REQUEST', 'BILL_REQUEST'],
+      }),
+    ).toEqual([
+      { capability: 'ORDER_CREATE', problem: 'ALREADY_ALLOWED' },
+      { capability: 'MENU_MANAGE', problem: 'REPEATED' },
+      { capability: 'DAY_END_CLOSE', problem: 'NOT_GRANTED' },
+      { capability: 'MENU_MANAGE', problem: 'BOTH' },
+      { capability: 'BILL_REQUEST', problem: 'REPEATED' },
+    ]);
   });
 });

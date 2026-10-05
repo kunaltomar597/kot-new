@@ -1,4 +1,4 @@
-import type { Role } from '@rp/domain';
+import type { Role, RoleCustomisation } from '@rp/domain';
 import type { Request } from 'express';
 import type { AppError } from '../errors/app-error.js';
 import type { AuthenticatedDevice } from './device.js';
@@ -6,7 +6,9 @@ import type { AuthenticatedDevice } from './device.js';
 /** The signed-in staff member behind a request, on the device that proved itself (AUTH-005). */
 export interface Principal {
   readonly staffId: string;
+  /** The base role; a custom role's changes are in `customRole` (P4-02e). Check with `grantOf`. */
   readonly role: Role;
+  readonly customRole?: RoleCustomisation | null;
   readonly restaurantId: string;
   readonly deviceId: string;
   readonly sessionId: string;
@@ -33,6 +35,8 @@ export interface Actor {
   /** Null in station mode. */
   readonly staffId: string | null;
   readonly role: Role;
+  /** A signed-in person's custom role (P4-02e); check with `grantOf`. */
+  readonly customRole?: RoleCustomisation | null;
   /** Set in station mode when the screen is bound to one station. */
   readonly stationId?: string | null;
 }

@@ -32,6 +32,8 @@ export const StaffTile = z.object({
   staffId: Id,
   displayName: z.string().min(1),
   role: Role,
+  /** The name of the person's custom role, shown instead of the base role's (P4-02e). */
+  customRoleName: z.string().nullable(),
   photoId: Id.nullable(),
 });
 export type StaffTile = z.infer<typeof StaffTile>;
@@ -53,6 +55,20 @@ export const RefreshRequest = z.strictObject({ refreshToken: z.string().min(20).
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
 
 /**
+ * A person's custom role (P4-02e, AUTH-012): its name and what it changes on top of their base
+ * role, so screens offer what they may do (the server decides with the same grants).
+ */
+export const PersonCustomRole = z.object({
+  id: Id,
+  name: z.string(),
+  /** Used outright, on top of the base role. */
+  added: z.array(Capability),
+  /** What the base role may do that this role may not. */
+  removed: z.array(Capability),
+});
+export type PersonCustomRole = z.infer<typeof PersonCustomRole>;
+
+/**
  * Tokens for a signed-in person on this device (AUTH-005). The access token is short-lived and
  * sent as `Authorization: Bearer`; the refresh token is kept by the app and rotated on every use.
  */
@@ -67,7 +83,12 @@ export const LoginResponse = z.object({
     /** The session ends after this many seconds without activity. */
     inactivityTimeoutSeconds: z.int().positive(),
   }),
-  staff: z.object({ id: Id, displayName: z.string(), role: Role }),
+  staff: z.object({
+    id: Id,
+    displayName: z.string(),
+    role: Role,
+    customRole: PersonCustomRole.nullable(),
+  }),
   /** Until when the Owner's password + TOTP step-up is valid, if it was done. */
   secondFactorValidUntil: Timestamp.nullable(),
 });

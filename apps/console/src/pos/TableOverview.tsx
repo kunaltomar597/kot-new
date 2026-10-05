@@ -1,5 +1,5 @@
 import type { TableOverviewEntry } from '@rp/contracts';
-import { grantFor } from '@rp/domain';
+import { grantOf } from '@rp/domain';
 import { Button, Dialog, EmptyState, ErrorState, LoadingState, Money, TableTile } from '@rp/ui-web';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -45,8 +45,8 @@ export function TableOverview() {
   const tables = sections.flatMap((section) => section.tables);
   const free = tables.filter((table) => table.state === 'FREE');
   const selected = tables.find((table) => table.tableId === panel?.tableId);
-  const canMove = person !== undefined && grantFor(person.role, 'TABLE_MOVE_MERGE') !== 'DENY';
-  const canCloseDay = person !== undefined && grantFor(person.role, 'DAY_END_CLOSE') !== 'DENY';
+  const canMove = person !== undefined && grantOf(person, 'TABLE_MOVE_MERGE') !== 'DENY';
+  const canCloseDay = person !== undefined && grantOf(person, 'DAY_END_CLOSE') !== 'DENY';
   const close = () => {
     setPanel(undefined);
   };

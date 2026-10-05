@@ -11,10 +11,13 @@ import { type RunningServer, startServer } from './server.js';
  * P0-14b acceptance: a real browser pairs with the real server, people sign in with their PIN and
  * land in their mode, and the offline banner shows while the server is down (NFR-P11). Later work
  * packages add their flows: the POS floor, orders, the kitchen display, the manager dashboard on a
- * desktop and a phone, billing, alerts, staff, devices and the menu editor.
+ * desktop and a phone, billing, alerts, staff, devices, the menu editor and custom roles.
  */
 
 const t = createTranslator();
+
+/** The Owner's password, set up in the second-factor flow and confirmed again later. */
+const OWNER_PASSWORD = 'rooftop tandoor since 1998';
 
 /** People from the development seed (apps/server/src/database/dev-seed.ts). */
 const PEOPLE = [
@@ -165,6 +168,8 @@ test.describe.serial('the web console', () => {
   // One browser profile: the device key it keeps is shared by every tab, like a POS terminal's.
   let context: BrowserContext;
   let page: Page;
+  // The Owner's one-time recovery codes, shown once when the authenticator is set up.
+  let recoveryCodes: string[] = [];
 
   test.beforeAll(async ({ browser }) => {
     server = await startServer();
@@ -634,7 +639,7 @@ test.describe.serial('the web console', () => {
     ).toBeVisible();
     await expectAccessible(page);
 
-    const password = 'rooftop tandoor since 1998';
+    const password = OWNER_PASSWORD;
     await page.getByRole('button', { name: t('ownerSecurity.password.setAction') }).click();
     const setPassword = page.getByRole('dialog', { name: t('ownerSecurity.password.setAction') });
     await setPassword.getByLabel(/^New password( \*)?$/).fill(password);
@@ -659,7 +664,8 @@ test.describe.serial('the web console', () => {
       .getByRole('list', { name: t('ownerSecurity.recovery.codes') })
       .getByRole('listitem');
     await expect(recovery).toHaveCount(10);
-    const firstCode = await recovery.first().innerText();
+    recoveryCodes = await recovery.allInnerTexts();
+    const firstCode = recoveryCodes[0] ?? '';
     await codes.getByRole('button', { name: t('ownerSecurity.recovery.saved') }).click();
     await expect(page.getByText(t('ownerSecurity.recovery.left', { count: 10 }))).toBeVisible();
 
@@ -1008,7 +1014,7 @@ test.describe.serial('the web console', () => {
     ).toBeVisible();
   });
 
-  test('[SEC-003] a cashier cannot open the Staff or Devices pages', async () => {
+  test('[SEC-003] [MGR-007] a cashier cannot open the Staff, Devices or Settings pages', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
     await page.keyboard.type('3333');
@@ -1019,5 +1025,198 @@ test.describe.serial('the web console', () => {
     await page.goto(`${server.url}/manage/devices`);
     await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: t('devices.title') })).toHaveCount(0);
+    await page.goto(`${server.url}/manage/settings`);
+    await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: t('settings.title') })).toHaveCount(0);
+  });
+
+  test('[AUTH-012] [AUTH-006] the Owner creates a Captain role, gives it to Ravi, and Ravi settles a bill', async () => {
+    await page.goto(server.url);
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
+    await page.keyboard.type('1111');
+    await expect(page).toHaveURL(/\/manage$/);
+    await page
+      .getByRole('navigation', { name: t('dashboard.navigation') })
+      .getByRole('link', { name: t('dashboard.section.staff') })
+      .click();
+    const staffPages = page.getByRole('navigation', { name: t('staff.pages.label') });
+    await staffPages.getByRole('link', { name: t('staff.pages.roles') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('customRoles.title') }),
+    ).toBeVisible();
+    await expect(page.getByText(t('customRoles.none'))).toBeVisible();
+
+    // A captain: a waiter who also prints bills and takes payments.
+    await page.getByRole('button', { name: t('customRoles.add') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('customRoles.editor.newTitle') }),
+    ).toBeVisible();
+    await page.getByLabel(/^Name( \*)?$/).fill('Captain');
+    await expect(page.getByLabel(/^Built on/)).toHaveValue('WAITER');
+    await page
+      .getByLabel(new RegExp(`^${escape(t('capabilities.BILL_PRINT_AND_PAYMENT'))}`))
+      .selectOption({ label: t('customRoles.editor.grants.ALLOW') });
+    await expectAccessible(page);
+    // A 360 px phone: the editor fits (MGR-011).
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.getByRole('button', { name: t('customRoles.editor.create') }).click();
+    // A new sign-in: the Owner confirms password and a second factor again.
+    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
+    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(OWNER_PASSWORD);
+    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
+    await confirm
+      .getByLabel(t('secondFactor.recoveryCode'), { exact: false })
+      .fill(recoveryCodes[1] ?? '');
+    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
+    await expect(page.getByText(t('customRoles.created', { name: 'Captain' }))).toBeVisible();
+    const captain = page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('heading', { name: 'Captain', exact: true }) });
+    await expect(
+      captain.getByText(t('customRoles.adds', { list: t('capabilities.BILL_PRINT_AND_PAYMENT') })),
+    ).toBeVisible();
+    await expectAccessible(page);
+
+    // Ravi becomes a captain.
+    await staffPages.getByRole('link', { name: t('staff.pages.people') }).click();
+    await page
+      .getByRole('group', { name: t('staff.actionsFor', { name: 'Ravi' }) })
+      .getByRole('button', { name: t('staff.edit') })
+      .click();
+    const edit = page.getByRole('dialog', { name: t('staff.form.editTitle', { name: 'Ravi' }) });
+    await edit.getByLabel(t('staff.form.role')).selectOption({ label: 'Captain (Waiter)' });
+    await edit.getByRole('button', { name: t('staff.form.save') }).click();
+    await expect(page.getByText(t('staff.saved', { name: 'Ravi' }))).toBeVisible();
+    await expect(
+      page
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('heading', { name: /^Ravi/ }) })
+        .getByText('Captain (Waiter)'),
+    ).toBeVisible();
+
+    // He signs in as a captain, seats guests, and settles their bill himself.
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    const ravi = page.getByRole('button', { name: /^Ravi/ });
+    await expect(ravi).toContainText('Captain');
+    await ravi.click();
+    await page.keyboard.type('4444');
+    await expect(page).toHaveURL(/\/pos$/);
+    await expect(
+      page.getByText(t('modes.signedInAs', { name: 'Ravi', role: 'Captain' })),
+    ).toBeVisible();
+    const hall = page.getByRole('region', { name: 'Main Hall' });
+    await hall.getByRole('button', { name: '3, Free' }).click();
+    const open = page.getByRole('dialog', { name: t('pos.open.title', { table: '3' }) });
+    await open.getByLabel(t('pos.open.guests'), { exact: true }).fill('2');
+    await open.getByRole('button', { name: t('pos.open.submit') }).click();
+    await hall.getByRole('button', { name: /^3, Occupied/ }).click();
+    await page.getByRole('button', { name: t('pos.table.takeOrder') }).click();
+    await page.getByRole('button', { name: 'Breads', exact: true }).click();
+    await page.getByRole('button', { name: /^Butter Naan, / }).click();
+    await page
+      .getByRole('complementary', { name: t('pos.cart.title') })
+      .getByRole('button', { name: t('pos.cart.send') })
+      .click();
+    await expect(page.getByText(/^Order \d+ sent to the kitchen$/)).toBeVisible();
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+
+    await hall.getByRole('button', { name: /^3, Occupied/ }).click();
+    await page.getByRole('button', { name: t('pos.billTable') }).click();
+    await page.getByRole('button', { name: t('billing.printBill') }).click();
+    await page.getByRole('button', { name: t('billing.pay') }).click();
+    await expect(page.getByRole('heading', { name: /^Payment for invoice / })).toBeVisible();
+    await page.getByLabel(t('payment.mode')).selectOption({ label: t('payment.modes.UPI') });
+    await page.getByRole('button', { name: t('payment.record') }).click();
+    await expect(page.getByText(/^Invoice .* is paid$/)).toBeVisible();
+    await page.getByRole('button', { name: t('pos.backToTables') }).click();
+    await expect(hall.getByRole('button', { name: '3, Free' })).toBeVisible();
+  });
+
+  test('[MGR-007] [BILL-005] [UPD-010] [AUTH-006] a manager changes the kitchen’s amber age and the cashier’s discount limit, and the Owner turns on the service charge', async () => {
+    const amber = t('settingItems.kds.ageAmberMinutes.label');
+    const limit = t('settingItems.billing.cashierDiscountLimitBp.label');
+    const service = t('settingItems.billing.serviceChargeEnabled.label');
+    const row = (label: string) =>
+      page
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('heading', { level: 4, name: label, exact: true }) });
+    const change = (label: string) =>
+      page.getByRole('button', {
+        name: t('settings.row.changeLabel', { name: label }),
+        exact: true,
+      });
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('settings.title') })).toBeVisible();
+    // What the provider sets, and what only the Owner changes, is shown but not offered.
+    await expect(
+      row(t('settingItems.pagers.heartbeatSeconds.label')).getByText(t('settings.row.vendor'), {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      row(service).getByText(t('settings.row.ownerOnly'), { exact: true }),
+    ).toBeVisible();
+    await expect(change(service)).toHaveCount(0);
+    await expectAccessible(page);
+
+    // Tickets turn amber after 8 minutes instead of 10.
+    await change(amber).click();
+    const amberDialog = page.getByRole('dialog', { name: amber, exact: true });
+    await amberDialog.getByLabel(new RegExp(`^${escape(amber)}`)).fill('8');
+    await amberDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(page.getByText(t('settings.dialog.saved', { name: amber }))).toBeVisible();
+    await expect(row(amber).getByText('8 minutes', { exact: true })).toBeVisible();
+    await expect(row(amber).getByText(t('settings.row.changed'), { exact: true })).toBeVisible();
+
+    // The cashier's limit goes from 10 % to 12.5 %, with a reason for the audit log.
+    await change(limit).click();
+    const limitDialog = page.getByRole('dialog', { name: limit, exact: true });
+    await limitDialog.getByLabel(new RegExp(`^${escape(limit)}`)).fill('12.5');
+    await limitDialog
+      .getByLabel(new RegExp(`^${escape(t('settings.dialog.reason'))}`))
+      .fill('Festival week');
+    await expectAccessible(page);
+    await limitDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(row(limit).getByText('12.5 %', { exact: true })).toBeVisible();
+
+    // Only what was changed (the test setup changed two sign-in settings), on a 360 px phone too.
+    await page.getByLabel(t('settings.general.changedOnly')).check();
+    await expect(row(amber)).toBeVisible();
+    await expect(row(limit)).toBeVisible();
+    await expect(row(service)).toHaveCount(0);
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // The Owner turns on the service charge, confirming the second factor (AUTH-006).
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
+    await page.keyboard.type('1111');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await change(service).click();
+    const serviceDialog = page.getByRole('dialog', { name: service, exact: true });
+    await expect(serviceDialog.getByText(t('settings.dialog.secondFactor'))).toBeVisible();
+    await serviceDialog.getByRole('checkbox', { name: service, exact: true }).check();
+    await serviceDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
+    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(OWNER_PASSWORD);
+    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
+    await confirm
+      .getByLabel(t('secondFactor.recoveryCode'), { exact: false })
+      .fill(recoveryCodes[2] ?? '');
+    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
+    await expect(page.getByText(t('settings.dialog.saved', { name: service }))).toBeVisible();
+    await expect(row(service).getByText(t('settings.values.on'), { exact: true })).toBeVisible();
+    await expect(row(amber).getByText('8 minutes', { exact: true })).toBeVisible();
   });
 });

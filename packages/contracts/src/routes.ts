@@ -212,8 +212,13 @@ import {
 } from './settings.js';
 import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
 import {
+  ArchiveRoleRequest,
   CreateStaffRequest,
+  CustomRoleRequest,
+  CustomRoleView,
   DeactivateStaffRequest,
+  RoleListResponse,
+  RoleParams,
   SetStaffPinRequest,
   StaffListResponse,
   StaffParams,
@@ -758,17 +763,23 @@ export const ROUTES = [
     summary: 'Add a person with a role and a PIN',
     description:
       'MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner ' +
-      'with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN ' +
-      'has exactly `auth.pinLength` digits, is hashed with the pepper and never stored or logged ' +
-      '(AUTH-002). Audited.',
+      'with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). A custom ' +
+      'role (AUTH-012) is given like its base role, except that one built on the manager role or ' +
+      'giving staff management counts as a manager. The PIN has exactly `auth.pinLength` digits, ' +
+      'is hashed with the pepper and never stored or logged (AUTH-002). Audited.',
     tags: ['staff'],
-    requirements: ['MGR-004', 'AUTH-001', 'AUTH-002', 'AUTH-006', 'AUD-001'],
+    requirements: ['MGR-004', 'AUTH-001', 'AUTH-002', 'AUTH-006', 'AUTH-012', 'AUD-001'],
     capability: 'STAFF_MANAGE',
     request: { body: CreateStaffRequest },
     responses: {
       201: { description: 'The new person.', schema: StaffView },
       ...standardErrors,
-      422: { description: 'The PIN does not have the configured length.', schema: ApiError },
+      404: { description: 'No such custom role, or it is archived.', schema: ApiError },
+      422: {
+        description:
+          'The PIN does not have the configured length, or the custom role is built on another role.',
+        schema: ApiError,
+      },
     },
   },
   {
@@ -777,19 +788,24 @@ export const ROUTES = [
     path: '/api/v1/staff/:staffId',
     summary: "Change a person's name, role, phone or e-mail",
     description:
-      "MGR-004. A new role applies to the person's next request (AUTH-010). Making someone a " +
-      "manager or no longer one needs the Owner's second factor (AUTH-006); a manager's details " +
-      'are changed by the Owner or themselves; nobody changes their own role. Audited with ' +
-      'before and after.',
+      "MGR-004. A new role, or custom role (AUTH-012), applies to the person's next request and " +
+      "closes their live connections (AUTH-010). Making someone a manager or no longer one needs the Owner's " +
+      'second factor (AUTH-006), as does giving or taking away a custom role built on the manager ' +
+      "role or giving staff management; a manager's details are changed by the Owner or " +
+      'themselves; nobody changes their own role. Audited with before and after.',
     tags: ['staff'],
-    requirements: ['MGR-004', 'AUTH-006', 'AUD-001'],
+    requirements: ['MGR-004', 'AUTH-006', 'AUTH-012', 'AUD-001'],
     capability: 'STAFF_MANAGE',
     request: { params: StaffParams, body: UpdateStaffRequest },
     responses: {
       200: { description: 'The person as they are now.', schema: StaffView },
       ...standardErrors,
-      404: { description: 'No such person.', schema: ApiError },
-      422: { description: 'The change is not allowed on this record.', schema: ApiError },
+      404: { description: 'No such person, or no such active custom role.', schema: ApiError },
+      422: {
+        description:
+          'The change is not allowed on this record, or the custom role is built on another role.',
+        schema: ApiError,
+      },
     },
   },
   {
@@ -849,6 +865,100 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such person.', schema: ApiError },
       422: { description: 'The PIN does not have the configured length.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listRoles',
+    method: 'GET',
+    path: '/api/v1/roles',
+    summary: 'The custom roles: what each adds to or takes from its base role',
+    description:
+      'AUTH-012: archived roles included, with how many active people have each, so the staff ' +
+      'editor can offer them.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'MGR-004'],
+    capability: 'STAFF_MANAGE',
+    responses: {
+      200: { description: 'Custom roles.', schema: RoleListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'createRole',
+    method: 'POST',
+    path: '/api/v1/roles',
+    summary: 'The Owner combines permissions into a new role on top of a base role',
+    description:
+      'AUTH-012. Only the Owner, with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until ' +
+      'then, AUTH-006). It may add anything a manager may do and take away anything the base role ' +
+      'may do, never what only the Owner may do (422 `ROLE_PERMISSIONS_INVALID` with each ' +
+      'problem). Names are unique among active roles, built-in ones included. Audited.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { body: CustomRoleRequest },
+    responses: {
+      201: { description: 'The new role.', schema: CustomRoleView },
+      ...standardErrors,
+      409: { description: 'Another active role has that name.', schema: ApiError },
+      422: { description: 'Permissions that cannot be given this way.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'updateRole',
+    method: 'PUT',
+    path: '/api/v1/roles/:roleId',
+    summary: "Change a custom role's name, base role or permissions",
+    description:
+      'AUTH-012, AUTH-006: the Owner with a fresh second factor. The people who have it work with ' +
+      'the new permissions from their next request; their live connections close, so their ' +
+      'screens sign in again with them. Audited with before and after.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUTH-010', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: RoleParams, body: CustomRoleRequest },
+    responses: {
+      200: { description: 'The role as it is now.', schema: CustomRoleView },
+      ...standardErrors,
+      404: { description: 'No such custom role.', schema: ApiError },
+      409: { description: 'Archived, or another active role has that name.', schema: ApiError },
+      422: { description: 'Permissions that cannot be given this way.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'archiveRole',
+    method: 'POST',
+    path: '/api/v1/roles/:roleId/archive',
+    summary: 'Archive a custom role nobody active has',
+    description:
+      'AUTH-012, AUTH-006: the Owner with a fresh second factor, with a reason. Deactivated people ' +
+      'keep it in their records. Audited.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: RoleParams, body: ArchiveRoleRequest },
+    responses: {
+      200: { description: 'The role, archived.', schema: CustomRoleView },
+      ...standardErrors,
+      404: { description: 'No such custom role.', schema: ApiError },
+      409: { description: 'Already archived, or active people have it.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'restoreRole',
+    method: 'POST',
+    path: '/api/v1/roles/:roleId/restore',
+    summary: 'Offer an archived custom role again',
+    description: 'AUTH-012, AUTH-006: the Owner with a fresh second factor. Audited.',
+    tags: ['staff'],
+    requirements: ['AUTH-012', 'AUTH-006', 'AUD-001'],
+    capability: 'STAFF_MANAGE',
+    request: { params: RoleParams },
+    responses: {
+      200: { description: 'The role, offered again.', schema: CustomRoleView },
+      ...standardErrors,
+      404: { description: 'No such custom role.', schema: ApiError },
+      409: { description: 'Not archived, or another active role has its name.', schema: ApiError },
     },
   },
   {

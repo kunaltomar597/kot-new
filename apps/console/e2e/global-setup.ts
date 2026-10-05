@@ -27,14 +27,18 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     env: { ...process.env, DATABASE_URL: database.url, RP_DATA_DIR: dataDir },
     stdio: 'inherit',
   });
-  // Kitchen staff sign in individually here, so every role can be tried at the PIN pad.
+  // Kitchen staff sign in individually here, so every role can be tried at the PIN pad. The
+  // tests also sign people in on one terminal far faster than a restaurant does, so the sign-in
+  // limit per device (SEC-009, tested on the server) is raised to its maximum.
   const client = new pg.Client({ connectionString: database.url });
   await client.connect();
   try {
     await client.query(
       `INSERT INTO settings (id, restaurant_id, key, value, updated_at)
-       SELECT gen_random_uuid(), id, 'auth.kitchenIndividualLogins', 'true'::jsonb, now()
-       FROM restaurants`,
+       SELECT gen_random_uuid(), id, setting.key, setting.value, now()
+       FROM restaurants,
+            (VALUES ('auth.kitchenIndividualLogins', 'true'::jsonb),
+                    ('auth.attemptsPerMinutePerDevice', '100'::jsonb)) AS setting (key, value)`,
     );
   } finally {
     await client.end();

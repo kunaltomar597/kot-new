@@ -461,7 +461,7 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `devices.lowBatteryAlertPercent` for the others; one alert per change of state) and printer
   alerts from `PrinterStatusChanged`, open until the printer is back.
 - `system-alerts.ts` (`SystemAlerts.checkDisk`) checks the data drive every hour and raises
-  `DISK_OR_BACKUP` at `notifications.diskAlertPercent` until space is freed. Backup and licence
+  `DISK_OR_BACKUP` at `storage.warnPercent` until space is freed. Backup and licence
   alerts will use the same engine (P7).
 
 ## Alerts on the waiter phone (P2-06a)
@@ -540,6 +540,34 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `RestaurantChanged` `STAFF`, which the staff list and the sign-in tiles follow.
 - `GET /api/v1/auth/owner/security` tells the Owner what of password, authenticator and recovery
   codes is set up, never a secret. See `test/integration/staff.int.test.ts`.
+
+## Custom roles (P4-02e)
+
+- A custom role (AUTH-012) is a row of `roles` with `built_in = false`: a base role (never the
+  Owner's), the capabilities it adds (`capabilities`, then allowed outright) and the ones it takes
+  away (`removed_capabilities`). `@rp/domain` `grantOf` applies it and `checkCustomRole` says what
+  may be added or taken away (never what only the Owner may do).
+- `src/staff/roles.service.ts` serves `/api/v1/roles`: everyone who manages staff lists them
+  (archived ones included, with how many active people have each); creating, changing, archiving
+  (with a reason, only when no active person has it) and restoring need the Owner with a fresh
+  second factor, since a role decides who manages staff and who counts as a manager. Names are
+  unique, ignoring case, among active custom roles and the built-in roles. Each change is audited
+  (ROLE_CREATED, ROLE_CHANGED with before and after, ROLE_ARCHIVED, ROLE_RESTORED) and announced
+  as `RestaurantChanged` `STAFF`. Roles are archived, never deleted.
+- People get a custom role like its base role: `customRoleId` with `role` on the staff routes
+  (422 `ROLE_MISMATCH` when it is built on another role, 404 `ROLE_NOT_FOUND` when it is archived).
+  Someone whose role manages staff counts as a manager (`isManagerRole`), so only the Owner with a
+  fresh second factor gives it or changes theirs. The role row is locked while it is given, and
+  locked for update while it changes, so nobody gets a role mid-change.
+- The principal is read again on every request with its custom role (`src/auth/custom-roles.ts`),
+  so a change applies from each person's next call. The permission key of a session includes the
+  role's grants, so the realtime sweep closes their sockets (`SESSION_ENDED`) and their screens
+  sign in again; people whose role stops taking orders leave today's sections
+  (`src/staff/sections.ts`). Socket rooms per capability (`r:<restaurant>:can:<capability>`)
+  carry events to whoever may use it, custom roles included. A manager's approval (AUTH-011)
+  still needs an Owner or Manager base role whose grant allows the action.
+- Sign-in, the current session and staff records carry the custom role (id, name, added,
+  removed); the sign-in tiles show its name. See `test/integration/roles.int.test.ts`.
 
 ## Pagers (P2-04a)
 

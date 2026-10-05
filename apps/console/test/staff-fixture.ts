@@ -12,6 +12,7 @@ export function staffView(role: Role, overrides: Partial<StaffView> = {}): Staff
     id: tile.staffId,
     displayName: tile.displayName,
     role,
+    customRole: null,
     active: true,
     phone: null,
     email: null,

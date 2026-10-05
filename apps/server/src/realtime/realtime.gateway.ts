@@ -24,6 +24,7 @@ import {
 import { businessDateOf } from '@rp/domain';
 import { type Namespace, Server, type Socket } from 'socket.io';
 import { authErrors } from '../auth/auth-errors.js';
+import { permissionKey } from '../auth/custom-roles.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import { DeviceTokenAuthenticator } from '../auth/device-token.authenticator.js';
 import type { Principal } from '../auth/principal.js';
@@ -245,7 +246,11 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
       rooms: roomsForConnection({
         device,
         ...(principal !== undefined && {
-          person: { staffId: principal.staffId, role: principal.role },
+          person: {
+            staffId: principal.staffId,
+            role: principal.role,
+            customRole: principal.customRole ?? null,
+          },
           sectionIds: await this.sectionsOf(principal),
         }),
       }),
@@ -468,7 +473,10 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         const row = deviceById.get(device.deviceId);
         if (row?.status !== 'ACTIVE') {
           this.end(socket, 'DEVICE_REVOKED');
-        } else if (principal !== undefined && live.get(principal.sessionId) !== principal.role) {
+        } else if (
+          principal !== undefined &&
+          live.get(principal.sessionId) !== permissionKey(principal)
+        ) {
           // Before a binding change: signing out on a waiter phone also ends its alerts (P2-06a),
           // and the app must hear that the person is signed out.
           this.end(socket, 'SESSION_ENDED');
@@ -495,7 +503,9 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         for (const { socket, principal } of recheck) {
           this.end(
             socket,
-            again.get(principal.sessionId) === principal.role ? 'DEVICE_CHANGED' : 'SESSION_ENDED',
+            again.get(principal.sessionId) === permissionKey(principal)
+              ? 'DEVICE_CHANGED'
+              : 'SESSION_ENDED',
           );
         }
       }

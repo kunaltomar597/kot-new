@@ -167,46 +167,64 @@ describe('[WTR-007] [WTR-009] [ORD-011] what can be done with a sent line', () =
     ({ state, parentOrderItemId }) as Parameters<typeof lineActions>[0];
 
   it('serves or picks up what is ready, and serves what was picked up', () => {
-    expect(lineActions(line('READY'), 'WAITER', false)).toMatchObject({
+    expect(lineActions(line('READY'), { role: 'WAITER' }, false)).toMatchObject({
       pickUp: true,
       serve: true,
     });
-    expect(lineActions(line('PICKED_UP'), 'WAITER', false)).toMatchObject({
+    expect(lineActions(line('PICKED_UP'), { role: 'WAITER' }, false)).toMatchObject({
       pickUp: false,
       serve: true,
     });
     for (const state of ['SENT', 'PREPARING', 'SERVED', 'CANCELLED', 'PENDING_APPROVAL']) {
-      expect(lineActions(line(state), 'MANAGER', true), state).toMatchObject({
+      expect(lineActions(line(state), { role: 'MANAGER' }, true), state).toMatchObject({
         pickUp: false,
         serve: false,
       });
     }
     // The kitchen marks items picked up at the pass but never serves (BRD §4.2).
-    expect(lineActions(line('READY'), 'KITCHEN', false)).toMatchObject({
+    expect(lineActions(line('READY'), { role: 'KITCHEN' }, false)).toMatchObject({
       pickUp: true,
       serve: false,
     });
   });
 
   it('lets waiters cancel on their own tables before cooking, and managers anywhere', () => {
-    expect(lineActions(line('SENT'), 'WAITER', true).cancel).toBe(true);
-    expect(lineActions(line('SENT'), 'WAITER', false).cancel).toBe(false);
-    expect(lineActions(line('SENT'), 'MANAGER', false).cancel).toBe(true);
-    expect(lineActions(line('PREPARING'), 'WAITER', true).cancel).toBe(false);
-    expect(lineActions(line('SENT'), 'WAITER', true).void).toBeNull();
+    expect(lineActions(line('SENT'), { role: 'WAITER' }, true).cancel).toBe(true);
+    expect(lineActions(line('SENT'), { role: 'WAITER' }, false).cancel).toBe(false);
+    expect(lineActions(line('SENT'), { role: 'MANAGER' }, false).cancel).toBe(true);
+    expect(lineActions(line('PREPARING'), { role: 'WAITER' }, true).cancel).toBe(false);
+    expect(lineActions(line('SENT'), { role: 'WAITER' }, true).void).toBeNull();
   });
 
   it("voids once cooking started: managers outright, waiters with a manager's PIN", () => {
     for (const state of ['PREPARING', 'READY', 'PICKED_UP', 'SERVED']) {
-      expect(lineActions(line(state), 'WAITER', false).void, state).toBe('OVERRIDE');
-      expect(lineActions(line(state), 'OWNER', false).void, state).toBe('ALLOW');
+      expect(lineActions(line(state), { role: 'WAITER' }, false).void, state).toBe('OVERRIDE');
+      expect(lineActions(line(state), { role: 'OWNER' }, false).void, state).toBe('ALLOW');
     }
-    expect(lineActions(line('VOIDED'), 'MANAGER', true).void).toBeNull();
-    expect(lineActions(line('READY'), 'KITCHEN', false).void).toBeNull();
+    expect(lineActions(line('VOIDED'), { role: 'MANAGER' }, true).void).toBeNull();
+    expect(lineActions(line('READY'), { role: 'KITCHEN' }, false).void).toBeNull();
+  });
+
+  it('[AUTH-012] follows a custom role', () => {
+    // A captain voids without a PIN and cancels on any table, but leaves serving to the waiters.
+    const captain = {
+      role: 'WAITER',
+      customRole: {
+        added: ['ITEM_CANCEL_BEFORE_PREP', 'ITEM_VOID_AFTER_PREP'],
+        removed: ['ITEM_MARK_SERVED'],
+      },
+    } as const;
+    expect(lineActions(line('READY'), captain, false)).toEqual({
+      pickUp: true,
+      serve: false,
+      cancel: false,
+      void: 'ALLOW',
+    });
+    expect(lineActions(line('SENT'), captain, false).cancel).toBe(true);
   });
 
   it('takes no steps on a combo part, and lists the lines that can be served', () => {
-    expect(lineActions(line('READY', 'combo'), 'MANAGER', true)).toEqual({
+    expect(lineActions(line('READY', 'combo'), { role: 'MANAGER' }, true)).toEqual({
       pickUp: false,
       serve: false,
       cancel: false,
@@ -214,9 +232,9 @@ describe('[WTR-007] [WTR-009] [ORD-011] what can be done with a sent line', () =
     });
     const ready = sentOrder('READY');
     const cooking = sentOrder('PREPARING', { id: 'second' });
-    expect(servableLines([ready, cooking], 'WAITER', true).map((served) => served.state)).toEqual([
-      'READY',
-    ]);
+    expect(
+      servableLines([ready, cooking], { role: 'WAITER' }, true).map((served) => served.state),
+    ).toEqual(['READY']);
   });
 });
 

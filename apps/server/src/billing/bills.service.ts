@@ -519,8 +519,8 @@ export class BillsService {
 
   /**
    * BILL-005: Owner and Manager may give any discount; a cashier up to their limit, and above it
-   * or complimentary with a manager's override token for DISCOUNT_ABOVE_LIMIT. Returns the
-   * approver, if one was needed.
+   * or complimentary with a manager's override token for DISCOUNT_ABOVE_LIMIT; a custom role as
+   * its discount permissions say (AUTH-012). Returns the approver, if one was needed.
    */
   private async approve(
     principal: Principal,
@@ -529,7 +529,7 @@ export class BillsService {
     overrideToken: string | undefined,
   ): Promise<string | null> {
     const snapshot = await this.settings.snapshot(principal.restaurantId);
-    const decision = decideDiscount(principal.role, rateBp, {
+    const decision = decideDiscount(principal, rateBp, {
       CASHIER: snapshot.get('billing.cashierDiscountLimitBp'),
     });
     if (decision === 'ALLOWED') return null;

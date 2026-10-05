@@ -15,7 +15,7 @@ import type {
   TotpConfirmResponse,
   TotpEnrollmentResponse,
 } from '@rp/contracts';
-import { canApproveOverride, decideStaffChange, grantFor, type Role } from '@rp/domain';
+import { canApproveOverride, decideStaffChange, grantOf, type Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
@@ -23,6 +23,7 @@ import type { CredentialKind } from '../generated/prisma/enums.js';
 import { staffErrors } from '../staff/staff-errors.js';
 import { authErrors } from './auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
+import { customisationOf, ROLE_GRANTS_SELECT, signedInCustomRole } from './custom-roles.js';
 import { hasFreshStepUp } from './step-up.js';
 import { CredentialHasher } from './credential-hasher.js';
 import type { AuthenticatedDevice } from './device.js';
@@ -87,6 +88,7 @@ export class AuthService {
         staffId: person.id,
         displayName: person.displayName,
         role: person.role.baseRole,
+        customRoleName: person.role.builtIn ? null : person.role.name,
         photoId: person.photoId,
       })),
     };
@@ -263,14 +265,24 @@ export class AuthService {
     await this.prisma.transaction(async (tx) => {
       const staff = await tx.staff.findFirst({
         where: { id: staffId, restaurantId: principal.restaurantId },
-        select: { id: true, active: true, role: { select: { baseRole: true } } },
+        select: { id: true, active: true, role: { select: ROLE_GRANTS_SELECT } },
       });
       if (staff === null) throw authErrors.forbidden();
       // A manager opens their own and their team's logins; the Owner's and other managers' locks
       // (the Owner's password guards Owner-only actions) only the Owner opens (P4-02a).
       const decision = decideStaffChange(
-        { staffId: principal.staffId, role: principal.role, secondFactorFresh: false },
-        { staffId: staff.id, role: staff.role.baseRole, active: staff.active },
+        {
+          staffId: principal.staffId,
+          role: principal.role,
+          customRole: principal.customRole ?? null,
+          secondFactorFresh: false,
+        },
+        {
+          staffId: staff.id,
+          role: staff.role.baseRole,
+          customRole: customisationOf(staff.role),
+          active: staff.active,
+        },
         { kind: 'UNLOCK' },
       );
       if (!decision.allowed) throw staffErrors.refused(decision.reason);
@@ -307,7 +319,7 @@ export class AuthService {
     device: AuthenticatedDevice,
     request: OverrideRequest,
   ): Promise<OverrideResponse> {
-    const grant = grantFor(principal.role, request.capability);
+    const grant = grantOf(principal, request.capability);
     if (grant === 'DENY') throw authErrors.forbidden();
     if (grant !== 'OVERRIDE') throw authErrors.overrideNotNeeded();
     const settings = await this.settings.get(principal.restaurantId);
@@ -324,9 +336,11 @@ export class AuthService {
         requesterId: principal.staffId,
         capability: request.capability,
       };
+      // A manager whose custom role takes the action away cannot approve it either (P4-02e).
       if (
         approver === null ||
         !canApproveOverride(approver.role) ||
+        grantOf(approver, request.capability) !== 'ALLOW' ||
         approver.id === principal.staffId
       ) {
         await this.hasher.verifyNothing(request.pin);
@@ -598,7 +612,12 @@ export class AuthService {
     });
     return staff === null
       ? null
-      : { id: staff.id, displayName: staff.displayName, role: staff.role.baseRole };
+      : {
+          id: staff.id,
+          displayName: staff.displayName,
+          role: staff.role.baseRole,
+          customRole: signedInCustomRole(staff.role),
+        };
   }
 
   /** Reads a credential with a row lock, so concurrent attempts count one after another. */

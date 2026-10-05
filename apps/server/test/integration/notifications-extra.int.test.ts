@@ -13,6 +13,7 @@ import { PrismaService } from '../../src/database/prisma.service.js';
 import { NOTIFICATION_CLOCK, NOTIFICATION_OPTIONS } from '../../src/notifications/clock.js';
 import { PRESENCE } from '../../src/notifications/presence.js';
 import { SystemAlerts } from '../../src/notifications/system-alerts.js';
+import { SettingsService } from '../../src/settings/settings.service.js';
 import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { domainEvent, produce } from '../helpers/events.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
@@ -253,5 +254,15 @@ describe('[NTF-003] device, printer and disk alerts', () => {
       'CLEARED',
     );
     expect(await alerts.checkDisk({ totalBytes: 0, freeBytes: 0 })).toBeNull();
+
+    // The warning level is the restaurant's `storage.warnPercent`.
+    await prisma.setting.create({
+      data: { restaurantId: kit.restaurantId, key: 'storage.warnPercent', value: 90 },
+    });
+    app.get(SettingsService).invalidate();
+    await alerts.checkDisk({ totalBytes: 100, freeBytes: 15 });
+    expect(await prisma.alert.count({ where: { dedupeKey: 'disk', status: 'OPEN' } })).toBe(0);
+    await alerts.checkDisk({ totalBytes: 100, freeBytes: 9 });
+    expect(await prisma.alert.count({ where: { dedupeKey: 'disk', status: 'OPEN' } })).toBe(1);
   });
 });
