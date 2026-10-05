@@ -85,7 +85,11 @@ export class MenuPublishService {
         { itemIds: refused },
       );
     }
-    if ((await tx.comboComponent.count({ where: { itemId } })) > 0) {
+    // A fixed part or one of a choice's items (P4-02d: choices were not checked before).
+    const partOf =
+      (await tx.comboComponent.count({ where: { itemId } })) +
+      (await tx.comboChoiceOption.count({ where: { itemId } }));
+    if (partOf > 0) {
       throw new AppError(
         422,
         'COMBO_COMPONENT_INVALID',

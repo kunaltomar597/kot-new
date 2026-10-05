@@ -117,7 +117,7 @@ describe('[MENU-005] combos', () => {
     expect(await prisma.auditLog.count({ where: { action: 'COMBO_CHANGED' } })).toBe(1);
   });
 
-  it('refuses combos inside combos, itself, and a combo part becoming a combo', async () => {
+  it('refuses combos inside combos, itself, and a combo part or choice becoming a combo', async () => {
     const nested = await server()
       .put(`/api/v1/menu/items/${id('Lassi')}/combo`)
       .set(as(manager))
@@ -128,6 +128,11 @@ describe('[MENU-005] combos', () => {
       .set(as(manager))
       .send({ ...thali(), components: [{ kind: 'FIXED', itemId: id('Lassi'), quantity: 1 }] });
     expect([part.status, codeOf(part)]).toEqual([422, 'COMBO_COMPONENT_INVALID']);
+    const choice = await server()
+      .put(`/api/v1/menu/items/${id('Chaas')}/combo`)
+      .set(as(manager))
+      .send({ ...thali(), components: [{ kind: 'FIXED', itemId: id('Dal'), quantity: 1 }] });
+    expect([choice.status, codeOf(choice)]).toEqual([422, 'COMBO_COMPONENT_INVALID']);
     const backwards = await server()
       .put(`/api/v1/menu/items/${id('Veg Thali')}/combo`)
       .set(as(manager))
