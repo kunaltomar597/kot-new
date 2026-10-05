@@ -46,7 +46,9 @@ What exists:
   (connected, battery, firmware, serial), renaming, and Locate with `DeviceLocateRequested` and the
   pager's locate message (P4-02c); the editor's draft with combos, stock counts and whether
   publishing would show something new, and `MenuDraftChanged` (P4-02d); custom roles, their
-  routes and the custom role on sign-in, staff records and tiles (P4-02e). 554 tests.
+  routes and the custom role on sign-in, staff records and tiles (P4-02e); a settings catalogue
+  with one pager heartbeat (set by the vendor), one vibration setting and one disk warning level
+  (P4-03a). 551 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -93,7 +95,8 @@ What exists:
   like their base role, applied by the guard, the override approver check, socket rooms per
   capability, order, table and discount rules, a change reaching its people on their next request
   with their screens signed in again, and people who stop taking orders taken off today's
-  sections (P4-02e). 743 tests (4 skipped without a real install).
+  sections (P4-02e); the disk alert at `storage.warnPercent` (P4-03a). 743 tests (4 skipped
+  without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -165,8 +168,10 @@ What exists:
   modifier groups and combo, availability and stock counts, categories, modifier groups and
   publishing, kept up to date while another manager edits (P4-02d); Staff → Roles with the
   Owner's role editor, custom roles offered in the staff editor and shown on rows and tiles, and
-  modes and dashboard pages that follow the custom role (P4-02e). 269 tests, and 19 Playwright
-  steps.
+  modes and dashboard pages that follow the custom role (P4-02e); the Settings page: every
+  setting of the catalogue by area with its value in its unit, its default and who changes it, an
+  editor chosen from its validation, "use the default", a reason for the audit log, vendor
+  settings read-only and the Owner's second factor (P4-03a). 285 tests, and 20 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -181,7 +186,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03 Configuration screens (P4-01, P2-03, P3-04 and P1-07 done).
+- P4-03b Notification rules (P2-03 and P4-03a done), then P4-03c to P4-03e (see phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -286,7 +291,11 @@ Recommended next WPs (dependencies met):
 - [x] P4-02c Devices
 - [x] P4-02d Menu editor
 - [x] P4-02e Custom roles (S)
-- [ ] P4-03 Configuration screens
+- [x] P4-03a Settings from the catalogue
+- [ ] P4-03b Notification rules
+- [ ] P4-03c Recommendation rules with boost, pin and block
+- [ ] P4-03d Floor, stations and printers
+- [ ] P4-03e Tax and invoice
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
 - [ ] P4-06 Report exports
@@ -572,6 +581,41 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-05 (P4-03a):
+
+242. P4-03 is built in five parts, each a page of the dashboard's Settings area: the General
+     settings from the catalogue (P4-03a), notification rules (P4-03b), recommendation rules with
+     boost, pin and block (P4-03c), floor, stations and printers (P4-03d), and tax and invoice
+     (P4-03e).
+243. The catalogue keeps one setting per value. The pager heartbeat is `pagers.heartbeatSeconds`,
+     now set by the vendor (10 to 300 s, default 30): the pager firmware and the broker must agree
+     on it, and a wrong value would mark every pager offline. Pager vibrations stay in
+     `pagers.vibration` (per event, edited in P4-03b). The disk warning is `storage.warnPercent`
+     (default 80 %), which the hourly disk check now reads. `pager.heartbeatSeconds`,
+     `pager.vibrationPatterns` and `notifications.diskAlertPercent` are gone; a value stored
+     under one of them is ignored.
+244. The General settings page is for anyone who may configure operations
+     (`OPERATIONS_CONFIGURE`, custom role applied): the Owner and managers by default. Everyone
+     on it sees every setting, and each says who changes it, rather than a shorter list.
+245. The names, descriptions and option labels of settings live in the i18n catalogue
+     (`settingItems.<key>`), not in the contracts' English descriptions, so they can be
+     translated (NFR-L02). A new setting without words fails the console's tests.
+246. The editor follows the setting's validation: numbers within its range; basis points typed as
+     a percent (12.5 for 12.5 %, up to two decimals) and paise as rupees; on and off as a switch;
+     fixed choices as a list; lists of text one per line; optional text left empty for none;
+     daily windows as two 24-hour times (HH:MM), where a window that ends before it starts runs
+     past midnight. A draft is checked with the catalogue's validation before it is sent; rules
+     across settings (amber before red) are the server's, shown as its message.
+247. A reason is optional when changing a setting (unlike voids and discounts) and is kept in the
+     audit entry with the values before and after (AUD-001).
+248. Vendor settings (UPD-010) are shown with their value and "Set by your provider" and are never
+     changed here. Managers see the Owner's settings (tax, invoice, data, licence) as "Only the
+     Owner changes this"; the Owner confirms the second factor when it is not fresh (AUTH-006).
+249. The bill printer offers "Choose a printer each time" and the active printers; a printer
+     archived since it was chosen still shows, marked "(archived)", until another is chosen.
+250. The notification rules and pager vibrations get their own page (P4-03b) instead of a raw
+     editor in the General list.
 
 Decided 2026-10-05 (P4-02e):
 
@@ -1107,7 +1151,8 @@ Decided 2026-09-26 (P2-03b):
      enough battery. The low-battery level is per device type since decision 119 (it was one
      shared `notifications.lowBatteryPercent`, default 20 %).
 104. The disk check runs hourly on the server PC and alerts every restaurant on it when the data
-     drive is at or above `notifications.diskAlertPercent` (default 80 %), until space is freed.
+     drive is at or above `storage.warnPercent` (default 80 %), until space is freed. Since
+     decision 243 (it was a second setting, `notifications.diskAlertPercent`).
 
 Decided 2026-09-26 (P2-03a):
 
@@ -1269,6 +1314,49 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P4-03a Settings from the catalogue
+
+Opened #76 (P4-02e). GitHub's hosted runners did not pick up its lint-and-test and APK jobs, twice
+(no step ran); its end-to-end, CodeQL and security checks passed. This branch carries P4-02e's
+commits, so its CI run covers both.
+
+Built: P4-03 split in five (phase-4.md, BUILD_PLAN.md). Contracts: the settings catalogue without
+duplicates (`pager.heartbeatSeconds`, `pager.vibrationPatterns` with `PAGER_PATTERNS` and
+`notifications.diskAlertPercent` removed; `pagers.heartbeatSeconds` set by the vendor, 10 to
+300 s). Server: `SystemAlerts.checkDisk` reads `storage.warnPercent`. i18n:
+`dashboard.section.settings`, `settings.*` (page, groups, rows, values, units, dialog, problems)
+and `settingItems.*` (name and description of every setting, option and daypart labels).
+Console: `src/manage/settings/` (`settings-view.ts`: groups, the editor from each schema, values in
+words, draft checks, who may change what; `SettingsScreen.tsx`; `SettingDialog.tsx`;
+`SettingsArea.tsx`), the Settings page in `modes.ts` (`OPERATIONS_CONFIGURE`) and
+`ManageHome.tsx`, and styles for groups, rows and windows.
+
+Tests: contracts 551 (three settings fewer, one test each), server 743 (the disk alert test also
+moves the level), console 285 (the settings logic: every setting placed with an editor and words,
+values in their units, drafts checked, who may change what; the page for a manager and the Owner:
+groups and read-only badges, a number with its range, a percent with a reason, the default, the
+printer and window editors, the second factor, the server's conflict message, search and changed
+only; Settings in the modes), and 20 Playwright steps (was 19): Vikram sees the provider's pager
+check-in and the Owner's service charge read-only, sets tickets to turn amber after 8 minutes and
+the cashier's limit to 12.5 % with a reason, and the page fits a 360 px phone; Asha turns on the
+service charge after her password and a recovery code; Neha cannot open Settings.
+
+Gotchas:
+
+- `t()` throws on a missing key in tests, so a setting added to the catalogue without
+  `settingItems.<key>` words fails the test that places every setting. Give it words, a group in
+  `GROUP_OF_AREA` (a new area) and, if its schema is new, an editor in `fieldOf`.
+- The browser tests' setup changes two sign-in settings, so "changed only" lists them too.
+- Playwright's `getByText` and `getByRole` names match parts of words unless `exact: true`:
+  "Change Service charge" also finds "Change Service charge rate", and "On" finds "on bills".
+- Labels with brackets ("Reason (optional)") need escaping in a regular expression; the screen
+  tests use `labelled()`.
+- zod 4: the inner schema of a classic type is a core type; read its kind from `._zod.def.type`.
+
+Deferred: none (the notification rules and pager vibrations are P4-03b by design).
+
+Decisions: 242 to 250.
 
 ### 2026-10-05: P4-02e Custom roles
 
@@ -1821,7 +1909,8 @@ Gotchas:
   (the pager card's minute refresh, `useNow`) runs on real time and never fires in the test.
 - Two settings hold the pager heartbeat: `pagers.heartbeatSeconds` (restaurant scope, used by the
   broker) and `pager.heartbeatSeconds` (vendor scope, unused). Left for P2-05, where the firmware
-  reads its heartbeat period, to settle on one.
+  reads its heartbeat period, to settle on one. (Settled in P4-03a, decision 243: only
+  `pagers.heartbeatSeconds` is left, set by the vendor.)
 
 Decisions: 119 to 123.
 

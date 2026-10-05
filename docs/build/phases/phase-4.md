@@ -121,7 +121,7 @@ As built:
   covered), registers Pager 1 for Ravi, sees its credential once and hands the pager to Sunita,
   well within 30 s; both pages pass axe and fit a 360 px phone.
 
-### P4-02c Devices
+### P4-02c Devices (done)
 
 Requirements: MGR-006, TAB-002, AUTH-008, AUTH-009.
 Deliverables: device list with type, binding (table, station, person), status, battery, app and
@@ -142,7 +142,7 @@ a live connection closes. The console's Devices page is `/manage/devices` (`DEVI
 located console shows its name and chimes (`LocateOverlay`), and a renamed one shows its new name
 at once. The tablet's and pager's side of Locate are in P3-01 and P2-05.
 
-### P4-02d Menu editor
+### P4-02d Menu editor (done)
 
 Requirements: MGR-005, MENU-001 to MENU-011 (the manager's side).
 Deliverables: full menu editor over the menu admin API: categories, items (photos, descriptions,
@@ -172,7 +172,7 @@ As built:
   POS sells it with the Jumbo size and the cheese dip; the editor and the list pass axe and fit a
   360 px phone.
 
-### P4-02e Custom roles (S)
+### P4-02e Custom roles (S) (done)
 
 Requirements: AUTH-012 (S).
 Deliverables: the Owner combines permissions into a named role on top of a base role; the
@@ -211,7 +211,7 @@ As built:
   captain, seats a table, sends an order and settles its bill by UPI; the Roles page and the role
   editor pass axe, and the editor fits a 360 px phone.
 
-## P4-03 Configuration screens
+## P4-03 Configuration screens (split)
 
 Requirements: MGR-007, NTF-002, REC-002, REC-009 (S), KDS-008, BILL-005, BILL-006, UPD-010.
 Depends on: P4-01, P2-03, P3-04, P1-07.
@@ -225,6 +225,90 @@ The rules editor uses the P3-04 API (`listRecommendationRules`, `createRecommend
 `updateRecommendationRule` with `active` to pause, `archiveRecommendationRule` with a reason), all
 audited. Boost, pin and block (REC-009) are new: they fit `@rp/domain` `recommend` as a filter
 (block) and as items placed first (pin) or ranked higher (boost) before the rules layer.
+
+Too big for one pull request, so it is built in five parts, each a page of the dashboard's
+Settings area (`/manage/settings`, for the people who configure operations) with its own tests and
+Playwright step. The server APIs exist (P1-01, P1-02, P1-07, P2-03, P3-04) except boost, pin and
+block.
+
+### P4-03a Settings from the catalogue (done)
+
+Requirements: MGR-007 (timers, thresholds, discount limits, service charge, formats), BILL-005
+(the cashier's discount limit), BILL-006, UPD-010, AUTH-006, AUD-001.
+Deliverables: the General settings page, generated from the P1-01a catalogue: settings grouped by
+area, each with its value in its unit, its default and an editor chosen from its validation
+(number with its range, switch, choice, lines, text, printer, daily windows), checked with the
+catalogue's own validation before sending, "use the default" and an optional reason for the audit
+log. Vendor-controlled settings are visible and read-only (UPD-010); settings a person may not
+change say who changes them; the Owner's tax, invoice and data settings ask for the second factor.
+Search and "changed only" filters. The notification rules and pager vibrations are left to their
+own page (P4-03b). The catalogue loses its duplicates: one pager heartbeat, one pager vibration
+setting and one disk warning level.
+Acceptance: every catalogue setting is on the page or named as another page's, editable or visibly
+read-only; Playwright: a manager changes the kitchen's amber age and the cashier's discount limit,
+the Owner turns on the service charge after the second factor, and a cashier cannot open the page.
+
+As built:
+
+- Catalogue: one pager heartbeat (`pagers.heartbeatSeconds`, now set by the vendor, 10 to 300 s,
+  because the pager firmware and the broker must agree on it), one vibration setting
+  (`pagers.vibration`, edited with the notification rules in P4-03b) and one disk warning level
+  (`storage.warnPercent`, which the hourly disk check now reads). 74 settings.
+- Console: Settings (`/manage/settings`) for people who configure operations
+  (`OPERATIONS_CONFIGURE`, custom role applied). The settings are grouped by area (orders, bills
+  and payments; kitchen; alerts; tablets and pagers; sign-in and security; suggestions; QR menu;
+  audit, backups and storage; updates and licence; formats), each with its name and what it does
+  (`settingItems` in the i18n catalogue), its value in its unit (basis points as a percent, paise
+  as rupees) and its default when changed. `settings-view.ts` chooses the editor from the
+  setting's schema: a number with its range, a switch, a choice, lines, text, the bill printer
+  (active printers, and an archived one still chosen), a daily window or the four daypart
+  windows. A draft is checked with the catalogue's own schema before it is sent; the server's
+  checks across settings (amber before red, for example) come back as the dialog's message. "Use
+  the default" and an optional reason, kept in the audit entry. Vendor settings say "Set by your
+  provider" and have no Change button; settings a manager may not change say "Only the Owner
+  changes this"; the Owner's tax, invoice and data settings ask for the second factor. A search
+  by name or description and "Only settings changed from their default". The page follows
+  `SettingsChanged` and printer changes. The notification rules and pager vibrations are not
+  listed: they get their own page (P4-03b).
+- Server: no new routes (P1-01a's settings API); the disk alert reads `storage.warnPercent`.
+- Playwright: Vikram (Manager) sees the provider's pager check-in and the Owner's service charge
+  as read-only, sets tickets to turn amber after 8 minutes and the cashier's limit to 12.5 % with
+  a reason; "changed only" shows those two and the page fits a 360 px phone; Asha (Owner) turns
+  on the service charge after her password and a recovery code; Neha (Cashier) cannot open
+  Settings. The page and the dialog pass axe.
+
+### P4-03b Notification rules
+
+Requirements: NTF-002, NTF-003, PGR-006, NTF-008 (nudge presets).
+Deliverables: the Notifications page: per event type (Appendix C), recipients, channels, pager
+text, escalation and repeat, with the factory rule shown and "back to the factory rule"; pager
+vibration per event; N and R. Stored in `notifications.rules` and `pagers.vibration`.
+Acceptance: a changed rule changes who is alerted (server test exists from P2-03); Playwright.
+
+### P4-03c Recommendation rules with boost, pin and block
+
+Requirements: REC-002, REC-009 (S), REC-006.
+Deliverables: the Recommendations page: rules (if the order has item or category X, suggest item or
+category Y, with priority, time window, dates, channels and label), pause, archive with a reason;
+boost, pin and block per item (new in `@rp/domain`, contracts and server, audited).
+Acceptance: a blocked item is never suggested, a pinned one comes first; Playwright.
+
+### P4-03d Floor, stations and printers
+
+Requirements: KDS-008, TBL-001, ONB-004 steps 5 and 6 (as lists; the drag-and-drop layout and
+printer discovery stay in P6-05).
+Deliverables: sections and tables (add, rename, capacity, archive, restore); stations (screen,
+print or both, printer); printers (network or USB, 80 or 58 mm) with a test print.
+Acceptance: Playwright adds a table, a station and a printer and runs a test print against a fake
+printer.
+
+### P4-03e Tax and invoice
+
+Requirements: MGR-007 (Owner only), AUTH-006, BILL-002, BILL-003, BILL-004, ONB-004 steps 1 to 3.
+Deliverables: the restaurant profile (managers) and its legal details, tax groups and invoice
+series (the Owner, after the second factor; managers see them).
+Acceptance: Playwright: the Owner adds a tax group and an invoice series; a manager sees them
+read-only.
 
 ## P4-04 Alert centre and system screen
 

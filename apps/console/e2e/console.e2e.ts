@@ -1014,7 +1014,7 @@ test.describe.serial('the web console', () => {
     ).toBeVisible();
   });
 
-  test('[SEC-003] a cashier cannot open the Staff or Devices pages', async () => {
+  test('[SEC-003] [MGR-007] a cashier cannot open the Staff, Devices or Settings pages', async () => {
     await page.getByRole('button', { name: t('login.signOut') }).click();
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
     await page.keyboard.type('3333');
@@ -1025,6 +1025,9 @@ test.describe.serial('the web console', () => {
     await page.goto(`${server.url}/manage/devices`);
     await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: t('devices.title') })).toHaveCount(0);
+    await page.goto(`${server.url}/manage/settings`);
+    await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: t('settings.title') })).toHaveCount(0);
   });
 
   test('[AUTH-012] [AUTH-006] the Owner creates a Captain role, gives it to Ravi, and Ravi settles a bill', async () => {
@@ -1130,5 +1133,90 @@ test.describe.serial('the web console', () => {
     await expect(page.getByText(/^Invoice .* is paid$/)).toBeVisible();
     await page.getByRole('button', { name: t('pos.backToTables') }).click();
     await expect(hall.getByRole('button', { name: '3, Free' })).toBeVisible();
+  });
+
+  test('[MGR-007] [BILL-005] [UPD-010] [AUTH-006] a manager changes the kitchen’s amber age and the cashier’s discount limit, and the Owner turns on the service charge', async () => {
+    const amber = t('settingItems.kds.ageAmberMinutes.label');
+    const limit = t('settingItems.billing.cashierDiscountLimitBp.label');
+    const service = t('settingItems.billing.serviceChargeEnabled.label');
+    const row = (label: string) =>
+      page
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('heading', { level: 4, name: label, exact: true }) });
+    const change = (label: string) =>
+      page.getByRole('button', {
+        name: t('settings.row.changeLabel', { name: label }),
+        exact: true,
+      });
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('settings.title') })).toBeVisible();
+    // What the provider sets, and what only the Owner changes, is shown but not offered.
+    await expect(
+      row(t('settingItems.pagers.heartbeatSeconds.label')).getByText(t('settings.row.vendor'), {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      row(service).getByText(t('settings.row.ownerOnly'), { exact: true }),
+    ).toBeVisible();
+    await expect(change(service)).toHaveCount(0);
+    await expectAccessible(page);
+
+    // Tickets turn amber after 8 minutes instead of 10.
+    await change(amber).click();
+    const amberDialog = page.getByRole('dialog', { name: amber, exact: true });
+    await amberDialog.getByLabel(new RegExp(`^${escape(amber)}`)).fill('8');
+    await amberDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(page.getByText(t('settings.dialog.saved', { name: amber }))).toBeVisible();
+    await expect(row(amber).getByText('8 minutes', { exact: true })).toBeVisible();
+    await expect(row(amber).getByText(t('settings.row.changed'), { exact: true })).toBeVisible();
+
+    // The cashier's limit goes from 10 % to 12.5 %, with a reason for the audit log.
+    await change(limit).click();
+    const limitDialog = page.getByRole('dialog', { name: limit, exact: true });
+    await limitDialog.getByLabel(new RegExp(`^${escape(limit)}`)).fill('12.5');
+    await limitDialog
+      .getByLabel(new RegExp(`^${escape(t('settings.dialog.reason'))}`))
+      .fill('Festival week');
+    await expectAccessible(page);
+    await limitDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(row(limit).getByText('12.5 %', { exact: true })).toBeVisible();
+
+    // Only what was changed (the test setup changed two sign-in settings), on a 360 px phone too.
+    await page.getByLabel(t('settings.general.changedOnly')).check();
+    await expect(row(amber)).toBeVisible();
+    await expect(row(limit)).toBeVisible();
+    await expect(row(service)).toHaveCount(0);
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // The Owner turns on the service charge, confirming the second factor (AUTH-006).
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
+    await page.keyboard.type('1111');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await change(service).click();
+    const serviceDialog = page.getByRole('dialog', { name: service, exact: true });
+    await expect(serviceDialog.getByText(t('settings.dialog.secondFactor'))).toBeVisible();
+    await serviceDialog.getByRole('checkbox', { name: service, exact: true }).check();
+    await serviceDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
+    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(OWNER_PASSWORD);
+    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
+    await confirm
+      .getByLabel(t('secondFactor.recoveryCode'), { exact: false })
+      .fill(recoveryCodes[2] ?? '');
+    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
+    await expect(page.getByText(t('settings.dialog.saved', { name: service }))).toBeVisible();
+    await expect(row(service).getByText(t('settings.values.on'), { exact: true })).toBeVisible();
+    await expect(row(amber).getByText('8 minutes', { exact: true })).toBeVisible();
   });
 });
