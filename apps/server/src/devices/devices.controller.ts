@@ -32,6 +32,7 @@ import { authErrors } from '../auth/auth-errors.js';
 import { Public, RequireCapability, RequireDevice } from '../auth/decorators.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import type { AuthenticatedRequest, Principal } from '../auth/principal.js';
+import { clientIdentityOf } from '../http/client-version.js';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
 import { DevicesService } from './devices.service.js';
 
@@ -81,7 +82,7 @@ export class DevicesController {
     @Req() request: Request,
     @Body(new ZodValidationPipe(PairDeviceRequest)) body: PairDeviceRequest,
   ): Promise<PairedDevice> {
-    return this.devices.pair(body, clientKey(request));
+    return this.devices.pair(body, clientKey(request), clientIdentityOf(request));
   }
 
   // Public: first step of device authentication; a challenge alone grants nothing.
@@ -103,7 +104,7 @@ export class DevicesController {
     @Req() request: Request,
     @Body(new ZodValidationPipe(DeviceTokenRequest)) body: DeviceTokenRequest,
   ): Promise<DeviceTokenResponse> {
-    return this.devices.issueToken(body, clientKey(request));
+    return this.devices.issueToken(body, clientKey(request), clientIdentityOf(request));
   }
 
   @Get('current')

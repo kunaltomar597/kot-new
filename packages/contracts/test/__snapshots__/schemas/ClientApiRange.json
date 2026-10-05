@@ -1,0 +1,19 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "current": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+      "oldest": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" }
+    },
+    "required": ["current", "oldest"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "current": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+      "oldest": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" }
+    },
+    "required": ["current", "oldest"],
+    "additionalProperties": false
+  }
+}

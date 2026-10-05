@@ -47,6 +47,13 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
       { type: 'POS', paired: 1, connected: 1 },
       { type: 'WAITER_PHONE', paired: 4, connected: 3 },
     ],
+    clients: {
+      api: { current: '1.0', oldest: '1.0' },
+      counts: [
+        { compatibility: 'CURRENT', devices: 4 },
+        { compatibility: 'UNKNOWN', devices: 1 },
+      ],
+    },
     update: {
       offered: {
         version: '1.2.0',
@@ -54,6 +61,8 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
         notes: 'Faster bills.',
         publishedAt: '2026-09-30T10:00:00.000Z',
         sizeBytes: 120 * 1_024 ** 2,
+        clientApi: { current: '1.0', oldest: '1.0' },
+        leavesBehind: 0,
       },
       installApproval: null,
       maintenanceWindow: { start: '03:00', end: '06:00' },

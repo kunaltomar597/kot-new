@@ -475,6 +475,53 @@ describe('[UPD-004] "Install now"', () => {
   });
 });
 
+describe('[UPD-006] apps and the client API', () => {
+  it('says which apps to update and which client API the server serves', async () => {
+    const status = systemStatus({
+      clients: {
+        api: { current: '1.4', oldest: '1.3' },
+        counts: [
+          { compatibility: 'CURRENT', devices: 3 },
+          { compatibility: 'PREVIOUS', devices: 2 },
+          { compatibility: 'TOO_OLD', devices: 1 },
+          { compatibility: 'NEWER', devices: 1 },
+        ],
+      },
+    });
+    await renderConsole({ fake: systemServer(status), path: PATH, signedIn: 'MANAGER' });
+    const devices = await section(t('systemPage.devices.title'));
+    expect(devices.getByText(t('systemPage.devices.tooOld', { count: 1 }))).toBeVisible();
+    expect(devices.getByText(t('systemPage.devices.previous', { count: 2 }))).toBeVisible();
+    expect(devices.getByText(t('systemPage.devices.newer', { count: 1 }))).toBeVisible();
+    const versions = await section(t('systemPage.versions.title'));
+    expect(versions.getByText(t('systemPage.versions.clientApi'))).toBeVisible();
+    expect(
+      versions.getByText(
+        t('systemPage.versions.clientApiValue', { current: '1.4', oldest: '1.3' }),
+      ),
+    ).toBeVisible();
+  });
+
+  it('warns before an update that would leave paired apps behind', async () => {
+    const status = systemStatus();
+    const offered = status.update.offered!;
+    const fake = systemServer({
+      ...status,
+      update: {
+        ...status.update,
+        offered: { ...offered, clientApi: { current: '1.2', oldest: '1.1' }, leavesBehind: 3 },
+      },
+    });
+    await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const update = await section(t('systemPage.update.title'));
+    expect(update.getByText(t('systemPage.update.leavesBehind', { count: 3 }))).toBeVisible();
+    const versions = await section(t('systemPage.versions.title'));
+    expect(
+      versions.getByText(t('systemPage.versions.clientApiOnly', { current: '1.0' })),
+    ).toBeVisible();
+  });
+});
+
 describe('[UPD-005] how updates go', () => {
   const withAgent = (
     agent: Partial<ReturnType<typeof systemStatus>['update']['agent']>,

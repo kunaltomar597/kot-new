@@ -14,6 +14,7 @@ import {
   type UpdateReport,
   UpdateRolloutRequest,
   type VendorReleaseView,
+  VersionMatrix,
 } from '@rp/contracts/control-plane';
 import { compareVersionText, haltReason, releaseToOffer } from '@rp/domain';
 import { z } from 'zod';
@@ -49,6 +50,11 @@ function stateOf(release: Release): RolloutState {
   return STATES.find((state) => state === release.rolloutState) ?? 'PAUSED';
 }
 
+/** The stored matrix, or null when there is none (or it no longer reads). */
+function matrixOf(release: Release): VersionMatrix | null {
+  return VersionMatrix.safeParse(release.matrix).data ?? null;
+}
+
 function toInfo(release: Release): ReleaseInfo {
   return {
     component: release.component,
@@ -60,6 +66,7 @@ function toInfo(release: Release): ReleaseInfo {
     notes: release.notes,
     publishedAt: release.publishedAt.toISOString(),
     securityCritical: release.securityCritical,
+    matrix: matrixOf(release),
   };
 }
 
@@ -172,6 +179,13 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
         `${release.component} ${release.version} is already on the ${release.channel} channel.`,
       );
     }
+    if (release.matrix !== null && release.matrix.release !== release.version) {
+      throw new CpError(
+        422,
+        'MATRIX_MISMATCH',
+        `The version matrix is for ${release.matrix.release}, not ${release.version}.`,
+      );
+    }
     if (
       release.targetInstallationId !== null &&
       (await this.prisma.installation.count({ where: { id: release.targetInstallationId } })) === 0
@@ -194,6 +208,7 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
           securityCritical: release.securityCritical,
           rolloutPercent: release.rolloutPercent,
           targetInstallationId: release.targetInstallationId,
+          ...(release.matrix !== null && { matrix: release.matrix }),
         },
       });
       await this.audit.record(tx, {
@@ -209,6 +224,7 @@ export class ReleasesService implements OnApplicationBootstrap, OnModuleDestroy 
           securityCritical: release.securityCritical,
           rolloutPercent: release.rolloutPercent,
           targetInstallationId: release.targetInstallationId,
+          clientApi: release.matrix?.clientApi ?? null,
         },
       });
     });

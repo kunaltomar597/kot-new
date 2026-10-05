@@ -43,6 +43,7 @@ const release = (version: string): ReleaseInfo => ({
   notes: 'Faster bills.',
   publishedAt: '2026-09-30T10:00:00.000Z',
   securityCritical: false,
+  matrix: null,
 });
 
 const server = () => request(httpServer(app));

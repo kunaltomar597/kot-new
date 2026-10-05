@@ -10,3 +10,8 @@ compile against these types. Enum values come from `@rp/domain` constants so the
 
 Requests use `z.strictObject` so unknown fields are rejected. P0-06 adds OpenAPI/AsyncAPI generation
 into `docs/api/`. Later WPs add their schemas here in the same PR as the endpoint.
+
+`client-api.ts` holds the client API version (`CLIENT_API_VERSION`, UPD-006), the `x-rp-client`
+header and the release's component version matrix (P7-04d, ADR-0016). `scripts/api-compat.ts`
+checks the contracts against every frozen client API version the server still serves
+(`pnpm contracts:compat`) and freezes one at a release (`pnpm contracts:freeze --release <x.y.z>`).

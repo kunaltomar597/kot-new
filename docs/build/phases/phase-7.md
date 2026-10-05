@@ -148,9 +148,20 @@ Split (2026-10-04):
     - it runs the installer and checks health;
     - to go back, it runs the previous version's kept installer, whose service host swaps the
       database copy back in.
-- **P7-04d Phones, tablets and pagers (UPD-001, UPD-006).** EAS Update channels for the phones and
-  tablets, and the in-app APK updater. A component version matrix with every release, and the
-  server's N-1 check of clients. Pager firmware distribution is P2-04b.
+- **P7-04d Client compatibility and the version matrix (UPD-006).** Split again (2026-10-05):
+  - The client API's version (`1.<minor>`) in `@rp/contracts`; every app sends it, with its own
+    version, in `x-rp-client` and the socket handshake.
+  - The server serves the current minor and the one before (N-1). An older app is refused with
+    426 `CLIENT_TOO_OLD` and told to update; the console reloads itself. A newer app is served.
+  - Each device's app version and API are kept and shown on the Devices and System pages, and so
+    are the devices an offered update would leave behind.
+  - The component version matrix of every release is built by the packaging step, published to
+    the Control Plane with the release and shown in the vendor web app.
+  - A contract check (`pnpm contracts:compat`) fails when the contracts stop serving an API
+    version that is still supported (frozen at each release with `pnpm contracts:freeze`).
+- **P7-04e Phone and tablet updates (UPD-001, UPD-007).** EAS Update channels for the phones and
+  tablets, applied only when the server speaks the update's client API, and the in-app APK
+  updater through the local server. Pager firmware distribution is P2-04b.
 
 ## P7-05 Backup and restore
 

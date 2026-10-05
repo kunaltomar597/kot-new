@@ -151,6 +151,40 @@ describe('[MGR-006] the device list', () => {
   });
 });
 
+describe('[UPD-006] apps to update', () => {
+  it('marks an app to update soon, one the server no longer serves, and one ahead of it', async () => {
+    const list = deviceList();
+    const [pos, tablet, kds, ...rest] = list.devices;
+    const fake = devicesServer({
+      devices: [
+        { ...pos!, compatibility: 'UNKNOWN', clientApi: null },
+        { ...tablet!, compatibility: 'PREVIOUS', clientApi: '1.3' },
+        { ...kds!, compatibility: 'TOO_OLD', clientApi: '1.2' },
+        ...rest.map((device, index) =>
+          index === 0 ? { ...device, compatibility: 'NEWER' as const, clientApi: '1.5' } : device,
+        ),
+      ],
+    });
+    await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const tabletRow = within(await rowOf('Tablet T7'));
+    expect(tabletRow.getByText(t('devices.compatibility.PREVIOUS'))).toHaveAttribute(
+      'title',
+      t('devices.compatibilityHint.PREVIOUS'),
+    );
+    expect(
+      within(await rowOf('Tandoor screen')).getByText(t('devices.compatibility.TOO_OLD')),
+    ).toBeVisible();
+    expect(
+      within(await rowOf(rest[0]!.name)).getByText(t('devices.compatibility.NEWER')),
+    ).toBeVisible();
+    // Current and unknown say nothing.
+    const posRow = within(await rowOf('Counter POS'));
+    for (const compatibility of ['PREVIOUS', 'TOO_OLD', 'NEWER'] as const) {
+      expect(posRow.queryByText(t(`devices.compatibility.${compatibility}`))).toBeNull();
+    }
+  });
+});
+
 describe('[AUTH-007] [AUTH-009] pairing a device', () => {
   it('asks what the device is, then shows its one-time code, addresses and fingerprint', async () => {
     const fake = devicesServer().on('POST', '/api/v1/devices/pairing-codes', () => ({

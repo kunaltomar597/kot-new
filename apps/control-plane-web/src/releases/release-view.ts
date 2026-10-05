@@ -17,6 +17,33 @@ export function installsLabel(release: VendorReleaseView, t: Translator): string
   return t('vendorApp.releases.installs', { installed, failures: failures + errorSpikes });
 }
 
+/**
+ * The apps a release's server serves (UPD-006): its client API range and, once a release spoke
+ * the oldest of it, the oldest app builds that still work. From its version matrix.
+ */
+export function matrixLabel(release: VendorReleaseView, t: Translator): string {
+  const { matrix } = release;
+  if (matrix === null) return t('vendorApp.releases.noMatrix');
+  const { current, oldest } = matrix.clientApi;
+  const api =
+    current === oldest
+      ? t('vendorApp.releases.apiOnly', { current })
+      : t('vendorApp.releases.apiRange', { current, oldest });
+  const minimum = matrix.clients.find((client) => client.minimumVersion !== null)?.minimumVersion;
+  return minimum === undefined || minimum === null
+    ? api
+    : t('vendorApp.releases.appsFrom', { api, version: minimum });
+}
+
+/** What the release contains, by component: "server 1.6.0, node 24.21.0, …". */
+export function matrixParts(release: VendorReleaseView, t: Translator): string | undefined {
+  if (release.matrix === null) return undefined;
+  const parts = [...release.matrix.components, ...release.matrix.clients]
+    .map((part) => `${'name' in part ? part.name : part.kind} ${part.version}`)
+    .join(', ');
+  return t('vendorApp.releases.matrixParts', { parts });
+}
+
 /** A new release starts small on Stable and goes to every Pilot PC (UPD-003). */
 export function defaultPercent(channel: ReleaseChannel): number {
   return channel === 'STABLE' ? 10 : 100;

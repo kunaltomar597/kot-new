@@ -1,5 +1,6 @@
 import { isValidGstin } from '@rp/domain';
 import { z } from 'zod';
+import { VersionMatrix } from '../client-api.js';
 import { Id, IsoDate, Timestamp } from '../common.js';
 import {
   DeviceLimits,
@@ -200,6 +201,8 @@ export const PublishReleaseRequest = z.strictObject({
   rolloutPercent: z.int().min(0).max(100).default(100),
   /** A hotfix for this PC only (UPD-002). */
   targetInstallationId: Id.nullable().default(null),
+  /** The release's `version-matrix.json` from the packaging step (UPD-006); its release must match. */
+  matrix: VersionMatrix.nullable().default(null),
 });
 export type PublishReleaseRequest = z.input<typeof PublishReleaseRequest>;
 

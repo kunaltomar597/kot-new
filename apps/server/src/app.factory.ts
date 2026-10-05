@@ -6,6 +6,7 @@ import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
 import { APP_CONFIG, type AppConfig, loadConfig } from './config/app-config.js';
 import { createSecretStore } from './auth/secret-store.js';
+import { clientVersionMiddleware } from './http/client-version.js';
 import { consoleMiddleware } from './http/console-static.js';
 import { caDownloadMiddleware } from './tls/ca-download.js';
 import { localServerNames, serverTlsOptions, TlsStore } from './tls/tls-store.js';
@@ -38,9 +39,10 @@ export function configureApp(app: INestApplication): void {
   const express = app as NestExpressApplication;
   express.useLogger(app.get(Logger));
   express.disable('x-powered-by');
-  // Order matters: correlation ID first, then the CA download and the console's files, then the
-  // JSON parser, then its error handler.
+  // Order matters: correlation ID first, then the apps the server no longer serves (UPD-006),
+  // then the CA download and the console's files, then the JSON parser, then its error handler.
   express.use(correlationMiddleware);
+  express.use(clientVersionMiddleware);
   express.use(caDownloadMiddleware(app.get(TlsService)));
   const { consoleDir } = app.get<AppConfig>(APP_CONFIG);
   if (consoleDir !== undefined) express.use(consoleMiddleware(consoleDir));

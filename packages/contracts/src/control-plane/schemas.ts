@@ -1,5 +1,6 @@
 import { LICENSE_STATES, WEEKDAYS } from '@rp/domain';
 import { z } from 'zod';
+import { VersionMatrix } from '../client-api.js';
 import { Id, Paise, Timestamp } from '../common.js';
 import { EscrowOffer, RestoreCodeNotice } from './cloud-backups.js';
 import { PendingDiagnosticsRequest } from './diagnostics.js';
@@ -305,6 +306,11 @@ export const ReleaseInfo = z.object({
    * Control Plane older than P7-04a sends nothing: not critical.
    */
   securityCritical: z.boolean().default(false),
+  /**
+   * Its component version matrix (UPD-006, P7-04d): the PC shows which paired apps it would leave
+   * behind. Null for a release published without one (and from Control Planes before P7-04d).
+   */
+  matrix: VersionMatrix.nullable().default(null),
 });
 export type ReleaseInfo = z.infer<typeof ReleaseInfo>;
 

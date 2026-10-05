@@ -8,6 +8,12 @@ import { Id, Timestamp } from './common.js';
  * (server → pager, QoS 1), `.../ack` and `.../heartbeat` (pager → server).
  */
 
+/**
+ * The pagers' MQTT protocol (topics and messages below), for the version matrix (UPD-006). It goes
+ * up when a release changes them; the server keeps serving the version before (N-1).
+ */
+export const PAGER_PROTOCOL_VERSION = 1;
+
 export const VibrationPattern = z.enum(['ONE_LONG', 'TWO_SHORT', 'THREE', 'ONE_SHORT']);
 export type VibrationPattern = z.infer<typeof VibrationPattern>;
 

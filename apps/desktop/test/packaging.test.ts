@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
-import { settingDefinition } from '@rp/contracts';
+import { CLIENT_API_VERSION, PAGER_PROTOCOL_VERSION, settingDefinition } from '@rp/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   APP_ID,
@@ -34,6 +34,7 @@ import {
   reachablePackages,
   runtimeDependencies,
 } from '../src/packaging/prune.js';
+import { VERSION_MATRIX_FILE, versionMatrix } from '../src/packaging/version-matrix.js';
 
 const repoRoot = join(import.meta.dirname, '..', '..', '..');
 const projectDir = join(repoRoot, 'apps', 'desktop');
@@ -493,5 +494,34 @@ describe('[SEC-011] [ONB-001] the installer', () => {
     // node_modules are handled outside electron-builder: the app is one bundled file.
     const beforeBuild = config.beforeBuild as () => Promise<boolean>;
     expect(await beforeBuild()).toBe(false);
+  });
+});
+
+describe('[UPD-006] the component version matrix of each release', () => {
+  it('lists what the installer contains, the client API it serves and each app', async () => {
+    const matrix = await versionMatrix(repoRoot, '1.2.3');
+    const versionOf = async (app: string) =>
+      (
+        JSON.parse(await readFile(join(repoRoot, 'apps', app, 'package.json'), 'utf8')) as {
+          version: string;
+        }
+      ).version;
+    expect(matrix.release).toBe('1.2.3');
+    expect(matrix.clientApi.current).toBe(CLIENT_API_VERSION);
+    expect(Object.fromEntries(matrix.components.map((part) => [part.name, part.version]))).toEqual({
+      server: await versionOf('server'),
+      console: await versionOf('console'),
+      desktop: '1.2.3',
+      node: NODE.version,
+      postgres: POSTGRES.version,
+      winsw: WINSW.version,
+    });
+    expect(matrix.clients.map((client) => [client.kind, client.version])).toEqual([
+      ['console', await versionOf('console')],
+      ['waiter-app', await versionOf('waiter-app')],
+      ['table-tablet', await versionOf('table-tablet')],
+    ]);
+    expect(matrix.pagerProtocol).toBe(PAGER_PROTOCOL_VERSION);
+    expect(VERSION_MATRIX_FILE).toBe('version-matrix.json');
   });
 });

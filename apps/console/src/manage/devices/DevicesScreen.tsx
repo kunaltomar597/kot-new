@@ -285,6 +285,23 @@ function bindingText(binding: Binding, t: ReturnType<typeof useT>): string | und
   }
 }
 
+const COMPATIBILITY_TONES = { PREVIOUS: 'warning', TOO_OLD: 'danger', NEWER: 'info' } as const;
+
+/** UPD-006: an app to update soon, one the server no longer serves, or one ahead of the server. */
+function CompatibilityBadge({ compatibility }: { compatibility: DeviceView['compatibility'] }) {
+  const t = useT();
+  if (compatibility === 'CURRENT' || compatibility === 'UNKNOWN') return null;
+  return (
+    <Badge
+      tone={COMPATIBILITY_TONES[compatibility]}
+      icon={<Icon name={compatibility === 'NEWER' ? 'info' : 'warning'} />}
+      title={t(`devices.compatibilityHint.${compatibility}`)}
+    >
+      {t(`devices.compatibility.${compatibility}`)}
+    </Badge>
+  );
+}
+
 /** One device: its name and type, its binding and state in words, and what can be done with it. */
 function DeviceRow({
   device,
@@ -355,6 +372,7 @@ function DeviceRow({
                 : t('devices.battery', { percent: device.batteryPercent })}
             </Badge>
           ) : null}
+          {active ? <CompatibilityBadge compatibility={device.compatibility} /> : null}
         </p>
         {details.length === 0 ? null : <p className="staff-row__contact">{details.join(' · ')}</p>}
       </div>

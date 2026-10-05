@@ -186,6 +186,34 @@
           "required": ["type", "paired", "connected"]
         }
       },
+      "clients": {
+        "type": "object",
+        "properties": {
+          "api": {
+            "type": "object",
+            "properties": {
+              "current": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+              "oldest": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" }
+            },
+            "required": ["current", "oldest"]
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "compatibility": {
+                  "type": "string",
+                  "enum": ["CURRENT", "PREVIOUS", "TOO_OLD", "NEWER", "UNKNOWN"]
+                },
+                "devices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["compatibility", "devices"]
+            }
+          }
+        },
+        "required": ["api", "counts"]
+      },
       "update": {
         "type": "object",
         "properties": {
@@ -206,9 +234,42 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "clientApi": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "current": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$"
+                          },
+                          "oldest": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$"
+                          }
+                        },
+                        "required": ["current", "oldest"]
+                      },
+                      { "type": "null" }
+                    ]
+                  },
+                  "leavesBehind": {
+                    "anyOf": [
+                      { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      { "type": "null" }
+                    ]
                   }
                 },
-                "required": ["version", "channel", "notes", "publishedAt", "sizeBytes"]
+                "required": [
+                  "version",
+                  "channel",
+                  "notes",
+                  "publishedAt",
+                  "sizeBytes",
+                  "clientApi",
+                  "leavesBehind"
+                ]
               },
               { "type": "null" }
             ]
@@ -378,6 +439,7 @@
       "qrRelay",
       "storage",
       "devices",
+      "clients",
       "update",
       "backup",
       "licence",
@@ -579,6 +641,37 @@
           "additionalProperties": false
         }
       },
+      "clients": {
+        "type": "object",
+        "properties": {
+          "api": {
+            "type": "object",
+            "properties": {
+              "current": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" },
+              "oldest": { "type": "string", "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$" }
+            },
+            "required": ["current", "oldest"],
+            "additionalProperties": false
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "compatibility": {
+                  "type": "string",
+                  "enum": ["CURRENT", "PREVIOUS", "TOO_OLD", "NEWER", "UNKNOWN"]
+                },
+                "devices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["compatibility", "devices"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["api", "counts"],
+        "additionalProperties": false
+      },
       "update": {
         "type": "object",
         "properties": {
@@ -599,9 +692,43 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "clientApi": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "current": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$"
+                          },
+                          "oldest": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9]\\d{0,2})\\.(0|[1-9]\\d{0,2})$"
+                          }
+                        },
+                        "required": ["current", "oldest"],
+                        "additionalProperties": false
+                      },
+                      { "type": "null" }
+                    ]
+                  },
+                  "leavesBehind": {
+                    "anyOf": [
+                      { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      { "type": "null" }
+                    ]
                   }
                 },
-                "required": ["version", "channel", "notes", "publishedAt", "sizeBytes"],
+                "required": [
+                  "version",
+                  "channel",
+                  "notes",
+                  "publishedAt",
+                  "sizeBytes",
+                  "clientApi",
+                  "leavesBehind"
+                ],
                 "additionalProperties": false
               },
               { "type": "null" }
@@ -779,6 +906,7 @@
       "qrRelay",
       "storage",
       "devices",
+      "clients",
       "update",
       "backup",
       "licence",

@@ -91,6 +91,7 @@ const release = (overrides: Partial<ReleaseInfo> = {}): ReleaseInfo => ({
   notes: null,
   publishedAt: '2026-10-01T10:00:00.000Z',
   securityCritical: false,
+  matrix: null,
   ...overrides,
 });
 

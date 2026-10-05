@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import { ApiError, HealthResponse } from '@rp/contracts/control-plane';
 import type { TestDatabase } from '@rp/test-postgres';
@@ -31,6 +34,22 @@ async function cli(...argv: string[]): Promise<{ code: number; lines: string[] }
     out: (line) => lines.push(line),
   });
   return { code, lines };
+}
+
+/** A `version-matrix.json` as `package:stage` writes it (UPD-006). */
+function matrixFile(release: string): string {
+  const path = join(mkdtempSync(join(tmpdir(), 'rp-matrix-')), 'version-matrix.json');
+  writeFileSync(
+    path,
+    JSON.stringify({
+      release,
+      clientApi: { current: '1.0', oldest: '1.0' },
+      components: [{ name: 'server', version: release }],
+      clients: [{ kind: 'waiter-app', version: release, minimumVersion: null }],
+      pagerProtocol: 1,
+    }),
+  );
+  return path;
 }
 
 function captured(lines: readonly string[], pattern: RegExp): string {
@@ -69,8 +88,13 @@ describe('[VCP-001] [VCP-002] [UPD-002] admin CLI (until the web app, P7-02)', (
       '160000000',
       '--notes',
       'Release candidate',
+      // UPD-006: the matrix the packaging step wrote.
+      '--matrix',
+      matrixFile('2.0.0-rc.1'),
     );
     expect(published.lines).toEqual(['Published RESTAURANT_PC 2.0.0-rc.1 on PILOT.']);
+    const stored = await prisma.release.findFirstOrThrow({ where: { version: '2.0.0-rc.1' } });
+    expect(stored.matrix).toMatchObject({ release: '2.0.0-rc.1', clientApi: { current: '1.0' } });
 
     const list = await cli('installations:list');
     expect(list.lines).toEqual([

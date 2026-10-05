@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Pin } from './auth.js';
+import { ClientCompatibility } from './client-api.js';
 import { DeviceType, Id, TableState, Timestamp } from './common.js';
 import { CaFingerprint } from './system.js';
 
@@ -201,6 +202,10 @@ export const DeviceView = DeviceSummary.extend({
   /** Serial on a pager's label (PGR-012). */
   serial: z.string().nullable(),
   revokedAt: Timestamp.nullable(),
+  /** The client API the app last said it speaks (`x-rp-client`), e.g. `1.0` (UPD-006). */
+  clientApi: z.string().nullable(),
+  /** How that stands against the server's: PREVIOUS and TOO_OLD apps need updating. */
+  compatibility: ClientCompatibility,
 });
 export type DeviceView = z.infer<typeof DeviceView>;
 

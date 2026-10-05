@@ -20,3 +20,7 @@ Contract changes are also visible as JSON-schema snapshots in
 `pnpm --filter @rp/contracts test` to write the snapshot of a new schema, or add `-u` to accept an
 intended change, and review the diff for breaking changes (UPD-006: the server keeps supporting
 the previous minor version). See ADR-0010.
+
+`compat/` holds the client API as each release froze it. `pnpm contracts:compat` (in `pnpm check`
+and CI) fails when the contracts stop serving a version the server still serves (N-1). See
+ADR-0016 and `docs/runbooks/client-compatibility.md`.

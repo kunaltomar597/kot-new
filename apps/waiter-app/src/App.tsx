@@ -1,7 +1,13 @@
 import type { Translator } from '@rp/i18n';
 import type { DeviceSession } from '@rp/mobile-core';
 import type { NotificationPermission } from '@rp/mobile-native';
-import { LoginScreen, PairingScreen, ShellProvider, useSessionState } from '@rp/mobile-shell';
+import {
+  LoginScreen,
+  PairingScreen,
+  ShellProvider,
+  UpdateRequiredScreen,
+  useSessionState,
+} from '@rp/mobile-shell';
 import { ToastProvider } from '@rp/ui-native';
 import { StatusBar } from 'expo-status-bar';
 import { NotificationsProvider } from './notifications';
@@ -11,8 +17,9 @@ import { SignedIn } from './SignedIn';
 const WAITER_APP_ROLES = ['WAITER', 'MANAGER', 'OWNER'] as const;
 
 function Screens({ notifications }: { notifications: NotificationPermission | undefined }) {
-  const { phase, person } = useSessionState();
+  const { phase, person, clientTooOld } = useSessionState();
   if (phase === 'loading') return null;
+  if (clientTooOld) return <UpdateRequiredScreen />;
   if (phase === 'unpaired') return <PairingScreen />;
   if (person === undefined) return <LoginScreen roles={WAITER_APP_ROLES} />;
   // Notifications are asked for as someone signs in (P2-06b).

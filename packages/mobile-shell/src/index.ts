@@ -8,6 +8,7 @@ export * from './override.js';
 export * from './PairingScreen.js';
 export * from './Screen.js';
 export * from './SuggestionRow.js';
+export * from './UpdateRequired.js';
 export * from './use-menu.js';
 export * from './use-live.js';
 export * from './use-now.js';

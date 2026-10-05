@@ -4,11 +4,15 @@ import {
   type AllowDataDeletionRequest,
   type AllowDataDeletionResponse,
   type ApproveUpdateRequest,
+  ClientCompatibility,
+  type DeviceSummary,
   DeviceType,
   STORAGE_CATEGORIES,
   type StorageCategory,
   type SystemStatusResponse,
 } from '@rp/contracts';
+import type { ReleaseInfo } from '@rp/contracts/control-plane';
+import { parseClientApiVersion } from '@rp/domain';
 import type { Principal } from '../auth/principal.js';
 import { backupSummary } from '../backups/backup-state.js';
 import { HeartbeatService } from '../cloud/heartbeat.service.js';
@@ -19,6 +23,7 @@ import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { AuditService } from '../audit/audit.service.js';
+import { clientApiRange, compatibilityOf } from '../http/client-version.js';
 import {
   dataDeletionAllowedUntil,
   dataDeletionPermission,
@@ -39,6 +44,23 @@ import {
   usedPercent,
 } from './storage-usage.js';
 import { readInstallApproval, saveInstallApproval } from './system-state.js';
+
+interface DeviceRow {
+  readonly id: string;
+  readonly type: DeviceSummary['type'];
+  readonly online: boolean;
+  readonly clientApi: string | null;
+}
+
+/** Paired apps (pagers speak MQTT, not the client API). */
+const apps = (rows: readonly DeviceRow[]) => rows.filter((row) => row.type !== 'PAGER');
+
+/** The paired apps a release's server would no longer serve (UPD-006); null without a matrix. */
+function leftBehind(rows: readonly DeviceRow[], offered: ReleaseInfo | null): number | null {
+  const next = parseClientApiVersion(offered?.matrix?.clientApi.current ?? '');
+  if (next === undefined) return null;
+  return apps(rows).filter((row) => compatibilityOf(row.clientApi, next) === 'TOO_OLD').length;
+}
 
 const errors = {
   notOffered: (version: string) =>
@@ -90,7 +112,7 @@ export class SystemService {
       this.postgresVersion(),
       driveSpace(this.config.dataDir),
       this.categories(),
-      this.devices(restaurantId),
+      this.deviceRows(restaurantId),
       readOfferedUpdate(this.prisma),
       readInstallApproval(this.prisma),
       this.prisma.tableSession.count({ where: { restaurantId, status: 'OPEN' } }),
@@ -153,7 +175,16 @@ export class SystemService {
           lastRunTotal: retention?.total ?? null,
         },
       },
-      devices,
+      devices: this.deviceCounts(restaurantId, devices),
+      clients: {
+        api: clientApiRange(),
+        counts: ClientCompatibility.options.flatMap((compatibility) => {
+          const count = apps(devices).filter(
+            (row) => compatibilityOf(row.clientApi) === compatibility,
+          ).length;
+          return count === 0 ? [] : [{ compatibility, devices: count }];
+        }),
+      },
       update: {
         offered:
           offered === null
@@ -164,6 +195,8 @@ export class SystemService {
                 notes: offered.notes,
                 publishedAt: offered.publishedAt,
                 sizeBytes: offered.sizeBytes,
+                clientApi: offered.matrix?.clientApi ?? null,
+                leavesBehind: leftBehind(devices, offered),
               },
         // An approval for an older version no longer applies.
         installApproval:
@@ -293,11 +326,17 @@ export class SystemService {
     }
   }
 
-  private async devices(restaurantId: string): Promise<SystemStatusResponse['devices']> {
-    const rows = await this.prisma.device.findMany({
+  private deviceRows(restaurantId: string): Promise<DeviceRow[]> {
+    return this.prisma.device.findMany({
       where: { restaurantId, status: 'ACTIVE' },
-      select: { id: true, type: true, online: true },
+      select: { id: true, type: true, online: true, clientApi: true },
     });
+  }
+
+  private deviceCounts(
+    restaurantId: string,
+    rows: readonly DeviceRow[],
+  ): SystemStatusResponse['devices'] {
     const connected = this.realtime.connectedDeviceIds(restaurantId);
     return DeviceType.options.flatMap((type) => {
       const ofType = rows.filter((row) => row.type === type);

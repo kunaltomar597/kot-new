@@ -7,6 +7,14 @@ export const en = {
   app: {
     name: 'Restaurant Operations Platform',
   },
+  console: {
+    outdated: {
+      title: 'This screen is out of date',
+      description:
+        'The restaurant’s server was updated. Load the page again to use the new version.',
+      reload: 'Load again',
+    },
+  },
   roles: {
     OWNER: 'Owner',
     MANAGER: 'Manager',
@@ -259,6 +267,13 @@ export const en = {
     unverified: 'Check the server’s certificate before pairing.',
   },
   mobile: {
+    update: {
+      title: 'Update this app',
+      staff:
+        'The restaurant’s server no longer works with this version of the app. Ask a manager to update it, then open it again.',
+      guestsTitle: 'This tablet needs an update',
+      guests: 'Please call a waiter to order.',
+    },
     serverLabel: 'Server address',
     serverHint: 'Shown on the POS in Manage → Devices, for example 192.168.1.20:8443.',
     invalidServer: 'Enter the server address shown on the POS, for example 192.168.1.20:8443.',
@@ -881,6 +896,16 @@ export const en = {
     lastSeen: 'Last seen {date} {time}',
     neverSeen: 'Not seen yet',
     appVersion: 'App {version}',
+    compatibility: {
+      PREVIOUS: 'Update soon',
+      TOO_OLD: 'Update needed',
+      NEWER: 'Newer than the server',
+    },
+    compatibilityHint: {
+      PREVIOUS: 'This app works now but stops at the next update of the restaurant PC.',
+      TOO_OLD: 'The restaurant’s server no longer works with this app until it is updated.',
+      NEWER: 'This app is newer than the restaurant PC. Install the update on the System page.',
+    },
     firmware: 'Firmware {version}',
     serial: 'Serial {serial}',
     unpairedAt: 'Unpaired {date} {time}',
@@ -2655,10 +2680,18 @@ export const en = {
       title: 'Devices',
       line: '{connected} of {paired} connected',
       none: 'No devices paired yet.',
+      tooOld:
+        '{count, plural, one {# app is} other {# apps are}} too old for this server and cannot connect. Update {count, plural, one {it} other {them}} (Manage → Devices).',
+      previous:
+        '{count, plural, one {# app works} other {# apps work}} but must be updated before the next update of this PC.',
+      newer:
+        '{count, plural, one {# app is} other {# apps are}} newer than this PC. Install the update on offer.',
     },
     update: {
       title: 'Updates',
       upToDate: 'This PC is up to date.',
+      leavesBehind:
+        'After this update, {count, plural, one {# paired app stops} other {# paired apps stop}} working until {count, plural, one {it is} other {they are}} updated. Update {count, plural, one {it} other {them}} first.',
       offered: 'Version {version} is ready',
       details: '{channel} · {size} · published {date}',
       window: 'It installs between {start} and {end}, when no table is open.',
@@ -2699,7 +2732,12 @@ export const en = {
       title: 'Licence',
       notActive: 'The licence status shows here once the restaurant is activated.',
     },
-    versions: { title: 'Versions' },
+    versions: {
+      title: 'Versions',
+      clientApi: 'App connection version',
+      clientApiValue: '{current} (also serves apps on {oldest})',
+      clientApiOnly: '{current}',
+    },
     uninstall: {
       title: 'Removing the software',
       intro:
@@ -4304,6 +4342,12 @@ export const en = {
       size: 'Size',
       megabytes: '{size} MB',
       notes: 'Notes',
+      matrix: 'Apps it serves',
+      noMatrix: 'No version matrix',
+      apiOnly: 'App API {current}',
+      apiRange: 'App API {current} and {oldest}',
+      appsFrom: '{api} · apps from {version}',
+      matrixParts: 'In this release: {parts}',
       publishedAt: 'Published',
       startPercent: 'Start with this share of the channel’s PCs (%)',
       startPercentHint:

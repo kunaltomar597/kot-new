@@ -103,6 +103,26 @@ describe('[AUTH-001] [AUTH-004] staff tiles and PIN login', () => {
   });
 });
 
+describe('[UPD-006] a console older than its server', () => {
+  it('says the screen is out of date and offers to load it again', async () => {
+    const reload = vi.fn();
+    // Only the button reads `location` here.
+    vi.stubGlobal('location', { reload });
+    const fake = server().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 426,
+      body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+    }));
+    const { user, container } = await renderConsole({ fake });
+    expect(
+      await screen.findByRole('alert', { name: undefined, description: undefined }),
+    ).toHaveTextContent(t('console.outdated.title'));
+    expect(screen.getByText(t('console.outdated.description'))).toBeVisible();
+    await user.click(screen.getByRole('button', { name: t('console.outdated.reload') }));
+    expect(reload).toHaveBeenCalledOnce();
+    await expectNoAxeViolations(container);
+  });
+});
+
 describe('[MGR-001] [KDS-001] modes', () => {
   it('offers managers every mode and signs them out', async () => {
     const { user } = await renderConsole({ fake: signsInAs(server(), 'MANAGER') });

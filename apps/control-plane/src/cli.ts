@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { readFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -9,6 +10,7 @@ import {
   LicenceState,
   RELEASE_CHANNELS,
   type ReleaseChannel,
+  VersionMatrix,
 } from '@rp/contracts/control-plane';
 import { AdminService } from './admin/admin.service.js';
 import { ControlPlaneModule } from './app.module.js';
@@ -34,6 +36,7 @@ Commands:
   installations:list
   release:publish --channel STABLE|PILOT --version <x.y.z> --url <https url>
                   --sha256 <hex> --size <bytes> [--notes <text>]
+                  [--matrix <version-matrix.json from the packaging step>]
   vendor-user:create --email <email> --name <name> --role SUPER_ADMIN|ONBOARDING|SUPPORT|FINANCE|READ_ONLY
                      the first Super Admin; prints the one-time setup token
   licence:show --installation <id>
@@ -57,6 +60,7 @@ const OPTIONS = {
   sha256: { type: 'string' },
   size: { type: 'string' },
   notes: { type: 'string' },
+  matrix: { type: 'string' },
   state: { type: 'string' },
   plan: { type: 'string' },
   limits: { type: 'string' },
@@ -225,6 +229,10 @@ export async function runCli(argv: readonly string[], context: CliContext): Prom
           sha256: required(values, 'sha256'),
           sizeBytes: size,
           ...(typeof values.notes === 'string' && { notes: values.notes }),
+          // UPD-006: the component version matrix the packaging step wrote.
+          ...(typeof values.matrix === 'string' && {
+            matrix: VersionMatrix.parse(JSON.parse(readFileSync(values.matrix, 'utf8'))),
+          }),
         },
         actor,
       );

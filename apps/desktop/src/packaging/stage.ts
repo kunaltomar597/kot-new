@@ -22,6 +22,7 @@ import {
 } from './payload.js';
 import { collectNotices, noticesText } from './notices.js';
 import { pruneUnreachable } from './prune.js';
+import { VERSION_MATRIX_FILE, versionMatrix } from './version-matrix.js';
 
 /**
  * The stage step (P0-16d): everything the installer packs, in `apps/desktop/staging`. Run after
@@ -281,6 +282,10 @@ export async function stage(options: StageOptions): Promise<StageManifest> {
     cloud: Object.fromEntries(Object.keys(cloud).map((key) => [key, true])),
   };
   await writeFile(join(layout.root, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  // UPD-006: published with the release, and installed beside the server for support.
+  const matrix = `${JSON.stringify(await versionMatrix(options.repoRoot, options.version), null, 2)}\n`;
+  await writeFile(join(layout.root, VERSION_MATRIX_FILE), matrix);
+  await writeFile(join(layout.payload, VERSION_MATRIX_FILE), matrix);
   return manifest;
 }
 

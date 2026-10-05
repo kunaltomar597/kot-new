@@ -1,11 +1,18 @@
 import { createPublicKey, verify } from 'node:crypto';
-import { deviceTokenMessage, type LoginResponse, pairingProofMessage } from '@rp/contracts';
+import {
+  CLIENT_API_VERSION,
+  CLIENT_HEADER,
+  deviceTokenMessage,
+  type LoginResponse,
+  pairingProofMessage,
+} from '@rp/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ApiClient,
   ApiContractError,
   ApiRequestError,
   ApiUnavailableError,
+  clientIdentityText,
   CORRELATION_HEADER,
   DeviceKeyUnavailableError,
   generateWebCryptoDeviceKey,
@@ -596,5 +603,62 @@ describe('[SEC-006] device keys need WebCrypto', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('[UPD-006] the app says which build it is', () => {
+  const app = { kind: 'waiter-app', version: '1.4.2' };
+
+  it('sends its identity and client API with every request and the live connection', async () => {
+    const server = new FakeServer().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 200,
+      body: TILES,
+    }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: PAIRED,
+      client: app,
+    });
+    await client.api.listStaffTiles();
+    const identity = `waiter-app/1.4.2 api/${CLIENT_API_VERSION}`;
+    expect(server.calls[0]?.headers[CLIENT_HEADER]).toBe(identity);
+    await expect(client.handshake()).resolves.toEqual({
+      deviceToken: 'device-1',
+      client: identity,
+    });
+    expect(clientIdentityText(app)).toBe(identity);
+  });
+
+  it('sends nothing it cannot carry, and nothing without being told', async () => {
+    expect(clientIdentityText({ kind: 'Waiter App', version: '1.0.0' })).toBeUndefined();
+    expect(clientIdentityText({ kind: 'waiter-app', version: '1.0 beta' })).toBeUndefined();
+    const server = new FakeServer().on('GET', '/api/v1/version', () => ({ status: 404 }));
+    await new ApiClient({ baseUrl: BASE, fetch: server.fetch }).api.getVersion().catch(() => null);
+    expect(server.calls[0]?.headers).not.toHaveProperty(CLIENT_HEADER);
+  });
+
+  it('tells the app when the server no longer serves it, over REST and the live connection', async () => {
+    const tooOld = vi.fn();
+    const server = new FakeServer().on('GET', '/api/v1/auth/staff-tiles', () => ({
+      status: 426,
+      body: { code: 'CLIENT_TOO_OLD', message: 'Update the app.' },
+    }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: PAIRED,
+      client: app,
+      onClientTooOld: tooOld,
+    });
+    await expect(client.api.listStaffTiles()).rejects.toMatchObject({
+      status: 426,
+      code: 'CLIENT_TOO_OLD',
+    });
+    expect(tooOld).toHaveBeenCalledOnce();
+    // The socket stops instead of retrying.
+    await expect(client.recover('CLIENT_TOO_OLD')).resolves.toBe('stop');
+    expect(tooOld).toHaveBeenCalledTimes(2);
+    expect(tooOld.mock.calls[1]?.[0]).toMatchObject({ status: 426, code: 'CLIENT_TOO_OLD' });
   });
 });

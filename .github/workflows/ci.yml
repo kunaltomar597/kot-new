@@ -73,6 +73,9 @@ jobs:
       - name: Contract docs are up to date
         run: pnpm contracts:docs:check
 
+      - name: Contracts still serve older apps (N-1)
+        run: pnpm contracts:compat
+
       - name: Lint
         run: pnpm lint
 
@@ -279,7 +282,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: windows-installer
-          path: apps/desktop/release/RestaurantPlatform-Setup-*.exe
+          # The installer and its component version matrix (UPD-006), published together.
+          path: |
+            apps/desktop/release/RestaurantPlatform-Setup-*.exe
+            apps/desktop/staging/version-matrix.json
           retention-days: 14
 
   relay-supabase:
