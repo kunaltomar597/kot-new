@@ -47,6 +47,20 @@ const rowOf = async (key: SettingKey) =>
   (await screen.findByRole('heading', { level: 4, name: t(`settingItems.${key}.label`) })).closest(
     'li',
   ) as HTMLElement;
+/**
+ * Waits until `key`'s row shows `text`. The page reads the settings again after a save, and 250 ms
+ * after a live event; on a busy CI runner that outlasts `waitFor`'s 1 s default, and role queries
+ * on this long page are slow, so the row is found once and the wait is longer.
+ */
+async function expectRowToShow(key: SettingKey, text: string): Promise<void> {
+  const row = await rowOf(key);
+  await waitFor(
+    () => {
+      expect(within(row).getByText(text)).toBeVisible();
+    },
+    { timeout: 5_000 },
+  );
+}
 const groupOf = (name: string) => screen.getByRole('region', { name }) as HTMLElement | undefined;
 const changeButton = (key: SettingKey) =>
   screen.findByRole('button', {
@@ -175,9 +189,7 @@ describe('[MGR-007] the General settings page', () => {
       ),
     ).toBeVisible();
     expect(putsTo(fake, 'kds.ageAmberMinutes')).toEqual([{ value: 12 }]);
-    await waitFor(async () => {
-      expect(within(await rowOf('kds.ageAmberMinutes')).getByText('12 minutes')).toBeVisible();
-    });
+    await expectRowToShow('kds.ageAmberMinutes', '12 minutes');
 
     // Another manager changes the discount limit: the page reads the settings again.
     fake.on('GET', '/api/v1/settings', () => ({
@@ -193,9 +205,7 @@ describe('[MGR-007] the General settings page', () => {
       sockets.sync(0);
       sockets.last.fire('event', settingsChanged(1, ['billing.cashierDiscountLimitBp']));
     });
-    await waitFor(async () => {
-      expect(within(await rowOf('billing.cashierDiscountLimitBp')).getByText('15 %')).toBeVisible();
-    });
+    await expectRowToShow('billing.cashierDiscountLimitBp', '15 %');
   });
 
   it('[BILL-005] [AUD-001] takes a discount limit in percent with a reason for the audit log', async () => {
@@ -219,11 +229,7 @@ describe('[MGR-007] the General settings page', () => {
         { value: 1_250, reason: 'Festival week' },
       ]);
     });
-    await waitFor(async () => {
-      expect(
-        within(await rowOf('billing.cashierDiscountLimitBp')).getByText('12.5 %'),
-      ).toBeVisible();
-    });
+    await expectRowToShow('billing.cashierDiscountLimitBp', '12.5 %');
   });
 
   it('goes back to a default, and closes without saving when nothing changed', async () => {
@@ -287,9 +293,7 @@ describe('[MGR-007] the General settings page', () => {
     await waitFor(() => {
       expect(putsTo(fake, 'bills.printerId')).toEqual([{ value: COUNTER_PRINTER }]);
     });
-    await waitFor(async () => {
-      expect(within(await rowOf('bills.printerId')).getByText('Counter printer')).toBeVisible();
-    });
+    await expectRowToShow('bills.printerId', 'Counter printer');
     expect(KITCHEN_PRINTER).not.toBe(COUNTER_PRINTER);
 
     await user.click(await changeButton('updates.maintenanceWindow'));
@@ -366,11 +370,7 @@ describe('[MGR-007] the General settings page', () => {
       { value: true },
       { value: true },
     ]);
-    await waitFor(async () => {
-      expect(
-        within(await rowOf('billing.serviceChargeEnabled')).getByText(t('settings.values.on')),
-      ).toBeVisible();
-    });
+    await expectRowToShow('billing.serviceChargeEnabled', t('settings.values.on'));
   });
 
   it('shows the server’s reason when it refuses a change', async () => {
