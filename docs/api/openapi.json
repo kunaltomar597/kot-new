@@ -11137,6 +11137,12 @@
           "externalId": { "type": ["string", "null"] },
           "available": { "type": "boolean" },
           "trackStock": { "type": "boolean" },
+          "stockCount": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
           "archivedAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           },
@@ -11165,6 +11171,7 @@
           "externalId",
           "available",
           "trackStock",
+          "stockCount",
           "archivedAt",
           "updatedAt"
         ],
@@ -11594,9 +11601,29 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/ModifierGroupView" }
           },
-          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ItemView" } }
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ItemView" } },
+          "combos": { "type": "array", "items": { "$ref": "#/components/schemas/ComboView" } },
+          "published": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "publishedAt": { "$ref": "#/components/schemas/Timestamp" }
+                },
+                "required": ["version", "publishedAt"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "unpublished": { "type": "boolean" }
         },
-        "required": ["categories", "modifierGroups", "items"],
+        "required": ["categories", "modifierGroups", "items", "combos", "published", "unpublished"],
         "additionalProperties": false
       },
       "MenuEntityParams": {

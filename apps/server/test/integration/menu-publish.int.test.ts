@@ -4,6 +4,7 @@ import {
   ComboView,
   ItemAvailabilityView,
   type LoginResponse,
+  MenuDraftResponse,
   MenuPublishResponse,
   MenuSnapshot,
 } from '@rp/contracts';
@@ -265,5 +266,44 @@ describe('[MENU-006] availability and stock', () => {
     expect(
       await prisma.auditLog.count({ where: { action: 'ITEM_AVAILABILITY_CHANGED' } }),
     ).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('[MGR-005] the editor’s draft', () => {
+  const draft = async () => {
+    const response = await server().get('/api/v1/menu/draft').set(as(manager));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    return MenuDraftResponse.parse(response.body);
+  };
+
+  it('[MENU-005] [MENU-006] holds every combo and what is left of counted items', async () => {
+    const current = await draft();
+    expect(current.combos).toEqual([
+      expect.objectContaining({
+        itemId: id('Veg Thali'),
+        timeWindow: { start: '11:00', end: '16:00' },
+      }),
+    ]);
+    const item = (name: string) => current.items.find((entry) => entry.id === id(name));
+    expect(item('Roti')).toMatchObject({ trackStock: true, stockCount: 0, available: false });
+    expect(item('Dal')).toMatchObject({ trackStock: false, stockCount: null });
+  });
+
+  it('[MENU-013] says whether publishing would show something new, live availability aside', async () => {
+    // Chaas came back after version 2 was published.
+    expect(await draft()).toMatchObject({ published: { version: 2 }, unpublished: true });
+    expect((await server().post('/api/v1/menu/publish').set(as(manager))).status).toBe(200);
+    expect(await draft()).toMatchObject({ published: { version: 3 }, unpublished: false });
+
+    // Availability and stock are live: they never wait for publishing.
+    const availability = await server()
+      .put(`/api/v1/menu/items/${id('Lassi')}/availability`)
+      .set(as(manager))
+      .send({ available: false, stockCount: 5 });
+    expect(availability.status).toBe(200);
+    expect((await draft()).unpublished).toBe(false);
+
+    await prisma.item.update({ where: { id: id('Lassi') }, data: { basePrice: 9_500 } });
+    expect((await draft()).unpublished).toBe(true);
   });
 });

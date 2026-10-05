@@ -15,12 +15,20 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import { AppError } from '../errors/app-error.js';
 import type { Category, Prisma } from '../generated/prisma/client.js';
 import { lockSetup } from '../restaurant/setup-changes.js';
+import {
+  buildMenuContent,
+  COMBO_INCLUDE,
+  comboView,
+  differsFromPublished,
+} from './menu-content.js';
+import { MenuPublishService } from './menu-publish.service.js';
 
 const ITEM_INCLUDE = {
   variants: { orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }] },
   modifierGroups: { orderBy: { displayOrder: 'asc' }, select: { groupId: true } },
   tags: { include: { tag: { select: { name: true } } }, orderBy: { id: 'asc' } },
   synonyms: { orderBy: { id: 'asc' }, select: { text: true } },
+  stockLevel: { select: { quantity: true } },
 } as const satisfies Prisma.ItemInclude;
 
 const GROUP_INCLUDE = {
@@ -95,14 +103,15 @@ function toItemView(item: ItemRow): ItemView {
     externalId: item.externalId,
     available: item.available,
     trackStock: item.trackStock,
+    stockCount: item.trackStock ? (item.stockLevel?.quantity ?? 0) : null,
     archivedAt: iso(item.archivedAt),
     updatedAt: item.updatedAt.toISOString(),
   };
 }
 
-/** What the audit log keeps of an item: everything but its timestamps. */
+/** What the audit log keeps of an item: everything but its timestamps and live stock count. */
 function itemSnapshot(view: ItemView) {
-  const { updatedAt: _updatedAt, archivedAt: _archivedAt, ...rest } = view;
+  const { updatedAt: _updatedAt, archivedAt: _archivedAt, stockCount: _stockCount, ...rest } = view;
   return { ...rest, variants: view.variants.filter((variant) => variant.archivedAt === null) };
 }
 
@@ -138,10 +147,15 @@ export class MenuAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly publisher: MenuPublishService,
   ) {}
 
+  /**
+   * Everything the editor shows (P4-02d): the draft, archived entries included, every combo, and
+   * whether publishing would show something new.
+   */
   async draft(restaurantId: string): Promise<MenuDraftResponse> {
-    const [categories, groups, items] = await Promise.all([
+    const [categories, groups, items, combos, content, published] = await Promise.all([
       this.prisma.category.findMany({
         where: { restaurantId },
         orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
@@ -156,11 +170,24 @@ export class MenuAdminService {
         include: ITEM_INCLUDE,
         orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
       }),
+      this.prisma.combo.findMany({
+        where: { restaurantId },
+        include: COMBO_INCLUDE,
+        orderBy: { createdAt: 'asc' },
+      }),
+      buildMenuContent(this.prisma, restaurantId),
+      this.publisher.published(restaurantId),
     ]);
     return {
       categories: categories.map(toCategoryView),
       modifierGroups: groups.map(toGroupView),
       items: items.map(toItemView),
+      combos: combos.map(comboView),
+      published:
+        published === null
+          ? null
+          : { version: published.version, publishedAt: published.publishedAt },
+      unpublished: published === null || differsFromPublished(content, published),
     };
   }
 

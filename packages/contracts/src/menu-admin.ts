@@ -193,18 +193,12 @@ export const ItemView = z.object({
   /** Availability and stock are set on their own (MENU-006, P1-03b). */
   available: z.boolean(),
   trackStock: z.boolean(),
+  /** What is left while stock is counted (`trackStock`), else null (MENU-006, P4-02d). */
+  stockCount: z.int().nonnegative().nullable(),
   archivedAt: Timestamp.nullable(),
   updatedAt: Timestamp,
 });
 export type ItemView = z.infer<typeof ItemView>;
-
-/** The whole draft menu for the editor, archived entries included. */
-export const MenuDraftResponse = z.object({
-  categories: z.array(CategoryView),
-  modifierGroups: z.array(ModifierGroupView),
-  items: z.array(ItemView),
-});
-export type MenuDraftResponse = z.infer<typeof MenuDraftResponse>;
 
 export const MenuArchiveRequest = z.strictObject({ reason: Reason });
 export type MenuArchiveRequest = z.infer<typeof MenuArchiveRequest>;
@@ -301,3 +295,22 @@ export const MenuPublishResponse = z.object({
   published: z.boolean(),
 });
 export type MenuPublishResponse = z.infer<typeof MenuPublishResponse>;
+
+// ---------------------------------------------------------------- the editor's draft
+
+/** The whole draft menu for the editor, archived entries included. */
+export const MenuDraftResponse = z.object({
+  categories: z.array(CategoryView),
+  modifierGroups: z.array(ModifierGroupView),
+  items: z.array(ItemView),
+  /** The combo of every item that is one (MENU-005, P4-02d). */
+  combos: z.array(ComboView),
+  /** The menu version every ordering surface shows now, or null before the first publish. */
+  published: z.object({ version: z.int().positive(), publishedAt: Timestamp }).nullable(),
+  /**
+   * The draft differs from that version, so publishing would show something new (P4-02d).
+   * Availability and stock counts are live and never wait for publishing, so they do not count.
+   */
+  unpublished: z.boolean(),
+});
+export type MenuDraftResponse = z.infer<typeof MenuDraftResponse>;
