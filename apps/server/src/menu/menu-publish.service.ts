@@ -18,6 +18,7 @@ import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
 import { lockSetup } from '../restaurant/setup-changes.js';
 import { buildMenuContent, COMBO_INCLUDE, comboView, menuChecksum } from './menu-content.js';
+import { announceDraftChange } from './menu-draft-events.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 /**
@@ -42,7 +43,9 @@ export class MenuPublishService {
   setCombo(principal: Principal, itemId: string, request: ComboRequest): Promise<ComboView> {
     return this.prisma.transaction(async (tx) => {
       await lockSetup(tx);
-      return this.setComboIn(tx, principal, itemId, request);
+      const combo = await this.setComboIn(tx, principal, itemId, request);
+      await announceDraftChange(tx, principal.restaurantId, 'ITEMS');
+      return combo;
     });
   }
 

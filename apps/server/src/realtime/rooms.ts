@@ -81,6 +81,8 @@ const VISIBLE_WITH: Readonly<
 > = {
   MenuPublished: 'EVERYONE',
   ItemAvailabilityChanged: 'EVERYONE',
+  // Only menu editors read the draft; ordering surfaces wait for the published menu.
+  MenuDraftChanged: 'MENU_MANAGE',
   TableOpened: 'ORDER_CREATE',
   TableMoved: 'ORDER_CREATE',
   TableClosed: 'ORDER_CREATE',

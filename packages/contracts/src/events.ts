@@ -36,6 +36,15 @@ export const ItemAvailabilityChanged = event(
   'ItemAvailabilityChanged',
   z.object({ itemId: Id, available: z.boolean(), stockCount: z.int().nonnegative().nullable() }),
 );
+/**
+ * The draft menu changed (P4-02d, MGR-005): a category, modifier group or item was added, changed,
+ * archived or restored, or a combo set. Only people who manage the menu hear it, so every open
+ * menu editor reads the draft again; ordering surfaces wait for `MenuPublished`.
+ */
+export const MenuDraftChanged = event(
+  'MenuDraftChanged',
+  z.object({ part: z.enum(['CATEGORIES', 'MODIFIER_GROUPS', 'ITEMS']) }),
+);
 
 export const TableOpened = event(
   'TableOpened',
@@ -266,6 +275,7 @@ export const RestaurantChanged = event(
 export const DomainEvent = z.discriminatedUnion('type', [
   MenuPublished,
   ItemAvailabilityChanged,
+  MenuDraftChanged,
   TableOpened,
   TableMoved,
   TableClosed,

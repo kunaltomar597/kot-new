@@ -133,6 +133,11 @@ describe('[ORD-010] [SEC-003] rooms an event reaches', () => {
     ]);
   });
 
+  it('[MGR-005] tells only menu editors that the draft changed, not the ordering surfaces', () => {
+    const targets = roomsForEvent(domainEvent('MenuDraftChanged', rid, { part: 'CATEGORIES' }));
+    expect(targets.sort()).toEqual([rooms.role(rid, 'MANAGER'), rooms.role(rid, 'OWNER')].sort());
+  });
+
   it('sends table events to the floor roles and that table, not the kitchen', () => {
     const targets = roomsForEvent(
       domainEvent('TableOpened', rid, {
@@ -378,6 +383,8 @@ function sample(type: (typeof DOMAIN_EVENT_TYPES)[number]) {
       return domainEvent(type, rid, { menuVersion: 1 });
     case 'ItemAvailabilityChanged':
       return domainEvent(type, rid, { itemId: id(), available: false, stockCount: null });
+    case 'MenuDraftChanged':
+      return domainEvent(type, rid, { part: 'ITEMS' });
     case 'TableOpened':
       return domainEvent(type, rid, {
         tableId: id(),

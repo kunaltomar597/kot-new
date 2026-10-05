@@ -306,4 +306,35 @@ describe('[MGR-005] the editor’s draft', () => {
     await prisma.item.update({ where: { id: id('Lassi') }, data: { basePrice: 9_500 } });
     expect((await draft()).unpublished).toBe(true);
   });
+
+  it('tells every open menu editor about each edit, and nothing about a refused one', async () => {
+    const drafts = () =>
+      prisma.outboxEvent.findMany({
+        where: { eventType: 'MenuDraftChanged' },
+        orderBy: { writeOrder: 'asc' },
+      });
+    const before = (await drafts()).length;
+    const category = { name: 'Desserts', parentId: null, displayOrder: 9 };
+    const created = await server().post('/api/v1/menu/categories').set(as(manager)).send(category);
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const twice = await server().post('/api/v1/menu/categories').set(as(manager)).send(category);
+    expect(twice.status).toBe(409);
+    const combo = await server()
+      .put(`/api/v1/menu/items/${id('Veg Thali')}/combo`)
+      .set(as(manager))
+      .send({
+        components: [{ kind: 'FIXED', itemId: id('Dal'), quantity: 1 }],
+        activeFrom: null,
+        activeUntil: null,
+        timeWindow: null,
+      });
+    expect(combo.status, JSON.stringify(combo.body)).toBe(200);
+
+    const events = await drafts();
+    expect(events).toHaveLength(before + 2);
+    expect(events.slice(-2).map((event) => event.payload)).toEqual([
+      expect.objectContaining({ payload: { part: 'CATEGORIES' } }),
+      expect.objectContaining({ payload: { part: 'ITEMS' } }),
+    ]);
+  });
 });
