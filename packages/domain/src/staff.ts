@@ -1,4 +1,9 @@
-import { grantOf, type PermissionHolder, type Role, type RoleCustomisation } from './permissions.js';
+import {
+  grantOf,
+  type PermissionHolder,
+  type Role,
+  type RoleCustomisation,
+} from './permissions.js';
 
 /**
  * Staff management rules (P4-02a, MGR-004, AUTH-001, AUTH-006): who may add, change, deactivate

@@ -23,7 +23,7 @@ import type { CredentialKind } from '../generated/prisma/enums.js';
 import { staffErrors } from '../staff/staff-errors.js';
 import { authErrors } from './auth-errors.js';
 import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
-import { signedInCustomRole } from './custom-roles.js';
+import { customisationOf, ROLE_GRANTS_SELECT, signedInCustomRole } from './custom-roles.js';
 import { hasFreshStepUp } from './step-up.js';
 import { CredentialHasher } from './credential-hasher.js';
 import type { AuthenticatedDevice } from './device.js';
@@ -265,7 +265,7 @@ export class AuthService {
     await this.prisma.transaction(async (tx) => {
       const staff = await tx.staff.findFirst({
         where: { id: staffId, restaurantId: principal.restaurantId },
-        select: { id: true, active: true, role: { select: { baseRole: true } } },
+        select: { id: true, active: true, role: { select: ROLE_GRANTS_SELECT } },
       });
       if (staff === null) throw authErrors.forbidden();
       // A manager opens their own and their team's logins; the Owner's and other managers' locks
@@ -277,7 +277,12 @@ export class AuthService {
           customRole: principal.customRole ?? null,
           secondFactorFresh: false,
         },
-        { staffId: staff.id, role: staff.role.baseRole, active: staff.active },
+        {
+          staffId: staff.id,
+          role: staff.role.baseRole,
+          customRole: customisationOf(staff.role),
+          active: staff.active,
+        },
         { kind: 'UNLOCK' },
       );
       if (!decision.allowed) throw staffErrors.refused(decision.reason);

@@ -776,7 +776,8 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such custom role, or it is archived.', schema: ApiError },
       422: {
-        description: 'The PIN does not have the configured length, or the custom role is built on another role.',
+        description:
+          'The PIN does not have the configured length, or the custom role is built on another role.',
         schema: ApiError,
       },
     },
@@ -801,7 +802,8 @@ export const ROUTES = [
       ...standardErrors,
       404: { description: 'No such person, or no such active custom role.', schema: ApiError },
       422: {
-        description: 'The change is not allowed on this record, or the custom role is built on another role.',
+        description:
+          'The change is not allowed on this record, or the custom role is built on another role.',
         schema: ApiError,
       },
     },

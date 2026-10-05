@@ -180,6 +180,7 @@ describe('[MGR-004] [AUTH-001] [AUTH-002] adding people', () => {
     expect(entry.after).toEqual({
       displayName: 'Deepak',
       role: 'WAITER',
+      customRole: null,
       hasPhone: true,
       hasEmail: false,
     });
@@ -239,10 +240,11 @@ describe('[MGR-004] changing people', () => {
     const entry = await prisma.auditLog.findFirstOrThrow({
       where: { action: 'STAFF_UPDATED', entityId: meena.id },
     });
-    expect(entry.before).toEqual({ displayName: 'Meena', role: 'WAITER' });
+    expect(entry.before).toEqual({ displayName: 'Meena', role: 'WAITER', customRole: null });
     expect(entry.after).toEqual({
       displayName: 'Meena K',
       role: 'CASHIER',
+      customRole: null,
       changed: ['displayName', 'email', 'role'],
     });
     expect(textOf(entry)).not.toContain('meena@example.in');

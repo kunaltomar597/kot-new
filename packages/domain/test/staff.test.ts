@@ -228,8 +228,9 @@ describe('[AUTH-012] staff management with a custom role', () => {
 
   it('lets nobody change their own custom role', () => {
     const kiran: StaffActor = { staffId: 'kiran', ...headCashier, secondFactorFresh: true };
-    expect(decide(kiran, holding('kiran', headCashier), { kind: 'CHANGE_ROLE', role: 'CASHIER' }))
-      .toBe('OWN_RECORD');
+    expect(
+      decide(kiran, holding('kiran', headCashier), { kind: 'CHANGE_ROLE', role: 'CASHIER' }),
+    ).toBe('OWN_RECORD');
     expect(decide(kiran, holding('kiran', headCashier), { kind: 'SET_PIN' })).toBe('ALLOWED');
   });
 });

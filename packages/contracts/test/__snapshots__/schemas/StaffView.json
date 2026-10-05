@@ -9,6 +9,23 @@
       },
       "displayName": { "type": "string" },
       "role": { "type": "string", "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+      "customRole": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": { "type": "string" }
+            },
+            "required": ["id", "name"]
+          },
+          { "type": "null" }
+        ]
+      },
       "active": { "type": "boolean" },
       "phone": { "type": ["string", "null"] },
       "email": { "type": ["string", "null"] },
@@ -48,6 +65,7 @@
       "id",
       "displayName",
       "role",
+      "customRole",
       "active",
       "phone",
       "email",
@@ -68,6 +86,24 @@
       },
       "displayName": { "type": "string" },
       "role": { "type": "string", "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+      "customRole": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": { "type": "string" }
+            },
+            "required": ["id", "name"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
       "active": { "type": "boolean" },
       "phone": { "type": ["string", "null"] },
       "email": { "type": ["string", "null"] },
@@ -107,6 +143,7 @@
       "id",
       "displayName",
       "role",
+      "customRole",
       "active",
       "phone",
       "email",

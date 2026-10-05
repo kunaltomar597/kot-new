@@ -21,11 +21,11 @@ import { CredentialHasher } from '../auth/credential-hasher.js';
 import { customisationOf, ROLE_GRANTS_SELECT, type RoleRow } from '../auth/custom-roles.js';
 import type { Principal } from '../auth/principal.js';
 import { hasFreshStepUp } from '../auth/step-up.js';
-import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import { PagerBroker } from '../pagers/pager-broker.js';
-import { announceSetupChange, lockSetup } from '../restaurant/setup-changes.js';
+import { announceSetupChange } from '../restaurant/setup-changes.js';
 import { roleErrors } from './role-errors.js';
+import { takeOffSections } from './sections.js';
 import { staffErrors } from './staff-errors.js';
 
 const STAFF_INCLUDE = {
@@ -144,7 +144,9 @@ export class StaffService {
     const given: NewRole =
       customRoleId === null
         ? { choice: { role: request.role, customRole: null }, customRoleId: null }
-        : customChoice(await this.customRole(this.prisma, restaurantId, customRoleId, request.role));
+        : customChoice(
+            await this.customRole(this.prisma, restaurantId, customRoleId, request.role),
+          );
     this.require(principal, settings, null, { kind: 'CREATE', ...given.choice });
     this.requirePinLength(request.pin, settings);
     const secretHash = await this.hasher.hash(request.pin);
@@ -211,7 +213,7 @@ export class StaffService {
       });
       const leftSections =
         newRole !== undefined && grantOf(newRole.choice, 'ORDER_CREATE') === 'DENY'
-          ? await this.takeOffSections(tx, restaurantId, target.id)
+          ? await takeOffSections(tx, restaurantId, [target.id])
           : 0;
       // Contact details are personal data: the audit says they changed, not what they are.
       await this.record(
@@ -271,7 +273,7 @@ export class StaffService {
         where: { restaurantId, staffId: target.id, type: { in: ['PAGER', 'WAITER_PHONE'] } },
         data: { staffId: null },
       });
-      const leftSections = await this.takeOffSections(tx, restaurantId, target.id);
+      const leftSections = await takeOffSections(tx, restaurantId, [target.id]);
       await this.record(
         tx,
         principal,
@@ -444,7 +446,13 @@ export class StaffService {
       return (await this.builtInRole(tx, principal.restaurantId, given.choice.role)).id;
     }
     const locked = customChoice(
-      await this.customRole(tx, principal.restaurantId, given.customRoleId, given.choice.role, true),
+      await this.customRole(
+        tx,
+        principal.restaurantId,
+        given.customRoleId,
+        given.choice.role,
+        true,
+      ),
     );
     this.require(principal, settings, target, { kind, ...locked.choice });
     return given.customRoleId;
@@ -461,7 +469,8 @@ export class StaffService {
     baseRole: AssignableRole | undefined,
     lock = false,
   ): Promise<RoleRow> {
-    if (lock) await db.$queryRaw`SELECT 1 AS locked FROM roles WHERE id = ${roleId}::uuid FOR SHARE`;
+    if (lock)
+      await db.$queryRaw`SELECT 1 AS locked FROM roles WHERE id = ${roleId}::uuid FOR SHARE`;
     const role = await db.role.findFirst({
       where: { id: roleId, restaurantId, builtIn: false, archivedAt: null },
       select: ROLE_GRANTS_SELECT,
@@ -489,26 +498,6 @@ export class StaffService {
       update: {},
       select: { id: true },
     });
-  }
-
-  /** Takes the person off today's (and later) waiter assignments; returns how many went. */
-  private async takeOffSections(
-    tx: TransactionClient,
-    restaurantId: string,
-    staffId: string,
-  ): Promise<number> {
-    await lockSetup(tx);
-    const today = await currentBusinessDate(tx, restaurantId);
-    const removed = await tx.shiftAssignment.deleteMany({
-      where: { restaurantId, staffId, businessDate: { gte: dbDate(today) } },
-    });
-    if (removed.count > 0) {
-      await announceSetupChange(tx, restaurantId, 'WAITER_ASSIGNMENTS', {
-        type: 'waiter_assignments',
-        id: restaurantId,
-      });
-    }
-    return removed.count;
   }
 
   private record(

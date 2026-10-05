@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ArchiveRoleRequest,
   CreateStaffRequest,
+  CustomRoleRequest,
+  CustomRoleView,
   DeactivateStaffRequest,
+  LoginResponse,
   OwnerSecurityResponse,
   SetStaffPinRequest,
   StaffView,
@@ -44,6 +48,7 @@ describe('[MGR-004] staff administration requests', () => {
       id: id(1),
       displayName: 'Ravi',
       role: 'WAITER',
+      customRole: null,
       active: true,
       phone: null,
       email: null,
@@ -54,6 +59,57 @@ describe('[MGR-004] staff administration requests', () => {
       updatedAt: '2026-09-28T10:00:00.000Z',
     };
     expect(StaffView.parse({ ...view, pin: '4321', secretHash: 'x' })).toEqual(view);
+  });
+});
+
+describe('[AUTH-012] custom roles', () => {
+  const captain = {
+    name: 'Captain',
+    baseRole: 'WAITER',
+    added: ['BILL_PRINT_AND_PAYMENT'],
+    removed: [],
+  };
+
+  it('combines known permissions on top of a role people can be given', () => {
+    expect(CustomRoleRequest.parse({ ...captain, name: '  Captain ' }).name).toBe('Captain');
+    expect(CustomRoleRequest.safeParse({ ...captain, baseRole: 'OWNER' }).success).toBe(false);
+    expect(CustomRoleRequest.safeParse({ ...captain, added: ['FLY'] }).success).toBe(false);
+    expect(CustomRoleRequest.safeParse({ ...captain, name: '' }).success).toBe(false);
+    expect(CustomRoleRequest.safeParse({ ...captain, builtIn: true }).success).toBe(false);
+    expect(ArchiveRoleRequest.safeParse({ reason: 'No longer needed' }).success).toBe(true);
+  });
+
+  it('gives a person a custom role by id, or the built-in role with null', () => {
+    expect(
+      CreateStaffRequest.safeParse({
+        displayName: 'Ravi',
+        role: 'WAITER',
+        customRoleId: id(7),
+        pin: '4321',
+      }).success,
+    ).toBe(true);
+    expect(UpdateStaffRequest.safeParse({ customRoleId: id(7) }).success).toBe(true);
+    expect(UpdateStaffRequest.safeParse({ customRoleId: null }).success).toBe(true);
+    expect(UpdateStaffRequest.safeParse({ customRoleId: 'captain' }).success).toBe(false);
+  });
+
+  it('tells a person at sign-in what their custom role changes, and lists roles with their people', () => {
+    const login = LoginResponse.shape.staff.parse({
+      id: id(1),
+      displayName: 'Ravi',
+      role: 'WAITER',
+      customRole: { id: id(7), name: 'Captain', added: ['BILL_PRINT_AND_PAYMENT'], removed: [] },
+    });
+    expect(login.customRole?.added).toEqual(['BILL_PRINT_AND_PAYMENT']);
+    expect(
+      CustomRoleView.safeParse({
+        id: id(7),
+        ...captain,
+        staffCount: 2,
+        archivedAt: null,
+        updatedAt: '2026-10-05T10:00:00.000Z',
+      }).success,
+    ).toBe(true);
   });
 });
 

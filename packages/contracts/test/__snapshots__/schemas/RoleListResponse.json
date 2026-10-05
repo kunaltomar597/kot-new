@@ -1,0 +1,250 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "roles": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": { "type": "string" },
+            "baseRole": { "type": "string", "enum": ["MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+            "added": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ORDER_CREATE",
+                  "ORDER_APPROVE_CUSTOMER",
+                  "ITEM_CANCEL_BEFORE_PREP",
+                  "ITEM_VOID_AFTER_PREP",
+                  "ITEM_MARK_PREPARING_READY",
+                  "ITEM_MARK_PICKED_UP",
+                  "ITEM_MARK_SERVED",
+                  "STOCK_MANAGE",
+                  "TABLE_MOVE_MERGE",
+                  "BILL_REQUEST",
+                  "BILL_PRINT_AND_PAYMENT",
+                  "DISCOUNT_WITHIN_LIMIT",
+                  "DISCOUNT_ABOVE_LIMIT",
+                  "SERVICE_CHARGE_REMOVE",
+                  "BILL_REPRINT",
+                  "BILL_EDIT_AFTER_PRINT",
+                  "INVOICE_VOID",
+                  "CASH_MOVEMENT_AND_SHIFT_CLOSE",
+                  "DAY_END_CLOSE",
+                  "MENU_MANAGE",
+                  "STAFF_MANAGE",
+                  "DEVICE_PAIR",
+                  "OPERATIONS_CONFIGURE",
+                  "TAX_AND_INVOICE_SETTINGS",
+                  "REPORTS_VIEW_EXPORT",
+                  "AUDIT_VIEW",
+                  "DATA_ADMIN",
+                  "LICENSE_VIEW",
+                  "LICENSE_MANAGE",
+                  "UPDATE_INSTALL_NOW"
+                ]
+              }
+            },
+            "removed": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ORDER_CREATE",
+                  "ORDER_APPROVE_CUSTOMER",
+                  "ITEM_CANCEL_BEFORE_PREP",
+                  "ITEM_VOID_AFTER_PREP",
+                  "ITEM_MARK_PREPARING_READY",
+                  "ITEM_MARK_PICKED_UP",
+                  "ITEM_MARK_SERVED",
+                  "STOCK_MANAGE",
+                  "TABLE_MOVE_MERGE",
+                  "BILL_REQUEST",
+                  "BILL_PRINT_AND_PAYMENT",
+                  "DISCOUNT_WITHIN_LIMIT",
+                  "DISCOUNT_ABOVE_LIMIT",
+                  "SERVICE_CHARGE_REMOVE",
+                  "BILL_REPRINT",
+                  "BILL_EDIT_AFTER_PRINT",
+                  "INVOICE_VOID",
+                  "CASH_MOVEMENT_AND_SHIFT_CLOSE",
+                  "DAY_END_CLOSE",
+                  "MENU_MANAGE",
+                  "STAFF_MANAGE",
+                  "DEVICE_PAIR",
+                  "OPERATIONS_CONFIGURE",
+                  "TAX_AND_INVOICE_SETTINGS",
+                  "REPORTS_VIEW_EXPORT",
+                  "AUDIT_VIEW",
+                  "DATA_ADMIN",
+                  "LICENSE_VIEW",
+                  "LICENSE_MANAGE",
+                  "UPDATE_INSTALL_NOW"
+                ]
+              }
+            },
+            "staffCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "archivedAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                { "type": "null" }
+              ]
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "baseRole",
+            "added",
+            "removed",
+            "staffCount",
+            "archivedAt",
+            "updatedAt"
+          ]
+        }
+      }
+    },
+    "required": ["roles"]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "roles": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "name": { "type": "string" },
+            "baseRole": { "type": "string", "enum": ["MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+            "added": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ORDER_CREATE",
+                  "ORDER_APPROVE_CUSTOMER",
+                  "ITEM_CANCEL_BEFORE_PREP",
+                  "ITEM_VOID_AFTER_PREP",
+                  "ITEM_MARK_PREPARING_READY",
+                  "ITEM_MARK_PICKED_UP",
+                  "ITEM_MARK_SERVED",
+                  "STOCK_MANAGE",
+                  "TABLE_MOVE_MERGE",
+                  "BILL_REQUEST",
+                  "BILL_PRINT_AND_PAYMENT",
+                  "DISCOUNT_WITHIN_LIMIT",
+                  "DISCOUNT_ABOVE_LIMIT",
+                  "SERVICE_CHARGE_REMOVE",
+                  "BILL_REPRINT",
+                  "BILL_EDIT_AFTER_PRINT",
+                  "INVOICE_VOID",
+                  "CASH_MOVEMENT_AND_SHIFT_CLOSE",
+                  "DAY_END_CLOSE",
+                  "MENU_MANAGE",
+                  "STAFF_MANAGE",
+                  "DEVICE_PAIR",
+                  "OPERATIONS_CONFIGURE",
+                  "TAX_AND_INVOICE_SETTINGS",
+                  "REPORTS_VIEW_EXPORT",
+                  "AUDIT_VIEW",
+                  "DATA_ADMIN",
+                  "LICENSE_VIEW",
+                  "LICENSE_MANAGE",
+                  "UPDATE_INSTALL_NOW"
+                ]
+              }
+            },
+            "removed": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ORDER_CREATE",
+                  "ORDER_APPROVE_CUSTOMER",
+                  "ITEM_CANCEL_BEFORE_PREP",
+                  "ITEM_VOID_AFTER_PREP",
+                  "ITEM_MARK_PREPARING_READY",
+                  "ITEM_MARK_PICKED_UP",
+                  "ITEM_MARK_SERVED",
+                  "STOCK_MANAGE",
+                  "TABLE_MOVE_MERGE",
+                  "BILL_REQUEST",
+                  "BILL_PRINT_AND_PAYMENT",
+                  "DISCOUNT_WITHIN_LIMIT",
+                  "DISCOUNT_ABOVE_LIMIT",
+                  "SERVICE_CHARGE_REMOVE",
+                  "BILL_REPRINT",
+                  "BILL_EDIT_AFTER_PRINT",
+                  "INVOICE_VOID",
+                  "CASH_MOVEMENT_AND_SHIFT_CLOSE",
+                  "DAY_END_CLOSE",
+                  "MENU_MANAGE",
+                  "STAFF_MANAGE",
+                  "DEVICE_PAIR",
+                  "OPERATIONS_CONFIGURE",
+                  "TAX_AND_INVOICE_SETTINGS",
+                  "REPORTS_VIEW_EXPORT",
+                  "AUDIT_VIEW",
+                  "DATA_ADMIN",
+                  "LICENSE_VIEW",
+                  "LICENSE_MANAGE",
+                  "UPDATE_INSTALL_NOW"
+                ]
+              }
+            },
+            "staffCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "archivedAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                { "type": "null" }
+              ]
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "baseRole",
+            "added",
+            "removed",
+            "staffCount",
+            "archivedAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["roles"],
+    "additionalProperties": false
+  }
+}

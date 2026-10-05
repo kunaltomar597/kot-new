@@ -6611,6 +6611,292 @@
         "x-requirements": ["ONB-004", "AUD-001"]
       }
     },
+    "/api/v1/roles": {
+      "get": {
+        "operationId": "listRoles",
+        "summary": "The custom roles: what each adds to or takes from its base role",
+        "description": "AUTH-012: archived roles included, with how many active people have each, so the staff editor can offer them.",
+        "tags": ["staff"],
+        "responses": {
+          "200": {
+            "description": "Custom roles.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/RoleListResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["AUTH-012", "MGR-004"]
+      },
+      "post": {
+        "operationId": "createRole",
+        "summary": "The Owner combines permissions into a new role on top of a base role",
+        "description": "AUTH-012. Only the Owner, with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). It may add anything a manager may do and take away anything the base role may do, never what only the Owner may do (422 `ROLE_PERMISSIONS_INVALID` with each problem). Names are unique among active roles, built-in ones included. Audited.",
+        "tags": ["staff"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CustomRoleRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new role.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CustomRoleView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Another active role has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "Permissions that cannot be given this way.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["AUTH-012", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/roles/{roleId}": {
+      "put": {
+        "operationId": "updateRole",
+        "summary": "Change a custom role's name, base role or permissions",
+        "description": "AUTH-012, AUTH-006: the Owner with a fresh second factor. The people who have it work with the new permissions from their next request; their live connections close, so their screens sign in again with them. Audited with before and after.",
+        "tags": ["staff"],
+        "parameters": [
+          {
+            "name": "roleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CustomRoleRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The role as it is now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CustomRoleView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such custom role.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Archived, or another active role has that name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "Permissions that cannot be given this way.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["AUTH-012", "AUTH-006", "AUTH-010", "AUD-001"]
+      }
+    },
+    "/api/v1/roles/{roleId}/archive": {
+      "post": {
+        "operationId": "archiveRole",
+        "summary": "Archive a custom role nobody active has",
+        "description": "AUTH-012, AUTH-006: the Owner with a fresh second factor, with a reason. Deactivated people keep it in their records. Audited.",
+        "tags": ["staff"],
+        "parameters": [
+          {
+            "name": "roleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ArchiveRoleRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The role, archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CustomRoleView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such custom role.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Already archived, or active people have it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["AUTH-012", "AUTH-006", "AUD-001"]
+      }
+    },
+    "/api/v1/roles/{roleId}/restore": {
+      "post": {
+        "operationId": "restoreRole",
+        "summary": "Offer an archived custom role again",
+        "description": "AUTH-012, AUTH-006: the Owner with a fresh second factor. Audited.",
+        "tags": ["staff"],
+        "parameters": [
+          {
+            "name": "roleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The role, offered again.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CustomRoleView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such custom role.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "Not archived, or another active role has its name.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "STAFF_MANAGE",
+        "x-requirements": ["AUTH-012", "AUTH-006", "AUD-001"]
+      }
+    },
     "/api/v1/sections": {
       "post": {
         "operationId": "createSection",
@@ -7356,7 +7642,7 @@
       "post": {
         "operationId": "createStaff",
         "summary": "Add a person with a role and a PIN",
-        "description": "MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN has exactly `auth.pinLength` digits, is hashed with the pepper and never stored or logged (AUTH-002). Audited.",
+        "description": "MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). A custom role (AUTH-012) is given like its base role, except that one built on the manager role or giving staff management counts as a manager. The PIN has exactly `auth.pinLength` digits, is hashed with the pepper and never stored or logged (AUTH-002). Audited.",
         "tags": ["staff"],
         "requestBody": {
           "required": true,
@@ -7389,22 +7675,28 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           },
+          "404": {
+            "description": "No such custom role, or it is archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
           "422": {
-            "description": "The PIN does not have the configured length.",
+            "description": "The PIN does not have the configured length, or the custom role is built on another role.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           }
         },
         "x-capability": "STAFF_MANAGE",
-        "x-requirements": ["MGR-004", "AUTH-001", "AUTH-002", "AUTH-006", "AUD-001"]
+        "x-requirements": ["MGR-004", "AUTH-001", "AUTH-002", "AUTH-006", "AUTH-012", "AUD-001"]
       }
     },
     "/api/v1/staff/{staffId}": {
       "patch": {
         "operationId": "updateStaff",
         "summary": "Change a person's name, role, phone or e-mail",
-        "description": "MGR-004. A new role applies to the person's next request (AUTH-010). Making someone a manager or no longer one needs the Owner's second factor (AUTH-006); a manager's details are changed by the Owner or themselves; nobody changes their own role. Audited with before and after.",
+        "description": "MGR-004. A new role, or custom role (AUTH-012), applies to the person's next request and closes their live connections (AUTH-010). Making someone a manager or no longer one needs the Owner's second factor (AUTH-006), as does giving or taking away a custom role built on the manager role or giving staff management; a manager's details are changed by the Owner or themselves; nobody changes their own role. Audited with before and after.",
         "tags": ["staff"],
         "parameters": [
           {
@@ -7450,20 +7742,20 @@
             }
           },
           "404": {
-            "description": "No such person.",
+            "description": "No such person, or no such active custom role.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           },
           "422": {
-            "description": "The change is not allowed on this record.",
+            "description": "The change is not allowed on this record, or the custom role is built on another role.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           }
         },
         "x-capability": "STAFF_MANAGE",
-        "x-requirements": ["MGR-004", "AUTH-006", "AUD-001"]
+        "x-requirements": ["MGR-004", "AUTH-006", "AUTH-012", "AUD-001"]
       }
     },
     "/api/v1/staff/{staffId}/deactivate": {
@@ -9215,6 +9507,12 @@
         "required": ["reason"],
         "additionalProperties": false
       },
+      "ArchiveRoleRequest": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 200 } },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "AssignPagerRequest": {
         "type": "object",
         "properties": {
@@ -9973,6 +10271,7 @@
         "properties": {
           "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
           "role": { "$ref": "#/components/schemas/AssignableRole" },
+          "customRoleId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "pin": { "$ref": "#/components/schemas/Pin" },
           "phone": {
             "anyOf": [{ "$ref": "#/components/schemas/PhoneNumber" }, { "type": "null" }]
@@ -10014,9 +10313,31 @@
             "properties": {
               "id": { "$ref": "#/components/schemas/Id" },
               "displayName": { "type": "string" },
-              "role": { "$ref": "#/components/schemas/Role" }
+              "role": { "$ref": "#/components/schemas/Role" },
+              "customRole": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": { "$ref": "#/components/schemas/Id" },
+                      "name": { "type": "string" },
+                      "added": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Capability" }
+                      },
+                      "removed": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Capability" }
+                      }
+                    },
+                    "required": ["id", "name", "added", "removed"],
+                    "additionalProperties": false
+                  },
+                  { "type": "null" }
+                ]
+              }
             },
-            "required": ["id", "displayName", "role"],
+            "required": ["id", "displayName", "role", "customRole"],
             "additionalProperties": false
           },
           "secondFactorValidUntil": {
@@ -10032,6 +10353,51 @@
           "shift": { "anyOf": [{ "$ref": "#/components/schemas/ShiftView" }, { "type": "null" }] }
         },
         "required": ["shift"],
+        "additionalProperties": false
+      },
+      "CustomRoleRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "baseRole": { "$ref": "#/components/schemas/AssignableRole" },
+          "added": {
+            "maxItems": 40,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Capability" }
+          },
+          "removed": {
+            "maxItems": 40,
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Capability" }
+          }
+        },
+        "required": ["name", "baseRole", "added", "removed"],
+        "additionalProperties": false
+      },
+      "CustomRoleView": {
+        "type": "object",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "baseRole": { "$ref": "#/components/schemas/AssignableRole" },
+          "added": { "type": "array", "items": { "$ref": "#/components/schemas/Capability" } },
+          "removed": { "type": "array", "items": { "$ref": "#/components/schemas/Capability" } },
+          "staffCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "archivedAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": [
+          "id",
+          "name",
+          "baseRole",
+          "added",
+          "removed",
+          "staffCount",
+          "archivedAt",
+          "updatedAt"
+        ],
         "additionalProperties": false
       },
       "DayEndBlockers": {
@@ -11566,9 +11932,31 @@
             "properties": {
               "id": { "$ref": "#/components/schemas/Id" },
               "displayName": { "type": "string" },
-              "role": { "$ref": "#/components/schemas/Role" }
+              "role": { "$ref": "#/components/schemas/Role" },
+              "customRole": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": { "$ref": "#/components/schemas/Id" },
+                      "name": { "type": "string" },
+                      "added": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Capability" }
+                      },
+                      "removed": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/Capability" }
+                      }
+                    },
+                    "required": ["id", "name", "added", "removed"],
+                    "additionalProperties": false
+                  },
+                  { "type": "null" }
+                ]
+              }
             },
-            "required": ["id", "displayName", "role"],
+            "required": ["id", "displayName", "role", "customRole"],
             "additionalProperties": false
           },
           "secondFactorValidUntil": {
@@ -14298,6 +14686,20 @@
         "additionalProperties": false
       },
       "Role": { "type": "string", "enum": ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"] },
+      "RoleListResponse": {
+        "type": "object",
+        "properties": {
+          "roles": { "type": "array", "items": { "$ref": "#/components/schemas/CustomRoleView" } }
+        },
+        "required": ["roles"],
+        "additionalProperties": false
+      },
+      "RoleParams": {
+        "type": "object",
+        "properties": { "roleId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["roleId"],
+        "additionalProperties": false
+      },
       "SacCode": { "type": "string", "pattern": "^\\d{4,8}$" },
       "SalesChannel": { "type": "string", "enum": ["POS", "WAITER_APP", "TABLE_TABLET", "QR"] },
       "SalesSummaryResponse": {
@@ -14985,6 +15387,12 @@
           "additionalProperties": false
         }
       },
+      "StaffCustomRole": {
+        "type": "object",
+        "properties": { "id": { "$ref": "#/components/schemas/Id" }, "name": { "type": "string" } },
+        "required": ["id", "name"],
+        "additionalProperties": false
+      },
       "StaffListResponse": {
         "type": "object",
         "properties": {
@@ -15011,9 +15419,10 @@
           "staffId": { "$ref": "#/components/schemas/Id" },
           "displayName": { "type": "string", "minLength": 1 },
           "role": { "$ref": "#/components/schemas/Role" },
+          "customRoleName": { "type": ["string", "null"] },
           "photoId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
         },
-        "required": ["staffId", "displayName", "role", "photoId"],
+        "required": ["staffId", "displayName", "role", "customRoleName", "photoId"],
         "additionalProperties": false
       },
       "StaffTilesResponse": {
@@ -15030,6 +15439,9 @@
           "id": { "$ref": "#/components/schemas/Id" },
           "displayName": { "type": "string" },
           "role": { "$ref": "#/components/schemas/Role" },
+          "customRole": {
+            "anyOf": [{ "$ref": "#/components/schemas/StaffCustomRole" }, { "type": "null" }]
+          },
           "active": { "type": "boolean" },
           "phone": { "type": ["string", "null"] },
           "email": { "type": ["string", "null"] },
@@ -15045,6 +15457,7 @@
           "id",
           "displayName",
           "role",
+          "customRole",
           "active",
           "phone",
           "email",
@@ -15793,6 +16206,7 @@
         "properties": {
           "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
           "role": { "$ref": "#/components/schemas/AssignableRole" },
+          "customRoleId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] },
           "phone": {
             "anyOf": [{ "$ref": "#/components/schemas/PhoneNumber" }, { "type": "null" }]
           },

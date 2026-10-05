@@ -42,7 +42,10 @@ export function customisationOf(
 ): RoleCustomisation | null {
   return role.builtIn
     ? null
-    : { added: capabilitiesOf(role.capabilities), removed: capabilitiesOf(role.removedCapabilities) };
+    : {
+        added: capabilitiesOf(role.capabilities),
+        removed: capabilitiesOf(role.removedCapabilities),
+      };
 }
 
 /** Whoever has `role`, for `grantOf`. */

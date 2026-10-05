@@ -10,7 +10,7 @@ import {
   type Paise,
   type RoundingMode,
 } from './money.js';
-import type { Role } from './permissions.js';
+import { grantOf, type PermissionHolder, type Role } from './permissions.js';
 
 /** An item-level or bill-level discount: a percentage or a flat amount (BILL-005). */
 export type DiscountValue =
@@ -52,7 +52,11 @@ export function effectiveDiscountRateBp(base: Paise, discount: DiscountValue): B
   return divideRounded(discountAmount(base, discount) * BASIS_POINTS_PER_WHOLE, base, 'UP');
 }
 
-/** Per-role discount limit in basis points, e.g. `{ CASHIER: 1000 }` = cashier up to 10 % (BILL-005 ⚙). */
+/**
+ * Per-role discount limit in basis points, e.g. `{ CASHIER: 1000 }` = cashier up to 10 % (BILL-005 ⚙).
+ * A role without a limit of its own that may discount within a limit (a custom role on another
+ * base role, AUTH-012) has the cashier's.
+ */
 export type DiscountLimits = Readonly<Partial<Record<Role, BasisPoints>>>;
 
 export const DEFAULT_DISCOUNT_LIMITS: DiscountLimits = { CASHIER: 1000 };
@@ -60,28 +64,31 @@ export const DEFAULT_DISCOUNT_LIMITS: DiscountLimits = { CASHIER: 1000 };
 export type DiscountDecision = 'ALLOWED' | 'REQUIRES_MANAGER_OVERRIDE' | 'DENIED';
 
 /**
- * Applies the discount rules from §4.2 and BILL-005:
- * - Owner and Manager may give any discount, including complimentary items.
- * - Cashier may discount up to their limit; above it, or complimentary, needs a manager PIN.
+ * Applies the discount rules from §4.2 and BILL-005 to `holder`'s grants, a custom role's
+ * changes included (AUTH-012):
+ * - Owner and Manager (DISCOUNT_ABOVE_LIMIT allowed) may give any discount, including
+ *   complimentary items.
+ * - Cashier (DISCOUNT_WITHIN_LIMIT) may discount up to their limit; above it, or complimentary,
+ *   needs a manager PIN (DISCOUNT_ABOVE_LIMIT by override).
  * - Waiter and Kitchen cannot discount.
  */
 export function decideDiscount(
-  role: Role,
+  holder: Role | PermissionHolder,
   requestedRateBp: BasisPoints,
   limits: DiscountLimits = DEFAULT_DISCOUNT_LIMITS,
 ): DiscountDecision {
   assertBasisPoints(requestedRateBp, 'requested discount', BASIS_POINTS_PER_WHOLE);
-  switch (role) {
-    case 'OWNER':
-    case 'MANAGER':
-      return 'ALLOWED';
-    case 'CASHIER': {
-      const limit = limits.CASHIER ?? 0;
-      const complimentary = requestedRateBp >= BASIS_POINTS_PER_WHOLE;
-      return !complimentary && requestedRateBp <= limit ? 'ALLOWED' : 'REQUIRES_MANAGER_OVERRIDE';
-    }
-    case 'WAITER':
-    case 'KITCHEN':
-      return 'DENIED';
+  const who: PermissionHolder = typeof holder === 'string' ? { role: holder } : holder;
+  const aboveLimit = grantOf(who, 'DISCOUNT_ABOVE_LIMIT');
+  if (aboveLimit === 'ALLOW') return 'ALLOWED';
+  const limit = limits[who.role] ?? limits.CASHIER ?? 0;
+  const complimentary = requestedRateBp >= BASIS_POINTS_PER_WHOLE;
+  if (
+    grantOf(who, 'DISCOUNT_WITHIN_LIMIT') === 'ALLOW' &&
+    !complimentary &&
+    requestedRateBp <= limit
+  ) {
+    return 'ALLOWED';
   }
+  return aboveLimit === 'OVERRIDE' ? 'REQUIRES_MANAGER_OVERRIDE' : 'DENIED';
 }

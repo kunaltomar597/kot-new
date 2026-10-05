@@ -35,8 +35,7 @@ export const roleErrors = {
     new AppError(409, 'ROLE_ARCHIVED', 'This custom role is archived. Restore it first.'),
   alreadyArchived: () =>
     new AppError(409, 'ROLE_ALREADY_ARCHIVED', 'This custom role is already archived.'),
-  notArchived: () =>
-    new AppError(409, 'ROLE_NOT_ARCHIVED', 'This custom role is not archived.'),
+  notArchived: () => new AppError(409, 'ROLE_NOT_ARCHIVED', 'This custom role is not archived.'),
   inUse: (staffCount: number) =>
     new AppError(
       409,
