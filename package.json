@@ -37,9 +37,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^16.0.0",
     "prettier": "^3.9.9",
-    "turbo": "^2.11.4",
+    "turbo": "^2.11.5",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.70.1",
+    "typescript-eslint": "^8.71.0",
     "vitest": "^5.0.2"
   }
 }
