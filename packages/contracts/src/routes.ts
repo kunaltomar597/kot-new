@@ -187,6 +187,10 @@ import {
   UpdateRestaurantProfileRequest,
 } from './restaurant.js';
 import {
+  RecommendationPreferenceListResponse,
+  RecommendationPreferenceParams,
+  RecommendationPreferenceRequest,
+  RecommendationPreferenceView,
   RecommendationRuleListResponse,
   RecommendationRuleParams,
   RecommendationRuleRequest,
@@ -2433,6 +2437,40 @@ export const ROUTES = [
       200: { description: 'Archived.', schema: RecommendationRuleView },
       ...standardErrors,
       404: { description: 'No such rule.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'listRecommendationPreferences',
+    method: 'GET',
+    path: '/api/v1/recommendation-preferences',
+    summary: 'The dishes pinned, boosted or blocked from suggestions',
+    description: 'REC-009: every dish not archived whose preference is not NORMAL.',
+    tags: ['recommendations'],
+    requirements: ['REC-009'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The preferences.', schema: RecommendationPreferenceListResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'setRecommendationPreference',
+    method: 'PUT',
+    path: '/api/v1/recommendation-preferences/:itemId',
+    summary: 'Pin, boost or block a dish, or put it back to normal',
+    description:
+      'REC-009: pinned dishes come first wherever they can be served, boosted ones before the ' +
+      "best sellers and first among a rule's, blocked ones never. Applies at once, without " +
+      'publishing the menu. Audited with before, after and the reason; a change that changes ' +
+      'nothing writes nothing.',
+    tags: ['recommendations'],
+    requirements: ['REC-009', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    request: { params: RecommendationPreferenceParams, body: RecommendationPreferenceRequest },
+    responses: {
+      200: { description: 'The dish’s preference now.', schema: RecommendationPreferenceView },
+      ...standardErrors,
+      404: { description: 'No such dish, or it is archived.', schema: ApiError },
     },
   },
   {

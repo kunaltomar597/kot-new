@@ -1,4 +1,4 @@
-import { DAYPARTS, RECOMMENDATION_LAYERS } from '@rp/domain';
+import { DAYPARTS, ITEM_PREFERENCES, RECOMMENDATION_LAYERS } from '@rp/domain';
 import { z } from 'zod';
 import { Id, IsoDate, SalesChannel, Timestamp } from './common.js';
 import { TimeWindow } from './settings.js';
@@ -6,11 +6,12 @@ import { TimeWindow } from './settings.js';
 /**
  * Recommendations (P3-04, REC-001 to REC-008, REC-011): suggestions for a table's order from the
  * restaurant's rules, then learned pairings (P6-02), then its best sellers for the time of day,
- * each with the reason it is suggested. Table-level only (REC-007): the input is the table's order
- * and cart, never a person.
+ * each with the reason it is suggested, with the dishes the manager pinned first, boosted ones
+ * before the best sellers and blocked ones never (REC-009, P4-03c). Table-level only (REC-007):
+ * the input is the table's order and cart, never a person.
  */
 
-/** Where a suggestion came from, highest precedence first (REC-001). */
+/** Where a suggestion came from, highest precedence first (REC-001, REC-009). */
 export const RecommendationLayer = z.enum(RECOMMENDATION_LAYERS);
 export type RecommendationLayer = z.infer<typeof RecommendationLayer>;
 
@@ -31,6 +32,10 @@ export const RecommendationReason = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('LEARNED'), becauseOf: z.string() }),
   /** A best seller of this time of day, or of the whole day outside every window. */
   z.object({ kind: z.literal('BEST_SELLER'), daypart: Daypart.nullable() }),
+  /** Pinned by the restaurant (REC-009): its own words ("Chef's special"), or null for "Our pick". */
+  z.object({ kind: z.literal('PINNED'), label: z.string().nullable() }),
+  /** Boosted by the restaurant (REC-009), with its own words or null, as a pinned dish. */
+  z.object({ kind: z.literal('BOOSTED'), label: z.string().nullable() }),
 ]);
 export type RecommendationReason = z.infer<typeof RecommendationReason>;
 
@@ -207,3 +212,48 @@ export type RecommendationRuleListResponse = z.infer<typeof RecommendationRuleLi
 
 export const RecommendationRuleParams = z.strictObject({ ruleId: Id });
 export type RecommendationRuleParams = z.infer<typeof RecommendationRuleParams>;
+
+// ---------------------------------------------------------------- dish preferences (REC-009)
+
+/** How the manager wants a dish suggested; NORMAL leaves it to the layers. */
+export const RECOMMENDATION_PREFERENCES = ['NORMAL', ...ITEM_PREFERENCES] as const;
+export const RecommendationPreference = z.enum(RECOMMENDATION_PREFERENCES);
+export type RecommendationPreference = z.infer<typeof RecommendationPreference>;
+
+/**
+ * Pins, boosts or blocks a dish, or puts it back to normal (REC-009): pinned dishes come first
+ * wherever they can be served, boosted ones before the best sellers and first among a rule's, and
+ * blocked ones are never suggested. The label, the restaurant's own words shown with the
+ * suggestion, is for a pinned or boosted dish only; the reason goes to the audit log (AUD-001).
+ */
+export const RecommendationPreferenceRequest = z
+  .strictObject({
+    preference: RecommendationPreference,
+    label: z.string().trim().min(1).max(60).nullable(),
+    reason: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine(
+    (request) =>
+      request.label === null || request.preference === 'PIN' || request.preference === 'BOOST',
+    { message: 'Only a pinned or boosted dish has a label', path: ['label'] },
+  );
+export type RecommendationPreferenceRequest = z.infer<typeof RecommendationPreferenceRequest>;
+
+export const RecommendationPreferenceView = z.object({
+  itemId: Id,
+  preference: RecommendationPreference,
+  label: z.string().nullable(),
+  updatedAt: Timestamp,
+});
+export type RecommendationPreferenceView = z.infer<typeof RecommendationPreferenceView>;
+
+/** The dishes pinned, boosted or blocked, of those not archived, for the Recommendations page. */
+export const RecommendationPreferenceListResponse = z.object({
+  preferences: z.array(RecommendationPreferenceView),
+});
+export type RecommendationPreferenceListResponse = z.infer<
+  typeof RecommendationPreferenceListResponse
+>;
+
+export const RecommendationPreferenceParams = z.strictObject({ itemId: Id });
+export type RecommendationPreferenceParams = z.infer<typeof RecommendationPreferenceParams>;

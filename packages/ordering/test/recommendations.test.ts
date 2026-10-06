@@ -35,6 +35,17 @@ describe('[REC-006] [TAB-011] the reason shown with a suggestion', () => {
       'Bestseller this evening',
     );
   });
+
+  it('[REC-009] calls a pinned or boosted dish the restaurant’s pick, in its words if it gave some', () => {
+    expect(describeRecommendation({ kind: 'PINNED', label: 'Chef’s special' }, t)).toBe(
+      'Chef’s special',
+    );
+    expect(describeRecommendation({ kind: 'PINNED', label: null }, t)).toBe('Our pick');
+    expect(describeRecommendation({ kind: 'BOOSTED', label: 'Fresh today' }, t)).toBe(
+      'Fresh today',
+    );
+    expect(describeRecommendation({ kind: 'BOOSTED', label: null }, t)).toBe('Our pick');
+  });
 });
 
 describe('[REC-008] a cart line added from a suggestion', () => {

@@ -57,7 +57,10 @@
       "recommendation": {
         "type": "object",
         "properties": {
-          "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+          "layer": {
+            "type": "string",
+            "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"]
+          },
           "ruleId": {
             "anyOf": [
               {
@@ -134,7 +137,10 @@
       "recommendation": {
         "type": "object",
         "properties": {
-          "layer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+          "layer": {
+            "type": "string",
+            "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"]
+          },
           "ruleId": {
             "anyOf": [
               {

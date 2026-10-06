@@ -2143,6 +2143,8 @@ export const en = {
         EVENING: 'Bestseller this evening',
         DINNER: 'Bestseller at dinner',
       },
+      /** A dish the restaurant pinned or boosted without words of its own (REC-009). */
+      pick: 'Our pick',
     },
   },
   states: {
