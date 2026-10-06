@@ -372,6 +372,17 @@ describe('[REC-002] [AUD-001] recommendation rules', () => {
     };
     expect((await put({ ...breads, priority: 10 })).status).toBe(200);
     expect(await auditOf(id('rule breads'))).toHaveLength(1);
+    // The same channels in another order are no change either.
+    expect(
+      (
+        await put({
+          ...breads,
+          priority: 10,
+          channels: ['QR', 'TABLE_TABLET', 'WAITER_APP', 'POS'],
+        })
+      ).status,
+    ).toBe(200);
+    expect(await auditOf(id('rule breads'))).toHaveLength(1);
 
     const changed = await put({ ...breads, priority: 20 });
     expect(changed.status).toBe(200);
