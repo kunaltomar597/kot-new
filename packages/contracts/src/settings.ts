@@ -1,7 +1,9 @@
+import { overrideProblems } from '@rp/domain';
 import { z } from 'zod';
 import { NotificationEventType, NUDGE_MESSAGE_MAX } from './alerts.js';
 import { Capability } from './auth.js';
 import { Timestamp } from './common.js';
+import { VibrationPattern } from './pagers.js';
 
 /**
  * The settings catalogue (P1-01a, MGR-007, UPD-010): every configurable value the BRD marks with
@@ -63,46 +65,60 @@ function setting<Schema extends z.ZodType, const Key extends string>(
 
 const int = (min: number, max: number) => z.int().min(min).max(max);
 
-/** NTF-002: a manager's changes to the Appendix C rules; anything left out keeps the default. */
-const NotificationRuleOverrides = z.partialRecord(
-  NotificationEventType,
-  z.strictObject({
-    recipients: z
-      .array(
-        z.enum([
-          'RESPONSIBLE_WAITER',
-          'SECTION_WAITERS',
-          'ALL_WAITERS',
-          'MANAGERS_ON_DUTY',
-          'CASHIER',
-          'STATION',
-          'OWNER',
-          'WEARER',
-          'SELECTED',
-        ]),
-      )
-      .min(1)
-      .optional(),
-    channels: z
-      .array(
-        z.enum([
-          'PAGER',
-          'WAITER_APP',
-          'POS',
-          'DASHBOARD',
-          'KDS',
-          'TABLET',
-          'PRINTED_SLIP',
-          'CONTROL_PLANE',
-        ]),
-      )
-      .min(1)
-      .optional(),
-    pagerText: z.string().trim().min(1).max(20).nullable().optional(),
-    escalate: z.boolean().optional(),
-    repeat: z.enum(['UNTIL_ACKED', 'NONE', 'ONCE_PER_STATE', 'UNTIL_RESOLVED', 'DAILY']).optional(),
-  }),
-);
+/**
+ * NTF-002: a manager's changes to the Appendix C rules, with each event's pager vibration
+ * (PGR-006); anything left out keeps the default. A change that cannot work for its event (someone
+ * it cannot reach, nothing to show it on, a pager with no text, an Appendix C row that is not an
+ * alert to shape) is refused (`ruleProblems` in `@rp/domain`).
+ */
+const NotificationRuleOverrides = z
+  .partialRecord(
+    NotificationEventType,
+    z.strictObject({
+      recipients: z
+        .array(
+          z.enum([
+            'RESPONSIBLE_WAITER',
+            'SECTION_WAITERS',
+            'ALL_WAITERS',
+            'MANAGERS_ON_DUTY',
+            'CASHIER',
+            'STATION',
+            'OWNER',
+            'WEARER',
+            'SELECTED',
+          ]),
+        )
+        .min(1)
+        .optional(),
+      channels: z
+        .array(
+          z.enum([
+            'PAGER',
+            'WAITER_APP',
+            'POS',
+            'DASHBOARD',
+            'KDS',
+            'TABLET',
+            'PRINTED_SLIP',
+            'CONTROL_PLANE',
+          ]),
+        )
+        .min(1)
+        .optional(),
+      pagerText: z.string().trim().min(1).max(20).nullable().optional(),
+      vibration: VibrationPattern.optional(),
+      escalate: z.boolean().optional(),
+      repeat: z
+        .enum(['UNTIL_ACKED', 'NONE', 'ONCE_PER_STATE', 'UNTIL_RESOLVED', 'DAILY'])
+        .optional(),
+    }),
+  )
+  .superRefine((overrides, context) => {
+    for (const { event, problem } of overrideProblems(overrides)) {
+      context.addIssue({ code: 'custom', path: [event], message: problem });
+    }
+  });
 /** `HH:MM`, 24-hour clock. */
 export const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 /** A daily window; `end` before `start` means it runs past midnight. */
@@ -407,8 +423,8 @@ export const SETTINGS = [
     scope: 'RESTAURANT',
     capability: 'OPERATIONS_CONFIGURE',
     description:
-      'Changes to the factory notification rules (Appendix C), per event: recipients, channels, pager text, escalation and repeat.',
-    requirements: ['NTF-002', 'NTF-003'],
+      'Changes to the factory notification rules (Appendix C), per event: recipients, channels, pager text and vibration, escalation and repeat.',
+    requirements: ['NTF-002', 'NTF-003', 'PGR-006'],
   }),
   setting({
     key: 'notifications.nudgePresets',
@@ -435,19 +451,6 @@ export const SETTINGS = [
       'How often a pager reports its battery and signal; three missed heartbeats and it counts as offline.',
     requirements: ['PGR-007'],
     unit: 'seconds',
-  }),
-  setting({
-    key: 'pagers.vibration',
-    schema: z.partialRecord(
-      NotificationEventType,
-      z.enum(['ONE_LONG', 'TWO_SHORT', 'THREE', 'ONE_SHORT']),
-    ),
-    defaultValue: {},
-    scope: 'RESTAURANT',
-    capability: 'OPERATIONS_CONFIGURE',
-    description:
-      'Changes to the pager vibration per alert type (ready: one long; requests: two short; manager: three).',
-    requirements: ['PGR-006'],
   }),
   setting({
     key: 'kds.ageAmberMinutes',

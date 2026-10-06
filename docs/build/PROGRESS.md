@@ -25,7 +25,9 @@ What exists:
   device type and a pager's Locate topic (P4-02c), and custom roles: a base role with what it
   adds and takes away, applied by `grantOf` to every permission decision, checked by
   `checkCustomRole`, a custom role that manages staff counting as a manager's, and discounts that
-  follow it (P4-02e). 235 tests.
+  follow it (P4-02e), and each notification rule's pager vibration, what a manager may choose for
+  each alert, what stops a rule from working and a change kept to what differs from the factory
+  rule (P4-03b). 240 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -47,8 +49,9 @@ What exists:
   pager's locate message (P4-02c); the editor's draft with combos, stock counts and whether
   publishing would show something new, and `MenuDraftChanged` (P4-02d); custom roles, their
   routes and the custom role on sign-in, staff records and tiles (P4-02e); a settings catalogue
-  with one pager heartbeat (set by the vendor), one vibration setting and one disk warning level
-  (P4-03a). 551 tests.
+  with one pager heartbeat (set by the vendor) and one disk warning level (P4-03a); notification
+  rules with each alert's pager vibration, and a rule change that cannot work refused (P4-03b).
+  551 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -95,8 +98,8 @@ What exists:
   like their base role, applied by the guard, the override approver check, socket rooms per
   capability, order, table and discount rules, a change reaching its people on their next request
   with their screens signed in again, and people who stop taking orders taken off today's
-  sections (P4-02e); the disk alert at `storage.warnPercent` (P4-03a). 743 tests (4 skipped
-  without a real install).
+  sections (P4-02e); the disk alert at `storage.warnPercent` (P4-03a); the pager's vibration
+  from each notification rule (P4-03b). 746 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -171,7 +174,10 @@ What exists:
   modes and dashboard pages that follow the custom role (P4-02e); the Settings page: every
   setting of the catalogue by area with its value in its unit, its default and who changes it, an
   editor chosen from its validation, "use the default", a reason for the audit log, vendor
-  settings read-only and the Owner's second factor (P4-03a). 285 tests, and 20 Playwright steps.
+  settings read-only and the Owner's second factor (P4-03a); the Notifications page: N, R and the
+  nudge messages, and a rule per alert saying whom it alerts, where it shows, what the pager shows
+  and how it buzzes, how it repeats and whether it goes on to the managers, edited with checks and
+  "Back to the factory rule" (P4-03b). 299 tests, and 21 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -186,7 +192,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03b Notification rules (P2-03 and P4-03a done), then P4-03c to P4-03e (see phase-4.md).
+- P4-03c Recommendation rules with boost, pin and block (P3-04 and P4-03a done), then P4-03d and
+  P4-03e (see phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -292,7 +299,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02d Menu editor
 - [x] P4-02e Custom roles (S)
 - [x] P4-03a Settings from the catalogue
-- [ ] P4-03b Notification rules
+- [x] P4-03b Notification rules
 - [ ] P4-03c Recommendation rules with boost, pin and block
 - [ ] P4-03d Floor, stations and printers
 - [ ] P4-03e Tax and invoice
@@ -582,6 +589,47 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-10-05 (P4-03b):
+
+251. Each notification rule carries its pager vibration (PGR-006), so a manager shapes an alert in
+     one place: whom it alerts, where, what the pager shows and how it buzzes. `pagers.vibration`
+     is gone; a value stored under it is ignored (its only editor was to be this page, so no
+     restaurant has one). An alert sent on to the managers still buzzes three times.
+252. The factory vibrations follow PGR-006's examples: food ready one long buzz; a new order to
+     approve and the table requests (water, waiter, bill) two short; what calls the manager (food
+     waiting at the pass, a nudge, a waiter nobody can reach) three; devices and the system one
+     short.
+253. Two Appendix C rows always happen and have no rule to change: order changes go to the
+     kitchen's screen and a printed slip (from the order engine), and a waiter nobody can reach
+     has their alerts go straight to the managers (NTF-007, NTF-009). The page shows them as
+     "Always", without a Change button, and the server refuses a change to them.
+254. Whom an alert may go to depends on the alert: a table's alerts go to its waiter, its
+     section's waiters, every waiter, the managers on duty or the cashier; a nudge always to the
+     waiters the manager picks; a device's alert to the managers, the pager's wearer, the cashier
+     or the Owner; the system's to the managers, the cashier or the Owner. The kitchen station is
+     not offered: the kitchen gets its alerts on its own screen.
+255. Where an alert shows is two choices: "Pager and waiter app" (they show the same alerts,
+     WTR-006) and "POS and dashboard" (one console, MGR-008). An alert's own extra places (the
+     table tablet for food ready, the provider for disk and backups) are kept as Appendix C has
+     them.
+256. An alert repeats in its factory way (until acknowledged, once per state change, until put
+     right, daily), every R until acknowledged, or never.
+257. The pager text has up to 20 characters; `{table}` fills in the table for a table's alerts and
+     `{message}` the manager's words for a nudge, which must keep it. The editor previews it for
+     table 7. A rule that does not reach pagers or the waiter app asks for no text.
+258. A rule that cannot work (nobody, nowhere, a pager with no text, a placeholder the alert
+     does not fill or a stray brace, a repeat the alert does not offer, a fixed row) is refused
+     by the server (422 `SETTING_INVALID`, naming the alert and the problem) and stopped in the
+     editor beside the field it is about.
+259. Saving a rule reads the rules again and changes only that alert's entry, keeping only what
+     differs from the factory rule: another manager's change to a different alert is kept, and a
+     rule put back to the factory one is no longer "Changed".
+260. N, R and the nudge messages show on both the General and the Notifications pages (the same
+     setting and editor): the rules talk about them, and someone looking under General finds them
+     too.
+261. The page's heading is "Notification rules" (its link says "Notifications"), because the
+     toasts' landmark is already called "Notifications".
+
 Decided 2026-10-05 (P4-03a):
 
 242. P4-03 is built in five parts, each a page of the dashboard's Settings area: the General
@@ -590,8 +638,9 @@ Decided 2026-10-05 (P4-03a):
      (P4-03e).
 243. The catalogue keeps one setting per value. The pager heartbeat is `pagers.heartbeatSeconds`,
      now set by the vendor (10 to 300 s, default 30): the pager firmware and the broker must agree
-     on it, and a wrong value would mark every pager offline. Pager vibrations stay in
-     `pagers.vibration` (per event, edited in P4-03b). The disk warning is `storage.warnPercent`
+     on it, and a wrong value would mark every pager offline. Pager vibrations stayed in
+     `pagers.vibration` (P4-03b then moved them into the rules, decision 251). The disk warning is
+     `storage.warnPercent`
      (default 80 %), which the hourly disk check now reads. `pager.heartbeatSeconds`,
      `pager.vibrationPatterns` and `notifications.diskAlertPercent` are gone; a value stored
      under one of them is ignored.
@@ -1314,6 +1363,55 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-05: P4-03b Notification rules
+
+Merged #77 (P4-03a), which also landed #76 (P4-02e, now shown as merged), after fixing its one red
+job: a settings screen test checked a row after a live refresh inside a 1 s `waitFor`, with a slow
+role query in the callback, and timed out on the loaded runner. Reproduced by running four copies
+on one core (three of four failed); the row is now found once and the wait allows 5 s, and all
+four pass.
+
+Built: `@rp/domain` `notifications.ts`: `vibration` on every rule, `VIBRATION_PATTERNS`,
+`NotificationRuleOverrides`, `FIXED_EVENTS`, `TABLE_ALERTS`, `recipientChoices`, `PHONE_CHANNELS`
+and `SCREEN_CHANNELS`, `fixedChannels`, `reachOf`, `channelsFor`, `repeatChoices`,
+`pagerPlaceholders`, `ruleProblems`, `overrideProblems`, `overrideFor` and `withRule`; `pager.ts`
+`vibrationFor` takes the rules. Contracts: `notifications.rules` with `vibration` and the rule
+checks; `pagers.vibration` removed (73 settings). Server: the pager broker reads the vibration
+from the rules. i18n: `settings.pages`, `notificationRules.*`; `settingItems.pagers.vibration`
+removed. Console: `SettingsArea.tsx` with General and Notifications, `SettingRow.tsx` (shared),
+`NotificationsScreen.tsx`, `RuleDialog.tsx` and `notification-rules-view.ts`. The browser test's
+takeaway step now matches its heading exactly: once the open takeaway orders had loaded,
+"Takeaway" also matched "Open takeaway orders".
+
+Tests: domain 240, contracts 551 (a rule change with its vibration, and one that
+cannot work refused with the alert and the problem), server 746 (a manager's change to the
+bill rule changes who is alerted, the pager text, escalation and repeat, with the reason in the
+audit log, and back to the factory rule the cashier is alerted again; five changes that cannot
+work are refused; a changed pager text and buzz reach the pager), console 299 (the rules page's
+logic: every alert once and in words, the changes and N and R read from the settings, whom and
+where, the pager preview and hint, repeats, editing and comparing rules, problems by field; the
+page: the rules in their groups with N, R and the nudge messages, a changed rule, the fixed rows,
+a change with a reason that keeps another alert's change, the checks, a nudge's message, back to
+the factory rule, N changed and the rules saying so, the server's refusal and a live refresh), and
+21 Playwright steps (was 20): Vikram sends water requests to the cashier too with "{table} JAL"
+and three buzzes, sets N to 90 seconds, checks a 360 px phone and puts the factory rule back.
+
+Gotchas:
+
+- The toasts' landmark is named "Notifications", so a page region with the same name fails axe's
+  `landmark-unique`.
+- Pass `{table}` and `{message}` into a message as values; a literal brace in an ICU message
+  starts an argument.
+- Testing Library's `user.type` reads `{` as the start of a key name: type `{{` for a brace.
+- Server tests that change `notifications.rules` reset it afterwards, or later tests' alerts
+  follow the changed rule.
+- On the Settings page, "Sign out" also matches the "Change Sign out idle …" buttons: use
+  `exact: true` in Playwright.
+
+Deferred: none.
+
+Decisions: 251 to 261.
 
 ### 2026-10-05: P4-03a Settings from the catalogue
 

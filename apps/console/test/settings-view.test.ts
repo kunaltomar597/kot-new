@@ -55,7 +55,7 @@ describe('[MGR-007] the settings page from the catalogue', () => {
       const check = checkDraft(key, draftOf(key, view.defaultValue));
       expect(check, key).toEqual({ ok: true, value: view.defaultValue });
     }
-    expect([...EDITED_ELSEWHERE].sort()).toEqual(['notifications.rules', 'pagers.vibration']);
+    expect([...EDITED_ELSEWHERE]).toEqual(['notifications.rules']);
   });
 
   it('reads each editor from the setting’s validation', () => {
@@ -228,9 +228,9 @@ describe('[MGR-007] the settings page from the catalogue', () => {
     expect(all.map((section) => section.group)).toEqual([...SETTING_GROUPS]);
     const keys = all.flatMap((section) => section.settings.map((setting) => setting.key));
     expect(keys).not.toContain('notifications.rules');
-    expect(keys).not.toContain('pagers.vibration');
+    expect(keys).toContain('notifications.escalationSeconds');
     expect(keys).not.toContain('future.setting');
-    expect(keys).toHaveLength(SETTING_KEYS.length - 2);
+    expect(keys).toHaveLength(SETTING_KEYS.length - 1);
     expect(all[1]?.settings.map((setting) => setting.key)).toEqual([
       'stock.kitchenMayManage',
       'kds.ageAmberMinutes',

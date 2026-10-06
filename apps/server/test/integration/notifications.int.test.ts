@@ -7,7 +7,7 @@ import {
   TableSessionView,
 } from '@rp/contracts';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { NOTIFICATION_CLOCK, NOTIFICATION_OPTIONS } from '../../src/notifications/clock.js';
 import { NotificationsService } from '../../src/notifications/notifications.service.js';
@@ -56,7 +56,7 @@ beforeAll(async () => {
   const hall = await prisma.section.create({
     data: { restaurantId: kit.restaurantId, name: 'Hall' },
   });
-  for (const [index, label] of ['4', '5', '6', '7', '8'].entries()) {
+  for (const [index, label] of ['4', '5', '6', '7', '8', '9', '10'].entries()) {
     tables[label] = (
       await prisma.diningTable.create({
         data: { restaurantId: kit.restaurantId, sectionId: hall.id, label, displayOrder: index },
@@ -213,6 +213,61 @@ describe('[NTF-002] [NTF-005] repeats and escalation', () => {
     expect(alert.recipientIds).toContain(kit.staff.MANAGER);
     expect(alert.escalateAt).toBeNull();
     expect(await events(alert.id, 'AlertEscalated')).toHaveLength(1);
+  });
+});
+
+describe('[NTF-002] [NTF-003] a manager’s change to a rule', () => {
+  const rules = (value: unknown) =>
+    server()
+      .put('/api/v1/settings/notifications.rules')
+      .set(as(manager))
+      .send({ value, reason: 'The cashier is busy at lunch' });
+
+  afterEach(async () => {
+    expect((await rules({})).status).toBe(200);
+  });
+
+  it('changes who is alerted, what the pager shows and whether it repeats or escalates', async () => {
+    const changed = await rules({
+      BILL_REQUEST: {
+        recipients: ['RESPONSIBLE_WAITER'],
+        pagerText: '{table} CHEQUE',
+        escalate: false,
+        repeat: 'NONE',
+      },
+    });
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    // The cashier is no longer alerted, nothing repeats and nobody is escalated to.
+    const alert = await requestBill(await openTable('9'));
+    expect(alert).toMatchObject({ pagerText: 'T9 CHEQUE', escalateAt: null, nextRepeatAt: null });
+    expect(alert.recipientIds).toEqual([kit.staff.WAITER]);
+    // The audit log keeps the change and its reason (AUD-001).
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'SETTING_CHANGED', after: { path: ['key'], equals: 'notifications.rules' } },
+      orderBy: { occurredAt: 'desc' },
+    });
+    expect(audit.reason).toBe('The cashier is busy at lunch');
+
+    // Back to the factory rule: the cashier hears again.
+    expect((await rules({})).status).toBe(200);
+    const again = await requestBill(await openTable('10'));
+    expect([...again.recipientIds].sort()).toEqual([kit.staff.WAITER, kit.staff.CASHIER].sort());
+  });
+
+  it('refuses a rule that cannot work', async () => {
+    for (const value of [
+      { ORDER_CHANGED: { recipients: ['STATION'], escalate: true } },
+      { WATER_REQUEST: { recipients: ['SELECTED'] } },
+      { BILL_REQUEST: { pagerText: null } },
+      { MANAGER_NUDGE: { pagerText: 'MGR CALLING' } },
+      { ITEM_READY: { channels: ['TABLET'] } },
+    ]) {
+      const refused = await rules(value);
+      expect([refused.status, ApiError.parse(refused.body).code], JSON.stringify(value)).toEqual([
+        422,
+        'SETTING_INVALID',
+      ]);
+    }
   });
 });
 

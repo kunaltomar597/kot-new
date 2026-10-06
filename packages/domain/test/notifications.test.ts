@@ -1,16 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
+  channelsFor,
   DEFAULT_NOTIFICATION_RULES,
   dueActions,
   effectiveRule,
+  FIXED_EVENTS,
+  fixedChannels,
   initialDeadlines,
   NOTIFICATION_EVENTS,
   type NotificationEvent,
+  type NotificationRuleOverride,
+  overrideFor,
+  overrideProblems,
+  pagerPlaceholders,
   pagerTextFor,
   reachesConsole,
   reachesPagerAndApp,
+  reachOf,
   type RecipientContext,
+  recipientChoices,
+  repeatChoices,
   resolveRecipients,
+  ruleProblems,
+  withRule,
 } from '../src/index.js';
 
 const context = (overrides: Partial<RecipientContext> = {}): RecipientContext => ({
@@ -206,5 +218,151 @@ describe('[MGR-008] [NTF-005] what asks for a person at the POS and the dashboar
     expect(reachesConsole(alert(['PAGER', 'WAITER_APP']), 'vikram')).toBe(false);
     expect(reachesConsole(alert(['PAGER', 'WAITER_APP'], ['vikram']), 'vikram')).toBe(true);
     expect(reachesConsole(alert(['PAGER', 'WAITER_APP'], ['vikram']), 'neha')).toBe(false);
+  });
+});
+
+describe('[NTF-002] [PGR-006] what a manager may change in a rule', () => {
+  const configurable = NOTIFICATION_EVENTS.filter((event) => !FIXED_EVENTS.has(event));
+  const problems = (event: NotificationEvent, change: NotificationRuleOverride) =>
+    ruleProblems(event, { ...DEFAULT_NOTIFICATION_RULES[event], ...change });
+
+  it('accepts every factory rule; order changes and unreachable waiters are not alerts to shape', () => {
+    expect(configurable).toHaveLength(11);
+    for (const event of configurable) {
+      const rule = DEFAULT_NOTIFICATION_RULES[event];
+      expect(ruleProblems(event, rule), event).toEqual([]);
+      expect(overrideFor(event, rule), event).toBeUndefined();
+    }
+    expect([...FIXED_EVENTS].sort()).toEqual(['ORDER_CHANGED', 'WAITER_UNREACHABLE']);
+    expect(ruleProblems('ORDER_CHANGED', DEFAULT_NOTIFICATION_RULES.ORDER_CHANGED)).toEqual([
+      'FIXED_EVENT',
+    ]);
+  });
+
+  it('offers each event the people it can reach and the repeats that suit it', () => {
+    expect(recipientChoices('WATER_REQUEST')).toEqual([
+      'RESPONSIBLE_WAITER',
+      'SECTION_WAITERS',
+      'ALL_WAITERS',
+      'MANAGERS_ON_DUTY',
+      'CASHIER',
+    ]);
+    expect(recipientChoices('MANAGER_NUDGE')).toEqual(['SELECTED']);
+    expect(recipientChoices('DEVICE_LOW_BATTERY_OR_OFFLINE')).toEqual([
+      'MANAGERS_ON_DUTY',
+      'WEARER',
+      'CASHIER',
+      'OWNER',
+    ]);
+    expect(recipientChoices('DISK_OR_BACKUP')).toEqual(['MANAGERS_ON_DUTY', 'CASHIER', 'OWNER']);
+    expect(repeatChoices('ITEM_READY')).toEqual(['UNTIL_ACKED', 'NONE']);
+    expect(repeatChoices('PRINTER_OFFLINE')).toEqual(['UNTIL_RESOLVED', 'UNTIL_ACKED', 'NONE']);
+    expect(pagerPlaceholders('ITEM_READY')).toEqual(['{table}']);
+    expect(pagerPlaceholders('MANAGER_NUDGE')).toEqual(['{message}']);
+    expect(pagerPlaceholders('PRINTER_OFFLINE')).toEqual([]);
+  });
+
+  it('[WTR-006] ties the pager to the waiter app and the POS to the dashboard, keeping the rest', () => {
+    expect(fixedChannels('ITEM_READY')).toEqual(['TABLET']);
+    expect(fixedChannels('DISK_OR_BACKUP')).toEqual(['CONTROL_PLANE']);
+    expect(fixedChannels('WATER_REQUEST')).toEqual([]);
+    expect(reachOf(DEFAULT_NOTIFICATION_RULES.ORDER_PENDING_APPROVAL)).toEqual({
+      phones: true,
+      screens: true,
+    });
+    expect(reachOf(DEFAULT_NOTIFICATION_RULES.PRINTER_OFFLINE)).toEqual({
+      phones: false,
+      screens: true,
+    });
+    expect(channelsFor('ITEM_READY', { phones: true, screens: true })).toEqual([
+      'PAGER',
+      'WAITER_APP',
+      'POS',
+      'DASHBOARD',
+      'TABLET',
+    ]);
+    expect(channelsFor('PRINTER_OFFLINE', { phones: false, screens: true })).toEqual([
+      'POS',
+      'DASHBOARD',
+    ]);
+  });
+
+  it('refuses a rule that cannot work', () => {
+    expect(problems('ITEM_READY', { recipients: [] })).toEqual(['NO_RECIPIENT']);
+    expect(problems('ITEM_READY', { recipients: ['SELECTED'] })).toEqual(['RECIPIENT_NOT_ALLOWED']);
+    expect(problems('ITEM_READY', { channels: ['TABLET'] })).toEqual(['NO_CHANNEL']);
+    // The table's tablet stays, and the kitchen's screen is not a water request's.
+    expect(problems('ITEM_READY', { channels: ['PAGER', 'WAITER_APP'] })).toEqual([
+      'CHANNEL_NOT_ALLOWED',
+    ]);
+    expect(problems('WATER_REQUEST', { channels: ['PAGER', 'KDS'] })).toEqual([
+      'CHANNEL_NOT_ALLOWED',
+    ]);
+    expect(problems('ITEM_READY', { pagerText: null })).toEqual(['PAGER_TEXT_MISSING']);
+    expect(problems('ITEM_READY', { pagerText: '{table} READY TO SERVE NOW' })).toEqual([
+      'PAGER_TEXT_TOO_LONG',
+    ]);
+    expect(
+      problems('PRINTER_OFFLINE', {
+        channels: ['PAGER', 'WAITER_APP', 'POS', 'DASHBOARD'],
+        pagerText: '{table} PRINTER',
+      }),
+    ).toEqual(['PAGER_TEXT_PLACEHOLDER']);
+    // A stray or doubled brace would reach the pager as it is.
+    expect(problems('WATER_REQUEST', { pagerText: '{table WATER' })).toEqual([
+      'PAGER_TEXT_PLACEHOLDER',
+    ]);
+    expect(problems('WATER_REQUEST', { pagerText: '{{table}} WATER' })).toEqual([
+      'PAGER_TEXT_PLACEHOLDER',
+    ]);
+    expect(problems('WATER_REQUEST', { pagerText: '{'.repeat(5000) })).toEqual([
+      'PAGER_TEXT_TOO_LONG',
+      'PAGER_TEXT_PLACEHOLDER',
+    ]);
+    expect(problems('MANAGER_NUDGE', { pagerText: 'MGR CALLING' })).toEqual([
+      'PAGER_TEXT_NEEDS_MESSAGE',
+    ]);
+    expect(problems('ITEM_READY', { repeat: 'DAILY' })).toEqual(['REPEAT_NOT_ALLOWED']);
+    // Off the pager, it needs no pager text.
+    expect(problems('PRINTER_OFFLINE', { pagerText: null })).toEqual([]);
+    expect(
+      overrideProblems({ ORDER_CHANGED: { escalate: true }, BILL_REQUEST: { recipients: [] } }),
+    ).toEqual([
+      { event: 'BILL_REQUEST', problem: 'NO_RECIPIENT' },
+      { event: 'ORDER_CHANGED', problem: 'FIXED_EVENT' },
+    ]);
+  });
+
+  it('keeps only what differs from the factory rule, so the rest follows it', () => {
+    const water = DEFAULT_NOTIFICATION_RULES.WATER_REQUEST;
+    expect(
+      overrideFor('WATER_REQUEST', {
+        ...water,
+        recipients: ['CASHIER', 'RESPONSIBLE_WAITER'],
+        vibration: 'THREE',
+      }),
+    ).toEqual({ recipients: ['RESPONSIBLE_WAITER', 'CASHIER'], vibration: 'THREE' });
+    // The POS alone, or the POS and the dashboard, reach the same screens.
+    expect(
+      overrideFor('ORDER_PENDING_APPROVAL', {
+        ...DEFAULT_NOTIFICATION_RULES.ORDER_PENDING_APPROVAL,
+        channels: ['PAGER', 'WAITER_APP', 'POS', 'DASHBOARD'],
+      }),
+    ).toBeUndefined();
+    expect(
+      overrideFor('ITEM_READY', {
+        ...DEFAULT_NOTIFICATION_RULES.ITEM_READY,
+        channels: channelsFor('ITEM_READY', { phones: true, screens: true }),
+      }),
+    ).toEqual({ channels: ['PAGER', 'WAITER_APP', 'POS', 'DASHBOARD', 'TABLET'] });
+    const changed = withRule({ ITEM_READY: { escalate: false } }, 'WATER_REQUEST', {
+      ...water,
+      repeat: 'NONE',
+    });
+    expect(changed).toEqual({ ITEM_READY: { escalate: false }, WATER_REQUEST: { repeat: 'NONE' } });
+    // Back to the factory rule.
+    expect(withRule(changed, 'ITEM_READY', DEFAULT_NOTIFICATION_RULES.ITEM_READY)).toEqual({
+      WATER_REQUEST: { repeat: 'NONE' },
+    });
   });
 });

@@ -473,7 +473,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
       vibration: vibrationFor(
         alert.type as NotificationEvent,
         alert.escalatedAt !== null,
-        settings.get('pagers.vibration'),
+        settings.get('notifications.rules'),
       ),
       sentAt: this.clock.now().toISOString(),
     };
@@ -506,7 +506,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
           vibration: vibrationFor(
             alert.type,
             alert.escalatedAt !== null,
-            settings.get('pagers.vibration'),
+            settings.get('notifications.rules'),
           ),
           sentAt: this.clock.now().toISOString(),
         },

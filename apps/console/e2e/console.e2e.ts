@@ -304,7 +304,7 @@ test.describe.serial('the web console', () => {
 
   test('[TBL-008] sends a takeaway order and shows its token', async () => {
     await page.getByRole('button', { name: t('pos.takeaway') }).click();
-    await expect(page.getByRole('heading', { name: t('pos.takeaway') })).toBeVisible();
+    await expect(page.getByRole('heading', { name: t('pos.takeaway'), exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Breads', exact: true }).click();
     await page.getByRole('button', { name: /^Butter Naan, / }).click();
     await page.getByLabel(t('pos.cart.customer')).fill('Anil');
@@ -1218,5 +1218,93 @@ test.describe.serial('the web console', () => {
     await expect(page.getByText(t('settings.dialog.saved', { name: service }))).toBeVisible();
     await expect(row(service).getByText(t('settings.values.on'), { exact: true })).toBeVisible();
     await expect(row(amber).getByText('8 minutes', { exact: true })).toBeVisible();
+  });
+
+  test('[NTF-002] [NTF-003] [PGR-006] [NTF-005] a manager sends water requests to the cashier too with a new pager text and buzz, changes N, then puts the factory rule back', async () => {
+    const water = t('alerts.type.WATER_REQUEST');
+    const n = t('settingItems.notifications.escalationSeconds.label');
+    const rule = (name: string) =>
+      page
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('heading', { level: 4, name, exact: true }) });
+    const changeWater = page.getByRole('button', {
+      name: t('notificationRules.row.changeLabel', { name: water }),
+      exact: true,
+    });
+    const pager = (text: string, vibration: 'TWO_SHORT' | 'THREE') =>
+      rule(water).getByText(
+        t('notificationRules.row.pager', {
+          text,
+          vibration: t(`notificationRules.vibration.${vibration}`),
+        }),
+        { exact: true },
+      );
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+
+    await page.getByRole('button', { name: t('login.signOut'), exact: true }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await page
+      .getByRole('navigation', { name: t('settings.pages.label') })
+      .getByRole('link', { name: t('settings.pages.notifications') })
+      .click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('notificationRules.title') }),
+    ).toBeVisible();
+    await expect(pager('T7 WATER', 'TWO_SHORT')).toBeVisible();
+    await expectAccessible(page);
+
+    // Water requests reach the cashier too; the pager says "T7 JAL" and buzzes three times.
+    await changeWater.click();
+    const dialog = page.getByRole('dialog', { name: water, exact: true });
+    await dialog
+      .getByRole('checkbox', { name: t('notificationRules.recipients.CASHIER'), exact: true })
+      .check();
+    await dialog
+      .getByLabel(new RegExp(`^${escape(t('notificationRules.dialog.pagerText'))}`))
+      .fill('{table} JAL');
+    await expect(
+      dialog.getByText(t('notificationRules.dialog.preview', { text: 'T7 JAL' })),
+    ).toBeVisible();
+    await dialog
+      .getByLabel(new RegExp(`^${escape(t('notificationRules.dialog.vibration'))}`))
+      .selectOption('THREE');
+    await expectAccessible(page);
+    await dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(
+      page.getByText(t('notificationRules.dialog.saved', { name: water })),
+    ).toBeVisible();
+    await expect(
+      rule(water).getByText(t('notificationRules.row.changed'), { exact: true }),
+    ).toBeVisible();
+    await expect(pager('T7 JAL', 'THREE')).toBeVisible();
+
+    // N goes from 60 to 90 seconds, and the rules that go on to the managers say so.
+    await page
+      .getByRole('button', { name: t('settings.row.changeLabel', { name: n }), exact: true })
+      .click();
+    const nDialog = page.getByRole('dialog', { name: n, exact: true });
+    await nDialog.getByLabel(new RegExp(`^${escape(n)}`)).fill('90');
+    await nDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(
+      rule(water).getByText(t('notificationRules.row.escalates', { after: '90 seconds' }), {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // Back to the factory rule.
+    await changeWater.click();
+    await dialog.getByRole('button', { name: t('notificationRules.dialog.useFactory') }).click();
+    await expect(dialog.getByText(t('notificationRules.dialog.factory'))).toBeVisible();
+    await dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(pager('T7 WATER', 'TWO_SHORT')).toBeVisible();
+    await expect(
+      rule(water).getByText(t('notificationRules.row.changed'), { exact: true }),
+    ).toHaveCount(0);
   });
 });

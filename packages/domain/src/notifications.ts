@@ -62,11 +62,17 @@ export const REPEAT_POLICIES = [
 ] as const;
 export type RepeatPolicy = (typeof REPEAT_POLICIES)[number];
 
+/** PGR-006: how a pager buzzes for an alert ⚙. */
+export const VIBRATION_PATTERNS = ['ONE_LONG', 'TWO_SHORT', 'THREE', 'ONE_SHORT'] as const;
+export type VibrationPattern = (typeof VIBRATION_PATTERNS)[number];
+
 export interface NotificationRule {
   readonly recipients: readonly RecipientKind[];
   readonly channels: readonly NotificationChannel[];
   /** What a pager shows; `{table}` and `{message}` are filled in. Null: no pager text. */
   readonly pagerText: string | null;
+  /** How the pager buzzes (PGR-006); an escalated alert always buzzes three times. */
+  readonly vibration: VibrationPattern;
   /** Unacknowledged after N seconds, the managers on duty are alerted too (NTF-005). */
   readonly escalate: boolean;
   readonly repeat: RepeatPolicy;
@@ -76,16 +82,21 @@ const rule = (
   recipients: readonly RecipientKind[],
   channels: readonly NotificationChannel[],
   pagerText: string | null,
+  vibration: VibrationPattern,
   escalate: boolean,
   repeat: RepeatPolicy,
-): NotificationRule => ({ recipients, channels, pagerText, escalate, repeat });
+): NotificationRule => ({ recipients, channels, pagerText, vibration, escalate, repeat });
 
-/** BRD Appendix C, the factory defaults (N = R = 60 s are settings). */
+/**
+ * BRD Appendix C, the factory defaults (N = R = 60 s are settings), with PGR-006's vibrations:
+ * ready = one long, a request = two short, the manager = three.
+ */
 export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, NotificationRule>> = {
   ORDER_PENDING_APPROVAL: rule(
     ['RESPONSIBLE_WAITER'],
     ['PAGER', 'WAITER_APP', 'POS'],
     '{table} NEW ORDER',
+    'TWO_SHORT',
     true,
     'UNTIL_ACKED',
   ),
@@ -93,6 +104,7 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['RESPONSIBLE_WAITER'],
     ['PAGER', 'WAITER_APP', 'TABLET'],
     '{table} READY',
+    'ONE_LONG',
     true,
     'UNTIL_ACKED',
   ),
@@ -100,6 +112,7 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['RESPONSIBLE_WAITER'],
     ['PAGER', 'WAITER_APP'],
     '{table} WATER',
+    'TWO_SHORT',
     true,
     'UNTIL_ACKED',
   ),
@@ -107,6 +120,7 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['RESPONSIBLE_WAITER'],
     ['PAGER', 'WAITER_APP'],
     '{table} WAITER',
+    'TWO_SHORT',
     true,
     'UNTIL_ACKED',
   ),
@@ -114,6 +128,7 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['RESPONSIBLE_WAITER', 'CASHIER'],
     ['PAGER', 'WAITER_APP', 'POS'],
     '{table} BILL',
+    'TWO_SHORT',
     true,
     'UNTIL_ACKED',
   ),
@@ -121,6 +136,7 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['MANAGERS_ON_DUTY'],
     ['POS', 'DASHBOARD', 'PAGER'],
     '{table} FOOD WAITING',
+    'THREE',
     false,
     'UNTIL_ACKED',
   ),
@@ -128,15 +144,24 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['SELECTED'],
     ['PAGER', 'WAITER_APP'],
     'MGR: {message}',
+    'THREE',
     false,
     'UNTIL_ACKED',
   ),
-  ORDER_CHANGED: rule(['STATION'], ['KDS', 'PRINTED_SLIP'], null, false, 'NONE'),
-  WAITER_UNREACHABLE: rule(['MANAGERS_ON_DUTY'], ['POS', 'DASHBOARD'], null, false, 'NONE'),
+  ORDER_CHANGED: rule(['STATION'], ['KDS', 'PRINTED_SLIP'], null, 'ONE_SHORT', false, 'NONE'),
+  WAITER_UNREACHABLE: rule(
+    ['MANAGERS_ON_DUTY'],
+    ['POS', 'DASHBOARD'],
+    null,
+    'THREE',
+    false,
+    'NONE',
+  ),
   DEVICE_LOW_BATTERY_OR_OFFLINE: rule(
     ['MANAGERS_ON_DUTY', 'WEARER'],
     ['DASHBOARD', 'WAITER_APP', 'PAGER'],
     'LOW BATTERY',
+    'ONE_SHORT',
     false,
     'ONCE_PER_STATE',
   ),
@@ -144,6 +169,7 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['MANAGERS_ON_DUTY', 'CASHIER'],
     ['POS', 'DASHBOARD'],
     null,
+    'ONE_SHORT',
     false,
     'UNTIL_RESOLVED',
   ),
@@ -151,20 +177,244 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
     ['OWNER', 'MANAGERS_ON_DUTY'],
     ['POS', 'DASHBOARD', 'CONTROL_PLANE'],
     null,
+    'ONE_SHORT',
     false,
     'DAILY',
   ),
-  LICENSE_STATE: rule(['OWNER', 'MANAGERS_ON_DUTY'], ['POS', 'DASHBOARD'], null, false, 'DAILY'),
+  LICENSE_STATE: rule(
+    ['OWNER', 'MANAGERS_ON_DUTY'],
+    ['POS', 'DASHBOARD'],
+    null,
+    'ONE_SHORT',
+    false,
+    'DAILY',
+  ),
 };
 
 /** A manager's change to one event's rule (NTF-002); anything left out keeps the default. */
 export type NotificationRuleOverride = Partial<NotificationRule>;
 
+/** A restaurant's changes to the factory rules, by event (the setting `notifications.rules`). */
+export type NotificationRuleOverrides = Readonly<
+  Partial<Record<NotificationEvent, NotificationRuleOverride>>
+>;
+
 export function effectiveRule(
   event: NotificationEvent,
-  overrides: Readonly<Partial<Record<NotificationEvent, NotificationRuleOverride>>> = {},
+  overrides: NotificationRuleOverrides = {},
 ): NotificationRule {
   return { ...DEFAULT_NOTIFICATION_RULES[event], ...overrides[event] };
+}
+
+/**
+ * Appendix C rows that say what always happens rather than an alert a manager shapes: the kitchen
+ * gets order changes on its screen and a printed slip from the order engine (P1-06, P1-07), and a
+ * waiter nobody can reach has their alerts go straight to the managers (NTF-007, NTF-009).
+ */
+export const FIXED_EVENTS: ReadonlySet<NotificationEvent> = new Set<NotificationEvent>([
+  'ORDER_CHANGED',
+  'WAITER_UNREACHABLE',
+]);
+
+/** Events about a table, whose pager text can name it with `{table}`. */
+export const TABLE_ALERTS: ReadonlySet<NotificationEvent> = new Set<NotificationEvent>([
+  'ORDER_PENDING_APPROVAL',
+  'ITEM_READY',
+  'WATER_REQUEST',
+  'WAITER_REQUEST',
+  'BILL_REQUEST',
+  'READY_NOT_COLLECTED',
+]);
+
+const TABLE_RECIPIENTS: readonly RecipientKind[] = [
+  'RESPONSIBLE_WAITER',
+  'SECTION_WAITERS',
+  'ALL_WAITERS',
+  'MANAGERS_ON_DUTY',
+  'CASHIER',
+];
+
+/**
+ * Whom a manager may choose for an event (NTF-002): the people the event can reach. A table's
+ * events go to its waiter, its section's waiters, every waiter, the managers or the cashier; a
+ * nudge to the waiters the manager picks; a device's to the managers, the cashier, the Owner and,
+ * for a pager, its wearer; the restaurant's own to the managers, the cashier and the Owner.
+ */
+export function recipientChoices(event: NotificationEvent): readonly RecipientKind[] {
+  if (TABLE_ALERTS.has(event)) return TABLE_RECIPIENTS;
+  switch (event) {
+    case 'MANAGER_NUDGE':
+      return ['SELECTED'];
+    case 'ORDER_CHANGED':
+      return ['STATION'];
+    case 'DEVICE_LOW_BATTERY_OR_OFFLINE':
+      return ['MANAGERS_ON_DUTY', 'WEARER', 'CASHIER', 'OWNER'];
+    default:
+      return ['MANAGERS_ON_DUTY', 'CASHIER', 'OWNER'];
+  }
+}
+
+/** The pager and the waiter app show the same alerts (WTR-006). */
+export const PHONE_CHANNELS: readonly NotificationChannel[] = ['PAGER', 'WAITER_APP'];
+/** The POS and the dashboard are one console; either shows what asks for the person (MGR-008). */
+export const SCREEN_CHANNELS: readonly NotificationChannel[] = ['POS', 'DASHBOARD'];
+
+/**
+ * What an event shows beyond people's devices, as its factory rule has it: the table's tablet for
+ * food ready, the kitchen's screen and slip, the vendor for disk and backups. Kept as it is.
+ */
+export function fixedChannels(event: NotificationEvent): readonly NotificationChannel[] {
+  return DEFAULT_NOTIFICATION_RULES[event].channels.filter(
+    (channel) => !PHONE_CHANNELS.includes(channel) && !SCREEN_CHANNELS.includes(channel),
+  );
+}
+
+/** Where a rule reaches people: on their pager and waiter app, on the POS and dashboard. */
+export interface RuleReach {
+  readonly phones: boolean;
+  readonly screens: boolean;
+}
+
+export function reachOf(rule: Pick<NotificationRule, 'channels'>): RuleReach {
+  return {
+    phones: rule.channels.some((channel) => PHONE_CHANNELS.includes(channel)),
+    screens: rule.channels.some((channel) => SCREEN_CHANNELS.includes(channel)),
+  };
+}
+
+/** An event's channels for a reach, with its fixed channels kept. */
+export function channelsFor(event: NotificationEvent, reach: RuleReach): NotificationChannel[] {
+  return [
+    ...(reach.phones ? PHONE_CHANNELS : []),
+    ...(reach.screens ? SCREEN_CHANNELS : []),
+    ...fixedChannels(event),
+  ];
+}
+
+/** How an event's alert may come back: its factory way, every R until acknowledged, or never. */
+export function repeatChoices(event: NotificationEvent): readonly RepeatPolicy[] {
+  return [
+    ...new Set<RepeatPolicy>([DEFAULT_NOTIFICATION_RULES[event].repeat, 'UNTIL_ACKED', 'NONE']),
+  ];
+}
+
+/** What an event's pager text may fill in: the table, or the manager's message. */
+export function pagerPlaceholders(event: NotificationEvent): readonly string[] {
+  if (event === 'MANAGER_NUDGE') return ['{message}'];
+  return TABLE_ALERTS.has(event) ? ['{table}'] : [];
+}
+
+export type RuleProblem =
+  | 'FIXED_EVENT'
+  | 'NO_RECIPIENT'
+  | 'RECIPIENT_NOT_ALLOWED'
+  | 'NO_CHANNEL'
+  | 'CHANNEL_NOT_ALLOWED'
+  | 'PAGER_TEXT_MISSING'
+  | 'PAGER_TEXT_TOO_LONG'
+  | 'PAGER_TEXT_PLACEHOLDER'
+  | 'PAGER_TEXT_NEEDS_MESSAGE'
+  | 'REPEAT_NOT_ALLOWED';
+
+/**
+ * What stops a rule from working for its event (NTF-002): nobody or somebody the event cannot reach,
+ * no pager, app or console to show it on, a pager with nothing to show or filling in what the event
+ * does not have (a nudge must keep `{message}`), or a repeat the event does not offer.
+ */
+export function ruleProblems(event: NotificationEvent, rule: NotificationRule): RuleProblem[] {
+  if (FIXED_EVENTS.has(event)) return ['FIXED_EVENT'];
+  const problems: RuleProblem[] = [];
+  const choices = recipientChoices(event);
+  if (rule.recipients.length === 0) problems.push('NO_RECIPIENT');
+  if (rule.recipients.some((kind) => !choices.includes(kind))) {
+    problems.push('RECIPIENT_NOT_ALLOWED');
+  }
+  const reach = reachOf(rule);
+  const fixed = fixedChannels(event);
+  if (!reach.phones && !reach.screens) problems.push('NO_CHANNEL');
+  if (
+    rule.channels.some(
+      (channel) =>
+        !PHONE_CHANNELS.includes(channel) &&
+        !SCREEN_CHANNELS.includes(channel) &&
+        !fixed.includes(channel),
+    ) ||
+    fixed.some((channel) => !rule.channels.includes(channel))
+  ) {
+    problems.push('CHANNEL_NOT_ALLOWED');
+  }
+  if (reach.phones) {
+    const text = rule.pagerText?.trim() ?? '';
+    const placeholders = pagerPlaceholders(event);
+    if (text === '') {
+      problems.push('PAGER_TEXT_MISSING');
+    } else {
+      if (text.length > PAGER_TEXT_MAX) problems.push('PAGER_TEXT_TOO_LONG');
+      // Whatever braces are left once the event's own placeholders are taken out would show on
+      // the pager as they are. Checked without a regular expression, which a text of many '{'
+      // could make slow.
+      const rest = placeholders.reduce(
+        (left, placeholder) => left.replaceAll(placeholder, ''),
+        text,
+      );
+      if (rest.includes('{') || rest.includes('}')) problems.push('PAGER_TEXT_PLACEHOLDER');
+      if (placeholders.includes('{message}') && !text.includes('{message}')) {
+        problems.push('PAGER_TEXT_NEEDS_MESSAGE');
+      }
+    }
+  }
+  if (!repeatChoices(event).includes(rule.repeat)) problems.push('REPEAT_NOT_ALLOWED');
+  return problems;
+}
+
+/** Every problem of a restaurant's changes, by event (the server refuses them, NTF-002). */
+export function overrideProblems(
+  overrides: NotificationRuleOverrides,
+): { readonly event: NotificationEvent; readonly problem: RuleProblem }[] {
+  return NOTIFICATION_EVENTS.filter((event) => overrides[event] !== undefined).flatMap((event) =>
+    ruleProblems(event, effectiveRule(event, overrides)).map((problem) => ({ event, problem })),
+  );
+}
+
+const sameMembers = <T>(a: readonly T[], b: readonly T[]) =>
+  a.length === b.length && a.every((value) => b.includes(value));
+
+/**
+ * The change from the factory rule that gives `rule`: only what differs, so what a manager left
+ * alone keeps following the factory rule. Undefined when it is the factory rule. Recipients are in
+ * the order of `recipientChoices`; channels are compared by reach.
+ */
+export function overrideFor(
+  event: NotificationEvent,
+  rule: NotificationRule,
+): NotificationRuleOverride | undefined {
+  const factory = DEFAULT_NOTIFICATION_RULES[event];
+  const reach = reachOf(rule);
+  const factoryReach = reachOf(factory);
+  const change: NotificationRuleOverride = {
+    ...(!sameMembers(rule.recipients, factory.recipients) && {
+      recipients: recipientChoices(event).filter((kind) => rule.recipients.includes(kind)),
+    }),
+    ...((reach.phones !== factoryReach.phones || reach.screens !== factoryReach.screens) && {
+      channels: channelsFor(event, reach),
+    }),
+    ...(rule.pagerText !== factory.pagerText && { pagerText: rule.pagerText }),
+    ...(rule.vibration !== factory.vibration && { vibration: rule.vibration }),
+    ...(rule.escalate !== factory.escalate && { escalate: rule.escalate }),
+    ...(rule.repeat !== factory.repeat && { repeat: rule.repeat }),
+  };
+  return Object.keys(change).length === 0 ? undefined : change;
+}
+
+/** The restaurant's changes with one event's rule set to `rule` (or back to the factory rule). */
+export function withRule(
+  overrides: NotificationRuleOverrides,
+  event: NotificationEvent,
+  rule: NotificationRule,
+): Partial<Record<NotificationEvent, NotificationRuleOverride>> {
+  const { [event]: _previous, ...others } = overrides;
+  const change = overrideFor(event, rule);
+  return change === undefined ? others : { ...others, [event]: change };
 }
 
 /** A pager line: at most 20 characters on the wrist display (PGR), in capitals as Appendix C. */
