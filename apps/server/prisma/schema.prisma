@@ -291,8 +291,8 @@ model DailyCounter {
 // ---------------------------------------------------------------- staff, access, devices
 
 model Role {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  restaurantId String    @map("restaurant_id") @db.Uuid
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  restaurantId        String    @map("restaurant_id") @db.Uuid
   /// Stable key: "MANAGER" for a built-in role, "custom:<id>" for a custom role (P4-02e).
   key                 String
   name                String
@@ -1261,9 +1261,19 @@ model ServiceRequest {
 
 /// @rp/domain RECOMMENDATION_LAYERS.
 enum RecommendationLayer {
+  PINNED
   RULE
   LEARNED
+  BOOSTED
   BEST_SELLER
+}
+
+/// @rp/contracts RECOMMENDATION_PREFERENCES.
+enum RecommendationPreferenceKind {
+  NORMAL
+  PIN
+  BOOST
+  BLOCK
 }
 
 /// @rp/contracts RECOMMENDATION_EVENT_KINDS.
@@ -1304,6 +1314,24 @@ model RecommendationRule {
 
   @@index([restaurantId, archivedAt])
   @@map("recommendation_rules")
+}
+
+/// How the manager wants a dish suggested (REC-009, P4-03c): pinned first, boosted before the best
+/// sellers, blocked never, or NORMAL. One row per dish, changed in place (back to NORMAL rather than
+/// deleted), each change in the audit log. It applies at once, without publishing the menu.
+model RecommendationPreference {
+  id           String                       @id @default(uuid(7)) @db.Uuid
+  restaurantId String                       @map("restaurant_id") @db.Uuid
+  itemId       String                       @map("item_id") @db.Uuid
+  preference   RecommendationPreferenceKind
+  /// The restaurant's own words shown with a pinned or boosted dish (a check constraint).
+  label        String?
+  updatedById  String?                      @map("updated_by_id") @db.Uuid
+  createdAt    DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([restaurantId, itemId])
+  @@map("recommendation_preferences")
 }
 
 /// What was done with a suggestion (REC-008): shown, opened or put in the cart (from the apps), or
