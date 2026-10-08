@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-08.
+Last updated: 2026-10-09.
 
 What exists:
 
@@ -104,8 +104,10 @@ What exists:
   firmware through the PC: the vendor's release downloaded and checked (the ESP-IDF image and its
   secure boot v2 signature against the keys built in), offered on each free pager's `ota` topic,
   downloaded with a one-time token, progress and rollbacks from the heartbeats, "Update now"
-  (P2-04b1, ADR-0018).
-  1151 tests (27 skipped: Windows only, a real install, or the performance runs).
+  (P2-04b1, ADR-0018); the Phase 7 exit scenarios S8, S9 and S10 against a real Control Plane
+  and across two PCs, and the backup keys of the PCs a PC was restored from, so the old PC's
+  archives still open in the archive viewer (P7-10).
+  1171 tests (27 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -265,9 +267,15 @@ What exists:
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
+Phase 7 is done (P7-10, 2026-10-09): S8, S9 and S10 pass on every build.
+
 Recommended next WPs (dependencies met):
 
-- P7-10 Phase 7 exit test (S8, S9, S10 automated).
+- P8-01 Load and capacity tests (the simulated load and its report; the lab rig's S1 needs a
+  person).
+- P8-03 Security hardening and penetration-test readiness (the external test needs the firm the
+  Business Owner engages).
+- P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -476,7 +484,7 @@ Recommended next WPs (dependencies met):
 - [x] P7-09 Digital bills
   - [x] P7-09a Digital bills at the Control Plane
   - [x] P7-09b Digital bills on the restaurant PC
-- [ ] P7-10 Phase 7 exit test
+- [x] P7-10 Phase 7 exit test (S8, S9, S10)
 
 ### Phase 8: Hardening and pilot
 
@@ -728,6 +736,40 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-09 (P7-10):
+
+682. The Phase 7 exit test is three integration files of the server's suite, run on every build:
+     `licence-exit` (S8) and `update-exit` (S9) against a real Control Plane in the same process,
+     and `data-exit` (S10) across two PCs (two databases and data folders) with the restore tool
+     between them. The clock moves with the process's `Date` (`vi.setSystemTime`) for the PC and
+     the Control Plane together, so the licence agent's clock guard never sees a clock set back
+     and the signed requests agree; the databases keep their own clocks, which these flows do not
+     compare.
+683. S8's internet outage is a TCP line between the PC and the Control Plane that the test cuts,
+     so the vendor's side goes on (its billing restricts the licence) while the PC judges the
+     grace over by itself, as on a real PC.
+684. S9 takes the updater's steps in TypeScript as `Invoke-RPUpdate` takes them: the services
+     stopped, `createUpdateSnapshot`, a new version that changes the database and never answers its
+     health check, the rollback request, `runPendingUpdateRollback` as the service host runs it,
+     the previous version started and answering `probeHealth`, the outcome file. The PowerShell
+     itself is covered by its Pester tests and the CI job "Windows installer" (`Test-Update.ps1`);
+     this scenario checks everything around it on every build: the agent's download, window and
+     backup, the reports, the Control Plane's automatic halt and fleet alert, and the next
+     morning's service.
+685. Found by S10: a PC restored from another PC's backup keeps its own backup key (decision 536),
+     so the archive viewer refused the old PC's archives, and decision 578's "open it on that PC"
+     is impossible once that PC is lost. The restore now keeps the backup's key, and the keys that
+     PC knew, in `system_meta` (`backups.earlier_keys`), sealed with a key derived from the new
+     PC's own backup key (HMAC), newest first, at most 20; the archive viewer opens a file with the
+     key its header names (`backupKeyFor`). They are for reading only: new backups and archives
+     use the PC's own key. A backup of the new PC carries them only for whoever holds its key,
+     who can read everything else in it already. Backups the old PC made are still restored with
+     the restore tool and the old recovery key (the one-click restore keeps refusing them and says
+     so).
+686. S10's history is made through the API on the days it happened (the clock set back to March
+     and April 2024), not with generated rows, because the audit chain must verify after the
+     purge and after the restore, and the generated rows' hashes are placeholders.
 
 Decided 2026-10-08 (P2-04b2), ADR-0019:
 
@@ -3588,6 +3630,75 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-09: P7-10 Phase 7 exit test, S8, S9, S10 (Phase 7 done)
+
+Built three scenarios in the server's integration suite (decisions 682-686):
+
+- `licence-exit.int.test.ts`, S8, 6 steps, a real Control Plane signing the licences and running
+  the billing, the PC behind a line the test cuts:
+  - active, a table served;
+  - an invoice unpaid: payment due, then grace with 7 days left, service as usual;
+  - offline, the grace runs out at 21:00: the PC judges it by itself (GRACE_ENDED), restricted from
+    04:00 tomorrow, and the evening's table is seated and sent to the kitchen;
+  - the next morning: new tables and orders refused (423 `LICENCE_RESTRICTED`); last night's table
+    billed and paid; the sales report, a CSV export and the full data export work;
+  - offline reactivation: the vendor's code read over the phone, typed in by the Owner, tables
+    again;
+  - online reactivation: the payment recorded, "Check now" takes the vendor's active licence,
+    which holds after the code's day; no tamper events.
+- `update-exit.int.test.ts`, S9, 5 steps, a real Control Plane publishing 1.2.0 to the channel:
+  - downloaded during the evening's service, waiting for the window;
+  - at 03:30 the backup and the hand-off, the vendor told it is installing;
+  - the updater's steps: database copied, 1.2.0 changes it and fails its health check, the
+    rollback request, the copy switched back as the service host does, 1.1.0 answers;
+  - the rollback recorded, audited and reported; the rollout halts by itself, the fleet shows
+    `UPDATE_FAILED`, the release is offered no more and the agent is idle;
+  - the next morning: last night's bill there, the failed version's changes gone (kept in
+    `<db>_failed_update` for support), a table served, the audit chain valid.
+- `data-exit.int.test.ts`, S10, 4 steps, one restaurant's history made through the API on the
+  days it happened (30 and 31 March, 1 April 2024, and today):
+  - FY 2023-24 archived to the USB drive, read back in full, purged; FY 2024-25 and today whole;
+    the purge audited and the audit chain valid;
+  - the archive viewer: the year's days, an invoice by date, as printed;
+  - a backup to the USB drive and the Owner's recovery key;
+  - the PC lost: the restore tool on a new PC with the recovery key; the same POS and PINs,
+    today's bill and payment, FY 2023-24 still purged, the next invoice number follows today's,
+    the audit chain valid, the new PC's own backup key, and the old PC's archive opening in the
+    archive viewer.
+
+Fixed (found by S10): after a restore onto a new PC the archive viewer refused the old PC's
+archives (`ARCHIVE_KEY_MISMATCH`). `src/backups/backup-keys.ts` keeps the earlier PCs' backup keys
+sealed in `system_meta`; `restoreBackup` carries them; `ArchiveViewerService` opens a file with
+the key its header names. Runbooks `backups.md` (step 6 on a new PC) and `data-lifecycle.md`.
+
+Also: `test/helpers/small-restaurant.ts` (a small menu and floor, a table's visit through the
+API); `@rp/control-plane/testing` exports `BillingService`, `LicencesService` and
+`ReleasesService`.
+
+Tests: server 1171 (+20, 27 skipped): the three scenarios (15), `backup-keys` unit (5). Format,
+build, contract docs, `contracts:compat`, lint, typecheck, every package's tests and the server's
+`test:coverage` pass. Traceability: Must 254/287, Should 18/24.
+
+Result: S8, S9 and S10 pass on every build; Phase 7's exit criterion ("licence and data
+scenarios S8 and S10 pass") is met, and S9 too.
+
+Not done or not verified:
+
+- The real S9 with the installer, the scheduled task and the TLS health check runs in the CI job
+  "Windows installer" on the first push (manual task 1, `gh` login); not run yet.
+- The licence keys are test keys: the vendor's KMS key and reactivation master secret are manual
+  task 23.
+
+Gotchas:
+
+- A POS allows only a few PIN sign-ins a minute (429 `RATE_LIMITED`); with `Date` frozen by
+  `vi.setSystemTime` the minute never ends, so sign each person in once per moment and reuse it.
+- `StartBackupResponse.run` has no file name yet (a backup gets its name after the read-back);
+  take it from `GET /backups` once `settled()`.
+- `POST /orders` answers 200, `POST /tables/:id/open` 201: the helper accepts any 2xx.
+- After changing `@rp/control-plane`'s `testing.ts`, build the Control Plane before the server's
+  tests (they import its `dist`).
 
 ### 2026-10-08: P2-04b2 Scan a pager's QR code with a camera (P2-04b done)
 

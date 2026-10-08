@@ -8,7 +8,8 @@ import type {
 } from '@rp/contracts';
 import { z } from 'zod';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
-import { backupKeyId, readBackupHeader } from '../backups/backup-file.js';
+import { readBackupHeader } from '../backups/backup-file.js';
+import { backupKeyFor } from '../backups/backup-keys.js';
 import { type InvoiceRow, invoiceView } from '../billing/invoices.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
@@ -28,7 +29,7 @@ const errors = {
     new AppError(
       422,
       'ARCHIVE_KEY_MISMATCH',
-      'This archive was made with another backup key (another PC). Open it on that PC, or ask support.',
+      'This archive was made with a backup key this PC does not know. Restore that PC’s backup here, or ask support.',
     ),
   invoiceNotFound: () =>
     new AppError(404, 'ARCHIVED_INVOICE_NOT_FOUND', 'There is no such invoice in this archive.'),
@@ -52,7 +53,10 @@ export class ArchiveViewerService {
     @Inject(SECRET_STORE) private readonly secrets: SecretStore,
   ) {}
 
-  /** The archive's file, checked to be there and to open with this PC's key. */
+  /**
+   * The archive's file, checked to be there and to open with this PC's key or the key of a PC
+   * this one was restored from (P7-10).
+   */
   private async open(id: string): Promise<{ file: string; key: Buffer; financialYear: string }> {
     const run = await this.prisma.archiveRun.findUnique({ where: { id } });
     if (run?.status !== 'DONE' || run.archiveFile === null) throw errors.notFound();
@@ -64,9 +68,9 @@ export class ArchiveViewerService {
       ))
     )
       throw errors.fileMissing(file);
-    const key = await this.secrets.get('backup-key');
     const header = await readBackupHeader(file);
-    if (header.keyId !== backupKeyId(key)) throw errors.otherKey();
+    const key = await backupKeyFor(this.prisma, await this.secrets.get('backup-key'), header.keyId);
+    if (key === undefined) throw errors.otherKey();
     return { file, key, financialYear: run.financialYear };
   }
 

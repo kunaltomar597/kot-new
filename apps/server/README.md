@@ -562,6 +562,21 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   `RP_SCENARIO_URL=... pnpm --filter @rp/server scenario:service-day`. See
   `test/scenario/real-install.scenario.test.ts` for the variables.
 
+## Phase 7 exit scenarios (P7-10)
+
+In the integration suite, on every build; the PC and a real Control Plane share the process's
+clock, which the scenarios move from day to day:
+
+- `test/integration/licence-exit.int.test.ts` (S8): overdue, grace, restricted from the next
+  business day, reactivation offline (a code) and online (paid), exports while restricted;
+- `test/integration/update-exit.int.test.ts` (S9): an update that fails its health check, the
+  updater's way back, the rollout halted, service the next morning;
+- `test/integration/data-exit.int.test.ts` (S10): archive-then-purge with its read-back, the
+  archive viewer, a backup restored on a new PC that still opens the old PC's archive
+  (`src/backups/backup-keys.ts`).
+
+`test/helpers/small-restaurant.ts` sets up their menu and floor and serves a table through the API.
+
 ## Windows services (P0-16b)
 
 On the restaurant PC the server runs under the **service host** (`src/service/service-host.ts`,
