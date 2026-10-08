@@ -89,12 +89,41 @@ export const PagerFirmwareOffer = z.object({
 });
 export type PagerFirmwareOffer = z.infer<typeof PagerFirmwareOffer>;
 
+/** A pager's serial, as on its label and its pairing screen: 4 to 32 letters, digits or dashes. */
+export const PagerSerial = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9-]{4,32}$/);
+export type PagerSerial = z.infer<typeof PagerSerial>;
+
+/**
+ * What a pager's QR code holds (PGR-012, P2-04b2): `RP-PAGER:<serial>`, shown on its pairing screen
+ * (P2-05) and printed on its label. Upper case, so the code uses QR's compact alphanumeric mode and
+ * stays readable on a small screen. A code with the bare serial (a supplier's label) is read too.
+ */
+export const PAGER_QR_PREFIX = 'RP-PAGER:';
+
+/** The text of a pager's QR code for its serial. */
+export function pagerQrText(serial: string): string {
+  return `${PAGER_QR_PREFIX}${serial}`;
+}
+
+/**
+ * The serial in a scanned QR code, or undefined when the code is not a pager's (a pairing code, a
+ * link, a table's code). The prefix may be in any case; spaces and line ends around it are ignored.
+ */
+export function pagerSerialFromQr(text: string): PagerSerial | undefined {
+  const trimmed = text.trim();
+  const serial = trimmed.toUpperCase().startsWith(PAGER_QR_PREFIX)
+    ? trimmed.slice(PAGER_QR_PREFIX.length)
+    : trimmed;
+  const parsed = PagerSerial.safeParse(serial);
+  return parsed.success ? parsed.data : undefined;
+}
+
 /** PGR-012: register a pager from its serial (the QR on its back) and optionally assign it. */
 export const CreatePagerRequest = z.strictObject({
-  serial: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z0-9-]{4,32}$/),
+  serial: PagerSerial,
   name: z.string().trim().min(1).max(60),
   staffId: Id.nullable(),
 });

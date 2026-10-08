@@ -74,7 +74,8 @@ export function certificateVerdict(
 
 /**
  * Permissions the console may have: notifications (alerts on the POS) and the camera for scanning
- * a pager's QR code (P2-04b), from its own server only. Everything else is refused.
+ * a pager's QR code (P2-04b2), from its own server only. Everything else is refused, the
+ * microphone included: `media` is the camera only (`mediaTypes`, Electron's `video` or `audio`).
  */
 const ALLOWED_PERMISSIONS = new Set(['notifications', 'media', 'clipboard-sanitized-write']);
 
@@ -82,7 +83,9 @@ export function isAllowedPermission(
   permission: string,
   requestingUrl: string,
   consoleUrl: string,
+  mediaTypes: readonly string[] = [],
 ): boolean {
+  if (permission === 'media' && mediaTypes.includes('audio')) return false;
   return ALLOWED_PERMISSIONS.has(permission) && isAllowedNavigation(requestingUrl, consoleUrl);
 }
 

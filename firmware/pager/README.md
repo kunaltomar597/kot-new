@@ -8,6 +8,19 @@ encryption in production.
 Built by: P0-H1 (battery prototype), P2-05 (production firmware). Not started yet.
 Outside the pnpm workspace; built with the ESP-IDF Docker image in CI.
 
+## The pairing screen's QR code (P2-04b2)
+
+The manager registers a pager on the Pagers page by its serial: typed, typed by a barcode scanner,
+or read from the pager's QR code with a phone's or the PC's camera (PGR-012, ADR-0019). P2-05's
+pairing screen and the printed label must show:
+
+- the QR code of `RP-PAGER:<serial>` (`pagerQrText` in `packages/contracts/src/pagers.ts`), error
+  correction M, with its four-module quiet zone. Use an upper-case serial of 4 to 32 letters,
+  digits or dashes; up to 11 characters keep it at version 1 (21 modules);
+- the serial in text under it, for typing.
+
+A bare serial in a supplier's QR code is read too.
+
 ## Over-the-air updates: what the server already does (P2-04b1)
 
 The restaurant PC passes on firmware the vendor releases in the Control Plane (PGR-011, ADR-0018,

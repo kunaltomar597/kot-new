@@ -65,6 +65,17 @@ never at a restaurant.
     password and authenticator code). Within 30 minutes uninstall with the box ticked: the data
     folder is deleted.
 
+Before step 11, if the PC has a webcam (P2-04b2, PGR-012):
+
+- **The camera reads a pager's QR code.** On the POS window: Manage → Staff → Pagers → Register a
+  pager → Scan the QR code. Windows asks nothing (the shell allows the camera to its own server
+  only); the camera picture appears with a square. Open `manual-tasks/assets/pager-qr-test.svg` on
+  the phone and hold it inside the square: the Serial field shows `TEST-0001`. Press Cancel (do
+  not register it). Then on the phone's browser (step 5), sign in as a manager and do the same
+  with the phone's back camera, holding it to the same code shown on the PC's screen. If the phone
+  says the camera cannot be used on this page, install the LAN CA on it
+  (`docs/runbooks/lan-tls.md`) and try again.
+
 If something fails, the logs are in `C:\ProgramData\RestaurantPlatform\setup-logs\` (install,
 repair), `%TEMP%\RestaurantPlatform-uninstall-*.log` (uninstall) and the data folder's `logs\`.
 Zip them and give them to Claude with the results.
@@ -91,5 +102,6 @@ Update over an older version: done / not tried; kept the data: yes / no
 Uninstall kept the data folder: yes / no; services removed: yes / no
 Install again found the data: yes / no
 Delete without permission refused: yes / no; with permission deleted: yes / no
+Camera read the test pager code: PC webcam yes / no / no webcam; phone yes / no (message shown: ...)
 Anything odd (messages, slow steps, the drive page's texts):
 ```

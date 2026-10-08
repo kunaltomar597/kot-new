@@ -376,13 +376,19 @@ Split (2026-10-05):
     15-minute token); progress and rollbacks from the heartbeat's `ota`.
   - The Pagers page: the firmware served, a release on its way or refused, each pager's update
     and "Update now" (`UPDATE_INSTALL_NOW`, audited).
-- **P2-04b2 Scan a pager's QR code with a camera on the Pagers page (PGR-012).** The serial is
-  typed or scanned with a barcode scanner today (P4-02b). Add a "Scan" button in the register
-  dialog that reads the pager's QR code with the device's camera (a phone browser, or the PC's
-  camera in the Electron shell, which allows the camera for its own server, decision 604). Windows
-  Chromium has no `BarcodeDetector`, so it needs a small decoder library (licence check, ADR if it
-  is a new kind of dependency). The QR content format is set with P2-05's pairing screen; accept
-  the bare serial too.
+- **P2-04b2 Scan a pager's QR code with a camera on the Pagers page (PGR-012) (done,
+  ADR-0019).** As built:
+  - `@rp/contracts`: a pager's QR code holds `RP-PAGER:<serial>` (`PAGER_QR_PREFIX`,
+    `pagerQrText`, `pagerSerialFromQr`, `PagerSerial`); a bare serial is read too. P2-05 shows it
+    on the pairing screen and the label (`firmware/pager/README.md`).
+  - `@rp/ui-web` `QrScanner`: the device's camera (video only, the back camera on a phone), frames
+    decoded with `jsqr` (Windows Chromium has no `BarcodeDetector`), light-on-dark codes too, the
+    camera off when it unmounts, and a `CameraProblem` the screen explains; `hasCameraApi`.
+  - console: "Scan the QR code" in the register dialog where the browser has a camera; another
+    code is "not a pager's" and scanning goes on; the serial read lands in its field. A barcode
+    scanner typing the whole code leaves the serial.
+  - The Electron shell grants the camera without the microphone. Manual task 14 checks the PC's
+    webcam and a phone.
 
 ## P2-05 Pager firmware
 

@@ -66,6 +66,13 @@ describe('[SEC-011] the shell’s hardening', () => {
     expect(isAllowedPermission('geolocation', CONSOLE, CONSOLE)).toBe(false);
     expect(isAllowedPermission('notifications', 'https://example.com/', CONSOLE)).toBe(false);
   });
+
+  it('[PGR-012] gives the console the camera for QR codes, never the microphone', () => {
+    expect(isAllowedPermission('media', CONSOLE, CONSOLE, ['video'])).toBe(true);
+    expect(isAllowedPermission('media', CONSOLE, CONSOLE, ['audio'])).toBe(false);
+    expect(isAllowedPermission('media', CONSOLE, CONSOLE, ['video', 'audio'])).toBe(false);
+    expect(isAllowedPermission('media', 'https://example.com/', CONSOLE, ['video'])).toBe(false);
+  });
 });
 
 describe('[NFR-A04] starting with the PC', () => {

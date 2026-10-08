@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-05.
+Last updated: 2026-10-08.
 
 What exists:
 
@@ -50,7 +50,7 @@ What exists:
   and its download, and the builds on the System page (P7-04e2); pager firmware: the
   `PAGER_FIRMWARE` release component, what the heartbeat says and hears about it, the offer on the
   pager's own `ota` topic and its answer in the pager's heartbeat, and the Pagers page's firmware
-  with "Update now" (P2-04b1). 949 tests.
+  with "Update now" (P2-04b1); a pager's QR code, `RP-PAGER:<serial>` (P2-04b2). 955 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -227,7 +227,8 @@ What exists:
   older than its server that loads the new one (P7-04d); the phone and tablet app versions the PC
   serves, or a damaged one, on the System page (P7-04e2); on the Pagers page, the firmware this PC
   passes on to its pagers, a release on its way or refused, each pager's update and "Update now"
-  (P2-04b1). 376 tests, and 23 Playwright steps.
+  (P2-04b1); registering a pager by reading its QR code with the device's camera (P2-04b2; the
+  Playwright run scans one through Chromium's fake camera). 383 tests, and 23 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -238,7 +239,8 @@ What exists:
   16.15 and WinSW 2.12 pinned by SHA-256, and hooks that run the set-up scripts on install,
   update, repair and uninstall; it keeps itself for going back after a failed update (P7-04c).
   The release's APKs with `apps.json` in the payload's `apps` folder (`package:stage --apk`,
-  P7-04e2). 39 tests without Electron; the CI job "Windows installer" builds,
+  P7-04e2). The camera for the console without the microphone (P2-04b2). 40 tests without
+  Electron; the CI job "Windows installer" builds,
   installs, kills the server, repairs and uninstalls on `windows-latest`.
 - `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
   5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
@@ -255,8 +257,9 @@ What exists:
   error mapping, and the resuming Socket.io connection) (P0-14a).
 - `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
   React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
-  Storybook 10 workbench (P0-13, ADR-0009); QR codes drawn in the browser (P4-02a, ADR-0014).
-  ui-web 102 tests.
+  Storybook 10 workbench (P0-13, ADR-0009); QR codes drawn in the browser (P4-02a, ADR-0014);
+  `QrScanner`, QR codes read with the device's camera and jsQR (P2-04b2, ADR-0019).
+  ui-web 120 tests.
 - CI security baseline: secret scan, dependency audit, licence policy, SBOM, CodeQL, Dependabot,
   generated OpenAPI/AsyncAPI docs (P0-06, ADR-0010).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
@@ -264,7 +267,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P2-04b2 Scan a pager's QR code with a camera on the Pagers page.
 - P7-10 Phase 7 exit test (S8, S9, S10 automated).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -342,10 +344,11 @@ Recommended next WPs (dependencies met):
 - [x] P2-03a Notification engine core
 - [x] P2-03b Nudges, breaks, device, printer and system alerts
 - [x] P2-04a Pager broker, credentials, delivery and heartbeats
-- [ ] P2-04b Pager firmware OTA distribution
+- [x] P2-04b Pager firmware OTA distribution and QR pairing
   - [x] P2-04b1 Firmware distribution through the PC (the pager's side is P2-05; the signing key
         is manual task 30)
-  - [ ] P2-04b2 Scan a pager's QR code with a camera on the Pagers page
+  - [x] P2-04b2 Scan a pager's QR code with a camera on the Pagers page (the PC's webcam and a
+        phone: manual task 14)
 - [ ] P2-05 Pager firmware [H]
 - [x] P2-06a Alerts in the waiter app
 - [x] P2-06b Background alerts on Android
@@ -725,6 +728,26 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-08 (P2-04b2), ADR-0019:
+
+677. A pager's QR code holds `RP-PAGER:<serial>` (upper case, so QR's alphanumeric mode keeps it
+     small). A bare serial (a supplier's label) is read too; any other code is "not a pager's"
+     and the camera keeps looking. P2-05 shows it on the pairing screen and prints it on the
+     label (`firmware/pager/README.md`). A barcode scanner that types the whole code into the
+     serial field leaves only the serial.
+678. QR codes are decoded with jsQR (Apache-2.0) in every browser rather than `BarcodeDetector`,
+     which Windows Chromium (the shell on the PC) lacks: frames at most 640 px every 150 ms,
+     dark-on-light and light-on-dark, no worker and no WebAssembly, so the console's CSP stays as
+     it is. The camera component is `@rp/ui-web` `QrScanner`, next to `QrCode`.
+679. "Scan the QR code" shows only where the browser has a camera API (a secure context: the
+     console over HTTPS or on the PC itself). A blocked, missing, busy or failed camera is
+     explained and the serial can still be typed. The camera turns off when the code is read,
+     scanning stops or the dialog closes; the serial read is put in its field, which takes focus.
+680. The Electron shell grants the console the camera without the microphone: a `media` request
+     or check that includes audio is refused.
+681. The console's Playwright run gives Chromium a fake camera showing a pager's QR code (a Y4M
+     written by `e2e/fake-camera.ts`), so the e2e registers its pager by scanning.
 
 Decided 2026-10-05 (P2-04b1), ADR-0018:
 
@@ -3565,6 +3588,57 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-08: P2-04b2 Scan a pager's QR code with a camera (P2-04b done)
+
+Built registering a pager by reading its QR code with the device's camera on the Pagers page
+(PGR-012; ADR-0019; decisions 677-681):
+
+- `@rp/contracts` `pagers.ts`: `PagerSerial` (now used by `CreatePagerRequest`, the same rule),
+  `PAGER_QR_PREFIX`, `pagerQrText`, `pagerSerialFromQr`. The OpenAPI document names
+  `PagerSerial`; the schema is unchanged.
+- `@rp/ui-web`: `QrScanner` (the camera into a video, frames drawn on a canvas and decoded with
+  `jsqr` 1.4.0, the camera off on unmount, a mirrored preview for a webcam, `CameraProblem`),
+  `browserQrCamera`, `hasCameraApi`, `decodeQr`, `frameSize`, `cameraProblemOf`; the `scan` icon;
+  styles in `qr.css`; a workbench story with the real camera.
+- console: the register dialog's "Scan the QR code", "not a pager's code", the serial read into
+  its field, the camera's problems in words (`pagers.scan.*`); `serialTyped` for barcode scanners
+  that type the whole code.
+- desktop: `isAllowedPermission` refuses `media` with audio; the shell passes Electron's
+  `mediaTypes` and `mediaType`.
+- docs: ADR-0019, the ARCHITECTURE table, `firmware/pager/README.md` (what P2-05's pairing screen
+  shows), the phase spec, the READMEs, manual task 14's camera check with
+  `manual-tasks/assets/pager-qr-test.svg` (`RP-PAGER:TEST-0001`).
+
+Tests:
+
+- contracts 955 (+6, with the `PagerSerial` snapshot);
+- ui-web 120 (+17): codes drawn by `uqr` decoded by jsQR, light on dark too; the browser camera
+  with `getUserMedia`, `play` and the canvas stubbed; the component with a fake camera;
+- console 383 (+7): the dialog through the real `browserQrCamera` with stubbed browser APIs, and
+  the view helpers;
+- desktop 40 (+1);
+- Playwright: the console's pager step now scans `RP-PAGER:WP-0101` through Chromium's fake camera
+  (`--use-file-for-fake-video-capture`); 24 of 24 pass.
+
+Format, build, contract docs, `contracts:compat`, licences, lint, typecheck, the tests of every
+package (server 1151, 27 skipped) and `test:coverage` of every touched package pass. The console
+bundle grew by 135 kB (jsQR); the QR menu's and the vendor web app's builds hold no jsQR.
+
+Not done or not verified:
+
+- No real camera has read a pager's code: manual task 14 checks the PC's webcam in the shell and a
+  phone's browser. The pager's own pairing screen comes with P2-05.
+
+Gotchas:
+
+- The sandboxed shell sets `PLAYWRIGHT_BROWSERS_PATH` to an empty cache; run the console e2e with
+  `PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright"`. A `-g` filter on one console
+  e2e test fails because the steps share one browser context; run the whole file.
+- jsQR is CommonJS with `exports.default` (and `jsQR.default = jsQR`): import the default and use
+  `.default`, which works under Node and Vite alike.
+- jsdom has no `navigator.mediaDevices`; tests define it with `Object.defineProperty` and remove it
+  with `Reflect.deleteProperty` (stubbing the whole `navigator` breaks user-event).
 
 ### 2026-10-05: P2-04b1 Pager firmware through the restaurant PC
 

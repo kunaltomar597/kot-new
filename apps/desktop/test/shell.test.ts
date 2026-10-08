@@ -223,9 +223,20 @@ describe('[NFR-A04] [SEC-011] the Electron shell', () => {
     const granted: boolean[] = [];
     h.request()({}, 'geolocation', (value) => granted.push(value), { requestingUrl: CONSOLE });
     h.request()({}, 'notifications', (value) => granted.push(value), { requestingUrl: CONSOLE });
-    expect(granted).toEqual([false, true]);
-    expect(h.check()({}, 'media', 'https://127.0.0.1:8080')).toBe(true);
-    expect(h.check()({}, 'media', 'https://example.com')).toBe(false);
+    // The camera for a pager's QR code (P2-04b2), never the microphone.
+    const media = (mediaTypes: string[]) => {
+      h.request()({}, 'media', (value) => granted.push(value), {
+        requestingUrl: CONSOLE,
+        mediaTypes,
+      });
+    };
+    media(['video']);
+    media(['audio']);
+    expect(granted).toEqual([false, true, true, false]);
+    expect(h.check()({}, 'media', 'https://127.0.0.1:8080', { mediaType: 'video' })).toBe(true);
+    expect(h.check()({}, 'media', 'https://127.0.0.1:8080', { mediaType: 'audio' })).toBe(false);
+    expect(h.check()({}, 'media', 'https://127.0.0.1:8080', {})).toBe(true);
+    expect(h.check()({}, 'media', 'https://example.com', { mediaType: 'video' })).toBe(false);
     const verdicts: number[] = [];
     const verdict = (hostname: string, data: string) => {
       h.certificate()({ hostname, errorCode: -202, certificate: { data } }, (value) =>

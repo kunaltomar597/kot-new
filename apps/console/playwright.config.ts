@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
+import { fakeCameraShowing } from './e2e/fake-camera.js';
 
 // Cloud sessions ship a Chromium build that may be older than this Playwright's: use it directly.
 // CI installs the matching browser instead (`playwright install chromium`).
@@ -22,7 +23,16 @@ export default defineConfig({
   reporter: process.env.CI === undefined ? 'list' : [['list'], ['html', { open: 'never' }]],
   use: {
     trace: 'retain-on-failure',
-    ...(chromium !== undefined && { launchOptions: { executablePath: chromium } }),
+    launchOptions: {
+      ...(chromium !== undefined && { executablePath: chromium }),
+      // The camera shows the QR code of the pager the e2e test registers (P2-04b2), allowed
+      // without asking.
+      args: [
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+        `--use-file-for-fake-video-capture=${fakeCameraShowing('RP-PAGER:WP-0101')}`,
+      ],
+    },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

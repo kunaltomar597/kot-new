@@ -14,6 +14,7 @@ export * from './components/Money.js';
 export * from './components/NumberPad.js';
 export * from './components/PinPad.js';
 export * from './components/QrCode.js';
+export * from './components/QrScanner.js';
 export * from './components/QuantityStepper.js';
 export * from './components/Select.js';
 export * from './components/Spinner.js';

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   batteryOf,
+  cameraProblemKey,
   checkPager,
   createPagerRequestOf,
   mayUpdateNow,
   pagerStateOf,
+  serialTyped,
   suggestedName,
   wearersFor,
 } from '../src/manage/staff/pagers-view.js';
@@ -32,6 +34,20 @@ describe('[PGR-012] registering a pager', () => {
       staffId: null,
     });
     expect(createPagerRequestOf({ ...form, staffId: RAVI }).staffId).toBe(RAVI);
+  });
+
+  it('keeps only the serial when a barcode scanner types a pager’s whole QR code', () => {
+    // A scanner types one key at a time; the prefix goes as soon as it is complete.
+    expect(serialTyped('RP-PAGER')).toBe('RP-PAGER');
+    expect(serialTyped('RP-PAGER:')).toBe('');
+    expect(serialTyped('rp-pager:WP-0002')).toBe('WP-0002');
+    expect(serialTyped('WP-0002')).toBe('WP-0002');
+  });
+
+  it('says what to do for each camera problem', () => {
+    expect(
+      (['UNSUPPORTED', 'DENIED', 'NO_CAMERA', 'BUSY', 'FAILED'] as const).map(cameraProblemKey),
+    ).toEqual(['unsupported', 'denied', 'noCamera', 'busy', 'failed']);
   });
 });
 

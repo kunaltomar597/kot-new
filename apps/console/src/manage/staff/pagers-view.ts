@@ -1,11 +1,13 @@
 import {
   CreatePagerRequest,
+  PAGER_QR_PREFIX,
   type PagerFirmwarePagerView,
   type ServedPagerFirmware,
   type PagerView,
   type StaffView,
 } from '@rp/contracts';
 import { pagerWarning } from '@rp/domain';
+import type { CameraProblem } from '@rp/ui-web';
 
 /** Pagers (P4-02b, PGR-012 to PGR-014): the register form and what a pager's row says. */
 
@@ -38,6 +40,40 @@ export function checkPager(form: PagerForm): Partial<Record<PagerField, PagerPro
   }
   if (!CreatePagerRequest.shape.name.safeParse(form.name).success) problems.name = 'nameRequired';
   return problems;
+}
+
+/**
+ * The serial field's text after a change. A barcode scanner that reads a pager's QR code types its
+ * whole text, `RP-PAGER:<serial>`, one key at a time: the field keeps only the serial.
+ */
+export function serialTyped(text: string): string {
+  return text.toUpperCase().startsWith(PAGER_QR_PREFIX) ? text.slice(PAGER_QR_PREFIX.length) : text;
+}
+
+/** What the register dialog's camera is doing (P2-04b2). */
+export type PagerScan =
+  | { readonly kind: 'OFF' }
+  /** `notPager`: the last code read was someone else's (a pairing code, a table's code). */
+  | { readonly kind: 'SCANNING'; readonly notPager: boolean }
+  | { readonly kind: 'READ'; readonly serial: string }
+  | { readonly kind: 'PROBLEM'; readonly problem: CameraProblem };
+
+/** The i18n key under `pagers.scan` that says what to do when the camera cannot scan. */
+export function cameraProblemKey(
+  problem: CameraProblem,
+): 'unsupported' | 'denied' | 'noCamera' | 'busy' | 'failed' {
+  switch (problem) {
+    case 'UNSUPPORTED':
+      return 'unsupported';
+    case 'DENIED':
+      return 'denied';
+    case 'NO_CAMERA':
+      return 'noCamera';
+    case 'BUSY':
+      return 'busy';
+    case 'FAILED':
+      return 'failed';
+  }
 }
 
 export function createPagerRequestOf(form: PagerForm): CreatePagerRequest {
