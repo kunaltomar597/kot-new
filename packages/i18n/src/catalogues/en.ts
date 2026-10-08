@@ -840,7 +840,8 @@ export const en = {
     form: {
       title: 'Register a pager',
       serial: 'Serial',
-      serialHint: 'On the pager’s label or its pairing screen. A barcode scanner can type it here.',
+      serialHint:
+        'On the pager’s label or its pairing screen. Scan its QR code, or type it; a barcode scanner can type it here.',
       serialInvalid: 'Use 4 to 32 letters, digits or dashes.',
       name: 'Name',
       nameHint: 'What people call it, like “Pager 3”.',
@@ -850,6 +851,23 @@ export const en = {
       nobody: 'Nobody yet',
       register: 'Register',
       cancel: 'Cancel',
+    },
+    scan: {
+      start: 'Scan the QR code',
+      again: 'Scan again',
+      stop: 'Stop scanning',
+      camera: 'Camera for the pager’s QR code',
+      hold: 'Hold the pager’s QR code inside the square.',
+      read: 'Serial {serial} read from the QR code.',
+      notPager:
+        'That QR code is not a pager’s. Show the code on the pager’s pairing screen or its label.',
+      unsupported:
+        'This browser cannot use a camera on this page. Open the console at its secure (https) address, or type the serial.',
+      denied:
+        'The camera is blocked. Allow it for this page in the browser’s settings, or type the serial.',
+      noCamera: 'No camera was found on this device. Type the serial instead.',
+      busy: 'Another app is using the camera. Close it and scan again, or type the serial.',
+      failed: 'The camera did not start. Scan again, or type the serial.',
     },
     giveDialog: {
       title: 'Give {pager} to',

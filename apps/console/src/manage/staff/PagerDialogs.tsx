@@ -1,22 +1,31 @@
-import type { PagerCredentialResponse, PagerView, StaffView } from '@rp/contracts';
-import { Button, Dialog, Select, TextField } from '@rp/ui-web';
-import { useId, useState } from 'react';
+import {
+  type PagerCredentialResponse,
+  pagerSerialFromQr,
+  type PagerView,
+  type StaffView,
+} from '@rp/contracts';
+import { Button, Dialog, hasCameraApi, Icon, QrScanner, Select, TextField } from '@rp/ui-web';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
 import {
+  cameraProblemKey,
   checkPager,
   createPagerRequestOf,
   type PagerField,
   type PagerForm,
+  type PagerScan,
+  serialTyped,
   suggestedName,
   wearersFor,
 } from './pagers-view.js';
 
 /**
- * Registers a pager from the serial on its label or pairing screen (PGR-012; a barcode scanner
- * types into the field like a keyboard), optionally giving it to someone at once. The server
- * answers with the pager's credential, shown next and only once.
+ * Registers a pager from the serial on its label or pairing screen (PGR-012), optionally giving it
+ * to someone at once. The serial is typed, typed by a barcode scanner like a keyboard, or read
+ * from the pager's QR code with this device's camera (a phone, or the PC's webcam in the shell;
+ * P2-04b2). The server answers with the pager's credential, shown next and only once.
  */
 export function RegisterPagerDialog({
   pagers,
@@ -40,6 +49,9 @@ export function RegisterPagerDialog({
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  const [canScan] = useState(hasCameraApi);
+  const [scan, setScan] = useState<PagerScan>({ kind: 'OFF' });
+  const serialField = useRef<HTMLInputElement>(null);
   const problems = checkPager(form);
   const problemOf = (field: PagerField) => {
     const problem = problems[field];
@@ -59,6 +71,21 @@ export function RegisterPagerDialog({
       setError(messageOf(failure, t));
       setBusy(false);
     }
+  };
+
+  // A serial read from the camera lands in its field, so the person sees what was read.
+  useEffect(() => {
+    if (scan.kind === 'READ') serialField.current?.focus();
+  }, [scan]);
+
+  const scanned = (text: string) => {
+    const serial = pagerSerialFromQr(text);
+    if (serial === undefined) {
+      setScan({ kind: 'SCANNING', notPager: true });
+      return;
+    }
+    setForm((current) => ({ ...current, serial }));
+    setScan({ kind: 'READ', serial });
   };
 
   return (
@@ -97,11 +124,61 @@ export function RegisterPagerDialog({
           spellCheck={false}
           required
           data-autofocus
+          ref={serialField}
           error={problemOf('serial')}
           onChange={(event) => {
-            setForm((current) => ({ ...current, serial: event.target.value }));
+            const serial = serialTyped(event.target.value);
+            setForm((current) => ({ ...current, serial }));
           }}
         />
+        {canScan ? (
+          <div className="pager-scan">
+            {scan.kind === 'SCANNING' ? (
+              <>
+                <QrScanner
+                  label={t('pagers.scan.camera')}
+                  onRead={scanned}
+                  onProblem={(problem) => {
+                    setScan({ kind: 'PROBLEM', problem });
+                  }}
+                />
+                <p role="status" className="pager-scan__status">
+                  {scan.notPager ? t('pagers.scan.notPager') : t('pagers.scan.hold')}
+                </p>
+              </>
+            ) : null}
+            {scan.kind === 'READ' ? (
+              <p role="status" className="pager-scan__status">
+                {t('pagers.scan.read', { serial: scan.serial })}
+              </p>
+            ) : null}
+            {scan.kind === 'PROBLEM' ? (
+              <p role="alert" className="console-notice console-notice--warning">
+                {t(`pagers.scan.${cameraProblemKey(scan.problem)}`)}
+              </p>
+            ) : null}
+            {scan.kind === 'SCANNING' ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setScan({ kind: 'OFF' });
+                }}
+              >
+                {t('pagers.scan.stop')}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                startIcon={<Icon name="scan" />}
+                onClick={() => {
+                  setScan({ kind: 'SCANNING', notPager: false });
+                }}
+              >
+                {scan.kind === 'OFF' ? t('pagers.scan.start') : t('pagers.scan.again')}
+              </Button>
+            )}
+          </div>
+        ) : null}
         <TextField
           label={t('pagers.form.name')}
           hint={t('pagers.form.nameHint')}

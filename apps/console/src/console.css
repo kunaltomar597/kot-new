@@ -1168,6 +1168,18 @@ body {
   gap: var(--rp-space-2);
 }
 
+/* Reading a pager's QR code with the camera in the register dialog (P2-04b2, PGR-012). */
+.pager-scan {
+  display: grid;
+  gap: var(--rp-space-2);
+  justify-items: start;
+}
+
+.pager-scan__status {
+  margin: 0;
+  color: var(--rp-color-text-muted);
+}
+
 /* A pager's credential, shown once (P4-02b, SEC-012). */
 .pager-credential {
   display: grid;

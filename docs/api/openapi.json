@@ -15511,7 +15511,7 @@
       "CreatePagerRequest": {
         "type": "object",
         "properties": {
-          "serial": { "type": "string", "pattern": "^[A-Za-z0-9-]{4,32}$" },
+          "serial": { "$ref": "#/components/schemas/PagerSerial" },
           "name": { "type": "string", "minLength": 1, "maxLength": 60 },
           "staffId": { "anyOf": [{ "$ref": "#/components/schemas/Id" }, { "type": "null" }] }
         },
@@ -20651,6 +20651,7 @@
         "required": ["deviceId"],
         "additionalProperties": false
       },
+      "PagerSerial": { "type": "string", "pattern": "^[A-Za-z0-9-]{4,32}$" },
       "PagerView": {
         "type": "object",
         "properties": {

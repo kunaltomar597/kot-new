@@ -4,7 +4,8 @@ The window on the restaurant PC that opens the console from its own server (P0-1
 
 - **Hardened (SEC-011).** Context isolation and the sandbox, no Node.js, no preload and no IPC.
   It navigates only to the server on this PC and opens no other windows. Permissions are limited
-  to notifications and the camera (for scanning a pager's QR code), for the console only.
+  to notifications and the camera (for scanning a pager's QR code, P2-04b2; never the
+  microphone), for the console only.
 - **The server's certificate.** The server on this PC uses the installation's own CA (ADR-0011),
   which Windows does not know. On a loopback address the shell trusts a certificate signed by
   that CA (the server's `ca.crt`) and refuses any other, so another program on the PC cannot pass

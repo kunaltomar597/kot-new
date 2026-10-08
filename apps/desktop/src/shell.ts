@@ -55,11 +55,16 @@ export interface ShellSession {
       webContents: unknown,
       permission: string,
       callback: (granted: boolean) => void,
-      details: { requestingUrl: string },
+      details: { requestingUrl: string; mediaTypes?: readonly string[] },
     ) => void,
   ): void;
   setPermissionCheckHandler(
-    handler: (webContents: unknown, permission: string, requestingOrigin: string) => boolean,
+    handler: (
+      webContents: unknown,
+      permission: string,
+      requestingOrigin: string,
+      details: { mediaType?: string },
+    ) => boolean,
   ): void;
   setCertificateVerifyProc(
     proc: (
@@ -137,10 +142,17 @@ export async function startShell(deps: ShellDeps): Promise<Shell | undefined> {
 
   const session = deps.session();
   session.setPermissionRequestHandler((_contents, permission, callback, details) => {
-    callback(isAllowedPermission(permission, details.requestingUrl, config.consoleUrl));
+    callback(
+      isAllowedPermission(permission, details.requestingUrl, config.consoleUrl, details.mediaTypes),
+    );
   });
-  session.setPermissionCheckHandler((_contents, permission, origin) =>
-    isAllowedPermission(permission, origin, config.consoleUrl),
+  session.setPermissionCheckHandler((_contents, permission, origin, details) =>
+    isAllowedPermission(
+      permission,
+      origin,
+      config.consoleUrl,
+      details.mediaType === undefined ? [] : [details.mediaType],
+    ),
   );
   session.setCertificateVerifyProc((request, callback) => {
     const check = {

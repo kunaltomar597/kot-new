@@ -711,7 +711,11 @@ test.describe.serial('the web console', () => {
     await page.getByRole('button', { name: t('pagers.register') }).click();
     const register = page.getByRole('dialog', { name: t('pagers.form.title') });
     await expect(register.getByLabel(/^Name( \*)?$/)).toHaveValue('Pager 1');
-    await register.getByLabel(/^Serial( \*)?$/).fill('WP-0101');
+    // The serial comes from the pager's QR code, read with the camera (Chromium's fake camera
+    // shows it, see playwright.config.ts).
+    await register.getByRole('button', { name: t('pagers.scan.start') }).click();
+    await expect(register.getByText(t('pagers.scan.read', { serial: 'WP-0101' }))).toBeVisible();
+    await expect(register.getByLabel(/^Serial( \*)?$/)).toHaveValue('WP-0101');
     await register.getByLabel(t('pagers.form.wearer')).selectOption({ label: 'Ravi' });
     await expectAccessible(page);
     await register.getByRole('button', { name: t('pagers.form.register') }).click();
