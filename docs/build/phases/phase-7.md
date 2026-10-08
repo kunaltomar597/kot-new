@@ -365,3 +365,7 @@ Deliverables: automated scenarios for licence staging and reactivation online/of
 restricted mode (S8), update failure rollback (S9), backup/restore to a new PC and archive-then-purge
 with archive viewer (S10).
 Acceptance: all pass; summary in PROGRESS.md.
+
+Built (2026-10-09): `apps/server/test/integration/licence-exit.int.test.ts` (S8),
+`update-exit.int.test.ts` (S9, the server's side; the installer's side is the CI job "Windows
+installer") and `data-exit.int.test.ts` (S10), in the server's integration suite.

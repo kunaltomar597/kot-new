@@ -109,10 +109,17 @@ finished archive. The Owner and managers may open it; a cashier's reports are th
   again.
 
 The archive file must be where it was written. If its drive is not connected the page says where it
-should be ("The archive file is not at …"); connect the drive and try again. An archive made on
-another PC is encrypted with that PC's backup key: open it there, or restore that PC's backup key
-from the vendor (key escrow, `backups.md`). The invoice register and the PDF books beside the
-archive are readable without the app, and `verifyBusinessArchive` checks an archive end to end.
+should be ("The archive file is not at …"); connect the drive and try again.
+
+An archive is encrypted with the backup key of the PC that made it. A PC restored from another
+PC's backup (a new PC after a failure, `backups.md`) keeps its own backup key for what it writes
+next, and keeps the old PC's key (and the keys that PC knew) for reading: the restore stores them
+in the database, sealed with a key derived from the new PC's own backup key (P7-10). So the old
+PC's archives open on the new PC as before. An archive whose key this PC never learned (made on
+another restaurant's PC, or on a PC this one was not restored from) is refused with "a backup key
+this PC does not know"; restore that PC's backup here first, or ask support. The invoice register
+and the PDF books beside the archive are readable without the app, and `verifyBusinessArchive`
+checks an archive end to end.
 
 ## The full data export (P7-06c)
 

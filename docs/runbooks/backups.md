@@ -294,6 +294,12 @@ who asked for the restore.
 
 5. Start the server. The staff sign in with their PINs as before, and paired devices reconnect.
    A device paired after the backup must be paired again.
+6. The new PC backs up with a backup key of its own: show the Owner the new recovery key
+   (System, Backups) to keep on paper; with the cloud backup on, the PC escrows the new key with
+   the vendor when the Control Plane asks for it. It keeps the old PC's key
+   for reading only, so the old years the old PC archived still open in the archive viewer
+   (`data-lifecycle.md`). Backups the old PC left on the USB drive still need the old recovery
+   key and the restore tool.
 
 ### To a moment (P7-05c)
 

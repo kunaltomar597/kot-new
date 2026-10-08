@@ -17,6 +17,7 @@ import {
   verifyBackupFile,
 } from './backup-contents.js';
 import { decryptBackup } from './backup-file.js';
+import { carryEarlierBackupKeys, EARLIER_BACKUP_KEYS } from './backup-keys.js';
 import { pgProgram, runPgTool } from './pg-tools.js';
 
 /** Folders under the data folder a backup brings back. */
@@ -318,6 +319,24 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRes
           } satisfies RestoreRecord),
         ],
       );
+      // A backup from another PC: its key (and the ones it knew) stay readable here, so that PC's
+      // archives still open in the archive viewer (P7-10).
+      const earlier = await client.query<{ value: string }>(
+        'SELECT value FROM system_meta WHERE key = $1',
+        [EARLIER_BACKUP_KEYS],
+      );
+      const carried = carryEarlierBackupKeys({
+        backupKey: options.key,
+        ownKey: await options.secrets.get('backup-key'),
+        sealed: earlier.rows[0]?.value,
+      });
+      await (carried === null
+        ? client.query('DELETE FROM system_meta WHERE key = $1', [EARLIER_BACKUP_KEYS])
+        : client.query(
+            `INSERT INTO system_meta (key, value, updated_at) VALUES ($1, $2, now())
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+            [EARLIER_BACKUP_KEYS, carried],
+          ));
     });
 
     log('Putting the secrets and files in place');
