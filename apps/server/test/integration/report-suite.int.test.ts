@@ -22,6 +22,7 @@ import {
   TableReportResponse,
   TableSessionView,
 } from '@rp/contracts';
+import { type Capability, OVERRIDE_RECORD_TYPES } from '@rp/domain';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../../src/database/prisma.service.js';
@@ -94,13 +95,15 @@ async function issue(billId: string): Promise<InvoiceView> {
   return InvoiceView.parse(response.body);
 }
 
-async function overrideToken(capability: string): Promise<string> {
+async function overrideToken(capability: Capability, entityId: string): Promise<string> {
   return OverrideResponse.parse(
     (
       await server().post('/api/v1/auth/override').set(as(cashier)).send({
         approverStaffId: kit.staff.MANAGER,
         pin: TEST_PINS.MANAGER,
         capability,
+        entityType: OVERRIDE_RECORD_TYPES[capability],
+        entityId,
       })
     ).body,
   ).overrideToken;
@@ -220,7 +223,7 @@ beforeAll(async () => {
     .post(`/api/v1/order-items/${water}/status`)
     .set(as(kitchen))
     .send({ event: 'START_PREPARING' });
-  const voidToken = await overrideToken('ITEM_VOID_AFTER_PREP');
+  const voidToken = await overrideToken('ITEM_VOID_AFTER_PREP', water);
   const voided = await server()
     .post(`/api/v1/order-items/${water}/void`)
     .set({ ...as(cashier), 'x-override-token': voidToken })
@@ -254,7 +257,7 @@ beforeAll(async () => {
     tableSessionId: t1,
     lines: [line('Water')],
   });
-  const editToken = await overrideToken('BILL_EDIT_AFTER_PRINT');
+  const editToken = await overrideToken('BILL_EDIT_AFTER_PRINT', invoices.t1.id);
   const reopened = await server()
     .post(`/api/v1/invoices/${invoices.t1.id}/reopen`)
     .set({ ...as(cashier), 'x-override-token': editToken })
@@ -272,7 +275,7 @@ beforeAll(async () => {
     lines: [line('Lassi', 2)],
   });
   const t2Bill = await bill({ tableSessionId: t2 });
-  const freeToken = await overrideToken('DISCOUNT_ABOVE_LIMIT');
+  const freeToken = await overrideToken('DISCOUNT_ABOVE_LIMIT', t2Bill.id);
   const freeLassi = await itemOf(second, 'Lassi');
   ids.freeLassi = freeLassi;
   const free = await server()

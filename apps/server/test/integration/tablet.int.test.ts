@@ -324,6 +324,61 @@ describe('[TAB-001] leaving kiosk mode', () => {
     });
   });
 
+  it('[MOBILE-S3] [MOBILE-D1] counts wrong PINs against the tablet, never locking the managers', async () => {
+    const tablet = await addDevice(app, kit, 'TABLE_TABLET', { tableId: id('T2') });
+    const codes: string[] = [];
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      codes.push(codeOf(await exit(tablet, { staffId: kit.staff.MANAGER, pin: '9999' })));
+    }
+    expect(codes).toEqual([
+      'INVALID_CREDENTIALS',
+      'INVALID_CREDENTIALS',
+      'INVALID_CREDENTIALS',
+      'INVALID_CREDENTIALS',
+      'DEVICE_LOCKED',
+    ]);
+    // The manager is not locked: their PIN works everywhere else, the tablet takes none.
+    const credential = await prisma.credential.findFirstOrThrow({
+      where: { staffId: kit.staff.MANAGER, kind: 'PIN' },
+    });
+    expect(credential).toMatchObject({ failedAttempts: 0, lockedUntil: null });
+    const right = await exit(tablet, { staffId: kit.staff.MANAGER, pin: TEST_PINS.MANAGER });
+    expect(codeOf(right)).toBe('DEVICE_LOCKED');
+    expect(
+      (await exit(id('tablet'), { staffId: kit.staff.MANAGER, pin: TEST_PINS.MANAGER })).status,
+    ).toBe(200);
+
+    // The managers hear of it, and see until when on the device list.
+    const alert = await prisma.alert.findFirstOrThrow({
+      where: { type: 'SIGN_IN_LOCKED', dedupeKey: `lockout:device:${tablet}` },
+    });
+    expect(alert.status).toBe('OPEN');
+    expect(alert.recipientIds).toContain(kit.staff.MANAGER);
+    const list = DeviceListResponse.parse(
+      (await server().get('/api/v1/devices').set(authHeaders(kit.deviceId, manager.accessToken)))
+        .body,
+    );
+    expect(list.devices.find((device) => device.id === tablet)?.pinsLockedUntil).not.toBeNull();
+    expect(await prisma.auditLog.count({ where: { action: 'DEVICE_PINS_LOCKED' } })).toBe(1);
+
+    // A waiter cannot let it take PINs again; a manager can, and the alert clears.
+    const unlock = (session: LoginResponse) =>
+      server()
+        .post(`/api/v1/devices/${tablet}/pins/unlock`)
+        .set(authHeaders(kit.deviceId, session.accessToken));
+    expect((await unlock(waiter)).status).toBe(403);
+    const unlocked = await unlock(manager);
+    expect(unlocked.status, JSON.stringify(unlocked.body)).toBe(200);
+    expect(unlocked.body).toMatchObject({ id: tablet, pinsLockedUntil: null });
+    expect((await prisma.alert.findUniqueOrThrow({ where: { id: alert.id } })).status).toBe(
+      'CLEARED',
+    );
+    expect(await prisma.auditLog.count({ where: { action: 'DEVICE_PINS_UNLOCKED' } })).toBe(1);
+    expect(
+      (await exit(tablet, { staffId: kit.staff.MANAGER, pin: TEST_PINS.MANAGER })).status,
+    ).toBe(200);
+  });
+
   it('refuses a wrong PIN (audited), a waiter, and any device but a tablet', async () => {
     const wrong = await exit(id('tablet'), { staffId: kit.staff.MANAGER, pin: '000000' });
     expect(wrong.status).toBe(401);

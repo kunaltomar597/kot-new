@@ -36,6 +36,7 @@ const GROUP_OF_TYPE: Readonly<
   SUSPICIOUS_ACTIVITY: 'staff',
   SUPPORT_REQUEST: 'system',
   VENDOR_RESTORE_CODE: 'system',
+  SIGN_IN_LOCKED: 'staff',
 };
 
 export function groupOf(alert: AlertView, staffId: string): AlertGroup {

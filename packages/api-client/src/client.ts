@@ -4,6 +4,7 @@ import {
   CLIENT_TOO_OLD,
   DEVICE_TOKEN_HEADER,
   deviceTokenMessage,
+  IDLE_HEADER,
   type LoginResponse,
   OVERRIDE_TOKEN_HEADER,
   type OwnerLoginRequest,
@@ -112,6 +113,12 @@ export interface ApiClientOptions {
   readonly onSessionEnded?: (code: string) => void;
   /** The device was unpaired (or its key is no longer accepted): show the pairing screen. */
   readonly onDeviceRevoked?: () => void;
+  /**
+   * Seconds since the person last touched the app (AUTH-005, MOBILE-E3), sent with every call as
+   * `x-rp-idle-seconds`: the server counts them active as of then, so calls the app makes by
+   * itself do not keep an idle session alive. Without it every call counts as activity.
+   */
+  readonly idleSeconds?: () => number;
   readonly timeoutMs?: number;
 }
 
@@ -477,6 +484,10 @@ export class ApiClient implements RealtimeAuthority {
       if (accessToken !== undefined) headers.authorization = `Bearer ${accessToken}`;
     }
     if (input.overrideToken !== undefined) headers[OVERRIDE_TOKEN_HEADER] = input.overrideToken;
+    const idle = this.options.idleSeconds?.();
+    if (idle !== undefined && Number.isFinite(idle)) {
+      headers[IDLE_HEADER] = String(Math.max(0, Math.floor(idle)));
+    }
     return headers;
   }
 

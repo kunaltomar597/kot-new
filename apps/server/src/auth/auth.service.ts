@@ -15,7 +15,18 @@ import type {
   TotpConfirmResponse,
   TotpEnrollmentResponse,
 } from '@rp/contracts';
-import { actorGrant, canApproveOverride, decideStaffChange, type Role } from '@rp/domain';
+import {
+  actorGrant,
+  canApproveOverride,
+  type Capability,
+  type CountedFailure,
+  countFailure,
+  decideStaffChange,
+  isLockedAt,
+  type LockoutPolicy,
+  OVERRIDE_RECORD_TYPES,
+  type Role,
+} from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
@@ -31,6 +42,7 @@ import { RateLimiter } from './rate-limiter.js';
 import { open, seal } from './secret-box.js';
 import { SECRET_STORE, type SecretStore } from './secret-store.js';
 import { roleCapabilities, SessionService, type SessionStaff } from './session.service.js';
+import { SignInLockouts } from './sign-in-lockouts.js';
 import { randomToken, sha256Hex } from './tokens.js';
 import { base32Encode, generateTotpSecret, otpauthUri, verifyTotp } from '@rp/totp';
 
@@ -56,7 +68,10 @@ function recoveryCode(): string {
 /**
  * Sign-in and the actions around it (AUTH-001 to AUTH-006, AUTH-011, AUTH-013). Failed attempts,
  * lockouts, sign-ins and overrides are audited in the same transaction as the state they change;
- * failures are committed before the error is returned, so they always count.
+ * failures are committed before the error is returned, so they always count. A wrong secret counts
+ * against the person and against the device it was typed on, so guesses spread over many people
+ * still stop (PC-S5); on a table tablet only against the tablet, so a diner cannot lock the
+ * managers out (MOBILE-D1). Every lockout alerts the managers and the Owner.
  */
 @Injectable()
 export class AuthService {
@@ -67,6 +82,7 @@ export class AuthService {
     private readonly settings: AuthSettingsService,
     private readonly audit: AuditService,
     private readonly limiter: RateLimiter,
+    private readonly lockouts: SignInLockouts,
     @Inject(SECRET_STORE) private readonly secrets: SecretStore,
   ) {}
 
@@ -103,9 +119,11 @@ export class AuthService {
       ): Promise<
         Outcome<{ staff: SessionStaff; session: Awaited<ReturnType<SessionService['create']>> }>
       > => {
+        const base = { tx, device, staffId: request.staffId, method: 'PIN' as const };
+        const blocked = await this.deviceBlocked(base, now);
+        if (blocked !== undefined) return { error: blocked };
         const staff = await this.activeStaff(tx, device.restaurantId, request.staffId);
         const credential = staff === null ? null : await this.lockedCredential(tx, staff.id, 'PIN');
-        const base = { tx, device, staffId: request.staffId, method: 'PIN' as const };
         if (staff === null || credential === null) {
           await this.hasher.verifyNothing(request.pin);
           return { error: await this.failure(base, 'Unknown staff member or no PIN set') };
@@ -159,8 +177,10 @@ export class AuthService {
     const now = new Date();
 
     const outcome = await this.prisma.transaction(async (tx) => {
-      const staff = await this.activeStaff(tx, device.restaurantId, request.staffId);
       const base = { tx, device, staffId: request.staffId, method: 'OWNER_PASSWORD' as const };
+      const blocked = await this.deviceBlocked(base, now);
+      if (blocked !== undefined) return { error: blocked } as const;
+      const staff = await this.activeStaff(tx, device.restaurantId, request.staffId);
       if (staff?.role !== 'OWNER') {
         await this.hasher.verifyNothing(request.password);
         return { error: await this.failure(base, 'Not an owner account') } as const;
@@ -207,6 +227,8 @@ export class AuthService {
     const now = new Date();
     const outcome = await this.prisma.transaction(async (tx) => {
       const base = { tx, device, staffId: principal.staffId, method: 'STEP_UP' as const };
+      const blocked = await this.deviceBlocked(base, now);
+      if (blocked !== undefined) return { error: blocked } as const;
       const verified = await this.verifyOwnerSecrets(
         tx,
         base,
@@ -282,6 +304,11 @@ export class AuthService {
         where: { staffId },
         data: { failedAttempts: 0, failureWindowStartedAt: null, lockedUntil: null },
       });
+      await this.lockouts.unlocked(tx, {
+        kind: 'PERSON',
+        restaurantId: principal.restaurantId,
+        staffId,
+      });
       await this.audit.record(tx, {
         action: 'STAFF_UNLOCKED',
         entityType: 'staff',
@@ -313,12 +340,19 @@ export class AuthService {
     );
     if (grant === 'DENY') throw authErrors.forbidden();
     if (grant !== 'OVERRIDE') throw authErrors.overrideNotNeeded();
+    // The approval names the record it is for, and works on no other (PC-T2).
+    const recordType = OVERRIDE_RECORD_TYPES[request.capability];
+    if (
+      recordType !== undefined &&
+      (request.entityType !== recordType || request.entityId === undefined)
+    ) {
+      throw authErrors.overrideRecordRequired(recordType);
+    }
     const settings = await this.settings.get(principal.restaurantId);
     this.throttle(`override:${device.deviceId}`, settings);
     const now = new Date();
 
     const outcome = await this.prisma.transaction(async (tx): Promise<Outcome<GrantedOverride>> => {
-      const approver = await this.activeStaff(tx, principal.restaurantId, request.approverStaffId);
       const base = {
         tx,
         device,
@@ -327,6 +361,9 @@ export class AuthService {
         requesterId: principal.staffId,
         capability: request.capability,
       };
+      const blocked = await this.deviceBlocked(base, now);
+      if (blocked !== undefined) return { error: blocked };
+      const approver = await this.activeStaff(tx, principal.restaurantId, request.approverStaffId);
       if (
         approver === null ||
         !canApproveOverride(approver.role) ||
@@ -390,7 +427,7 @@ export class AuthService {
   /**
    * A manager lets staff out of a table tablet's kiosk mode with their PIN (TAB-001). Nobody is
    * signed in on a tablet, so the manager is chosen from the tiles; the attempt is throttled per
-   * tablet, a wrong PIN counts towards the manager's lock-out (AUTH-013), and the exit is audited.
+   * tablet, a wrong PIN counts against the tablet (MOBILE-S3), and the exit is audited.
    */
   async kioskExit(
     device: AuthenticatedDevice,
@@ -452,8 +489,9 @@ export class AuthService {
 
   /**
    * A PIN entered on a device nobody is signed in on (a table tablet): throttled per device, the
-   * person must be active and `eligible`, and a wrong PIN counts towards their lock-out. `onSuccess`
-   * runs in the same transaction (its audit entry).
+   * person must be active and `eligible`, and a wrong PIN counts against the tablet, which stops
+   * taking PINs for a while at its limit (MOBILE-S3, MOBILE-D1). `onSuccess` runs in the same
+   * transaction (its audit entry).
    */
   private async pinOnDevice(
     device: AuthenticatedDevice,
@@ -467,8 +505,10 @@ export class AuthService {
     this.throttle(`${method.toLowerCase()}:${device.deviceId}`, settings);
     const now = new Date();
     const outcome = await this.prisma.transaction(async (tx): Promise<Outcome<SessionStaff>> => {
-      const staff = await this.activeStaff(tx, device.restaurantId, staffId);
       const base = { tx, device, staffId, method };
+      const blocked = await this.deviceBlocked(base, now);
+      if (blocked !== undefined) return { error: blocked };
+      const staff = await this.activeStaff(tx, device.restaurantId, staffId);
       if (staff === null || !eligible(staff)) {
         await this.hasher.verifyNothing(pin);
         await this.failure(base, 'Not allowed to do this');
@@ -495,13 +535,18 @@ export class AuthService {
 
   /**
    * Uses up an override token for `capability`, if it was issued to this person's session on this
-   * device, is unused and has not expired. Single use: a second request with it is refused.
+   * device, is unused and has not expired. Single use: a second request with it is refused. An
+   * approval for an action about a record (`OVERRIDE_RECORD_TYPES`) is used only on the record it
+   * names: on another it is refused and stays unused (PC-T2).
    */
   async consumeOverride(
     principal: Principal,
-    capability: string,
+    capability: Capability,
     token: string,
+    record?: { readonly entityType: string; readonly entityId: string },
   ): Promise<ConsumedOverride | null> {
+    const recordType = OVERRIDE_RECORD_TYPES[capability];
+    if (recordType !== undefined && record?.entityType !== recordType) return null;
     const now = new Date();
     const tokenHash = sha256Hex(token);
     const used = await this.prisma.overrideGrant.updateMany({
@@ -512,6 +557,8 @@ export class AuthService {
         capability,
         requesterSessionId: principal.sessionId,
         deviceId: principal.deviceId,
+        ...(recordType !== undefined &&
+          record !== undefined && { entityType: record.entityType, entityId: record.entityId }),
       },
       data: { usedAt: now },
     });
@@ -791,7 +838,27 @@ export class AuthService {
     return true;
   }
 
-  /** Counts a wrong PIN/password in the lockout window, locking at the limit (AUTH-003). */
+  /**
+   * The device takes no PINs or passwords for now (PC-S5): the attempt is refused before anything
+   * is checked, and audited.
+   */
+  private async deviceBlocked(context: FailureContext, now: Date): Promise<AppError | undefined> {
+    const row = await context.tx.device.findUnique({
+      where: { id: context.device.deviceId },
+      select: { pinsLockedUntil: true },
+    });
+    const until = row?.pinsLockedUntil ?? null;
+    if (until === null || !isLockedAt(until, now)) return undefined;
+    await this.failure(context, 'This device takes no PINs for now');
+    return authErrors.deviceLocked(until);
+  }
+
+  /**
+   * Counts a wrong PIN or password (AUTH-003): against the person, locking their login at the
+   * limit, and against the device it was typed on, which stops taking any at its own limit
+   * (PC-S5). On a table tablet only against the tablet (MOBILE-D1). Each lock is audited and
+   * alerts the managers and the Owner.
+   */
   private async wrongSecret(
     context: FailureContext,
     credential: CredentialRow,
@@ -799,34 +866,120 @@ export class AuthService {
     now: Date,
     reason: string,
   ): Promise<AppError> {
-    const windowMs = settings.lockoutWindowMinutes * 60_000;
-    const inWindow =
-      credential.failureWindowStartedAt !== null &&
-      now.getTime() - credential.failureWindowStartedAt.getTime() < windowMs;
-    const failures = inWindow ? credential.failedAttempts + 1 : 1;
-    const lock = failures >= settings.lockoutMaxFailures;
-    const lockedUntil = new Date(now.getTime() + settings.lockoutMinutes * 60_000);
-    await context.tx.credential.update({
-      where: { id: credential.id },
-      data: lock
-        ? { failedAttempts: 0, failureWindowStartedAt: null, lockedUntil }
-        : {
-            failedAttempts: failures,
-            failureWindowStartedAt: inWindow ? credential.failureWindowStartedAt : now,
-          },
+    const { tx, device } = context;
+    const window = {
+      windowMinutes: settings.lockoutWindowMinutes,
+      lockMinutes: settings.lockoutMinutes,
+    };
+    const tablet = device.type === 'TABLE_TABLET';
+    let person: CountedFailure | undefined;
+    if (!tablet) {
+      person = countFailure(
+        { failures: credential.failedAttempts, windowStartedAt: credential.failureWindowStartedAt },
+        now,
+        { ...window, maxFailures: settings.lockoutMaxFailures },
+      );
+      await tx.credential.update({
+        where: { id: credential.id },
+        data: {
+          failedAttempts: person.failures,
+          failureWindowStartedAt: person.windowStartedAt,
+          ...(person.lockedUntil !== null && { lockedUntil: person.lockedUntil }),
+        },
+      });
+    }
+    const deviceMax = tablet
+      ? settings.tabletLockoutMaxFailures
+      : settings.deviceLockoutMaxFailures;
+    const onDevice = await this.countDeviceFailure(
+      context,
+      { ...window, maxFailures: deviceMax },
+      now,
+    );
+    const personLock = person?.lockedUntil ?? null;
+    await this.failure(context, reason, {
+      ...(person !== undefined && {
+        failures: personLock === null ? person.failures : settings.lockoutMaxFailures,
+      }),
+      deviceFailures: onDevice.lockedUntil === null ? onDevice.failures : deviceMax,
     });
-    await this.failure(context, reason, { failures });
-    if (!lock) return authErrors.invalidCredentials(settings.lockoutMaxFailures - failures);
-    await this.audit.record(context.tx, {
-      action: 'LOGIN_LOCKED',
-      entityType: 'staff',
-      entityId: context.staffId,
-      deviceId: context.device.deviceId,
-      restaurantId: context.device.restaurantId,
-      after: { lockedUntil, method: context.method },
-      reason: `${String(settings.lockoutMaxFailures)} failed attempts within ${String(settings.lockoutWindowMinutes)} minutes`,
+    if (personLock !== null) {
+      await this.audit.record(tx, {
+        action: 'LOGIN_LOCKED',
+        entityType: 'staff',
+        entityId: context.staffId,
+        deviceId: device.deviceId,
+        restaurantId: device.restaurantId,
+        after: { lockedUntil: personLock, method: context.method },
+        reason: `${String(settings.lockoutMaxFailures)} failed attempts within ${String(settings.lockoutWindowMinutes)} minutes`,
+      });
+      const staff = await tx.staff.findUniqueOrThrow({
+        where: { id: context.staffId },
+        select: { displayName: true },
+      });
+      await this.lockouts.locked(tx, {
+        kind: 'PERSON',
+        restaurantId: device.restaurantId,
+        staffId: context.staffId,
+        staffName: staff.displayName,
+        deviceId: device.deviceId,
+        deviceName: onDevice.name,
+        method: context.method,
+        lockedUntil: personLock,
+      });
+    }
+    if (onDevice.lockedUntil !== null) {
+      await this.audit.record(tx, {
+        action: 'DEVICE_PINS_LOCKED',
+        entityType: 'device',
+        entityId: device.deviceId,
+        deviceId: device.deviceId,
+        restaurantId: device.restaurantId,
+        after: { pinsLockedUntil: onDevice.lockedUntil, method: context.method },
+        reason: `${String(deviceMax)} wrong PINs or passwords on this device within ${String(settings.lockoutWindowMinutes)} minutes`,
+      });
+      await this.lockouts.locked(tx, {
+        kind: 'DEVICE',
+        restaurantId: device.restaurantId,
+        deviceId: device.deviceId,
+        deviceName: onDevice.name,
+        lockedUntil: onDevice.lockedUntil,
+      });
+    }
+    if (personLock !== null) return authErrors.locked(personLock);
+    if (onDevice.lockedUntil !== null) return authErrors.deviceLocked(onDevice.lockedUntil);
+    if (person === undefined || onDevice.left < person.left) {
+      return authErrors.invalidCredentials(onDevice.left, true);
+    }
+    return authErrors.invalidCredentials(person.left);
+  }
+
+  /** One more wrong secret typed on the device, counted under a row lock (PC-S5). */
+  private async countDeviceFailure(
+    context: FailureContext,
+    policy: LockoutPolicy,
+    now: Date,
+  ): Promise<CountedFailure & { readonly name: string }> {
+    const { tx, device } = context;
+    await tx.$queryRaw`SELECT 1 AS locked FROM devices WHERE id = ${device.deviceId}::uuid FOR UPDATE`;
+    const row = await tx.device.findUniqueOrThrow({
+      where: { id: device.deviceId },
+      select: { name: true, pinFailures: true, pinFailureWindowStartedAt: true },
     });
-    return authErrors.locked(lockedUntil);
+    const counted = countFailure(
+      { failures: row.pinFailures, windowStartedAt: row.pinFailureWindowStartedAt },
+      now,
+      policy,
+    );
+    await tx.device.update({
+      where: { id: device.deviceId },
+      data: {
+        pinFailures: counted.failures,
+        pinFailureWindowStartedAt: counted.windowStartedAt,
+        ...(counted.lockedUntil !== null && { pinsLockedUntil: counted.lockedUntil }),
+      },
+    });
+    return { ...counted, name: row.name };
   }
 
   private async lockedFailure(context: FailureContext, lockedUntil: Date): Promise<AppError> {

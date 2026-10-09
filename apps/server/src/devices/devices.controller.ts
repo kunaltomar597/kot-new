@@ -17,6 +17,7 @@ import {
   type DeviceChallengeResponse,
   type DeviceListResponse,
   type DeviceSummary,
+  type DeviceView,
   DeviceTokenRequest,
   type DeviceTokenResponse,
   HTTP_DEVICE_TYPES,
@@ -149,6 +150,16 @@ export class DevicesController {
     @Body(new ZodValidationPipe(RevokeDeviceRequest)) body: RevokeDeviceRequest,
   ): Promise<DeviceSummary> {
     return this.devices.revoke(principalOf(request), deviceId, body.reason);
+  }
+
+  @Post(':deviceId/pins/unlock')
+  @HttpCode(200)
+  @RequireCapability('DEVICE_PAIR')
+  unlockPins(
+    @Req() request: AuthenticatedRequest,
+    @Param('deviceId', new ParseUUIDPipe()) deviceId: string,
+  ): Promise<DeviceView> {
+    return this.devices.unlockPins(principalOf(request), deviceId);
   }
 
   @Post(':deviceId/locate')

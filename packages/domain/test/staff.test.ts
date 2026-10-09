@@ -3,6 +3,7 @@ import {
   ASSIGNABLE_ROLES,
   decideStaffChange,
   isAssignableRole,
+  isEasilyGuessedPin,
   isValidPin,
   ROLES,
   rolesOffered,
@@ -156,5 +157,36 @@ describe('[AUTH-001] PINs', () => {
     expect(isValidPin('12a4', 4)).toBe(false);
     expect(isValidPin(' 123', 4)).toBe(false);
     expect(isValidPin('', 4)).toBe(false);
+  });
+});
+
+describe('[AUTH-001] [PC-S5] easily guessed PINs', () => {
+  it.each([
+    ['0000', 'one digit'],
+    ['999999', 'one digit'],
+    ['1212', 'a repeated block'],
+    ['123123', 'a repeated block'],
+    ['696969', 'a repeated block'],
+    ['1234', 'a run up'],
+    ['4321', 'a run down'],
+    ['7890', 'a run past 9'],
+    ['654321', 'a run down'],
+    ['1122', 'pairs'],
+    ['112233', 'pairs'],
+    ['1985', 'a year'],
+    ['2024', 'a year'],
+    ['2580', 'a keypad line'],
+    ['147258', 'keypad columns'],
+  ])('refuses %s (%s)', (pin) => {
+    expect(isEasilyGuessedPin(pin)).toBe(true);
+  });
+
+  it.each(['4831', '7305', '2468', '9157', '482915', '730146'])('accepts %s', (pin) => {
+    expect(isEasilyGuessedPin(pin)).toBe(false);
+  });
+
+  it('leaves a malformed PIN to the length check', () => {
+    expect(isEasilyGuessedPin('12a4')).toBe(false);
+    expect(isEasilyGuessedPin('')).toBe(false);
   });
 });

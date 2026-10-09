@@ -9,6 +9,7 @@ import {
   evaluatePermission,
   extraCapabilitiesOf,
   grantFor,
+  OVERRIDE_RECORD_TYPES,
   OWNER_SECOND_FACTOR_CAPABILITIES,
   ROLES,
 } from '../src/index.js';
@@ -87,6 +88,15 @@ describe('[AUTH-011] permission evaluation', () => {
     });
     expect(canApproveOverride('OWNER')).toBe(true);
     expect(canApproveOverride('WAITER')).toBe(false);
+  });
+
+  it('[PC-T2] names the kind of record every approvable action is about', () => {
+    const approvable = CAPABILITIES.filter((capability) =>
+      ROLES.some((role) => grantFor(role, capability) === 'OVERRIDE'),
+    );
+    expect(Object.keys(OVERRIDE_RECORD_TYPES).sort()).toEqual([...approvable].sort());
+    expect(OVERRIDE_RECORD_TYPES.ITEM_VOID_AFTER_PREP).toBe('order_item');
+    expect(OVERRIDE_RECORD_TYPES.INVOICE_VOID).toBe('invoice');
   });
 });
 

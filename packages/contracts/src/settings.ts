@@ -163,6 +163,36 @@ export const SETTINGS = [
     requirements: ['AUTH-003', 'SEC-009'],
   }),
   setting({
+    key: 'auth.deviceLockoutMaxFailures',
+    schema: int(3, 100),
+    defaultValue: 10,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Wrong PINs or passwords on one device, for anyone, within the window that stop it taking any for the lockout time (our default).',
+    requirements: ['AUTH-003', 'SEC-009'],
+  }),
+  setting({
+    key: 'auth.tabletLockoutMaxFailures',
+    schema: int(3, 50),
+    defaultValue: 5,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Wrong PINs on a table tablet within the window that stop it taking any for the lockout time; they never lock the person (our default).',
+    requirements: ['AUTH-003', 'TAB-001'],
+  }),
+  setting({
+    key: 'auth.refuseEasyPins',
+    schema: z.boolean(),
+    defaultValue: true,
+    scope: 'RESTAURANT',
+    capability: 'STAFF_MANAGE',
+    description:
+      'Refuse PINs that are guessed first, such as 1234, 1111, 1212 or a year, when a PIN is set (our default).',
+    requirements: ['AUTH-001', 'AUTH-002'],
+  }),
+  setting({
     key: 'auth.accessTokenMinutes',
     schema: int(1, 15),
     defaultValue: 15,

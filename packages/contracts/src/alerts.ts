@@ -23,6 +23,7 @@ export const NotificationEventType = z.enum([
   'SUSPICIOUS_ACTIVITY',
   'SUPPORT_REQUEST',
   'VENDOR_RESTORE_CODE',
+  'SIGN_IN_LOCKED',
 ]);
 export type NotificationEventType = z.infer<typeof NotificationEventType>;
 

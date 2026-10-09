@@ -29,13 +29,17 @@ export const authErrors = {
       'DEVICE_MISMATCH',
       'This sign-in belongs to another device. Sign in again here.',
     ),
-  invalidCredentials: (attemptsRemaining?: number) =>
+  /**
+   * A wrong PIN or password; with the tries left before the login locks, or before this device
+   * stops taking any (`device`), whichever comes first.
+   */
+  invalidCredentials: (attemptsRemaining?: number, device = false) =>
     new AppError(
       401,
       'INVALID_CREDENTIALS',
       attemptsRemaining === undefined
         ? 'That did not match. Check and try again.'
-        : `That did not match. ${String(attemptsRemaining)} ${attemptsRemaining === 1 ? 'try' : 'tries'} left before the login is locked.`,
+        : `That did not match. ${String(attemptsRemaining)} ${attemptsRemaining === 1 ? 'try' : 'tries'} left before ${device ? 'this device stops taking PINs for a while' : 'the login is locked'}.`,
       attemptsRemaining === undefined ? undefined : { attemptsRemaining },
     ),
   locked: (lockedUntil: Date) =>
@@ -43,6 +47,14 @@ export const authErrors = {
       423,
       'ACCOUNT_LOCKED',
       'This login is locked after too many wrong attempts. Wait, or ask a manager to unlock it.',
+      { lockedUntil: lockedUntil.toISOString() },
+    ),
+  /** PC-S5: too many wrong PINs or passwords on this device, for anyone. */
+  deviceLocked: (lockedUntil: Date) =>
+    new AppError(
+      423,
+      'DEVICE_LOCKED',
+      'This device takes no PINs for now: too many wrong ones were typed on it. Wait, or ask a manager to let it take PINs again on the Devices page.',
       { lockedUntil: lockedUntil.toISOString() },
     ),
   rateLimited: () =>
@@ -79,6 +91,14 @@ export const authErrors = {
       409,
       'OVERRIDE_NOT_NEEDED',
       'You can do this yourself; no manager approval is needed.',
+    ),
+  /** PC-T2: an approval for this action names the record it is for. */
+  overrideRecordRequired: (entityType: string) =>
+    new AppError(
+      422,
+      'OVERRIDE_RECORD_REQUIRED',
+      'Say which record the manager approves: an approval is for one record only.',
+      { entityType },
     ),
   approverNotAllowed: () =>
     new AppError(403, 'APPROVER_NOT_ALLOWED', 'Only a manager or the Owner can approve this.'),

@@ -1,5 +1,5 @@
 import type { AlertView } from '@rp/contracts';
-import { formatDisplayDate } from '@rp/domain';
+import { formatDisplayDate, timeOfDayOf } from '@rp/domain';
 import type { Translator } from '@rp/i18n';
 import { minutesSince } from './floor-view.js';
 
@@ -88,6 +88,18 @@ function detailOf(alert: AlertView, t: Translator): string | null {
       return name === null || reason === null
         ? null
         : t('alerts.vendorRestoreCode', { name, reason });
+    }
+    case 'SIGN_IN_LOCKED': {
+      const device = textOf(payload.deviceName);
+      const until = textOf(payload.lockedUntil);
+      const at = until === null ? Number.NaN : Date.parse(until);
+      if (device === null || Number.isNaN(at)) return null;
+      const time = timeOfDayOf(new Date(at));
+      if (payload.scope === 'DEVICE') return t('alerts.devicePinsLocked', { device, time });
+      const name = textOf(payload.staffName);
+      if (name === null) return null;
+      const method = textOf(payload.method) ?? 'PIN';
+      return t('alerts.personLocked', { name, time, method, device });
     }
     case 'DEVICE_LOW_BATTERY_OR_OFFLINE': {
       const device =

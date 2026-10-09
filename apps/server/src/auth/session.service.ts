@@ -211,11 +211,13 @@ export class SessionService {
   /**
    * Checks an access token on every request: signature and expiry, the device it was issued to,
    * and the session behind it (not revoked, not expired, not idle, person still active). Renews
-   * the inactivity timer.
+   * the inactivity timer as of the person's last touch: `idleMs` before now, as the app says
+   * (MOBILE-E3), so a call the app made by itself while they were away keeps nothing alive.
    */
   async authenticate(
     token: string,
     device: AuthenticatedDevice | undefined,
+    idleMs = 0,
   ): Promise<AccessResult> {
     let claims;
     try {
@@ -235,9 +237,12 @@ export class SessionService {
     const settings = await this.settings.get(session.restaurantId);
     const failure = await this.check(session, device, settings, now);
     if (failure !== undefined) return { failure };
-    const idleFor = now.getTime() - session.lastActiveAt.getTime();
-    if (idleFor > TOUCH_INTERVAL_MS) {
-      await this.prisma.session.update({ where: { id: session.id }, data: { lastActiveAt: now } });
+    const activeAt = now.getTime() - idleMs;
+    if (activeAt - session.lastActiveAt.getTime() > TOUCH_INTERVAL_MS) {
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { lastActiveAt: new Date(activeAt) },
+      });
     }
     return {
       principal: {
@@ -315,9 +320,14 @@ export class SessionService {
 
   /**
    * Rotates the refresh token and issues a new access token. Presenting an already rotated
-   * refresh token means it leaked: the whole session is revoked (AUTH-005).
+   * refresh token means it leaked: the whole session is revoked (AUTH-005). Activity counts as of
+   * the person's last touch, as in `authenticate`.
    */
-  async refresh(refreshToken: string, device: AuthenticatedDevice): Promise<LoginResponse> {
+  async refresh(
+    refreshToken: string,
+    device: AuthenticatedDevice,
+    idleMs = 0,
+  ): Promise<LoginResponse> {
     const now = new Date();
     const hash = sha256Hex(refreshToken);
     const session = await this.prisma.session.findUnique({
@@ -359,10 +369,15 @@ export class SessionService {
     }
 
     const nextToken = randomToken();
+    const activeAt = Math.max(session.lastActiveAt.getTime(), now.getTime() - idleMs);
     // Conditional on the old hash, so two concurrent refreshes cannot both succeed.
     const rotated = await this.prisma.session.updateMany({
       where: { id: session.id, tokenHash: hash, revokedAt: null },
-      data: { tokenHash: sha256Hex(nextToken), previousTokenHash: hash, lastActiveAt: now },
+      data: {
+        tokenHash: sha256Hex(nextToken),
+        previousTokenHash: hash,
+        lastActiveAt: new Date(activeAt),
+      },
     });
     if (rotated.count !== 1) throw authErrors.sessionRevoked();
     return this.issue({

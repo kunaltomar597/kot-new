@@ -21,6 +21,13 @@ export const staffErrors = {
     new AppError(422, 'PIN_LENGTH', `The PIN must have exactly ${String(length)} digits.`, {
       pinLength: length,
     }),
+  /** PC-S5: `auth.refuseEasyPins` is on and the PIN is one guessed first. */
+  pinTooEasy: () =>
+    new AppError(
+      422,
+      'PIN_TOO_EASY',
+      'That PIN is too easy to guess, like 1234, 1111, 1212 or a year. Choose another.',
+    ),
   /** Why `decideStaffChange` refused (`@rp/domain`). */
   refused: (reason: StaffRefusal): AppError => {
     switch (reason) {

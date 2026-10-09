@@ -342,6 +342,39 @@ describe('[MGR-006] [AUTH-008] [AUTH-009] changing a device', () => {
     ).toBeNull();
   });
 
+  it('[PC-S5] shows a device that takes no PINs until when, and lets it take them again', async () => {
+    // 09:00 UTC is 14:30 in India.
+    const locked = deviceList();
+    locked.devices = locked.devices.map((device) =>
+      device.id === TABLET_T7 ? { ...device, pinsLockedUntil: '2026-10-10T09:00:00.000Z' } : device,
+    );
+    const fake = devicesServer(locked, deviceList()).on(
+      'POST',
+      `${DEVICES}/${TABLET_T7}/pins/unlock`,
+      () => ({ status: 200, body: deviceView() }),
+    );
+    const { user } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    expect(
+      within(await rowOf('Tablet T7')).getByText(t('devices.pinsLocked', { time: '14:30' })),
+    ).toBeVisible();
+    // Only the locked device offers it.
+    expect(
+      within(await actionsFor('Tandoor screen')).queryByRole('button', {
+        name: t('devices.unlockPinsNamed', { name: 'Tandoor screen' }),
+      }),
+    ).toBeNull();
+    await user.click(
+      within(await actionsFor('Tablet T7')).getByRole('button', {
+        name: t('devices.unlockPinsNamed', { name: 'Tablet T7' }),
+      }),
+    );
+    expect(await screen.findByText(t('devices.pinsUnlocked', { name: 'Tablet T7' }))).toBeVisible();
+    expect(fake.callsTo('POST', `${DEVICES}/${TABLET_T7}/pins/unlock`)).toHaveLength(1);
+    await waitFor(() => {
+      expect(screen.queryByText(t('devices.pinsLocked', { time: '14:30' }))).toBeNull();
+    });
+  });
+
   it('moves a table tablet to another table', async () => {
     const fake = devicesServer().on('PUT', `${DEVICES}/${TABLET_T7}/table`, () => ({
       status: 200,

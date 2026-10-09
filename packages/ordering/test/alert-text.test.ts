@@ -125,6 +125,34 @@ describe('[WTR-006] [NFR-U04] what an alert says on the waiter app and the POS',
     expect(describeAlert({ ...asked, payload: {} }, t).detail).toBeNull();
   });
 
+  it('[PC-S5] says whose sign-in locked, or which device stopped taking PINs, and until when', () => {
+    const locked = alert({ type: 'SIGN_IN_LOCKED', tableLabel: null });
+    // 09:00 UTC is 14:30 in India.
+    const lockedUntil = '2026-10-10T09:00:00.000Z';
+    expect(
+      describeAlert(
+        {
+          ...locked,
+          payload: { scope: 'PERSON', staffName: 'Ravi', deviceName: 'POS 1', lockedUntil },
+        },
+        t,
+      ),
+    ).toEqual({
+      title: 'Sign-in locked after wrong PINs',
+      detail:
+        'Ravi cannot sign in until 14:30: too many wrong PINs on POS 1. If it was not them, someone may be guessing. Unlock it on the Staff page.',
+    });
+    expect(
+      describeAlert(
+        { ...locked, payload: { scope: 'DEVICE', deviceName: 'Table 4 tablet', lockedUntil } },
+        t,
+      ).detail,
+    ).toBe(
+      'Table 4 tablet takes no PINs until 14:30: too many wrong ones were typed on it. If staff did not mistype them, someone may be guessing. Let it take PINs again on the Devices page.',
+    );
+    expect(describeAlert({ ...locked, payload: { scope: 'DEVICE' } }, t).detail).toBeNull();
+  });
+
   it('[PGR-013] says which device ran low or went offline', () => {
     const pager = { deviceType: 'PAGER', deviceName: 'Pager 3', online: true, batteryPercent: 12 };
     const device = alert({ type: 'DEVICE_LOW_BATTERY_OR_OFFLINE', tableLabel: null });

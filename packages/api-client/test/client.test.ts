@@ -246,6 +246,36 @@ describe('[AUTH-005] access tokens are refreshed, sessions end cleanly', () => {
     expect(saved.at(-1)?.session?.refreshToken).toBe('refresh-token-number-2');
   });
 
+  it('[MOBILE-E3] says on every call, the refresh too, how long the person has been idle', async () => {
+    let idle = 42.7;
+    const server = new FakeServer()
+      .on('POST', '/api/v1/auth/refresh', () => ({
+        status: 200,
+        body: login('access-2', 'refresh-token-number-2'),
+      }))
+      .on('GET', '/api/v1/devices', () => ({ status: 200, body: DEVICES }));
+    const client = new ApiClient({
+      baseUrl: BASE,
+      fetch: server.fetch,
+      credentials: signedIn(login('access-1', 'refresh-token-number-1', 0.2)),
+      idleSeconds: () => idle,
+    });
+    await client.api.listDevices();
+    expect(server.callsTo('POST', '/api/v1/auth/refresh')[0]?.headers['x-rp-idle-seconds']).toBe(
+      '42',
+    );
+    expect(server.callsTo('GET', '/api/v1/devices')[0]?.headers['x-rp-idle-seconds']).toBe('42');
+    idle = -3;
+    await client.api.listDevices();
+    expect(server.callsTo('GET', '/api/v1/devices')[1]?.headers['x-rp-idle-seconds']).toBe('0');
+
+    const silent = new ApiClient({ baseUrl: BASE, fetch: server.fetch, credentials: signedIn() });
+    await silent.api.listDevices();
+    expect(server.callsTo('GET', '/api/v1/devices')[2]?.headers).not.toHaveProperty(
+      'x-rp-idle-seconds',
+    );
+  });
+
   it('refreshes and retries once when the server says the token expired', async () => {
     const server = new FakeServer()
       .on(

@@ -33,6 +33,8 @@ export async function createMobileClient(options: {
   client?: ClientApp;
   /** The server no longer serves this build (426 `CLIENT_TOO_OLD`). */
   onClientTooOld?: (error: ApiRequestError) => void;
+  /** Seconds since the person last touched the app (MOBILE-E3), sent with every call. */
+  idleSeconds?: () => number;
   fetch?: typeof fetch;
 }): Promise<ApiClient> {
   const credentials = (await loadCredentials(options.secureStore)) ?? {};
@@ -45,6 +47,7 @@ export async function createMobileClient(options: {
     ...(options.onSessionEnded !== undefined && { onSessionEnded: options.onSessionEnded }),
     ...(options.client !== undefined && { client: options.client }),
     ...(options.onClientTooOld !== undefined && { onClientTooOld: options.onClientTooOld }),
+    ...(options.idleSeconds !== undefined && { idleSeconds: options.idleSeconds }),
     onDeviceRevoked: () => {
       writing = writing.then(() => options.secureStore.removeItem(CREDENTIALS_KEY));
       options.onDeviceRevoked?.();

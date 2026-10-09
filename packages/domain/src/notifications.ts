@@ -24,6 +24,8 @@ export const NOTIFICATION_EVENTS = [
   'SUPPORT_REQUEST',
   /** The vendor issued a code that opens this restaurant's cloud backups (DATA-003, P7-05e). */
   'VENDOR_RESTORE_CODE',
+  /** Wrong PINs or passwords locked a person's sign-in, or stopped a device taking them (PC-S5). */
+  'SIGN_IN_LOCKED',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 
@@ -173,6 +175,8 @@ export const DEFAULT_NOTIFICATION_RULES: Readonly<Record<NotificationEvent, Noti
   ),
   // Not in Appendix C: the Owner hears whenever the vendor can open the backups (OI-10).
   VENDOR_RESTORE_CODE: rule(['OWNER'], ['POS', 'DASHBOARD'], null, false, 'NONE'),
+  // Not in Appendix C: a lockout may be someone guessing PINs, and a manager can lift it (PC-S5).
+  SIGN_IN_LOCKED: rule(['OWNER', 'MANAGERS_ON_DUTY'], ['POS', 'DASHBOARD'], null, false, 'NONE'),
 };
 
 /** A manager's change to one event's rule (NTF-002); anything left out keeps the default. */

@@ -133,7 +133,28 @@ those threats:
   LAN and the local server, the pager channel and the phones and tablets: approvals bound to their
   record, large bodies only from paired devices, PIN failures per device and weak PINs, erasure of
   diners' numbers on orders and bills, formulas in the data export, the workbook's inflate limit,
-  the broker's limits and acknowledgements, and the waiter phone's inactivity sign-out.
+  the broker's limits and acknowledgements, and the waiter phone's inactivity sign-out. Split
+  (2026-10-10) into three, by the part of the PC each touches (18 threats were too many for one
+  pull request):
+  - **P8-03b2a Sign-in and approvals** (PC-S5, PC-D2, MOBILE-S3, MOBILE-D1, PC-T2, MOBILE-E3):
+    a failure budget per device (wrong PINs or passwords on one device within the lockout window
+    stop it taking any for the lockout time; a manager lets it take them again from the Devices
+    page); wrong PINs typed on a table tablet count against the tablet, not the person; easily
+    guessed PINs refused when a PIN is set (a setting, on by default); managers and the Owner
+    alerted to every lockout (`SIGN_IN_LOCKED`), the alert cleared when the lock is lifted; an
+    approval for a voided item, a reopened or voided invoice or a discount above the limit must
+    name its record and works only on it, refused without being spent on another; the apps tell
+    the server how long the person has been idle (`x-rp-idle-seconds`), so reads a waiter phone
+    makes by itself no longer keep the session alive.
+  - **P8-03b2b The pager broker** (PAGER-D3, PAGER-D4, PAGER-D6, PAGER-E3, PAGER-R2, PAGER-R3,
+    PAGER-T1, PAGER-T4): packet, connection, sign-in time and Argon2 limits, heartbeat rate and
+    retained messages, the connected-pager list, the licence's pager limit, acknowledgements only
+    of alerts sent to the pager and recorded with it, failed sign-ins logged and counted, and no
+    firmware release with a lower secure version.
+  - **P8-03b2c Bodies, uploads, exports and erasure** (PC-D1, PC-D4, PC-T8, PC-I9): a device
+    check before the large body parsers, the workbook inflated with a limit on what comes out,
+    `csvCell` in the data export and the invoice register, and erasure of a diner's number on
+    orders and bills.
 - **P8-03b3 Fixes to the licence and the update pipeline.** The threats planned for P8-03b3: the
   clock guard, fingerprint reads, licence replay, reactivation reports, tamper alerts, builds
   without vendor keys, the updater's version check and pinned CI actions.

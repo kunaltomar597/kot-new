@@ -546,16 +546,14 @@ export class BillsService {
     if (overrideToken === undefined || overrideToken === '') {
       throw authErrors.overrideRequired('DISCOUNT_ABOVE_LIMIT');
     }
+    // An approval is for one bill only; on another it is refused and not spent (PC-T2).
     const override = await this.auth.consumeOverride(
       principal,
       'DISCOUNT_ABOVE_LIMIT',
       overrideToken,
+      { entityType: 'bill', entityId: billId },
     );
     if (override === null) throw authErrors.overrideInvalid();
-    // An approval given for a particular bill is good for that bill only.
-    if (override.entityId !== null && override.entityId !== billId) {
-      throw authErrors.overrideInvalid();
-    }
     return override.approverId;
   }
 }

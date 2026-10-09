@@ -22,6 +22,11 @@ export type RouteAccess =
       readonly capability: Capability;
       /** A kitchen screen in station mode may call it with nobody signed in (AUTH-005). */
       readonly stationMode?: boolean;
+      /**
+       * The route parameter with the id of the record the action is about, for a capability a
+       * manager approves (`OVERRIDE_RECORD_TYPES`): the approval must be for that record (PC-T2).
+       */
+      readonly record?: string;
     };
 
 type RouteDecorator = MethodDecorator & ClassDecorator;
@@ -54,10 +59,11 @@ export const RequireSession = (options: { stationMode?: boolean } = {}): RouteDe
  */
 export const RequireCapability = (
   capability: Capability,
-  options: { stationMode?: boolean } = {},
+  options: { stationMode?: boolean; record?: string } = {},
 ): RouteDecorator =>
   SetMetadata(ROUTE_ACCESS, {
     kind: 'CAPABILITY',
     capability,
     ...(options.stationMode === true && { stationMode: true }),
+    ...(options.record !== undefined && { record: options.record }),
   } satisfies RouteAccess);

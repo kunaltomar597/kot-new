@@ -156,21 +156,33 @@ change the traffic or to collect PINs.
 Someone at a paired device tries PINs, or tries a few PINs for every person in turn.
 
 - Mitigation: PINs work only on a paired staff device; they are hashed with Argon2id and a pepper;
-  five failures in ten minutes lock that person for 15 minutes (audited); each device may try ten
-  times a minute; unknown people and wrong PINs take the same time.
+  five failures in ten minutes lock that person for 15 minutes (audited); every wrong PIN or
+  password also counts against the device it was typed on, which takes none for 15 minutes after
+  ten in ten minutes whoever they were for, so spreading guesses over people gains nothing
+  (`auth.deviceLockoutMaxFailures`); each device may try ten times a minute; the PINs guessed
+  first (one digit or block repeated, runs, pairs, years, keypad lines) are refused when a PIN is
+  set (`auth.refuseEasyPins`, on by default); every lockout alerts the managers and the Owner
+  (`SIGN_IN_LOCKED`); unknown people and wrong PINs take the same time.
 - Code: `apps/server/src/auth/credential-hasher.ts` (`CredentialHasher`, `verifyNothing`);
-  `apps/server/src/auth/auth.service.ts` (`wrongSecret`, `throttle`);
-  `apps/server/src/auth/rate-limiter.ts`; `packages/domain/src/staff.ts` (`isValidPin`).
+  `apps/server/src/auth/auth.service.ts` (`wrongSecret`, `countDeviceFailure`, `deviceBlocked`,
+  `throttle`); `apps/server/src/auth/rate-limiter.ts`; `packages/domain/src/lockout.ts`
+  (`countFailure`); `packages/domain/src/staff.ts` (`isValidPin`, `isEasilyGuessedPin`);
+  `apps/server/src/staff/staff.service.ts` (`requireHardToGuess`);
+  `apps/server/src/notifications/lockout-alerts.ts` (`LockoutAlerts`).
 - Tests: `apps/server/test/integration/auth-login.int.test.ts` "locks after 5 failures in 10
-  minutes, for 15 minutes, and audits it", "refuses the 11th attempt within a minute from one
-  device, but not from another", "refuses the staff tiles and PIN login to an unknown device, even
-  with a valid PIN"; `apps/server/test/unit/auth-primitives.test.ts` "depends on the pepper, so a
-  stolen hash alone is useless".
-- Risk: likelihood Medium, impact High: High.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: the lockout counts per person, so
-  spreading guesses over 20 people gives about 100 guesses every 15 minutes, and `0000` or `1234`
-  are accepted; P8-03b2 adds a failure budget per device, refuses easily guessed PINs (a setting)
-  and alerts managers to repeated lockouts.
+  minutes, for 15 minutes, and audits it", "stops a device taking any PIN after 10 wrong ones for
+  anyone, spread over people", "refuses the 11th attempt within a minute from one device, but not
+  from another", "refuses the staff tiles and PIN login to an unknown device, even with a valid
+  PIN", "alerts the managers and the Owner when a login locks, and clears it when it is
+  unlocked"; `apps/server/test/integration/staff.int.test.ts` "refuses an easily guessed PIN,
+  unless the restaurant allows them"; `packages/domain/test/staff.test.ts` "easily guessed PINs";
+  `apps/server/test/unit/auth-primitives.test.ts` "depends on the pepper, so a stolen hash alone is
+  useless".
+- Risk: likelihood Low, impact High: Medium.
+- Status: Mitigated (P8-03b2a: the lockout counted only per person, so 20 people gave about 100
+  guesses every 15 minutes, and `0000` or `1234` were accepted). What is left: ten guesses per
+  device every 25 minutes, each lock alerting the managers; 6-digit PINs (`auth.pinLength`) cut it
+  a hundredfold.
 
 #### PC-S6 A stolen phone or a person who has left
 
@@ -244,18 +256,26 @@ A modified app sends its own prices, discounts, a staff id or a role, hoping the
 A cashier asks a manager to approve voiding a ₹200 dish, then uses the approval to void a ₹2,000
 one or another bill; the audit names the manager as the approver.
 
-- Mitigation: an approval is for one capability, used once, within 2 minutes, by the session that
-  asked for it; the discount path also checks the record. Voids of items and invoices and reopening
-  an invoice do not check which record the approval was for.
-- Code: `apps/server/src/auth/auth.service.ts` (`consumeOverride`);
-  `apps/server/src/orders/order-items.service.ts`;
-  `apps/server/src/billing/invoice-actions.service.ts`.
+- Mitigation: an approval is for one capability and one record, used once, within 2 minutes, by
+  the session that asked for it. An approval for a voided item, a reopened or voided invoice or a
+  discount above the limit must name its record when it is given (422 `OVERRIDE_RECORD_REQUIRED`
+  otherwise, before the PIN is checked); the guard takes the record from the route
+  (`OVERRIDE_RECORD_TYPES`, the route's `record` parameter) and the discount from its bill, and an
+  approval used on another record is refused and stays unused. A route of such a capability that
+  does not say where its record is refuses every request.
+- Code: `packages/domain/src/permissions.ts` (`OVERRIDE_RECORD_TYPES`);
+  `apps/server/src/auth/auth.service.ts` (`grantOverride`, `consumeOverride`);
+  `apps/server/src/auth/permission.guard.ts` (`overrideRecord`);
+  `apps/server/src/billing/bills.service.ts` (`approve`).
 - Tests: `apps/server/test/integration/auth-guard.int.test.ts` "turns a manager PIN into a
-  single-use approval for one capability", "is bound to the requester session and expires after 2
-  minutes".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03b2 by 2026-10-13: the approval carries the record it was given
-  for, and using it on another is refused without spending it.
+  single-use approval for one capability", "works only on the record it names, refused and not
+  spent on another", "is refused without the record, or for another kind of record, before the
+  PIN", "is bound to the requester session and expires after 2 minutes";
+  `packages/domain/test/permissions.test.ts` "names the kind of record every approvable action is
+  about".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2a: voids of items and invoices and reopening an invoice did not check
+  which record the approval was for).
 
 #### PC-T3 Changing or deleting money records in the database
 
@@ -352,7 +372,7 @@ runs as a formula when a spreadsheet opens an export.
   formula"; `apps/server/test/integration/audit-viewer.int.test.ts` "exports the log with its
   filters, and not to people without it".
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: the data export's CSV files and the
+- Status: Partly mitigated. Plan: P8-03b2c by 2026-10-13: the data export's CSV files and the
   invoice register use `csvCell` (the JSONL keeps the text as typed).
 
 ### Repudiation
@@ -565,7 +585,7 @@ A diner asks to be forgotten (DATA-011) and their number stays on orders and bil
   the number"; `apps/server/test/integration/retention.int.test.ts` "removes old operational data
   and anonymises old personal data, audited".
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: erasure also clears the number on orders
+- Status: Partly mitigated. Plan: P8-03b2c by 2026-10-13: erasure also clears the number on orders
   and bills (matched on its digits), and leaves digital bills already sent as they were.
 
 #### PC-I10 Metadata in menu photos
@@ -605,7 +625,7 @@ parses them before it checks who is calling, and runs out of memory during servi
   `AI_IMPORT_BODY_LIMIT`).
 - Tests: `apps/server/test/integration/errors.int.test.ts` "limits request body size".
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03b2 by 2026-10-13: a device-token check before the large
+- Status: Not mitigated. Plan: P8-03b2c by 2026-10-13: a device-token check before the large
   parsers, so only paired devices can send more than a small body.
 
 #### PC-D2 Lockouts used to stop the restaurant
@@ -613,15 +633,26 @@ parses them before it checks who is calling, and runs out of memory during servi
 Someone with any paired device, a diner at a tablet included, types wrong PINs for the managers
 and waiters and locks them out during service, again and again.
 
-- Mitigation: lockouts last 15 minutes and a manager can unlock a person; approver PINs lock too.
-- Code: `apps/server/src/auth/auth.service.ts` (`AuthService`, `unlock`).
-- Tests: `apps/server/test/integration/auth-guard.int.test.ts` "locks the approver PIN after
-  repeated wrong attempts"; `apps/server/test/integration/auth-login.int.test.ts` "lets a manager
-  unlock a locked login, and nobody else".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: wrong PINs typed on a table tablet count
-  against the tablet, not the person (a decision, recorded), and managers are alerted to
-  lockouts.
+- Mitigation: wrong PINs typed on a table tablet count against the tablet, never the person
+  (MOBILE-D1, decided in P8-03b2a); on a staff device each one also counts against the device,
+  which stops taking PINs after ten, so one device can lock out at most two people every 25
+  minutes; every lockout alerts the managers and the Owner with the person and the device, and a
+  manager lifts a person's lock (Staff page) or a device's (Devices page) at once, which clears the
+  alert; lockouts last 15 minutes.
+- Code: `apps/server/src/auth/auth.service.ts` (`wrongSecret`, `unlock`);
+  `apps/server/src/devices/devices.service.ts` (`unlockPins`);
+  `apps/server/src/notifications/lockout-alerts.ts` (`LockoutAlerts`);
+  `apps/console/src/manage/devices/DevicesScreen.tsx` (`onUnlockPins`).
+- Tests: `apps/server/test/integration/tablet.int.test.ts` "counts wrong PINs against the
+  tablet, never locking the managers"; `apps/server/test/integration/auth-login.int.test.ts` "lets
+  a manager unlock a locked login, and nobody else", "lets a manager, not a waiter, let a device
+  take PINs again at once", "alerts the managers and the Owner when a login locks, and clears it
+  when it is unlocked"; `apps/server/test/integration/auth-guard.int.test.ts` "locks the approver
+  PIN after repeated wrong attempts"; `apps/console/test/devices.test.tsx` "shows a device that
+  takes no PINs until when, and lets it take them again".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2a: a diner could lock the managers out from a tablet, and nobody was
+  told of a lockout).
 
 #### PC-D3 Flooding the server or the socket
 
@@ -653,7 +684,7 @@ A manager's account uploads a photo or a menu spreadsheet that expands to gigaby
   with too many pixels"; `apps/server/test/unit/menu-workbook.test.ts` "refuses archives that
   would unpack too large, and files that are not ZIPs".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: the workbook's entries are inflated with a
+- Status: Partly mitigated. Plan: P8-03b2c by 2026-10-13: the workbook's entries are inflated with a
   limit on what comes out, whatever the directory says.
 
 #### PC-D5 A full disk or a stopped log archive

@@ -107,6 +107,18 @@ export const OWNER_SECOND_FACTOR_CAPABILITIES: ReadonlySet<Capability> = new Set
 export const OVERRIDE_APPROVER_ROLES: ReadonlySet<Role> = new Set<Role>(['OWNER', 'MANAGER']);
 
 /**
+ * The kind of record each approvable action is about (AUTH-011, PC-T2): a manager's approval names
+ * its record when it is given and is good for that record only, so approving a ₹200 void cannot
+ * void a ₹2,000 dish. Every capability any role needs an approval for has one.
+ */
+export const OVERRIDE_RECORD_TYPES: Readonly<Partial<Record<Capability, string>>> = {
+  ITEM_VOID_AFTER_PREP: 'order_item',
+  DISCOUNT_ABOVE_LIMIT: 'bill',
+  BILL_EDIT_AFTER_PRINT: 'invoice',
+  INVOICE_VOID: 'invoice',
+};
+
+/**
  * Built-in roles a custom role can build on (AUTH-012). The Owner and managers already have every
  * grantable capability, so a custom role starts from a cashier, waiter or kitchen role.
  */

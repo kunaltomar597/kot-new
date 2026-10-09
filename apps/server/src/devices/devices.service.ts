@@ -30,6 +30,7 @@ import type { AuthenticatedDevice } from '../auth/device.js';
 import { DeviceTokenService } from '../auth/device-token.service.js';
 import type { Principal } from '../auth/principal.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
+import { SignInLockouts } from '../auth/sign-in-lockouts.js';
 import { sha256Hex } from '../auth/tokens.js';
 import { newId } from '../common/ids.js';
 import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
@@ -148,7 +149,7 @@ function summary(device: DeviceRow): DeviceSummary {
 }
 
 /** The manager's view (MGR-006): a pager is connected by its heartbeats, an app by its socket. */
-function view(device: DeviceRow, connected: ReadonlySet<string>): DeviceView {
+function view(device: DeviceRow, connected: ReadonlySet<string>, now: Date): DeviceView {
   return {
     ...summary(device),
     connected:
@@ -164,6 +165,10 @@ function view(device: DeviceRow, connected: ReadonlySet<string>): DeviceView {
     clientApi: device.clientApi,
     // Pagers speak MQTT, not the client API (their firmware is P2-04b).
     compatibility: device.type === 'PAGER' ? 'UNKNOWN' : compatibilityOf(device.clientApi),
+    pinsLockedUntil:
+      device.pinsLockedUntil !== null && device.pinsLockedUntil > now
+        ? device.pinsLockedUntil.toISOString()
+        : null,
   };
 }
 
@@ -191,6 +196,7 @@ export class DevicesService {
     private readonly tls: TlsService,
     private readonly realtime: RealtimeGateway,
     private readonly licence: LicenceAgentService,
+    private readonly lockouts: SignInLockouts,
   ) {}
 
   async createPairingCode(
@@ -379,7 +385,42 @@ export class DevicesService {
       orderBy: { createdAt: 'asc' },
     });
     const connected = this.realtime.connectedDeviceIds(principal.restaurantId);
-    return { devices: devices.map((device) => view(device, connected)) };
+    const now = new Date();
+    return { devices: devices.map((device) => view(device, connected, now)) };
+  }
+
+  /**
+   * Lets a device take PINs and passwords again before its lock ends (PC-S5, MOBILE-S3): its count
+   * starts again and the lockout alert clears. Audited; every screen hears of it.
+   */
+  async unlockPins(principal: Principal, deviceId: string): Promise<DeviceView> {
+    const unlocked = await this.prisma.transaction(async (tx) => {
+      const device = await tx.device.findFirst({
+        where: { id: deviceId, restaurantId: principal.restaurantId },
+      });
+      if (device === null) throw AppError.notFound('The device');
+      const updated = await tx.device.update({
+        where: { id: device.id },
+        data: { pinFailures: 0, pinFailureWindowStartedAt: null, pinsLockedUntil: null },
+      });
+      await this.lockouts.unlocked(tx, {
+        kind: 'DEVICE',
+        restaurantId: principal.restaurantId,
+        deviceId: device.id,
+      });
+      await this.audit.record(tx, {
+        action: 'DEVICE_PINS_UNLOCKED',
+        entityType: 'device',
+        entityId: device.id,
+        actorId: principal.staffId,
+        deviceId: principal.deviceId,
+        restaurantId: principal.restaurantId,
+        before: { pinFailures: device.pinFailures, pinsLockedUntil: device.pinsLockedUntil },
+      });
+      await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));
+      return updated;
+    });
+    return view(unlocked, this.realtime.connectedDeviceIds(principal.restaurantId), new Date());
   }
 
   /** Renames a device (MGR-006): audited, and every screen hears of it. */

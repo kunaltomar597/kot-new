@@ -1,5 +1,6 @@
 import { Inject, Injectable, type NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
+import { idleMsOf } from './activity.js';
 import { DEVICE_AUTHENTICATOR, type DeviceAuthenticator } from './device.js';
 import type { AuthenticatedRequest } from './principal.js';
 import { SessionService } from './session.service.js';
@@ -30,7 +31,7 @@ export class AuthenticationMiddleware implements NestMiddleware {
       // whether they run (CWE-807).
       const device = await this.devices.authenticate(request);
       const token = bearerToken(request.headers.authorization);
-      const result = await this.sessions.authenticate(token, device);
+      const result = await this.sessions.authenticate(token, device, idleMsOf(request));
       target.device = device;
       if ('principal' in result) target.principal = result.principal;
       // Without a bearer token, a protected route simply answers "please sign in".

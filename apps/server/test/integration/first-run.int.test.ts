@@ -41,6 +41,12 @@ describe('[ONB-001] [ONB-004] the first run', () => {
       .post('/api/v1/first-run')
       .send({ restaurantName: 'Spice Route', ownerName: 'Asha', ownerPin: '12' });
     expect(bad.status).toBe(400);
+    // [PC-S5] The Owner's PIN may not be one guessed first.
+    const easy = await server()
+      .post('/api/v1/first-run')
+      .send({ restaurantName: 'Spice Route', ownerName: 'Asha', ownerPin: '1234' });
+    expect([easy.status, ApiError.parse(easy.body).code]).toEqual([422, 'PIN_TOO_EASY']);
+    expect(await prisma.restaurant.count()).toBe(0);
 
     const created = await server()
       .post('/api/v1/first-run')
@@ -67,7 +73,7 @@ describe('[ONB-001] [ONB-004] the first run', () => {
     // Only once.
     const again = await server()
       .post('/api/v1/first-run')
-      .send({ restaurantName: 'Another', ownerName: 'Someone', ownerPin: '1111' });
+      .send({ restaurantName: 'Another', ownerName: 'Someone', ownerPin: '5038' });
     expect([again.status, ApiError.parse(again.body).code]).toEqual([403, 'FIRST_RUN_CLOSED']);
     expect(FirstRunStatus.parse((await server().get('/api/v1/first-run')).body)).toEqual({
       needed: false,

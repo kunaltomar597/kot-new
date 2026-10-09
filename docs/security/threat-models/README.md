@@ -73,38 +73,32 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 
 | Component                                               | Threats | Mitigated | Partly mitigated | Not mitigated | Accepted | Residual Medium | Residual High or Critical |
 | ------------------------------------------------------- | ------: | --------: | ---------------: | ------------: | -------: | --------------: | ------------------------: |
-| [The LAN and the local server](local-server-and-lan.md) |      45 |        24 |               14 |             4 |        3 |              23 |                         3 |
+| [The LAN and the local server](local-server-and-lan.md) |      45 |        27 |               12 |             3 |        3 |              22 |                         2 |
 | [The pager channel](pager-channel.md)                   |      26 |        12 |               10 |             3 |        1 |               4 |                         2 |
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        15 |                8 |             4 |        2 |               9 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        11 |                7 |             2 |        1 |              11 |                         2 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        10 |                6 |             3 |        1 |               7 |                         2 |
 | [The Vendor Control Plane](control-plane.md)            |      22 |         8 |               12 |             1 |        1 |               8 |                         1 |
 | [The desktop shell](desktop-shell.md)                   |      14 |         5 |                5 |             3 |        1 |               7 |                         0 |
-| [The phones and tablets](phones-and-tablets.md)         |      18 |         8 |                7 |             3 |        0 |               6 |                         1 |
-| All                                                     |     195 |        93 |               69 |            23 |       10 |              75 |                        11 |
+| [The phones and tablets](phones-and-tablets.md)         |      18 |        11 |                5 |             2 |        0 |               5 |                         0 |
+| All                                                     |     195 |        99 |               65 |            21 |       10 |              73 |                         9 |
 
 Open threats and their plans, by date:
 
 | Threat                                                                                                                                      | Residual | Status           | Plan           | By         |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
-| [MOBILE-D1](phones-and-tablets.md#mobile-d1-a-diner-locking-managers-out-from-a-tablet) A diner locking managers out from a tablet          | Medium   | Not mitigated    | P8-03b2        | 2026-10-13 |
-| [MOBILE-E3](phones-and-tablets.md#mobile-e3-a-lost-phone-still-signed-in) A lost phone still signed in                                      | Medium   | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [MOBILE-S3](phones-and-tablets.md#mobile-s3-a-diner-guessing-a-managers-pin-at-a-tablet) A diner guessing a manager's PIN at a tablet       | High     | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PAGER-D3](pager-channel.md#pager-d3-flooding-the-broker-without-a-credential) Flooding the broker without a credential                     | High     | Not mitigated    | P8-03b2        | 2026-10-13 |
-| [PAGER-D4](pager-channel.md#pager-d4-a-signed-in-pager-publishing-too-much) A signed-in pager publishing too much                           | Low      | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PAGER-D6](pager-channel.md#pager-d6-a-pager-the-pc-wrongly-thinks-is-connected) A pager the PC wrongly thinks is connected                 | Low      | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PAGER-E3](pager-channel.md#pager-e3-more-pagers-than-the-licence-allows) More pagers than the licence allows                               | Low      | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PAGER-R2](pager-channel.md#pager-r2-i-did-not-press-it) "I did not press it"                                                               | Low      | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PAGER-R3](pager-channel.md#pager-r3-failed-pager-sign-ins-leave-no-trace) Failed pager sign-ins leave no trace                             | Low      | Not mitigated    | P8-03b2        | 2026-10-13 |
-| [PAGER-T1](pager-channel.md#pager-t1-a-forged-acknowledgement) A forged acknowledgement                                                     | Low      | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PAGER-T4](pager-channel.md#pager-t4-going-back-to-older-firmware) Going back to older firmware                                             | Low      | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PC-D1](local-server-and-lan.md#pc-d1-large-bodies-before-authentication) Large bodies before authentication                                | Medium   | Not mitigated    | P8-03b2        | 2026-10-13 |
-| [PC-D2](local-server-and-lan.md#pc-d2-lockouts-used-to-stop-the-restaurant) Lockouts used to stop the restaurant                            | Medium   | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PC-D4](local-server-and-lan.md#pc-d4-decompression-bombs-in-uploads) Decompression bombs in uploads                                        | Medium   | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PC-I9](local-server-and-lan.md#pc-i9-diners-personal-data-kept-after-they-ask) Diners' personal data kept after they ask                   | Medium   | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PC-S5](local-server-and-lan.md#pc-s5-guessing-a-pin) Guessing a PIN                                                                        | High     | Partly mitigated | P8-03b2        | 2026-10-13 |
-| [PC-T2](local-server-and-lan.md#pc-t2-a-managers-approval-used-on-another-record) A manager's approval used on another record               | Medium   | Not mitigated    | P8-03b2        | 2026-10-13 |
-| [PC-T8](local-server-and-lan.md#pc-t8-formulas-in-exported-files) Formulas in exported files                                                | Medium   | Partly mitigated | P8-03b2        | 2026-10-13 |
+| [PAGER-D3](pager-channel.md#pager-d3-flooding-the-broker-without-a-credential) Flooding the broker without a credential                     | High     | Not mitigated    | P8-03b2b       | 2026-10-13 |
+| [PAGER-D4](pager-channel.md#pager-d4-a-signed-in-pager-publishing-too-much) A signed-in pager publishing too much                           | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
+| [PAGER-D6](pager-channel.md#pager-d6-a-pager-the-pc-wrongly-thinks-is-connected) A pager the PC wrongly thinks is connected                 | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
+| [PAGER-E3](pager-channel.md#pager-e3-more-pagers-than-the-licence-allows) More pagers than the licence allows                               | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
+| [PAGER-R2](pager-channel.md#pager-r2-i-did-not-press-it) "I did not press it"                                                               | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
+| [PAGER-R3](pager-channel.md#pager-r3-failed-pager-sign-ins-leave-no-trace) Failed pager sign-ins leave no trace                             | Low      | Not mitigated    | P8-03b2b       | 2026-10-13 |
+| [PAGER-T1](pager-channel.md#pager-t1-a-forged-acknowledgement) A forged acknowledgement                                                     | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
+| [PAGER-T4](pager-channel.md#pager-t4-going-back-to-older-firmware) Going back to older firmware                                             | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
+| [PC-D1](local-server-and-lan.md#pc-d1-large-bodies-before-authentication) Large bodies before authentication                                | Medium   | Not mitigated    | P8-03b2c       | 2026-10-13 |
+| [PC-D4](local-server-and-lan.md#pc-d4-decompression-bombs-in-uploads) Decompression bombs in uploads                                        | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
+| [PC-I9](local-server-and-lan.md#pc-i9-diners-personal-data-kept-after-they-ask) Diners' personal data kept after they ask                   | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
+| [PC-T8](local-server-and-lan.md#pc-t8-formulas-in-exported-files) Formulas in exported files                                                | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
 | [LICENCE-D2](licence-mechanism.md#licence-d2-a-failed-fingerprint-read-taken-for-another-pc) A failed fingerprint read taken for another PC | Medium   | Not mitigated    | P8-03b3        | 2026-10-15 |
 | [LICENCE-D3](licence-mechanism.md#licence-d3-a-release-with-no-vendor-keys) A release with no vendor keys                                   | Medium   | Not mitigated    | P8-03b3        | 2026-10-15 |
 | [LICENCE-R3](licence-mechanism.md#licence-r3-tampering-nobody-looks-at) Tampering nobody looks at                                           | Low      | Partly mitigated | P8-03b3        | 2026-10-15 |

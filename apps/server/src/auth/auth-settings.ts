@@ -14,6 +14,12 @@ export interface AuthSettings {
   readonly lockoutMinutes: number;
   /** SEC-009: login and override attempts per device per minute. */
   readonly attemptsPerMinutePerDevice: number;
+  /** PC-S5: wrong PINs or passwords on one device within the window that stop it taking any. */
+  readonly deviceLockoutMaxFailures: number;
+  /** MOBILE-S3: the same on a table tablet, where they count against the tablet only. */
+  readonly tabletLockoutMaxFailures: number;
+  /** PC-S5: refuse easily guessed PINs when one is set. */
+  readonly refuseEasyPins: boolean;
   /** AUTH-005: at most 15 minutes. */
   readonly accessTokenMinutes: number;
   /** AUTH-005: POS and waiter devices. */
@@ -53,6 +59,9 @@ export class AuthSettingsService {
       lockoutWindowMinutes: values.get('auth.lockoutWindowMinutes'),
       lockoutMinutes: values.get('auth.lockoutMinutes'),
       attemptsPerMinutePerDevice: values.get('auth.attemptsPerMinutePerDevice'),
+      deviceLockoutMaxFailures: values.get('auth.deviceLockoutMaxFailures'),
+      tabletLockoutMaxFailures: values.get('auth.tabletLockoutMaxFailures'),
+      refuseEasyPins: values.get('auth.refuseEasyPins'),
       accessTokenMinutes: values.get('auth.accessTokenMinutes'),
       inactivityMinutes: values.get('auth.inactivityMinutes'),
       managerBrowserInactivityMinutes: values.get('auth.managerBrowserInactivityMinutes'),

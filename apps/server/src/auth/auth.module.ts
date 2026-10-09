@@ -14,6 +14,7 @@ import { PermissionGuard } from './permission.guard.js';
 import { RateLimiter } from './rate-limiter.js';
 import { createSecretStore, SECRET_STORE } from './secret-store.js';
 import { SessionService } from './session.service.js';
+import { SignInLockouts } from './sign-in-lockouts.js';
 import { TokenService } from './tokens.js';
 
 /**
@@ -44,6 +45,7 @@ import { TokenService } from './tokens.js';
     CredentialHasher,
     TokenService,
     RateLimiter,
+    SignInLockouts,
     SessionService,
     AuthService,
     { provide: APP_GUARD, useClass: PermissionGuard },
@@ -56,6 +58,7 @@ import { TokenService } from './tokens.js';
     DeviceTokenService,
     DeviceTokenAuthenticator,
     RateLimiter,
+    SignInLockouts,
     SECRET_STORE,
   ],
 })

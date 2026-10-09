@@ -23,7 +23,6 @@ import {
   createAuthKit,
   deviceTokenOf,
   signIn,
-  TEST_PINS,
 } from '../helpers/auth-kit.js';
 import { RealtimeTestClient } from '../helpers/realtime-client.js';
 import { appUrl, createTestApp, httpServer } from '../helpers/test-app.js';
@@ -122,7 +121,7 @@ async function create(
   return server().post('/api/v1/staff').set(as(session)).send(body);
 }
 
-async function addPerson(role: string, name: string, pin = '5678'): Promise<StaffView> {
+async function addPerson(role: string, name: string, pin = '5938'): Promise<StaffView> {
   const response = await create(manager, { displayName: name, role, pin });
   expect(response.status).toBe(201);
   return StaffView.parse(response.body);
@@ -195,7 +194,35 @@ describe('[MGR-004] [AUTH-001] [AUTH-002] adding people', () => {
     expect(codeOf(response)).toBe('PIN_LENGTH');
     expect(ApiError.parse(response.body).details).toEqual({ pinLength: 4 });
     // PINs need not be unique: people pick their name first (AUTH-001).
-    await addPerson('KITCHEN', 'Same PIN', TEST_PINS.WAITER);
+    await addPerson('KITCHEN', 'Same PIN', '2468');
+  });
+
+  it('[PC-S5] refuses an easily guessed PIN, unless the restaurant allows them', async () => {
+    for (const pin of ['1234', '0000', '1212', '1990']) {
+      const response = await create(manager, { displayName: 'Easy', role: 'WAITER', pin });
+      expect([response.status, codeOf(response)], pin).toEqual([422, 'PIN_TOO_EASY']);
+    }
+    const person = await addPerson('WAITER', 'Changes PIN');
+    const reset = await server()
+      .put(`/api/v1/staff/${person.id}/pin`)
+      .set(as(manager))
+      .send({ pin: '4321' });
+    expect([reset.status, codeOf(reset)]).toEqual([422, 'PIN_TOO_EASY']);
+
+    await prisma.setting.create({
+      data: { restaurantId: kit.restaurantId, key: 'auth.refuseEasyPins', value: false },
+    });
+    app.get(AuthSettingsService).invalidate();
+    try {
+      expect(
+        (await create(manager, { displayName: 'Easy', role: 'WAITER', pin: '1234' })).status,
+      ).toBe(201);
+    } finally {
+      await prisma.setting.deleteMany({
+        where: { restaurantId: kit.restaurantId, key: 'auth.refuseEasyPins' },
+      });
+      app.get(AuthSettingsService).invalidate();
+    }
   });
 
   it('lists everyone, active first, with PIN and lock state but never a secret', async () => {
@@ -222,7 +249,7 @@ describe('[MGR-004] [AUTH-001] [AUTH-002] adding people', () => {
 describe('[MGR-004] changing people', () => {
   it('changes a name, contact and role; the role applies to the next request', async () => {
     const meena = await addPerson('WAITER', 'Meena');
-    const session = LoginResponse.parse((await pinLogin(meena.id, '5678')).body);
+    const session = LoginResponse.parse((await pinLogin(meena.id, '5938')).body);
     const response = await server()
       .patch(`/api/v1/staff/${meena.id}`)
       .set(as(manager))
@@ -260,7 +287,7 @@ describe('[MGR-004] changing people', () => {
 
   it('sets a PIN, lifting a lockout and ending the person’s other sessions', async () => {
     const kiran = await addPerson('CASHIER', 'Kiran');
-    const session = LoginResponse.parse((await pinLogin(kiran.id, '5678')).body);
+    const session = LoginResponse.parse((await pinLogin(kiran.id, '5938')).body);
     await prisma.credential.update({
       where: { staffId_kind: { staffId: kiran.id, kind: 'PIN' } },
       data: { lockedUntil: new Date(Date.now() + 10 * 60_000) },
@@ -275,7 +302,7 @@ describe('[MGR-004] changing people', () => {
       .set(as(manager))
       .send({ pin: '9753' });
     expect(response.status).toBe(204);
-    expect((await pinLogin(kiran.id, '5678')).status).toBe(401);
+    expect((await pinLogin(kiran.id, '5938')).status).toBe(401);
     expect((await pinLogin(kiran.id, '9753')).status).toBe(200);
     expect((await server().get('/api/v1/auth/session').set(as(session))).status).toBe(401);
     const entry = await prisma.auditLog.findFirstOrThrow({
@@ -300,7 +327,7 @@ describe('[AUTH-008] [MGR-004] deactivating', () => {
   it('signs the person out everywhere within 5 s, takes back their devices and sections', async () => {
     const sunil = await addPerson('WAITER', 'Sunil');
     const phone = await addDevice(app, kit, 'WAITER_PHONE');
-    const session = LoginResponse.parse((await pinLogin(sunil.id, '5678', phone)).body);
+    const session = LoginResponse.parse((await pinLogin(sunil.id, '5938', phone)).body);
     const socket = await RealtimeTestClient.connect(appUrl(app), {
       deviceToken: deviceTokenOf(phone),
       accessToken: session.accessToken,
@@ -322,7 +349,7 @@ describe('[AUTH-008] [MGR-004] deactivating', () => {
     expect(refused.status).toBe(401);
     expect(await socket.waitForDisconnect(5_000)).toBe('io server disconnect');
     expect(performance.now() - started).toBeLessThan(5_000);
-    expect((await pinLogin(sunil.id, '5678')).status).toBe(401);
+    expect((await pinLogin(sunil.id, '5938')).status).toBe(401);
     expect(await prisma.device.findUniqueOrThrow({ where: { id: pager } })).toMatchObject({
       staffId: null,
     });
@@ -355,7 +382,7 @@ describe('[AUTH-008] [MGR-004] deactivating', () => {
     const back = await server().post(`/api/v1/staff/${sunil.id}/reactivate`).set(as(manager));
     expect(back.status).toBe(200);
     expect(StaffView.parse(back.body).active).toBe(true);
-    expect((await pinLogin(sunil.id, '5678')).status).toBe(200);
+    expect((await pinLogin(sunil.id, '5938')).status).toBe(200);
     expect(
       await prisma.auditLog.count({ where: { action: 'STAFF_REACTIVATED', entityId: sunil.id } }),
     ).toBe(1);
@@ -413,7 +440,7 @@ describe('[AUTH-006] creating or removing managers', () => {
     // Another manager's record is the Owner's to change.
     for (const call of [
       server().patch(`/api/v1/staff/${rohit.id}`).set(as(manager)).send({ displayName: 'R' }),
-      server().put(`/api/v1/staff/${rohit.id}/pin`).set(as(manager)).send({ pin: '1111' }),
+      server().put(`/api/v1/staff/${rohit.id}/pin`).set(as(manager)).send({ pin: '5038' }),
       server()
         .post(`/api/v1/staff/${rohit.id}/deactivate`)
         .set(as(manager))
@@ -443,7 +470,7 @@ describe('[AUTH-006] creating or removing managers', () => {
     const response = await server()
       .put(`/api/v1/staff/${kit.staff.OWNER}/pin`)
       .set(as(manager))
-      .send({ pin: '2222' });
+      .send({ pin: '6049' });
     expect(response.status).toBe(403);
     expect(codeOf(response)).toBe('OWNER_ONLY');
   });
@@ -456,7 +483,7 @@ describe('[AUTH-006] creating or removing managers', () => {
     expect(codeOf(ownerLock)).toBe('OWNER_ONLY');
 
     await stepUp();
-    const added = await create(owner, { displayName: 'Meera', role: 'MANAGER', pin: '8765' });
+    const added = await create(owner, { displayName: 'Meera', role: 'MANAGER', pin: '8604' });
     expect(added.status).toBe(201);
     const meera = StaffView.parse(added.body);
     const otherManager = await unlock(manager, meera.id);
