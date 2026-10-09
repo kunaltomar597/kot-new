@@ -110,6 +110,7 @@ import {
   DeviceChallengeResponse,
   DeviceHealthRequest,
   DeviceListResponse,
+  DeviceView,
   DeviceSummary,
   DeviceTokenRequest,
   DeviceTokenResponse,
@@ -1065,8 +1066,8 @@ export const ROUTES = [
     description:
       'Public because nothing exists yet; only from the server PC itself and only while no ' +
       'restaurant exists (ONB-001). Creates the built-in roles, a default invoice series and ' +
-      'the Owner with their PIN; the Owner sets a password and authenticator next (AUTH-006). ' +
-      'Audited.',
+      'the Owner with their PIN, which must not be easily guessed (PC-S5); the Owner sets a ' +
+      'password and authenticator next (AUTH-006). Audited.',
     tags: ['onboarding'],
     requirements: ['ONB-001', 'ONB-004', 'AUD-001'],
     capability: 'PUBLIC',
@@ -1075,6 +1076,7 @@ export const ROUTES = [
       201: { description: 'Created.', schema: FirstRunResponse },
       400: { description: 'The request does not match the contract.', schema: ApiError },
       403: { description: 'Not from the server PC, or already set up.', schema: ApiError },
+      422: { description: 'The PIN is too easy to guess.', schema: ApiError },
     },
   },
   {
@@ -1305,16 +1307,23 @@ export const ROUTES = [
     summary: 'Sign in on this device with a staff PIN',
     description:
       'Locks the staff login for 15 min after 5 failures in 10 min and rate-limits attempts per ' +
-      'device (AUTH-003, SEC-009). Kitchen staff sign in only when individual kitchen logins are on.',
+      'device (AUTH-003, SEC-009). Every wrong PIN or password on a device also counts against the ' +
+      'device: at `auth.deviceLockoutMaxFailures` within the window it takes none for the lockout ' +
+      'time (423 `DEVICE_LOCKED`) until a manager lets it again (PC-S5). Managers and the Owner are ' +
+      'alerted to each lockout (`SIGN_IN_LOCKED`). Kitchen staff sign in only when individual ' +
+      'kitchen logins are on.',
     tags: ['auth'],
-    requirements: ['AUTH-001', 'AUTH-002', 'AUTH-003', 'AUTH-005', 'AUTH-013'],
+    requirements: ['AUTH-001', 'AUTH-002', 'AUTH-003', 'AUTH-005', 'AUTH-013', 'SEC-009'],
     capability: 'DEVICE',
     devices: STAFF_DEVICE_TYPES,
     request: { body: PinLoginRequest },
     responses: {
       200: { description: 'Signed in.', schema: LoginResponse },
       ...deviceErrors,
-      423: { description: 'Login locked after repeated failures.', schema: ApiError },
+      423: {
+        description: 'The login is locked, or this device takes no PINs for now.',
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this device.', schema: ApiError },
     },
   },
@@ -1325,7 +1334,8 @@ export const ROUTES = [
     summary: 'Sign in as the Owner with password and second factor',
     description:
       'Password + TOTP (or a recovery code) sign-in; the session carries a fresh step-up for ' +
-      'Owner-only actions (AUTH-006).',
+      'Owner-only actions (AUTH-006). A wrong password also counts against the device, as at ' +
+      '`pinLogin`.',
     tags: ['auth'],
     requirements: ['AUTH-006', 'AUTH-013'],
     capability: 'DEVICE',
@@ -1334,7 +1344,10 @@ export const ROUTES = [
     responses: {
       200: { description: 'Signed in.', schema: LoginResponse },
       ...deviceErrors,
-      423: { description: 'Login locked after repeated failures.', schema: ApiError },
+      423: {
+        description: 'The login is locked, or this device takes no passwords for now.',
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this device.', schema: ApiError },
     },
   },
@@ -1345,7 +1358,8 @@ export const ROUTES = [
     summary: 'Get a new access token and rotate the refresh token',
     description:
       'Fails when the session was revoked, expired or idle too long. Reusing an old refresh token ' +
-      'revokes the whole session (AUTH-005).',
+      'revokes the whole session (AUTH-005). Counts as activity only as far as `x-rp-idle-seconds` ' +
+      'says the person was there.',
     tags: ['auth'],
     requirements: ['AUTH-005'],
     capability: 'DEVICE',
@@ -1370,7 +1384,10 @@ export const ROUTES = [
     summary: 'The signed-in person and their session on this device',
     description:
       'Apps check a restored session with it after a restart. Like every authenticated call it ' +
-      'counts as activity, so an app can keep a session alive while the person is using it.',
+      'counts as activity, so an app can keep a session alive while the person is using it. An ' +
+      'app that sends `x-rp-idle-seconds` (how long ago the person last touched it) is counted ' +
+      'active as of then, so calls it makes by itself do not keep an idle session alive ' +
+      '(MOBILE-E3).',
     tags: ['auth'],
     requirements: ['AUTH-005'],
     capability: 'SESSION',
@@ -1396,8 +1413,11 @@ export const ROUTES = [
     path: '/api/v1/auth/override',
     summary: 'A manager approves one action on this device with their PIN',
     description:
-      'Returns a single-use token for one capability (and entity) of the signed-in requester; ' +
-      'both people are audited (AUTH-011).',
+      'Returns a single-use token for one capability and record of the signed-in requester; ' +
+      'both people are audited (AUTH-011). An approval for a voided item, a reopened or voided ' +
+      'invoice or a discount above the limit must name its record (`entityType`, `entityId`) and ' +
+      'works only on that record: used on another it is refused and not spent (PC-T2). A wrong ' +
+      'PIN also counts against the device, as at `pinLogin`.',
     tags: ['auth'],
     requirements: ['AUTH-011', 'AUTH-013'],
     capability: 'SESSION',
@@ -1405,7 +1425,15 @@ export const ROUTES = [
     responses: {
       200: { description: 'Override granted.', schema: OverrideResponse },
       ...standardErrors,
-      423: { description: "The manager's login is locked.", schema: ApiError },
+      422: {
+        description:
+          'The approval does not name the record it is for (`OVERRIDE_RECORD_REQUIRED`).',
+        schema: ApiError,
+      },
+      423: {
+        description: "The manager's login is locked, or this device takes no PINs for now.",
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this device.', schema: ApiError },
     },
   },
@@ -1416,7 +1444,7 @@ export const ROUTES = [
     summary: "Unlock a staff member's PIN login after repeated failures",
     description:
       'A manager unlocks their own login and their team’s; the Owner’s and other managers’ ' +
-      'only the Owner (P4-02a).',
+      'only the Owner (P4-02a). Clears the lockout alert.',
     tags: ['auth'],
     requirements: ['AUTH-003', 'AUTH-013'],
     capability: 'STAFF_MANAGE',
@@ -1569,7 +1597,8 @@ export const ROUTES = [
     description:
       'MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner ' +
       'with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN ' +
-      'has exactly `auth.pinLength` digits, is hashed with the pepper and never stored or logged ' +
+      'has exactly `auth.pinLength` digits, is not easily guessed while `auth.refuseEasyPins` is ' +
+      'on (422 `PIN_TOO_EASY`, PC-S5), is hashed with the pepper and never stored or logged ' +
       '(AUTH-002). Audited.',
     tags: ['staff'],
     requirements: ['MGR-004', 'AUTH-001', 'AUTH-002', 'AUTH-006', 'AUD-001'],
@@ -1647,7 +1676,8 @@ export const ROUTES = [
     path: '/api/v1/staff/:staffId/pin',
     summary: "Set or reset a person's PIN",
     description:
-      'MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, hashed with the pepper, never ' +
+      'MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, not easily guessed while ' +
+      '`auth.refuseEasyPins` is on (422 `PIN_TOO_EASY`, PC-S5), hashed with the pepper, never ' +
       "stored, logged or shown. Clears a lockout (AUTH-003). A manager's PIN is set by the Owner " +
       "or themselves, the Owner's only by the Owner. Audited without the PIN.",
     tags: ['staff'],
@@ -1827,6 +1857,24 @@ export const ROUTES = [
     capability: 'DEVICE_PAIR',
     request: { params: z.object({ deviceId: Id }), body: RevokeDeviceRequest },
     responses: { 200: { description: 'Revoked.', schema: DeviceSummary }, ...standardErrors },
+  },
+  {
+    operationId: 'unlockDevicePins',
+    method: 'POST',
+    path: '/api/v1/devices/:deviceId/pins/unlock',
+    summary: 'Let a device take PINs again after too many wrong ones',
+    description:
+      'PC-S5, MOBILE-S3: a device that stopped taking PINs and passwords after too many wrong ' +
+      'ones takes them again at once; the lockout alert clears. Audited.',
+    tags: ['devices'],
+    requirements: ['AUTH-003', 'SEC-009', 'AUD-001'],
+    capability: 'DEVICE_PAIR',
+    request: { params: z.object({ deviceId: Id }) },
+    responses: {
+      200: { description: 'It takes PINs again.', schema: DeviceView },
+      ...standardErrors,
+      404: { description: 'No such device.', schema: ApiError },
+    },
   },
   {
     operationId: 'locateDevice',
@@ -3146,8 +3194,11 @@ export const ROUTES = [
     path: '/api/v1/devices/current/kiosk-exit',
     summary: "A manager lets staff out of a table tablet's kiosk mode with their PIN",
     description:
-      'TAB-001, AUTH-009: checks the PIN of an active manager or the Owner (failures count ' +
-      'towards their lock-out) and audits the exit (TABLET_KIOSK_EXITED). Only table tablets.',
+      'TAB-001, AUTH-009: checks the PIN of an active manager or the Owner and audits the exit ' +
+      '(TABLET_KIOSK_EXITED). Wrong PINs count against the tablet, not the person: at ' +
+      '`auth.tabletLockoutMaxFailures` the tablet takes no PINs for the lockout time and the ' +
+      'managers are alerted, so a diner cannot lock the managers out (MOBILE-S3, MOBILE-D1). ' +
+      'Only table tablets.',
     tags: ['devices'],
     requirements: ['TAB-001', 'AUTH-013', 'AUD-001'],
     capability: 'DEVICE',
@@ -3157,7 +3208,10 @@ export const ROUTES = [
       200: { description: 'Allowed.', schema: KioskExitResponse },
       ...deviceErrors,
       403: { description: 'Not a table tablet, or not a manager.', schema: ApiError },
-      423: { description: "The manager's login is locked.", schema: ApiError },
+      423: {
+        description: "The manager's login is locked, or the tablet takes no PINs for now.",
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this tablet.', schema: ApiError },
     },
   },
@@ -3243,8 +3297,9 @@ export const ROUTES = [
     path: '/api/v1/devices/current/orders/:orderId/approve',
     summary: 'Approve at table: the waiter approves on the tablet with their PIN',
     description:
-      "ORD-004: the PIN is checked like a sign-in (failures count towards the person's " +
-      "lock-out); waiters may approve only their own table's orders. Only this tablet's table.",
+      'ORD-004: the PIN is checked like a sign-in, but wrong ones count against the tablet, not ' +
+      "the person (MOBILE-D1); waiters may approve only their own table's orders. Only this " +
+      "tablet's table.",
     tags: ['orders'],
     requirements: ['ORD-004', 'ORD-003', 'AUTH-013', 'AUTH-009'],
     capability: 'DEVICE',
@@ -3256,7 +3311,10 @@ export const ROUTES = [
       403: { description: 'Not this table, or not allowed to approve.', schema: ApiError },
       404: { description: 'No such order at this table.', schema: ApiError },
       409: { description: 'Nothing waits for approval, or a dish ran out.', schema: ApiError },
-      423: { description: 'The login is locked.', schema: ApiError },
+      423: {
+        description: 'The login is locked, or the tablet takes no PINs for now.',
+        schema: ApiError,
+      },
       429: { description: 'Too many attempts from this tablet.', schema: ApiError },
     },
   },

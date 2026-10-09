@@ -156,6 +156,7 @@ export const en = {
       SUSPICIOUS_ACTIVITY: 'Suspicious activity to review',
       SUPPORT_REQUEST: 'Support asks for diagnostics',
       VENDOR_RESTORE_CODE: 'The vendor can open your cloud backups',
+      SIGN_IN_LOCKED: 'Sign-in locked after wrong PINs',
     },
     orderFrom:
       'Order {number} from the {source, select, TABLE_TABLET {table tablet} QR {QR menu} WAITER_APP {waiter app} other {POS}}',
@@ -174,6 +175,10 @@ export const en = {
     supportRequest: '{name} from support: “{reason}”. Allow or decline it on the System page.',
     vendorRestoreCode:
       '{name} from the vendor issued a restore code for your cloud backups: “{reason}”. If you did not ask for a restore onto a new PC, call the vendor now.',
+    personLocked:
+      '{name} cannot sign in until {time}: too many wrong {method, select, OWNER_PASSWORD {passwords} STEP_UP {passwords} other {PINs}} on {device}. If it was not them, someone may be guessing. Unlock it on the Staff page.',
+    devicePinsLocked:
+      '{device} takes no PINs until {time}: too many wrong ones were typed on it. If staff did not mistype them, someone may be guessing. Let it take PINs again on the Devices page.',
     /** Android notifications on the waiter phone (P2-06b, WTR-005). */
     notification: {
       listeningTitle: 'Alerts for {name}',
@@ -938,6 +943,10 @@ export const en = {
     batteryCharging: 'Battery {percent}%, charging',
     locate: 'Locate',
     locateNamed: 'Locate {name}',
+    pinsLocked: 'Takes no PINs until {time}',
+    unlockPins: 'Take PINs again',
+    unlockPinsNamed: 'Let {name} take PINs again',
+    pinsUnlocked: '{name} takes PINs again.',
     locating: '{name} is flashing and sounding for {seconds} seconds.',
     network: {
       WIFI: 'On Wi-Fi',
@@ -3277,6 +3286,9 @@ export const en = {
       lockoutWindowMinutes: 'Wrong PINs counted within',
       lockoutMinutes: 'Locked login stays locked for',
       attemptsPerMinutePerDevice: 'Sign-in attempts per device per minute',
+      deviceLockoutMaxFailures: 'Wrong PINs before a device stops taking them',
+      tabletLockoutMaxFailures: 'Wrong PINs before a table tablet stops taking them',
+      refuseEasyPins: 'Refuse easily guessed PINs',
       accessTokenMinutes: 'Access token lifetime',
       inactivityMinutes: 'Sign out POS and waiter phones after',
       managerBrowserInactivityMinutes: 'Sign out manager browsers after',
@@ -3426,6 +3438,12 @@ export const en = {
       lockoutWindowMinutes: 'Window in which wrong PINs are counted.',
       lockoutMinutes: 'How long a locked login stays locked unless a manager unlocks it.',
       attemptsPerMinutePerDevice: 'Login and override attempts allowed per device per minute.',
+      deviceLockoutMaxFailures:
+        'Wrong PINs or passwords on one device, for anyone, within the window that stop it taking any for the lockout time (our default).',
+      tabletLockoutMaxFailures:
+        'Wrong PINs on a table tablet within the window that stop it taking any for the lockout time; they never lock the person (our default).',
+      refuseEasyPins:
+        'Refuse PINs that are guessed first, such as 1234, 1111, 1212 or a year, when a PIN is set (our default).',
       accessTokenMinutes: 'Lifetime of an access token (at most 15 minutes).',
       inactivityMinutes: 'Inactivity after which a POS or waiter device signs the person out.',
       managerBrowserInactivityMinutes:

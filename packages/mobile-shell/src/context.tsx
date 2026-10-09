@@ -17,7 +17,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { AppState } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 
 interface Shell {
   readonly session: DeviceSession;
@@ -45,7 +45,11 @@ export function uiStrings(t: Translator): UiStrings {
   };
 }
 
-/** Gives the screens the device session, the catalogue, the app's updates and the theme. */
+/**
+ * Gives the screens the device session, the catalogue, the app's updates and the theme. Every
+ * touch anywhere in the app tells the session the person is there (AUTH-005, MOBILE-E3), so only
+ * their own use keeps them signed in.
+ */
 export function ShellProvider({
   session,
   translator,
@@ -67,7 +71,17 @@ export function ShellProvider({
   return (
     <ShellContext value={shell}>
       <ThemeProvider>
-        <UiStringsProvider strings={strings}>{children}</UiStringsProvider>
+        <UiStringsProvider strings={strings}>
+          <View
+            style={styles.app}
+            testID="shell-touches"
+            onTouchStart={() => {
+              session.touched();
+            }}
+          >
+            {children}
+          </View>
+        </UiStringsProvider>
       </ThemeProvider>
     </ShellContext>
   );
@@ -145,3 +159,5 @@ export function useAppUpdateWhenFree(inUse: boolean): void {
     };
   }, [updater, apkUpdater, inUse, onScreen]);
 }
+
+const styles = StyleSheet.create({ app: { flex: 1 } });

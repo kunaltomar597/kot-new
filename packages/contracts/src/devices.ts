@@ -210,6 +210,11 @@ export const DeviceView = DeviceSummary.extend({
   clientApi: z.string().nullable(),
   /** How that stands against the server's: PREVIOUS and TOO_OLD apps need updating. */
   compatibility: ClientCompatibility,
+  /**
+   * Until when the device takes no PINs or passwords after too many wrong ones (PC-S5); null when
+   * it takes them. A manager can let it take them again sooner (`unlockDevicePins`).
+   */
+  pinsLockedUntil: Timestamp.nullable(),
 });
 export type DeviceView = z.infer<typeof DeviceView>;
 

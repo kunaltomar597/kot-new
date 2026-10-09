@@ -5,6 +5,7 @@ import {
   type FirstRunStatus,
   settingDefinition,
 } from '@rp/contracts';
+import { isEasilyGuessedPin } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { CredentialHasher } from '../auth/credential-hasher.js';
 import { ADVISORY_LOCKS } from '../database/advisory-locks.js';
@@ -24,6 +25,11 @@ const BUILT_IN_ROLES = [
 function pinLength(): number {
   const value = settingDefinition('auth.pinLength')?.defaultValue;
   return typeof value === 'number' ? value : 4;
+}
+
+/** A new restaurant refuses easily guessed PINs unless the catalogue's default says not (PC-S5). */
+function refuseEasyPins(): boolean {
+  return settingDefinition('auth.refuseEasyPins')?.defaultValue !== false;
 }
 
 const closed = () =>
@@ -58,6 +64,13 @@ export class FirstRunService {
         400,
         'VALIDATION_FAILED',
         `The PIN must have ${String(pinLength())} digits, as every PIN here.`,
+      );
+    }
+    if (refuseEasyPins() && isEasilyGuessedPin(request.ownerPin)) {
+      throw new AppError(
+        422,
+        'PIN_TOO_EASY',
+        'That PIN is too easy to guess, like 1234, 1111, 1212 or a year. Choose another.',
       );
     }
     const pinHash = await this.hasher.hash(request.ownerPin);

@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b1).
+Last updated: 2026-10-10 (P8-03b2a).
 
 What exists:
 
@@ -25,7 +25,9 @@ What exists:
   (P7-04c); client API versions, N-1 and the component version matrix (P7-04d); which
   over-the-air update a phone or tablet takes, and when it restarts on it (P7-04e1); which APK
   from the PC a phone or tablet takes, and when a kiosk tablet installs it by itself (P7-04e2);
-  when the PC offers its pager firmware to a pager, and when it gives up (P2-04b1). 376 tests.
+  when the PC offers its pager firmware to a pager, and when it gives up (P2-04b1); the PINs
+  guessed first, counting wrong secrets towards a lock, and the kind of record each approval is
+  for (P8-03b2a). 403 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -53,7 +55,10 @@ What exists:
   with "Update now" (P2-04b1); a pager's QR code, `RP-PAGER:<serial>` (P2-04b2); the kinds of
   device each device endpoint serves (`devices`, `x-devices`), `HTTP_DEVICE_TYPES`,
   `STAFF_DEVICE_TYPES` and `PairableDeviceType`, and the docs generator refusing a device endpoint
-  without its devices or a public one that does not say why (P8-03a). 961 tests.
+  without its devices or a public one that does not say why (P8-03a); the `SIGN_IN_LOCKED` alert,
+  a device's PIN lock with `unlockDevicePins`, `IDLE_HEADER` (`x-rp-idle-seconds`) and the
+  settings `auth.deviceLockoutMaxFailures`, `auth.tabletLockoutMaxFailures` and
+  `auth.refuseEasyPins` (P8-03b2a). 964 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -119,8 +124,13 @@ What exists:
   devices, no pairing code for a pager, and the authorisation sweep over every endpoint (P8-03a);
   payments, cash movements and day-ends that the server's own database role cannot change, an
   unpaired pager cut off at once with its wearer released, no start in production without TLS,
-  and a manager's approval token kept out of the request log (P8-03b1).
-  1202 tests (28 skipped: Windows only, a real install, or the performance runs).
+  and a manager's approval token kept out of the request log (P8-03b1); wrong PINs and passwords
+  counted against the device as well as the person (a device stops taking them after ten in ten
+  minutes), against a table tablet only, never its managers, easily guessed PINs refused, every
+  lockout alerting the managers and the Owner until lifted, a manager's approval good only for
+  the record it names, and sessions kept alive only as of the person's last touch, as the app
+  says (P8-03b2a). 1212 tests (28 skipped: Windows only, a real install, or the performance
+  runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -136,7 +146,9 @@ What exists:
   first read and sends Acknowledge pressed on a notification (P2-06b); `OtaUpdater`, the apps'
   over-the-air updates: an EAS update only when the server speaks its client API, applied while
   the device is free (P7-04e1, ADR-0017); `ApkUpdater`, new APKs from the restaurant PC: offered
-  to a person on a phone, installed by a kiosk tablet between guests (P7-04e2). 102 tests.
+  to a person on a phone, installed by a kiosk tablet between guests (P7-04e2); the person's last
+  touch, sent with every call so the phone's own reads keep no idle session alive (P8-03b2a).
+  103 tests.
 - `packages/ui-native`: the React Native component library with the same props and tokens as
   `@rp/ui-web` (Button, Money, StatusChip, PinPad, Sheet, toasts, menu item, quantity and option
   pickers) (P2-01b), table tiles and a segmented control (P2-02a), a text field (P2-02b).
@@ -155,8 +167,8 @@ What exists:
   "Update this app" screen that says when an update is on its way (P7-04e1); the in-app APK
   updater: `AndroidApkInstaller` (download over the pinned CA with the SHA-256, package and
   version checked, Android's `PackageInstaller`, the reopening after `MY_PACKAGE_REPLACED`) and
-  the shell's `ApkOffer` on the sign-in screen and "Update this app" (P7-04e2). Shell 48 tests,
-  mobile-native 41.
+  the shell's `ApkOffer` on the sign-in screen and "Update this app" (P7-04e2); every touch in the
+  app counting as the person's activity (P8-03b2a). Shell 49 tests, mobile-native 41.
 - `apps/waiter-app` and `apps/table-tablet`: Expo SDK 57 development builds that pair, sign in
   (waiter) and show live data, with EAS profiles, Maestro flows and a CI job building debug APKs
   (P2-01c). The waiter app's home is "My tables" or all tables, with open, move and request bill,
@@ -250,7 +262,9 @@ What exists:
   (P2-04b1); registering a pager by reading its QR code with the device's camera (P2-04b2; the
   Playwright run scans one through Chromium's fake camera); the kitchen screen's sound made ready
   before the first touch, and a Playwright speed test of taps and screen changes (NFR-P07) on a
-  restaurant of the design capacity's size (P8-01b). 383 tests, and 25 Playwright steps.
+  restaurant of the design capacity's size (P8-01b); on the Devices page, a device that takes no
+  PINs after too many wrong ones, until when, and "Take PINs again" (P8-03b2a). 384 tests, and 25
+  Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -287,7 +301,9 @@ What exists:
 - `docs/security/`: the security documents of P8-03: `authorisation.md`, who may call what on
   every surface and the tests that check it (P8-03a); `threat-models/`, a STRIDE model of each of
   the eight components with 195 threats, their code, their tests and a dated plan for each one
-  left open, checked on every build by `pnpm security:threats` (P8-03b1).
+  left open, checked on every build by `pnpm security:threats` (P8-03b1). P8-03b2a mitigated six
+  (PIN guessing, lockouts, a tablet's PIN prompt, approvals used on another record, a phone left
+  signed in): 99 mitigated, 9 residual Highs, each planned.
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
@@ -300,9 +316,9 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b2, P8-03b3 and P8-03b4: the fixes the threat models planned, by their dates (the summary
-  in `docs/security/threat-models/README.md` lists each threat). P8-03b2 first: three of its
-  threats are residual Highs (PIN guessing, a tablet's PIN prompt, the pager broker's limits).
+- P8-03b2b (the pager broker: PAGER-D3 is a residual High), then P8-03b2c, P8-03b3 and P8-03b4:
+  the fixes the threat models planned, by their dates (the summary in
+  `docs/security/threat-models/README.md` lists each threat).
 - Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
   incident response plan and the pack for the penetration testers (the external test needs the
   firm the Business Owner engages).
@@ -528,7 +544,11 @@ Recommended next WPs (dependencies met):
   - [x] P8-03a Authorisation sweep (local server and Control Plane)
   - [~] P8-03b STRIDE threat models
     - [x] P8-03b1 The threat models of the eight components, their checks, the High finding fixed
-    - [ ] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
+    - [~] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
+      - [x] P8-03b2a Sign-in and approvals (PIN budgets per device, easy PINs, lockout alerts,
+            approvals bound to their record, the waiter phone's inactivity)
+      - [ ] P8-03b2b The pager broker's limits, acknowledgements and sign-in log
+      - [ ] P8-03b2c Bodies, uploads, exports and erasure
     - [ ] P8-03b3 Threat-model fixes to the licence and the update pipeline
     - [ ] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
   - [ ] P8-03c DAST of the QR site, relay and Control Plane
@@ -779,6 +799,45 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b2a):
+
+723. P8-03b2 is split into three by the part of the PC each touches (`phase-8.md`): P8-03b2a
+     sign-in and approvals (this WP), P8-03b2b the pager broker, P8-03b2c bodies, uploads, exports
+     and erasure. The threats keep their date (2026-10-13) and name their part.
+724. Every wrong PIN or password counts against the device it was typed on as well as the person
+     (AUTH-003's "attempts are also rate-limited per device", read as a budget as well as a rate):
+     at `auth.deviceLockoutMaxFailures` (10, our default) within the lockout window the device
+     takes none for the lockout time, whoever they were for; a right PIN does not reset the count,
+     so a member of staff cannot clear it with their own sign-in. A manager lets the device take
+     PINs again at once from the Devices page (`unlockDevicePins`, audited `DEVICE_PINS_UNLOCKED`).
+     Refused attempts on a locked device are audited like any failure.
+725. Wrong PINs typed on a table tablet (leaving the kiosk, approving at the table) count against
+     the tablet only, never the person, so a diner cannot lock the managers out (MOBILE-D1); the
+     tablet stops taking PINs after `auth.tabletLockoutMaxFailures` (5, our default) and the
+     managers are alerted. Meanwhile waiters approve that table's orders from their phones.
+726. PINs guessed first are refused when a PIN is set, by default (`auth.refuseEasyPins`): one digit
+     or one block repeated (`0000`, `1212`, `123123`), runs up or down with 9→0 (`1234`, `4321`,
+     `7890`), digits in pairs (`1122`), 4-digit years 1900-2099, keypad lines (`2580`) and a few
+     favourites (`isEasilyGuessedPin`). PINs already set stay until changed (they are only stored
+     hashed). The first run refuses them too, by the catalogue's default.
+727. Every lockout raises `SIGN_IN_LOCKED` to the Owner and the managers on duty, on the POS and
+     the dashboard, without repeats or escalation: one open alert per person or device, with who,
+     where and until when; it clears when a manager unlocks the person, sets a new PIN or lets the
+     device take PINs again.
+728. An approval for an action about a record (`OVERRIDE_RECORD_TYPES`: a voided item, a reopened or
+     voided invoice, a discount above the limit) must name its record when it is given (422
+     `OVERRIDE_RECORD_REQUIRED`, before the PIN is checked) and is used only on that record; on
+     another it is refused and stays unused. The guard takes the record from the route's `record`
+     parameter; a route of such a capability that does not name one refuses every request. Before,
+     an approval without a record worked on any record, and the discount path spent it before
+     checking.
+729. The apps say on every call how long ago the person last touched them (`x-rp-idle-seconds`);
+     the server counts the person active as of then, so calls an app makes by itself no longer
+     keep an idle session alive (AUTH-005, MOBILE-E3). An app that does not send it (an N-1 build)
+     counts every call as activity, as before; a socket's (re)connection never counts. The mobile
+     shell counts any touch on the app; the console keeps its own inactivity sign-out (P0-14b) and
+     does not send the header.
 
 Decided 2026-10-10 (P8-03b1):
 
@@ -3899,6 +3958,63 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b2a Sign-in and approvals
+
+Split P8-03b2 into P8-03b2a (this one), P8-03b2b (the pager broker) and P8-03b2c (bodies, uploads,
+exports and erasure). Decisions 723 to 729.
+
+Built (six threats of the models mitigated: PC-S5, PC-D2, PC-T2, MOBILE-S3, MOBILE-D1, MOBILE-E3):
+
+- `@rp/domain`: `isEasilyGuessedPin`, `countFailure` and `isLockedAt` (`lockout.ts`, used for the
+  person's and the device's count), `OVERRIDE_RECORD_TYPES`, and the `SIGN_IN_LOCKED` alert with
+  its rule and vibration.
+- `@rp/contracts`: `SIGN_IN_LOCKED`; `DeviceView.pinsLockedUntil`; `unlockDevicePins`
+  (`POST /api/v1/devices/:deviceId/pins/unlock`, DEVICE_PAIR); `IDLE_HEADER`; three settings; the
+  routes' texts (423 `DEVICE_LOCKED`, 422 `PIN_TOO_EASY` and `OVERRIDE_RECORD_REQUIRED`).
+- Server: migration `20261010120000_device_pin_lockout` (the device's count and lock).
+  `AuthService` counts each wrong secret against the person (not on a tablet) and against the
+  device under a row lock, refuses a locked device first, audits `DEVICE_PINS_LOCKED`, and tells
+  `SignInLockouts`, a registry the notification engine's `LockoutAlerts` listens on (the engine's
+  module builds on the auth module, so auth cannot call it directly); unlocking a person, setting
+  their PIN and unlocking a device clear the alert. Approvals: the record is required when one is
+  given, `consumeOverride` matches it, the guard reads it from the route
+  (`RequireCapability(capability, { record })`), the discount from its bill. `StaffService` and
+  the first run refuse easy PINs. Sessions: `idleMsOf` reads the header; `authenticate` and
+  `refresh` count activity as of the last touch; the socket's handshake never counts.
+- `@rp/api-client`: `idleSeconds`, sent on every call and the refresh. `@rp/mobile-core`:
+  `DeviceSession.touched()` and the seconds since. `@rp/mobile-shell`: `ShellProvider` wraps the
+  app in a view whose touches call it.
+- Console: the alert's words and its place among staff alerts; the Devices page's lock badge and
+  "Take PINs again".
+- Tests and their fixtures: approvals now name their records (billing, order items, reports,
+  suspicious activity); PINs set through the API in tests are no longer easy ones (staff, roles,
+  first run); the matrix probe takes a record for the four approvable capabilities.
+- Threat models: the six threats `Mitigated` with their code and tests; the other twelve name
+  P8-03b2b or P8-03b2c; the summary rewritten (99 mitigated, 9 residual Highs).
+  `docs/security/authorisation.md` says what an approval and a tablet's PIN now do.
+
+Tests: server 1212 (+10, 28 skipped), domain 403, contracts 964 (schema snapshots updated for the
+alert and the device view), api-client 42, mobile-core 103, shell 49, console 384, waiter app 70;
+all 43 test tasks green, lint, typecheck, format, docs, compat and `pnpm security:threats` green.
+Traceability: Must 264/287.
+
+Not done or not verified:
+
+- P8-03b2b and P8-03b2c, as split.
+- The touch capture in a real React Native build (a `Modal`'s touches should reach the root view
+  through React's tree; jest checks the view only): the next device check (manual task 29) can
+  confirm that the phone signs out 10 minutes after the last touch with the Tables screen open.
+
+Gotchas:
+
+- The contracts' schema snapshots (`packages/contracts/test/__snapshots__/schemas/`) fail when a
+  response gains a field or an enum a value: update them with `npx vitest run -u
+test/snapshot.test.ts` in `packages/contracts` and read the diff.
+- Helpers that set PINs through the API need PINs that `isEasilyGuessedPin` accepts (`5938`,
+  `2468`, `9753`); `TEST_PINS` (`1111`...) are written straight to the database and stay.
+- Server tests that approve a void, a reopen, an invoice void or a big discount must send the
+  record (`entityType` from `OVERRIDE_RECORD_TYPES`, and `entityId`).
 
 ### 2026-10-10: P8-03b1 STRIDE threat models
 

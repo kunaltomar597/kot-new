@@ -10,6 +10,7 @@ import {
   type AssignableRole,
   decideStaffChange,
   grantFor,
+  isEasilyGuessedPin,
   isValidPin,
   type Role,
   type StaffChange,
@@ -19,6 +20,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { type AuthSettings, AuthSettingsService } from '../auth/auth-settings.js';
 import { CredentialHasher } from '../auth/credential-hasher.js';
 import type { Principal } from '../auth/principal.js';
+import { SignInLockouts } from '../auth/sign-in-lockouts.js';
 import { hasFreshStepUp } from '../auth/step-up.js';
 import { currentBusinessDate, dbDate } from '../common/business-dates.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
@@ -102,6 +104,7 @@ export class StaffService {
     private readonly settings: AuthSettingsService,
     private readonly audit: AuditService,
     private readonly pagers: PagerBroker,
+    private readonly lockouts: SignInLockouts,
   ) {}
 
   /** Everyone not archived, active first, by name (MGR-004). */
@@ -122,6 +125,7 @@ export class StaffService {
     const settings = await this.settings.get(principal.restaurantId);
     this.require(principal, settings, null, { kind: 'CREATE', role: request.role });
     this.requirePinLength(request.pin, settings);
+    this.requireHardToGuess(request.pin, settings);
     const secretHash = await this.hasher.hash(request.pin);
     const { restaurantId } = principal;
     const person = await this.prisma.transaction(async (tx) => {
@@ -321,6 +325,7 @@ export class StaffService {
     await this.prisma.transaction(async (tx) => {
       const target = await this.lockedTarget(tx, restaurantId, staffId);
       this.require(principal, settings, target, { kind: 'SET_PIN' });
+      this.requireHardToGuess(pin, settings);
       const had = target.credentials.find((credential) => credential.kind === 'PIN');
       await tx.credential.upsert({
         where: { staffId_kind: { staffId: target.id, kind: 'PIN' } },
@@ -337,6 +342,7 @@ export class StaffService {
         where: { staffId: target.id, revokedAt: null, id: { not: principal.sessionId } },
         data: { revokedAt: now, revokeReason: 'PIN_CHANGED' },
       });
+      await this.lockouts.unlocked(tx, { kind: 'PERSON', restaurantId, staffId: target.id });
       await this.record(tx, principal, 'STAFF_PIN_SET', target.id, null, {
         firstPin: had === undefined,
         lockLifted:
@@ -371,6 +377,11 @@ export class StaffService {
 
   private requirePinLength(pin: string, settings: AuthSettings): void {
     if (!isValidPin(pin, settings.pinLength)) throw staffErrors.pinLength(settings.pinLength);
+  }
+
+  /** Not a PIN guessed first, while `auth.refuseEasyPins` is on (PC-S5). */
+  private requireHardToGuess(pin: string, settings: AuthSettings): void {
+    if (settings.refuseEasyPins && isEasilyGuessedPin(pin)) throw staffErrors.pinTooEasy();
   }
 
   /** The person, locked for the rest of the transaction so two changes cannot interleave. */

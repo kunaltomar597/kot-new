@@ -14,7 +14,13 @@ import {
   TableOverviewResponse,
   TableSessionView,
 } from '@rp/contracts';
-import { calendarDateOf, financialYearOf, gstinCheckCharacter } from '@rp/domain';
+import {
+  calendarDateOf,
+  type Capability,
+  financialYearOf,
+  gstinCheckCharacter,
+  OVERRIDE_RECORD_TYPES,
+} from '@rp/domain';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { allocateInvoiceSequence } from '../../src/database/numbering.js';
@@ -179,13 +185,15 @@ async function bill(target: object, login = cashier): Promise<BillView> {
   return BillView.parse(response.body);
 }
 
-async function override(capability: string) {
+async function override(capability: Capability, entityId: string) {
   return OverrideResponse.parse(
     (
       await server().post('/api/v1/auth/override').set(as(cashier)).send({
         approverStaffId: kit.staff.MANAGER,
         pin: TEST_PINS.MANAGER,
         capability,
+        entityType: OVERRIDE_RECORD_TYPES[capability],
+        entityId,
       })
     ).body,
   ).overrideToken;
@@ -323,7 +331,7 @@ describe('[BILL-005] discounts', () => {
       reason: 'Birthday',
     });
     expect([withoutPin.status, codeOf(withoutPin)]).toEqual([403, 'OVERRIDE_REQUIRED']);
-    const token = await override('DISCOUNT_ABOVE_LIMIT');
+    const token = await override('DISCOUNT_ABOVE_LIMIT', dineIn.id);
     const comp = await discount(
       dineIn.id,
       { orderItemId: lassi, kind: 'PERCENT', rateBp: 10_000, reason: 'Birthday' },
@@ -689,7 +697,7 @@ describe('[BILL-010] [BILL-003] void and re-issue', () => {
 
     const withoutPin = await voidIt(as(cashier));
     expect([withoutPin.status, codeOf(withoutPin)]).toEqual([403, 'OVERRIDE_REQUIRED']);
-    const token = await override('INVOICE_VOID');
+    const token = await override('INVOICE_VOID', original.id);
     const done = await voidIt({ ...as(cashier), 'x-override-token': token });
     expect(done.status, JSON.stringify(done.body)).toBe(200);
     voided = InvoiceView.parse(done.body);
@@ -781,7 +789,7 @@ describe('[BILL-010] editing a printed bill', () => {
         .send({ reason: 'Guest ordered another water' });
     const withoutPin = await reopen(as(cashier));
     expect([withoutPin.status, codeOf(withoutPin)]).toEqual([403, 'OVERRIDE_REQUIRED']);
-    const token = await override('BILL_EDIT_AFTER_PRINT');
+    const token = await override('BILL_EDIT_AFTER_PRINT', printed.id);
     const opened = await reopen({ ...as(cashier), 'x-override-token': token });
     expect(opened.status, JSON.stringify(opened.body)).toBe(200);
     const view = BillView.parse(opened.body);

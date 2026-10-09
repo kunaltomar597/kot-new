@@ -49,7 +49,10 @@ decides, before validation and before any work, and refuses with:
 | An Owner-only action without a fresh password + TOTP (AUTH-006)  | 403 `SECOND_FACTOR_REQUIRED`                                  |
 
 A manager's override is single-use, for one capability, bound to the requester's session and valid
-2 minutes (AUTH-011). When the matrix says OWN (a waiter's own tables, a cashier's own shift), the
+2 minutes (AUTH-011). An override for an action about a record (a voided item, a reopened or voided
+invoice, a discount above the limit: `OVERRIDE_RECORD_TYPES`) names its record when it is given
+and works on that record only; on another it is refused and not spent (P8-03b2a, PC-T2). When the
+matrix says OWN (a waiter's own tables, a cashier's own shift), the
 guard lets the request through marked `ownershipRequired` and the service checks the object; see
 "Object-level checks".
 
@@ -65,7 +68,8 @@ guard lets the request through marked `ownershipRequired` and the service checks
 
 `HTTP_DEVICE_TYPES` and `STAFF_DEVICE_TYPES` in `@rp/contracts` hold these lists. A table tablet is
 in diners' hands: staff confirm things there with their PIN for that one action (leaving the kiosk,
-approving a diner's order at the table), never with a session. Sign-in endpoints refuse tablets and
+approving a diner's order at the table), never with a session. Wrong PINs there count against
+the tablet, which stops taking them for a while, never against the person (P8-03b2a, MOBILE-D1). Sign-in endpoints refuse tablets and
 pagers, and a session on one counts for nothing even if it existed. No pairing code is made for a
 pager (`PairableDeviceType`): pagers are registered on the Pagers page with their own MQTT
 credential and never hold a device key.

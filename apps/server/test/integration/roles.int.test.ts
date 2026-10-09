@@ -17,7 +17,7 @@ import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
 
 const PASSWORD = 'correct horse battery';
-const CAPTAIN_PIN = '5151';
+const CAPTAIN_PIN = '5170';
 
 let database: TestDatabase;
 let app: INestApplication;

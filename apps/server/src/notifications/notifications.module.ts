@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module.js';
 import { EventsModule } from '../events/events.module.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { RealtimeModule } from '../realtime/realtime.module.js';
@@ -9,6 +10,7 @@ import {
   NOTIFICATION_OPTIONS,
   SYSTEM_CLOCK,
 } from './clock.js';
+import { LockoutAlerts } from './lockout-alerts.js';
 import { NotificationTriggers } from './notification-triggers.js';
 import {
   BreakController,
@@ -21,7 +23,7 @@ import { SystemAlerts } from './system-alerts.js';
 
 /** The notification and escalation engine (P2-03, NTF-001 to NTF-007). */
 @Module({
-  imports: [EventsModule, RealtimeModule, SettingsModule],
+  imports: [AuthModule, EventsModule, RealtimeModule, SettingsModule],
   controllers: [NotificationsController, BreakController, DeviceAlertsController],
   providers: [
     { provide: NOTIFICATION_CLOCK, useValue: SYSTEM_CLOCK },
@@ -39,6 +41,7 @@ import { SystemAlerts } from './system-alerts.js';
     NotificationsService,
     NotificationTriggers,
     SystemAlerts,
+    LockoutAlerts,
   ],
   exports: [NotificationsService, PresenceRegistry, NOTIFICATION_CLOCK],
 })

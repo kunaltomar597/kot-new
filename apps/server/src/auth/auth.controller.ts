@@ -20,6 +20,7 @@ import {
   UnlockStaffRequest,
 } from '@rp/contracts';
 import { ZodValidationPipe } from '../validation/zod-validation.pipe.js';
+import { idleMsOf } from './activity.js';
 import { authErrors } from './auth-errors.js';
 import { AuthService } from './auth.service.js';
 import { RequireCapability, RequireDevice, RequireSession } from './decorators.js';
@@ -84,7 +85,7 @@ export class AuthController {
     @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(RefreshRequest)) body: RefreshRequest,
   ): Promise<LoginResponse> {
-    return this.sessions.refresh(body.refreshToken, deviceOf(request));
+    return this.sessions.refresh(body.refreshToken, deviceOf(request), idleMsOf(request));
   }
 
   @Post('logout')

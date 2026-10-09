@@ -160,7 +160,7 @@ export class InvoicesController {
 
   @Post(':id/reopen')
   @HttpCode(200)
-  @RequireCapability('BILL_EDIT_AFTER_PRINT')
+  @RequireCapability('BILL_EDIT_AFTER_PRINT', { record: 'id' })
   reopen(
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,
@@ -171,7 +171,7 @@ export class InvoicesController {
 
   @Post(':id/void')
   @HttpCode(200)
-  @RequireCapability('INVOICE_VOID')
+  @RequireCapability('INVOICE_VOID', { record: 'id' })
   void(
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(InvoiceParams)) params: InvoiceParams,

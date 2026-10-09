@@ -354,6 +354,35 @@ describe('[AUTH-001] [AUTH-005] staff on the device', () => {
     await session.keepAlive();
   });
 
+  it('[MOBILE-E3] tells the server how long ago the person last touched the phone', async () => {
+    const fake = server();
+    let now = 1_000_000;
+    const session = new DeviceSession({
+      ...newDevice(),
+      fetch: fake.fetch,
+      connect: new SocketFactory().connect,
+      now: () => now,
+    });
+    await session.start();
+    await session.pair(ADDRESS, 'abcd-efgh');
+    await session.signIn(STAFF.WAITER.staffId, '4444');
+    const idleOf = () => fake.calls.at(-1)?.headers['x-rp-idle-seconds'];
+    expect(idleOf()).toBe('0');
+
+    // Nobody touches it: the reads it makes by itself say so.
+    now += 7 * 60_000;
+    await session.staffTiles();
+    expect(idleOf()).toBe('420');
+    session.touched();
+    now += 5_000;
+    await session.staffTiles();
+    expect(idleOf()).toBe('5');
+    // "The person is still here" is a touch too.
+    now += 60_000;
+    await session.keepAlive();
+    expect(idleOf()).toBe('0');
+  });
+
   it('shows the person signed out when the server ends the session', async () => {
     const fake = server().on('GET', '/api/v1/auth/session', () => ({
       status: 401,

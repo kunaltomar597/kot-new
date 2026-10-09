@@ -1,7 +1,12 @@
 import { type CanActivate, type ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OVERRIDE_TOKEN_HEADER } from '@rp/contracts';
-import { actorGrant, grantFor, OWNER_SECOND_FACTOR_CAPABILITIES } from '@rp/domain';
+import {
+  actorGrant,
+  grantFor,
+  OVERRIDE_RECORD_TYPES,
+  OWNER_SECOND_FACTOR_CAPABILITIES,
+} from '@rp/domain';
 import { authErrors } from './auth-errors.js';
 import { AuthSettingsService } from './auth-settings.js';
 import { AuthService } from './auth.service.js';
@@ -23,7 +28,8 @@ import type { AuthenticatedRequest, Principal } from './principal.js';
  *   matrix. ALLOW passes, and Owner-only capabilities (AUTH-006) also need a fresh password + TOTP
  *   step-up. OWN passes with `request.ownershipRequired` set, so the service checks the table or
  *   shift belongs to the person. OVERRIDE needs a manager's single-use override token in the
- *   `x-override-token` header (AUTH-011). DENY is refused.
+ *   `x-override-token` header (AUTH-011), given for the record in the route's `record` parameter
+ *   (PC-T2). DENY is refused.
  * - Routes that declare nothing are refused and logged: a missing declaration is a bug.
  */
 @Injectable()
@@ -57,7 +63,7 @@ export class PermissionGuard implements CanActivate {
         if (access.stationMode === true && (await this.stationMode(request, access.capability))) {
           return true;
         }
-        return this.checkCapability(request, access.capability);
+        return this.checkCapability(request, access);
       case undefined:
         this.logger.error(
           { path: request.originalUrl },
@@ -99,8 +105,9 @@ export class PermissionGuard implements CanActivate {
 
   private async checkCapability(
     request: AuthenticatedRequest,
-    capability: Extract<RouteAccess, { kind: 'CAPABILITY' }>['capability'],
+    access: Extract<RouteAccess, { kind: 'CAPABILITY' }>,
   ): Promise<boolean> {
+    const { capability } = access;
     const principal = this.principal(request);
     // A custom role's extra capabilities count as ALLOW (AUTH-012).
     switch (
@@ -121,7 +128,12 @@ export class PermissionGuard implements CanActivate {
         const header = request.headers[OVERRIDE_TOKEN_HEADER];
         const token = Array.isArray(header) ? header[0] : header;
         if (token === undefined || token === '') throw authErrors.overrideRequired(capability);
-        const override = await this.auth.consumeOverride(principal, capability, token);
+        const override = await this.auth.consumeOverride(
+          principal,
+          capability,
+          token,
+          this.overrideRecord(request, access),
+        );
         if (override === null) throw authErrors.overrideInvalid();
         request.override = override;
         return true;
@@ -129,5 +141,26 @@ export class PermissionGuard implements CanActivate {
       case 'DENY':
         throw authErrors.forbidden();
     }
+  }
+
+  /**
+   * The record a route acts on, for an approval that must be for it (PC-T2). A route of such a
+   * capability that does not say where its record is would let any approval through: refused.
+   */
+  private overrideRecord(
+    request: AuthenticatedRequest,
+    access: Extract<RouteAccess, { kind: 'CAPABILITY' }>,
+  ): { readonly entityType: string; readonly entityId: string } | undefined {
+    const entityType = OVERRIDE_RECORD_TYPES[access.capability];
+    if (entityType === undefined) return undefined;
+    const entityId = access.record === undefined ? undefined : request.params[access.record];
+    if (typeof entityId !== 'string' || entityId === '') {
+      this.logger.error(
+        { path: request.originalUrl, capability: access.capability },
+        'Route does not say which record its approval is for; refusing the request',
+      );
+      throw authErrors.forbidden();
+    }
+    return { entityType, entityId };
   }
 }

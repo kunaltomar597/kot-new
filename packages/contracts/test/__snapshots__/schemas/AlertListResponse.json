@@ -30,7 +30,8 @@
                 "LICENSE_STATE",
                 "SUSPICIOUS_ACTIVITY",
                 "SUPPORT_REQUEST",
-                "VENDOR_RESTORE_CODE"
+                "VENDOR_RESTORE_CODE",
+                "SIGN_IN_LOCKED"
               ]
             },
             "status": { "type": "string", "enum": ["OPEN", "ACKNOWLEDGED", "CLEARED"] },
@@ -193,7 +194,8 @@
                 "LICENSE_STATE",
                 "SUSPICIOUS_ACTIVITY",
                 "SUPPORT_REQUEST",
-                "VENDOR_RESTORE_CODE"
+                "VENDOR_RESTORE_CODE",
+                "SIGN_IN_LOCKED"
               ]
             },
             "status": { "type": "string", "enum": ["OPEN", "ACKNOWLEDGED", "CLEARED"] },

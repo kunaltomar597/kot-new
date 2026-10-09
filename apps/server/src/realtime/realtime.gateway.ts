@@ -250,7 +250,8 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     // Always checked; without a token it simply fails and the device connects on its own
     // (CWE-807). A token that is sent must be valid.
     const accessToken = handshake.data.accessToken ?? '';
-    const session = await this.sessions.authenticate(accessToken, device);
+    // A (re)connection is the app's doing, not the person's: it keeps no idle session alive.
+    const session = await this.sessions.authenticate(accessToken, device, Number.POSITIVE_INFINITY);
     let principal: Principal | undefined;
     if ('principal' in session) principal = session.principal;
     else if (accessToken !== '') throw ConnectRefusal.from(session.failure);

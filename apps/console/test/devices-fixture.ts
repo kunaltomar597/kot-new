@@ -50,6 +50,7 @@ export function deviceView(overrides: Partial<DeviceView> = {}): DeviceView {
     revokedAt: null,
     clientApi: '1.0',
     compatibility: 'CURRENT',
+    pinsLockedUntil: null,
     ...overrides,
   };
 }

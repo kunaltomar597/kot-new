@@ -688,7 +688,7 @@
       "post": {
         "operationId": "grantOverride",
         "summary": "A manager approves one action on this device with their PIN",
-        "description": "Returns a single-use token for one capability (and entity) of the signed-in requester; both people are audited (AUTH-011).",
+        "description": "Returns a single-use token for one capability and record of the signed-in requester; both people are audited (AUTH-011). An approval for a voided item, a reopened or voided invoice or a discount above the limit must name its record (`entityType`, `entityId`) and works only on that record: used on another it is refused and not spent (PC-T2). A wrong PIN also counts against the device, as at `pinLogin`.",
         "tags": ["auth"],
         "requestBody": {
           "required": true,
@@ -721,8 +721,14 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           },
+          "422": {
+            "description": "The approval does not name the record it is for (`OVERRIDE_RECORD_REQUIRED`).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
           "423": {
-            "description": "The manager's login is locked.",
+            "description": "The manager's login is locked, or this device takes no PINs for now.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -742,7 +748,7 @@
       "post": {
         "operationId": "ownerLogin",
         "summary": "Sign in as the Owner with password and second factor",
-        "description": "Password + TOTP (or a recovery code) sign-in; the session carries a fresh step-up for Owner-only actions (AUTH-006).",
+        "description": "Password + TOTP (or a recovery code) sign-in; the session carries a fresh step-up for Owner-only actions (AUTH-006). A wrong password also counts against the device, as at `pinLogin`.",
         "tags": ["auth"],
         "requestBody": {
           "required": true,
@@ -776,7 +782,7 @@
             }
           },
           "423": {
-            "description": "Login locked after repeated failures.",
+            "description": "The login is locked, or this device takes no passwords for now.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -955,7 +961,7 @@
       "post": {
         "operationId": "pinLogin",
         "summary": "Sign in on this device with a staff PIN",
-        "description": "Locks the staff login for 15 min after 5 failures in 10 min and rate-limits attempts per device (AUTH-003, SEC-009). Kitchen staff sign in only when individual kitchen logins are on.",
+        "description": "Locks the staff login for 15 min after 5 failures in 10 min and rate-limits attempts per device (AUTH-003, SEC-009). Every wrong PIN or password on a device also counts against the device: at `auth.deviceLockoutMaxFailures` within the window it takes none for the lockout time (423 `DEVICE_LOCKED`) until a manager lets it again (PC-S5). Managers and the Owner are alerted to each lockout (`SIGN_IN_LOCKED`). Kitchen staff sign in only when individual kitchen logins are on.",
         "tags": ["auth"],
         "requestBody": {
           "required": true,
@@ -989,7 +995,7 @@
             }
           },
           "423": {
-            "description": "Login locked after repeated failures.",
+            "description": "The login is locked, or this device takes no PINs for now.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -1003,14 +1009,14 @@
         },
         "x-capability": "DEVICE",
         "x-devices": ["POS", "KDS", "WAITER_PHONE", "MANAGER_BROWSER"],
-        "x-requirements": ["AUTH-001", "AUTH-002", "AUTH-003", "AUTH-005", "AUTH-013"]
+        "x-requirements": ["AUTH-001", "AUTH-002", "AUTH-003", "AUTH-005", "AUTH-013", "SEC-009"]
       }
     },
     "/api/v1/auth/refresh": {
       "post": {
         "operationId": "refreshSession",
         "summary": "Get a new access token and rotate the refresh token",
-        "description": "Fails when the session was revoked, expired or idle too long. Reusing an old refresh token revokes the whole session (AUTH-005).",
+        "description": "Fails when the session was revoked, expired or idle too long. Reusing an old refresh token revokes the whole session (AUTH-005). Counts as activity only as far as `x-rp-idle-seconds` says the person was there.",
         "tags": ["auth"],
         "requestBody": {
           "required": true,
@@ -1053,7 +1059,7 @@
       "get": {
         "operationId": "getCurrentSession",
         "summary": "The signed-in person and their session on this device",
-        "description": "Apps check a restored session with it after a restart. Like every authenticated call it counts as activity, so an app can keep a session alive while the person is using it.",
+        "description": "Apps check a restored session with it after a restart. Like every authenticated call it counts as activity, so an app can keep a session alive while the person is using it. An app that sends `x-rp-idle-seconds` (how long ago the person last touched it) is counted active as of then, so calls it makes by itself do not keep an idle session alive (MOBILE-E3).",
         "tags": ["auth"],
         "responses": {
           "200": {
@@ -1171,7 +1177,7 @@
       "post": {
         "operationId": "unlockStaff",
         "summary": "Unlock a staff member's PIN login after repeated failures",
-        "description": "A manager unlocks their own login and their team’s; the Owner’s and other managers’ only the Owner (P4-02a).",
+        "description": "A manager unlocks their own login and their team’s; the Owner’s and other managers’ only the Owner (P4-02a). Clears the lockout alert.",
         "tags": ["auth"],
         "requestBody": {
           "required": true,
@@ -2399,6 +2405,60 @@
         "x-requirements": ["MGR-006"]
       }
     },
+    "/api/v1/devices/{deviceId}/pins/unlock": {
+      "post": {
+        "operationId": "unlockDevicePins",
+        "summary": "Let a device take PINs again after too many wrong ones",
+        "description": "PC-S5, MOBILE-S3: a device that stopped taking PINs and passwords after too many wrong ones takes them again at once; the lockout alert clears. Audited.",
+        "tags": ["devices"],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "It takes PINs again.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DeviceView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such device.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "DEVICE_PAIR",
+        "x-requirements": ["AUTH-003", "SEC-009", "AUD-001"]
+      }
+    },
     "/api/v1/devices/{deviceId}/revoke": {
       "post": {
         "operationId": "revokeDevice",
@@ -2911,7 +2971,7 @@
       "post": {
         "operationId": "exitKiosk",
         "summary": "A manager lets staff out of a table tablet's kiosk mode with their PIN",
-        "description": "TAB-001, AUTH-009: checks the PIN of an active manager or the Owner (failures count towards their lock-out) and audits the exit (TABLET_KIOSK_EXITED). Only table tablets.",
+        "description": "TAB-001, AUTH-009: checks the PIN of an active manager or the Owner and audits the exit (TABLET_KIOSK_EXITED). Wrong PINs count against the tablet, not the person: at `auth.tabletLockoutMaxFailures` the tablet takes no PINs for the lockout time and the managers are alerted, so a diner cannot lock the managers out (MOBILE-S3, MOBILE-D1). Only table tablets.",
         "tags": ["devices"],
         "requestBody": {
           "required": true,
@@ -2945,7 +3005,7 @@
             }
           },
           "423": {
-            "description": "The manager's login is locked.",
+            "description": "The manager's login is locked, or the tablet takes no PINs for now.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -3056,7 +3116,7 @@
       "post": {
         "operationId": "approveOrderAtTable",
         "summary": "Approve at table: the waiter approves on the tablet with their PIN",
-        "description": "ORD-004: the PIN is checked like a sign-in (failures count towards the person's lock-out); waiters may approve only their own table's orders. Only this tablet's table.",
+        "description": "ORD-004: the PIN is checked like a sign-in, but wrong ones count against the tablet, not the person (MOBILE-D1); waiters may approve only their own table's orders. Only this tablet's table.",
         "tags": ["orders"],
         "parameters": [
           {
@@ -3116,7 +3176,7 @@
             }
           },
           "423": {
-            "description": "The login is locked.",
+            "description": "The login is locked, or the tablet takes no PINs for now.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -3701,7 +3761,7 @@
       "post": {
         "operationId": "completeFirstRun",
         "summary": "Create the restaurant and its Owner on a fresh install",
-        "description": "Public because nothing exists yet; only from the server PC itself and only while no restaurant exists (ONB-001). Creates the built-in roles, a default invoice series and the Owner with their PIN; the Owner sets a password and authenticator next (AUTH-006). Audited.",
+        "description": "Public because nothing exists yet; only from the server PC itself and only while no restaurant exists (ONB-001). Creates the built-in roles, a default invoice series and the Owner with their PIN, which must not be easily guessed (PC-S5); the Owner sets a password and authenticator next (AUTH-006). Audited.",
         "tags": ["onboarding"],
         "requestBody": {
           "required": true,
@@ -3724,6 +3784,12 @@
           },
           "403": {
             "description": "Not from the server PC, or already set up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The PIN is too easy to guess.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -10982,7 +11048,7 @@
       "post": {
         "operationId": "createStaff",
         "summary": "Add a person with a role and a PIN",
-        "description": "MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN has exactly `auth.pinLength` digits, is hashed with the pepper and never stored or logged (AUTH-002). Audited.",
+        "description": "MGR-004. Managers add cashiers, waiters and kitchen staff; adding a manager needs the Owner with a fresh second factor (403 `SECOND_FACTOR_REQUIRED` until then, AUTH-006). The PIN has exactly `auth.pinLength` digits, is not easily guessed while `auth.refuseEasyPins` is on (422 `PIN_TOO_EASY`, PC-S5), is hashed with the pepper and never stored or logged (AUTH-002). Audited.",
         "tags": ["staff"],
         "requestBody": {
           "required": true,
@@ -11170,7 +11236,7 @@
       "put": {
         "operationId": "setStaffPin",
         "summary": "Set or reset a person's PIN",
-        "description": "MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, hashed with the pepper, never stored, logged or shown. Clears a lockout (AUTH-003). A manager's PIN is set by the Owner or themselves, the Owner's only by the Owner. Audited without the PIN.",
+        "description": "MGR-004, AUTH-001, AUTH-002: exactly `auth.pinLength` digits, not easily guessed while `auth.refuseEasyPins` is on (422 `PIN_TOO_EASY`, PC-S5), hashed with the pepper, never stored, logged or shown. Clears a lockout (AUTH-003). A manager's PIN is set by the Owner or themselves, the Owner's only by the Owner. Audited without the PIN.",
         "tags": ["staff"],
         "parameters": [
           {
@@ -16155,7 +16221,10 @@
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           },
           "clientApi": { "type": ["string", "null"] },
-          "compatibility": { "$ref": "#/components/schemas/ClientCompatibility" }
+          "compatibility": { "$ref": "#/components/schemas/ClientCompatibility" },
+          "pinsLockedUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
         },
         "required": [
           "id",
@@ -16178,7 +16247,8 @@
           "serial",
           "revokedAt",
           "clientApi",
-          "compatibility"
+          "compatibility",
+          "pinsLockedUntil"
         ],
         "additionalProperties": false
       },
@@ -16224,7 +16294,10 @@
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           },
           "clientApi": { "type": ["string", "null"] },
-          "compatibility": { "$ref": "#/components/schemas/ClientCompatibility" }
+          "compatibility": { "$ref": "#/components/schemas/ClientCompatibility" },
+          "pinsLockedUntil": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          }
         },
         "required": [
           "id",
@@ -16246,7 +16319,8 @@
           "serial",
           "revokedAt",
           "clientApi",
-          "compatibility"
+          "compatibility",
+          "pinsLockedUntil"
         ]
       },
       "DiagnosticsBundle": {
@@ -19293,7 +19367,8 @@
           "LICENSE_STATE",
           "SUSPICIOUS_ACTIVITY",
           "SUPPORT_REQUEST",
-          "VENDOR_RESTORE_CODE"
+          "VENDOR_RESTORE_CODE",
+          "SIGN_IN_LOCKED"
         ]
       },
       "NotifyManagerResponse": {

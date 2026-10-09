@@ -94,16 +94,20 @@ Someone copies a phone's stored credentials to another device.
 
 A diner taps the tablet's hidden corner, which lists every manager and the Owner, and tries PINs.
 
-- Mitigation: tries are limited per tablet, wrong PINs are audited, and five lock the person for 15
-  minutes; staff never get a session on a tablet.
+- Mitigation: wrong PINs count against the tablet: after five in ten minutes it takes none for 15
+  minutes (`auth.tabletLockoutMaxFailures`) and the managers and the Owner are alerted, with the
+  tablet's name; a manager can let it take PINs again from the Devices page. Tries are limited per
+  tablet, wrong PINs are audited, PINs guessed first are refused when set, and staff never get a
+  session on a tablet.
 - Code: `apps/table-tablet/src/StaffPanel.tsx`; `apps/server/src/auth/auth.service.ts`
-  (`kioskExit`).
-- Tests: `apps/server/test/integration/tablet.int.test.ts` "refuses a wrong PIN (audited), a
-  waiter, and any device but a tablet".
-- Risk: likelihood Medium, impact High: High.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: wrong PINs on a tablet count against the
-  tablet, which stops taking PINs for a while and alerts the managers, instead of locking the
-  managers out (PC-S5, PC-D2).
+  (`kioskExit`, `pinOnDevice`, `wrongSecret`);
+  `apps/server/src/notifications/lockout-alerts.ts` (`LockoutAlerts`).
+- Tests: `apps/server/test/integration/tablet.int.test.ts` "counts wrong PINs against the tablet,
+  never locking the managers", "refuses a wrong PIN (audited), a waiter, and any device but a
+  tablet".
+- Risk: likelihood Low, impact High: Medium.
+- Status: Mitigated (P8-03b2a: wrong PINs locked the managers instead of the tablet). What is
+  left: five guesses every 25 minutes per tablet, each lock alerting the managers.
 
 ### Tampering
 
@@ -231,12 +235,16 @@ A PIN typed on a phone shows in a screenshot, a screen recording or the recent a
 A diner types wrong PINs for each manager at the tablet's staff panel, again and again; the
 managers are locked out on every device for 15 minutes each time.
 
-- Mitigation: none beyond PC-D2's unlock: wrong PINs at a tablet count against the person.
-- Code: `apps/server/src/auth/auth.service.ts` (`AuthService`).
-- Tests: `apps/server/test/integration/auth-login.int.test.ts` "locks after 5 failures in 10
-  minutes, for 15 minutes, and audits it".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03b2 by 2026-10-13: see MOBILE-S3.
+- Mitigation: wrong PINs at a tablet never count against the person (decided in P8-03b2a), so the
+  managers stay signed in everywhere; the most a diner does is stop that tablet taking PINs for 15
+  minutes, which alerts the managers, who let it take them again from the Devices page, and
+  waiters approve that table's orders from their phones meanwhile.
+- Code: `apps/server/src/auth/auth.service.ts` (`wrongSecret`);
+  `apps/server/src/devices/devices.service.ts` (`unlockPins`).
+- Tests: `apps/server/test/integration/tablet.int.test.ts` "counts wrong PINs against the tablet,
+  never locking the managers".
+- Risk: likelihood Low, impact Low: Low.
+- Status: Mitigated (P8-03b2a).
 
 #### MOBILE-D2 A diner flooding the waiter from a tablet
 
@@ -289,17 +297,25 @@ mode, `adb`, or a tablet that is only screen-pinned.
 
 A waiter's phone is left unlocked and signed in; someone else uses it as the waiter.
 
-- Mitigation: managers unpair it, which ends everything at once. The inactivity sign-out never
-  comes while the Tables screen is open, because its pager card reads every minute and every read
-  counts as activity.
-- Code: `apps/waiter-app/src/PagerCard.tsx`; `apps/server/src/auth/session.service.ts`
-  (`SessionService`).
-- Tests: `apps/server/test/integration/devices.int.test.ts` "stops the device token and every
-  session on the device at once"; `apps/server/test/integration/realtime.int.test.ts` "live
-  connections end when their credentials do".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: reads the app makes by itself no longer
-  count as activity, so a phone left alone signs out after the inactivity time.
+- Mitigation: the app tells the server how long ago the person last touched it on every call
+  (`x-rp-idle-seconds`), and the server counts them active as of then, so the reads the app makes
+  by itself (the pager card, live lists, a reconnection) no longer keep the session alive: a phone
+  left alone signs out after the inactivity time (10 minutes). Managers can also unpair it, which
+  ends everything at once.
+- Code: `packages/mobile-shell/src/context.tsx` (`ShellProvider`);
+  `packages/mobile-core/src/device-session.ts` (`touched`); `packages/api-client/src/client.ts`
+  (`idleSeconds`); `apps/server/src/auth/activity.ts` (`idleMsOf`);
+  `apps/server/src/auth/session.service.ts` (`SessionService`).
+- Tests: `apps/server/test/integration/auth-login.int.test.ts` "does not keep a session alive
+  with calls the app made by itself while the person was away", "keeps it alive as of the last
+  touch, and every call counts without the header"; `packages/mobile-core/test/device-session.test.ts`
+  "tells the server how long ago the person last touched the phone";
+  `packages/mobile-shell/test/shell.test.tsx` "counts a touch anywhere in the app, and nothing
+  else, as the person being there"; `apps/server/test/integration/devices.int.test.ts` "stops the
+  device token and every session on the device at once".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2a: the pager card read every minute and every read counted as
+  activity, so the Tables screen never signed out).
 
 #### MOBILE-E4 A rooted phone
 

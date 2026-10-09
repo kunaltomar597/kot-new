@@ -1,5 +1,5 @@
 import type { DeviceView } from '@rp/contracts';
-import { displayDateTime } from '@rp/domain';
+import { displayDateTime, timeOfDayOf } from '@rp/domain';
 import { Badge, Button, EmptyState, ErrorState, Icon, LoadingState, useToast } from '@rp/ui-web';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useConsole, useConsoleState } from '../../app/console-context.js';
@@ -26,8 +26,9 @@ type Open =
  * The paired devices (P4-02c, MGR-006): each screen, phone, tablet and pager with what it is bound
  * to, whether it is connected, its battery and versions and when it was last seen. A manager pairs
  * a new device, renames one, moves a table tablet to another table (AUTH-009) or unpairs one
- * (AUTH-008: it stops working at once). The list follows changes made on any screen and reads
- * connections again every half minute.
+ * (AUTH-008: it stops working at once). A device that stopped taking PINs after too many wrong
+ * ones says until when, and a manager can let it take them again (PC-S5). The list follows
+ * changes made on any screen and reads connections again every half minute.
  */
 export function DevicesScreen() {
   const t = useT();
@@ -130,6 +131,20 @@ export function DevicesScreen() {
                             title: t('devices.locating', { name: device.name, seconds }),
                             tone: 'success',
                           });
+                        },
+                        (failure: unknown) => {
+                          toast.show({ title: messageOf(failure, t), tone: 'danger' });
+                        },
+                      );
+                    }}
+                    onUnlockPins={() => {
+                      controller.api.unlockDevicePins({ params: { deviceId: device.id } }).then(
+                        () => {
+                          toast.show({
+                            title: t('devices.pinsUnlocked', { name: device.name }),
+                            tone: 'success',
+                          });
+                          reload();
                         },
                         (failure: unknown) => {
                           toast.show({ title: messageOf(failure, t), tone: 'danger' });
@@ -311,6 +326,7 @@ function DeviceRow({
   onMove,
   onStations,
   onLocate,
+  onUnlockPins,
   onUnpair,
 }: {
   device: DeviceView;
@@ -320,6 +336,7 @@ function DeviceRow({
   onMove?: () => void;
   onStations?: () => void;
   onLocate?: () => void;
+  onUnlockPins?: () => void;
   onUnpair?: () => void;
 }) {
   const t = useT();
@@ -373,6 +390,11 @@ function DeviceRow({
             </Badge>
           ) : null}
           {active ? <CompatibilityBadge compatibility={device.compatibility} /> : null}
+          {active && device.pinsLockedUntil !== null ? (
+            <Badge tone="danger" icon={<Icon name="warning" />}>
+              {t('devices.pinsLocked', { time: timeOfDayOf(new Date(device.pinsLockedUntil)) })}
+            </Badge>
+          ) : null}
         </p>
         {details.length === 0 ? null : <p className="staff-row__contact">{details.join(' · ')}</p>}
       </div>
@@ -393,6 +415,15 @@ function DeviceRow({
           {device.type === 'KDS' ? (
             <Button variant="secondary" onClick={onStations}>
               {t('devices.stations')}
+            </Button>
+          ) : null}
+          {device.pinsLockedUntil !== null ? (
+            <Button
+              variant="secondary"
+              onClick={onUnlockPins}
+              aria-label={t('devices.unlockPinsNamed', { name: device.name })}
+            >
+              {t('devices.unlockPins')}
             </Button>
           ) : null}
           {device.type === 'TABLE_TABLET' && device.connected ? (

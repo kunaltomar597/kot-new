@@ -353,6 +353,17 @@ describe('[MENU-013] [WTR-012] the menu and unsent orders on the device', () => 
   });
 });
 
+describe('[AUTH-005] [MOBILE-E3] the person’s own use of the app', () => {
+  it('counts a touch anywhere in the app, and nothing else, as the person being there', async () => {
+    const { session } = newSession();
+    const touched = jest.spyOn(session, 'touched');
+    await renderShell(session, <Text>Table 5</Text>);
+    expect(touched).not.toHaveBeenCalled();
+    await fireEvent(screen.getByText('Table 5'), 'touchStart');
+    expect(touched).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('messages', () => {
   it('turns failures into plain language', () => {
     expect(

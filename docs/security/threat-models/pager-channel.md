@@ -144,7 +144,7 @@ escalation and falsifying response times.
 - Tests: `apps/server/test/integration/pagers.int.test.ts` "ignores a pager publishing where it
   may not", "delivers an alert within 2 s, and the button acknowledges it everywhere".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: a pager acknowledges only alerts that
+- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: a pager acknowledges only alerts that
   were sent to it, as the waiter phone already does.
 
 #### PAGER-T2 Getting round the topic rules
@@ -190,7 +190,7 @@ Someone gets the pagers to run an older, signed firmware with a known flaw.
 - Tests: `packages/domain/test/pager-firmware.test.ts` "leaves a pager on the same or a newer
   version alone", "never offers a version again to a pager that rolled back from it".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: the PC refuses a release whose secure
+- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: the PC refuses a release whose secure
   version is lower than the one it serves; P2-05 burns the anti-rollback fuse on the pager.
 
 #### PAGER-T5 Forged heartbeats or update reports
@@ -229,7 +229,7 @@ A waiter says the alert was acknowledged by someone else.
 - Tests: `apps/server/test/integration/pagers.int.test.ts` "delivers an alert within 2 s, and the
   button acknowledges it everywhere".
 - Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: the acknowledgement records the pager it
+- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: the acknowledgement records the pager it
   came from.
 
 #### PAGER-R3 Failed pager sign-ins leave no trace
@@ -241,7 +241,7 @@ Someone tries pagers' credentials against the broker and nobody can see it.
 - Tests: `apps/server/test/integration/pagers.int.test.ts` "refuses a wrong password and another
   pager’s topics".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Not mitigated. Plan: P8-03b2 by 2026-10-13: failed sign-ins are logged and counted.
+- Status: Not mitigated. Plan: P8-03b2b by 2026-10-13: failed sign-ins are logged and counted.
 
 ### Information disclosure
 
@@ -342,9 +342,9 @@ reads them before sign-in, and the POS server, in the same process, runs out of 
 - Mitigation: none yet: the broker sets no packet size, no connection limit and a 30-second
   sign-in time.
 - Code: `apps/server/src/pagers/pager-broker.ts` (`PagerBroker`).
-- Tests: none, no test floods the broker yet; P8-03b2 adds them with the limits.
+- Tests: none, no test floods the broker yet; P8-03b2b adds them with the limits.
 - Risk: likelihood Medium, impact High: High.
-- Status: Not mitigated. Plan: P8-03b2 by 2026-10-13: a packet size limit before and after
+- Status: Not mitigated. Plan: P8-03b2b by 2026-10-13: a packet size limit before and after
   sign-in, a connection limit, a short sign-in time and a limit on Argon2 checks at once.
 
 #### PAGER-D4 A signed-in pager publishing too much
@@ -357,7 +357,7 @@ A pager, or a copy, sends heartbeats as fast as it can, or retained or large mes
 - Tests: `apps/server/test/integration/pagers.int.test.ts` "ignores a pager publishing where it
   may not".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: heartbeats faster than half the interval
+- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: heartbeats faster than half the interval
   are dropped, retained and large messages refused.
 
 #### PAGER-D5 A firmware update stopping pagers in service
@@ -385,7 +385,7 @@ a waiter without a working pager counts as reachable and NTF-007's immediate esc
 - Tests: `apps/server/test/integration/pagers.int.test.ts` "sends open alerts again when the pager
   reconnects".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: a connection counts only once the broker
+- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: a connection counts only once the broker
   has it, and a closing session removes only its own entry.
 
 ### Elevation of privilege
@@ -427,5 +427,5 @@ devices (LIC-001).
 - Tests: `apps/server/test/integration/licence-agent.int.test.ts` "pairs no more devices of a kind
   than the licence allows".
 - Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b2 by 2026-10-13: registering a pager checks the licence's
+- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: registering a pager checks the licence's
   pager limit.

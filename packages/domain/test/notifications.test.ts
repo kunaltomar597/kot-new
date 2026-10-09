@@ -53,6 +53,7 @@ describe('[NTF-002] [NTF-003] the Appendix C matrix', () => {
     ['SUSPICIOUS_ACTIVITY', ['asha'], null, false, 'NONE'],
     ['SUPPORT_REQUEST', ['asha', 'vikram'], null, false, 'UNTIL_RESOLVED'],
     ['VENDOR_RESTORE_CODE', ['asha'], null, false, 'NONE'],
+    ['SIGN_IN_LOCKED', ['asha', 'vikram'], null, false, 'NONE'],
   ];
 
   it('covers every event type', () => {

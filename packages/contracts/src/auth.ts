@@ -11,6 +11,13 @@ export const Capability = z.enum(CAPABILITIES);
  */
 export const OVERRIDE_TOKEN_HEADER = 'x-override-token';
 
+/**
+ * How many whole seconds ago the person last touched the app (AUTH-005, MOBILE-E3). An app sends
+ * it on every call; the server counts the person active as of then, not as of the call, so reads
+ * the app makes by itself do not keep an idle session alive. Without it a call counts as activity.
+ */
+export const IDLE_HEADER = 'x-rp-idle-seconds';
+
 /** Numeric PIN, 4 digits by default, 6 when the owner requires it (AUTH-001). */
 export const Pin = z.string().regex(/^\d{4,8}$/, 'PIN must be 4 to 8 digits');
 

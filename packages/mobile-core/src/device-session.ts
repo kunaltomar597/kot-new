@@ -76,6 +76,8 @@ export interface DeviceSessionOptions {
   readonly connect?: RealtimeConnectionOptions['connect'];
   /** Where background failures (saving to storage) are reported. */
   readonly onError?: (error: unknown) => void;
+  /** The time, for how long the person has been idle; tests pass a fake. */
+  readonly now?: () => number;
 }
 
 const SERVER_KEY = 'rp.server.v1';
@@ -115,8 +117,11 @@ export class DeviceSession {
   private connection: RealtimeConnection | undefined;
   /** Bumped whenever the client is replaced, so late callbacks of an old client are ignored. */
   private generation = 0;
+  /** When the person last touched the app (MOBILE-E3); the app's start until then. */
+  private touchedAt: number;
 
   constructor(private readonly options: DeviceSessionOptions) {
+    this.touchedAt = this.now();
     this.menu = new MenuCache(options.plainStore);
     this.orders = new OrderOutbox({
       store: options.plainStore,
@@ -241,6 +246,7 @@ export class DeviceSession {
 
   /** Signs a person in with their PIN (AUTH-001, AUTH-004). */
   async signIn(staffId: string, pin: string): Promise<void> {
+    this.touched();
     const login = await this.requireClient().signInWithPin({ staffId, pin });
     this.update({ person: login.staff, session: login.session, notice: undefined });
     // The person's role decides which rooms the connection joins.
@@ -257,9 +263,18 @@ export class DeviceSession {
     this.connect(undefined);
   }
 
+  /**
+   * The person touched the screen (AUTH-005, MOBILE-E3). Their session lasts the inactivity time
+   * from their last touch, however often the app reads by itself.
+   */
+  touched(): void {
+    this.touchedAt = this.now();
+  }
+
   /** Tells the server the person is still here (AUTH-005 inactivity). */
   async keepAlive(): Promise<void> {
     if (this.client?.session === undefined) return;
+    this.touched();
     try {
       await this.client.api.getCurrentSession();
     } catch {
@@ -282,6 +297,10 @@ export class DeviceSession {
   stop(): void {
     this.connection?.stop();
     this.connection = undefined;
+  }
+
+  private now(): number {
+    return this.options.now?.() ?? Date.now();
   }
 
   /** Pins the server's CA before anything is sent to it; nothing to pin without TLS. */
@@ -323,6 +342,9 @@ export class DeviceSession {
         this.options.appVersion !== undefined && {
           client: { kind: this.options.appKind, version: this.options.appVersion },
         }),
+      // The server counts the person active as of their last touch, so the reads the app makes
+      // by itself (the pager card, live lists) never keep an idle session alive (MOBILE-E3).
+      idleSeconds: () => (this.now() - this.touchedAt) / 1000,
       onClientTooOld: () => {
         if (generation !== this.generation || this.snapshot.clientTooOld) return;
         this.stop();

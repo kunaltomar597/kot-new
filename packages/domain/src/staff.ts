@@ -145,3 +145,42 @@ export function rolesOffered(
 export function isValidPin(pin: string, length: number): boolean {
   return pin.length === length && /^\d+$/.test(pin);
 }
+
+/** PINs chosen often that no pattern below catches: lines on a phone keypad, and favourites. */
+const COMMON_PINS: ReadonlySet<string> = new Set([
+  '2580',
+  '0852',
+  '1004',
+  '147258',
+  '258369',
+  '159753',
+  '951753',
+  '741852',
+  '963852',
+]);
+
+/**
+ * Whether a PIN is among the first an attacker tries (PC-S5): one digit or one block repeated
+ * (`0000`, `1212`, `123123`), a run up or down (`1234`, `4321`, `7890`), digits in pairs
+ * (`1122`, `112233`), a year (`1985`, `2024`), a line on the keypad (`2580`) or another favourite.
+ * Refused when a PIN is set, unless the restaurant turns the check off (`auth.refuseEasyPins`).
+ */
+export function isEasilyGuessedPin(pin: string): boolean {
+  if (!/^\d+$/.test(pin)) return false;
+  const digits = Array.from(pin, Number);
+  for (let size = 1; size < pin.length; size += 1) {
+    if (pin.length % size === 0 && pin.slice(0, size).repeat(pin.length / size) === pin) {
+      return true;
+    }
+  }
+  const steps = digits.slice(1).map((digit, index) => (digit - (digits[index] ?? 0) + 10) % 10);
+  if (steps.every((step) => step === 1) || steps.every((step) => step === 9)) return true;
+  if (
+    pin.length % 2 === 0 &&
+    digits.every((digit, index) => digit === digits[index - (index % 2)])
+  ) {
+    return true;
+  }
+  if (pin.length === 4 && (pin.startsWith('19') || pin.startsWith('20'))) return true;
+  return COMMON_PINS.has(pin);
+}
