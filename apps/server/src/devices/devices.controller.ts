@@ -19,13 +19,14 @@ import {
   type DeviceSummary,
   DeviceTokenRequest,
   type DeviceTokenResponse,
+  HTTP_DEVICE_TYPES,
   type LocateDeviceResponse,
   PairDeviceRequest,
   type PairedDevice,
   type PairingCodeResponse,
   RenameDeviceRequest,
-  SetDeviceStationsRequest,
   RevokeDeviceRequest,
+  SetDeviceStationsRequest,
 } from '@rp/contracts';
 import type { Request } from 'express';
 import { authErrors } from '../auth/auth-errors.js';
@@ -108,7 +109,7 @@ export class DevicesController {
   }
 
   @Get('current')
-  @RequireDevice()
+  @RequireDevice(HTTP_DEVICE_TYPES)
   current(@Req() request: AuthenticatedRequest): Promise<DeviceSummary> {
     return this.devices.current(deviceOf(request));
   }

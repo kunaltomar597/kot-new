@@ -51,6 +51,30 @@ export const DeviceType = z.enum([
   'PAGER',
   'MANAGER_BROWSER',
 ]);
+export type DeviceType = z.infer<typeof DeviceType>;
+
+/**
+ * Devices that call the local server over HTTPS and its socket. Pagers are not among them: they
+ * are registered on the Pagers page and speak MQTT only (PGR-005, SEC-012).
+ */
+export const HTTP_DEVICE_TYPES = [
+  'POS',
+  'KDS',
+  'WAITER_PHONE',
+  'TABLE_TABLET',
+  'MANAGER_BROWSER',
+] as const satisfies readonly DeviceType[];
+
+/**
+ * Devices on which staff sign in (AUTH-001). A table tablet is in diners' hands and acts for its
+ * own table only (AUTH-009): staff confirm things there with their PIN, never with a session.
+ */
+export const STAFF_DEVICE_TYPES = [
+  'POS',
+  'KDS',
+  'WAITER_PHONE',
+  'MANAGER_BROWSER',
+] as const satisfies readonly DeviceType[];
 
 /** Optional mapping to another POS or aggregator system (INT-005). */
 export const ExternalId = z.string().min(1).max(128).optional();

@@ -71,7 +71,7 @@ import {
   UnlockStaffRequest,
 } from './auth.js';
 import { CurrentAppBuildResponse } from './app-builds.js';
-import { ApiError, Id } from './common.js';
+import { ApiError, type DeviceType, HTTP_DEVICE_TYPES, Id, STAFF_DEVICE_TYPES } from './common.js';
 import {
   KdsTicket,
   KdsTicketsQuery,
@@ -378,6 +378,12 @@ export interface RouteDefinition<TAccess extends string = RouteCapability> {
    * `PUBLIC` for the few endpoints that need neither (they must say why in `description`).
    */
   capability: TAccess;
+  /**
+   * For `DEVICE` endpoints of the local server: the kinds of device that may call it; the server
+   * refuses every other kind (403 `DEVICE_NOT_ALLOWED`, deny by default, SEC-003). Endpoints that
+   * need a signed-in person are for the devices staff sign in on (`STAFF_DEVICE_TYPES`).
+   */
+  devices?: readonly DeviceType[];
   request?: {
     params?: z.ZodObject;
     query?: z.ZodObject;
@@ -397,6 +403,7 @@ const standardErrors = {
 const deviceErrors = {
   400: standardErrors[400],
   401: { description: 'Unknown or unpaired device, or invalid credentials.', schema: ApiError },
+  403: { description: 'This kind of device may not call it.', schema: ApiError },
 } as const satisfies Readonly<Record<number, RouteResponse>>;
 
 export const ROUTES = [
@@ -987,11 +994,13 @@ export const ROUTES = [
     tags: ['system'],
     requirements: ['NFR-O02'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     request: { body: ClientErrorReport },
     responses: {
       204: { description: 'Taken.' },
       400: { description: 'The request does not match the contract.', schema: ApiError },
       401: { description: 'Unknown or unpaired device.', schema: ApiError },
+      403: deviceErrors[403],
     },
   },
   {
@@ -1007,9 +1016,11 @@ export const ROUTES = [
     tags: ['devices'],
     requirements: ['WTR-001', 'UPD-001', 'UPD-006'],
     capability: 'DEVICE',
+    devices: ['WAITER_PHONE', 'TABLE_TABLET'],
     responses: {
       200: { description: 'The build, or null.', schema: CurrentAppBuildResponse },
       401: { description: 'Unknown or unpaired device.', schema: ApiError },
+      403: deviceErrors[403],
     },
   },
   {
@@ -1025,9 +1036,11 @@ export const ROUTES = [
     tags: ['devices'],
     requirements: ['WTR-001', 'UPD-001', 'UPD-007'],
     capability: 'DEVICE',
+    devices: ['WAITER_PHONE', 'TABLE_TABLET'],
     responses: {
       200: { description: 'The APK.' },
       401: { description: 'Unknown or unpaired device.', schema: ApiError },
+      403: deviceErrors[403],
       404: { description: 'No build of this device’s app on this PC.', schema: ApiError },
     },
   },
@@ -1279,6 +1292,7 @@ export const ROUTES = [
     tags: ['auth'],
     requirements: ['AUTH-001'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: {
       200: { description: 'Login tiles.', schema: StaffTilesResponse },
       ...deviceErrors,
@@ -1295,6 +1309,7 @@ export const ROUTES = [
     tags: ['auth'],
     requirements: ['AUTH-001', 'AUTH-002', 'AUTH-003', 'AUTH-005', 'AUTH-013'],
     capability: 'DEVICE',
+    devices: STAFF_DEVICE_TYPES,
     request: { body: PinLoginRequest },
     responses: {
       200: { description: 'Signed in.', schema: LoginResponse },
@@ -1314,6 +1329,7 @@ export const ROUTES = [
     tags: ['auth'],
     requirements: ['AUTH-006', 'AUTH-013'],
     capability: 'DEVICE',
+    devices: STAFF_DEVICE_TYPES,
     request: { body: OwnerLoginRequest },
     responses: {
       200: { description: 'Signed in.', schema: LoginResponse },
@@ -1333,6 +1349,7 @@ export const ROUTES = [
     tags: ['auth'],
     requirements: ['AUTH-005'],
     capability: 'DEVICE',
+    devices: STAFF_DEVICE_TYPES,
     request: { body: RefreshRequest },
     responses: { 200: { description: 'New tokens.', schema: LoginResponse }, ...deviceErrors },
   },
@@ -1747,6 +1764,7 @@ export const ROUTES = [
     tags: ['devices'],
     requirements: ['AUTH-007', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: { 200: { description: 'This device.', schema: DeviceSummary }, ...deviceErrors },
   },
   {
@@ -1852,6 +1870,7 @@ export const ROUTES = [
     tags: ['restaurant'],
     requirements: ['ONB-004', 'BILL-002', 'NFR-L03'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: {
       200: { description: 'The restaurant.', schema: RestaurantProfile },
       ...deviceErrors,
@@ -3093,6 +3112,7 @@ export const ROUTES = [
     tags: ['devices'],
     requirements: ['TAB-002', 'TAB-003', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     responses: {
       200: { description: 'The table.', schema: TabletTableView },
       ...deviceErrors,
@@ -3112,6 +3132,7 @@ export const ROUTES = [
     tags: ['devices'],
     requirements: ['TAB-015', 'NTF-003', 'MGR-006'],
     capability: 'DEVICE',
+    devices: ['KDS', 'WAITER_PHONE', 'TABLE_TABLET'],
     request: { body: DeviceHealthRequest },
     responses: {
       204: { description: 'Recorded.' },
@@ -3130,6 +3151,7 @@ export const ROUTES = [
     tags: ['devices'],
     requirements: ['TAB-001', 'AUTH-013', 'AUD-001'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { body: KioskExitRequest },
     responses: {
       200: { description: 'Allowed.', schema: KioskExitResponse },
@@ -3150,6 +3172,7 @@ export const ROUTES = [
     tags: ['feedback'],
     requirements: ['TAB-014', 'BILL-011', 'SEC-019', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { body: TabletFeedbackRequest },
     responses: {
       201: { description: 'Thank you.', schema: TabletFeedbackResponse },
@@ -3189,6 +3212,7 @@ export const ROUTES = [
     tags: ['orders'],
     requirements: ['TAB-008', 'TAB-009', 'ORD-003', 'ORD-013', 'ORD-014', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { body: TabletOrderRequest },
     responses: {
       200: { description: 'Accepted, or lines rejected.', schema: SubmitOrderResponse },
@@ -3206,6 +3230,7 @@ export const ROUTES = [
     tags: ['orders'],
     requirements: ['TAB-009', 'TAB-010', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     responses: {
       200: { description: 'The orders.', schema: TabletOrdersResponse },
       ...deviceErrors,
@@ -3223,6 +3248,7 @@ export const ROUTES = [
     tags: ['orders'],
     requirements: ['ORD-004', 'ORD-003', 'AUTH-013', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { params: OrderParams, body: ApproveAtTableRequest },
     responses: {
       200: { description: 'The order, sent.', schema: OrderView },
@@ -3247,6 +3273,7 @@ export const ROUTES = [
     tags: ['notifications'],
     requirements: ['WTR-006', 'NTF-006', 'AUTH-005'],
     capability: 'DEVICE',
+    devices: ['WAITER_PHONE'],
     responses: {
       200: { description: 'The holder and their open alerts.', schema: DeviceAlertsResponse },
       ...deviceErrors,
@@ -3265,6 +3292,7 @@ export const ROUTES = [
     tags: ['notifications'],
     requirements: ['WTR-006', 'NTF-004'],
     capability: 'DEVICE',
+    devices: ['WAITER_PHONE'],
     request: { params: AlertParams },
     responses: {
       200: { description: 'The alert.', schema: AlertView },
@@ -3386,6 +3414,7 @@ export const ROUTES = [
     tags: ['service-requests'],
     requirements: ['TAB-004', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     responses: {
       200: {
         description: 'The open session and its requests.',
@@ -3408,6 +3437,7 @@ export const ROUTES = [
     tags: ['service-requests'],
     requirements: ['TAB-004', 'BILL-015', 'NTF-003', 'NTF-005', 'SEC-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { body: RaiseServiceRequest },
     responses: {
       201: { description: 'The request, active.', schema: ServiceRequestView },
@@ -3432,6 +3462,7 @@ export const ROUTES = [
     tags: ['service-requests'],
     requirements: ['TAB-004', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { params: ServiceRequestParams },
     responses: {
       200: { description: 'The request.', schema: ServiceRequestView },
@@ -3450,6 +3481,7 @@ export const ROUTES = [
     tags: ['menu'],
     requirements: ['TAB-005', 'REC-004'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     responses: {
       200: { description: 'The bestsellers, most ordered first.', schema: BestSellersResponse },
       ...deviceErrors,
@@ -3497,6 +3529,7 @@ export const ROUTES = [
     tags: ['recommendations'],
     requirements: ['TAB-011', 'REC-001', 'REC-005', 'REC-006', 'REC-007', 'REC-011', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { query: TableRecommendationsQuery },
     responses: {
       200: { description: 'Suggestions, best first.', schema: RecommendationsResponse },
@@ -3535,6 +3568,7 @@ export const ROUTES = [
     tags: ['recommendations'],
     requirements: ['REC-008', 'TAB-011', 'AUTH-009'],
     capability: 'DEVICE',
+    devices: ['TABLE_TABLET'],
     request: { body: RecordTableRecommendationEventsRequest },
     responses: {
       204: { description: 'Recorded.' },
@@ -3805,6 +3839,7 @@ export const ROUTES = [
     tags: ['menu'],
     requirements: ['MENU-012', 'MENU-013', 'MENU-006'],
     capability: 'DEVICE',
+    devices: HTTP_DEVICE_TYPES,
     responses: {
       200: { description: 'The menu.', schema: MenuSnapshot },
       ...deviceErrors,

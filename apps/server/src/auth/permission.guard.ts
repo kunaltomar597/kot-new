@@ -12,8 +12,9 @@ import type { AuthenticatedRequest, Principal } from './principal.js';
  * Global guard: deny by default (AUTH-010, SEC-003). Every route declares its access:
  *
  * - `@Public()` passes.
- * - `@RequireDevice()` needs a paired device.
- * - `@RequireSession()` needs a signed-in person (on the device their token was issued to);
+ * - `@RequireDevice(devices)` needs a paired device of one of those kinds.
+ * - `@RequireSession()` needs a signed-in person (on the device their token was issued to, one
+ *   of the devices staff sign in on: `STAFF_DEVICE_TYPES`);
  *   `{ stationMode: true }` also admits a kitchen screen in station mode (see below).
  * - `@RequireCapability(c, { stationMode: true })` also lets a kitchen screen with nobody signed in
  *   act for the kitchen (station mode, AUTH-005), when kitchen staff do not sign in individually
@@ -46,6 +47,7 @@ export class PermissionGuard implements CanActivate {
         return true;
       case 'DEVICE':
         if (request.device === undefined) throw authErrors.deviceNotRecognised();
+        if (!access.devices.includes(request.device.type)) throw authErrors.deviceNotAllowed();
         return true;
       case 'SESSION':
         if (access.stationMode === true && (await this.stationMode(request))) return true;

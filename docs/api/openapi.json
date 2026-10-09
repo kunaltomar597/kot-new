@@ -3,7 +3,7 @@
   "info": {
     "title": "Restaurant Operations Platform: local server API",
     "version": "0.1.0",
-    "description": "Generated from @rp/contracts by `pnpm contracts:docs`; do not edit by hand. Money is integer paise, rates are basis points, dates are YYYY-MM-DD and instants are ISO-8601 UTC. `x-capability` names the permission the server enforces (AUTH-010): a capability, `SESSION` (any signed-in person), `DEVICE` (a paired device, nobody signed in) or `PUBLIC`; `x-requirements` lists the BRD requirement IDs. Components cover every exported contract schema, including those not yet used by a route. A `<Name>Input` component describes what a client may send when it differs from the parsed form (for example omitted defaults)."
+    "description": "Generated from @rp/contracts by `pnpm contracts:docs`; do not edit by hand. Money is integer paise, rates are basis points, dates are YYYY-MM-DD and instants are ISO-8601 UTC. `x-capability` names the permission the server enforces (AUTH-010): a capability, `SESSION` (any signed-in person), `DEVICE` (a paired device, nobody signed in) or `PUBLIC`; `x-devices` lists the kinds of device a `DEVICE` endpoint serves (others get 403 `DEVICE_NOT_ALLOWED`), and people sign in only on POS terminals, kitchen screens, waiter phones and managers' browsers; `x-requirements` lists the BRD requirement IDs. Components cover every exported contract schema, including those not yet used by a route. A `<Name>Input` component describes what a client may send when it differs from the parsed form (for example omitted defaults)."
   },
   "servers": [
     { "url": "/", "description": "The restaurant's local server (address set at installation)" }
@@ -769,6 +769,12 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
           "423": {
             "description": "Login locked after repeated failures.",
             "content": {
@@ -783,6 +789,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "MANAGER_BROWSER"],
         "x-requirements": ["AUTH-006", "AUTH-013"]
       }
     },
@@ -975,6 +982,12 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
           "423": {
             "description": "Login locked after repeated failures.",
             "content": {
@@ -989,6 +1002,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "MANAGER_BROWSER"],
         "x-requirements": ["AUTH-001", "AUTH-002", "AUTH-003", "AUTH-005", "AUTH-013"]
       }
     },
@@ -1022,9 +1036,16 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "MANAGER_BROWSER"],
         "x-requirements": ["AUTH-005"]
       }
     },
@@ -1092,9 +1113,16 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"],
         "x-requirements": ["AUTH-001"]
       }
     },
@@ -1965,9 +1993,16 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"],
         "x-requirements": ["NFR-O02"]
       }
     },
@@ -2609,9 +2644,16 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"],
         "x-requirements": ["AUTH-007", "AUTH-009"]
       }
     },
@@ -2650,6 +2692,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["WAITER_PHONE"],
         "x-requirements": ["WTR-006", "NTF-006", "AUTH-005"]
       }
     },
@@ -2704,6 +2747,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["WAITER_PHONE"],
         "x-requirements": ["WTR-006", "NTF-004"]
       }
     },
@@ -2727,9 +2771,16 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["WAITER_PHONE", "TABLE_TABLET"],
         "x-requirements": ["WTR-001", "UPD-001", "UPD-006"]
       }
     },
@@ -2747,6 +2798,12 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
           "404": {
             "description": "No build of this device’s app on this PC.",
             "content": {
@@ -2755,6 +2812,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["WAITER_PHONE", "TABLE_TABLET"],
         "x-requirements": ["WTR-001", "UPD-001", "UPD-007"]
       }
     },
@@ -2807,6 +2865,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-014", "BILL-011", "SEC-019", "AUTH-009"]
       }
     },
@@ -2844,6 +2903,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["KDS", "WAITER_PHONE", "TABLE_TABLET"],
         "x-requirements": ["TAB-015", "NTF-003", "MGR-006"]
       }
     },
@@ -2898,6 +2958,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-001", "AUTH-013", "AUD-001"]
       }
     },
@@ -2936,6 +2997,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-009", "TAB-010", "AUTH-009"]
       },
       "post": {
@@ -2986,6 +3048,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-008", "TAB-009", "ORD-003", "ORD-013", "ORD-014", "AUTH-009"]
       }
     },
@@ -3066,6 +3129,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["ORD-004", "ORD-003", "AUTH-013", "AUTH-009"]
       }
     },
@@ -3155,6 +3219,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": [
           "TAB-011",
           "REC-001",
@@ -3214,6 +3279,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["REC-008", "TAB-011", "AUTH-009"]
       }
     },
@@ -3252,6 +3318,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-004", "AUTH-009"]
       },
       "post": {
@@ -3306,6 +3373,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-004", "BILL-015", "NTF-003", "NTF-005", "SEC-009"]
       }
     },
@@ -3362,6 +3430,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-004", "AUTH-009"]
       }
     },
@@ -3404,6 +3473,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-002", "TAB-003", "AUTH-009"]
       }
     },
@@ -5018,6 +5088,12 @@
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
           },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
           "404": {
             "description": "No menu has been published yet.",
             "content": {
@@ -5026,6 +5102,7 @@
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"],
         "x-requirements": ["MENU-012", "MENU-013", "MENU-006"]
       }
     },
@@ -5228,9 +5305,16 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["TABLE_TABLET"],
         "x-requirements": ["TAB-005", "REC-004"]
       }
     },
@@ -9735,9 +9819,16 @@
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
+          },
+          "403": {
+            "description": "This kind of device may not call it.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
           }
         },
         "x-capability": "DEVICE",
+        "x-devices": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"],
         "x-requirements": ["ONB-004", "BILL-002", "NFR-L03"]
       }
     },
@@ -15521,7 +15612,7 @@
       "CreatePairingCodeRequest": {
         "type": "object",
         "properties": {
-          "type": { "$ref": "#/components/schemas/DeviceType" },
+          "type": { "$ref": "#/components/schemas/PairableDeviceType" },
           "name": { "$ref": "#/components/schemas/DeviceName" },
           "tableId": { "$ref": "#/components/schemas/Id" },
           "stationId": { "$ref": "#/components/schemas/Id" },
@@ -20701,6 +20792,10 @@
         },
         "required": ["code", "algorithm", "publicKey", "proof"],
         "additionalProperties": false
+      },
+      "PairableDeviceType": {
+        "type": "string",
+        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"]
       },
       "PairedDevice": {
         "type": "object",

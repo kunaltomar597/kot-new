@@ -58,7 +58,7 @@ export class ServiceRequestsController {
  * table only (AUTH-009), whoever is signed in on it. P3-02 builds the buttons on these.
  */
 @Controller('devices/current/service-requests')
-@RequireDevice()
+@RequireDevice(['TABLE_TABLET'])
 export class TabletServiceRequestsController {
   constructor(private readonly requests: ServiceRequestsService) {}
 

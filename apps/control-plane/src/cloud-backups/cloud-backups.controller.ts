@@ -16,6 +16,7 @@ import {
   CloudRestoreRequest,
   type CloudRestoreResponse,
   EscrowBackupKeyRequest,
+  ObjectStoreGrantParams,
   RestoreCodeRequest,
   type RestoreCodeView,
   type CloudBackupView,
@@ -123,12 +124,12 @@ export class CloudBackupsController {
   @Put('object-store/:grant')
   @Public()
   async putPart(
-    @Param('grant') token: string,
+    @Param(new ZodPipe(ObjectStoreGrantParams)) params: ObjectStoreGrantParams,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
     const store = this.localStore();
-    const grant = store.verify(token);
+    const grant = store.verify(params.grant);
     if (grant?.op !== 'PUT_PART') throw denied();
     const md5 = request.headers['content-md5'];
     try {
@@ -144,9 +145,12 @@ export class CloudBackupsController {
 
   @Get('object-store/:grant')
   @Public()
-  download(@Param('grant') token: string, @Res() response: Response): void {
+  download(
+    @Param(new ZodPipe(ObjectStoreGrantParams)) params: ObjectStoreGrantParams,
+    @Res() response: Response,
+  ): void {
     const store = this.localStore();
-    const grant = store.verify(token);
+    const grant = store.verify(params.grant);
     if (grant?.op !== 'GET') throw denied();
     response.status(200).setHeader('content-type', 'application/octet-stream');
     store.open(grant).pipe(response);

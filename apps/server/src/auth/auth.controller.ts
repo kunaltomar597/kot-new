@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import {
   type CurrentSessionResponse,
+  HTTP_DEVICE_TYPES,
   type LoginResponse,
   OverrideRequest,
   type OverrideResponse,
@@ -9,6 +10,7 @@ import {
   type OwnerSecurityResponse,
   PinLoginRequest,
   RefreshRequest,
+  STAFF_DEVICE_TYPES,
   type StaffTilesResponse,
   StepUpRequest,
   type StepUpResponse,
@@ -44,7 +46,7 @@ export class AuthController {
   ) {}
 
   @Get('staff-tiles')
-  @RequireDevice()
+  @RequireDevice(HTTP_DEVICE_TYPES)
   staffTiles(@Req() request: AuthenticatedRequest): Promise<StaffTilesResponse> {
     return this.auth.staffTiles(deviceOf(request));
   }
@@ -57,7 +59,7 @@ export class AuthController {
 
   @Post('pin-login')
   @HttpCode(200)
-  @RequireDevice()
+  @RequireDevice(STAFF_DEVICE_TYPES)
   pinLogin(
     @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(PinLoginRequest)) body: PinLoginRequest,
@@ -67,7 +69,7 @@ export class AuthController {
 
   @Post('owner-login')
   @HttpCode(200)
-  @RequireDevice()
+  @RequireDevice(STAFF_DEVICE_TYPES)
   ownerLogin(
     @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(OwnerLoginRequest)) body: OwnerLoginRequest,
@@ -77,7 +79,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(200)
-  @RequireDevice()
+  @RequireDevice(STAFF_DEVICE_TYPES)
   refresh(
     @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(RefreshRequest)) body: RefreshRequest,

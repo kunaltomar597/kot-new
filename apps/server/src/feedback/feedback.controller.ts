@@ -24,7 +24,7 @@ function principalOf(request: AuthenticatedRequest): Principal {
 
 /** Feedback from the table tablet after the bill (TAB-014). */
 @Controller('devices/current/feedback')
-@RequireDevice()
+@RequireDevice(['TABLE_TABLET'])
 export class TabletFeedbackController {
   constructor(private readonly feedback: FeedbackService) {}
 

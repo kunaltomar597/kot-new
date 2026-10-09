@@ -669,7 +669,7 @@ describe('[TAB-011] [AUTH-009] suggestions on the table tablet', () => {
     const kds = await server()
       .get('/api/v1/devices/current/recommendations')
       .set(authHeaders(id('kds')));
-    expect(codeOf(kds)).toBe('NOT_A_TABLE_TABLET');
+    expect(codeOf(kds)).toBe('DEVICE_NOT_ALLOWED');
   });
 
   it('tells staff when the table session is unknown or closed', async () => {

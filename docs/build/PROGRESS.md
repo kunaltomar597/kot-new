@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-01b).
+Last updated: 2026-10-10 (P8-03a).
 
 What exists:
 
@@ -50,7 +50,10 @@ What exists:
   and its download, and the builds on the System page (P7-04e2); pager firmware: the
   `PAGER_FIRMWARE` release component, what the heartbeat says and hears about it, the offer on the
   pager's own `ota` topic and its answer in the pager's heartbeat, and the Pagers page's firmware
-  with "Update now" (P2-04b1); a pager's QR code, `RP-PAGER:<serial>` (P2-04b2). 955 tests.
+  with "Update now" (P2-04b1); a pager's QR code, `RP-PAGER:<serial>` (P2-04b2); the kinds of
+  device each device endpoint serves (`devices`, `x-devices`), `HTTP_DEVICE_TYPES`,
+  `STAFF_DEVICE_TYPES` and `PairableDeviceType`, and the docs generator refusing a device endpoint
+  without its devices or a public one that does not say why (P8-03a). 961 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -112,13 +115,16 @@ What exists:
   the not-collected sweep found from the dishes still live, an index for a combo line's parts,
   and the GST and source reports in one pass each (P8-01a); the same rush with diners ordering on
   QR pages through the relay behind simulated internet lines, measuring NFR-P05 and NFR-P06
-  (P8-01b). 1186 tests (28 skipped: Windows only, a real install, or the performance runs).
+  (P8-01b); device endpoints refusing the kinds of device they do not serve, sign-in only on staff
+  devices, no pairing code for a pager, and the authorisation sweep over every endpoint (P8-03a).
+  1199 tests (28 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
   rollouts, backups, diagnostics and more (Phase 7); pager firmware is a release component with
-  the same rollouts, and PCs report what their pagers did with it (P2-04b1). 142 tests. Not
-  deployed yet (hosting account pending).
+  the same rollouts, and PCs report what their pagers did with it (P2-04b1); its routes checked
+  against the registry and its authorisation sweep (P8-03a). 149 tests. Not deployed yet (hosting
+  account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
@@ -275,6 +281,8 @@ What exists:
   ui-web 120 tests.
 - CI security baseline: secret scan, dependency audit, licence policy, SBOM, CodeQL, Dependabot,
   generated OpenAPI/AsyncAPI docs (P0-06, ADR-0010).
+- `docs/security/`: the security documents of P8-03, starting with `authorisation.md`, who may
+  call what on every surface and the tests that check it (P8-03a).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
@@ -285,8 +293,9 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03 Security hardening and penetration-test readiness (the external test needs the firm the
-  Business Owner engages).
+- P8-03b STRIDE threat models; then P8-03c DAST, P8-03d the standards checklists, P8-03e the
+  incident response plan and the pack for the penetration testers (the external test needs the
+  firm the Business Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -505,7 +514,12 @@ Recommended next WPs (dependencies met):
   - [x] P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
   - [ ] P8-01c S1 on the lab rig with real devices [H]
 - [ ] P8-02 Failure drills [H]
-- [ ] P8-03 Security hardening and pentest readiness
+- [~] P8-03 Security hardening and pentest readiness
+  - [x] P8-03a Authorisation sweep (local server and Control Plane)
+  - [ ] P8-03b STRIDE threat models
+  - [ ] P8-03c DAST of the QR site, relay and Control Plane
+  - [ ] P8-03d Standards checklists, Electron review and MDM policy
+  - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
 - [ ] P8-05 Runbooks, manuals, training
 - [ ] P8-06 Pilot readiness
@@ -751,6 +765,47 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03a):
+
+706. P8-03 is split into five (`phase-8.md`): P8-03a the authorisation sweep (this WP), P8-03b
+     STRIDE threat models, P8-03c DAST, P8-03d the standards checklists with the Electron review
+     and the MDM policy, P8-03e the incident response plan and the pack for the penetration
+     testers (the external test itself needs the firm, [H]). What they produce goes in
+     `docs/security/`.
+707. "Automated authorisation tests" (SEC-017) are two sweeps: every endpoint in the local
+     server's and the Control Plane's registries is called the way an attacker would, and must
+     get the exact refusal from the guard before any work is done. Calls that would be allowed
+     are not made there; each feature's tests cover them, including the object-level checks, and
+     the permission matrix stays tested row by row through the probe controller. The lists of
+     public endpoints live in the sweep tests, so opening a new one is a deliberate change.
+708. Device endpoints name the kinds of device they serve (`@RequireDevice(devices)`, the
+     registry's `devices`, `x-devices` in the OpenAPI document), and the guard refuses every other
+     kind with 403 `DEVICE_NOT_ALLOWED` before validation. Each list is what that endpoint's
+     clients are: any device but a pager for the menu, the restaurant, the staff tiles, the device
+     itself and client errors; staff devices for sign-in and refresh; phones and tablets for their
+     app builds; kitchen screens, phones and tablets for health; the waiter phone for its alerts;
+     the table tablet for everything about its table (orders, approval at the table, service
+     requests, feedback, suggestions, best sellers, kiosk exit). The services' own "not a table
+     tablet" checks stay behind the guard.
+709. Staff sign in only on POS terminals, kitchen screens, waiter phones and managers' browsers
+     (`STAFF_DEVICE_TYPES`). A table tablet is in diners' hands and acts for its own table only
+     (AUTH-009): staff confirm things there with their PIN for that one action. Before, a person
+     could sign in with their PIN through a tablet's credential and get a session that reached the
+     whole restaurant. Sign-in and refresh now refuse tablets and pagers, and a session on one
+     counts for nothing (`SessionService`), so no other way in opens it.
+710. Pagers never use HTTPS: no pairing code is made for a pager (`PairableDeviceType`, 400).
+     Before, a manager could make one through the API (the console never offered it), and a
+     device paired with it would hold a device key that opened the device endpoints, including
+     the staff tiles. Pagers are registered on the Pagers page with an MQTT credential only.
+711. Found and fixed: the Control Plane served two public endpoints that were in neither its
+     registry nor its OpenAPI document, the development object store's signed URLs (`PUT` and
+     `GET /v1/object-store/:grant`). They are registered now (PUBLIC, saying why: the HMAC-signed
+     grant is the authorisation; 404 in staging and production, whose configuration refuses the
+     local store), and the grant is read through the registered schema. The Control Plane's routes
+     are now checked against its registry on every build, as the local server's are.
+712. The wrong kind of device gets 403 `DEVICE_NOT_ALLOWED`, which the apps treat as final (no
+     retry). A kitchen screen asking for an app build is now refused instead of told "no build".
 
 Decided 2026-10-10 (P8-01b):
 
@@ -3772,6 +3827,10 @@ Security-sensitive PRs for the P8-03 human review:
   (`firmware-image.ts`) and the trusted key list, the public firmware download with its one-time
   token, the pager's new `ota` topic in the broker's ACL, and the reports a pager may send about
   offers (only for versions offered to it, once).
+- P8-03a (merged locally): the permission guard's device lists and `DEVICE_NOT_ALLOWED`,
+  sessions only on staff devices (sign-in, refresh and `SessionService`), no pairing code for a
+  pager, the Control Plane's development object-store routes and their grant schema, and the two
+  authorisation sweeps with their lists of public endpoints.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -3779,6 +3838,61 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03a Authorisation sweep (local server and Control Plane)
+
+Split P8-03 into P8-03a to P8-03e (`phase-8.md`, decision 706). Decisions 706 to 712.
+
+Built:
+
+- `@rp/contracts`: `HTTP_DEVICE_TYPES`, `STAFF_DEVICE_TYPES`, `PairableDeviceType` (pairing codes
+  no longer take `PAGER`); `devices` on every `DEVICE` route, with 403 in their responses; the
+  docs generator emits `x-devices` and refuses a device route without devices, devices on any
+  other route, and a public route whose description is empty. The Control Plane registry gains
+  `uploadObjectStorePart` and `downloadObjectStoreFile` with `ObjectStoreGrantParams`.
+- Server: `@RequireDevice(devices)` (a required list) and the guard's 403 `DEVICE_NOT_ALLOWED`;
+  the health route overrides its controller's list; `SessionService` refuses to create or accept a
+  session on a device that is not a staff device.
+- Control Plane: the object-store routes read the grant through `ObjectStoreGrantParams`.
+- Tests:
+  - `apps/server/test/integration/authorisation-sweep.int.test.ts`, 12 tests, about 3,500 calls in
+    a few seconds;
+  - `apps/control-plane/test/integration/authorisation-sweep.int.test.ts`, 7 tests: the routes
+    against the registry, and the sweep;
+  - `test/helpers/served-routes.ts`, the served routes and their access, shared with the registry
+    test in `auth-guard.int`, which now compares device lists too;
+  - a pairing test for pagers, and contract tests for the device lists and the generator's rules.
+  - Both sweeps were checked by breaking the guard (the device check, the vendor role check): each
+    failed and named every endpoint.
+- `docs/security/README.md` (the index for P8-03) and `docs/security/authorisation.md` (the model
+  per surface, the public endpoints and why, the object-level checks with their tests, sockets,
+  MQTT, the relay, the Control Plane, the sweeps, and how to change who may call what).
+
+Found and fixed (decisions 709 to 711): staff could sign in with a PIN through a table tablet's
+credential; a pairing code could be made for a pager, giving it a device key; the Control Plane
+served two public routes missing from its registry and document. Changed answers: a kitchen screen
+or POS on a tablet-only route, or a kitchen screen asking for an app build, now gets 403
+`DEVICE_NOT_ALLOWED` (the tests that expected `NOT_A_TABLE_TABLET` or "no build" follow).
+
+Tests: server 1199 (+13, 28 skipped), Control Plane 149 (+7), contracts 961 (+6), console 383 and
+the 25 Playwright steps unchanged and passing. Format, build, contract docs, `contracts:compat`,
+lint, typecheck and every package's tests pass. Traceability: Must 263/287 (SEC-017 now covered).
+
+Not done or not verified:
+
+- P8-03b to P8-03e. The sweep does not cover the socket and MQTT surfaces by enumeration; their
+  handshake, rooms and ACL tests are listed in `authorisation.md`.
+- No security headers on the local server and the Control Plane yet (no CSP, HSTS or
+  `X-Frame-Options` from the API): that is P8-03c's DAST to find and fix.
+
+Gotchas:
+
+- `ROUTES` is a long `as const` union; widen it (`const routes: readonly RouteDefinition[] =
+ROUTES`) before filtering in tests, or TypeScript cannot index the permission matrix.
+- The sweep calls each endpoint with a fresh id for every path parameter: the guard decides
+  before validation and lookups, so the ids need not exist.
+- A route's devices are the decorator's (the handler's, else the controller's); the registry
+  test compares them sorted.
 
 ### 2026-10-10: P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
 

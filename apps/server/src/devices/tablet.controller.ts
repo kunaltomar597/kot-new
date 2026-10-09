@@ -19,7 +19,7 @@ function deviceOf(request: AuthenticatedRequest): AuthenticatedDevice {
 
 /** What a device asks about itself (P3-01a): a tablet's table and kiosk exit, any app's health. */
 @Controller('devices/current')
-@RequireDevice()
+@RequireDevice(['TABLE_TABLET'])
 export class TabletController {
   constructor(private readonly tablets: TabletService) {}
 
@@ -28,7 +28,9 @@ export class TabletController {
     return this.tablets.table(deviceOf(request));
   }
 
+  /** The Android apps' battery and connection (TAB-015); a kitchen screen may report too. */
   @Post('health')
+  @RequireDevice(['KDS', 'WAITER_PHONE', 'TABLE_TABLET'])
   @HttpCode(204)
   async health(
     @Req() request: AuthenticatedRequest,

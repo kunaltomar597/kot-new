@@ -17,6 +17,7 @@ import {
   CloudBackupParams,
   CloudRestoreRequest,
   CloudRestoreResponse,
+  ObjectStoreGrantParams,
   EscrowBackupKeyRequest,
   RestoreCodeRequest,
   RestoreCodeView,
@@ -1139,7 +1140,8 @@ export const CONTROL_PLANE_ROUTES = [
     path: '/v1/cloud-restores',
     summary: 'Trade a restore code for the backup key and the cloud backups’ addresses',
     description:
-      'The restore tool on a new PC (DATA-004). The key is unwrapped by the vendor’s KMS and ' +
+      'Public because the restore tool on a new PC (DATA-004) has no credential yet: the ' +
+      'one-time restore code is the credential. The key is unwrapped by the vendor’s KMS and ' +
       'wrapped again for the tool’s own public key, so it never crosses in the clear. The code ' +
       'works once. Rate-limited per address; audited.',
     tags: ['backups'],
@@ -1155,6 +1157,47 @@ export const CONTROL_PLANE_ROUTES = [
       },
       429: { description: 'Too many attempts from this address.', schema: ApiError },
       503: { description: 'Escrow or the cloud backup is not set up here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'uploadObjectStorePart',
+    method: 'PUT',
+    path: '/v1/object-store/:grant',
+    summary: 'Upload one part of a cloud backup to the development object store',
+    description:
+      'Public because the HMAC-signed grant in the URL is the authorisation, as a presigned S3 ' +
+      'URL is: it names one part of one upload and expires. Development and tests only: ' +
+      'staging and production keep cloud backups in S3, where these addresses answer 404 ' +
+      '(the configuration refuses the local store there). The body is the part’s bytes, ' +
+      'checked against `Content-MD5` when given.',
+    tags: ['backups'],
+    requirements: ['DATA-003'],
+    capability: 'PUBLIC',
+    request: { params: ObjectStoreGrantParams },
+    responses: {
+      200: { description: 'Stored; the part’s ETag is in the `ETag` header.' },
+      400: { description: 'The part does not match its Content-MD5.', schema: ApiError },
+      403: { description: 'The grant is not valid, not for this, or expired.', schema: ApiError },
+      404: { description: 'No local object store here.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'downloadObjectStoreFile',
+    method: 'GET',
+    path: '/v1/object-store/:grant',
+    summary: 'Download a cloud backup from the development object store',
+    description:
+      'application/octet-stream. Public because the HMAC-signed grant in the URL is the ' +
+      'authorisation, as a presigned S3 URL is: it names one file and expires. Development and ' +
+      'tests only (404 in staging and production, which use S3).',
+    tags: ['backups'],
+    requirements: ['DATA-003', 'DATA-004'],
+    capability: 'PUBLIC',
+    request: { params: ObjectStoreGrantParams },
+    responses: {
+      200: { description: 'The file.' },
+      403: { description: 'The grant is not valid, not for this, or expired.', schema: ApiError },
+      404: { description: 'No local object store here.', schema: ApiError },
     },
   },
   {

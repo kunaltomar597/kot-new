@@ -100,6 +100,13 @@ export type CloudBackupView = z.infer<typeof CloudBackupView>;
 export const CloudBackupListResponse = z.object({ backups: z.array(CloudBackupView) });
 export type CloudBackupListResponse = z.infer<typeof CloudBackupListResponse>;
 
+/**
+ * The address of the development object store's signed URL (P7-05d): an HMAC-signed grant for
+ * one part or one download, as a presigned S3 URL would be.
+ */
+export const ObjectStoreGrantParams = z.strictObject({ grant: z.string().min(1).max(2_000) });
+export type ObjectStoreGrantParams = z.infer<typeof ObjectStoreGrantParams>;
+
 // ------------------------------------------------------------ key escrow (P7-05e, OI-10)
 
 const KeyId = z.string().regex(/^[0-9a-f]{16}$/);

@@ -21,7 +21,7 @@ function deviceFrom(request: AuthenticatedRequest): AuthenticatedDevice {
  * `client-version.ts`), so a refused app can update itself.
  */
 @Controller('devices/current/app-build')
-@RequireDevice()
+@RequireDevice(['WAITER_PHONE', 'TABLE_TABLET'])
 export class AppBuildsController {
   private readonly logger = new Logger(AppBuildsController.name);
 

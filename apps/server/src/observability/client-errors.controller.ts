@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, Inject, Post, Req } from '@nestjs/common';
-import { ClientErrorReport } from '@rp/contracts';
+import { ClientErrorReport, HTTP_DEVICE_TYPES } from '@rp/contracts';
 import type { SentryReporter } from '@rp/error-reporting';
 import { authErrors } from '../auth/auth-errors.js';
 import { RequireDevice } from '../auth/decorators.js';
@@ -31,7 +31,7 @@ export class ClientErrorsController {
 
   @Post()
   @HttpCode(204)
-  @RequireDevice()
+  @RequireDevice(HTTP_DEVICE_TYPES)
   report(
     @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(ClientErrorReport)) body: ClientErrorReport,
