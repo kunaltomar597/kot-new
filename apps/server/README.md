@@ -577,6 +577,31 @@ clock, which the scenarios move from day to day:
 
 `test/helpers/small-restaurant.ts` sets up their menu and floor and serves a table through the API.
 
+## Load test at design capacity (P8-01a)
+
+`test/load/` simulates the restaurant of BRD §7.2 against the server (ADR-0020): 200 live
+connections (tablets, waiter phones, kitchen screens, POS, dashboards and console screens, each
+re-reading its screen after events as the apps do), 30 pagers on MQTTS and 8 printers on raw TCP.
+Orders arrive open-loop at the peak rate; the kitchen cooks, waiters approve, pick up and serve,
+diners call, cashiers bill and print, managers change availability and run reports. At the end the
+server is killed and every client must come back.
+
+- `plan.ts`: the shape (`DESIGN_CAPACITY`, `SMOKE_SHAPE`) and the seeded schedule;
+- `restaurant.ts`: the restaurant, its devices and pagers, and a year of history in steady state;
+- `device.ts`, `pager.ts`, `printer.ts`, `tls-fetch.ts`: the simulated devices;
+- `server.ts`: the built server in its own process, or the server in this process;
+- `rush.ts`: the run, its figures per NFR-P target and the checks (nothing lost or duplicated);
+- `report.ts`: the Markdown that `docs/build/performance.md` records.
+
+The full run: `pnpm build`, then `RP_PERF=1 pnpm --filter @rp/server test:perf load`
+(`RP_LOAD_MINUTES`, `RP_LOAD_ORDERS_PER_HOUR`, `RP_LOAD_HISTORY_DAYS`; the report in
+`RP_LOAD_REPORT`, by default `$TMPDIR/rp-load-report.md`, with the raw figures next to it as JSON).
+It takes the rush's 25 minutes plus 10 to 60 for the year of history. To set the history up once
+and reuse it, point `RP_LOAD_ADMIN_URL` at a PostgreSQL of your own and `RP_LOAD_BASE` at a folder:
+later runs copy the restaurant in about 30 s. With `pg_stat_statements` loaded in that PostgreSQL,
+the busiest statements of a rush are a query away. The server's log is in the run's data folder. A
+short version runs in the integration suite on every build (`test/integration/load-rush.int.test.ts`).
+
 ## Windows services (P0-16b)
 
 On the restaurant PC the server runs under the **service host** (`src/service/service-host.ts`,
@@ -622,6 +647,7 @@ pnpm --filter @rp/server db:migrate:deploy   apply pending migrations (what the 
 pnpm --filter @rp/server db:seed       load the development seed (build first)
 pnpm --filter @rp/server menu:template write the vendor menu import template (build first)
 pnpm --filter @rp/server scenario:service-day   Phase 1 exit scenario against RP_SCENARIO_URL
+RP_PERF=1 pnpm --filter @rp/server test:perf load   the load test at design capacity (build first)
 pnpm --filter @rp/server control-plane:enrol <code>   enrol this PC with the Control Plane
 pnpm --filter @rp/server clean         remove dist, coverage and the generated Prisma client
 ```

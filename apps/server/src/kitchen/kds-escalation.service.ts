@@ -64,14 +64,29 @@ export class KdsEscalationService implements OnApplicationBootstrap, OnModuleDes
       const settings = await this.settings.snapshot(restaurantId);
       if (!settings.get('kds.autoEscalateNotCollected')) continue;
       const since = new Date(now.getTime() - settings.get('kds.readyNotCollectedMinutes') * 60_000);
-      const waiting = await this.prisma.kot.findMany({
-        where: {
-          restaurantId,
-          bumpedAt: null,
-          lines: { some: { orderItem: { state: 'READY', readyAt: { lte: since } } } },
-        },
+      // From the dishes waiting at the pass, not from every ticket nobody bumped (P8-01a).
+      const stations = await this.prisma.station.findMany({
+        where: { restaurantId },
         select: { id: true },
       });
+      const ready = await this.prisma.orderItem.findMany({
+        where: {
+          restaurantId,
+          // By station and state: the index that holds today's few dishes at the pass.
+          stationId: { in: stations.map((station) => station.id) },
+          state: 'READY',
+          readyAt: { lte: since },
+        },
+        select: { kotLines: { select: { kotId: true } } },
+      });
+      const kotIds = [...new Set(ready.flatMap((item) => item.kotLines.map((line) => line.kotId)))];
+      const waiting =
+        kotIds.length === 0
+          ? []
+          : await this.prisma.kot.findMany({
+              where: { restaurantId, id: { in: kotIds }, bumpedAt: null },
+              select: { id: true },
+            });
       if (waiting.length === 0) continue;
       // Once per ticket, whether that alert is still open or was dealt with.
       const raisedBefore = new Set(

@@ -1,8 +1,6 @@
+import { liveRefresh } from '@rp/ordering';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConsole, useConsoleState } from './console-context.js';
-
-/** Wait this long after an event before reading again, so a burst of events costs one read. */
-const REFRESH_DELAY_MS = 250;
 
 export type LiveData<T> =
   | { readonly status: 'loading' }
@@ -44,14 +42,13 @@ export function useLive<T>(
 
   useEffect(() => {
     reload();
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    // 250 ms after the first event of a burst, whatever follows it (NFR-P01).
+    const refresh = liveRefresh(reload);
     const unsubscribe = controller.onEvent((event) => {
-      if (!latest.current.affects(event.type)) return;
-      clearTimeout(timer);
-      timer = setTimeout(reload, REFRESH_DELAY_MS);
+      if (latest.current.affects(event.type)) refresh.notify();
     });
     return () => {
-      clearTimeout(timer);
+      refresh.cancel();
       unsubscribe();
       generation.current += 1;
     };

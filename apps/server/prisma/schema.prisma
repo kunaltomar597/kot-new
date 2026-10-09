@@ -1104,6 +1104,8 @@ model OrderItem {
   updatedAt            DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([orderId])
+  // A combo line's parts (P8-01a: read on every kitchen step and by the live order feed).
+  @@index([parentOrderItemId])
   @@index([restaurantId, businessDate, state])
   @@index([stationId, state])
   @@map("order_items")

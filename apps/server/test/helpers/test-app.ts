@@ -48,6 +48,8 @@ export async function createTestApp(options: {
   }[];
   /** Runs before start-up hooks, e.g. to subscribe test consumers to the event bus. */
   beforeInit?: (app: INestApplication) => void;
+  /** The port to listen on (default: any free one), e.g. to start again where clients expect. */
+  port?: number;
 }): Promise<INestApplication> {
   const config = testConfig({ databaseUrl: options.databaseUrl, ...options.config });
   let builder = Test.createTestingModule({
@@ -71,7 +73,7 @@ export async function createTestApp(options: {
   // for each request and then connects to 127.0.0.1, where another process (a test database,
   // a relay function under Deno) may hold the same port number: macOS lets a wildcard and a
   // specific address share it, and the request then ends in "socket hang up".
-  await app.listen(0, '127.0.0.1');
+  await app.listen(options.port ?? 0, '127.0.0.1');
   return app;
 }
 

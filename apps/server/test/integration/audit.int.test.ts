@@ -44,10 +44,17 @@ afterAll(async () => {
   }
 });
 
-function record(f: Fixture, action = 'ORDER_CREATED', extra: Record<string, unknown> = {}) {
-  return f.prisma.transaction((tx) =>
+/** Records an entry in a transaction of its own; its place in the chain once committed. */
+async function record(
+  f: Fixture,
+  action = 'ORDER_CREATED',
+  extra: Record<string, unknown> = {},
+): Promise<{ id: string; seq: number; hash: string }> {
+  const { id } = await f.prisma.transaction((tx) =>
     f.audit.record(tx, { action, entityType: 'order', entityId: newId(), ...extra }),
   );
+  const row = await f.prisma.auditLog.findUniqueOrThrow({ where: { id } });
+  return { id, seq: Number(row.chainSeq), hash: row.hash };
 }
 
 describe('[AUD-002] [AUD-003] recording entries', () => {
@@ -139,6 +146,30 @@ describe('[AUD-002] [AUD-003] recording entries', () => {
     await expect(record(f, 'ORDER_CREATED', { businessDate: '25-09-2026' })).rejects.toThrow(
       /YYYY-MM-DD/,
     );
+  });
+});
+
+describe('[AUD-002] [AUD-003] entries of one transaction', () => {
+  it('are written together when it ends, in the order recorded, under one lock', async () => {
+    const f = await fixture();
+    await record(f, 'SHIFT_OPENED');
+    const ids = await f.prisma.transaction(async (tx) => {
+      const first = await f.audit.record(tx, { action: 'ORDER_CREATED', entityType: 'order' });
+      // Not in the chain until the transaction ends: the chain's lock is not held meanwhile.
+      expect(await tx.auditLog.count()).toBe(1);
+      const locks = await tx.$queryRaw<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()`;
+      expect(locks[0]?.n).toBe(0);
+      const second = await f.audit.record(tx, { action: 'KOT_PRINTED', entityType: 'kot' });
+      return [first.id, second.id];
+    });
+    const rows = await f.prisma.auditLog.findMany({ orderBy: { chainSeq: 'asc' } });
+    expect(rows.map((row) => [row.id, Number(row.chainSeq)]).slice(1)).toEqual([
+      [ids[0], 2],
+      [ids[1], 3],
+    ]);
+    expect(rows[2]?.prevHash).toBe(rows[1]?.hash);
+    expect((await f.audit.verify()).valid).toBe(true);
   });
 });
 

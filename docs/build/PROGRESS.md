@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-09.
+Last updated: 2026-10-09 (P8-01a).
 
 What exists:
 
@@ -106,8 +106,12 @@ What exists:
   downloaded with a one-time token, progress and rollbacks from the heartbeats, "Update now"
   (P2-04b1, ADR-0018); the Phase 7 exit scenarios S8, S9 and S10 against a real Control Plane
   and across two PCs, and the backup keys of the PCs a PC was restored from, so the old PC's
-  archives still open in the archive viewer (P7-10).
-  1171 tests (27 skipped: Windows only, a real install, or the performance runs).
+  archives still open in the archive viewer (P7-10); the load test at design capacity
+  (`test/load/`, ADR-0020) with what it found fixed: audit entries written when their
+  transaction ends (no deadlock through the chain's lock), kitchen screens, the order feed and
+  the not-collected sweep found from the dishes still live, an index for a combo line's parts,
+  and the GST and source reports in one pass each (P8-01a).
+  1184 tests (28 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -169,7 +173,8 @@ What exists:
   "Again", live checks of cart lines and KOT delivery (P2-02b); what a person may do with a sent
   line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a); the
   reason shown with a suggestion and the suggestion a cart line came from (P3-04); "my tables"
-  from the domain's planning helper (P4-02b). 38 tests.
+  from the domain's planning helper (P4-02b); `liveRefresh`, when a live screen reads again
+  (P8-01a). 87 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server, the Control Plane and the relay (Prisma or Supabase CLI migrations, optional prelude).
 - `infra/supabase` (`@rp/relay`): the QR relay's database (P5-01, ADR-0015). It has:
@@ -267,12 +272,13 @@ What exists:
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
-Phase 7 is done (P7-10, 2026-10-09): S8, S9 and S10 pass on every build.
+Phase 7 is done (P7-10, 2026-10-09): S8, S9 and S10 pass on every build. The simulated rush at
+design capacity meets every in-restaurant target of §7.1 (P8-01a, `docs/build/performance.md`).
 
 Recommended next WPs (dependencies met):
 
-- P8-01 Load and capacity tests (the simulated load and its report; the lab rig's S1 needs a
-  person).
+- P8-01b Online and on-screen targets: NFR-P05 and NFR-P06 through the relay during the rush,
+  NFR-P07 with the browser's Event Timing, NFR-P12 recorded.
 - P8-03 Security hardening and penetration-test readiness (the external test needs the firm the
   Business Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -488,7 +494,10 @@ Recommended next WPs (dependencies met):
 
 ### Phase 8: Hardening and pilot
 
-- [ ] P8-01 Load and capacity tests
+- [~] P8-01 Load and capacity tests
+  - [x] P8-01a The simulated rush at design capacity
+  - [ ] P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
+  - [ ] P8-01c S1 on the lab rig with real devices [H]
 - [ ] P8-02 Failure drills [H]
 - [ ] P8-03 Security hardening and pentest readiness
 - [ ] P8-04 UX polish and accessibility audit
@@ -736,6 +745,89 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-09 (P8-01a), ADR-0020:
+
+687. P8-01 is split: P8-01a, the simulated rush at design capacity (this WP); P8-01b, NFR-P05 and
+     NFR-P06 through the relay during the rush, NFR-P07 (tap feedback and screen transitions) with
+     the browser's Event Timing in Playwright, and NFR-P12 recorded; P8-01c, S1 on the lab rig with
+     real devices [H].
+688. The load test is a Node.js harness on the apps' own clients (`@rp/api-client`, its
+     `RealtimeConnection`, `mqtt`, raw TCP printers), not k6 (ADR-0020). It runs the built server
+     in a process of its own with TLS and the pager broker, on a PostgreSQL as durable as the
+     restaurant PC's (fsync, synchronous commit, full-page writes, WAL archived during the rush).
+     It is opt-in (`RP_PERF=1 pnpm --filter @rp/server test:perf load`, the rush's 25 minutes and
+     10 to 60 for the year of history); a small in-process run of the same harness is in the
+     integration suite.
+     `NODE_ENV=development` for the server: `production` insists on the nightly backup and a
+     licence, `test` turns the print queue off.
+689. What is simulated (`DESIGN_CAPACITY` in `test/load/plan.ts`): 100 tables in 4 sections given
+     to 20 waiters (phone and pager each), 1,000 dishes (one in ten with sizes, some with options)
+     on 6 stations, each with a kitchen screen in station mode and a ticket printer, 2 bill
+     printers, 60 tablets on the first 60 tables, 8 runners and 2 managers with pagers (30 pagers),
+     2 POS, 2 dashboards. The other 110 of the 200 live connections are console screens showing
+     the alert centre, signed in as managers: they hear every alert and read the alerts again
+     after each, the heaviest choice a console screen allows. 80 tables are seated first; then 20
+     minutes at 300 orders an hour, open-loop: 45 % another round from the waiter's phone, 20 %
+     diners' orders on the tablet approved by the waiter, 25 % new parties, 10 % takeaway; a bill
+     as often as a new party; 90 diners' calls and 1,800 looks at the suggestions an hour; a dish
+     out of stock every minute and back 30 s later; a twelve-month report every 2 minutes; one
+     order in ten sent twice with the same key. The kitchen cooks in 30 to 120 s so tables turn
+     over within the run. History: 365 days at 2,000 orders a day (the P4-05c generator), brought
+     to the state a year of service leaves (90 days of alerts, today's suggestions learned,
+     vacuumed and analysed).
+690. What each figure is: NFR-P01 from the request that sends the order (or approves the diner's
+     order) to the read of the station's kitchen screen that first shows the ticket, the screen's
+     250 ms wait included; NFR-P02 to the ticket's last byte at the station's printer; NFR-P03 from
+     the kitchen's "Ready" (the first of the table's since its last alert closed) or the tablet's
+     call to the alert on each recipient's pager; NFR-P04, per change, the last of the 200 devices
+     to hear it; NFR-P08 from opening the bill to its last byte at the counter's printer (preview,
+     invoice, print); NFR-P09 and NFR-P10 as the HTTP round trip; NFR-P11 from killing the
+     server's process (SIGKILL) to each client's resync, judged by the slowest. Percentiles are
+     nearest-rank.
+691. Found by the load test and fixed: a live screen read again 250 ms after the last event of a
+     burst, so a kitchen's steady stream of events kept a new ticket off its screen for up to 1.3 s.
+     It now reads 250 ms after the first (`@rp/ordering` `liveRefresh`, used by the console's and
+     the phones' `useLive`).
+692. Found and fixed: an order and a payment at the same table at once deadlocked (PostgreSQL
+     40P01, a 500 for both): the payment took the audit chain's lock and then the table's, the order
+     the table's and then the audit chain's. Audit entries are now written when their transaction
+     ends (`PrismaService.beforeCommit`), so the chain's lock is the last any transaction takes and
+     is held for milliseconds; `AuditService.record` returns only the entry's id. Entries keep the
+     time they were recorded; their order in the chain is the order transactions commit, as
+     before.
+693. Found and fixed: the kitchen screen read every ticket of its station that was never bumped,
+     so a kitchen that serves from the pass without bumping broke its own screen within months
+     (a year: 730,000 tickets, Prisma P2029). Open tickets now come from the dishes still at the
+     station (`order_items` by station and state); the not-collected sweep likewise.
+694. The simulated devices start with a device token signed at set-up: 200 challenges from one
+     address trip the limit of 60 a minute per address, which every device of a restaurant has to
+     itself. `tlsFetch` sends a request once more when the server closed the kept-alive
+     connection under it (its 5 s idle timeout), as browsers and OkHttp do.
+695. Found with `pg_stat_statements` and fixed: with a year of orders, a kitchen step took 0.7 s
+     and the live order feed 0.8 s, and the notification consumer fell 18 s behind (NFR-P03).
+     Three reasons. A combo line's parts were read by `parent_order_item_id`, which had no
+     index: migration `20261009090000_load_test_indexes`. The order feed checked every order the
+     restaurant ever took for a live item: it now starts from the live items by station and
+     state. And it counted each line's parts with Prisma's `_count`, which aggregates the whole
+     `order_items` table on every read: it now tells a combo line by its parts among the order's
+     items. Afterwards the database's busiest statements take 0.1 to 0.5 ms each.
+696. The full run can reuse a restaurant set up before (`RP_LOAD_BASE` with `RP_LOAD_ADMIN_URL`):
+     the first run keeps the database as `rp_load_base` and the devices' keys in
+     `restaurant.json`. Later runs copy it (`CREATE DATABASE … TEMPLATE`, about 30 s for 5 GB),
+     apply the migrations written since, and set up the day: printers, tables, tokens, learned
+     suggestions. A run then takes the rush's time, not the hour the history can take.
+697. NFR-P10 under the rush: the twelve-month source report took 5.1 s and the GST summary 4.4 s,
+     with the rush around them. Both now go over each table once and aggregate by hash, with the
+     same figures to the paisa on the generated year:
+     - the source report adds up each order's lines first, instead of counting distinct orders
+       over every line: 2.45 s to 1.56 s on its own;
+     - the GST summary keeps each tax cluster's components in one pass over the tax lines,
+       instead of joining them to themselves. It takes each invoice's SAC code per tax group as
+       `min(sac_code)`, what `DISTINCT ON … ORDER BY sac_code NULLS LAST` picked, and lets the
+       planner see the invoices it reads: 3.7 s to 2.3 s on its own.
+       In the rush of 2026-10-09 the slowest report then took 3.4 s (sources), staff 3.3 s and GST
+       3.2 s; the rest under 2.7 s.
 
 Decided 2026-10-09 (P7-10):
 
@@ -3630,6 +3722,80 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-09: P8-01a The simulated rush at design capacity
+
+Split P8-01: P8-01a (this one), P8-01b (NFR-P05 and NFR-P06 through the relay, NFR-P07 with the
+browser's Event Timing, NFR-P12 recorded) and P8-01c (S1 on the lab rig, [H]), in `phase-8.md`.
+Decisions 687 to 697, ADR-0020, `docs/build/performance.md`.
+
+Built:
+
+- `apps/server/test/load/`, the load harness:
+  - `plan.ts`: `DESIGN_CAPACITY` and `SMOKE_SHAPE`, the seeded open-loop schedule;
+  - `restaurant.ts`: §7.2's restaurant with its devices and pagers, a year of history in steady
+    state, `readyForToday`, and `saveRestaurant`/`loadRestaurant` to reuse it;
+  - `device.ts`, `tls-fetch.ts`, `pager.ts`, `printer.ts`: the simulated devices on the apps' own
+    client over pinned TLS, MQTTS pagers, raw TCP printers;
+  - `server.ts`: the built server in a process of its own, or in this process;
+  - `rush.ts`: the rush, the people's reactions, the restart, the figures per target and S1's
+    checks;
+  - `report.ts` and `stats.ts`.
+- `test/performance/load.perf.test.ts` (opt-in; `RP_LOAD_ADMIN_URL`, `RP_LOAD_BASE` to reuse a
+  set-up history), `test/integration/load-rush.int.test.ts` (the short run on every build).
+- `test-app.ts`: a `port` option, so an in-process server can start again where clients expect.
+
+Found by the load test and fixed:
+
+- `@rp/ordering` `liveRefresh`: live screens read 250 ms after the first event of a burst
+  (console's and phones' `useLive`); a kitchen's stream of events held a ticket back up to 1.3 s.
+- Audit entries written when their transaction ends (`PrismaService.beforeCommit`,
+  `AuditService.record` returns the id only): an order and a payment at the same table
+  deadlocked (40P01, 500s) through the chain's lock. `lock-order.int.test.ts`.
+- `KdsService.openTickets` and the not-collected sweep from the dishes still at the station: a
+  year of never-bumped tickets broke the kitchen screen (P2029). Regression test in
+  `kds.int.test.ts`.
+- Migration `20261009090000_load_test_indexes` (`order_items.parent_order_item_id`); the order
+  feed from its live items and without Prisma's `_count`.
+- The GST summary and the source report in one pass each.
+
+Result (2026-10-09, 20 minutes at 300 orders an hour, 200 connections, 30 pagers, 8 printers,
+365 days of history): every target met:
+
+| Target  | p95                          |
+| ------- | ---------------------------- |
+| NFR-P01 | 425 ms                       |
+| NFR-P02 | 51 ms                        |
+| NFR-P03 | 78 ms                        |
+| NFR-P04 | 75 ms                        |
+| NFR-P08 | 47 ms                        |
+| NFR-P09 | 27 ms                        |
+| NFR-P10 | 3.4 s at most                |
+| NFR-P11 | 3.9 s for the slowest client |
+
+Every order, KOT, print, bill and pager alert happened exactly once; no request failed. Before
+the fixes the same run gave NFR-P03 p95 18 s, NFR-P10 7.7 s and stalls of seconds everywhere.
+
+Tests: server 1184 (+13, 28 skipped: the short rush, lock order, the KDS regression, audit
+deferral, the harness's unit tests), ordering 87 (+3), console 383 and mobile-shell 48 unchanged.
+
+Not done or not verified:
+
+- P8-01b and P8-01c (above). The figures are from the build Mac, which was in use meanwhile;
+  P8-01c measures S1 on the lab rig's PC.
+- The full run's 110 extra connections are manager consoles reading the alert list after every
+  alert, the heaviest choice; a real restaurant has a handful.
+
+Gotchas:
+
+- PostgreSQL 16's default `CREATE DATABASE … TEMPLATE` writes the whole copy to the WAL (5 GB for
+  the base): the harness uses `STRATEGY FILE_COPY`.
+- The year's set-up took 10 minutes on one run and an hour on another, with the Mac busy; use
+  `RP_LOAD_BASE` to set it up once. A base needs `restaurant.json.migrations`, written by the
+  set-up, so later runs apply only newer migrations.
+- 60 device-token requests a minute per address: the harness signs the devices' tokens at set-up.
+- zsh does not split `$VAR` into words: run psql loops through `bash`.
+- Ending the turn kills background runs in the headless autorun: poll with foreground waits.
 
 ### 2026-10-09: P7-10 Phase 7 exit test, S8, S9, S10 (Phase 7 done)
 
