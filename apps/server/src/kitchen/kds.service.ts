@@ -107,11 +107,7 @@ export class KdsService {
       ...(stationIds !== null && { stationId: { in: [...stationIds] } }),
     };
     const [open, bumped, snapshot] = await Promise.all([
-      this.prisma.kot.findMany({
-        where: { ...scope, bumpedAt: null },
-        include: TICKET_INCLUDE,
-        orderBy: [{ createdAt: 'asc' }, { kotNumber: 'asc' }],
-      }),
+      this.openTickets(actor.restaurantId, stationIds, businessDate),
       this.prisma.kot.findMany({
         where: { ...scope, bumpedAt: { gte: new Date(now.getTime() - RECALL_WINDOW_MS) } },
         include: TICKET_INCLUDE,
@@ -120,13 +116,7 @@ export class KdsService {
       }),
       this.settings.snapshot(actor.restaurantId),
     ]);
-    const today = dbDate(businessDate).getTime();
-    const showing = open.filter((kot) =>
-      kot.kind === 'NEW'
-        ? kot.lines.some((line) => AT_STATION.has(line.orderItem.state))
-        : // Change and cancellation slips stay until seen and bumped, on the day they were raised.
-          kot.businessDate.getTime() >= today,
-    );
+    const showing = open;
     const views = await this.views(actor.restaurantId, [...showing, ...bumped]);
     return {
       station: stations.length === 1 ? (stations[0] ?? null) : null,
@@ -141,6 +131,48 @@ export class KdsService {
       },
       serverTime: now.toISOString(),
     };
+  }
+
+  /**
+   * The tickets a station shows, oldest first: those with an item still to cook or at the pass,
+   * and the day's change and cancellation slips, until bumped. They are found from the items at
+   * the station, a few hundred at most, so a ticket nobody bumped (the waiter served it from the
+   * pass) is never read again. Read from every unbumped ticket, a year at design capacity was
+   * 730,000 tickets and the query failed (P8-01a).
+   */
+  private async openTickets(
+    restaurantId: string,
+    stationIds: readonly string[] | null,
+    businessDate: string,
+  ): Promise<TicketRow[]> {
+    const stations =
+      stationIds === null
+        ? (
+            await this.prisma.station.findMany({ where: { restaurantId }, select: { id: true } })
+          ).map((station) => station.id)
+        : [...stationIds];
+    const cooking = await this.prisma.orderItem.findMany({
+      where: { restaurantId, stationId: { in: stations }, state: { in: [...AT_STATION] } },
+      select: { kotLines: { select: { kotId: true } } },
+    });
+    const kotIds = [...new Set(cooking.flatMap((item) => item.kotLines.map((line) => line.kotId)))];
+    const scope = { restaurantId, stationId: { in: stations }, bumpedAt: null };
+    const [tickets, slips] = await Promise.all([
+      kotIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.kot.findMany({
+            where: { ...scope, id: { in: kotIds }, kind: 'NEW' },
+            include: TICKET_INCLUDE,
+          }),
+      // Change and cancellation slips stay until seen and bumped, on the day they were raised.
+      this.prisma.kot.findMany({
+        where: { ...scope, kind: { not: 'NEW' }, businessDate: { gte: dbDate(businessDate) } },
+        include: TICKET_INCLUDE,
+      }),
+    ]);
+    return [...tickets, ...slips].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.kotNumber - b.kotNumber,
+    );
   }
 
   /** Takes a finished ticket off the screen (KDS-005). Bumping twice changes nothing. */

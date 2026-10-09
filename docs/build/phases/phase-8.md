@@ -15,6 +15,43 @@ connections; simulated MQTT pagers; a generated 5-year dataset for report and si
 of p95 figures against every NFR-P target. S1 dinner rush on the lab rig with real devices.
 Acceptance: all targets met or tickets raised with fixes.
 
+Split (2026-10-09), because the simulated rush, the online targets and the lab rig are separate
+pieces of work:
+
+### P8-01a The simulated rush at design capacity
+
+Requirements: NFR-P01, NFR-P02, NFR-P03, NFR-P04, NFR-P08, NFR-P09, NFR-P10, NFR-P11, §7.2, S1
+(simulated part: zero lost or duplicate orders and KOTs).
+Deliverables: a load harness in `apps/server/test/load/` (the "similar" to k6: Node.js with the
+apps' own `@rp/api-client`, Socket.io and MQTT clients). It runs the built server in a process of
+its own, with TLS as on the restaurant PC. It simulates the restaurant of §7.2:
+
+- 100 tables, 1,000 dishes and 6 stations, with 60 tablets, 20 waiter phones, 6 kitchen screens,
+  POS terminals and dashboards making up 200 live connections;
+- 30 pagers on MQTT and 8 network printers on TCP;
+- a peak hour of 300 orders an hour as an open-loop arrival rate, on 12 months of generated
+  history.
+
+The simulated screens read again after events as the apps do. The kitchen cooks, waiters
+approve, pick up and serve, diners call, cashiers bill and print, managers change availability
+and run reports. At the end the server is killed and started again under all its connections.
+The run reports p95 figures against each target, the server's CPU and memory, and checks that
+every order, KOT, print and alert happened once. A short in-process version of the same run is
+in the integration suite. The measured figures go in `docs/build/performance.md`.
+Acceptance: the run passes on this Mac with every target met, or with tickets raised with fixes.
+
+### P8-01b Online and on-screen targets
+
+Requirements: NFR-P05, NFR-P06 (QR through the relay, during the rush), NFR-P07 (tap feedback
+and screen transitions on the console, measured with the browser's Event Timing in Playwright),
+NFR-P12 (already a Playwright test, P5-05b). Their figures are added to `performance.md`.
+
+### P8-01c S1 on the lab rig [H]
+
+Requirements: S1 with real devices: 40 tables, 3 stations, 8 waiters, 25 tablets, 10 pagers,
+600 orders in 3 hours. Claude prepares the harness against a real install and the procedure. A
+person runs it on the lab rig with real phones, tablets, pagers and printers and reports back.
+
 ## P8-02 Failure drills
 
 Requirements: S2 to S5, S7, S14, NFR-A01 to NFR-A04, §7.3 failure table.

@@ -1,0 +1,81 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
+import { SMOKE_SHAPE } from '../load/plan.js';
+import { SimulatedPrinter } from '../load/printer.js';
+import { readyForToday, setUpLoadRestaurant } from '../load/restaurant.js';
+import { runRush } from '../load/rush.js';
+import { type LoadTarget, startInProcessServer } from '../load/server.js';
+
+/**
+ * The load run of P8-01a, small and short, so the harness keeps working as the server changes:
+ * every device, pager and printer of the full run, in fewer numbers, with the server in this
+ * process. Latencies are measured at design capacity by `test/performance/load.perf.test.ts`;
+ * here the run must serve every order, ticket, print and alert exactly once, and every client
+ * must come back after the server restarts.
+ */
+
+let database: TestDatabase | undefined;
+let target: LoadTarget | undefined;
+const printers: SimulatedPrinter[] = [];
+
+afterAll(async () => {
+  await target?.stop();
+  await Promise.all(printers.map((printer) => printer.stop()));
+  await database?.drop();
+});
+
+describe('[NFR-P01] [NFR-P02] [NFR-P03] [NFR-P04] [NFR-P08] [NFR-P09] [NFR-P11] a short rush', () => {
+  it('serves every order, KOT, print and alert once, and every client comes back after a restart', async () => {
+    const shape = SMOKE_SHAPE;
+    database = await createTestDatabase();
+    const stations = await Promise.all(
+      Array.from({ length: shape.stations }, (_, index) =>
+        SimulatedPrinter.start(`station ${String(index + 1)}`),
+      ),
+    );
+    const bills = await Promise.all(
+      Array.from({ length: shape.billPrinters }, (_, index) =>
+        SimulatedPrinter.start(`bills ${String(index + 1)}`),
+      ),
+    );
+    printers.push(...stations, ...bills);
+    const server = await startInProcessServer({
+      databaseUrl: database.url,
+      dataDir: mkdtempSync(join(tmpdir(), 'rp-load-')),
+    });
+    target = server;
+    const ports = {
+      stations: stations.map((printer) => printer.port),
+      bills: bills.map((printer) => printer.port),
+    };
+    const restaurant = await readyForToday(
+      server.app(),
+      await setUpLoadRestaurant(server.app(), shape, ports, database.url),
+      ports,
+    );
+    const result = await runRush({
+      shape,
+      target: server,
+      restaurant,
+      databaseUrl: database.url,
+      printers: { stations, bills },
+      restart: true,
+    });
+
+    expect(server.errors).toEqual([]);
+    expect(result.checks.filter((check) => !check.ok)).toEqual([]);
+    expect(result.devices).toBe(shape.connections);
+    expect(result.pagers).toBe(shape.waiters + shape.runners + shape.managers);
+    // Each target was measured (NFR-P10's reports cover a year without history here).
+    for (const entry of result.targets) {
+      expect(entry.summary.count, entry.id).toBeGreaterThan(0);
+    }
+    const restarted = result.targets.find((entry) => entry.id === 'NFR-P11');
+    expect(restarted?.summary.count).toBe(shape.connections);
+    expect(restarted?.met).toBe(true);
+    expect(result.restart?.pagers.count).toBe(result.pagers);
+  }, 240_000);
+});

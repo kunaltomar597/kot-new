@@ -114,18 +114,28 @@ export class ReportSuiteService {
         net: bigint;
       }[]
     >`
+      WITH per_order AS (
+        -- Each order's lines summed first: counting distinct orders over every line sorted a
+        -- year's 2.9 million lines (P8-01a).
+        SELECT oi.order_id,
+               sum(il.line_total) AS gross,
+               sum(il.discount) AS discounts,
+               sum(il.taxable_value) AS net
+        FROM invoices i
+        JOIN invoice_lines il ON il.invoice_id = i.id AND il.version = i.version
+        JOIN order_items oi ON oi.id = il.order_item_id
+        WHERE i.restaurant_id = ${restaurantId}::uuid
+          AND i.status <> 'VOIDED'
+          AND i.business_date BETWEEN ${range.from}::date AND ${range.to}::date
+        GROUP BY oi.order_id
+      )
       SELECT o.source::text AS source, o.order_type::text AS order_type,
-             count(DISTINCT o.id) AS orders,
-             coalesce(sum(il.line_total), 0) AS gross,
-             coalesce(sum(il.discount), 0) AS discounts,
-             coalesce(sum(il.taxable_value), 0) AS net
-      FROM invoices i
-      JOIN invoice_lines il ON il.invoice_id = i.id AND il.version = i.version
-      JOIN order_items oi ON oi.id = il.order_item_id
-      JOIN orders o ON o.id = oi.order_id
-      WHERE i.restaurant_id = ${restaurantId}::uuid
-        AND i.status <> 'VOIDED'
-        AND i.business_date BETWEEN ${range.from}::date AND ${range.to}::date
+             count(*) AS orders,
+             coalesce(sum(p.gross), 0) AS gross,
+             coalesce(sum(p.discounts), 0) AS discounts,
+             coalesce(sum(p.net), 0) AS net
+      FROM per_order p
+      JOIN orders o ON o.id = p.order_id
       GROUP BY 1, 2
       ORDER BY 1, 2`;
     const mapped = rows.map((row) => ({

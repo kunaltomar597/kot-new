@@ -26,5 +26,9 @@ NFR-M01), free of any UI framework so both use the same rules and one set of tes
   how long it has waited (`alertAge`). The waiter app's alert banner uses it (P2-06a); so will the
   POS alert centre (P2-06c).
 
+- `live-refresh.ts`: when a live screen reads again after events (`liveRefresh`): 250 ms after
+  the first event of a burst, so a steady stream of events still refreshes it (NFR-P01, P8-01a).
+  The console's and the phones' `useLive` and the load test's simulated screens use it.
+
 `@rp/ordering/testing` holds a sample menu for tests. Business rules that are not about showing or
 collecting an order (money, tax, permissions, table states) stay in `@rp/domain`.

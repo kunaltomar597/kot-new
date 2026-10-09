@@ -26,8 +26,9 @@ const FEED_SELECT = {
   createdAt: true,
   table: { select: { label: true } },
   tableSession: { select: { waiterId: true } },
+  // Every item, ended ones too, so a combo line is known by its parts (`parentOrderItemId`):
+  // Prisma's `_count` of the parts counted every order item ever, on each read (P8-01a).
   items: {
-    where: { state: { notIn: [...ENDED] } },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: {
       id: true,
@@ -40,13 +41,24 @@ const FEED_SELECT = {
       sentAt: true,
       preparingAt: true,
       readyAt: true,
+      parentOrderItemId: true,
       parent: { select: { name: true } },
-      _count: { select: { components: true } },
     },
   },
 } as const satisfies Prisma.OrderSelect;
 
 type FeedRow = Prisma.OrderGetPayload<{ select: typeof FEED_SELECT }>;
+
+const ENDED_STATES: ReadonlySet<string> = new Set(ENDED);
+
+/** The order's combo lines: those that have parts. */
+function combos(order: FeedRow): ReadonlySet<string> {
+  return new Set(
+    order.items.flatMap((item) =>
+      item.parentOrderItemId === null ? [] : [item.parentOrderItemId],
+    ),
+  );
+}
 
 function waiterOf(order: FeedRow): string | null {
   return order.tableSession?.waiterId ?? order.createdById;
@@ -69,12 +81,30 @@ export class OrderFeedService {
 
   async feed(restaurantId: string): Promise<OrderFeedResponse> {
     const now = new Date();
-    const businessDate = await currentBusinessDate(this.prisma, restaurantId, now);
-    const [newestFirst, stations, openSessions, snapshot, menu] = await Promise.all([
+    const [businessDate, stations] = await Promise.all([
+      currentBusinessDate(this.prisma, restaurantId, now),
+      this.prisma.station.findMany({
+        where: { restaurantId },
+        select: { id: true, name: true, archivedAt: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    // The orders come from their live items, by station and state (an index of today's few
+    // dishes), not by checking every order the restaurant ever took (P8-01a).
+    const live = await this.prisma.orderItem.findMany({
+      where: {
+        restaurantId,
+        stationId: { in: stations.map((station) => station.id) },
+        state: { in: [...LIVE_ITEM_STATES] },
+      },
+      select: { orderId: true },
+      distinct: ['orderId'],
+    });
+    const [newestFirst, openSessions, snapshot, menu] = await Promise.all([
       this.prisma.order.findMany({
         where: {
           restaurantId,
-          items: { some: { state: { in: [...LIVE_ITEM_STATES] } } },
+          id: { in: live.map((item) => item.orderId) },
           OR: [
             { tableSession: { status: 'OPEN' } },
             { tableSessionId: null, businessDate: dbDate(businessDate) },
@@ -83,11 +113,6 @@ export class OrderFeedService {
         select: FEED_SELECT,
         orderBy: [{ createdAt: 'desc' }, { orderNumber: 'desc' }],
         take: MAX_ORDERS,
-      }),
-      this.prisma.station.findMany({
-        where: { restaurantId },
-        select: { id: true, name: true, archivedAt: true },
-        orderBy: { name: 'asc' },
       }),
       this.prisma.tableSession.findMany({
         where: { restaurantId, status: 'OPEN', waiterId: { not: null } },
@@ -120,6 +145,7 @@ export class OrderFeedService {
     return {
       orders: orders.map((order): OrderFeedEntry => {
         const waiterId = waiterOf(order);
+        const comboLines = combos(order);
         return {
           orderId: order.id,
           orderNumber: order.orderNumber,
@@ -133,7 +159,7 @@ export class OrderFeedService {
           createdAt: order.createdAt.toISOString(),
           items: order.items
             // The kitchen cooks a combo's parts; the combo's own line only follows them.
-            .filter((item) => item._count.components === 0)
+            .filter((item) => !ENDED_STATES.has(item.state) && !comboLines.has(item.id))
             .map((item) => ({
               orderItemId: item.id,
               name: item.name,

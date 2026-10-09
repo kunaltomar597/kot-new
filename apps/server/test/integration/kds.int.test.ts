@@ -403,6 +403,28 @@ describe('[TBL-005] [KDS-003] moved tables', () => {
   });
 });
 
+describe('[KDS-001] [NFR-P01] a kitchen that never bumps its tickets', () => {
+  it('shows only what is still at the station, however many old tickets were left', async () => {
+    // Found by the load run (P8-01a): a station whose tickets were served from the pass and
+    // never bumped. Read from every unbumped ticket, a year of them broke the query.
+    const base = { restaurantId: kit.restaurantId };
+    const grill = await prisma.station.create({ data: { ...base, name: 'Grill', mode: 'SCREEN' } });
+    const grillScreen = await addDevice(app, kit, 'KDS', { stationId: grill.id });
+    await prisma.$executeRaw`
+      INSERT INTO kots (id, restaurant_id, business_date, kot_number, order_id, station_id)
+      SELECT gen_random_uuid(), ${kit.restaurantId}::uuid, DATE '2025-01-01' + n / 1000,
+             100000 + n, ${id('order')}::uuid, ${grill.id}::uuid
+      FROM generate_series(1, 40000) AS n`;
+    const started = performance.now();
+    const shown = await tickets(authHeaders(grillScreen));
+    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(shown.tickets).toEqual([]);
+    expect(
+      (await tickets(screen('allScreen'))).tickets.every((t) => t.stationName !== 'Grill'),
+    ).toBe(true);
+  });
+});
+
 describe('[AUTH-005] when kitchen staff sign in individually', () => {
   it('refuses a kitchen screen with nobody signed in', async () => {
     await prisma.setting.upsert({

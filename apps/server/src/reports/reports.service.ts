@@ -282,33 +282,33 @@ export class ReportsService {
     const rows = await this.prisma.$queryRaw<
       { sac_code: string | null; rate_bp: number; code: string; amount: bigint; taxable: bigint }[]
     >`
-      WITH live AS (
+      -- One pass over each table, aggregated by hash (P8-01a): a year took 3.7 s with the tax
+      -- lines joined to themselves and each invoice's SAC code picked by sorting every line.
+      WITH live AS NOT MATERIALIZED (
         SELECT id, version FROM invoices
         WHERE restaurant_id = ${restaurantId}::uuid AND status <> 'VOIDED'
           AND business_date BETWEEN ${range.from}::date AND ${range.to}::date
-      ), taxed AS (
-        SELECT tl.invoice_id, tl.tax_group_id, tl.taxable_value, tl.code, tl.rate_bp, tl.amount
-        FROM tax_lines tl JOIN live l ON l.id = tl.invoice_id AND tl.version = l.version
       ), clusters AS (
-        SELECT invoice_id, tax_group_id, taxable_value, sum(rate_bp)::int AS rate_bp
-        FROM taxed GROUP BY 1, 2, 3
+        -- A tax group's components on one invoice at one taxable value: their rate and amounts.
+        SELECT tl.invoice_id, tl.tax_group_id, tl.taxable_value, sum(tl.rate_bp)::int AS rate_bp,
+               array_agg(tl.code) AS codes, array_agg(tl.amount) AS amounts
+        FROM tax_lines tl JOIN live l ON l.id = tl.invoice_id AND tl.version = l.version
+        GROUP BY 1, 2, 3
       ), sac AS (
-        SELECT DISTINCT ON (il.invoice_id, il.tax_group_id) il.invoice_id, il.tax_group_id,
-               il.sac_code
+        -- The tax group's SAC code on the invoice: the first in order, nulls last.
+        SELECT il.invoice_id, il.tax_group_id, min(il.sac_code) AS sac_code
         FROM invoice_lines il JOIN live l ON l.id = il.invoice_id AND il.version = l.version
         WHERE il.tax_group_id IS NOT NULL
-        ORDER BY il.invoice_id, il.tax_group_id, il.sac_code NULLS LAST
+        GROUP BY 1, 2
       ), keyed AS (
-        SELECT c.invoice_id, c.tax_group_id, c.taxable_value, c.rate_bp, s.sac_code
+        SELECT c.taxable_value, c.rate_bp, c.codes, c.amounts, s.sac_code
         FROM clusters c
         LEFT JOIN sac s ON s.invoice_id = c.invoice_id AND s.tax_group_id = c.tax_group_id
       ), taxable AS (
         SELECT sac_code, rate_bp, sum(taxable_value) AS taxable FROM keyed GROUP BY 1, 2
       ), parts AS (
-        SELECT k.sac_code, k.rate_bp, t.code, sum(t.amount) AS amount
-        FROM keyed k
-        JOIN taxed t ON t.invoice_id = k.invoice_id AND t.tax_group_id = k.tax_group_id
-                    AND t.taxable_value = k.taxable_value
+        SELECT k.sac_code, k.rate_bp, part.code, sum(part.amount) AS amount
+        FROM keyed k CROSS JOIN LATERAL unnest(k.codes, k.amounts) AS part (code, amount)
         GROUP BY 1, 2, 3
       )
       SELECT p.sac_code, p.rate_bp, p.code, p.amount, tx.taxable

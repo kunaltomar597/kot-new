@@ -59,6 +59,7 @@ RESTAURANT PC (Windows 11; staff network separate from guest Wi-Fi)
 | Pager firmware    | ESP-IDF + esp-mqtt on ESP32-S3 (planned)                                                         | PubSubClient cannot publish QoS 1 (ADR-0004)                                                            |
 | Payments          | None: payment mode recorded by hand                                                              | BRD decision Q4                                                                                         |
 | Testing           | Vitest 5, Testing Library + axe, Playwright, Maestro, Storybook 10                               | Unit + integration against a real throwaway PostgreSQL; e2e in CI                                       |
+| Load tests        | Node.js harness on `@rp/api-client`, `mqtt` and raw TCP printers (Vitest, opt-in)                | BRD's "k6 or similar": the devices' own clients and protocols, type-checked (ADR-0020)                  |
 | CI / supply chain | GitHub Actions: check, e2e, Android APKs, CodeQL, audit, gitleaks, licence policy, SBOM          | SEC-013, ADR-0010                                                                                       |
 
 Do not add a dependency that overlaps a row here. A new dependency needs a licence the policy
@@ -198,6 +199,12 @@ Do not "fix" these.
 - The person who asks for the bill is not alerted about their own request (P2-06d).
 - A move into licence Restricted state happens only at the start of the next business day, never
   during service (LIC-005).
+- Audit entries are written when their transaction ends, not where `AuditService.record` is
+  called, which returns only the entry's id (P8-01a). The hash chain's advisory lock is then the
+  last lock a transaction takes, held for milliseconds, and can never close a deadlock.
+- Live screens read again 250 ms after the first event of a burst, not after the last
+  (`@rp/ordering` `liveRefresh`), so a busy kitchen's stream of events cannot hold a new ticket
+  off the screen (NFR-P01, P8-01a).
 - PRs merge with merge commits, not squash, so stacked WP branches keep their history (ADR-0008).
 
 ## 07 Scalability and future considerations
@@ -207,8 +214,8 @@ Do not "fix" these.
   items, 5 years of history in ≤ 100 GB. Build for this, not for 100x.
 - Known limits: one PC per restaurant (no hot standby), in-process event bus, invoice numbering
   serialised per series, best sellers cached ten minutes.
-- Planned next: QR relay and sync agent (P5), licensing, backups, updates and data lifecycle (P7),
-  load tests at capacity (P8-01).
+- Measured at this capacity (P8-01a, ADR-0020): the simulated rush meets every in-restaurant
+  target of §7.1; the figures are in `docs/build/performance.md`.
 - Not planned in v1: multi-outlet, payments, aggregators, iOS, other languages. Keep the hooks the
   BRD asks for (`source`, `externalRef`, `externalId`, externalised strings, INT-003 ports), but add
   no other abstractions for them.
