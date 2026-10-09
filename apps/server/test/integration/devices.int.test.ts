@@ -6,6 +6,7 @@ import {
   DeviceRevoked,
   DeviceSummary,
   deviceTokenMessage,
+  HTTP_DEVICE_TYPES,
   PairedDevice,
   PairingCodeResponse,
   pairingProofMessage,
@@ -32,7 +33,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/test-database.
 @Controller('probe-table')
 class TableProbeController {
   @Get(':tableId')
-  @RequireDevice()
+  @RequireDevice(HTTP_DEVICE_TYPES)
   read(@Req() request: AuthenticatedRequest, @Param('tableId') tableId: string) {
     assertTableAccess(request.device, tableId);
     return { tableId };
@@ -223,6 +224,15 @@ describe('[AUTH-007] pairing', () => {
     const code = await createCode({ type: 'TABLE_TABLET', name: 'Tablet 1', tableId: tables[0] });
     const device = PairedDevice.parse((await pair(code.code, keys())).body);
     expect(device.tableId).toBe(tables[0]);
+  });
+
+  it('[SEC-012] [PGR-012] makes no code for a pager, which never gets a device key', async () => {
+    const response = await server()
+      .post('/api/v1/devices/pairing-codes')
+      .set(asManager())
+      .send({ type: 'PAGER', name: 'Pager 1', staffId: kit.staff.WAITER });
+    expect(response.status).toBe(400);
+    expect(await prisma.pairingCode.count({ where: { type: 'PAGER' } })).toBe(0);
   });
 });
 

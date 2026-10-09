@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CurrentSessionResponse, LoginResponse } from '@rp/contracts';
+import { type CurrentSessionResponse, type LoginResponse, STAFF_DEVICE_TYPES } from '@rp/contracts';
 import { type Capability, extraCapabilitiesOf, type Role } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
@@ -10,6 +10,11 @@ import { type AuthSettings, AuthSettingsService } from './auth-settings.js';
 import type { AuthenticatedDevice } from './device.js';
 import type { Principal } from './principal.js';
 import { AccessTokenError, randomToken, sha256Hex, TokenService } from './tokens.js';
+
+/** Whether people sign in on this kind of device (AUTH-001, AUTH-009). */
+function isStaffDevice(device: AuthenticatedDevice): boolean {
+  return (STAFF_DEVICE_TYPES as readonly string[]).includes(device.type);
+}
 
 /** Writes of `lastActiveAt` are skipped within this interval to save a write per request. */
 const TOUCH_INTERVAL_MS = 30_000;
@@ -99,6 +104,8 @@ export class SessionService {
       now: Date;
     },
   ): Promise<{ session: SessionRow; refreshToken: string }> {
+    // The sign-in routes admit only these devices; this keeps any other way in shut too.
+    if (!isStaffDevice(input.device)) throw authErrors.deviceNotAllowed();
     const refreshToken = randomToken();
     const session = await tx.session.create({
       data: {
@@ -292,6 +299,8 @@ export class SessionService {
     if (session.revokedAt !== null || session.deviceId !== device.deviceId) {
       return authErrors.sessionRevoked();
     }
+    // A session on a table tablet or a pager counts for nothing (AUTH-009, SEC-003).
+    if (!isStaffDevice(device)) return authErrors.deviceNotAllowed();
     const idleFor = now.getTime() - session.lastActiveAt.getTime();
     if (session.expiresAt <= now || idleFor > this.inactivityMs(settings, device)) {
       await this.revoke(session.id, session.expiresAt <= now ? 'EXPIRED' : 'INACTIVITY');

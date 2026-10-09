@@ -4,7 +4,7 @@
     "properties": {
       "type": {
         "type": "string",
-        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
+        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"]
       },
       "name": { "type": "string", "minLength": 1, "maxLength": 60 },
       "tableId": {
@@ -41,7 +41,7 @@
     "properties": {
       "type": {
         "type": "string",
-        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
+        "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "MANAGER_BROWSER"]
       },
       "name": { "type": "string", "minLength": 1, "maxLength": 60 },
       "tableId": {

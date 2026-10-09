@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put, Req } from '@nestjs/
 import {
   ComboRequest,
   type ComboView,
+  HTTP_DEVICE_TYPES,
   ItemAvailabilityRequest,
   type ItemAvailabilityView,
   MenuEntityParams,
@@ -26,7 +27,7 @@ export class MenuPublishController {
 
   // Any paired device: tablets and waiter apps cache it and refresh on MenuPublished (MENU-013).
   @Get()
-  @RequireDevice()
+  @RequireDevice(HTTP_DEVICE_TYPES)
   current(@Req() request: AuthenticatedRequest): Promise<MenuSnapshot> {
     if (request.device === undefined) throw authErrors.deviceNotRecognised();
     return this.menu.current(request.device.restaurantId);

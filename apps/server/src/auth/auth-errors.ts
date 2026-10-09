@@ -52,6 +52,8 @@ export const authErrors = {
       'Too many attempts from this device. Wait a minute and try again.',
     ),
   forbidden: () => new AppError(403, 'FORBIDDEN', 'You do not have permission to do this.'),
+  deviceNotAllowed: () =>
+    new AppError(403, 'DEVICE_NOT_ALLOWED', 'This kind of device cannot do this.'),
   ownerOnly: () => new AppError(403, 'OWNER_ONLY', 'Only the Owner can do this.'),
   secondFactorRequired: () =>
     new AppError(

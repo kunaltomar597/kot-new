@@ -82,7 +82,7 @@ export class BreakController {
  * the phone goes on alerting like a pager after an inactivity sign-out.
  */
 @Controller('devices/current/alerts')
-@RequireDevice()
+@RequireDevice(['WAITER_PHONE'])
 export class DeviceAlertsController {
   constructor(private readonly notifications: NotificationsService) {}
 

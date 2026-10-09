@@ -53,7 +53,7 @@ function deviceOf(request: AuthenticatedRequest): AuthenticatedDevice {
 
 /** A diner's orders from the table tablet, and "Approve at table" (P3-03a, AUTH-009). */
 @Controller('devices/current/orders')
-@RequireDevice()
+@RequireDevice(['TABLE_TABLET'])
 export class TabletOrdersController {
   constructor(private readonly approvals: OrderApprovalsService) {}
 

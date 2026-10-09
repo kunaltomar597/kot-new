@@ -79,6 +79,57 @@ the external penetration test.
 People needed: Business Owner engages a CERT-In empanelled testing firm.
 Acceptance: zero open Critical/High; Medium findings with dated remediation plans.
 
+Split (2026-10-10) into five, because each is a different kind of work; `docs/security/` holds
+what they produce:
+
+### P8-03a Authorisation sweep
+
+Requirements: SEC-003, SEC-017 (automated authorisation tests), AUTH-005, AUTH-009, AUTH-010,
+SEC-012, SEC-018.
+Deliverables: every endpoint of the local server and the Control Plane called the way an attacker
+would (no credential, unpaired device, wrong kind of device, nobody signed in, another device's
+token, signed-out session, each role or vendor role without the capability, station mode, a PC on
+vendor endpoints and the other way round, a revoked PC), on every build; device endpoints name the
+kinds of device they serve and the guard refuses the rest; staff sign in only on staff devices,
+never on a table tablet or a pager; no pairing code for a pager; the Control Plane's routes
+checked against its registry; `docs/security/authorisation.md` with the evidence per surface.
+Acceptance: both sweeps pass; every finding fixed.
+
+### P8-03b STRIDE threat models
+
+Requirements: SEC-000.
+Deliverables: a STRIDE threat model per component in `docs/security/threat-models/` (the LAN and
+the local server, the pager channel, the QR relay and site, the update pipeline, the licence
+mechanism, the Control Plane, the desktop shell, the phones and tablets), each threat with its
+mitigation and the code or test that shows it, and the gaps found, fixed or given to a WP.
+Acceptance: every component covered; no unmitigated High threat without a fix or a dated plan.
+
+### P8-03c DAST of the QR site, relay and Control Plane
+
+Requirements: SEC-017, SEC-001, SEC-004.
+Deliverables: OWASP ZAP scans (baseline and API scan from the OpenAPI documents) of the QR site,
+the relay functions, the Control Plane and the local server's HTTPS, runnable locally and in CI;
+security headers; fixes for the findings; results in `docs/security/dast.md`.
+Acceptance: no open High finding; the rest triaged.
+
+### P8-03d Standards checklists, Electron review and MDM policy
+
+Requirements: BRD §8.1 (OWASP ASVS L2, OWASP Top 10 and API Top 10, MASVS-L1 with resilience for
+the kiosk tablet, ETSI EN 303 645, CIS for the Windows host), SEC-010, SEC-011.
+Deliverables: each checklist with every control's status and its evidence link; the Electron
+hardening review; the MDM policy document for phones and tablets.
+Acceptance: every control met, not applicable with a reason, or a finding with a plan.
+
+### P8-03e Incident response plan and penetration-test support
+
+Requirements: SEC-016, SEC-017.
+Deliverables: the incident response plan (severities, contacts and on-call, CERT-In within 6 hours,
+DPDP breach notifications, templates for restaurants, the annual tabletop exercise); the pack for
+the testing firm (scope, rules of engagement, test environment and accounts, what to send back).
+People needed: the Business Owner names the CERT-In point of contact and engages the firm; the
+external test and fixing its findings follow it [H].
+Acceptance: plan reviewed by the Business Owner; the firm can start from the pack.
+
 ## P8-04 UX polish and accessibility audit
 
 Requirements: NFR-U01 to NFR-U07, KDS-011, TAB-016.

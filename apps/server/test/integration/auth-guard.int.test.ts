@@ -1,6 +1,5 @@
 import { Writable } from 'node:stream';
-import { type INestApplication, RequestMethod } from '@nestjs/common';
-import { ModulesContainer } from '@nestjs/core';
+import type { INestApplication } from '@nestjs/common';
 import { ApiError, OverrideResponse, ROUTES } from '@rp/contracts';
 import {
   CAPABILITIES,
@@ -12,7 +11,6 @@ import {
 } from '@rp/domain';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { ROUTE_ACCESS, type RouteAccess } from '../../src/auth/decorators.js';
 import { newId } from '../../src/common/ids.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import {
@@ -25,6 +23,7 @@ import {
   TEST_PINS,
 } from '../helpers/auth-kit.js';
 import { AuthProbeController, MatrixProbeController } from '../helpers/auth-probe.js';
+import { accessName, servedRoutes } from '../helpers/served-routes.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
 
@@ -248,51 +247,16 @@ describe('[SEC-015] [AUTH-002] logs', () => {
 });
 
 describe('[AUTH-010] [INT-002] route registry', () => {
-  const methodName: Partial<Record<RequestMethod, string>> = {
-    [RequestMethod.GET]: 'GET',
-    [RequestMethod.POST]: 'POST',
-    [RequestMethod.PUT]: 'PUT',
-    [RequestMethod.PATCH]: 'PATCH',
-    [RequestMethod.DELETE]: 'DELETE',
-  };
-  const accessName = (access: RouteAccess | undefined): string =>
-    access === undefined
-      ? 'UNDECLARED'
-      : access.kind === 'CAPABILITY'
-        ? access.capability
-        : access.kind;
-  const join = (...parts: string[]) =>
-    `/${parts
-      .flatMap((part) => part.split('/'))
-      .filter((part) => part !== '')
-      .join('/')}`;
-
   it('matches the controllers: same routes, each with the declared access', () => {
-    const served: string[] = [];
-    const testControllers = new Set<unknown>([AuthProbeController, MatrixProbeController]);
-    for (const module of app.get(ModulesContainer).values()) {
-      for (const wrapper of module.controllers.values()) {
-        const controller = wrapper.metatype as (new (...args: never[]) => unknown) | null;
-        if (controller === null || testControllers.has(controller)) continue;
-        const base = (Reflect.getMetadata('path', controller) as string | undefined) ?? '';
-        const classAccess = Reflect.getMetadata(ROUTE_ACCESS, controller) as
-          RouteAccess | undefined;
-        const prototype = controller.prototype as Record<string, unknown>;
-        for (const name of Object.getOwnPropertyNames(prototype)) {
-          const handler = prototype[name];
-          if (typeof handler !== 'function' || name === 'constructor') continue;
-          const path = Reflect.getMetadata('path', handler) as string | undefined;
-          const method = Reflect.getMetadata('method', handler) as RequestMethod | undefined;
-          if (path === undefined || method === undefined) continue;
-          const access =
-            (Reflect.getMetadata(ROUTE_ACCESS, handler) as RouteAccess | undefined) ?? classAccess;
-          served.push(
-            `${methodName[method] ?? String(method)} ${join('api/v1', base, path)} ${accessName(access)}`,
-          );
-        }
-      }
-    }
-    const registered = ROUTES.map((route) => `${route.method} ${route.path} ${route.capability}`);
+    const served = servedRoutes(app, [AuthProbeController, MatrixProbeController]).map(
+      (route) => `${route.method} ${route.path} ${accessName(route.access)}`,
+    );
+    const registered = ROUTES.map(
+      (route) =>
+        `${route.method} ${route.path} ${route.capability}${
+          'devices' in route ? `(${[...route.devices].sort().join(',')})` : ''
+        }`,
+    );
     // Every served route is in the registry with the same access (so it is documented and guarded).
     expect(served.filter((route) => !registered.includes(route))).toEqual([]);
     // Registered ahead of their work package; remove each line when the route is implemented.

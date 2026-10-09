@@ -33,10 +33,17 @@ export function deviceTokenMessage(deviceId: string, challenge: string): string 
 /** A device's name is what staff call it, like "Kitchen screen 2" (MGR-006). */
 export const DeviceName = z.string().trim().min(1).max(60);
 
+/**
+ * What a pairing code can pair (AUTH-007): every device but a pager, which is registered on the
+ * Pagers page with its own MQTT credential and never gets a device key (PGR-012, SEC-012).
+ */
+export const PairableDeviceType = DeviceType.exclude(['PAGER']);
+export type PairableDeviceType = z.infer<typeof PairableDeviceType>;
+
 /** A manager prepares the pairing of one device (AUTH-007). */
 export const CreatePairingCodeRequest = z
   .strictObject({
-    type: DeviceType,
+    type: PairableDeviceType,
     name: DeviceName,
     /** Required for table tablets: the one table the tablet serves (AUTH-009). */
     tableId: Id.optional(),
@@ -44,10 +51,7 @@ export const CreatePairingCodeRequest = z
     stationId: Id.optional(),
     /** For kitchen screens: the stations it shows, when more than one (KDS-002). */
     stationIds: z.array(Id).min(1).max(10).optional(),
-    /**
-     * For pagers: the person wearing it. For waiter phones: the person it alerts until someone
-     * signs in on it (P2-06a).
-     */
+    /** For waiter phones: the person it alerts until someone signs in on it (P2-06a). */
     staffId: Id.optional(),
   })
   .refine((request) => request.type !== 'TABLE_TABLET' || request.tableId !== undefined, {

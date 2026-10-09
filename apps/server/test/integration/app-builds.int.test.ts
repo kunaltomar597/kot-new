@@ -136,12 +136,13 @@ describe('[WTR-001] [UPD-001] each phone and tablet gets its own app from the PC
     expect(sha256((await download(tablet)).body as Buffer)).toBe(sha256(tabletApk));
   });
 
-  it('offers nothing to a device that is not a phone or tablet, or not paired', async () => {
-    expect(await buildOf(kds)).toBeNull();
+  it('[SEC-003] refuses a device that is not a phone or tablet, or not paired', async () => {
+    const build = await api(app).get('/api/v1/devices/current/app-build').set(authHeaders(kds));
+    expect([build.status, ApiError.parse(build.body).code]).toEqual([403, 'DEVICE_NOT_ALLOWED']);
     const none = await download(kds);
-    expect(none.status).toBe(404);
+    expect(none.status).toBe(403);
     expect(ApiError.parse(JSON.parse((none.body as Buffer).toString('utf8'))).code).toBe(
-      'NO_APP_BUILD',
+      'DEVICE_NOT_ALLOWED',
     );
     const anonymous = await api(app).get('/api/v1/devices/current/app-build');
     expect(anonymous.status).toBe(401);

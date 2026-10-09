@@ -59,7 +59,7 @@ export class RecommendationsController {
 
 /** The table tablet's suggestions for its own table (TAB-011, AUTH-009); its screens are P3-05. */
 @Controller('devices/current/recommendations')
-@RequireDevice()
+@RequireDevice(['TABLE_TABLET'])
 export class TabletRecommendationsController {
   constructor(private readonly recommendations: RecommendationsService) {}
 
@@ -141,7 +141,7 @@ export class LearnedRecommendationsController {
 
 /** The bestseller badge and filter on the tablet and QR menu (TAB-005, P3-03a). */
 @Controller('menu')
-@RequireDevice()
+@RequireDevice(['TABLE_TABLET'])
 export class BestSellersController {
   constructor(private readonly recommendations: RecommendationsService) {}
 

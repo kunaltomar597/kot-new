@@ -34,6 +34,7 @@ const route = (overrides: Partial<RouteDefinition>): RouteDefinition => ({
   method: 'GET',
   path: '/api/v1/things/:thingId',
   summary: 'Get a thing',
+  description: 'Public because things are no secret.',
   tags: ['things'],
   requirements: [],
   capability: 'PUBLIC',
@@ -171,6 +172,36 @@ describe('[INT-002] [NFR-M06] generated contract documents', () => {
     expect(() =>
       buildOpenApi({ ...options, routes: [route({}), route({ operationId: 'other' })] }),
     ).toThrow(/Duplicate route/);
+  });
+
+  it('[SEC-003] makes device endpoints name their devices and public ones say why', () => {
+    const device = (devices?: RouteDefinition['devices']) =>
+      route({ capability: 'DEVICE', ...(devices !== undefined && { devices }) });
+    expect(() => buildOpenApi({ ...options, routes: [device()] })).toThrow(/name their devices/);
+    expect(() => buildOpenApi({ ...options, routes: [device([])] })).toThrow(/no device/);
+    expect(() => buildOpenApi({ ...options, routes: [route({ devices: ['POS'] })] })).toThrow(
+      /name their devices/,
+    );
+    expect(() => buildOpenApi({ ...options, routes: [route({ description: ' ' })] })).toThrow(
+      /says why/,
+    );
+    const document = buildOpenApi({
+      ...options,
+      routes: [device(['TABLE_TABLET'])],
+    }) as unknown as { paths: Record<string, { get: Record<string, unknown> }> };
+    expect(document.paths['/api/v1/things/{thingId}']?.get['x-devices']).toEqual(['TABLE_TABLET']);
+  });
+
+  it('[SEC-003] documents the devices of every device endpoint of the local server', () => {
+    const devices = Object.values(openapi.paths)
+      .flatMap((item) => Object.values(item) as Record<string, unknown>[])
+      .filter((operation) => operation['x-capability'] === 'DEVICE')
+      .map((operation) => operation['x-devices'] as string[]);
+    expect(devices.length).toBeGreaterThan(20);
+    for (const list of devices) {
+      expect(list.length).toBeGreaterThan(0);
+      expect(list).not.toContain('PAGER');
+    }
   });
 
   it('names events that are only defined inside the catalogue after their type', () => {

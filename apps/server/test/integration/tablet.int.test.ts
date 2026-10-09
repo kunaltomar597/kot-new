@@ -169,7 +169,7 @@ describe('[TAB-002] [TAB-003] [AUTH-009] the tablet’s own table', () => {
       .get('/api/v1/devices/current/table')
       .set(asDevice(id('kds')));
     expect(kds.status).toBe(403);
-    expect(codeOf(kds)).toBe('NOT_A_TABLE_TABLET');
+    expect(codeOf(kds)).toBe('DEVICE_NOT_ALLOWED');
     const unbound = await server()
       .get('/api/v1/devices/current/table')
       .set(asDevice(id('unbound')));
@@ -335,7 +335,7 @@ describe('[TAB-001] leaving kiosk mode', () => {
     expect(codeOf(byWaiter)).toBe('APPROVER_NOT_ALLOWED');
     const fromKds = await exit(id('kds'), { staffId: kit.staff.MANAGER, pin: TEST_PINS.MANAGER });
     expect(fromKds.status).toBe(403);
-    expect(codeOf(fromKds)).toBe('NOT_A_TABLE_TABLET');
+    expect(codeOf(fromKds)).toBe('DEVICE_NOT_ALLOWED');
   });
 });
 
