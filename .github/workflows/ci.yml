@@ -76,6 +76,11 @@ jobs:
       - name: Contracts still serve older apps (N-1)
         run: pnpm contracts:compat
 
+      # SEC-000: every threat model's files, functions and test titles still exist, and every open
+      # threat has a dated plan (docs/security/threat-models/README.md).
+      - name: Threat models are current
+        run: pnpm security:threats
+
       - name: Lint
         run: pnpm lint
 
@@ -197,21 +202,27 @@ jobs:
     # uninstalling keeps the data unless the Owner allowed deleting it (NFR-I02). Then scenario S9
     # (P7-04c, UPD-005): an update that fails its health check is rolled back, application and
     # database, and a good one installs through the watchdog and the updater's task. Signed only
-    # when the code-signing certificate's secrets exist; the vendor's addresses come from
+    # on main when the code-signing certificate's secrets exist; the vendor's addresses come from
     # repository variables (unset ones stay off on the PC).
     name: Windows installer
     runs-on: windows-latest
     timeout-minutes: 90
+    # SEC-013, SEC-006 (threat model "The update pipeline", UPDATE-E2): only a push to main is
+    # signed, in the environment `release-signing`, which holds the certificate's secrets and
+    # gives them to jobs on main only. Pull requests and other branches build unsigned test
+    # installers, so code nobody has reviewed is never signed as the vendor's.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'release-signing' || '' }}
     env:
       RP_CONTROL_PLANE_URL: ${{ vars.RP_CONTROL_PLANE_URL }}
       RP_RELAY_URL: ${{ vars.RP_RELAY_URL }}
       RP_QR_SITE_URL: ${{ vars.RP_QR_SITE_URL }}
       RP_ERROR_DSN: ${{ secrets.RP_ERROR_DSN }}
-      # UPD-007: the signer updates must carry, set with the certificate. Without it the builds
-      # are unsigned test builds that take unsigned updates (for S9 here); a signed build never
-      # does (the build step refuses it). Never install an unsigned build at a restaurant.
-      RP_UPDATE_PUBLISHER: ${{ vars.RP_UPDATE_PUBLISHER }}
-      RP_ALLOW_UNSIGNED_UPDATES: ${{ vars.RP_UPDATE_PUBLISHER == '' && '1' || '' }}
+      # UPD-007: the signer updates must carry, set with the certificate, on main only. Without it
+      # the builds are unsigned test builds that take unsigned updates (for S9 here); a signed
+      # build never does (the build step refuses it). Never install an unsigned build at a
+      # restaurant.
+      RP_UPDATE_PUBLISHER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RP_UPDATE_PUBLISHER || '' }}
+      RP_ALLOW_UNSIGNED_UPDATES: ${{ (github.event_name != 'push' || github.ref != 'refs/heads/main' || vars.RP_UPDATE_PUBLISHER == '') && '1' || '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -239,8 +250,8 @@ jobs:
 
       - name: Build the installer
         env:
-          WIN_CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_P12 }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WIN_CSC_LINK: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_P12 || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
         run: pnpm --filter @rp/desktop package:win
 
       - name: Install, check, repair and uninstall on this runner
@@ -251,8 +262,8 @@ jobs:
 
       - name: Build the next version's installer from the same payload (scenario S9)
         env:
-          WIN_CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_P12 }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WIN_CSC_LINK: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_P12 || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ env.RP_UPDATE_PUBLISHER != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
         shell: pwsh
         run: |
           $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version

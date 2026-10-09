@@ -400,7 +400,10 @@ esp-mqtt over TLS with pinned CA; pairing mode showing a QR/serial; alert queue 
 vibration pattern per type, LED, 2×12 text; short press ack, long press scroll; heartbeat every 30 s;
 "no connection" icon + single vibration on loss; low-battery warning; OTA with A/B partitions,
 signature check and automatic rollback; secure boot v2 and flash encryption config for production;
-debug console locked; no default passwords. Unit tests for queue/formatting logic (Unity on host),
+debug console locked; no default passwords. From the threat model (`docs/security/threat-models/pager-channel.md`,
+the threats planned for P2-05): flash encryption with encrypted NVS for the MQTT secret, JTAG off
+by eFuse and secure download mode, the anti-rollback eFuse (`secure_version`), and the CA pinned
+with the host name checked before the secret is sent. Unit tests for queue/formatting logic (Unity on host),
 hardware-in-the-loop test procedure. A CI job that builds the firmware with the ESP-IDF Docker image.
 People needed: flashing and on-device tests.
 Acceptance: CI build green; person confirms on devices: alert → vibrate ≤ 2 s, ack round trip, OTA

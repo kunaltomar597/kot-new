@@ -45,6 +45,8 @@ export function redactionPaths(): string[] {
     'req.headers.authorization',
     'req.headers.cookie',
     'req.headers["x-device-token"]',
+    // A manager's single-use approval (AUTH-011); found by the threat model (P8-03b).
+    'req.headers["x-override-token"]',
     'res.headers["set-cookie"]',
   ]);
   for (const key of SENSITIVE_KEYS) {

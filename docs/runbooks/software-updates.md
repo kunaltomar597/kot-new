@@ -71,8 +71,10 @@ The installer's build names the signer every update must carry:
 | `RP_UPDATE_PUBLISHER`         | The code-signing certificate's subject, e.g. `CN=..., O=..., L=..., C=IN`. Set it with the certificate. |
 | `RP_ALLOW_UNSIGNED_UPDATES=1` | Test builds only: unsigned updates are accepted. Refused together with a publisher.                     |
 
-In CI they come from the repository variable `RP_UPDATE_PUBLISHER`. While it is unset, CI builds
-are unsigned test builds that accept unsigned updates. **Never install an unsigned build at a
+In CI they come from the repository variable `RP_UPDATE_PUBLISHER`, on pushes to `main` only.
+While it is unset, and on every other branch and pull request, CI builds are unsigned test builds
+that accept unsigned updates; only `main` reaches the certificate, in the environment
+`release-signing` (SEC-013, `manual-tasks/01-github-access.md`). **Never install an unsigned build at a
 restaurant.** A build signed with the certificate (`WIN_CSC_LINK`) refuses to build without
 `RP_UPDATE_PUBLISHER` or with unsigned updates allowed.
 

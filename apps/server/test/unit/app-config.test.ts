@@ -21,6 +21,7 @@ describe('server configuration', () => {
     const config = loadConfig({
       ...base,
       NODE_ENV: 'production',
+      RP_TLS: 'on',
       PORT: '9443',
       LOG_LEVEL: 'warn',
       LOG_PRETTY: '1',
@@ -44,6 +45,13 @@ describe('server configuration', () => {
     expect(() => loadConfig({ ...base, RP_TLS: 'yes' })).toThrow(/tls/);
   });
 
+  it('[SEC-001] needs TLS in production', () => {
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production' })).toThrow(/RP_TLS/);
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', RP_TLS: 'off' })).toThrow(/RP_TLS/);
+    expect(loadConfig({ ...base, NODE_ENV: 'production', RP_TLS: 'on' }).tls).toBe(true);
+    expect(loadConfig({ ...base, RP_TLS: 'off' }).tls).toBe(false);
+  });
+
   it('rejects invalid values with a readable message', () => {
     expect(() => loadConfig({})).toThrow(ConfigError);
     expect(() => loadConfig({ DATABASE_URL: 'mysql://x' })).toThrow(/postgresql/);
@@ -65,7 +73,7 @@ describe('server configuration', () => {
   });
 
   it('[LIC-003] always applies the licence in production, with only the keys built in', () => {
-    expect(loadConfig({ ...base, NODE_ENV: 'production' }).licenceEnforce).toBe(true);
+    expect(loadConfig({ ...base, NODE_ENV: 'production', RP_TLS: 'on' }).licenceEnforce).toBe(true);
     expect(loadConfig({ ...base, NODE_ENV: 'development' }).licenceEnforce).toBe(false);
     expect(loadConfig({ ...base, RP_LICENCE_ENFORCE: 'true' }).licenceEnforce).toBe(true);
     expect(() =>

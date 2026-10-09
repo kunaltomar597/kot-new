@@ -179,10 +179,17 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     });
     this.server = server;
     this.unsubscribe = this.bus.onPublished((events) => {
-      for (const published of events)
+      for (const published of events) {
+        const { event } = published;
+        // AUTH-008: an unpaired pager loses its connection at once, not at its next sign-in.
+        if (event.type === 'DeviceRevoked') {
+          if (event.payload.deviceType === 'PAGER') this.disconnect(event.payload.deviceId);
+          continue;
+        }
         void this.deliver(published).catch((error: unknown) => {
           this.logger.error(`Pager delivery failed: ${String(error)}`);
         });
+      }
     });
     if (this.options.offlineCheckMs > 0) {
       this.timer = setInterval(() => {
@@ -276,7 +283,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
   /** PGR-007: marks pagers offline after three missed heartbeats. */
   async checkOffline(now: Date = this.clock.now()): Promise<number> {
     const online = await this.prisma.device.findMany({
-      where: { type: 'PAGER', online: true },
+      where: { type: 'PAGER', online: true, status: 'ACTIVE' },
       select: {
         id: true,
         restaurantId: true,

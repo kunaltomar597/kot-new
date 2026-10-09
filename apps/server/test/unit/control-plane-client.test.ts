@@ -243,6 +243,7 @@ describe('[SEC-001] Control Plane address', () => {
       loadConfig({
         ...base,
         NODE_ENV: 'production',
+        RP_TLS: 'on',
         RP_CONTROL_PLANE_URL: 'https://cp.example.com',
       }).controlPlaneUrl,
     ).toBe('https://cp.example.com');

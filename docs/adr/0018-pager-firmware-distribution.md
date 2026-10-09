@@ -70,8 +70,9 @@ the bootloader against key digests burned into eFuses), which PGR-010 asks for a
 - **Pushing the image over MQTT in chunks.** Slower and heavier on the broker, and re-implements
   what `esp_https_ota` does with resumption and TLS.
 - **Basic auth with the pager's MQTT secret on the download.** Works, but costs an Argon2id check
-  per request and sends the long-lived secret again; a one-time token tied to the offer is
-  narrower.
+  per request and sends the long-lived secret again; a short-lived token tied to the offer is
+  narrower. (The token works for its 15 minutes, so a pager can resume a cut download; the image
+  is not secret and is signed. Worded "one-time" before P8-03b.)
 
 ## Consequences
 

@@ -89,14 +89,17 @@ pnpm --filter @rp/desktop package:win       (apps/desktop/release/RestaurantPlat
   and the DSN a secret.
 - Signing: electron-builder signs the executables, the installer and the uninstaller when
   `WIN_CSC_LINK` (the certificate, a .p12 file or its base64) and `WIN_CSC_KEY_PASSWORD` are set.
-  In CI they are the secrets `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD`, which
-  wait for the code-signing certificate (Owner checklist). Without them the installer is unsigned
-  and Windows SmartScreen warns about it.
+  In CI they are the secrets `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` of the
+  environment `release-signing`, which wait for the code-signing certificate (Owner checklist).
+  Only pushes to `main` use that environment and sign; pull requests and other branches build
+  unsigned test installers (SEC-013, `manual-tasks/01-github-access.md`). Without them the
+  installer is unsigned and Windows SmartScreen warns about it.
 - Updates (UPD-007, P7-04c): `RP_UPDATE_PUBLISHER`, the certificate's subject, is the signer every
   update must carry on the PCs this installer sets up; `RP_ALLOW_UNSIGNED_UPDATES=1` lets a test
   build take unsigned updates. A signed build refuses to build without the publisher or with
-  unsigned updates allowed. In CI the publisher is the repository variable of that name, and the
-  builds allow unsigned updates while it is unset (`software-updates.md`, "Signing").
+  unsigned updates allowed. In CI the publisher is the repository variable of that name, used on
+  `main` only, and the builds allow unsigned updates while it is unset and on every other branch
+  (`software-updates.md`, "Signing").
 - `package:win --product-version <v>` builds the staged payload as another version: the CI job's
   update test (scenario S9) installs one version and updates it to the next.
 - Node.js, PostgreSQL and WinSW are downloaded once into `node_modules/.cache/rp-installer` and
