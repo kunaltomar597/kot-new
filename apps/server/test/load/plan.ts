@@ -165,6 +165,8 @@ export type ArrivalKind =
   | 'NEXT_ROUND'
   /** Diners order on their tablet; the waiter approves. */
   | 'TABLET_ORDER'
+  /** Diners at a table without a tablet order on its QR page, through the relay (P8-01b). */
+  | 'QR_ORDER'
   /** A party is seated and orders. */
   | 'NEW_PARTY'
   /** A takeaway order at the counter, billed at once. */
@@ -176,10 +178,10 @@ export type ArrivalKind =
   | 'AVAILABILITY'
   | 'REPORT';
 
-/** How the orders of the hour are made up. */
+/** How the orders of the hour are made up (QR pages since P8-01b, from the waiters' and tablets' share). */
 export const ORDER_MIX: Readonly<
-  Record<'NEXT_ROUND' | 'TABLET_ORDER' | 'NEW_PARTY' | 'TAKEAWAY', number>
-> = { NEXT_ROUND: 0.45, TABLET_ORDER: 0.2, NEW_PARTY: 0.25, TAKEAWAY: 0.1 };
+  Record<'NEXT_ROUND' | 'TABLET_ORDER' | 'QR_ORDER' | 'NEW_PARTY' | 'TAKEAWAY', number>
+> = { NEXT_ROUND: 0.35, TABLET_ORDER: 0.15, QR_ORDER: 0.15, NEW_PARTY: 0.25, TAKEAWAY: 0.1 };
 
 export interface Arrival {
   /** Milliseconds after the measured part starts. */

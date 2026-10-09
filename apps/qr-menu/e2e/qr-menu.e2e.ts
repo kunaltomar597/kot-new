@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { expect, type Page, test } from '@playwright/test';
 import { en } from '@rp/i18n';
+import { QR_MENU_REFRESH_MS } from '@rp/ordering';
 import pg from 'pg';
+import { IDS, menuDocument } from './fixture.js';
 import { e2eState } from './state.js';
 
 /**
@@ -258,5 +260,38 @@ test.describe('[QR-001] [QR-013] the rest of the site', () => {
     await expect(page.getByRole('heading', { name: s.privacy.title })).toBeVisible();
     await page.goto(`${state.site}/terms`);
     await expect(page.getByRole('heading', { name: s.terms.title })).toBeVisible();
+  });
+});
+
+// Last: it publishes menus of its own.
+test.describe('[NFR-P05] [MENU-006] an open page follows the menu', () => {
+  test('shows a dish sold out within the refresh, and at once when the diner comes back', async ({
+    page,
+  }) => {
+    const withDal = (available: boolean) => {
+      const document = menuDocument();
+      return {
+        ...document,
+        menu: {
+          ...document.menu,
+          items: document.menu.items.map((item) =>
+            item.id === IDS.dal ? { ...item, available } : item,
+          ),
+        },
+      };
+    };
+    await page.clock.install();
+    await tablePage(page, 'T2');
+    await expect(inMenu(page, 'Add Dal Makhani')).toBeVisible();
+    // The restaurant marks Dal Makhani out of stock; its server sends the menu to the relay.
+    await asServer('PUT', 'menu', { version: 100, document: withDal(false) });
+    await page.clock.runFor(QR_MENU_REFRESH_MS);
+    await expect(inMenu(page, 'Add Dal Makhani')).toHaveCount(0);
+    // Back in stock while the phone's screen was off: shown as soon as the page is seen again.
+    await asServer('PUT', 'menu', { version: 101, document: withDal(true) });
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(inMenu(page, 'Add Dal Makhani')).toBeVisible();
   });
 });

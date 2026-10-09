@@ -14,7 +14,10 @@ import {
   menuCategories,
   needsOptions,
   type NewCartLine,
+  QR_MENU_REFRESH_MS,
+  QR_ORDER_POLL_MS,
   qrBestSellers,
+  qrOrderSettled,
   qrSuggestions,
   removeLine,
   requestLines,
@@ -46,10 +49,6 @@ import { browserId, newUuid, tableValue } from './storage';
 
 type LoadedMenu = QrMenuResponse & { document: QrMenuDocument };
 
-/** How often the page asks whether the menu, availability or the restaurant's presence changed. */
-const MENU_REFRESH_MS = 60_000;
-/** How often an order on its way is checked (QR-007). */
-const ORDER_POLL_MS = 3_000;
 const FILTERS: readonly TabletFilter[] = ['veg', 'jain', 'spicy', 'bestseller'];
 /** How many suggestions a row shows (REC-005). */
 const SUGGESTIONS = 4;
@@ -171,9 +170,10 @@ function MenuPage({
     [cart],
   );
 
-  // QR-008: the menu, availability and the restaurant's presence, kept fresh.
+  // QR-008, NFR-P05: the menu, availability and the restaurant's presence, kept fresh, and asked
+  // for at once when the diner comes back to the page (the phone's screen was off).
   useEffect(() => {
-    const timer = setInterval(() => {
+    const refresh = () => {
       // The page's clock moves with the menu (combo hours, best sellers by time of day).
       setNow(Date.now());
       fetchMenu(relayUrl, token, menu.version).then(
@@ -185,21 +185,23 @@ function MenuPage({
         },
         () => undefined,
       );
-    }, MENU_REFRESH_MS);
+    };
+    const page = globalThis.document;
+    const back = () => {
+      if (page.visibilityState === 'visible') refresh();
+    };
+    const timer = setInterval(refresh, QR_MENU_REFRESH_MS);
+    page.addEventListener('visibilitychange', back);
     return () => {
       clearInterval(timer);
+      page.removeEventListener('visibilitychange', back);
     };
   }, [relayUrl, token, menu.version]);
 
   // QR-007: each order on its way, until it is settled.
   const unsettled = orderIds.filter((id) => {
     const order = orders.get(id);
-    return (
-      order === undefined ||
-      order.status === 'SUBMITTED' ||
-      order.status === 'RECEIVED' ||
-      order.status === 'SENT_TO_KITCHEN'
-    );
+    return order === undefined || !qrOrderSettled(order);
   });
   const unsettledKey = unsettled.join(',');
   useEffect(() => {
@@ -217,7 +219,7 @@ function MenuPage({
       }
     };
     poll();
-    const timer = setInterval(poll, ORDER_POLL_MS);
+    const timer = setInterval(poll, QR_ORDER_POLL_MS);
     return () => {
       stopped = true;
       clearInterval(timer);

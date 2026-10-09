@@ -1,6 +1,17 @@
 import type { MenuSnapshot } from '@rp/contracts';
 
 /**
+ * How often an open QR page asks the relay whether the menu changed (NFR-P05, MENU-006). A change
+ * reaches the relay within seconds, so an open page shows it within this and those seconds,
+ * under NFR-P05's 30 s; an unchanged menu costs the relay a few bytes (`?known=`). The load test
+ * measures it (P8-01b).
+ */
+export const QR_MENU_REFRESH_MS = 20_000;
+
+/** How often an open QR page asks after each order on its way (QR-007). */
+export const QR_ORDER_POLL_MS = 3_000;
+
+/**
  * The menu the QR page offers (QR-002, MENU-012), as the local server publishes it to the relay:
  * the dishes on the QR channel, the parts of their combos (which the relay's line check needs),
  * and only the categories, option groups and tax groups those use. Kitchen stations stay at home.

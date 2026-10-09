@@ -85,6 +85,24 @@ export function KdsScreen({ sounds: given }: { sounds?: KitchenSounds }) {
     known.current = new Set([...current.tickets, ...current.recentlyBumped].map((t2) => t2.kotId));
   }, [current, sounds, soundOn]);
 
+  // The sound is made ready once the board is painted and the browser is idle, so the first
+  // touch only switches it on (NFR-P07).
+  useEffect(() => {
+    const prepare = () => {
+      sounds.prepare();
+    };
+    if ('requestIdleCallback' in globalThis) {
+      const id = requestIdleCallback(prepare, { timeout: 2_000 });
+      return () => {
+        cancelIdleCallback(id);
+      };
+    }
+    const timer = setTimeout(prepare, 500);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [sounds]);
+
   const enableSound = () => {
     sounds.unlock();
     setSoundOn(true);

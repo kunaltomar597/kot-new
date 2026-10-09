@@ -11,6 +11,14 @@ import {
   DEFAULT_PRINT_QUEUE_OPTIONS,
   PRINT_QUEUE_OPTIONS,
 } from '../../src/printing/print-queue.service.js';
+import {
+  DEFAULT_RELAY_ORDERS_OPTIONS,
+  RELAY_ORDERS_OPTIONS,
+} from '../../src/relay/relay-orders.service.js';
+import {
+  DEFAULT_RELAY_SYNC_OPTIONS,
+  RELAY_SYNC_OPTIONS,
+} from '../../src/relay/relay-sync.service.js';
 import { TlsService } from '../../src/tls/tls.service.js';
 import { createTestApp } from '../helpers/test-app.js';
 import { tlsFetch } from './tls-fetch.js';
@@ -67,13 +75,15 @@ async function healthy(url: string, ca: string, alive: () => boolean): Promise<n
  * The built server (`apps/server/dist/main.js`, after `pnpm build`) in a process of its own, as
  * the Windows service runs it: TLS on, the pager broker on, its log in `logFile`. `NODE_ENV` is
  * `development`: `production` insists on the nightly backup and a licence, and `test` turns the
- * print queue off. The database and the data folder were prepared by the set-up.
+ * print queue off. The database and the data folder were prepared by the set-up. With `relayUrl`
+ * it syncs with the QR relay there (P8-01b), with the restaurant PC's own timings.
  */
 export async function startBuiltServer(options: {
   readonly databaseUrl: string;
   readonly dataDir: string;
   readonly ca: string;
   readonly logFile: string;
+  readonly relayUrl?: string;
 }): Promise<LoadTarget> {
   const [port, mqttPort] = [await freePort(), await freePort()];
   const url = `https://127.0.0.1:${String(port)}`;
@@ -98,6 +108,7 @@ export async function startBuiltServer(options: {
           RP_MQTT: 'on',
           RP_MQTT_PORT: String(mqttPort),
           RP_BACKUPS: 'off',
+          ...(options.relayUrl !== undefined && { RP_RELAY_URL: options.relayUrl }),
           LOG_LEVEL: 'warn',
         },
         stdio: ['ignore', log, log],
@@ -138,11 +149,14 @@ export async function startBuiltServer(options: {
 
 /**
  * The server in this process (the integration suite's short run), on fixed ports so it can be
- * started again where the devices expect it. Its print queue runs as on the restaurant PC.
+ * started again where the devices expect it. Its print queue runs as on the restaurant PC; with
+ * `relayUrl` it syncs with the QR relay there, starting at once rather than after the seconds a
+ * restaurant PC gives itself to settle.
  */
 export async function startInProcessServer(options: {
   readonly databaseUrl: string;
   readonly dataDir: string;
+  readonly relayUrl?: string;
 }): Promise<
   LoadTarget & { readonly app: () => INestApplication; readonly errors: readonly string[] }
 > {
@@ -169,8 +183,19 @@ export async function startInProcessServer(options: {
         mqttPort,
         host: '127.0.0.1',
         logLevel: 'error',
+        ...(options.relayUrl !== undefined && { relayUrl: options.relayUrl }),
       },
-      overrides: [{ provide: PRINT_QUEUE_OPTIONS, useValue: DEFAULT_PRINT_QUEUE_OPTIONS }],
+      overrides: [
+        { provide: PRINT_QUEUE_OPTIONS, useValue: DEFAULT_PRINT_QUEUE_OPTIONS },
+        {
+          provide: RELAY_SYNC_OPTIONS,
+          useValue: { ...DEFAULT_RELAY_SYNC_OPTIONS, firstDelayMs: 200 },
+        },
+        {
+          provide: RELAY_ORDERS_OPTIONS,
+          useValue: { ...DEFAULT_RELAY_ORDERS_OPTIONS, firstDelayMs: 200, realtimeDelayMs: 200 },
+        },
+      ],
     });
   let app = await create();
   const ca = app.get(TlsService).ca()?.certificate;

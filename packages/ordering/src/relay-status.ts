@@ -1,4 +1,4 @@
-import type { QrOrderStatus, QrOrderStatusDetail } from '@rp/contracts/relay';
+import type { QrOrderStatus, QrOrderStatusDetail, QrOrderView } from '@rp/contracts/relay';
 import type { OrderItemState } from '@rp/domain';
 
 /**
@@ -82,6 +82,24 @@ export function qrSteps(
   if (from === 'SENT_TO_KITCHEN') return target === 'SENT_TO_KITCHEN' ? ['SENT_TO_KITCHEN'] : [];
   if (target === 'RECEIVED') return ['RECEIVED'];
   return from === 'SUBMITTED' ? ['RECEIVED', target] : [target];
+}
+
+/** A line whose way through the restaurant is over. */
+const DONE: ReadonlySet<OrderItemState> = new Set(['SERVED', 'REJECTED', 'CANCELLED', 'VOIDED']);
+
+/**
+ * Whether a diner's page is done following a QR order (QR-007): rejected or expired, or every
+ * dish served or taken off. Until then it asks the relay every few seconds; without an end it
+ * would ask for the rest of the visit (found by the load test, P8-01b).
+ */
+export function qrOrderSettled(order: Pick<QrOrderView, 'status' | 'detail'>): boolean {
+  if (order.status === 'REJECTED' || order.status === 'EXPIRED') return true;
+  const items = order.detail.items ?? [];
+  return (
+    order.status === 'SENT_TO_KITCHEN' &&
+    items.length > 0 &&
+    items.every((item) => DONE.has(item.state))
+  );
 }
 
 // ---------------------------------------------------------------- call waiter / request bill

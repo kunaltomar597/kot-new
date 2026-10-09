@@ -135,3 +135,9 @@ device key, as screens of one terminal would. axe runs through the browser's deb
 since the server's Content Security Policy refuses inline scripts, after entrance animations end
 (a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium
 (`/opt/pw-browsers`); CI installs Playwright's own.
+
+`e2e/speed.e2e.ts` measures NFR-P07 (P8-01b) on a restaurant of the design capacity's size (the
+seed grown to 1,000 dishes and 100 tables in global setup), with the browser's CPU slowed down 4
+times: each tap by the browser's Event Timing (input to the next painted frame), each screen
+change until a frame shows the new screen's heading. It prints the figures that
+`docs/build/performance.md` records.
