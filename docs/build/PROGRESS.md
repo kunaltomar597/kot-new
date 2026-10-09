@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-09 (P8-01a).
+Last updated: 2026-10-10 (P8-01b).
 
 What exists:
 
@@ -110,8 +110,9 @@ What exists:
   (`test/load/`, ADR-0020) with what it found fixed: audit entries written when their
   transaction ends (no deadlock through the chain's lock), kitchen screens, the order feed and
   the not-collected sweep found from the dishes still live, an index for a combo line's parts,
-  and the GST and source reports in one pass each (P8-01a).
-  1184 tests (28 skipped: Windows only, a real install, or the performance runs).
+  and the GST and source reports in one pass each (P8-01a); the same rush with diners ordering on
+  QR pages through the relay behind simulated internet lines, measuring NFR-P05 and NFR-P06
+  (P8-01b). 1186 tests (28 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -185,7 +186,8 @@ What exists:
     rules, retention) on PostgreSQL, also run against local Supabase in CI.
   - The diners' edge functions (P5-02a): `qr-menu`, `submit-order` (the restaurant's own line
     check, rate limits per table and per browser, idempotent) and `order-status`. They are
-    bundled for Deno and smoke-tested there; the expiry job runs every minute.
+    bundled for Deno and smoke-tested there; the expiry job runs every minute. `qr-menu` does not
+    read the menu for a browser that has the latest (P8-01b).
   - The local server's function `server` (P5-02b): a Realtime session, presence with the QR
     settings, menu publishing, the tables with their code hashes, pickup and status reports.
     124 tests in all, 3 of them under Deno.
@@ -193,6 +195,8 @@ What exists:
 - `apps/qr-menu` (P5-05a): the public QR menu site on Next.js 16, a table's menu from the relay
   with search, filters, options, cart, sending and following orders, read-only when the restaurant
   is absent, and privacy and terms. Tested on a phone (Playwright, Pixel 7) against a real relay.
+  An open page asks for the menu every 20 s and when the diner comes back to it, and stops
+  following an order once every dish is served (P8-01b).
 - `apps/server/src/relay`: the QR relay sync agent's publishing side (P5-03a). It sends presence
   with the QR settings, and the tables and the QR menu by content hash. It backs off while offline
   and catches up after. The credential is sealed (`relay:credential`). The System page shows its
@@ -235,7 +239,9 @@ What exists:
   serves, or a damaged one, on the System page (P7-04e2); on the Pagers page, the firmware this PC
   passes on to its pagers, a release on its way or refused, each pager's update and "Update now"
   (P2-04b1); registering a pager by reading its QR code with the device's camera (P2-04b2; the
-  Playwright run scans one through Chromium's fake camera). 383 tests, and 23 Playwright steps.
+  Playwright run scans one through Chromium's fake camera); the kitchen screen's sound made ready
+  before the first touch, and a Playwright speed test of taps and screen changes (NFR-P07) on a
+  restaurant of the design capacity's size (P8-01b). 383 tests, and 25 Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -272,13 +278,13 @@ What exists:
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
-Phase 7 is done (P7-10, 2026-10-09): S8, S9 and S10 pass on every build. The simulated rush at
-design capacity meets every in-restaurant target of §7.1 (P8-01a, `docs/build/performance.md`).
+Phase 7 is done (P7-10, 2026-10-09): S8, S9 and S10 pass on every build. Every NFR-P target of
+§7.1 is met at design capacity (P8-01a and P8-01b, `docs/build/performance.md`): the simulated rush
+with QR diners through the relay, the console's taps and screens, and the QR menu's first view.
+S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-01b Online and on-screen targets: NFR-P05 and NFR-P06 through the relay during the rush,
-  NFR-P07 with the browser's Event Timing, NFR-P12 recorded.
 - P8-03 Security hardening and penetration-test readiness (the external test needs the firm the
   Business Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -494,9 +500,9 @@ Recommended next WPs (dependencies met):
 
 ### Phase 8: Hardening and pilot
 
-- [~] P8-01 Load and capacity tests
+- [~] P8-01 Load and capacity tests (only the lab rig's S1 remains, P8-01c [H])
   - [x] P8-01a The simulated rush at design capacity
-  - [ ] P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
+  - [x] P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
   - [ ] P8-01c S1 on the lab rig with real devices [H]
 - [ ] P8-02 Failure drills [H]
 - [ ] P8-03 Security hardening and pentest readiness
@@ -745,6 +751,57 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-01b):
+
+698. NFR-P05 and NFR-P06 are measured in the load run itself. The QR relay (`@rp/relay/testing`:
+     its schema, functions and the stand-in for Supabase Realtime) runs in the harness's process,
+     and the server syncs with it as on the restaurant PC (the built server with `RP_RELAY_URL`, its
+     own timings, the Realtime doorbell). Two simulated internet lines (`test/load/slow-line.ts`, a
+     TCP relay that delays every chunk each way): 20 ms each way for the restaurant's broadband to
+     Mumbai, 75 ms for diners' phones on 4G (Lighthouse's 150 ms there and back, as NFR-P12's
+     test). Supabase's own time (an edge function starting, its region) is not in the figures;
+     they are measured again on the deployed relay (manual task 20).
+699. The order mix gains QR orders: 35 % rounds from the waiter's phone, 15 % tablet orders, 15 %
+     QR orders from the tables without a tablet (T61 to T100), 25 % new parties, 10 % takeaway.
+     At a table without a tablet a diner opens the QR page when the table is seated (the waiter
+     takes the first order); the page asks for the menu every `QR_MENU_REFRESH_MS`, follows each
+     order every 3 s and closes when the bill is paid. One QR order in ten is sent twice with the
+     same key. The relay's orders are checked against the server's: each one made once, an
+     expired one never.
+700. What the figures are: NFR-P05 per availability change and per QR page open when it was made,
+     until that page shows it; a page that never showed it (the dish came back before it looked)
+     counts until it next looked, which is past the 30 s. The relay's own time (what a page opened
+     then shows) is in the breakdown. NFR-P06 from the diner's send (the POST to the relay) until
+     the dashboard hears the server's `OrderSubmitted` for it; the diner's page saying "received"
+     (it asks every 3 s) is in the breakdown.
+701. Found and fixed: an open QR page asked for the menu every 60 s, so a dish out of stock showed
+     there up to a minute and the sync later, against NFR-P05's 30 s (MENU-006: "the QR menu
+     within 30 s"). It now asks every 20 s (`QR_MENU_REFRESH_MS` in `@rp/ordering`) and at once
+     when the diner comes back to the page (`visibilitychange`). An unchanged menu (`?known=`)
+     answers in a few bytes, and the relay no longer reads the menu for it at all
+     (`restaurantState(…, known)`): before, every such call read the whole menu document (about
+     0.5 MB at 1,000 dishes) out of the database and parsed it in the function.
+702. Found and fixed: a QR page followed every order every 3 s for the rest of the visit, since
+     "sent to the kitchen" was never final. An order is now settled once every dish is served or
+     taken off, or it was rejected or expired (`qrOrderSettled` in `@rp/ordering`): fewer calls to
+     the relay's functions per order.
+703. NFR-P07 is measured by `apps/console/e2e/speed.e2e.ts` on a restaurant of the design
+     capacity's size (the development seed grown to 1,000 dishes and 100 tables), with the
+     browser's CPU slowed down 4 times (Lighthouse's mobile setting; the restaurant PC and kitchen
+     screens are slower than the build Mac): a cashier's order at a table, the kitchen's ticket and
+     a manager's walk through ten dashboard pages. A tap is the longest event of the interaction
+     from the input to the next painted frame (Event Timing; under 16 ms the browser does not
+     report it and it counts as 16). A screen change runs from the tap's input to the first frame
+     that shows a heading the screen did not have; until nothing on it is loading is recorded too.
+     Both are judged at p95, as the other targets, with the maximum reported. The phones and
+     tablets are measured on real devices in P8-01c.
+704. Found and fixed: the kitchen screen made its Web Audio context on the first touch (it unlocks
+     the sound, KDS-009), and that tap took 112 ms at 4×. The context is now made, silent, when the
+     browser is idle after the board is painted (`KitchenSounds.prepare`); the first touch only
+     resumes it, and the tap takes under 16 ms.
+705. NFR-P12 is recorded from the QR site's Playwright test (P5-05b): the 300-dish menu's LCP on a
+     Pixel 7 profile over Slow 4G with a CPU 4 times slower.
 
 Decided 2026-10-09 (P8-01a), ADR-0020:
 
@@ -3722,6 +3779,63 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-01b Online and on-screen targets (NFR-P05, P06, P07, P12)
+
+Every NFR-P target of §7.1 is now measured and met at design capacity (`docs/build/performance.md`).
+Decisions 698 to 705.
+
+Built:
+
+- The QR side of the load run (`apps/server/test/load/`):
+  - `qr.ts`: the relay started in the harness with its Realtime stand-in, the server connected to
+    it (credential, a QR code per table), `qrReady`, `QrPage` (a diner's phone doing the QR site's
+    calls) and `inStepWith`;
+  - `slow-line.ts`: a TCP relay that delays each way (20 ms for the restaurant, 75 ms for 4G);
+  - `rush.ts`: QR orders (15 % of the mix) on the tables without a tablet, pages opened when
+    seated and closed when billed, targets NFR-P05 and NFR-P06, and two checks (each relay order
+    made once by the server; every change reached every open page);
+  - both servers take `relayUrl` (the in-process one starts its sync at once); the short run in the
+    integration suite and the full run have the relay.
+- `apps/console/e2e/speed.e2e.ts` (NFR-P07) on a design-size restaurant made by the e2e global setup
+  (`RP_E2E_SPEED_DATABASE_URL`).
+- An e2e test of the QR site: an open page follows the menu within the refresh and when the diner
+  comes back to it.
+
+Found and fixed (decisions 701, 702, 704):
+
+- QR pages asked for the menu every 60 s: now 20 s (`QR_MENU_REFRESH_MS`) and on `visibilitychange`;
+  the relay's `qr-menu` no longer reads the menu for a browser that has the latest.
+- QR pages followed every order for the whole visit: `qrOrderSettled` ends it.
+- The kitchen screen's first touch made the Web Audio context (112 ms at 4×): it is made when the
+  browser is idle (`KitchenSounds.prepare`).
+
+Result (2026-10-10): NFR-P05 p95 20.8 s at the pages (2.5 s at the relay), NFR-P06 p95 363 ms (9
+samples; 422 ms over 14 in the run before), NFR-P07 taps p95 24 ms (max 40 ms) and screens p95
+36 ms at 4× CPU, NFR-P12 LCP 544 ms. The in-restaurant targets held with the QR traffic added
+(NFR-P01 436 ms, NFR-P10 3.2 s, NFR-P11 3.9 s). Every check passed.
+
+Tests: server 1186 (+2: the slow line, `inStepWith`; the short rush now with the relay), ordering
+90 (+3), console 383 (the KDS sound test extended) and 25 Playwright steps (+1), QR site e2e 11
+(+1). Format, build, contract docs, `contracts:compat`, lint, typecheck and every package's tests
+pass. Traceability: Must 262/287.
+
+Not done or not verified:
+
+- Supabase's own time is not in the online figures; P8-01c measures NFR-P05 and NFR-P06 against
+  the deployed relay (manual task 20), and NFR-P07 on the Android phones and tablets.
+- The speed test's 4× slowdown is relative to the machine it runs on; on a slower CI runner it is
+  harsher. It asserts p95 only.
+
+Gotchas:
+
+- The generated history has QR orders of its own (no relay order behind them): checks of today's
+  QR orders must filter by business date.
+- The relay's `qr-menu` is read by every open page every 20 s: keep its unchanged path free of the
+  menu document.
+- The full run: `RP_PERF=1 RP_LOAD_ADMIN_URL=postgresql://postgres@127.0.0.1:55432/postgres
+RP_LOAD_BASE=$HOME/.local/rp-load-lab/base pnpm --filter @rp/server test:perf load` (about 23
+  minutes with the base); reset `pg_stat_statements` in the `postgres` database at "Rush:".
 
 ### 2026-10-09: P8-01a The simulated rush at design capacity
 

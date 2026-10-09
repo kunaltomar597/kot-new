@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { qrChannelMenu } from '../src/qr-menu.js';
+import { QR_MENU_REFRESH_MS, QR_ORDER_POLL_MS, qrChannelMenu } from '../src/qr-menu.js';
 import { IDS, MENU } from '../src/testing/menu-fixture.js';
 
 const withQr = (ids: readonly string[]) => ({
@@ -46,5 +46,15 @@ describe('[QR-002] [MENU-012] the menu the QR page offers', () => {
     const menu = qrChannelMenu(counted);
     expect(menu.items.find((item) => item.id === IDS.dal)?.stockCount).toBeNull();
     expect(menu.items.find((item) => item.id === IDS.jamun)?.stockCount).toBe(0);
+  });
+});
+
+describe('[NFR-P05] [MENU-006] how often an open QR page asks for the menu', () => {
+  it('leaves room within the 30 s for the restaurant to send a change to the relay', () => {
+    // The relay has a change a few seconds after it is made (the sync's 2 s wait and the round
+    // trips, P8-01b measures them); a page that asks this often shows it within those and this.
+    expect(QR_MENU_REFRESH_MS + 5_000).toBeLessThanOrEqual(30_000);
+    // An order on its way is followed more often than the menu (QR-007).
+    expect(QR_ORDER_POLL_MS).toBeLessThan(QR_MENU_REFRESH_MS);
   });
 });

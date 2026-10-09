@@ -577,19 +577,24 @@ clock, which the scenarios move from day to day:
 
 `test/helpers/small-restaurant.ts` sets up their menu and floor and serves a table through the API.
 
-## Load test at design capacity (P8-01a)
+## Load test at design capacity (P8-01a, P8-01b)
 
 `test/load/` simulates the restaurant of BRD §7.2 against the server (ADR-0020): 200 live
 connections (tablets, waiter phones, kitchen screens, POS, dashboards and console screens, each
 re-reading its screen after events as the apps do), 30 pagers on MQTTS and 8 printers on raw TCP.
 Orders arrive open-loop at the peak rate; the kitchen cooks, waiters approve, pick up and serve,
-diners call, cashiers bill and print, managers change availability and run reports. At the end the
-server is killed and every client must come back.
+diners call, cashiers bill and print, managers change availability and run reports. Diners at the
+tables without a tablet order on their QR page through the QR relay, which runs in the harness
+(`@rp/relay/testing`, with its Realtime stand-in) behind simulated internet lines; the server syncs
+with it as on the restaurant PC (NFR-P05, NFR-P06). At the end the server is killed and every
+client must come back.
 
 - `plan.ts`: the shape (`DESIGN_CAPACITY`, `SMOKE_SHAPE`) and the seeded schedule;
 - `restaurant.ts`: the restaurant, its devices and pagers, and a year of history in steady state;
 - `device.ts`, `pager.ts`, `printer.ts`, `tls-fetch.ts`: the simulated devices;
 - `server.ts`: the built server in its own process, or the server in this process;
+- `qr.ts`, `slow-line.ts`: the relay, the server's connection to it, diners' QR pages, and an
+  internet line that delays each way;
 - `rush.ts`: the run, its figures per NFR-P target and the checks (nothing lost or duplicated);
 - `report.ts`: the Markdown that `docs/build/performance.md` records.
 

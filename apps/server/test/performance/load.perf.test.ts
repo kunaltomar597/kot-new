@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { cpus, platform, release, tmpdir, totalmem } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
+import { QR_MENU_REFRESH_MS } from '@rp/ordering';
 import { type LocalPostgres, startLocalPostgres, withDatabase } from '@rp/test-postgres';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -9,6 +10,7 @@ import { TlsService } from '../../src/tls/tls.service.js';
 import { createTestApp } from '../helpers/test-app.js';
 import { DESIGN_CAPACITY, type LoadShape } from '../load/plan.js';
 import { SimulatedPrinter } from '../load/printer.js';
+import { connectQr, type QrRelay, startQrRelay } from '../load/qr.js';
 import { renderReport } from '../load/report.js';
 import {
   loadRestaurant,
@@ -24,9 +26,11 @@ import { applyMigrations, migrationFiles } from '../setup/postgres.js';
  * P8-01a: the simulated rush at the BRD's design capacity (§7.2), the figures of every NFR-P
  * target it covers, and S1's "zero lost or duplicate orders/KOTs". The built server (run
  * `pnpm build` first) runs in a process of its own with TLS, on a PostgreSQL that is as durable
- * as the restaurant PC's (fsync, synchronous commit, full-page writes, WAL archiving). Opt-in, as
- * the other runs: `RP_PERF=1 pnpm --filter @rp/server test:perf load`, the rush's 25 minutes and
- * 10 to 60 for the year of history.
+ * as the restaurant PC's (fsync, synchronous commit, full-page writes, WAL archiving). Since
+ * P8-01b it syncs with the QR relay (in this process, behind simulated internet lines), and the
+ * tables without a tablet order on their QR pages (NFR-P05, NFR-P06). Opt-in, as the other runs:
+ * `RP_PERF=1 pnpm --filter @rp/server test:perf load`, the rush's 25 minutes and 10 to 60 for
+ * the year of history.
  *
  * - `RP_LOAD_MINUTES`, `RP_LOAD_ORDERS_PER_HOUR` and `RP_LOAD_HISTORY_DAYS` change the shape.
  * - `RP_LOAD_ADMIN_URL`: a PostgreSQL to use (its own settings, e.g. with `pg_stat_statements`)
@@ -61,12 +65,14 @@ let cluster: LocalPostgres | undefined;
 let walDir: string | undefined;
 let setupApp: INestApplication | undefined;
 let target: LoadTarget | undefined;
+let relay: QrRelay | undefined;
 let dropRun: (() => Promise<void>) | undefined;
 const printers: SimulatedPrinter[] = [];
 
 afterAll(async () => {
   await setupApp?.close().catch(() => undefined);
   await target?.stop();
+  await relay?.stop();
   await Promise.all(printers.map((printer) => printer.stop()));
   await dropRun?.();
   await cluster?.stop();
@@ -92,7 +98,7 @@ async function sql(url: string, statement: string): Promise<pg.QueryResult> {
 }
 
 describe.skipIf(!ENABLED)(
-  '[NFR-P01] [NFR-P02] [NFR-P03] [NFR-P04] [NFR-P08] [NFR-P09] [NFR-P10] [NFR-P11] the rush at design capacity',
+  '[NFR-P01] [NFR-P02] [NFR-P03] [NFR-P04] [NFR-P05] [NFR-P06] [NFR-P08] [NFR-P09] [NFR-P10] [NFR-P11] the rush at design capacity',
   () => {
     it(
       'meets every target with nothing lost or duplicated',
@@ -177,8 +183,10 @@ describe.skipIf(!ENABLED)(
             await sql(databaseUrl, readFileSync(file, 'utf8'));
           }
         }
+        relay = await startQrRelay({ adminUrl, runId: 'load' });
         setupApp = await createTestApp({ databaseUrl, config: { dataDir, tls: true } });
         restaurant = await readyForToday(setupApp, restaurant, ports);
+        const tokens = await connectQr(setupApp, restaurant, relay.credential);
         const ca = setupApp.get(TlsService).ca()?.certificate;
         if (ca === undefined) throw new Error('No CA');
         await setupApp.close();
@@ -189,7 +197,13 @@ describe.skipIf(!ENABLED)(
         }
 
         const logFile = join(dataDir, 'server.log');
-        target = await startBuiltServer({ databaseUrl, dataDir, ca, logFile });
+        target = await startBuiltServer({
+          databaseUrl,
+          dataDir,
+          ca,
+          logFile,
+          relayUrl: relay.serverUrl,
+        });
         log(`Server ${String(target.pid)} at ${target.url}, its log in ${logFile}`);
         const result = await runRush({
           shape,
@@ -198,6 +212,7 @@ describe.skipIf(!ENABLED)(
           databaseUrl,
           printers: { stations, bills },
           restart: true,
+          qr: { relay, tokens, refreshMs: QR_MENU_REFRESH_MS },
           log,
         });
 

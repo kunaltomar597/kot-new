@@ -39,6 +39,11 @@ export function renderReport(result: RushResult, context: RunContext): string {
     `- ${String(shape.tables)} tables, ${String(shape.dishes)} dishes, ${String(shape.stations)} stations with a kitchen screen and a ticket printer each, ${String(shape.billPrinters)} bill printers;`,
     `- ${String(result.devices)} live connections (${String(shape.tablets)} tablets, ${String(shape.waiters)} waiter phones, ${String(shape.stations)} kitchen screens, ${String(shape.posTerminals)} POS, ${String(shape.dashboards)} dashboards, the rest console screens with the alert centre) and ${String(result.pagers)} pagers;`,
     `- ${String(shape.ordersPerHour)} orders an hour for ${result.measuredMinutes.toFixed(1)} minutes after ${String(Math.round(shape.occupancy * shape.tables))} tables were seated, on ${shape.historyDays > 0 ? `${String(shape.historyDays)} days of history at ${String(shape.historyOrdersPerDay)} orders a day` : 'no history'}.`,
+    ...(result.qr === null
+      ? []
+      : [
+          `- The tables without a tablet order on their QR page through the relay, which the server reaches over a line of ${ms(result.qr.restaurantOneWayMs)} each way and the diners' phones over 4G at ${ms(result.qr.dinersOneWayMs)} each way; each open page asks for the menu every ${ms(result.qr.refreshMs)}.`,
+        ]),
     '',
     row(['Target', 'What', 'Budget', 'Samples', 'p50', 'p95', 'p99', 'Max', 'Met']),
     row(['---', '---', '---:', '---:', '---:', '---:', '---:', '---:', '---']),

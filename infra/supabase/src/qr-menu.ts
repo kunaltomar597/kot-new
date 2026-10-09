@@ -11,7 +11,7 @@ export const qrMenu: Handler = serveWith('GET', (request, context) =>
     const query = QrMenuQuery.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!query.success) throw new HttpError(400, 'VALIDATION_FAILED', 'Give ?known= as a version.');
     const scope = await openTable(tx, request);
-    const state = await restaurantState(tx, scope);
+    const state = await restaurantState(tx, scope, query.data.known);
     const unchanged = state.menu !== undefined && state.menu.version === query.data.known;
     const { version, document } = unchanged
       ? { version: state.menu.version, document: null }

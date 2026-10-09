@@ -4,6 +4,11 @@
  * after a tap on the page, so the screen unlocks it on the first touch.
  */
 export interface KitchenSounds {
+  /**
+   * Makes the sound ready, still silent, before anyone touches the screen: making it takes the
+   * browser long enough to slow the first tap past NFR-P07's 100 ms (found by P8-01b).
+   */
+  prepare(): void;
   unlock(): void;
   newTicket(volumePercent: number): void;
   change(volumePercent: number): void;
@@ -40,6 +45,13 @@ export function webAudioSounds(
     }
   };
   return {
+    prepare() {
+      try {
+        context ??= create();
+      } catch {
+        // No audio on this device: the screen still works, silently.
+      }
+    },
     unlock() {
       try {
         context ??= create();

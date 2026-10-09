@@ -9,9 +9,15 @@ import { board, KDS_IDS, line, minutesAgo, NOW, ticket } from './kds-fixture.js'
 /** Records the notes the kitchen sounds play (Web Audio is not in jsdom). */
 class FakeAudioContext {
   static played: { frequency: number; type: string }[] = [];
+  static made = 0;
+  static resumed = 0;
   currentTime = 0;
   destination = {};
+  constructor() {
+    FakeAudioContext.made += 1;
+  }
   resume() {
+    FakeAudioContext.resumed += 1;
     return Promise.resolve();
   }
   createOscillator() {
@@ -79,6 +85,8 @@ beforeEach(() => {
   vi.stubGlobal('isSecureContext', true);
   vi.stubGlobal('AudioContext', FakeAudioContext);
   FakeAudioContext.played = [];
+  FakeAudioContext.made = 0;
+  FakeAudioContext.resumed = 0;
 });
 
 afterEach(() => {
@@ -259,9 +267,15 @@ describe('[KDS-009] [KDS-012] sounds and reconnecting', () => {
     );
     const { user, sockets } = await renderKds(fake);
     await card(/^KOT 1/);
+    // [NFR-P07] Made before the first touch, which then only switches it on.
+    await waitFor(() => {
+      expect(FakeAudioContext.made).toBe(1);
+    });
+    expect(FakeAudioContext.resumed).toBe(0);
     await user.click(screen.getByRole('button', { name: t('kds.enableSound') }));
     expect(screen.queryByRole('button', { name: t('kds.enableSound') })).toBeNull();
     expect(FakeAudioContext.played).toEqual([]);
+    expect([FakeAudioContext.made, FakeAudioContext.resumed]).toEqual([1, 1]);
 
     act(() => {
       sockets.sync(0);

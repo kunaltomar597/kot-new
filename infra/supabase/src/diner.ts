@@ -37,22 +37,31 @@ export async function openTable(tx: Tx, request: Request): Promise<TableScope> {
 }
 
 export interface RestaurantState {
-  /** The latest publication, if any. */
+  /** The latest publication, if any; its document is null when it is the `known` version. */
   readonly menu: { readonly version: number; readonly document: unknown } | undefined;
   /** QR-008: not heard from within the read-only time. */
   readonly readOnly: boolean;
   readonly pickupTimeoutSeconds: number;
 }
 
-/** The latest menu, whether the restaurant is present, and its pickup timeout. */
-export async function restaurantState(tx: Tx, scope: TableScope): Promise<RestaurantState> {
+/**
+ * The latest menu, whether the restaurant is present, and its pickup timeout. A browser that has
+ * the latest version already (`known`) is asked about every few seconds (NFR-P05): the menu is
+ * then not read at all.
+ */
+export async function restaurantState(
+  tx: Tx,
+  scope: TableScope,
+  known?: number,
+): Promise<RestaurantState> {
   const [row] = await tx.query<{
     version: number | null;
     menu: unknown;
     read_only: boolean;
     pickup: number;
   }>(
-    `SELECT latest.version::int AS version, latest.menu,
+    `SELECT latest.version::int AS version,
+            CASE WHEN latest.version = $2::bigint THEN NULL ELSE latest.menu END AS menu,
             (p.last_seen_at IS NULL
               OR p.last_seen_at < now() - make_interval(secs => s.read_only_after_seconds))
               AS read_only,
@@ -64,7 +73,7 @@ export async function restaurantState(tx: Tx, scope: TableScope): Promise<Restau
        WHERE m.tenant_id = s.tenant_id ORDER BY m.version DESC LIMIT 1
      ) AS latest ON true
      WHERE s.tenant_id = $1`,
-    [scope.tenantId],
+    [scope.tenantId, known ?? null],
   );
   if (row === undefined) throw new HttpError(404, 'TABLE_NOT_FOUND', 'This QR code is not in use.');
   return {

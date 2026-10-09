@@ -45,12 +45,20 @@ Acceptance: the run passes on this Mac with every target met, or with tickets ra
 Requirements: NFR-P05, NFR-P06 (QR through the relay, during the rush), NFR-P07 (tap feedback
 and screen transitions on the console, measured with the browser's Event Timing in Playwright),
 NFR-P12 (already a Playwright test, P5-05b). Their figures are added to `performance.md`.
+Deliverables: the rush of P8-01a with the QR relay (`@rp/relay/testing`, with its Realtime
+stand-in) behind simulated internet lines, the server syncing with it as on the restaurant PC, and
+diners' QR pages on the tables without a tablet doing what the QR site does (the menu every
+refresh, orders sent and followed); a Playwright speed test of the console on a restaurant of the
+design capacity's size with a slowed-down CPU; the QR site's LCP test run and recorded.
+Acceptance: every figure in `performance.md`, each target met or fixed.
 
 ### P8-01c S1 on the lab rig [H]
 
 Requirements: S1 with real devices: 40 tables, 3 stations, 8 waiters, 25 tablets, 10 pagers,
 600 orders in 3 hours. Claude prepares the harness against a real install and the procedure. A
 person runs it on the lab rig with real phones, tablets, pagers and printers and reports back.
+Also measured there (P8-01b could not): NFR-P07 on the waiter phones and table tablets, and
+NFR-P05 and NFR-P06 against the deployed relay (manual task 20) with the harness's QR pages.
 
 ## P8-02 Failure drills
 

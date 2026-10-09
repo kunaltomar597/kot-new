@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { qrStatusOf, qrSteps } from '../src/relay-status.js';
+import { qrOrderSettled, qrStatusOf, qrSteps } from '../src/relay-status.js';
 
 const line = (
   state: Parameters<typeof qrStatusOf>[0]['lines'][number]['state'],
@@ -48,6 +48,28 @@ describe('[QR-007] what the diner’s QR page says', () => {
     expect(qrStatusOf({ outcome: 'EXPIRED', rejectionReason: null, lines: [] }).status).toBe(
       'EXPIRED',
     );
+  });
+});
+
+describe('[QR-007] how long a diner’s page follows an order', () => {
+  const sent = (...states: Parameters<typeof line>[0][]) => ({
+    status: 'SENT_TO_KITCHEN' as const,
+    detail: { items: states.map((state, index) => line(state, index === 0 ? 'a' : 'b')) },
+  });
+
+  it('follows it until every dish is served or taken off', () => {
+    expect(qrOrderSettled({ status: 'SUBMITTED', detail: {} })).toBe(false);
+    expect(qrOrderSettled({ status: 'RECEIVED', detail: {} })).toBe(false);
+    expect(qrOrderSettled(sent('SERVED', 'READY'))).toBe(false);
+    expect(qrOrderSettled(sent('SERVED', 'CANCELLED'))).toBe(true);
+    expect(qrOrderSettled(sent('VOIDED'))).toBe(true);
+    // Without the lines' states it cannot tell, so it keeps following.
+    expect(qrOrderSettled({ status: 'SENT_TO_KITCHEN', detail: {} })).toBe(false);
+  });
+
+  it('stops once the restaurant rejected it or it expired', () => {
+    expect(qrOrderSettled({ status: 'REJECTED', detail: {} })).toBe(true);
+    expect(qrOrderSettled({ status: 'EXPIRED', detail: {} })).toBe(true);
   });
 });
 

@@ -1,3 +1,6 @@
+import { createConnection, createServer } from 'node:net';
+import { performance } from 'node:perf_hooks';
+import type { QrMenuDocument } from '@rp/contracts/relay';
 import { describe, expect, it } from 'vitest';
 import {
   DESIGN_CAPACITY,
@@ -10,6 +13,8 @@ import {
   within,
 } from '../load/plan.js';
 import { readJob } from '../load/printer.js';
+import { type AvailabilityChange, inStepWith } from '../load/qr.js';
+import { startSlowLine } from '../load/slow-line.js';
 import { ms } from '../load/report.js';
 import { percentile, SampleSets, Samples } from '../load/stats.js';
 
@@ -91,8 +96,7 @@ describe('[NFR-P01] [S1] the schedule of the rush', () => {
     const arrivals = schedule(shape, seeded(42));
     const count = (kind: string) => arrivals.filter((arrival) => arrival.kind === kind).length;
     const hours = shape.minutes / 60;
-    const orders =
-      count('NEXT_ROUND') + count('TABLET_ORDER') + count('NEW_PARTY') + count('TAKEAWAY');
+    const orders = Object.keys(ORDER_MIX).reduce((sum, kind) => sum + count(kind), 0);
     expect(orders / hours).toBeGreaterThan(285);
     expect(orders / hours).toBeLessThan(315);
     for (const [kind, share] of Object.entries(ORDER_MIX)) {
@@ -126,5 +130,57 @@ describe('[NFR-P02] [NFR-P08] what a printed page says it is', () => {
       orderNumber: null,
       invoiceNumber: 'INV/26-27/000123',
     });
+  });
+});
+
+describe('[NFR-P05] [NFR-P06] the QR side of the run', () => {
+  it('delays every chunk on the internet line each way, in order', async () => {
+    // An echo server behind a line of 60 ms each way.
+    const echo = createServer((socket) => socket.pipe(socket));
+    await new Promise<void>((resolve) => echo.listen(0, '127.0.0.1', resolve));
+    const address = echo.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+    const line = await startSlowLine({ host: '127.0.0.1', port }, 60);
+    try {
+      const socket = createConnection({ host: '127.0.0.1', port: line.port });
+      await new Promise<void>((resolve) => socket.once('connect', resolve));
+      let received = '';
+      const started = performance.now();
+      const done = new Promise<number>((resolve) => {
+        socket.on('data', (chunk) => {
+          received += chunk.toString();
+          if (received.length >= 6) resolve(performance.now() - started);
+        });
+      });
+      socket.write('abc');
+      socket.write('def');
+      const roundTrip = await done;
+      expect(received).toBe('abcdef');
+      expect(roundTrip).toBeGreaterThanOrEqual(115);
+      socket.destroy();
+    } finally {
+      await line.stop();
+      await new Promise<void>((resolve) => {
+        echo.close(() => {
+          resolve();
+        });
+      });
+    }
+  });
+
+  it('counts a page in step when it shows a change, or once a later one has begun', () => {
+    const menu = (available: boolean) =>
+      ({ menu: { items: [{ id: 'dal', available }] } }) as unknown as QrMenuDocument;
+    const out: AvailabilityChange = { itemId: 'dal', available: false, startedAt: 1_000 };
+    const back: AvailabilityChange = { itemId: 'dal', available: true, startedAt: 31_000 };
+    const changes = [out, back];
+    // Before the relay has it, the page still shows the dish.
+    expect(inStepWith(menu(true), out, changes, 2_000)).toBe(false);
+    expect(inStepWith(menu(false), out, changes, 12_000)).toBe(true);
+    // A page that never looked while it was out: in step only once the dish was back in stock.
+    expect(inStepWith(menu(true), out, changes, 30_000)).toBe(false);
+    expect(inStepWith(menu(true), out, changes, 35_000)).toBe(true);
+    expect(inStepWith(menu(false), back, changes, 35_000)).toBe(false);
+    expect(inStepWith(menu(true), back, changes, 45_000)).toBe(true);
   });
 });

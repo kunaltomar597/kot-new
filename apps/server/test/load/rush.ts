@@ -12,13 +12,22 @@ import type {
   PendingApprovalsResponse,
   SubmitOrderResponse,
 } from '@rp/contracts';
+import type { QrMenuDocument, QrSubmitOrderResponse } from '@rp/contracts/relay';
 import { addDays } from '@rp/domain';
-import { affectsApprovals, affectsFloor } from '@rp/ordering';
+import { affectsApprovals, affectsFloor, QR_ORDER_POLL_MS, qrOrderSettled } from '@rp/ordering';
 import pg from 'pg';
 import { type DeviceMetrics, SimulatedDevice } from './device.js';
 import { SimulatedPager } from './pager.js';
 import { type Arrival, type LoadShape, schedule, seeded, within } from './plan.js';
 import type { SimulatedPrinter } from './printer.js';
+import {
+  DINERS_ONE_WAY_MS,
+  inStepWith,
+  QrPage,
+  type QrRelay,
+  qrReady,
+  RESTAURANT_ONE_WAY_MS,
+} from './qr.js';
 import type { LoadRestaurant, LoadTable } from './restaurant.js';
 import type { LoadTarget } from './server.js';
 import { type LatencySummary, SampleSets, Samples } from './stats.js';
@@ -49,6 +58,18 @@ export const TARGETS = [
     id: 'NFR-P04',
     what: 'Availability change → every connected device (the last of each change)',
     budgetMs: 2_000,
+    statistic: 'p95',
+  },
+  {
+    id: 'NFR-P05',
+    what: 'Availability change → each open QR page (online)',
+    budgetMs: 30_000,
+    statistic: 'p95',
+  },
+  {
+    id: 'NFR-P06',
+    what: 'QR order sent from a diner’s phone → received by the server (online)',
+    budgetMs: 5_000,
     statistic: 'p95',
   },
   {
@@ -122,6 +143,12 @@ export interface RushResult {
     readonly downMs: number;
     readonly pagers: LatencySummary;
   } | null;
+  /** The QR side, when the run had one (P8-01b). */
+  readonly qr: {
+    readonly refreshMs: number;
+    readonly dinersOneWayMs: number;
+    readonly restaurantOneWayMs: number;
+  } | null;
 }
 
 export interface RushOptions {
@@ -136,6 +163,16 @@ export interface RushOptions {
   };
   /** Kill the server at the end and measure the clients coming back (NFR-P11). */
   readonly restart: boolean;
+  /**
+   * Diners' phones with the QR page open on the tables without a tablet, through the relay
+   * (P8-01b, NFR-P05, NFR-P06): the relay the server syncs with, each table's code, and how often
+   * an open page asks for the menu (the QR site's QR_MENU_REFRESH_MS). Without it, none.
+   */
+  readonly qr?: {
+    readonly relay: QrRelay;
+    readonly tokens: Readonly<Record<string, string>>;
+    readonly refreshMs: number;
+  };
   readonly log?: (line: string) => void;
 }
 
@@ -167,6 +204,8 @@ interface TableState {
   unserved: number;
   seatedAt: number;
   readonly openRequests: Set<ServiceType>;
+  /** A QR order on its way to the server: the diners wait for it before the next. */
+  qrInFlight: boolean;
 }
 
 interface AlertSeen {
@@ -186,6 +225,22 @@ interface Change {
   readonly startedAt: number;
   readonly receipts: Map<number, number>;
   readonly measured: boolean;
+  /** The QR pages open when it was made, and when each first showed it (NFR-P05). */
+  readonly pages: Map<QrPage, number | undefined>;
+  /** When the relay served it (a page opened then would show it). */
+  relayAt: number | undefined;
+}
+
+/** A diners' QR order, from the phone to the server (NFR-P06). */
+interface QrSent {
+  readonly tableId: string;
+  readonly lines: readonly OrderLineRequest[];
+  readonly startedAt: number;
+  readonly measured: boolean;
+  /** When the dashboard heard the server had it. */
+  receivedAt: number | undefined;
+  /** When the diner's page first said the restaurant had it. */
+  seenReceivedAt: number | undefined;
 }
 
 interface Bill {
@@ -306,6 +361,7 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
         unserved: 0,
         seatedAt: 0,
         openRequests: new Set(),
+        qrInFlight: false,
       },
     ]),
   );
@@ -334,7 +390,36 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
     billPrinted: new Samples(),
   };
   let retriesNotReplayed = 0;
+  const qr = options.qr;
+  /** The QR page open on each table without a tablet while its diners are seated. */
+  const qrPages = new Map<string, QrPage>();
+  /** QR orders on their way to the server, by table session, oldest first. */
+  const qrOnTheWay = new Map<string, QrSent[]>();
+  const qrSamples = { received: new Samples(), dinerSees: new Samples() };
 
+  // The server's QR orders, as the dashboard hears them (NFR-P06).
+  observer.onEvent((event, at) => {
+    if (event.type !== 'OrderSubmitted' || event.payload.source !== 'QR') return;
+    const { orderId, orderNumber, tableSessionId } = event.payload;
+    const sent = tableSessionId === undefined ? undefined : qrOnTheWay.get(tableSessionId)?.shift();
+    if (sent === undefined) {
+      count('QR orders nobody sent');
+      return;
+    }
+    sent.receivedAt = at;
+    if (sent.measured) {
+      qrSamples.received.add(at - sent.startedAt);
+      measuredOrders.add(orderId);
+    }
+    orderByNumber.set(orderNumber, orderId);
+    expectedStations.set(
+      orderId,
+      new Set(sent.lines.map((line) => stationOf.get(line.itemId) ?? '')),
+    );
+    awaitingApproval.add(orderId);
+    const state = tables.get(sent.tableId);
+    if (state !== undefined) state.qrInFlight = false;
+  });
   // The dashboard hears every alert, with its table and recipients.
   observer.onEvent((event, at) => {
     if (event.type === 'AlertRaised' && event.payload.repeat === 0) {
@@ -371,13 +456,15 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
   }
 
   // ------------------------------------------------------------ ordering
-  const lines = (channel: SalesChannel): OrderLineRequest[] => {
-    const items = sellable(channel);
-    return Array.from({ length: 2 + Math.floor(random() * 4) }, () => {
+  const pickLines = (
+    items: readonly MenuItem[],
+    groupsOf: ReadonlyMap<string, MenuSnapshot['modifierGroups'][number]>,
+  ): OrderLineRequest[] =>
+    Array.from({ length: 2 + Math.floor(random() * 4) }, () => {
       const item = pick(items);
       if (item === undefined) throw new Error('Nothing on the menu');
       const modifiers = item.modifierGroupIds.flatMap((groupId) => {
-        const group = groups.get(groupId);
+        const group = groupsOf.get(groupId);
         const option = group === undefined ? undefined : pick(group.options);
         return option !== undefined && (group?.minSelections ?? 0) + (chance(0.3) ? 1 : 0) > 0
           ? [{ groupId, optionIds: [option.id] }]
@@ -392,7 +479,15 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
         modifiers,
       };
     });
-  };
+  const lines = (channel: SalesChannel): OrderLineRequest[] => pickLines(sellable(channel), groups);
+  /** What diners pick on their QR page: from the menu it shows, which may be a little old. */
+  const qrLines = (menu: QrMenuDocument): OrderLineRequest[] =>
+    pickLines(
+      menu.menu.items.filter(
+        (item) => item.available && !item.archived && item.channels.includes('QR'),
+      ),
+      new Map(menu.menu.modifierGroups.map((group) => [group.id, group])),
+    );
 
   /**
    * Sends an order as the app does: again with the same key now and then (the outbox after a
@@ -499,6 +594,8 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
       state.rounds = 0;
       state.unserved = 0;
       count('tables seated');
+      // At a table without a tablet, a diner opens the QR page; the waiter takes the first order.
+      if (state.table.tablet === null) await openPage(state);
       await round(state);
     } finally {
       state.busy = false;
@@ -509,6 +606,140 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
     [...tables.values()].filter(
       (state) => state.sessionId !== null && !state.busy && !state.billing && filter(state),
     );
+
+  // ------------------------------------------------------------ QR pages (P8-01b)
+  /** When a page shows each change it was open for (NFR-P05). */
+  const pageSaw = (page: QrPage, at: number) => {
+    const menu = page.menu;
+    if (menu === undefined) return;
+    for (const change of changes) {
+      if (change.pages.has(page) && change.pages.get(page) === undefined) {
+        if (inStepWith(menu, change, changes, at)) change.pages.set(page, at);
+      }
+    }
+  };
+
+  const openPage = async (state: TableState) => {
+    if (qr === undefined) return;
+    const page = new QrPage(state.table.id, {
+      url: qr.relay.dinersUrl,
+      token: qr.tokens[state.table.id] ?? '',
+      refreshMs: qr.refreshMs,
+      metrics,
+    });
+    page.onMenu(pageSaw);
+    qrPages.set(state.table.id, page);
+    // Pages opened at different times ask for the menu at different moments.
+    await page.open(random() * qr.refreshMs);
+    count('QR pages opened');
+  };
+
+  /** The diners leave: their page closes, and what it had not shown yet is not counted. */
+  const closePage = (state: TableState) => {
+    const page = qrPages.get(state.table.id);
+    if (page === undefined) return;
+    page.close();
+    qrPages.delete(state.table.id);
+    for (const change of changes) {
+      if (change.pages.has(page) && change.pages.get(page) === undefined) {
+        change.pages.delete(page);
+      }
+    }
+  };
+
+  /** The page follows the order as the QR site does: until it is settled or the diners leave. */
+  const follow = async (
+    page: QrPage,
+    state: TableState,
+    sessionId: string,
+    relayOrderId: string,
+    sent: QrSent,
+  ) => {
+    while (!page.closed && !quiet) {
+      const order = await page.order(relayOrderId).catch(() => undefined);
+      if (order !== undefined) {
+        if (order.status !== 'SUBMITTED' && sent.seenReceivedAt === undefined) {
+          sent.seenReceivedAt = performance.now();
+          if (sent.measured) qrSamples.dinerSees.add(sent.seenReceivedAt - sent.startedAt);
+        }
+        if (qrOrderSettled(order)) {
+          if (order.status !== 'SENT_TO_KITCHEN') {
+            // Never made (a dish ran out on the way, say): nothing to wait for or serve.
+            count(`QR orders not made (${order.status})`);
+            const queue = qrOnTheWay.get(sessionId);
+            if (sent.receivedAt === undefined && queue?.includes(sent) === true) {
+              queue.splice(queue.indexOf(sent), 1);
+              state.qrInFlight = false;
+            }
+            state.unserved = Math.max(0, state.unserved - sent.lines.length);
+          }
+          return;
+        }
+      }
+      await sleep(QR_ORDER_POLL_MS);
+    }
+  };
+
+  /**
+   * Diners order on their QR page (QR-006): the relay keeps the order until the server picks it
+   * up, rung by Realtime (P5-03d); the waiter approves it as a tablet's. A dish that ran out is
+   * refused by the relay; the page reloads the menu and the diners send the rest.
+   */
+  const qrOrder = async (state: TableState) => {
+    const page = qrPages.get(state.table.id);
+    const sessionId = state.sessionId;
+    const menu = page?.menu;
+    if (page === undefined || sessionId === null || menu === undefined) return;
+    state.qrInFlight = true;
+    let remaining = qrLines(menu);
+    for (let attempt = 0; attempt < 3 && remaining.length > 0; attempt += 1) {
+      const idempotencyKey = randomUUID();
+      const sent: QrSent = {
+        tableId: state.table.id,
+        lines: remaining,
+        startedAt: performance.now(),
+        measured: measuring(),
+        receivedAt: undefined,
+        seenReceivedAt: undefined,
+      };
+      // On its way before it is sent: the server may have it before the phone has the answer.
+      const queue = qrOnTheWay.get(sessionId) ?? [];
+      qrOnTheWay.set(sessionId, queue);
+      queue.push(sent);
+      const drop = () => {
+        if (queue.includes(sent)) queue.splice(queue.indexOf(sent), 1);
+      };
+      let answer: QrSubmitOrderResponse;
+      try {
+        answer = await page.submit({ idempotencyKey, lines: remaining });
+      } catch (error) {
+        drop();
+        state.qrInFlight = false;
+        throw error;
+      }
+      if (answer.status === 'REJECTED') {
+        drop();
+        count('QR lines refused (dish just ran out)', answer.rejectedLines.length);
+        const refused = new Set(answer.rejectedLines.map((line) => line.clientLineId));
+        remaining = remaining.filter((line) => !refused.has(line.clientLineId));
+        await page.refresh();
+        continue;
+      }
+      if (chance(shape.retryShare)) {
+        count('orders sent twice');
+        const again = await page.submit({ idempotencyKey, lines: remaining });
+        if (again.status !== 'ACCEPTED' || !again.replayed || again.order.id !== answer.order.id) {
+          retriesNotReplayed += 1;
+        }
+      }
+      state.rounds += 1;
+      state.unserved += remaining.length;
+      count('orders from QR pages');
+      void follow(page, state, sessionId, answer.order.id, sent);
+      return;
+    }
+    state.qrInFlight = false;
+  };
 
   const tabletOrder = async (state: TableState) => {
     const tablet = tabletOf(state.table);
@@ -590,9 +821,9 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
   };
 
   const billTable = async () => {
-    const ready = seated((state) => state.rounds > 0 && state.unserved === 0).sort(
-      (a, b) => a.seatedAt - b.seatedAt,
-    )[0];
+    const ready = seated(
+      (state) => state.rounds > 0 && state.unserved === 0 && !state.qrInFlight,
+    ).sort((a, b) => a.seatedAt - b.seatedAt)[0];
     if (ready === undefined) {
       count('bills not yet due (every table still eating)');
       return;
@@ -608,6 +839,7 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
       await settle(till, { tableSessionId: sessionId });
       ready.sessionId = null;
       ready.openRequests.clear();
+      closePage(ready);
     } finally {
       ready.billing = false;
     }
@@ -649,6 +881,12 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
       startedAt: performance.now(),
       receipts: new Map(),
       measured: measuring(),
+      pages: new Map(
+        [...qrPages.values()]
+          .filter((page) => page.menu !== undefined)
+          .map((page): [QrPage, number | undefined] => [page, undefined]),
+      ),
+      relayAt: undefined,
     });
     await manager.call('setItemAvailability', () =>
       manager.api.setItemAvailability({
@@ -908,6 +1146,34 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
   timers.push(sampler);
   const loop = monitorEventLoopDelay({ resolution: 10 });
 
+  // ------------------------------------------------------------ the QR relay
+  // One phone keeps the QR menu open and asks every 250 ms: when the relay itself has each change.
+  const firstQrTable = restaurant.tables.find((table) => table.tablet === null);
+  const watcher =
+    qr === undefined || firstQrTable === undefined
+      ? undefined
+      : new QrPage(firstQrTable.id, {
+          url: qr.relay.dinersUrl,
+          token: qr.tokens[firstQrTable.id] ?? '',
+          refreshMs: 250,
+          // Its calls are not the diners' and stay out of the figures; its failures do not.
+          metrics: { http: new SampleSets(), errors: metrics.errors },
+        });
+  if (qr !== undefined && watcher !== undefined) {
+    log('Waiting for the server to be in step with the QR relay');
+    await qrReady(qr.relay, 120_000);
+    watcher.onMenu((page, at) => {
+      const menu = page.menu;
+      if (menu === undefined) return;
+      for (const change of changes) {
+        if (change.relayAt === undefined && inStepWith(menu, change, changes, at)) {
+          change.relayAt = at;
+        }
+      }
+    });
+    await watcher.open(250);
+  }
+
   // ------------------------------------------------------------ warm-up
   phase = 'WARM_UP';
   const inFlight = new Set<Promise<unknown>>();
@@ -946,8 +1212,18 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
   const measuredMinutes = (performance.now() - rushStart) / 60_000;
   log('Draining');
   await Promise.race([Promise.all([...inFlight]), sleep(120_000)]);
-  // What was sent last reaches its screens and printers.
-  await sleep(5_000);
+  // What was sent last reaches its screens and printers, and every open QR page asks for the
+  // menu once more.
+  const pagesBehind = () =>
+    changes.some(
+      (change) =>
+        change.measured && [...change.pages.values()].some((seenAt) => seenAt === undefined),
+    );
+  const printedBy = performance.now() + 5_000;
+  const pagesBy = printedBy + (qr?.refreshMs ?? 0);
+  while (performance.now() < printedBy || (pagesBehind() && performance.now() < pagesBy)) {
+    await sleep(250);
+  }
 
   function dispatch(arrival: Arrival): Promise<unknown> {
     switch (arrival.kind) {
@@ -958,6 +1234,15 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
       case 'TABLET_ORDER': {
         const state = pick(seated((candidate) => candidate.table.tablet !== null));
         return state === undefined ? takeaway() : tabletOrder(state);
+      }
+      case 'QR_ORDER': {
+        const state = pick(
+          seated((candidate) => qrPages.has(candidate.table.id) && !candidate.qrInFlight),
+        );
+        if (state !== undefined) return qrOrder(state);
+        // No QR page free (or no relay in this run): another round from a waiter instead.
+        const other = pick(seated());
+        return other === undefined ? takeaway() : round(other);
       }
       case 'NEW_PARTY': {
         const free = [...tables.values()].filter(
@@ -992,6 +1277,9 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
   // ------------------------------------------------------------ the restart
   quiet = true;
   phase = 'QUIET';
+  const quietAt = performance.now();
+  for (const page of qrPages.values()) page.close();
+  watcher?.close();
   const errorsBefore = Object.fromEntries(metrics.errors);
   let restart: RushResult['restart'] = null;
   const reconnection = new Samples();
@@ -1095,23 +1383,39 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
       ?.jobs.find((entry) => entry.invoiceNumber === bill.invoiceNumber);
     if (bill.measured && job !== undefined) samples.billPrinted.add(job.at - bill.startedAt);
   }
+  // NFR-P05: each open page, each change; a page still behind at the end counts until then.
+  const p05 = new Samples();
+  const atRelay = new Samples();
+  let pagesMissed = 0;
+  for (const change of changes) {
+    if (!change.measured) continue;
+    if (change.relayAt !== undefined) atRelay.add(change.relayAt - change.startedAt);
+    for (const seenAt of change.pages.values()) {
+      if (seenAt === undefined) pagesMissed += 1;
+      p05.add((seenAt ?? quietAt) - change.startedAt);
+    }
+  }
   const figures: Record<TargetId, Samples> = {
     'NFR-P01': p01,
     'NFR-P02': p02,
     'NFR-P03': p03,
     'NFR-P04': p04,
+    'NFR-P05': p05,
+    'NFR-P06': qrSamples.received,
     'NFR-P08': samples.billPrinted,
     'NFR-P09': samples.recommendations,
     'NFR-P10': samples.reports,
     'NFR-P11': reconnection,
   };
-  const targets = TARGETS.filter((entry) => entry.id !== 'NFR-P11' || options.restart).map(
-    (entry): TargetResult => {
-      const summary = figures[entry.id].summary();
-      const value = entry.statistic === 'max' ? summary.max : summary.p95;
-      return { ...entry, summary, met: value !== null && value <= entry.budgetMs };
-    },
-  );
+  const online = (id: TargetId) => id === 'NFR-P05' || id === 'NFR-P06';
+  const targets = TARGETS.filter(
+    (entry) =>
+      (entry.id !== 'NFR-P11' || options.restart) && (!online(entry.id) || qr !== undefined),
+  ).map((entry): TargetResult => {
+    const summary = figures[entry.id].summary();
+    const value = entry.statistic === 'max' ? summary.max : summary.p95;
+    return { ...entry, summary, met: value !== null && value <= entry.budgetMs };
+  });
 
   // ------------------------------------------------------------ the checks
   const checks = await checkRun({
@@ -1130,6 +1434,14 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
     retries: counts['orders sent twice'] ?? 0,
     retriesNotReplayed,
     errors: errorsBefore,
+    qr:
+      qr === undefined
+        ? undefined
+        : {
+            relay: qr.relay,
+            pagesMissed,
+            pagesChecked: p05.count,
+          },
   });
   count('alerts without a trigger found', unmatchedAlerts);
   count(
@@ -1165,12 +1477,27 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
             rssFirstMinuteMb: average(usage.slice(0, 12).map((entry) => entry.rss)) / 1_024,
             rssLastMinuteMb: average(usage.slice(-12).map((entry) => entry.rss)) / 1_024,
           },
-    breakdown: { 'NFR-P01: the ticket’s event at the kitchen screen': heard.summary() },
+    breakdown: {
+      'NFR-P01: the ticket’s event at the kitchen screen': heard.summary(),
+      ...(qr !== undefined && {
+        'NFR-P05: the change at the relay (a page opened then shows it)': atRelay.summary(),
+        'NFR-P06: the diner’s page says the restaurant has it (it asks every 3 s)':
+          qrSamples.dinerSees.summary(),
+      }),
+    },
     harness: {
       eventLoopP99Ms: loop.percentile(99) / 1e6,
       eventLoopMaxMs: loop.max / 1e6,
     },
     restart,
+    qr:
+      qr === undefined
+        ? null
+        : {
+            refreshMs: qr.refreshMs,
+            dinersOneWayMs: DINERS_ONE_WAY_MS,
+            restaurantOneWayMs: RESTAURANT_ONE_WAY_MS,
+          },
   };
 }
 
@@ -1194,6 +1521,14 @@ interface CheckInput {
   readonly retries: number;
   readonly retriesNotReplayed: number;
   readonly errors: Record<string, number>;
+  readonly qr:
+    | {
+        readonly relay: QrRelay;
+        /** Pages that never showed a change they were open for. */
+        readonly pagesMissed: number;
+        readonly pagesChecked: number;
+      }
+    | undefined;
 }
 
 /** S1's "zero lost or duplicate orders/KOTs", and that every print and alert arrived once. */
@@ -1339,6 +1674,47 @@ async function checkRun(input: CheckInput): Promise<CheckResult[]> {
         .map((device) => `${device.kind}: ${device.ended ?? ''}`),
       input.devices.length,
     );
+
+    if (input.qr !== undefined) {
+      // ORD-013 through the relay: each order a diner sent is made once, or refused with a reason.
+      const relayOrders = await input.qr.relay.relay.admin.query<{ id: string; status: string }>(
+        'SELECT id, status FROM relay.qr_orders WHERE tenant_id = $1',
+        [input.qr.relay.tenantId],
+      );
+      // Today's: the generated history has QR orders of its own, without a relay behind them.
+      const made = await client.query<{ external_ref: string | null; orders: string }>(
+        `SELECT external_ref, count(*) AS orders FROM orders
+         WHERE restaurant_id = $1 AND business_date = $2 AND source = 'QR'
+         GROUP BY external_ref`,
+        [restaurantId, businessDate],
+      );
+      const madeOf = new Map(
+        made.rows.map((row) => [row.external_ref ?? 'without a relay order', Number(row.orders)]),
+      );
+      const atRelay = new Set(relayOrders.rows.map((row) => row.id));
+      // Picked up and made once; an expired one never (QR-007); a refused one at most once.
+      const right = (status: string, times: number) =>
+        status === 'REJECTED' ? times <= 1 : times === (status === 'EXPIRED' ? 0 : 1);
+      add(
+        'Every QR order the relay took was made once by the server',
+        [
+          ...relayOrders.rows
+            .filter(
+              (row) => row.status === 'SUBMITTED' || !right(row.status, madeOf.get(row.id) ?? 0),
+            )
+            .map((row) => `${row.id} (${row.status}): ${String(madeOf.get(row.id) ?? 0)} made`),
+          ...[...madeOf.keys()].filter((id) => !atRelay.has(id)).map((id) => `${id} extra`),
+        ],
+        relayOrders.rows.length,
+      );
+      add(
+        'Every availability change reached every open QR page',
+        input.qr.pagesMissed === 0
+          ? []
+          : [`${String(input.qr.pagesMissed)} pages never showed one`],
+        input.qr.pagesChecked,
+      );
+    }
 
     add(
       'No request failed',
