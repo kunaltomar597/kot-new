@@ -14,7 +14,9 @@ can be updated. Never paste secrets, keys or passwords into a Claude session or 
       `gh auth login` (GitHub.com, HTTPS, "authenticate Git with your GitHub credentials").
       Steps: [`manual-tasks/01-github-access.md`](manual-tasks/01-github-access.md).
 - [x] `main` is the repository's default branch.
-- [ ] Protect `main` (require the CI check). Same file.
+- [ ] Protect `main` (pull requests, the CI checks), require 2FA for everyone with access, and
+      create the `release-signing` environment for the code-signing certificate (SEC-013). Same
+      file.
 
 ## 2. Accounts and keys (Business Owner)
 
@@ -24,12 +26,17 @@ code from going live:
 
 - [ ] Domain name + DNS (QR site, Control Plane, update server).
 - [ ] Cloud hosting in India + cloud KMS / secrets manager (Control Plane, licence-signing key).
-- [ ] Windows code-signing certificate (signed installer and updates). Put it into the repository's
-      Actions secrets as `WINDOWS_CERTIFICATE_P12` (the .p12 file in base64) and
+- [ ] Windows code-signing certificate (signed installer and updates). Put it into the secrets of
+      the GitHub environment `release-signing` (never the repository's own secrets, which every
+      branch can read) as `WINDOWS_CERTIFICATE_P12` (the .p12 file in base64) and
       `WINDOWS_CERTIFICATE_PASSWORD`, and its subject (`certutil -dump`, "Subject:") into the
-      repository variable `RP_UPDATE_PUBLISHER`; the CI job "Windows installer" then signs, and the
-      installed PCs accept only updates signed with it (`docs/runbooks/windows-installer.md`,
-      "Building it"; `docs/runbooks/software-updates.md`, "Signing").
+      repository variable `RP_UPDATE_PUBLISHER`; the CI job "Windows installer" then signs pushes
+      to `main`, and the installed PCs accept only updates signed with it
+      (`docs/runbooks/windows-installer.md`, "Building it"; `docs/runbooks/software-updates.md`,
+      "Signing"). Certificates issued since June 2023 keep their key in a hardware token or a
+      cloud HSM (SEC-006), so there may be no .p12 to export: tell Claude which signing service
+      the certificate comes with, and the job will call it from that environment instead:
+      [`manual-tasks/31-code-signing.md`](manual-tasks/31-code-signing.md).
 - [ ] Supabase organisation, Mumbai region (QR relay), then deploy the relay schema and give the
       edge functions their login: [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).
 - [ ] Host the QR menu site (Next.js, India region) on its domain:
@@ -93,6 +100,8 @@ any of them by telling Claude.
 - [ ] OI-08 grace period and subscription terms (today: 7 days); OI-10 backup key escrow (today:
       escrowed in the KMS, released by a one-time restore code Support issues after verifying the
       Owner by video call with ID and a call back; the Owner is alerted; see manual task 27).
+      Should a second vendor person approve each release of a key (threat model CP-I1)? Today
+      Support alone can.
 - [ ] Pricing and plans.
 
 ## 5. Legal, compliance and pilot

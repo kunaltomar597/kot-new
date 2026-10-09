@@ -36,6 +36,8 @@ describe('[SEC-015] log redaction', () => {
       expect(paths).toContain(`*.*.${key}`);
     }
     expect(paths).toContain('req.headers.authorization');
+    expect(paths).toContain('req.headers["x-device-token"]');
+    expect(paths).toContain('req.headers["x-override-token"]');
   });
 });
 

@@ -230,6 +230,11 @@ describe('[SEC-015] [AUTH-002] logs', () => {
       pin: TEST_PINS.MANAGER,
       capability: 'BILL_EDIT_AFTER_PRINT',
     });
+    // The approval travels in a header, which the request log must not show either.
+    await server()
+      .post('/api/v1/probe-matrix/BILL_EDIT_AFTER_PRINT')
+      .set(as('CASHIER'))
+      .set('x-override-token', (grant.body as { overrideToken: string }).overrideToken);
     const logs = logLines.join('');
     expect(logs.length).toBeGreaterThan(1_000);
     const secrets = [

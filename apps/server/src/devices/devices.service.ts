@@ -458,7 +458,7 @@ export class DevicesService {
   /**
    * Unpairs a device (AUTH-008): its device token and every staff session on it stop working at
    * the next request, and a `DeviceRevoked` event tells the real-time gateway (P0-12) to close
-   * its connections.
+   * its connections, and the pager broker a pager's.
    */
   async revoke(principal: Principal, deviceId: string, reason: string): Promise<DeviceSummary> {
     if (deviceId === principal.deviceId) throw errors.ownDevice();
@@ -469,9 +469,19 @@ export class DevicesService {
       if (device === null) throw errors.notFound();
       if (device.status === 'REVOKED') return summary(device);
       const now = new Date();
+      // An unpaired pager is nobody's any more, so its wearer's alerts escalate at once when they
+      // have no other way to hear them (NTF-007); the broker drops its connection on the event,
+      // so it is offline from now on, and the offline check never alerts about it.
+      const pager = device.type === 'PAGER';
+      const releasesWearer = pager && device.staffId !== null;
       const revoked = await tx.device.update({
         where: { id: device.id },
-        data: { status: 'REVOKED', revokedAt: now },
+        data: {
+          status: 'REVOKED',
+          revokedAt: now,
+          ...(pager && { online: false }),
+          ...(releasesWearer && { staffId: null }),
+        },
       });
       const sessions = await tx.session.updateMany({
         where: { deviceId: device.id, revokedAt: null },
@@ -503,8 +513,12 @@ export class DevicesService {
         actorId: principal.staffId,
         deviceId: principal.deviceId,
         restaurantId: principal.restaurantId,
-        before: { status: device.status },
-        after: { status: 'REVOKED', sessionsRevoked: sessions.count },
+        before: { status: device.status, ...(releasesWearer && { staffId: device.staffId }) },
+        after: {
+          status: 'REVOKED',
+          sessionsRevoked: sessions.count,
+          ...(releasesWearer && { staffId: null }),
+        },
         reason,
       });
       await announceSetupChange(tx, principal.restaurantId, 'DEVICES', deviceAggregate(device.id));

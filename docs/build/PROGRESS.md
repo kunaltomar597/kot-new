@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03a).
+Last updated: 2026-10-10 (P8-03b1).
 
 What exists:
 
@@ -116,8 +116,11 @@ What exists:
   and the GST and source reports in one pass each (P8-01a); the same rush with diners ordering on
   QR pages through the relay behind simulated internet lines, measuring NFR-P05 and NFR-P06
   (P8-01b); device endpoints refusing the kinds of device they do not serve, sign-in only on staff
-  devices, no pairing code for a pager, and the authorisation sweep over every endpoint (P8-03a).
-  1199 tests (28 skipped: Windows only, a real install, or the performance runs).
+  devices, no pairing code for a pager, and the authorisation sweep over every endpoint (P8-03a);
+  payments, cash movements and day-ends that the server's own database role cannot change, an
+  unpaired pager cut off at once with its wearer released, no start in production without TLS,
+  and a manager's approval token kept out of the request log (P8-03b1).
+  1202 tests (28 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -281,8 +284,12 @@ What exists:
   ui-web 120 tests.
 - CI security baseline: secret scan, dependency audit, licence policy, SBOM, CodeQL, Dependabot,
   generated OpenAPI/AsyncAPI docs (P0-06, ADR-0010).
-- `docs/security/`: the security documents of P8-03, starting with `authorisation.md`, who may
-  call what on every surface and the tests that check it (P8-03a).
+- `docs/security/`: the security documents of P8-03: `authorisation.md`, who may call what on
+  every surface and the tests that check it (P8-03a); `threat-models/`, a STRIDE model of each of
+  the eight components with 195 threats, their code, their tests and a dated plan for each one
+  left open, checked on every build by `pnpm security:threats` (P8-03b1).
+- CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
+  every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
@@ -293,7 +300,10 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b STRIDE threat models; then P8-03c DAST, P8-03d the standards checklists, P8-03e the
+- P8-03b2, P8-03b3 and P8-03b4: the fixes the threat models planned, by their dates (the summary
+  in `docs/security/threat-models/README.md` lists each threat). P8-03b2 first: three of its
+  threats are residual Highs (PIN guessing, a tablet's PIN prompt, the pager broker's limits).
+- Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
   incident response plan and the pack for the penetration testers (the external test needs the
   firm the Business Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -516,7 +526,11 @@ Recommended next WPs (dependencies met):
 - [ ] P8-02 Failure drills [H]
 - [~] P8-03 Security hardening and pentest readiness
   - [x] P8-03a Authorisation sweep (local server and Control Plane)
-  - [ ] P8-03b STRIDE threat models
+  - [~] P8-03b STRIDE threat models
+    - [x] P8-03b1 The threat models of the eight components, their checks, the High finding fixed
+    - [ ] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
+    - [ ] P8-03b3 Threat-model fixes to the licence and the update pipeline
+    - [ ] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
   - [ ] P8-03c DAST of the QR site, relay and Control Plane
   - [ ] P8-03d Standards checklists, Electron review and MDM policy
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
@@ -765,6 +779,49 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b1):
+
+713. P8-03b is split into four (`phase-8.md`): P8-03b1 the threat models (this WP), and three parts
+     for the fixes they plan: P8-03b2 the restaurant PC (server, pager broker, data, waiter app),
+     P8-03b3 the licence and the update pipeline, P8-03b4 the Control Plane and the QR relay. Each
+     open threat names the part that fixes it and a date: P8-03b2 by 2026-10-13, P8-03b3 by
+     2026-10-15, P8-03b4 by 2026-10-17, P8-03c by 2026-10-19, P8-03d by 2026-10-22, P8-03e by
+     2026-10-24; P2-05 (the pager's firmware, [H]) by 2026-12-15 and the manual tasks by
+     2026-11-30 are targets that hardware and accounts decide, reviewed in P8-06.
+714. How a threat is rated and closed (`docs/security/threat-models/README.md`): the residual risk
+     after the mitigations as built, from likelihood and impact by the OWASP Risk Rating matrix
+     (Low × High is Medium, Medium × High is High, High × High is Critical). A residual High or
+     Critical always has a dated plan; a Medium or Low threat not mitigated has a plan or a written
+     reason to accept it. `pnpm security:threats` (in `pnpm check` and CI) checks every file,
+     function and test title a model names, and refuses a plan whose work package is already
+     ticked, so finishing one means updating its threats.
+715. Code signing in CI only for a push to `main`, in the GitHub environment `release-signing`,
+     which holds the certificate's secrets and is deployable from `main` only; every other build
+     is an unsigned test build that takes unsigned updates. Before, every pull request's build
+     received the certificate, and a pull request's code would have been signed as the vendor's
+     and installed by every PC (UPDATE-E2, the only High that could be fixed in a day). Manual task
+     1 now requires branch protection, two-factor sign-in and that environment; manual task 31
+     covers the certificate, whose key stays in an HSM (SEC-006).
+716. Payments, cash movements and day-ends are append-only for the server's database role
+     (`20261010100000_money_records_append_only`): no code changes them, and a correction is a new
+     record. Before, the server's login could change a payment's mode or amount without a trace.
+717. Unpairing a pager on the Devices page drops its MQTT session at once, marks it offline and
+     releases its wearer (audited before and after), so NTF-007 escalates at once for a waiter
+     left without a way to hear alerts, and the offline check (now for active pagers only) never
+     alerts about it. Before, the pager kept its session until it signed in again.
+718. In production the server refuses to start without TLS (`RP_TLS`), as it already refused other
+     unsafe settings; the installer always turns it on.
+719. The request log redacts `x-override-token`, a manager's single-use approval (SEC-015).
+720. Diners' phone numbers stay unencrypted in the PC's database (SEC-007 makes encrypting them a
+     Should): the database listens on the PC only behind logins in the DPAPI store, and BitLocker
+     (PC-I5, P8-03d) protects the disk. Erasure (DATA-011) reaching orders and bills is P8-03b2.
+721. ADR-0015 is corrected: relay tables have Row-Level Security enabled, not forced (the
+     definer-rights functions need to bypass it). ADR-0018 is corrected: the pager firmware token
+     works for its 15 minutes, so a pager can resume a cut download.
+722. Question for the Business Owner (MANUAL_TASKS.md, OI-10): should a second vendor person
+     approve each release of a restaurant's backup key? Built today: Support alone, after verifying
+     the Owner, who is alerted (CP-I1, accepted until answered).
 
 Decided 2026-10-10 (P8-03a):
 
@@ -3827,6 +3884,10 @@ Security-sensitive PRs for the P8-03 human review:
   (`firmware-image.ts`) and the trusted key list, the public firmware download with its one-time
   token, the pager's new `ota` topic in the broker's ACL, and the reports a pager may send about
   offers (only for versions offered to it, once).
+- P8-03b1 (merged locally): CI's code-signing gate and the `release-signing` environment, the
+  REVOKE of UPDATE on payments, cash movements and day-ends, the pager broker dropping an unpaired
+  pager, TLS required in production, the redaction of `x-override-token`, and the threat models
+  themselves (`docs/security/threat-models/`), which the human review should read first.
 - P8-03a (merged locally): the permission guard's device lists and `DEVICE_NOT_ALLOWED`,
   sessions only on staff devices (sign-in, refresh and `SessionService`), no pairing code for a
   pager, the Control Plane's development object-store routes and their grant schema, and the two
@@ -3838,6 +3899,79 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b1 STRIDE threat models
+
+Split P8-03b into P8-03b1 (this one) and three fix parts, P8-03b2 to P8-03b4 (`phase-8.md`,
+decision 713). Decisions 713 to 722.
+
+Built:
+
+- `docs/security/threat-models/`: a STRIDE model of each component SEC-000 and the spec name (the
+  LAN and the local server, the pager channel, the QR relay and site, the update pipeline, the
+  licence mechanism, the Control Plane, the desktop shell, the phones and tablets), each with its
+  scope, assets, entry points, trust boundaries, data flows and threats. 195 threats: 93
+  mitigated, 13 accepted with a reason, 89 with a dated plan; 11 residual Highs, all planned (PIN
+  guessing and a tablet's PIN prompt, a stolen PC without BitLocker, the PC's Windows
+  administrator, a rogue access point for pagers, flooding the pager broker, a compromised
+  dependency, unprotected `main`, holding the licence's clock back, patching the server's
+  JavaScript, a PC deleting its cloud backups). The index's summary lists every open threat by
+  date.
+- `infra/ci/check-threat-models.mjs` (`pnpm security:threats`, in `pnpm check` and the CI check
+  job) and its tests (`[SEC-000]`, `pnpm ci:test`): every file, function and test title a model
+  names exists; ratings follow the matrix; open threats have plans in open work packages or manual
+  tasks; the summary is current (`--write`).
+- `infra/ci/signing-policy.test.mjs` (`[SEC-013]`): the certificate only for a push to `main`.
+- `restore.int`'s check for databases a failed restore left behind looks at this test's two
+  databases only: across the shared cluster it caught another file's restore in progress, which
+  failed one full run.
+- Research: six read-only agents went through each component's code the way an attacker would;
+  every path and test title they gave was checked by the script, and each finding fixed here
+  started with a test that failed without the fix.
+
+Found and fixed (decisions 715 to 719): CI gave every pull request's build the code-signing
+certificate; the server's database role could change payments, cash movements and day-ends; an
+unpaired pager kept its MQTT session and its wearer; production started without TLS; the request
+log wrote a manager's approval token. ADR-0015 and ADR-0018 corrected (decision 721). Manual task 1
+now requires branch protection, two-factor sign-in and the `release-signing` environment; manual
+task 31 added (the code-signing certificate in an HSM).
+
+Found and planned (the models say where and by when), the most serious first:
+
+- P8-03b2: a manager's approval can be used on another record (voids, reopening an invoice);
+  bodies up to 55 MB parsed before authentication; PIN lockouts per person only, so guesses spread
+  over the staff and a diner at a tablet can lock managers out; weak PINs; the pager broker has no
+  packet or connection limits and a manager's pager can acknowledge any alert; erasure misses
+  orders and bills; the data export's CSV has no formula neutralising; the workbook's ZIP limit
+  trusts its directory; the waiter phone's pager card keeps its session from ever timing out.
+- P8-03b3: the licence's clock guard freezes judged time instead of advancing it; a failed
+  fingerprint read counts as another PC; a signed build can ship without vendor keys; Actions
+  pinned by tag.
+- P8-03b4: the Control Plane trusts the backup date a PC sends (a compromised PC can make
+  retention delete its real backups); diagnostics never deleted; no RLS and no ADR for it; the
+  relay's per-table order limit counts rejected orders; the functions' login holds the
+  provisioning role.
+
+Tests: server 1202 (+3, 28 skipped), `pnpm ci:test` 15 (+11). Traceability: Must 264/287 (SEC-000
+covered).
+
+Not done or not verified:
+
+- The fix parts P8-03b2 to P8-03b4, and the threats planned for P8-03c to P8-03e, P2-05 and the
+  manual tasks.
+- The `environment:` expression in `ci.yml` (empty for anything but a push to `main`) runs only
+  on GitHub: check on the first push that pull requests still run the Windows installer job
+  without the environment, and that a push to `main` waits for it.
+
+Gotchas:
+
+- A model's evidence is checked literally: renaming a test or a function a model names fails
+  `pnpm security:threats` until the model follows. Quote a title's literal part when it is built
+  from `%s` or a template.
+- A plan that names a work package stops the build once that package is ticked: finishing P8-03b2
+  means turning each of its threats into `Mitigated` with its code and tests (or a new plan).
+- Write the description of a threat directly under its heading, then the five fields;
+  `pnpm security:threats --write` rewrites only the summary.
 
 ### 2026-10-10: P8-03a Authorisation sweep (local server and Control Plane)
 

@@ -176,12 +176,31 @@ describe('[SEC-005] [INT-005] schema conventions', () => {
 });
 
 describe('[AUD-004] [SEC-007] least-privilege database roles', () => {
-  it('gives rp_app SELECT, INSERT and UPDATE on every table', async () => {
+  it('gives rp_app SELECT and INSERT on every table', async () => {
     const rows = await query<{ tablename: string; ok: boolean }>(`
       SELECT tablename,
         has_table_privilege('rp_app', format('%I.%I', schemaname, tablename), 'SELECT, INSERT') AS ok
       FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`);
     expect(rows.filter((row) => !row.ok)).toEqual([]);
+  });
+
+  it('never lets rp_app change a payment, a cash movement or a closed day', async () => {
+    const rows = await query<{ tablename: string }>(`
+      SELECT tablename FROM pg_tables
+      WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'
+        AND NOT has_table_privilege('rp_app', format('%I.%I', schemaname, tablename), 'UPDATE')`);
+    expect(rows.map((row) => row.tablename).sort()).toEqual(
+      ['audit_log', 'cash_movements', 'day_ends', 'payments'].sort(),
+    );
+    await asRole('rp_app', async (client) => {
+      for (const statement of [
+        'UPDATE payments SET mode = mode',
+        'UPDATE cash_movements SET amount = amount',
+        'UPDATE day_ends SET restaurant_id = restaurant_id',
+      ]) {
+        await expect(client.query(statement)).rejects.toThrow(/permission denied/);
+      }
+    });
   });
 
   it('never lets rp_app DELETE financial or audit records', async () => {

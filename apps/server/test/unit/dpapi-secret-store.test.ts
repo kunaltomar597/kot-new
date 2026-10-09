@@ -151,8 +151,10 @@ describe('[SEC-006] the DPAPI secret store', () => {
     expect(loadConfig(base).secretStore).toBe('file');
     expect(() => loadConfig({ ...base, NODE_ENV: 'production' }, 'win32')).toThrow(/dpapi/);
     expect(
-      loadConfig({ ...base, NODE_ENV: 'production', RP_SECRET_STORE: 'dpapi' }, 'win32')
-        .secretStore,
+      loadConfig(
+        { ...base, NODE_ENV: 'production', RP_SECRET_STORE: 'dpapi', RP_TLS: 'on' },
+        'win32',
+      ).secretStore,
     ).toBe('dpapi');
     expect(() => loadConfig({ ...base, RP_SECRET_STORE: 'dpapi' }, 'linux')).toThrow(/Windows/);
     expect(() => loadConfig({ ...base, RP_SECRET_STORE: 'vault' })).toThrow(/secretStore/);

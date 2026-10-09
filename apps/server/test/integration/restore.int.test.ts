@@ -210,8 +210,13 @@ describe('[DATA-004] restore onto a new PC', () => {
     await expect(
       restoreBackup({ ...base, databaseUrl: original.url, file: backupFile, key: backupKey }),
     ).rejects.toBeInstanceOf(RestoreError);
+    // Only this test's databases: other files restore in the same cluster at the same time.
+    const restoring = [fresh.url, original.url].map(
+      (url) => `${new URL(url).pathname.slice(1).slice(0, 63 - '_restoring'.length)}_restoring`,
+    );
     const left = await query<{ datname: string }>(
-      "SELECT datname FROM pg_database WHERE datname LIKE '%\\_restoring'",
+      'SELECT datname FROM pg_database WHERE datname = ANY($1)',
+      [restoring],
     );
     expect(left).toEqual([]);
     expect(existsSync(join(newData, 'photos'))).toBe(false);

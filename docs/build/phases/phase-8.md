@@ -104,21 +104,67 @@ mechanism, the Control Plane, the desktop shell, the phones and tablets), each t
 mitigation and the code or test that shows it, and the gaps found, fixed or given to a WP.
 Acceptance: every component covered; no unmitigated High threat without a fix or a dated plan.
 
+Split (2026-10-10), because the models found more to fix than one pull request should hold. Each
+model's threats name the part that fixes them (`Plan: P8-03b2 by <date>`), and
+`pnpm security:threats` refuses a plan whose work package is done, so finishing one means updating
+those threats:
+
+- **P8-03b1 The threat models (done).** The eight models and their index in
+  `docs/security/threat-models/`, `pnpm security:threats` (`infra/ci/check-threat-models.mjs`)
+  checking every model's evidence on every build, the High finding fixed (the code-signing
+  certificate within reach of pull-request builds) and the smallest findings fixed on the way.
+  As built (2026-10-10):
+  - 195 threats over the eight components, each with its code and the titles of its tests: 93
+    mitigated, 13 accepted with a reason, 89 with a dated plan (P8-03b2 18, P8-03b3 9, P8-03b4 13,
+    P8-03c 7, P8-03d 26, P8-03e 3, P2-05 4, manual tasks 1, 20, 21, 23, 29, 30 and 31). Eleven
+    residual Highs, each planned; no Critical.
+  - The checks: every file, function and test title named exists; ratings follow the OWASP matrix
+    of likelihood and impact; a residual High or Critical has a plan; an open threat has a plan or
+    a reason; a plan names an open work package or a manual task; the index's summary is current.
+    In `pnpm check` and the CI job; its tests (`[SEC-000]`) in `pnpm ci:test`.
+  - Fixed: CI signed every pull request's installer (now pushes to `main` only, in the
+    `release-signing` environment; `infra/ci/signing-policy.test.mjs`); the server's database role
+    could UPDATE payments, cash movements and day-ends; an unpaired pager kept its MQTT session and
+    its wearer; production started without TLS; the request log wrote the `x-override-token`
+    header. ADR-0015 ("RLS forced") and ADR-0018 ("one-time token") corrected; manual task 1
+    makes branch protection and two-factor sign-in required; manual task 31 (the code-signing
+    certificate in an HSM) added.
+- **P8-03b2 Fixes on the restaurant PC.** The threats planned for P8-03b2 in the models of the
+  LAN and the local server, the pager channel and the phones and tablets: approvals bound to their
+  record, large bodies only from paired devices, PIN failures per device and weak PINs, erasure of
+  diners' numbers on orders and bills, formulas in the data export, the workbook's inflate limit,
+  the broker's limits and acknowledgements, and the waiter phone's inactivity sign-out.
+- **P8-03b3 Fixes to the licence and the update pipeline.** The threats planned for P8-03b3: the
+  clock guard, fingerprint reads, licence replay, reactivation reports, tamper alerts, builds
+  without vendor keys, the updater's version check and pinned CI actions.
+- **P8-03b4 Fixes in the Control Plane and the QR relay.** The threats planned for P8-03b4: backup
+  dates and retention, diagnostics retention, vendor sign-in races, tenant isolation (an ADR and a
+  cross-tenant test), https for every service, bill links in logs, the relay's service-request and
+  order limits, body limits, the provisioning role and the photo bucket.
+
+Acceptance of each fix part: no threat planned for it is left open; `pnpm security:threats` passes.
+
 ### P8-03c DAST of the QR site, relay and Control Plane
 
 Requirements: SEC-017, SEC-001, SEC-004.
 Deliverables: OWASP ZAP scans (baseline and API scan from the OpenAPI documents) of the QR site,
 the relay functions, the Control Plane and the local server's HTTPS, runnable locally and in CI;
-security headers; fixes for the findings; results in `docs/security/dast.md`.
-Acceptance: no open High finding; the rest triaged.
+security headers; fixes for the findings; results in `docs/security/dast.md`. Also every threat
+whose plan names P8-03c in `docs/security/threat-models/` (the summary in its README lists them).
+Acceptance: no open High finding; the rest triaged; no threat left planned for P8-03c.
 
 ### P8-03d Standards checklists, Electron review and MDM policy
 
 Requirements: BRD §8.1 (OWASP ASVS L2, OWASP Top 10 and API Top 10, MASVS-L1 with resilience for
 the kiosk tablet, ETSI EN 303 645, CIS for the Windows host), SEC-010, SEC-011.
 Deliverables: each checklist with every control's status and its evidence link; the Electron
-hardening review; the MDM policy document for phones and tablets.
-Acceptance: every control met, not applicable with a reason, or a finding with a plan.
+hardening review; the MDM policy document for phones and tablets. Also every threat whose plan
+names P8-03d in `docs/security/threat-models/` (26 at P8-03b: the PC's administrator account and
+BitLocker, the database's service account, the CA's name constraints, the Electron shell's
+developer tools, debugging switches and device permissions, the kiosk's restrictions, the phones'
+backups and screen capture, build provenance, LIC-007's integrity checks).
+Acceptance: every control met, not applicable with a reason, or a finding with a plan; no threat
+left planned for P8-03d.
 
 ### P8-03e Incident response plan and penetration-test support
 
@@ -128,6 +174,8 @@ DPDP breach notifications, templates for restaurants, the annual tabletop exerci
 the testing firm (scope, rules of engagement, test environment and accounts, what to send back).
 People needed: the Business Owner names the CERT-In point of contact and engages the firm; the
 external test and fixing its findings follow it [H].
+Also every threat whose plan names P8-03e in `docs/security/threat-models/` (a stolen relay
+credential, fake QR stickers, ransomware), and the threat models in the testers' pack.
 Acceptance: plan reviewed by the Business Owner; the firm can start from the pack.
 
 ## P8-04 UX polish and accessibility audit

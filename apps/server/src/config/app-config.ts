@@ -308,6 +308,11 @@ export function loadConfig(
     if (config.pagerFirmwareKeys.length > 0) {
       throw new ConfigError('In production only the firmware keys built into the software count');
     }
+    // SEC-001: staff devices and pagers reach this PC over TLS only (HTTPS, WSS and MQTTS). The
+    // installer always turns it on; a server configured by hand must too (P8-03b).
+    if (!config.tls) {
+      throw new ConfigError('In production RP_TLS must be on: devices connect over TLS only');
+    }
     return Object.freeze({ ...config, licenceEnforce: true });
   }
   return Object.freeze(config);

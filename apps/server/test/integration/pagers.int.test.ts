@@ -457,3 +457,41 @@ describe('[PGR-012] [PGR-014] re-assignment', () => {
     expect(await changesAnnounced(pagerB.deviceId)).toBe(announced + 1);
   });
 });
+
+describe('[AUTH-008] [SEC-012] [NTF-007] unpairing a pager', () => {
+  it('ends its connection at once and frees its wearer', async () => {
+    const credential = await register('WP-0009', kit.staff.OWNER);
+    const pager = await connect(credential);
+    const broker = app.get(PagerBroker);
+    expect(broker.isStaffConnected(kit.restaurantId, kit.staff.OWNER)).toBe(true);
+    const closed = new Promise<void>((resolve) => {
+      pager.client.once('close', () => {
+        resolve();
+      });
+    });
+    const response = await server()
+      .post(`/api/v1/devices/${credential.deviceId}/revoke`)
+      .set(as(manager))
+      .send({ reason: 'Lost on the floor' });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    // Found by the threat model (P8-03b): the pager kept its session until it signed in again.
+    await closed;
+    expect(broker.isStaffConnected(kit.restaurantId, kit.staff.OWNER)).toBe(false);
+    const stored = await prisma.device.findUniqueOrThrow({ where: { id: credential.deviceId } });
+    expect(stored.staffId).toBeNull();
+    // Offline from now on, so the offline check never alerts about a pager nobody uses.
+    expect(stored.online).toBe(false);
+    const statusEvents = () =>
+      prisma.outboxEvent.count({
+        where: { eventType: 'DeviceStatusChanged', aggregateId: credential.deviceId },
+      });
+    const announced = await statusEvents();
+    await broker.checkOffline(new Date(now.getTime() + 3_600_000));
+    expect(await statusEvents()).toBe(announced);
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'DEVICE_REVOKED', entityId: credential.deviceId },
+    });
+    expect(audit.before).toMatchObject({ staffId: kit.staff.OWNER });
+    await expect(connect(credential)).rejects.toThrow();
+  });
+});

@@ -60,8 +60,10 @@ Realtime already use.
 - Edge functions set it with `set_config(..., true)` in the same transaction as `SET LOCAL ROLE`.
 - Every policy compares rows with `relay.claim_tenant()` and `relay.claim_table()`. An absent or
   malformed claim matches nothing.
-- Every policy names its role (`TO relay_writer`, ...). Tables have RLS enabled and forced, so even
-  the owner's ad-hoc queries are filtered unless they explicitly bypass it.
+- Every policy names its role (`TO relay_writer`, ...). Tables have RLS enabled, not forced: the
+  schema's owner and its definer-rights functions (`resolve_table_token`, `rate_limit_wait`,
+  `purge`) bypass it by design, and no relay role owns a table. (Corrected in P8-03b; this ADR
+  said "enabled and forced" before, which no migration did.)
 
 ### Secrets are stored as hashes
 
