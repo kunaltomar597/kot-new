@@ -1,4 +1,5 @@
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import type { INestApplication } from '@nestjs/common';
 import { ApiError, LicenceView, type LoginResponse } from '@rp/contracts';
 import type { HeartbeatResponse, LicencePayload } from '@rp/contracts/control-plane';
@@ -8,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { saveEnrolment } from '../../src/cloud/control-plane-state.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { LicenceAgentService } from '../../src/licensing/licence-agent.service.js';
-import { FINGERPRINT_READER } from '../../src/licensing/pc-fingerprint.js';
+import { FINGERPRINT_READER, type Identifiers } from '../../src/licensing/pc-fingerprint.js';
 import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
@@ -37,6 +38,16 @@ const IDENTIFIERS = {
   CPU_ID: 'c-1',
 };
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+/** What the PC's fingerprint reader gives; a test changes it. */
+const reader = {
+  identifiers: IDENTIFIERS as Identifiers,
+  reads: 0,
+  read(): Promise<Identifiers> {
+    this.reads += 1;
+    return Promise.resolve(this.identifiers);
+  },
+};
 
 function licence(overrides: Partial<LicencePayload> = {}) {
   const issuedAt = new Date();
@@ -89,9 +100,7 @@ beforeAll(async () => {
   app = await createTestApp({
     databaseUrl: database.url,
     config: { licenceEnforce: true, licenceKeys: [VENDOR_KEY] },
-    overrides: [
-      { provide: FINGERPRINT_READER, useValue: { read: () => Promise.resolve(IDENTIFIERS) } },
-    ],
+    overrides: [{ provide: FINGERPRINT_READER, useValue: reader }],
   });
   prisma = app.get(PrismaService);
   agent = app.get(LicenceAgentService);
@@ -339,7 +348,7 @@ describe('[LIC-003] [LIC-005] the licence on this PC', () => {
     let report = await agent.heartbeatReport();
     expect(report.tamper?.map((event) => event.kind)).toContain('CLOCK_ROLLBACK');
     // Delivered: no longer reported.
-    await agent.accept(answer(), report.tamper ?? []);
+    await agent.accept(answer(), report);
     report = await agent.heartbeatReport();
     expect(report.tamper ?? []).toEqual([]);
 
@@ -372,5 +381,133 @@ describe('[LIC-003] [LIC-005] the licence on this PC', () => {
       )
       .catch((error: unknown) => error);
     expect(reused).toMatchObject({ code: 'REACTIVATION_CODE_USED' });
+  });
+});
+
+describe('[LIC-007] [LIC-004] [LIC-006] tampering offline (P8-03b3a)', () => {
+  /** The server's running time, moved on by the tests (the agent's monotonic clock). */
+  let running = 0;
+  const principal = () => ({
+    staffId: kit.staff.OWNER,
+    role: 'OWNER' as const,
+    restaurantId: kit.restaurantId,
+    deviceId: kit.deviceId,
+    sessionId: owner.session.id,
+    secondFactorAt: new Date(),
+    capabilities: [],
+  });
+  const idOf = (file: { payload: string }) =>
+    (JSON.parse(file.payload) as LicencePayload).licenceId;
+
+  beforeAll(() => {
+    running = performance.now();
+    agent.monotonicMs = () => running;
+  });
+
+  it('never takes a licence older than the newest it kept, and counts one put back as tampered', async () => {
+    const newer = licence({ issuedAt: new Date(Date.now() + DAY_MS).toISOString() });
+    const older = licence({ validUntil: new Date(Date.now() + 60 * DAY_MS).toISOString() });
+    await agent.accept(answer({ licence: newer }));
+    await agent.accept(answer({ licence: older }));
+    expect((await agent.heartbeatReport()).licence?.licenceId).toBe(idOf(newer));
+
+    // Offline, someone puts the older file back in the database: validly signed, but tampered.
+    await prisma.systemMeta.update({
+      where: { key: 'licence.file' },
+      data: { value: JSON.stringify(older) },
+    });
+    await agent.refresh();
+    expect(await view(owner)).toMatchObject({ recorded: 'RESTRICTED', problem: 'TAMPERED' });
+    const report = await agent.heartbeatReport();
+    // It names the file it holds: not the newest, so online the Control Plane sends that again.
+    expect(report.licence?.licenceId).toBe(idOf(older));
+    expect(report.tamper?.map((event) => event.kind)).toContain('LICENCE_TAMPERED');
+    await agent.accept(answer(), report);
+  });
+
+  it('lets a licence run out offline with the clock held back, by the time the server runs', async () => {
+    // The vendor's newest licence, issued 20 days ahead of this PC's clock, valid for a day.
+    const issuedAt = Date.now() + 20 * DAY_MS;
+    await agent.accept(
+      answer({
+        licence: licence({
+          issuedAt: new Date(issuedAt).toISOString(),
+          validUntil: new Date(issuedAt + DAY_MS).toISOString(),
+        }),
+      }),
+    );
+    expect(await view(owner)).toMatchObject({ state: 'ACTIVE', problem: null });
+    // Never judged behind the issue time: the clock, 20 days behind, is reported as held back.
+    expect((await agent.heartbeatReport()).tamper?.map((event) => event.kind)).toContain(
+      'CLOCK_ROLLBACK',
+    );
+
+    // The clock stays where it is; the server runs on, six hours at a time.
+    let hours = 0;
+    let state = (await view(owner)).state;
+    while (state !== 'RESTRICTED' && hours < 72) {
+      running += 6 * HOUR_MS;
+      hours += 6;
+      await agent.refresh(new Date());
+      state = (await view(owner)).state;
+    }
+    expect(await view(owner)).toMatchObject({ state: 'RESTRICTED', problem: 'EXPIRED' });
+    // Run out after the day it was valid, restricted from the next business day after that.
+    expect(hours).toBeGreaterThan(24);
+    expect(hours).toBeLessThanOrEqual(54);
+  });
+
+  it('judges no PC by a fingerprint read that said too little, and reads it again soon', async () => {
+    const before = reader.reads;
+    // Hours later the fingerprint is read again, and WMI gives only two identifiers.
+    reader.identifiers = { MACHINE_ID: 'm-1', CPU_ID: 'c-1' };
+    running += 7 * HOUR_MS;
+    await agent.refresh(new Date());
+    expect(reader.reads).toBe(before + 1);
+    // Not taken for another PC: the last read that said something stays in use.
+    expect((await view(owner)).problem).toBe('EXPIRED');
+    expect((await agent.heartbeatReport()).licence?.fingerprint).toEqual(
+      fingerprintOf(INSTALLATION, IDENTIFIERS),
+    );
+    // Tried again five minutes later, not every minute.
+    running += 60_000;
+    await agent.refresh(new Date());
+    expect(reader.reads).toBe(before + 1);
+    // Three identifiers read, none of them this PC's: another PC.
+    reader.identifiers = { MACHINE_ID: 'm-9', BOARD_SERIAL: 'b-9', BIOS_UUID: 'u-9' };
+    running += 5 * 60_000;
+    await agent.refresh(new Date());
+    expect(reader.reads).toBe(before + 2);
+    expect((await view(owner)).problem).toBe('OTHER_PC');
+    expect((await agent.heartbeatReport()).tamper?.map((event) => event.kind)).toContain(
+      'OTHER_PC',
+    );
+    // This PC again.
+    reader.identifiers = IDENTIFIERS;
+    running += 7 * HOUR_MS;
+    await agent.refresh(new Date());
+    expect((await view(owner)).problem).toBe('EXPIRED');
+  });
+
+  it('takes no code reaching past 60 days, and reports the code it took until delivered', async () => {
+    const reach = (days: number) =>
+      new Date(Date.now() + 20 * DAY_MS + days * DAY_MS).toISOString().slice(0, 10);
+    const far = reactivationCode(SECRET, INSTALLATION, reach(70), 3);
+    const refused = await agent.reactivate(principal(), far).catch((error: unknown) => error);
+    expect(refused).toMatchObject({ code: 'REACTIVATION_CODE_INVALID' });
+    const until = reach(10);
+    await agent.reactivate(principal(), reactivationCode(SECRET, INSTALLATION, until, 2));
+    expect((await view(owner)).state).toBe('ACTIVE');
+    let report = await agent.heartbeatReport();
+    expect(report.licence?.reactivation).toEqual({ counter: 2, validUntil: until });
+    // A heartbeat that did not carry it delivers nothing; the one that did, delivers it.
+    await agent.accept(answer(), { tamper: [] });
+    expect((await agent.heartbeatReport()).licence?.reactivation).toEqual({
+      counter: 2,
+      validUntil: until,
+    });
+    await agent.accept(answer(), report);
+    report = await agent.heartbeatReport();
+    expect(report.licence?.reactivation).toBeNull();
   });
 });

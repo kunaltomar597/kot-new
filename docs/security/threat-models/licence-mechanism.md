@@ -96,18 +96,25 @@ The customer makes their own reactivation codes to stay active offline.
 
 - Mitigation: a code carries the day and a counter under a 56-bit HMAC with the installation's
   reactivation secret; five tries an hour; the counter must be newer; a terminated contract is
-  never reactivated. The secret is on the PC, so an administrator could make codes the vendor
-  never issued, and the Control Plane does not see the codes used.
-- Code: `packages/licensing/src/reactivation.ts` (`readReactivationCode`);
-  `apps/server/src/licensing/licence-agent.service.ts` (`LicenceAgentService.reactivate`).
+  never reactivated. A code reaches 60 days at most: the Control Plane issues none further and the
+  PC takes none further. The Control Plane keeps each code's day and counter (never the code);
+  the PC reports the last code it took in its heartbeats until one is answered, and a code that
+  matches none issued opens a licence tampering alert (SEC-015). The secret is on the PC, so an
+  administrator can still make codes offline, each for 60 days at most, until the PC is online.
+- Code: `packages/licensing/src/reactivation.ts` (`readReactivationCode`, `lastReactivationDay`);
+  `apps/server/src/licensing/licence-agent.service.ts` (`LicenceAgentService.reactivate`,
+  `heartbeatReport`); `apps/control-plane/src/licences/licences.service.ts` (`checkReactivation`);
+  `apps/control-plane/src/fleet/fleet.service.ts` (`licenceTampering`).
 - Tests: `packages/licensing/test/licensing.test.ts` "carries the day and a counter, read back only
-  by its installation", "refuses a mistyped code";
-  `apps/server/test/integration/licence-agent.int.test.ts` "the Owner reactivates it offline with
-  the vendor".
+  by its installation", "refuses a mistyped code", "reaches 60 days at most, as the vendor issues
+  them"; `apps/server/test/integration/licence-agent.int.test.ts` "the Owner reactivates it offline
+  with the vendor", "takes no code reaching past 60 days, and reports the code it took until
+  delivered"; `apps/control-plane/test/integration/licences.int.test.ts` "checks the code a PC
+  took against those issued, and alerts on another".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b3 by 2026-10-15: the heartbeat reports the last code's
-  counter and day, the Control Plane compares them with the codes it issued and alerts, and the PC
-  takes a code for 60 days at most, as the Control Plane issues them.
+- Status: Partly mitigated. Accepted: the secret has to be on the PC for codes to work offline, so
+  an administrator of the PC can make codes; each reaches 60 days at most, and the first heartbeat
+  after it brings the alert.
 
 ### Tampering
 
@@ -142,30 +149,44 @@ The customer changes the record of the last time seen or the pending restriction
 
 The customer sets the PC's clock back, or keeps it behind, so the licence never expires.
 
-- Mitigation: the PC never judges by a time earlier than the last it saw, and reports a clock set
-  back. But the judged time then stays where it was while the clock lags, so offline the licence's
-  end never comes, and a restriction the vendor sends never starts.
+- Mitigation: the PC judges by the latest of its clock, the last judged time moved on by the time
+  the server has run since (a monotonic clock nobody can set), the newest licence's issue time and
+  the issue time of the licence it holds, which the vendor signed and renews daily while online.
+  A clock set back, or held back more than an hour behind the judged time, is reported and, when
+  repeated, alerts at the Control Plane. So whenever the restaurant can take orders, the licence's
+  end comes on time. The heartbeat answer's server time is not a floor: it is not signed, and a
+  wrong one could push the PC's time years ahead; it is compared for CLOCK_SKEW only.
 - Code: `packages/licensing/src/clock.ts` (`guardedNow`);
   `apps/server/src/licensing/licence-agent.service.ts` (`LicenceAgentService`).
 - Tests: `packages/licensing/test/licensing.test.ts` "never judges by a time earlier than the last
-  seen, and reports a clock set back".
-- Risk: likelihood Medium, impact High: High.
-- Status: Partly mitigated. Plan: P8-03b3 by 2026-10-15: judged time moves on with the time the
-  server has been running, and never falls behind the licence's issue time or the vendor's last
-  server time.
+  seen, and reports a clock set back", "moves on while the server runs, whatever the clock says,
+  and reports a clock held back", "never falls behind the issue time of the licence held or the
+  newest accepted"; `apps/server/test/integration/licence-agent.int.test.ts` "lets a licence
+  run out offline with the clock held back, by the time the server runs".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Partly mitigated. Accepted: no clock nobody can set runs while the server is stopped on a
+  PC the customer administers, so stopping the server between services with the clock held back
+  stretches an offline licence by the hours it was off, never more; online the vendor's renewals
+  and restrictions arrive as usual.
 
 #### LICENCE-T4 Putting an older licence back
 
 Offline, the customer puts back an older ACTIVE licence file over a newer one that restricts.
 
-- Mitigation: online, the Control Plane sends the latest licence again when the PC reports another
-  one. Offline, any validly signed file is taken.
-- Code: `apps/server/src/licensing/licence-agent.service.ts` (`LicenceAgentService`).
-- Tests: `apps/control-plane/test/integration/licences.int.test.ts` "sends nothing new while the
-  licence is current, and the same one again if lost".
+- Mitigation: the sealed record keeps the newest issue time accepted; a validly signed file issued
+  before it counts as tampered (restricted from the next business day, reported), and the PC never
+  keeps an older file the Control Plane sends. Online, the Control Plane sends the latest licence
+  again when the PC reports another one. Putting the sealed record back with the file is
+  LICENCE-T2's.
+- Code: `packages/licensing/src/evaluate.ts` (`isOlderLicence`);
+  `apps/server/src/licensing/licence-agent.service.ts` (`LicenceAgentService`).
+- Tests: `packages/licensing/test/licensing.test.ts` "counts a signed licence older than the newest
+  accepted as tampered"; `apps/server/test/integration/licence-agent.int.test.ts` "never takes a
+  licence older than the newest it kept, and counts one put back as tampered";
+  `apps/control-plane/test/integration/licences.int.test.ts` "sends nothing new while the licence
+  is current, and the same one again if lost".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b3 by 2026-10-15: the sealed record keeps the newest issue
-  time accepted, and an older file counts as tampered.
+- Status: Mitigated.
 
 #### LICENCE-T5 Patching the server
 
@@ -214,13 +235,23 @@ The Owner disputes when the licence restricted or who reactivated it.
 A PC reports tampering (a clock set back, an edited record, another PC) and nobody at the vendor
 notices.
 
-- Mitigation: each report is audited at the Control Plane; no fleet alert is raised.
+- Mitigation: each report is audited at the Control Plane, and a licence tampering fleet alert goes
+  to the webhook (SEC-015): at once for a licence file changed or put back, an edited record,
+  another PC, or a reactivation code never issued; for the clock once it is reported three times
+  within a week. A person closes it with a reason, and the reports count afresh from then.
 - Code: `apps/control-plane/src/heartbeats/heartbeats.service.ts` (`HeartbeatsService`);
-  `packages/domain/src/fleet-health.ts` (`FLEET_ALERT_KINDS`).
+  `packages/domain/src/fleet-health.ts` (`tamperAlertDue`);
+  `apps/control-plane/src/fleet/fleet.service.ts` (`licenceTampering`).
 - Tests: `apps/control-plane/test/integration/licences.int.test.ts` "records what the PC reports as
-  tampering, once per heartbeat".
-- Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b3 by 2026-10-15: a fleet alert for tampering (SEC-015).
+  tampering, once per heartbeat"; `packages/domain/test/fleet-health.test.ts` "alerts at once for a
+  licence or record changed, another PC, or a code never issued", "alerts for the clock only when
+  it is reported again and again within a week";
+  `apps/control-plane/test/integration/fleet.int.test.ts` "alerts at once for an edited licence or
+  another PC, and Support closes it with a reason", "alerts for the clock only once it is reported
+  again and again, counting afresh after"; `apps/control-plane-web/test/fleet.test.tsx` "shows what
+  the PC reported and lets Support close it with a reason".
+- Risk: likelihood Low, impact Low: Low.
+- Status: Mitigated.
 
 ### Information disclosure
 
@@ -284,16 +315,23 @@ The licence runs out, or the vendor restricts it, in the middle of a busy evenin
 The PC's identifiers cannot be read once (a slow or failing PowerShell call), and the licence
 believes it is on another PC.
 
-- Mitigation: none: an empty read is kept for six hours and judged another PC, which reports
-  tampering and restricts from the next business day; on the first heartbeat the Control Plane
-  would bind an empty fingerprint.
-- Code: `apps/server/src/licensing/pc-fingerprint.ts` (`SystemFingerprintReader`);
+- Mitigation: a read with fewer than three identifiers is unknown: it is not kept, the last read
+  that said something stays in use and the PC reads again five minutes later; until a read says
+  something the licence does not judge the PC by it. The Control Plane binds, compares and renews
+  nothing on an unknown fingerprint, so a PC that never reads one runs out at the licence's end,
+  as offline.
+- Code: `packages/licensing/src/fingerprint.ts` (`fingerprintKnown`);
+  `apps/server/src/licensing/licence-agent.service.ts` (`LicenceAgentService`);
   `apps/control-plane/src/licences/licences.service.ts` (`forHeartbeat`).
 - Tests: `packages/licensing/test/licensing.test.ts` "tolerates two changed identifiers, not
-  three".
-- Risk: likelihood Low, impact High: Medium.
-- Status: Not mitigated. Plan: P8-03b3 by 2026-10-15: a read with fewer than three identifiers is
-  "unknown", neither kept nor judged, and the Control Plane binds only three or more.
+  three", "takes a read of fewer than three identifiers for unknown, never for another PC", "judges
+  no PC by a read that failed: the licence stands until a read succeeds";
+  `apps/server/test/integration/licence-agent.int.test.ts` "judges no PC by a fingerprint read that
+  said too little, and reads it again soon";
+  `apps/control-plane/test/integration/licences.int.test.ts` "binds and renews nothing on a
+  fingerprint read of fewer than three identifiers".
+- Risk: likelihood Low, impact Low: Low.
+- Status: Mitigated.
 
 #### LICENCE-D3 A release with no vendor keys
 
@@ -304,9 +342,9 @@ restaurant that installs it restricts from the next business day.
   it.
 - Code: `packages/licensing/src/vendor-keys.ts` (`VENDOR_LICENCE_KEYS`);
   `apps/desktop/src/packaging/package-cli.ts`.
-- Tests: none, the build has no such check yet; P8-03b3 adds it with its test.
+- Tests: none, the build has no such check yet; P8-03b3b adds it with its test.
 - Risk: likelihood Low, impact High: Medium.
-- Status: Not mitigated. Plan: P8-03b3 by 2026-10-15: a signed build refuses to build while the
+- Status: Not mitigated. Plan: P8-03b3b by 2026-10-15: a signed build refuses to build while the
   licence keys or the pager firmware keys are empty.
 
 ### Elevation of privilege

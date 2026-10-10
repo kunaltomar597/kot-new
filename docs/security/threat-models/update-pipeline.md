@@ -144,7 +144,7 @@ installer.
   `infra/ci/check-licenses.mjs` (`findViolations`).
 - Tests: `infra/ci/check-licenses.test.mjs` "fails GPL, AGPL and SSPL even with an exception".
 - Risk: likelihood Medium, impact High: High.
-- Status: Partly mitigated. Plan: P8-03b3 by 2026-10-15: every Action in every workflow pinned to a
+- Status: Partly mitigated. Plan: P8-03b3b by 2026-10-15: every Action in every workflow pinned to a
   commit, as `security.yml` already does, with a test that keeps them pinned.
 
 #### UPDATE-T2 An installer changed on the PC before it runs
@@ -178,7 +178,7 @@ Someone gets the PCs to install an older, signed version with a known flaw.
   version"; `infra/installer/windows/tests/SoftwareUpdate.Tests.ps1` "never installs an older
   version, nor without the way back".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b3 by 2026-10-15: the updater refuses an installer whose
+- Status: Partly mitigated. Plan: P8-03b3b by 2026-10-15: the updater refuses an installer whose
   product version is not the version asked for.
 
 #### UPDATE-T4 Changed programs inside the installer
@@ -384,6 +384,6 @@ offer it an update runs code as SYSTEM.
   `apps/server/test/integration/update-agent.int.test.ts` "is unavailable without a version from
   the installer, or a way to check signatures".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03b3 by 2026-10-15: the heartbeat says whether a PC takes
+- Status: Partly mitigated. Plan: P8-03b3b by 2026-10-15: the heartbeat says whether a PC takes
   unsigned updates and the Control Plane alerts on it; the build's guard becomes a tested
   function.

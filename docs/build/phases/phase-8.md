@@ -173,7 +173,26 @@ those threats:
     goes to it again, leaving sent ones as they were. Four threats mitigated.
 - **P8-03b3 Fixes to the licence and the update pipeline.** The threats planned for P8-03b3: the
   clock guard, fingerprint reads, licence replay, reactivation reports, tamper alerts, builds
-  without vendor keys, the updater's version check and pinned CI actions.
+  without vendor keys, the updater's version check and pinned CI actions. Split (2026-10-10) into
+  two, by where the fix lives:
+  - **P8-03b3a The licence** (LICENCE-S3, LICENCE-T3, LICENCE-T4, LICENCE-D2, LICENCE-R3): the
+    judged time moving on with the server's running time and never behind the signed issue times,
+    a clock held back reported, the newest issue time kept and an older file counted as tampered,
+    a fingerprint read of fewer than three identifiers neither kept nor judged (nor bound by the
+    Control Plane), codes reaching 60 days at most, the last code taken reported and compared with
+    those issued, and a licence tampering fleet alert (SEC-015). Done (2026-10-10): `guardedNow`
+    takes the last judged time and clock, the monotonic time since and the signed floors (the
+    heartbeat answer's server time is not one: it is not signed); the sealed record keeps
+    `clockAt`, `newestIssuedAt` and `lastCode`; `fingerprintKnown`; the Control Plane's
+    `licence_reactivation_codes` and `checkReactivation`; `tamperAlertDue` (serious kinds and an
+    unissued code at once, the clock's after three reports in seven days) and the
+    `LICENCE_TAMPERING` alert, closed by a person with a reason. Five threats mitigated or
+    accepted with what remains.
+  - **P8-03b3b The update pipeline and the builds** (UPDATE-T1, UPDATE-T3, UPDATE-E3, LICENCE-D3):
+    every GitHub Action pinned to a commit with a test that keeps them pinned, the updater refusing
+    an installer whose product version is not the one asked for, the heartbeat saying whether the
+    PC takes unsigned updates with a fleet alert for it, and the build's guard a tested function
+    that also refuses a signed build without the licence keys or the pager firmware keys.
 - **P8-03b4 Fixes in the Control Plane and the QR relay.** The threats planned for P8-03b4: backup
   dates and retention, diagnostics retention, vendor sign-in races, tenant isolation (an ADR and a
   cross-tenant test), https for every service, bill links in logs, the relay's service-request and

@@ -4,6 +4,19 @@ import type { Translator } from '@rp/i18n';
 const numberOf = (value: unknown): number | undefined =>
   typeof value === 'number' ? value : undefined;
 
+/** What a PC reports as tampering, and a code the vendor never issued (LIC-007, SEC-015). */
+const TAMPERING = [
+  'LICENCE_TAMPERED',
+  'RECORD_TAMPERED',
+  'OTHER_PC',
+  'CLOCK_ROLLBACK',
+  'CLOCK_SKEW',
+  'REACTIVATION_CODE_NOT_ISSUED',
+] as const;
+type Tampering = (typeof TAMPERING)[number];
+const isTampering = (value: unknown): value is Tampering =>
+  (TAMPERING as readonly unknown[]).includes(value);
+
 /** What an alert saw, in a sentence (VCP-005, AUD-003). */
 export function alertDetail(alert: FleetAlertView, t: Translator): string {
   const details = alert.details ?? {};
@@ -36,6 +49,11 @@ export function alertDetail(alert: FleetAlertView, t: Translator): string {
       return typeof details.error === 'string'
         ? t('vendorApp.fleet.detail.updateWithError', { text, error: details.error })
         : text;
+    }
+    case 'LICENCE_TAMPERING': {
+      const kinds = Array.isArray(details.kinds) ? details.kinds.filter(isTampering) : [];
+      const list = kinds.map((kind) => t(`vendorApp.fleet.detail.tamper.${kind}`)).join(', ');
+      return t('vendorApp.fleet.detail.tampering', { list });
     }
   }
 }

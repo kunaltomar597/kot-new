@@ -9,12 +9,16 @@ used by the local server. Apps never verify a licence: they get their entitlemen
   built into the software (several, for rotation). The signing key lives only in the cloud KMS;
   `signLicence` is what the Control Plane's signer does.
 - `fingerprint.ts`: five hardware identifiers, kept only as SHA-256 hashes tied to the
-  installation; three of five must match (LIC-004).
+  installation; three of five must match (LIC-004). A read with fewer than three is unknown
+  (`fingerprintKnown`): never judged, never bound.
 - `evaluate.ts`: `evaluateLicence` turns the verified file, this PC and the time into the state
   of LIC-005 and what the restaurant can do. A restriction applies only from the next business
-  day after it is first decided.
-- `reactivation.ts`: 16-character offline reactivation codes read over the phone (LIC-006).
-- `clock.ts`: the clock guard: never judge by a time earlier than the last seen (LIC-007).
+  day after it is first decided. A signed file older than the newest accepted counts as tampered.
+- `reactivation.ts`: 16-character offline reactivation codes read over the phone (LIC-006), 60
+  days ahead at most.
+- `clock.ts`: the clock guard (LIC-007): judge by the latest of the clock, the last judged time
+  moved on by the server's running time, and the signed issue times; report a clock set back or
+  held back.
 
-Built by: P7-01a. Security-sensitive: two human reviewers before release (NFR-M05, manual task
-23).
+Built by: P7-01a; hardened in P8-03b3a. Security-sensitive: two human reviewers before release
+(NFR-M05, manual task 23).

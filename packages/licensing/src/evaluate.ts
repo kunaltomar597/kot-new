@@ -6,7 +6,7 @@ import {
   type LicenseCapabilities,
   restrictionEffectiveAt,
 } from '@rp/domain';
-import { isLicensedPc } from './fingerprint.js';
+import { fingerprintKnown, isLicensedPc } from './fingerprint.js';
 import type { LicenceFileProblem, VerifiedLicence } from './signing.js';
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -27,9 +27,17 @@ export type LicenceProblem =
 export interface LicenceInput {
   readonly file: VerifiedLicence;
   readonly installationId: string;
-  /** The PC's fingerprint now (`fingerprintOf`). */
+  /**
+   * The PC's fingerprint now (`fingerprintOf`). A read with fewer than three identifiers is
+   * unknown (`fingerprintKnown`) and not judged: a failed read is never taken for another PC.
+   */
   readonly fingerprint: readonly (string | null)[];
-  /** The time to judge by: the clock, never earlier than the last time seen (`guardedNow`). */
+  /**
+   * The newest licence issue time this PC accepted (LIC-007): a validly signed file issued before
+   * it was put back over a newer one, and counts as tampered.
+   */
+  readonly newestIssuedAt?: Date | undefined;
+  /** The time to judge by (`guardedNow`): never earlier than the last judged, moving on. */
   readonly now: Date;
   /** When a restriction was first decided, as saved; undefined when none is pending. */
   readonly restrictionDecidedAt: Date | undefined;
@@ -61,11 +69,22 @@ function graceEndOf(payload: LicencePayload): Date | undefined {
   return new Date(Date.parse(payload.graceStartedAt) + payload.graceDays * DAY_MS);
 }
 
+/** Whether a verified file is older than the newest one this PC accepted (put back). */
+export function isOlderLicence(payload: LicencePayload, newestIssuedAt: Date | undefined): boolean {
+  return newestIssuedAt !== undefined && Date.parse(payload.issuedAt) < newestIssuedAt.getTime();
+}
+
 function problemOf(input: LicenceInput): LicenceProblem | null {
   if (!input.file.ok) return input.file.problem;
   const { payload } = input.file;
+  if (isOlderLicence(payload, input.newestIssuedAt)) return 'TAMPERED';
   if (payload.installationId !== input.installationId) return 'OTHER_INSTALLATION';
-  if (!isLicensedPc(payload.fingerprint, input.fingerprint)) return 'OTHER_PC';
+  if (
+    fingerprintKnown(input.fingerprint) &&
+    !isLicensedPc(payload.fingerprint, input.fingerprint)
+  ) {
+    return 'OTHER_PC';
+  }
   if (input.now.getTime() > Date.parse(payload.validUntil)) return 'EXPIRED';
   const graceEnd = graceEndOf(payload);
   if (payload.state === 'GRACE' && graceEnd !== undefined && graceEnd <= input.now) {

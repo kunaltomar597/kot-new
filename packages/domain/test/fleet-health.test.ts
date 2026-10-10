@@ -7,6 +7,7 @@ import {
   fleetAlertsDue,
   offlineMinutesDuringHours,
   openSince,
+  tamperAlertDue,
   weekdayOf,
 } from '../src/fleet-health.js';
 
@@ -158,5 +159,41 @@ describe('[AUD-003] audit chain heads', () => {
       reason: 'ROLLED_BACK',
       sequence: 10,
     });
+  });
+});
+
+describe('[SEC-015] [LIC-007] tampering that calls for a person', () => {
+  const now = new Date('2026-10-10T12:00:00.000Z');
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+
+  it('alerts at once for a licence or record changed, another PC, or a code never issued', () => {
+    expect(tamperAlertDue([{ kind: 'LICENCE_TAMPERED', at: daysAgo(0) }], now)).toEqual([
+      'LICENCE_TAMPERED',
+    ]);
+    expect(
+      tamperAlertDue(
+        [
+          { kind: 'OTHER_PC', at: daysAgo(0) },
+          { kind: 'RECORD_TAMPERED', at: daysAgo(0) },
+        ],
+        now,
+      ),
+    ).toEqual(['OTHER_PC', 'RECORD_TAMPERED']);
+    expect(tamperAlertDue([], now, true)).toEqual(['REACTIVATION_CODE_NOT_ISSUED']);
+    expect(tamperAlertDue([], now)).toEqual([]);
+  });
+
+  it('alerts for the clock only when it is reported again and again within a week', () => {
+    const twice = [
+      { kind: 'CLOCK_SKEW', at: daysAgo(2) },
+      { kind: 'CLOCK_ROLLBACK', at: daysAgo(0) },
+    ];
+    expect(tamperAlertDue(twice, now)).toEqual([]);
+    expect(tamperAlertDue([...twice, { kind: 'CLOCK_SKEW', at: daysAgo(5) }], now)).toEqual([
+      'CLOCK_ROLLBACK',
+      'CLOCK_SKEW',
+    ]);
+    // Older than the week: not repeated any more.
+    expect(tamperAlertDue([...twice, { kind: 'CLOCK_SKEW', at: daysAgo(8) }], now)).toEqual([]);
   });
 });
