@@ -55,5 +55,9 @@ export function alertDetail(alert: FleetAlertView, t: Translator): string {
       const list = kinds.map((kind) => t(`vendorApp.fleet.detail.tamper.${kind}`)).join(', ');
       return t('vendorApp.fleet.detail.tampering', { list });
     }
+    case 'UNSIGNED_UPDATES':
+      return t('vendorApp.fleet.detail.unsigned', {
+        version: typeof details.version === 'string' ? details.version : '?',
+      });
   }
 }

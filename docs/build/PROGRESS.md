@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b3a).
+Last updated: 2026-10-10 (P8-03b3b).
 
 What exists:
 
@@ -29,7 +29,8 @@ What exists:
   guessed first, counting wrong secrets towards a lock, and the kind of record each approval is
   for (P8-03b2a); a pager's heartbeat too soon after the last, and firmware that would lower the
   anti-rollback version (P8-03b2b); which licence tampering reports call for a person at the
-  vendor (P8-03b3a). 407 tests.
+  vendor (P8-03b3a); how a PC checks its updates, and the alert for one that takes unsigned ones
+  (P8-03b3b). 409 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -63,7 +64,9 @@ What exists:
   `auth.refuseEasyPins` (P8-03b2a); a pager's sign-ins with a wrong secret on `PagerView`, and
   the firmware problem `SECURE_VERSION_LOWER` (P8-03b2b); the orders, bills and invoices an
   erasure reached, on `EraseDinerContactResponse` (P8-03b2c); the reactivation code a PC took, on
-  its heartbeat, and the `LICENCE_TAMPERING` fleet alert (P8-03b3a). 964 tests.
+  its heartbeat, and the `LICENCE_TAMPERING` fleet alert (P8-03b3a); how the PC checks its
+  updates, `updateSigning` on its heartbeat, and the `UNSIGNED_UPDATES` fleet alert (P8-03b3b).
+  964 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -148,8 +151,10 @@ What exists:
   signed, so a clock held back no longer holds the licence's end off, a clock held back reported,
   an older licence put back counted as tampered, a fingerprint read of fewer than three
   identifiers neither kept nor judged, and reactivation codes reaching 60 days at most, the last
-  one reported to the vendor (P8-03b3a). 1250 tests (28 skipped: Windows only, a real install, or
-  the performance runs).
+  one reported to the vendor (P8-03b3a); an installer whose product version is not the release's
+  refused with its signature after the download, and each heartbeat saying how the PC checks its
+  updates (P8-03b3b). 1252 tests (28 skipped: Windows only, a real install, or the performance
+  runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -158,7 +163,9 @@ What exists:
   against the registry and its authorisation sweep (P8-03a); licences bound and renewed only on a
   fingerprint of three identifiers or more, the reactivation codes issued kept and the one a PC
   took checked against them, and a licence tampering alert, in the vendor web app too, closed by
-  Support with a reason (P8-03b3a). 153 tests. Not deployed yet (hosting account pending).
+  Support with a reason (P8-03b3a); an alert for a PC that takes unsigned updates, closing by
+  itself once a signed build replaces it (P8-03b3b). 154 tests. Not deployed yet (hosting account
+  pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
@@ -297,8 +304,10 @@ What exists:
   16.15 and WinSW 2.12 pinned by SHA-256, and hooks that run the set-up scripts on install,
   update, repair and uninstall; it keeps itself for going back after a failed update (P7-04c).
   The release's APKs with `apps.json` in the payload's `apps` folder (`package:stage --apk`,
-  P7-04e2). The camera for the console without the microphone (P2-04b2). 40 tests without
-  Electron; the CI job "Windows installer" builds,
+  P7-04e2). The camera for the console without the microphone (P2-04b2). The release guard
+  (`release-guard.ts`): a signed build names the updates' signer, never takes unsigned updates,
+  is staged on Windows and carries the vendor's licence key and pager firmware key, read from the
+  staged server (P8-03b3b). 46 tests without Electron; the CI job "Windows installer" builds,
   installs, kills the server, repairs and uninstalls on `windows-latest`.
 - `infra/installer/windows` (P0-16c): the PowerShell the installer runs, for Windows PowerShell
   5.1: the data-drive choice (ONB-002), folder permissions by SID, the services' accounts and
@@ -306,7 +315,8 @@ What exists:
   keeps the data unless the Owner allowed deleting it (NFR-I02). The drive page's INI file, and
   stopping and starting the services around an update (P0-16d). The updater (P7-04c): a SYSTEM
   scheduled task that installs a checked update and goes back to the previous version and its
-  database when the new one fails its health check (scenario S9 in the CI job). 138 Pester tests
+  database when the new one fails its health check (scenario S9 in the CI job), and refuses an
+  installer whose product version is not the one asked for (P8-03b3b). 139 Pester tests
   anywhere
   (`pnpm installer:test`, needs `pwsh`), 7 more on Windows only (CI job "Windows set-up scripts");
   `windows/ci/Test-Installer.ps1` checks the built installer in the CI job "Windows installer".
@@ -329,9 +339,13 @@ What exists:
   (large bodies before authentication, decompression bombs, formulas in exports, a diner's
   number kept after erasure), P8-03b3a five of the licence's (the clock held back, an older
   licence put back, a failed fingerprint read, forged reactivation codes, tampering nobody looks
-  at): 113 mitigated, 7 residual Highs, each planned.
+  at), P8-03b3b four of the update pipeline's and the licence's (Actions by tag, an older
+  installer under a newer name, a test build at a restaurant, a release without the vendor's
+  keys): 117 mitigated, 6 residual Highs, each planned.
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
+  Every GitHub Action is pinned to a commit with its version in a comment, one commit per Action
+  (P8-03b3b, `infra/ci/pinned-actions.test.mjs`).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
 - The full plan: `docs/build/BUILD_PLAN.md` and `docs/build/phases/phase-0.md` to `phase-8.md`.
 
@@ -342,10 +356,9 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b3b (the update pipeline and the builds: pinned Actions, the updater's version check,
-  unsigned updates reported, the release guard) and P8-03b4 (the Control Plane and the QR relay):
-  the fixes the threat models planned, by their dates (the summary in
-  `docs/security/threat-models/README.md` lists each threat).
+- P8-03b4 (the Control Plane and the QR relay): the last fixes the threat models planned for
+  P8-03b, by their dates (the summary in `docs/security/threat-models/README.md` lists each
+  threat).
 - Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
   incident response plan and the pack for the penetration testers (the external test needs the
   firm the Business Owner engages).
@@ -576,10 +589,10 @@ Recommended next WPs (dependencies met):
             approvals bound to their record, the waiter phone's inactivity)
       - [x] P8-03b2b The pager broker's limits, acknowledgements and sign-in log
       - [x] P8-03b2c Bodies, uploads, exports and erasure
-    - [~] P8-03b3 Threat-model fixes to the licence and the update pipeline
+    - [x] P8-03b3 Threat-model fixes to the licence and the update pipeline
       - [x] P8-03b3a The licence (clock guard, older licences, fingerprint reads, reactivation
             codes, the licence tampering alert)
-      - [ ] P8-03b3b The update pipeline and the builds (pinned Actions, the updater's version
+      - [x] P8-03b3b The update pipeline and the builds (pinned Actions, the updater's version
             check, unsigned updates reported, the release guard)
     - [ ] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
   - [ ] P8-03c DAST of the QR site, relay and Control Plane
@@ -830,6 +843,38 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b3b):
+
+748. Every GitHub Action is pinned to the commit its floating tag pointed at on 2026-10-10, so CI
+     runs what it ran, with the release in a comment, one commit per Action in all workflows
+     (`security.yml`'s setup-node and upload-artifact moved to the same releases as `ci.yml`'s).
+     Dependabot's Actions updates wait 5 days (14 for a major), as for packages. The PostgreSQL
+     service containers of CI's test jobs stay by tag (`postgres:16`): they get no secrets and no
+     checkout, and a digest would freeze their fixes, which Dependabot does not move.
+749. An installer's version is the ProductVersion string of its version resource, which
+     electron-builder writes as the build's full version, pre-release included (read from a test
+     installer built on this Mac). It must equal the version asked for exactly; an installer
+     without one is refused. The agent checks it in the same PowerShell call as the signature
+     (Windows only; off Windows only the updater does), the updater again before it stops
+     anything. The previous version's installer for going back is not checked again: the updater
+     kept it at install, in the administrators-only folder.
+750. The heartbeat's `updateSigning` (optional, so older PCs and Control Planes still talk): VENDOR,
+     UNSIGNED or NONE. Allowing unsigned installers wins over a publisher, since an unsigned one
+     passes there.
+751. `UNSIGNED_UPDATES` is a fleet alert opened from the heartbeat's state (red), closing by itself
+     once the PC says VENDOR or NONE. NONE alerts nobody: a build that installs no update is no
+     way in. The vendor's lab PCs on test builds alert too, on purpose: the vendor then sees
+     every test build enrolled.
+752. The release guard counts a build as signed as electron-builder does (`WIN_CSC_LINK` when set,
+     even empty, else `CSC_LINK`), also off Windows, where electron-builder skips signing. It
+     refuses a signed build staged off Windows even with `--any-platform`, without
+     `RP_UPDATE_PUBLISHER`, with unsigned updates allowed, without a licence key that is an
+     Ed25519 SPKI key, or without one to three lower-case SHA-256 pager key digests. It reads the
+     keys from the staged server, what the installer will carry, not from the sources.
+753. A signed release needs the pager firmware key too (manual task 30), as the threat plan said,
+     although a restaurant without pagers would run without it: pagers are part of the pilot, and
+     a release that cannot pass firmware on would need a second release to fix it.
 
 Decided 2026-10-10 (P8-03b3a):
 
@@ -4090,6 +4135,63 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b3b The update pipeline and the builds
+
+Decisions 748 to 753. Four threats mitigated: UPDATE-T1 (the residual High, now Medium), UPDATE-T3,
+UPDATE-E3 and LICENCE-D3. P8-03b3 is done.
+
+Built:
+
+- CI: every `uses:` in `ci.yml`, `android.yml` and `security.yml` at a full commit with its
+  release in a comment; `infra/ci/pinned-actions.test.mjs` (in `pnpm ci:test`) refuses a tag, a
+  branch, a short commit, a pin without its version, two commits of one Action, and Dependabot's
+  Actions block without a cooldown (added: 5 days, 14 for a major).
+- `@rp/domain`: `UPDATE_SIGNING` and `updateSigningOf`; `UNSIGNED_UPDATES` in `FLEET_ALERT_KINDS`
+  and `SELF_RESOLVING_ALERTS`, `FleetHealthInput.updateSigning` in `fleetAlertsDue`.
+- `@rp/contracts`: `HeartbeatRequest.updateSigning` (optional).
+- Server: `HeartbeatService` sends `updateSigning` from the installation's update settings;
+  `SIGNATURE_SCRIPT` also reads the installer's `VersionInfo.ProductVersion`, and the agent refuses
+  a download that is another version (`installerVersionProblem`), retried like a bad signature.
+- Updater (`RestaurantPlatform.Setup.psm1`): `Get-RPInstallerVersion`; `Invoke-RPUpdateStep`
+  refuses an installer whose product version is not the version asked for, after the signature
+  and before anything is stopped, and removes its copy.
+- Control Plane: migration `20261010160000_unsigned_updates`; the alert's details (the PC's
+  version) and its chat text. Vendor web app: its badge (red) and its sentence.
+- Desktop: `src/packaging/release-guard.ts` (`releaseRefusals`, `signedBuild`,
+  `stagedUpdateSettings`, `stagedKeys`); `package-cli.ts` runs it before electron-builder.
+- Docs: the four threats (117 mitigated in all, 6 residual Highs); the runbooks' "A PC that takes
+  unsigned updates" and the guard under "Signing"; manual tasks 23 and 30 (a signed release
+  refuses to build without their keys); `infra/ci/README.md`; `phase-8.md`.
+
+Tests: domain 409 (+2), server 1252 (+2, 28 skipped; `update-agent.int` refuses another version,
+`control-plane.int` checks the heartbeat's `updateSigning`, S9's `update-exit.int` sees the test
+build's alert), Control Plane 154 (+1), desktop 46 (+6), vendor web 74, contracts 964 (6 schema
+snapshots), CI scripts 19 (+4), Pester 139 (+1); all other test tasks green; lint, typecheck,
+format, docs, compat and `pnpm security:threats` green. Checked by hand on this Mac: the guard
+against a really staged payload (refuses a signed build: staged on darwin, no publisher, no
+licence key, no pager key; refuses an unsigned one without `--any-platform`), and a test
+installer built with `--product-version 0.1.1-rc.2` carries `ProductVersion` `0.1.1-rc.2`.
+Traceability: Must 264/287.
+
+Not done or not verified:
+
+- Windows' `VersionInfo.ProductVersion` on a real installer is read only in CI's "Windows
+  installer" job (S9 builds the next version with `--product-version` and updates to it, so a
+  mismatch would fail there) and by the Windows-only unit test on a file without a version
+  resource. Neither has run: GitHub is not reachable from this Mac (manual task 1).
+- The pins themselves were looked up with `git ls-remote`; CI has not run them yet (same reason).
+
+Gotchas:
+
+- To add or bump an Action by hand: `git ls-remote https://github.com/<owner>/<repo>
+'refs/tags/vX.Y.Z*'` and take the `^{}` line for an annotated tag (pnpm/action-setup and
+  gradle/actions have them); `supabase/setup-cli@v1` and `denoland/setup-deno@v2` were branches,
+  not tags.
+- The server's `AppConfig` is frozen: a test cannot switch a PC between signed and unsigned; build
+  another app (`createTestApp({ config })`), as S9 does with `updateAllowUnsigned: true`.
+- `stagedKeys` imports two files from the staged payload; Node caches modules by path, so a test
+  that changes them must use a new folder.
 
 ### 2026-10-10: P8-03b3a The licence
 

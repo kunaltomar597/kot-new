@@ -15,6 +15,7 @@ export const ALERT_TONE = {
   AUDIT_CHAIN_MISMATCH: 'danger',
   UPDATE_FAILED: 'warning',
   LICENCE_TAMPERING: 'danger',
+  UNSIGNED_UPDATES: 'danger',
 } as const;
 
 /** The alerts a person closes with a reason, and the words for closing each. */

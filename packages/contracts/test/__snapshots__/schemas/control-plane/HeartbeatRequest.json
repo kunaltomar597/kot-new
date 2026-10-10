@@ -164,6 +164,7 @@
           { "type": "null" }
         ]
       },
+      "updateSigning": { "type": "string", "enum": ["VENDOR", "UNSIGNED", "NONE"] },
       "backup": {
         "anyOf": [
           {
@@ -507,6 +508,7 @@
           { "type": "null" }
         ]
       },
+      "updateSigning": { "type": "string", "enum": ["VENDOR", "UNSIGNED", "NONE"] },
       "backup": {
         "anyOf": [
           {

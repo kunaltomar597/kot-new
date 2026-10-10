@@ -192,7 +192,18 @@ those threats:
     every GitHub Action pinned to a commit with a test that keeps them pinned, the updater refusing
     an installer whose product version is not the one asked for, the heartbeat saying whether the
     PC takes unsigned updates with a fleet alert for it, and the build's guard a tested function
-    that also refuses a signed build without the licence keys or the pager firmware keys.
+    that also refuses a signed build without the licence keys or the pager firmware keys. Done
+    (2026-10-10): every Action in the three workflows at a full commit with its version in a
+    comment, one commit per Action, Dependabot's cooldown for Actions too
+    (`infra/ci/pinned-actions.test.mjs`); the installer's product version (its version resource)
+    compared with the version asked for by the agent after the download
+    (`installerVersionProblem`) and by the updater before it stops anything
+    (`Get-RPInstallerVersion`); `updateSigning` on the heartbeat (`updateSigningOf`) and the
+    `UNSIGNED_UPDATES` fleet alert, which closes by itself once a signed build replaces the test
+    build; `release-guard.ts` (`releaseRefusals`), which refuses a signed build that allows
+    unsigned updates, names no publisher, was staged off Windows, or whose staged server has no
+    licence key or pager firmware key digest (`stagedKeys`). Four threats mitigated; P8-03b3 is
+    done.
 - **P8-03b4 Fixes in the Control Plane and the QR relay.** The threats planned for P8-03b4: backup
   dates and retention, diagnostics retention, vendor sign-in races, tenant isolation (an ADR and a
   cross-tenant test), https for every service, bill links in logs, the relay's service-request and

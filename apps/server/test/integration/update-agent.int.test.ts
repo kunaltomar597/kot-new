@@ -189,7 +189,7 @@ describe('[UPD-004] [UPD-005] [UPD-007] the update agent', () => {
     expect(fetches).toBe(1);
   });
 
-  it('tries a failed download again later, and refuses a bad signature', async () => {
+  it('tries a failed download again later, and refuses a bad signature or another version', async () => {
     // A re-published release (another file) is downloaded again; this attempt fails.
     await saveOfferedUpdate(prisma, release({ sha256: 'b'.repeat(64) }));
     failFetch = true;
@@ -213,8 +213,18 @@ describe('[UPD-004] [UPD-005] [UPD-007] the update agent', () => {
       error: 'The installer’s signature is not valid (HashMismatch).',
     });
     expect(readdirSync(updatesDir(dataDir))).toEqual([]);
-    signature = { status: 'NotSigned', subject: null };
+
+    // UPD-002: an older installer under the release's name and SHA-256 is not taken either.
+    signature = { status: 'NotSigned', subject: null, productVersion: '1.0.5' };
     now = new Date(now.getTime() + 10 * 60_000);
+    await agent.runOnce();
+    expect(await agentStatus()).toMatchObject({
+      state: 'DOWNLOAD_FAILED',
+      error: 'The installer installs version 1.0.5, not version 1.2.0 as the release says.',
+    });
+    expect(readdirSync(updatesDir(dataDir))).toEqual([]);
+    signature = { status: 'NotSigned', subject: null, productVersion: '1.2.0' };
+    now = new Date(now.getTime() + 20 * 60_000);
     await agent.runOnce();
     expect(await agentStatus()).toMatchObject({ state: 'WAITING', waitingFor: 'WINDOW' });
   });

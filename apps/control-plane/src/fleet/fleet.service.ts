@@ -203,6 +203,7 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
       disk: report?.disk ?? null,
       diskAlertPercent: this.config.diskAlertPercent,
       backup: report?.backup ?? null,
+      updateSigning: report?.updateSigning ?? null,
     };
   }
 
@@ -213,6 +214,10 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
     const backup = report.backup ?? null;
     if (kind === 'BACKUP_FAILED' && backup !== null) {
       return { error: backup.lastError, failedAt: backup.lastFailureAt };
+    }
+    if (kind === 'UNSIGNED_UPDATES') {
+      const pc = report.components.find((component) => component.name === 'RESTAURANT_PC');
+      return { version: pc?.version ?? null };
     }
     return {};
   }

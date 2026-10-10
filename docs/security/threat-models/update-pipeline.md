@@ -137,15 +137,21 @@ A package on npm, or a GitHub Action, is taken over and its new version runs in 
 installer.
 
 - Mitigation: the lockfile is frozen; install scripts are blocked except for a reviewed list;
-  `pnpm audit` fails on high advisories; CodeQL; Dependabot waits days before proposing an update;
-  licences are checked; an SBOM per build; secret scanning. Some Actions are pinned by tag, not by
-  commit.
-- Code: `.github/workflows/security.yml`; `.github/dependabot.yml`;
+  `pnpm audit` fails on high advisories; CodeQL; Dependabot waits days before proposing an update
+  to a package or an Action; licences are checked; an SBOM per build; secret scanning. Every
+  Action in every workflow is pinned to a full commit with its version in a comment, one commit per
+  Action, and a test refuses a tag, a branch or a short commit (P8-03b3b). What remains: a package
+  taken over and not found out within Dependabot's wait, which `pnpm audit` and review must catch;
+  the test databases CI starts as service containers are by tag, and get no secrets and no access
+  to the checkout.
+- Code: `.github/workflows/security.yml`; `.github/workflows/ci.yml`; `.github/dependabot.yml`;
   `infra/ci/check-licenses.mjs` (`findViolations`).
-- Tests: `infra/ci/check-licenses.test.mjs` "fails GPL, AGPL and SSPL even with an exception".
-- Risk: likelihood Medium, impact High: High.
-- Status: Partly mitigated. Plan: P8-03b3b by 2026-10-15: every Action in every workflow pinned to a
-  commit, as `security.yml` already does, with a test that keeps them pinned.
+- Tests: `infra/ci/check-licenses.test.mjs` "fails GPL, AGPL and SSPL even with an exception";
+  `infra/ci/pinned-actions.test.mjs` "pins every Action in every workflow to a full commit, with
+  the version it is", "runs each Action at one commit, in every workflow", "has Dependabot propose
+  new pins, after the same wait as for packages".
+- Risk: likelihood Low, impact High: Medium.
+- Status: Mitigated.
 
 #### UPDATE-T2 An installer changed on the PC before it runs
 
@@ -169,17 +175,24 @@ Someone gets the PCs to install an older, signed version with a known flaw.
 
 - Mitigation: the Control Plane offers only newer releases, the agent takes only a newer version,
   the updater compares it with the installed one and the health check wants the version asked for.
-  The installer file's own version is not compared with the version asked for.
+  The installer's own version (the product version its version resource names, which the build
+  writes) must be the version asked for: the agent checks it with the signature after the
+  download, and the updater again before it stops anything (P8-03b3b), so an older signed
+  installer published under a newer version's name and SHA-256 is refused.
 - Code: `packages/domain/src/rollout.ts` (`releaseToOffer`);
   `apps/server/src/updates/update-agent.service.ts` (`isNewerVersion`);
-  `infra/installer/windows/RestaurantPlatform.Setup.psm1` (`Wait-RPHealthyServer`).
+  `apps/server/src/updates/authenticode.ts` (`installerVersionProblem`);
+  `infra/installer/windows/RestaurantPlatform.Setup.psm1` (`Get-RPInstallerVersion`,
+  `Invoke-RPUpdateStep`, `Wait-RPHealthyServer`).
 - Tests: `packages/domain/test/rollout.test.ts` "offers the newest release the rollout reaches,
   and never an older one"; `packages/domain/test/software-update.test.ts` "moves only to a newer
   version"; `infra/installer/windows/tests/SoftwareUpdate.Tests.ps1` "never installs an older
-  version, nor without the way back".
+  version, nor without the way back", "changes nothing when the installer is not the version
+  asked for"; `apps/server/test/unit/updates.test.ts` "refuses an installer that is not the version
+  the release names"; `apps/server/test/integration/update-agent.int.test.ts` "tries a failed
+  download again later, and refuses a bad signature or another version".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b3b by 2026-10-15: the updater refuses an installer whose
-  product version is not the version asked for.
+- Status: Mitigated.
 
 #### UPDATE-T4 Changed programs inside the installer
 
@@ -373,17 +386,27 @@ vendor's certificate, and every PC would install that build.
 A test build, which takes unsigned updates, is installed at a restaurant; then anyone who can
 offer it an update runs code as SYSTEM.
 
-- Mitigation: a signed build refuses to allow unsigned updates or to build without the publisher;
-  a build with neither refuses every update; the runbooks say never to install a test build. The
-  Control Plane cannot see which PCs take unsigned updates.
+- Mitigation: the release guard, a tested function the package step runs, refuses a signed build
+  that allows unsigned updates, names no publisher or was staged off Windows; a build with neither
+  refuses every update; the runbooks say never to install a test build. Each heartbeat says how
+  the PC checks its updates, and the Control Plane alerts on a PC that takes unsigned ones (in the
+  webhook and the vendor web app) until a signed build replaces it (P8-03b3b).
 - Code: `apps/desktop/src/packaging/nsis.ts` (`updateSettingsFrom`);
-  `apps/desktop/src/packaging/package-cli.ts`.
+  `apps/desktop/src/packaging/release-guard.ts` (`releaseRefusals`, `signedBuild`);
+  `apps/desktop/src/packaging/package-cli.ts`; `packages/domain/src/software-update.ts`
+  (`updateSigningOf`); `packages/domain/src/fleet-health.ts` (`fleetAlertsDue`);
+  `apps/server/src/cloud/heartbeat.service.ts` (`HeartbeatService`).
 - Tests: `apps/desktop/test/packaging.test.ts` "names the signer updates must carry, or allows
-  unsigned ones on a test build only"; `apps/server/test/unit/updates.test.ts` "takes unsigned
-  installers only on a test build, and never a damaged signature";
-  `apps/server/test/integration/update-agent.int.test.ts` "is unavailable without a version from
-  the installer, or a way to check signatures".
+  unsigned ones on a test build only", "refuses a signed build that takes unsigned updates or
+  names no signer", "refuses a signed build staged off Windows, even as a test of the script",
+  "counts a build as signed as electron-builder does: WIN_CSC_LINK when set, else CSC_LINK";
+  `apps/server/test/unit/updates.test.ts` "takes unsigned installers only on a test build, and
+  never a damaged signature"; `apps/server/test/integration/update-agent.int.test.ts` "is
+  unavailable without a version from the installer, or a way to check signatures";
+  `packages/domain/test/fleet-health.test.ts` "alerts while a PC takes unsigned updates, a test
+  build at a restaurant"; `apps/control-plane/test/integration/fleet.int.test.ts` "alerts while a
+  PC takes unsigned updates, until a signed build replaces it";
+  `apps/server/test/integration/update-exit.int.test.ts` "the PC records and reports the rollback;
+  the vendor’s rollout halts by itself".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03b3b by 2026-10-15: the heartbeat says whether a PC takes
-  unsigned updates and the Control Plane alerts on it; the build's guard becomes a tested
-  function.
+- Status: Mitigated.

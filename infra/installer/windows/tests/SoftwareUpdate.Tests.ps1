@@ -234,6 +234,8 @@ Describe '[UPD-005] [UPD-007] installing an update, and going back when it fails
         $script:InstallerCode = @{ '1.1.0' = 0; '1.2.0' = 0 }
         $script:FileSha = $script:Sha
         $script:Signature = [pscustomobject]@{ Status = 'NotSigned'; Subject = $null }
+        # The version an installer's version resource names: by default the one in its name.
+        $script:ProductVersion = @{}
         $script:Request = New-TestRequest
         $script:RollbackOk = $true
         $script:HostAnswers = $true
@@ -278,6 +280,11 @@ Describe '[UPD-005] [UPD-007] installing an update, and going back when it fails
         Mock -ModuleName $ModuleName Get-RPInstallerFile { @() }
         Mock -ModuleName $ModuleName Get-RPFileSha256 { $script:FileSha }
         Mock -ModuleName $ModuleName Get-RPAuthenticode { $script:Signature }
+        Mock -ModuleName $ModuleName Get-RPInstallerVersion {
+            $named = ([regex]::Match($Path, 'Setup-(.+)\.exe$')).Groups[1].Value
+            if ($script:ProductVersion.ContainsKey($named)) { return $script:ProductVersion[$named] }
+            $named
+        }
         Mock -ModuleName $ModuleName Set-RPFolderPermission { $null = $script:Calls.Add('acl') }
         Mock -ModuleName $ModuleName Stop-RPService { $null = $script:Calls.Add("stop $Name") }
         Mock -ModuleName $ModuleName Start-RPService { $null = $script:Calls.Add("start $Name") }
@@ -423,6 +430,24 @@ Describe '[UPD-005] [UPD-007] installing an update, and going back when it fails
         $result = Invoke-RPUpdate @script:Update
         $result.error | Should -Be 'The installer''s signature is not valid (HashMismatch). Nothing was changed.'
         Get-Call 'stop *' | Should -HaveCount 0
+    }
+
+    It 'changes nothing when the installer is not the version asked for' {
+        # An older signed installer under the new version's name, or one that names no version.
+        $script:ProductVersion = @{ '1.2.0' = '1.0.5' }
+        $result = Invoke-RPUpdate @script:Update
+        $result.outcome | Should -Be 'FAILED'
+        $result.error | Should -Be 'The installer installs version 1.0.5, not version 1.2.0 as asked. Nothing was changed.'
+        Get-Call 'stop *' | Should -HaveCount 0
+        Get-Call 'installer *' | Should -HaveCount 0
+        Get-Call "remove $($script:ProgramDataDir)\installers\RestaurantPlatform-Setup-1.2.0.exe" | Should -HaveCount 1
+        $script:ProductVersion = @{ '1.2.0' = $null }
+        $script:Request = New-TestRequest -Change @{ requestId = '0199b0e0-0000-7000-8000-000000000003' }
+        (Invoke-RPUpdate @script:Update).error | Should -Be 'The installer installs no version, not version 1.2.0 as asked. Nothing was changed.'
+        $script:ProductVersion = @{ '1.2.0' = '1.2.0-rc.1' }
+        $script:Request = New-TestRequest -Change @{ requestId = '0199b0e0-0000-7000-8000-000000000004' }
+        (Invoke-RPUpdate @script:Update).error | Should -BeLike 'The installer installs version 1.2.0-rc.1, not*'
+        Get-Call 'installer *' | Should -HaveCount 0
     }
 
     It 'never installs an older version, nor without the way back' {

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { BusinessHours } from '@rp/contracts';
 import type { HeartbeatRequest, HeartbeatResponse, ReleaseInfo } from '@rp/contracts/control-plane';
+import { updateSigningOf } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
 import { newId } from '../common/ids.js';
@@ -342,6 +343,11 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       restoreCodesSeen,
       // How the last update went (UPD-003, P7-04c), until a heartbeat carrying it is answered.
       ...(updateReport !== null && { updateReport }),
+      // Whether this PC takes unsigned updates, a test build the vendor is alerted to (UPD-007).
+      updateSigning: updateSigningOf({
+        publisher: this.config.updatePublisher ?? null,
+        allowUnsigned: this.config.updateAllowUnsigned,
+      }),
       // The pager firmware this PC passes on, and how its last release went (PGR-011, P2-04b).
       pagerFirmware,
       ...licence,

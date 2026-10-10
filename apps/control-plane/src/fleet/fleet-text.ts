@@ -28,6 +28,8 @@ export function alertText(alert: FleetAlertView): string {
         : '?';
       return `${where}: the licence looks tampered with (${kinds}). Speak to the restaurant before closing.`;
     }
+    case 'UNSIGNED_UPDATES':
+      return `${where}: version ${shown(details.version)} is a test build that installs unsigned updates. Reinstall it with a signed release.`;
   }
 }
 
@@ -38,6 +40,7 @@ const RESOLVED = {
   AUDIT_CHAIN_MISMATCH: 'audit chain alert closed',
   UPDATE_FAILED: 'the PC runs that version now',
   LICENCE_TAMPERING: 'licence tampering alert closed',
+  UNSIGNED_UPDATES: 'the PC now takes only signed updates',
 } as const;
 
 /** What each kind of tampering report means (LIC-007). */

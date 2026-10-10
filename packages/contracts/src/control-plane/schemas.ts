@@ -1,4 +1,4 @@
-import { LICENSE_STATES, WEEKDAYS } from '@rp/domain';
+import { LICENSE_STATES, UPDATE_SIGNING, WEEKDAYS } from '@rp/domain';
 import { z } from 'zod';
 import { VersionMatrix } from '../client-api.js';
 import { Id, IsoDate, Paise, Timestamp } from '../common.js';
@@ -281,6 +281,13 @@ export const HeartbeatRequest = z.looseObject({
   errorCount: z.int().nonnegative().optional(),
   /** The latest update attempt, until the Control Plane has seen it (P7-04). */
   updateReport: UpdateReport.nullable().optional(),
+  /**
+   * How this PC checks the updates it installs (UPD-007, P8-03b3b): VENDOR, only the vendor's
+   * Authenticode signature; UNSIGNED, a test build that takes unsigned installers too, which the
+   * Control Plane alerts on (never install one at a restaurant); NONE, a build that installs no
+   * update. Absent from PCs before P8-03b3b.
+   */
+  updateSigning: z.enum(UPDATE_SIGNING).optional(),
   backup: HeartbeatBackup.nullable().optional(),
   /** The restaurant's opening hours, for "offline during business hours" (VCP-005). */
   businessHours: z

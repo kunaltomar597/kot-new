@@ -41,6 +41,11 @@ updates:
       time: '06:00'
       timezone: Asia/Kolkata
     open-pull-requests-limit: 5
+    # Every Action is pinned to a commit with its version in a comment (UPDATE-T1,
+    # infra/ci/pinned-actions.test.mjs); Dependabot moves both. New releases age first, as above.
+    cooldown:
+      default-days: 5
+      semver-major-days: 14
     commit-message:
       prefix: ci
     groups:

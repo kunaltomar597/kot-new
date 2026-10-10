@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
@@ -40,6 +40,13 @@ import {
   reachablePackages,
   runtimeDependencies,
 } from '../src/packaging/prune.js';
+import {
+  type ReleaseFacts,
+  releaseRefusals,
+  signedBuild,
+  stagedKeys,
+  stagedUpdateSettings,
+} from '../src/packaging/release-guard.js';
 import { VERSION_MATRIX_FILE, versionMatrix } from '../src/packaging/version-matrix.js';
 
 const repoRoot = join(import.meta.dirname, '..', '..', '..');
@@ -606,5 +613,126 @@ describe('[WTR-001] [UPD-007] the phone and tablet APKs in the installer (P7-04e
     await expect(
       stageAppBuilds({ repoRoot, release: '2.3.0', apkDir: empty, target: join(scratch, 'e') }),
     ).rejects.toThrow(/No APKs/);
+  });
+});
+
+describe('[UPD-007] [LIC-003] [PGR-011] the release guard (P8-03b3b)', () => {
+  const licenceKey = generateKeyPairSync('ed25519')
+    .publicKey.export({ type: 'spki', format: 'der' })
+    .toString('base64');
+  const rsaKey = generateKeyPairSync('rsa', { modulusLength: 1024 })
+    .publicKey.export({ type: 'spki', format: 'der' })
+    .toString('base64');
+  const release: ReleaseFacts = {
+    signed: true,
+    updates: { publisher: true, allowUnsigned: false },
+    stagedOn: 'win32',
+    anyPlatform: false,
+    keys: { licence: [licenceKey], pagerFirmware: [sha256('pager key')] },
+  };
+  const test: ReleaseFacts = {
+    signed: false,
+    updates: { publisher: false, allowUnsigned: true },
+    stagedOn: 'win32',
+    anyPlatform: false,
+    keys: { licence: [], pagerFirmware: [] },
+  };
+
+  it('builds a release with all it needs, and a test installer without them', () => {
+    expect(releaseRefusals(release)).toEqual([]);
+    expect(releaseRefusals(test)).toEqual([]);
+    expect(
+      releaseRefusals({ ...test, updates: { publisher: false, allowUnsigned: false } }),
+    ).toEqual([]);
+    expect(releaseRefusals({ ...test, stagedOn: 'darwin', anyPlatform: true })).toEqual([]);
+    expect(releaseRefusals({ ...test, stagedOn: 'darwin' })).toEqual([
+      expect.stringMatching(/staged on darwin; stage it on Windows, or pass --any-platform/),
+    ]);
+  });
+
+  it('refuses a signed build that takes unsigned updates or names no signer', () => {
+    expect(
+      releaseRefusals({ ...release, updates: { publisher: true, allowUnsigned: true } }),
+    ).toEqual([expect.stringMatching(/cannot accept unsigned updates/)]);
+    expect(
+      releaseRefusals({ ...release, updates: { publisher: false, allowUnsigned: false } }),
+    ).toEqual([expect.stringMatching(/RP_UPDATE_PUBLISHER/)]);
+  });
+
+  it('refuses a signed build without the vendor’s licence key or pager firmware key', () => {
+    expect(releaseRefusals({ ...release, keys: { licence: [], pagerFirmware: [] } })).toEqual([
+      expect.stringMatching(
+        /licence key in packages\/licensing\/src\/vendor-keys\.ts \(manual task 23\)/,
+      ),
+      expect.stringMatching(/pager firmware key’s digest .* \(manual task 30\)/),
+    ]);
+    const bad = (keys: Partial<ReleaseFacts['keys']>) =>
+      releaseRefusals({ ...release, keys: { ...release.keys, ...keys } });
+    expect(bad({ licence: [rsaKey] })).toEqual([
+      expect.stringMatching(/not an Ed25519 public key/),
+    ]);
+    expect(bad({ licence: ['not a key!'] })).toEqual([expect.stringMatching(/not an Ed25519/)]);
+    expect(bad({ pagerFirmware: [sha256('a').toUpperCase()] })).toEqual([
+      expect.stringMatching(/lower-case hex/),
+    ]);
+    expect(bad({ pagerFirmware: ['a', 'b', 'c', 'd'].map(sha256) })).toEqual([
+      expect.stringMatching(/at most 3/),
+    ]);
+    expect(bad({ pagerFirmware: ['a', 'b', 'c'].map(sha256) })).toEqual([]);
+  });
+
+  it('refuses a signed build staged off Windows, even as a test of the script', () => {
+    expect(releaseRefusals({ ...release, stagedOn: 'darwin', anyPlatform: true })).toEqual([
+      expect.stringMatching(/a signed installer is staged on Windows/),
+    ]);
+  });
+
+  it('counts a build as signed as electron-builder does: WIN_CSC_LINK when set, else CSC_LINK', () => {
+    expect(signedBuild({})).toBe(false);
+    expect(signedBuild({ WIN_CSC_LINK: '', CSC_LINK: '' })).toBe(false);
+    expect(signedBuild({ WIN_CSC_LINK: 'MIIK...' })).toBe(true);
+    expect(signedBuild({ CSC_LINK: 'C:\\certs\\vendor.p12' })).toBe(true);
+    // An empty WIN_CSC_LINK wins over CSC_LINK, as in electron-builder.
+    expect(signedBuild({ WIN_CSC_LINK: '', CSC_LINK: 'MIIK...' })).toBe(false);
+  });
+
+  it('reads the update settings and the keys the staged installer carries', async () => {
+    const defines = (updates: { publisher?: string; allowUnsigned: boolean }) =>
+      stagedUpdateSettings(nsisDefines({ setupDir: 'x', minFreeGb: 20, cloud: {}, updates }));
+    expect(defines({ publisher: 'CN=Vendor', allowUnsigned: false })).toEqual({
+      publisher: true,
+      allowUnsigned: false,
+    });
+    expect(defines({ allowUnsigned: true })).toEqual({ publisher: false, allowUnsigned: true });
+    expect(defines({ allowUnsigned: false })).toEqual({ publisher: false, allowUnsigned: false });
+
+    // A staged server as the stage step deploys it: its dist, and @rp/licensing in node_modules.
+    const payloadWith = async (name: string, firmwareKeys: string) => {
+      const server = join(scratch, name, INSTALL_FOLDERS.server);
+      const licensing = join(server, 'node_modules', '@rp', 'licensing');
+      const firmware = join(server, 'dist', 'pager-firmware');
+      await mkdir(join(licensing, 'dist'), { recursive: true });
+      await mkdir(firmware, { recursive: true });
+      await writeFile(join(server, 'package.json'), '{"type":"module"}');
+      await writeFile(join(licensing, 'package.json'), '{"type":"module"}');
+      await writeFile(
+        join(licensing, 'dist', 'vendor-keys.js'),
+        `export const VENDOR_LICENCE_KEYS = [${JSON.stringify(licenceKey)}];\n`,
+      );
+      await writeFile(join(firmware, 'firmware-keys.js'), firmwareKeys);
+      return join(scratch, name);
+    };
+    expect(
+      await stagedKeys(
+        await payloadWith(
+          'payload',
+          `export const PAGER_FIRMWARE_KEY_DIGESTS = [${JSON.stringify(sha256('k'))}];\n`,
+        ),
+      ),
+    ).toEqual({ licence: [licenceKey], pagerFirmware: [sha256('k')] });
+    await expect(
+      stagedKeys(await payloadWith('renamed', 'export const OTHER = [];\n')),
+    ).rejects.toThrow(/no list PAGER_FIRMWARE_KEY_DIGESTS/);
+    await expect(stagedKeys(join(scratch, 'nothing'))).rejects.toThrow();
   });
 });

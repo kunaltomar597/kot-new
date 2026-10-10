@@ -4656,6 +4656,7 @@ export const en = {
         AUDIT_CHAIN_MISMATCH: 'Audit log changed',
         UPDATE_FAILED: 'Update failed',
         LICENCE_TAMPERING: 'Licence tampering',
+        UNSIGNED_UPDATES: 'Takes unsigned updates',
       },
       detail: {
         offline: 'Silent for {minutes} minutes of opening hours',
@@ -4681,6 +4682,8 @@ export const en = {
           CLOCK_SKEW: 'the clock far off, again and again',
           REACTIVATION_CODE_NOT_ISSUED: 'a reactivation code the vendor never issued',
         },
+        unsigned:
+          'Version {version} is a test build that installs unsigned updates. Reinstall it with a signed release.',
       },
     },
     remote: {
