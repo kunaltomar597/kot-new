@@ -797,8 +797,9 @@ Ransomware encrypts the PC, or its disk dies, in the middle of a business day.
 - Tests: `apps/server/test/integration/restore.int.test.ts` "backs up, loses the PC, and restores
   with the recovery key (RTO and RPO measured)".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03e by 2026-10-24: the incident response plan's ransomware
-  playbook; the restore rehearsal on a real PC is manual task 25.
+- Status: Partly mitigated. The ransomware playbook and the restaurant's guidance are in
+  `docs/security/incident-response.md` (P8-03e). Plan: manual task 25 by 2026-11-30: the restore
+  rehearsal on a real PC.
 
 ### Elevation of privilege
 

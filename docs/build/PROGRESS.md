@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03d2b2d).
+Last updated: 2026-10-11 (P8-03e).
 
 What exists:
 
@@ -379,6 +379,13 @@ What exists:
   console under Trusted Types, in the POS window, and on the QR site under a nonce): 133
   mitigated. P8-03c2a mitigated PC-D3 (floods from the LAN, `flood.int.test.ts`): 134
   mitigated.
+- `docs/security/incident-response.md`, `incident-templates.md`, `pentest-pack.md` (P8-03e): the
+  incident response plan (severities, roles and on-call, CERT-In 6-hour report, DPDP breach steps,
+  playbooks for a stolen relay credential, a fake QR sticker, ransomware, leaked keys, bad updates,
+  a breached Control Plane, lost devices and a reported vulnerability, the annual tabletop
+  exercise), notice templates and restaurant guidance, and the pack for the testing firm (scope,
+  rules of engagement, environment and accounts, what to send back). Documents only; names,
+  the exercise and the firm are manual task 36.
 - `docs/security/checklists/` (P8-03d2b2d): OWASP ASVS L2 with the Top 10s (81 controls), MASVS-L1 with
   resilience (31), ETSI EN 303 645 (13) and CIS for the Windows host (17); each control Met, N/A with a
   reason, or a Finding with a dated plan. `pnpm security:checklists` (in `pnpm check`) checks that
@@ -405,9 +412,6 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03e the incident response
-  plan and the pack for the penetration testers (the external test needs the firm the Business
-  Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -671,7 +675,7 @@ Recommended next WPs (dependencies met):
         - [x] P8-03d2b2c1 PC-I5, E2, T7, D6 and DESKTOP-E4: BitLocker warning, PC runbook, readiness line
         - [x] P8-03d2b2c2 PC-I6 (the database's own service account) and PC-S4 (CA name constraints)
       - [x] P8-03d2b2d The four checklists (ASVS, MASVS, ETSI, CIS; `pnpm security:checklists`)
-  - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
+  - [x] P8-03e Incident response plan and penetration-test support (the plan and the pack are written; naming the people, the tabletop exercise and the external test are manual task 36 [H])
 - [ ] P8-04 UX polish and accessibility audit
 - [ ] P8-05 Runbooks, manuals, training
 - [ ] P8-06 Pilot readiness
@@ -4414,6 +4418,21 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03e the incident response plan and the penetration-test pack
+
+Decided: the plan keeps blanks (italic) for every name, phone and address, since only the Business Owner
+can fill them; the pilot's entry criteria (P8-06) must check manual task 36 step 1. DPDP: the vendor tells
+the restaurant (fiduciary) at once; the restaurant tells the Board and persons; the 72-hour detailed report
+is stated "confirmed by counsel". The CERT-In address is stated with "check it, it changes". Vulnerability
+disclosure policy (ETSI 5.2): acknowledge in 3 working days, 90 days to fix. RELAY-S3 moves to manual task 20
+(nothing watches credential use), RELAY-S4 becomes Partly mitigated (guidance written; domain is manual
+task 21), PC-D7 keeps manual task 25 (restore rehearsal). ETSI-5.2 and ASVS-14.6 now plan manual task 36.
+
+Built: `docs/security/incident-response.md`, `incident-templates.md`, `pentest-pack.md`, manual task 36,
+links from the security and runbooks READMEs. Threat summary regenerated (195 threats, 29 with a plan).
+Verified: `pnpm security:threats`, `pnpm security:checklists`, links resolve. No code changed.
+Next: P8-04 UX polish and accessibility audit, P8-05 runbooks and manuals, P0-H1 firmware.
 
 ### 2026-10-11: P8-03d2b2d the four standards checklists
 

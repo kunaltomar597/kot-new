@@ -75,13 +75,13 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | ------------------------------------------------------- | ------: | --------: | ---------------: | ------------: | -------: | --------------: | ------------------------: |
 | [The LAN and the local server](local-server-and-lan.md) |      45 |        37 |                5 |             0 |        3 |              18 |                         0 |
 | [The pager channel](pager-channel.md)                   |      26 |        19 |                5 |             1 |        1 |               4 |                         1 |
-| [The QR relay and site](qr-relay-and-site.md)           |      29 |        22 |                4 |             1 |        2 |               6 |                         0 |
+| [The QR relay and site](qr-relay-and-site.md)           |      29 |        22 |                5 |             0 |        2 |               6 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        16 |                3 |             1 |        1 |              10 |                         1 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        14 |                4 |             0 |        2 |               7 |                         0 |
 | [The Vendor Control Plane](control-plane.md)            |      22 |        16 |                5 |             0 |        1 |               7 |                         0 |
 | [The desktop shell](desktop-shell.md)                   |      14 |        11 |                2 |             0 |        1 |               5 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        13 |                4 |             0 |        1 |               5 |                         0 |
-| All                                                     |     195 |       148 |               32 |             3 |       12 |              62 |                         2 |
+| All                                                     |     195 |       148 |               33 |             2 |       12 |              62 |                         2 |
 
 Open threats and their plans, by date:
 
@@ -89,9 +89,6 @@ Open threats and their plans, by date:
 | -------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
 | [UPDATE-E2](update-pipeline.md#update-e2-a-pull-request-signed-as-the-vendors) A pull request signed as the vendor's                   | Medium   | Partly mitigated | manual task 1  | 2026-10-17 |
 | [UPDATE-T6](update-pipeline.md#update-t6-unreviewed-code-on-main) Unreviewed code on main                                              | High     | Not mitigated    | manual task 1  | 2026-10-17 |
-| [PC-D7](local-server-and-lan.md#pc-d7-ransomware-or-a-dead-disk) Ransomware or a dead disk                                             | Medium   | Partly mitigated | P8-03e         | 2026-10-24 |
-| [RELAY-S3](qr-relay-and-site.md#relay-s3-a-stolen-restaurant-credential) A stolen restaurant credential                                | Low      | Partly mitigated | P8-03e         | 2026-10-24 |
-| [RELAY-S4](qr-relay-and-site.md#relay-s4-a-fake-qr-sticker) A fake QR sticker                                                          | Medium   | Not mitigated    | P8-03e         | 2026-10-24 |
 | [MOBILE-E2](phones-and-tablets.md#mobile-e2-a-diner-leaving-the-kiosk) A diner leaving the kiosk                                       | Medium   | Partly mitigated | manual task 33 | 2026-10-31 |
 | [MOBILE-I4](phones-and-tablets.md#mobile-i4-pins-in-screenshots-and-the-recent-apps-list) PINs in screenshots and the recent apps list | Low      | Partly mitigated | manual task 33 | 2026-10-31 |
 | [MOBILE-R2](phones-and-tablets.md#mobile-r2-alerts-acknowledged-from-the-lock-screen) Alerts acknowledged from the lock screen         | Low      | Partly mitigated | manual task 33 | 2026-10-31 |
@@ -100,8 +97,11 @@ Open threats and their plans, by date:
 | [PC-D6](local-server-and-lan.md#pc-d6-attacks-from-guest-wi-fi-on-a-flat-network) Attacks from guest Wi-Fi on a flat network           | Medium   | Partly mitigated | manual task 35 | 2026-10-31 |
 | [PC-E2](local-server-and-lan.md#pc-e2-a-windows-administrator-on-the-pc) A Windows administrator on the PC                             | Medium   | Partly mitigated | manual task 35 | 2026-10-31 |
 | [RELAY-I3](qr-relay-and-site.md#relay-i3-the-relays-own-secrets) The relay's own secrets                                               | Medium   | Partly mitigated | manual task 20 | 2026-11-30 |
+| [RELAY-S3](qr-relay-and-site.md#relay-s3-a-stolen-restaurant-credential) A stolen restaurant credential                                | Low      | Partly mitigated | manual task 20 | 2026-11-30 |
 | [RELAY-I4](qr-relay-and-site.md#relay-i4-diners-privacy) Diners' privacy                                                               | Low      | Partly mitigated | manual task 21 | 2026-11-30 |
+| [RELAY-S4](qr-relay-and-site.md#relay-s4-a-fake-qr-sticker) A fake QR sticker                                                          | Medium   | Partly mitigated | manual task 21 | 2026-11-30 |
 | [LICENCE-I3](licence-mechanism.md#licence-i3-the-vendors-signing-key-leaking) The vendor's signing key leaking                         | Medium   | Partly mitigated | manual task 23 | 2026-11-30 |
+| [PC-D7](local-server-and-lan.md#pc-d7-ransomware-or-a-dead-disk) Ransomware or a dead disk                                             | Medium   | Partly mitigated | manual task 25 | 2026-11-30 |
 | [CP-T2](control-plane.md#cp-t2-a-compromised-pc-deleting-its-own-cloud-backups) A compromised PC deleting its own cloud backups        | Low      | Partly mitigated | manual task 26 | 2026-11-30 |
 | [UPDATE-S3](update-pipeline.md#update-s3-a-spoofed-update-for-the-phones-and-tablets) A spoofed update for the phones and tablets      | Medium   | Partly mitigated | manual task 29 | 2026-11-30 |
 | [PAGER-S4](pager-channel.md#pager-s4-firmware-from-a-spoofed-source) Firmware from a spoofed source                                    | Medium   | Partly mitigated | manual task 30 | 2026-11-30 |

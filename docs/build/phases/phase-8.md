@@ -337,7 +337,7 @@ P8-03d2b2 (2026-10-11) is split: **a** UPDATE-S2, the update signer pinned by it
 subject (`RP_UPDATE_ISSUER`; done); **b** UPDATE-R3 (b1, done: the `release-evidence` job) and LICENCE-T5 (b2); **c** the PC's threats (PC-E2, I5,
 I6, S4, T7, D6; DESKTOP-E4; c1 done: the procedures and the BitLocker warning; c2: I6 and S4); **d** the four checklists (done: `docs/security/checklists/`, `pnpm security:checklists`).
 
-### P8-03e Incident response plan and penetration-test support
+### P8-03e Incident response plan and penetration-test support (done 2026-10-11)
 
 Requirements: SEC-016, SEC-017.
 Deliverables: the incident response plan (severities, contacts and on-call, CERT-In within 6 hours,
