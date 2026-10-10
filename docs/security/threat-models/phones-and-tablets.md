@@ -71,8 +71,9 @@ false data.
   once they have"; `packages/mobile-native/test/lan-trust.test.ts` "downloads a server’s CA, pins
   it and forgets it on unpairing".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: tests of the trust manager and the APK
-  installer on Android itself, and a man-in-the-middle check on a device (MASVS-NETWORK).
+- Status: Partly mitigated. Plan: manual task 33 by 2026-10-31: the man-in-the-middle check on a
+  device (MASVS-NETWORK). The trust manager and the APK installer are tested through JavaScript
+  fakes and checked by Android itself on that device.
 
 #### MOBILE-S2 A copied device credential
 
@@ -147,12 +148,13 @@ Another app on the device sends an intent to the alert service or a receiver, to
 alerts or start an install.
 
 - Mitigation: the service and the receivers are not exported; the device admin receiver needs
-  Android's own permission; the notifications' intents are explicit. Nothing tests the manifest.
+  Android's own permission; the notifications' intents are explicit. A test reads the manifest.
 - Code: `packages/mobile-native/android/src/main/AndroidManifest.xml`.
-- Tests: none, the manifest is checked only by Android; P8-03d adds a test of what it exports.
+- Tests: `packages/mobile-native/test/manifest.test.ts` "exports only the device admin receiver,
+  and only to the system", "declares every component with an explicit exported flag", "asks for no
+  permission the apps do not use".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: a test of the manifest's exported
-  components and permissions.
+- Status: Mitigated (P8-03d2a).
 
 ### Repudiation
 
@@ -172,14 +174,17 @@ A manager denies having let a tablet out of the kiosk, or approved a diner's ord
 Whoever holds a locked phone acknowledges its holder's alert from the lock screen, which shows the
 alert's text to anyone.
 
-- Mitigation: the acknowledgement counts as the phone's holder's; the notification is public on
-  the lock screen and its action works without unlocking.
+- Mitigation: the acknowledgement counts as the phone's holder's; the notification is private on
+  the lock screen, which shows only that there is an alert (the public version carries the
+  phone's "Alerts for ..." words), and Acknowledge needs the phone unlocked. The channel is
+  `rp.alerts.v2` because an existing channel keeps its lock-screen setting. The phone's own screen
+  lock (MDM policy) is what makes this hold.
 - Code: `packages/mobile-native/android/src/main/java/com/rp/mobilenative/AlertNotifications.kt`.
 - Tests: `packages/mobile-native/test/alerts.test.ts` "passes Acknowledge pressed on a notification
   on until it stops listening".
 - Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: a private version of the notification on
-  the lock screen, and Acknowledge only after unlocking.
+- Status: Partly mitigated. Plan: manual task 33 by 2026-10-31: the lock screen on a real phone.
+  The Kotlin cannot be compiled or run in the build environment.
 
 ### Information disclosure
 
@@ -211,22 +216,29 @@ A tablet keeps the last table's cart and orders for the next guests to see.
 
 Android's backup copies the app's files to the cloud or a computer over USB.
 
-- Mitigation: credentials are in the Keystore, which backups do not carry; the apps do not turn
-  Android's backup off, so other files (the pinned CA's settings, the cache) are copied.
+- Mitigation: credentials are in the Keystore, which backups do not carry; both apps set
+  `allowBackup` off, so no other file (the pinned CA's settings, the cache) is copied either.
 - Code: `apps/waiter-app/app.config.ts`; `apps/table-tablet/app.config.ts`.
-- Tests: none, Expo's default applies; P8-03d sets it and tests it.
+- Tests: `apps/waiter-app/test/app-config.test.tsx` "turns Android’s backup off in every
+  environment"; `apps/table-tablet/test/app-config.test.tsx` "turns Android’s backup off in every
+  environment".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: `allowBackup` off in both apps.
+- Status: Mitigated (P8-03d2a).
 
 #### MOBILE-I4 PINs in screenshots and the recent apps list
 
 A PIN typed on a phone shows in a screenshot, a screen recording or the recent apps' preview.
 
-- Mitigation: none; the BRD makes blocking screenshots on PIN screens a Should (SEC-010).
-- Code: `packages/mobile-shell/src/LoginScreen.tsx`.
-- Tests: none, nothing blocks screen capture yet.
+- Mitigation: the PIN pad holds Android's `FLAG_SECURE` on the app's window while it shows, which
+  blocks screenshots, screen recording and the recent apps' preview; the flag goes when the last
+  pad goes. A device that cannot set it still lets the PIN be typed.
+- Code: `packages/ui-native/src/screen-guard.ts`; `packages/ui-native/src/components/PinPad.tsx`;
+  `packages/mobile-native/src/screen-guard.ts`; `RpKioskModule.kt` (`secureScreen`).
+- Tests: `packages/ui-native/test/screen-guard.test.tsx` "secures the screen while a PIN pad
+  shows, and only then"; `packages/mobile-native/test/screen-guard.test.ts` "passes on to the
+  native module whether the window is secure".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: screen capture blocked on the PIN screens.
+- Status: Partly mitigated. Plan: manual task 33 by 2026-10-31: a screenshot on a real device.
 
 ### Denial of service
 
@@ -282,16 +294,20 @@ mode, `adb`, or a tablet that is only screen-pinned.
 - Mitigation: as device owner the app locks the task with no system features, and turns off the
   keyguard and the status bar; leaving needs a manager's PIN. Without device ownership it falls
   back to screen pinning, which a diner can undo, and only the staff panel shows which mode it is
-  in. No user restrictions are set (safe boot, debugging, factory reset), and the set-up procedure
-  leaves USB debugging on.
+  in. As device owner it also sets the user restrictions for safe boot, debugging features, factory
+  reset, new users and account changes; leaving with a manager's PIN lifts only the debugging
+  one, and locking again sets it. The MDM policy (docs/runbooks/mdm-policy.md) turns USB debugging
+  off after set-up.
 - Code: `packages/mobile-native/android/src/main/java/com/rp/mobilenative/RpKioskModule.kt`.
 - Tests: `packages/mobile-native/test/kiosk.test.ts` "locks as device owner and pins otherwise, and
   lets go after the PIN"; `apps/table-tablet/test/app.test.tsx` "PIN from the hidden corner, and
   locks again".
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: the device owner's user restrictions, a
-  home screen that stays the app, the kiosk mode reported to the managers, USB debugging off in
-  the set-up procedure, and the MDM policy.
+- Status: Partly mitigated. Plan: manual task 33 by 2026-10-31: the restrictions on a real
+  tablet. Lock-task mode with no system features already takes the home button away, so no
+  separate home screen is set. The kiosk mode reaching the managers' screens (it is on the staff
+  panel only) is not built: a diner who unpins an unmanaged tablet is seen by staff, and the MDM
+  policy refuses an unmanaged tablet in a dining room.
 
 #### MOBILE-E3 A lost phone still signed in
 
@@ -324,7 +340,8 @@ A waiter roots their phone to change the app or read its memory.
 - Mitigation: the server trusts nothing the app decides (MOBILE-T1); the BRD makes root and tamper
   detection on waiter devices a Should (SEC-010).
 - Code: `packages/mobile-core/src/device-session.ts` (`DeviceSession`).
-- Tests: none, there is no root detection yet.
+- Tests: none; there is no root detection in the app, by decision (MDM policy).
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: decide root detection with the MDM policy,
-  which can refuse rooted devices itself.
+- Status: Accepted: root detection in the app runs on the device the attacker controls and the
+  server trusts nothing the app decides (MOBILE-T1); the MDM's compliance check refuses rooted
+  devices (docs/runbooks/mdm-policy.md).

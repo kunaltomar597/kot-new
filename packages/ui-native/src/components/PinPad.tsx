@@ -1,6 +1,7 @@
 import { fontSize, fontWeight, radius, spacing, touchTarget } from '@rp/design-tokens';
 import { type ReactNode, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSecureScreen } from '../screen-guard.js';
 import { useUiStrings } from '../strings.js';
 import { useTheme, weight } from '../theme.js';
 import { Glyph } from './Glyph.js';
@@ -45,6 +46,7 @@ export function PinPad({
       `PIN length must be a whole number from ${String(MIN_PIN_LENGTH)} to ${String(MAX_PIN_LENGTH)}.`,
     );
   }
+  useSecureScreen();
   const strings = useUiStrings().pinPad;
   const { colors } = useTheme();
   const [digits, setDigits] = useState('');

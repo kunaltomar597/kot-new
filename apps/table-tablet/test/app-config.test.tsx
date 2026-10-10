@@ -62,3 +62,11 @@ describe('[UPD-001] [UPD-007] the app’s over-the-air updates', () => {
     }
   });
 });
+
+describe('[SEC-010] [MOBILE-I3] the app’s data stays on the device', () => {
+  it('turns Android’s backup off in every environment', () => {
+    for (const env of ['development', 'preview', 'production']) {
+      expect(configFor({ APP_ENV: env }).android?.allowBackup).toBe(false);
+    }
+  });
+});

@@ -7,6 +7,7 @@ import {
   watchUncaughtErrors,
 } from '@rp/mobile-core';
 import {
+  AndroidScreenGuard,
   AndroidAlertNotifier,
   AndroidApkInstaller,
   AndroidServerTrust,
@@ -16,6 +17,7 @@ import {
   plainStore,
   secureStore,
 } from '@rp/mobile-native';
+import { setScreenGuard } from '@rp/ui-native';
 import Constants from 'expo-constants';
 import { alertNotificationText } from './notifications';
 
@@ -35,6 +37,8 @@ export const notifier = new AndroidAlertNotifier(alertNotificationText(translato
  */
 async function createSession(): Promise<DeviceSession> {
   await installRandomValues();
+  // No screenshots or recent-apps preview of a PIN pad (MOBILE-I4); a device without it still works.
+  await AndroidScreenGuard.load().then(setScreenGuard, () => undefined);
   const session = new DeviceSession({
     secureStore: await secureStore(),
     plainStore: await plainStore(),
