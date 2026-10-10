@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03c2a).
+Last updated: 2026-10-10 (P8-03c2b).
 
 What exists:
 
@@ -400,9 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03c2b Floods at the cloud's edges: rate limits in front of the Control Plane (CP-D1) and the
-  relay's reads throttled at the relay and the QR site (RELAY-D4), the two threats planned there.
-- Then P8-03d the standards checklists (26 threats planned there), P8-03e the incident response
+- P8-03d the standards checklists (26 threats planned there), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -648,8 +646,8 @@ Recommended next WPs (dependencies met):
           Types), `/version`
     - [ ] P8-03c2 Floods and rate limits
       - [x] P8-03c2a Floods from the LAN (the HTTPS server and the socket, PC-D3)
-      - [ ] P8-03c2b Floods at the cloud's edges (the Control Plane, the relay's reads; CP-D1,
-            RELAY-D4)
+      - [x] P8-03c2b Floods at the cloud's edges (the Control Plane, the relay's reads; CP-D1,
+            RELAY-D4); the edge's own rules wait for the hosting accounts (manual task 32)
   - [ ] P8-03d Standards checklists, Electron review and MDM policy
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
@@ -897,6 +895,21 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03c2b):
+
+785. The Control Plane limits each client address itself (`CP_REQUEST_BURST` 300, then
+     `CP_REQUESTS_PER_SECOND` 30; digital bill pages `CP_PUBLIC_REQUEST_BURST` 60, then 5 a
+     second), because a flood must be stopped before bodies are read even where no edge exists
+     yet. Environment settings, not BRD ⚙ values. A burst of 0 is off (tests). Staging and
+     production refuse to start with the limits on and `CP_TRUST_PROXY` at 0, since behind the
+     load balancer every caller would share one address and one flood would stop everyone.
+786. The relay throttles reads in each function instance's memory (no query): per table token 40
+     then 5 a second, per address 120 then 20 (a table's phones read about 2 a second). The QR
+     site's server shares one read of the menu per table for 5 s. A throttled first view shows
+     the site's error page; the browser retries on its own timer.
+787. CP-D1 and RELAY-D4 stay "Partly mitigated" with their plan moved to manual task 32 (the edge
+     rules at the hosting provider), checked by `infra/edge/check-edge.mjs`.
 
 Decided 2026-10-10 (P8-03c2a):
 
@@ -4358,6 +4371,31 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03c2b Floods at the cloud's edges
+
+Decisions 785 to 787. CP-D1 and RELAY-D4 reduced to Low and moved to manual task 32 (the edge's
+rules need the hosting accounts); no threat is planned for P8-03c2 any more.
+
+Built:
+
+- Control Plane: `src/http/request-limits.ts` (`requestLimitMiddleware`, a token bucket per client
+  address, second in the pipeline after the headers; 429 `RATE_LIMITED` with `Retry-After`), four
+  settings in `CpConfigSchema`, and the `CP_TRUST_PROXY` rule for staging and production.
+- Relay: `infra/supabase/src/read-throttle.ts` (`ReadThrottle`) in `qr-menu`, `order-status` and
+  the GET of `service-request`, before the database; the address is Cloudflare's header or the
+  last `x-forwarded-for` entry.
+- QR site: `src/site/menu-cache.ts` (`sharedMenu`) used by the table page; failures not kept.
+- `infra/edge` (README with the rules, `check-edge.mjs`), manual task 32, tests in
+  `infra/ci/check-edge.test.mjs`.
+- Tests: Control Plane unit `request-limits.test.ts` (5), integration `request-limits.int.test.ts`
+  (2), config (1 new; production fixtures now set `CP_TRUST_PROXY`); relay `read-throttle.test.ts`
+  (4); QR site `menu-cache.test.ts` (2); `ci:test` (3).
+- Docs: CP-D1 and RELAY-D4 in the threat models, `dast.md`, `phase-8.md`, the Control Plane README
+  and `.env.example`.
+
+Not done: the edge rules themselves and a run of `check-edge.mjs` against staging (manual task 32);
+the relay throttles are per function instance, so only the edge counts across instances.
 
 ### 2026-10-10: P8-03c2a Floods from the LAN
 

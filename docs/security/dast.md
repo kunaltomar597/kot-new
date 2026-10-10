@@ -123,6 +123,6 @@ included; nothing in it is secret, and it fits the speed budget (QR-012), but P8
 - **The deployments.** The scans run on plain http on this machine (the local server on its own
   HTTPS). The hosts' TLS, HSTS and edge limits are checked where they are set up: the QR site's
   headers and TLS in manual task 21, the relay's on Supabase in manual task 20, the Control
-  Plane's when it is hosted; rate limits at the edge are P8-03c2b.
+  Plane's when it is hosted; the in-service limits, `infra/edge` and its check of a deployment are P8-03c2b.
 - **The penetration test.** DAST finds what a scanner finds. The testers of P8-03e get these
   reports, the threat models and the authorisation sweep as their starting point.

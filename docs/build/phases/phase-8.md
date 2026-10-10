@@ -290,10 +290,17 @@ and the floods, which need load from the LAN and limits at the edge, are another
     1,000 messages waiting and none written in a sweep destroyed; `flood.int.test.ts` from
     127.0.0.1 and ::1, with a flood at full speed from a worker thread against the production
     limits.
-  - **P8-03c2b Floods at the cloud's edges (CP-D1, RELAY-D4).** Rate limits in the Control Plane
-    and the configuration of the edge in front of it; the relay's reads throttled per table and
-    the QR site's menu fetch made cheap; the checks against a deployment. Acceptance: no threat
-    left planned for P8-03c2.
+  - **P8-03c2b Floods at the cloud's edges (CP-D1, RELAY-D4) (done).** Rate limits in the Control
+    Plane and the configuration of the edge in front of it; the relay's reads throttled per table
+    and the QR site's menu fetch made cheap; the checks against a deployment. Acceptance: no threat
+    left planned for P8-03c2. As built: `requestLimitMiddleware` in the Control Plane (per address
+    300 at once then 30 a second, digital bill pages 60 then 5, `/v1/health` never; settings
+    `CP_REQUEST_BURST` and the three others; staging and production need `CP_TRUST_PROXY`);
+    `ReadThrottle` in the relay's functions (per table token 40 then 5 a second, per address 120
+    then 20) before the database; `sharedMenu` on the QR site (one read of the relay per table in
+    5 s); `infra/edge` with the rules the edge must have and `check-edge.mjs`, which floods a
+    deployment and expects 429 with `Retry-After`; the edge itself needs the hosting accounts
+    (manual task 32), so CP-D1 and RELAY-D4 stay "Partly mitigated" with that plan.
 
 ### P8-03d Standards checklists, Electron review and MDM policy
 

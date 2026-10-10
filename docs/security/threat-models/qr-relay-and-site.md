@@ -434,13 +434,23 @@ checked.
 Anyone with a table's code reads the menu and order status as fast as they can, and every page
 view of the site fetches the menu again, which costs the vendor and slows the relay.
 
-- Mitigation: the menu is read only when it changed for a browser that has the latest; nothing
-  limits the reads.
-- Code: `infra/supabase/config.toml`; `apps/qr-menu/src/site/relay.ts`.
-- Tests: none, throttling belongs to the edge in front of the functions and the site.
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03c2b by 2026-10-19: rate limits at the edge (the site's host and
-  Supabase), checked by the DAST run.
+- Mitigation: the menu is read only when it changed for a browser that has the latest. The
+  functions throttle reads before the database is reached: a table's token gets 40 reads at once
+  and then 5 a second, a client address 120 and then 20 a second (the menu, an order's status and a
+  service request's status), 429 `RATE_LIMITED` with `Retry-After`. The site's server asks the
+  relay once per table in 5 seconds and gives that menu to everyone who opens the page meanwhile.
+  The throttles are in each function instance's memory; the edge counts across instances
+  (`infra/edge`).
+- Code: `infra/supabase/src/read-throttle.ts` (`ReadThrottle`); `infra/supabase/src/qr-menu.ts`;
+  `infra/supabase/src/order-status.ts`; `infra/supabase/src/service-request.ts`;
+  `apps/qr-menu/src/site/menu-cache.ts` (`sharedMenu`); `infra/edge/check-edge.mjs`.
+- Tests: `infra/supabase/test/read-throttle.test.ts` "refuses a table that reads faster than its
+  limit, with 429 and Retry-After", "limits an address across its tables", "counts the address the
+  nearest proxy saw, not one the caller wrote"; `apps/qr-menu/test/menu-cache.test.ts` "asks the
+  relay once for visitors who arrive together, and again after a few seconds".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Partly mitigated. Plan: manual task 32 by 2026-11-30: the rate limits at the edge (the
+  site's host and Supabase) once they have a host, checked with `infra/edge/check-edge.mjs`.
 
 #### RELAY-D5 The relay or the internet down
 

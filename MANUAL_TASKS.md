@@ -37,6 +37,9 @@ code from going live:
       cloud HSM (SEC-006), so there may be no .p12 to export: tell Claude which signing service
       the certificate comes with, and the job will call it from that environment instead:
       [`manual-tasks/31-code-signing.md`](manual-tasks/31-code-signing.md).
+- [ ] Rate limits at the edge in front of the Control Plane, the relay and the QR site, once they
+      have a host, then run `infra/edge/check-edge.mjs` against staging (threats CP-D1, RELAY-D4):
+      [`manual-tasks/32-edge-rate-limits.md`](manual-tasks/32-edge-rate-limits.md).
 - [ ] Supabase organisation, Mumbai region (QR relay), then deploy the relay schema and give the
       edge functions and the Control Plane their logins:
       [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).

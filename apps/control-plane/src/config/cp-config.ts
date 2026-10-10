@@ -54,6 +54,16 @@ export const CpConfigSchema = z
     /** Reverse proxies in front of the service, so rate limits see the real client address. */
     trustProxy: z.coerce.number().int().min(0).max(5).default(0),
     /**
+     * Requests one client address may make at once, then per second (CP-D1); 0 is off (tests).
+     * A restaurant's PCs and a vendor's staff are far below it; the edge in front of the service
+     * has the real limits (`infra/edge`), these are the instance's own.
+     */
+    requestBurst: z.coerce.number().int().min(0).max(100_000).default(300),
+    requestsPerSecond: z.coerce.number().int().min(1).max(10_000).default(30),
+    /** The same for digital bill pages, which anyone on the internet opens. */
+    publicRequestBurst: z.coerce.number().int().min(1).max(100_000).default(60),
+    publicRequestsPerSecond: z.coerce.number().int().min(1).max(10_000).default(5),
+    /**
      * The AI provider's key for menu import (ONB-006), from the secret manager only (SEC-002).
      * Without it, AI import is off and restaurants use the Excel template.
      */
@@ -307,6 +317,15 @@ export const CpConfigSchema = z
         message: `the escrow key stays in India: CP_ESCROW_KMS_REGION is one of ${INDIA_REGIONS.join(', ')}`,
       });
     }
+    // Behind the load balancer every caller would share its address, and one limit would stop all.
+    if (config.env !== 'development' && config.requestBurst > 0 && config.trustProxy === 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['trustProxy'],
+        message:
+          'staging and production need CP_TRUST_PROXY (the proxies in front) for the request limits',
+      });
+    }
     if (config.env !== 'development' && !databaseUsesTls(config.databaseUrl)) {
       context.addIssue({
         code: 'custom',
@@ -336,6 +355,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CpConfig {
     logPretty: env.LOG_PRETTY,
     heartbeatSeconds: env.CP_HEARTBEAT_SECONDS,
     trustProxy: env.CP_TRUST_PROXY,
+    requestBurst: env.CP_REQUEST_BURST,
+    requestsPerSecond: env.CP_REQUESTS_PER_SECOND,
+    publicRequestBurst: env.CP_PUBLIC_REQUEST_BURST,
+    publicRequestsPerSecond: env.CP_PUBLIC_REQUESTS_PER_SECOND,
     aiApiKey: env.CP_AI_API_KEY === '' ? undefined : env.CP_AI_API_KEY,
     aiModel: env.CP_AI_MODEL,
     aiBaseUrl: env.CP_AI_BASE_URL,

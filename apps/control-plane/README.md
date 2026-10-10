@@ -77,7 +77,14 @@ Environment variables only; see `.env.example`.
   pages a CSP with Trusted Types, and a path outside `/v1` that nothing served is the API's JSON
   404 (P8-03c1, `docs/security/dast.md`).
 - `CP_TRUST_PROXY` is the number of reverse proxies in front of the service. It is needed so the
-  enrolment rate limit sees the client's address, not the load balancer's.
+  enrolment rate limit sees the client's address, not the load balancer's. Staging and production
+  refuse to start without it while the request limits are on.
+- `CP_REQUEST_BURST` (300) and `CP_REQUESTS_PER_SECOND` (30) limit each client address, and
+  `CP_PUBLIC_REQUEST_BURST` (60) and `CP_PUBLIC_REQUESTS_PER_SECOND` (5) the digital bill pages
+  on top of that: past them the answer is 429 `RATE_LIMITED` with `Retry-After`, before any body
+  is read (`src/http/request-limits.ts`, threat CP-D1). The health probe is never limited. A
+  burst of 0 turns them off. These are each instance's own; the edge in front of the service
+  limits across instances (`infra/edge/README.md`).
 - Serve the API at the root of its host. The signature covers the path, so a proxy must not
   rewrite it.
 

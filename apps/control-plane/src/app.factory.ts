@@ -13,6 +13,7 @@ import {
   notFoundOutsideApi,
   securityHeadersMiddleware,
 } from './http/pipeline.js';
+import { requestLimitMiddleware } from './http/request-limits.js';
 import { webMiddleware } from './http/web-static.js';
 
 export const API_PREFIX = 'v1';
@@ -37,6 +38,15 @@ export function configureControlPlaneApp(app: INestApplication): void {
   express.use(correlationMiddleware);
   express.use(securityHeadersMiddleware);
   if (config.env !== 'development') express.use(hstsMiddleware);
+  // Before the web app, the bodies and everything else that costs (CP-D1).
+  express.use(
+    requestLimitMiddleware({
+      burst: config.requestBurst,
+      perSecond: config.requestsPerSecond,
+      publicBurst: config.publicRequestBurst,
+      publicPerSecond: config.publicRequestsPerSecond,
+    }),
+  );
   // The vendor web app (P7-02e) on the same origin as the API; never for `/v1/...`.
   if (config.webDir !== undefined) express.use(webMiddleware(config.webDir));
   // Menu photos and PDFs (ONB-006) are the only large bodies; everything else stays small.

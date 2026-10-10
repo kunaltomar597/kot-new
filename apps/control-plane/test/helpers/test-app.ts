@@ -25,6 +25,8 @@ export function testConfig(databaseUrl: string, overrides: Partial<CpConfig> = {
       logLevel: 'silent',
       billingIntervalMinutes: 0,
       fleetSweepSeconds: 0,
+      // Tests share one address and make many calls; the limit has tests of its own.
+      requestBurst: 0,
     }),
     ...overrides,
   });
