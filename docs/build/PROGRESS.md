@@ -183,8 +183,11 @@ What exists:
   pinned, boosted and blocked dishes with their words, and a preview of what a table is suggested
   now (P4-03c); the Floor page (sections and tables: add, change, archive with a reason, restore)
   and the Stations and printers page (printers with whether they print, a test page and sending
-  their tickets elsewhere; stations shown, printed or both) (P4-03d). 360 tests, and 23
-  Playwright steps.
+  their tickets elsewhere; stations shown, printed or both) (P4-03d); the Restaurant page (name,
+  contact and logo, opening hours, when the business day ends) and the Tax and invoice page
+  (invoice particulars with the GSTIN checked, tax groups with rates as percentages, invoice
+  series with their first number as it is typed), changed by the Owner after the second factor
+  and read only for managers (P4-03e). 412 tests, and 24 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -199,7 +202,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03e Tax and invoice (P4-03a done; see phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -308,7 +310,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-03b Notification rules
 - [x] P4-03c Recommendation rules with boost, pin and block
 - [x] P4-03d Floor, stations and printers
-- [ ] P4-03e Tax and invoice
+- [x] P4-03e Tax and invoice
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
 - [ ] P4-06 Report exports
@@ -635,6 +637,42 @@ Decided 2026-10-05 (P4-03b):
      too.
 261. The page's heading is "Notification rules" (its link says "Notifications"), because the
      toasts' landmark is already called "Notifications".
+
+Decided 2026-10-10 (P4-03e):
+
+279. The restaurant's own details are two more pages of Settings. Restaurant holds what managers
+     change (name, contact, logo, opening hours, when the business day ends), as the server's
+     profile route allows them (`OPERATIONS_CONFIGURE`). Tax and invoice holds the invoice
+     particulars, the tax groups and the invoice series: the Owner changes them after the second
+     factor (AUTH-006), and managers and custom roles that open Settings see them read only, with
+     a note saying only the Owner changes them (MGR-007).
+280. The legal name, address, state, GSTIN and FSSAI number sit on the Tax and invoice page, not
+     the Restaurant page: they are what every tax invoice prints (BILL-002), and the server guards
+     them with the tax capability and the second factor.
+281. The logo is uploaded as a menu photo (the server's only image upload), so choosing or
+     replacing it needs `MENU_MANAGE`; without it the dialog says so, and removing the logo still
+     works. A separate logo upload route was not worth adding for one image.
+282. Every change on both pages takes an optional reason for the audit log, as settings do
+     (decision 247), of at least 3 characters when one is given; archiving a tax group or a
+     series asks for a reason, as archiving does elsewhere.
+283. A new tax group starts with CGST and SGST rows with empty rates and SAC 996331 (restaurant
+     service), the usual case for an intra-state restaurant; the rows can be removed for a
+     nil-rated group or changed to IGST or CESS. Rates are typed as percentages with up to two
+     decimals and sent as basis points.
+284. A new invoice series puts the financial year in the number and starts again every April,
+     with "/" and 6 digits (INV/2026-27/000001), the seed's format; the dialog shows the first
+     number as it is typed, from the domain's formatter.
+285. Opening hours allow up to 4 windows a day (the server takes 28 a week), and windows are not
+     checked for overlap: the hours are shown to guests and staff, nothing is refused because of
+     them, and the server accepts them as they are. "Use Monday's hours every day" fills the week
+     from Monday, the usual first step.
+286. The default series has no Make default or Archive buttons: it is already the default, and
+     the server refuses to archive it. Another series is made default first.
+287. The Tax and invoice page reads again on `RestaurantChanged`, a menu change (the items using
+     each group) and `BillPrinted` (the invoices issued from each series, which fix a series's
+     format), so what it shows matches what the server will allow.
+288. The refusal to archive a tax group in use is the text the Owner reads, singular for one item:
+     "1 menu item uses this tax group. Give it another tax group first."
 
 Decided 2026-10-10 (P4-03d):
 
@@ -1422,6 +1460,43 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P4-03e Tax and invoice (P4-03 done)
+
+Built:
+
+- Console: Settings → Restaurant (`RestaurantScreen.tsx`, `RestaurantDialogs.tsx`, logic in
+  `restaurant-view.ts`): the name, phone, email and logo, the opening hours day by day and when
+  the business day ends, each part with its own dialog, for everyone who opens Settings. Settings
+  → Tax and invoice (`TaxScreen.tsx`, `TaxDialogs.tsx`, logic in `tax-view.ts`): the invoice
+  particulars, the tax groups and the invoice series, changed by the Owner after the second
+  factor and shown read only, with a note, to everyone else. `FormDialog.tsx` holds the dialog
+  frame and the optional reason the settings dialogs share; the Floor and Printing dialogs moved
+  onto it. Strings under `restaurant.*` and `tax.*`.
+- Server: the refusal to archive a tax group in use reads well for one item, and the integration
+  test checks its words.
+- Tests: the view logic on its own (contact, hours, cut-off, legal particulars and GSTIN, tax
+  groups, series and their first number), both screens with Testing Library and axe (second
+  factor, cancelling it, refusals kept in the dialog, live changes, read-only views, a custom role
+  without `MENU_MANAGE`), and a Playwright step: a manager sets every day's hours, the Owner adds
+  a tax group and a series after the second factor and archives the group, and the manager sees
+  the tax page read only.
+
+Deferred:
+
+- Nothing from the spec. The first-run wizard that walks through these steps is P7-07; these
+  pages are what it will reuse.
+
+Gotchas for the next session:
+
+- `labelled()` in the console tests now matches the whole label with an optional " *" (the
+  required mark): "Address" no longer matches "Address, second line (optional)".
+- ReasonDialog shows the server's refusal as the field's error (`rp-field__error`), not as an
+  alert; FormDialog shows it as an alert.
+- The e2e Owner has used recovery codes 0 to 3; the next Owner step should use `recoveryCodes[4]`.
+- An invoice series's example depends on today's financial year: compute it with the domain's
+  `formatInvoiceNumber` and `financialYearOf(calendarDateOf(now, 'Asia/Kolkata'))`, as the e2e
+  step does, rather than writing the year down.
 
 ### 2026-10-10: P4-03d Floor, stations and printers
 

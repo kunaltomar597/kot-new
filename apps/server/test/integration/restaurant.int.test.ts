@@ -325,6 +325,9 @@ describe('[BILL-004] tax groups', () => {
 
     const inUse = await archive();
     expect([inUse.status, codeOf(inUse)]).toEqual([409, 'TAX_GROUP_IN_USE']);
+    expect(ApiError.parse(inUse.body).message).toBe(
+      '1 menu item uses this tax group. Give it another tax group first.',
+    );
     const listed = TaxGroupListResponse.parse(
       (await server().get('/api/v1/tax-groups').set(as(owner))).body,
     );

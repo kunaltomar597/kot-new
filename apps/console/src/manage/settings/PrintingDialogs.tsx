@@ -1,9 +1,10 @@
 import type { PrinterView, StationView } from '@rp/contracts';
-import { Button, ChoiceGroup, Dialog, Select, TextField } from '@rp/ui-web';
-import { type ReactNode, useId, useState } from 'react';
+import { ChoiceGroup, Select, TextField } from '@rp/ui-web';
+import { useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
+import { FormDialog } from './FormDialog.js';
 import {
   activePrinters,
   CONNECTIONS,
@@ -23,66 +24,6 @@ import {
   stationFormOf,
   stationRequestOf,
 } from './printing-view.js';
-
-/** A dialog's form with a cancel and a confirm button, the server's refusal shown above them. */
-function FormDialog({
-  title,
-  description,
-  confirmLabel,
-  busy,
-  error,
-  onConfirm,
-  onClose,
-  children,
-}: {
-  title: string;
-  description?: string;
-  confirmLabel?: string;
-  busy: boolean;
-  error: string | undefined;
-  onConfirm: () => void;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const t = useT();
-  const formId = useId();
-  return (
-    <Dialog
-      open
-      onClose={onClose}
-      dismissible={!busy}
-      title={title}
-      description={description}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={busy}>
-            {t('settings.dialog.cancel')}
-          </Button>
-          <Button type="submit" form={formId} loading={busy}>
-            {confirmLabel ?? t('settings.dialog.save')}
-          </Button>
-        </>
-      }
-    >
-      <form
-        id={formId}
-        className="console-form"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          onConfirm();
-        }}
-      >
-        {children}
-        {error === undefined ? null : (
-          <p role="alert" className="console-notice console-notice--danger">
-            {error}
-          </p>
-        )}
-      </form>
-    </Dialog>
-  );
-}
 
 const isConnection = (value: string): value is PrinterForm['connection'] =>
   CONNECTIONS.some((connection) => connection === value);

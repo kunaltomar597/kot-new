@@ -425,13 +425,63 @@ As built:
   archives the station, the printer and the table with reasons. Both pages and every dialog pass axe,
   and both pages fit a 360 px phone.
 
-### P4-03e Tax and invoice
+### P4-03e Tax and invoice (done)
 
 Requirements: MGR-007 (Owner only), AUTH-006, BILL-002, BILL-003, BILL-004, ONB-004 steps 1 to 3.
 Deliverables: the restaurant profile (managers) and its legal details, tax groups and invoice
 series (the Owner, after the second factor; managers see them).
 Acceptance: Playwright: the Owner adds a tax group and an invoice series; a manager sees them
 read-only.
+
+As built:
+
+- Console: Settings has two more pages for everyone who opens Settings. Restaurant
+  (`/manage/settings/restaurant`) holds what managers change (`OPERATIONS_CONFIGURE`, as the
+  server's profile route requires): the name, phone, email and logo, the opening hours, and when
+  the business day ends. Tax and invoice (`/manage/settings/tax`) holds the invoice particulars
+  (legal name, address, state, GSTIN, FSSAI number), the tax groups and the invoice series. The
+  Owner changes them after the second factor (`TAX_AND_INVOICE_SETTINGS`, AUTH-006); managers see
+  them with a note that only the Owner changes them, and no buttons. The legal particulars sit on
+  the Tax page rather than the Restaurant page because the server guards them with the tax
+  capability and the second factor. The logic without React is in `restaurant-view.ts` and
+  `tax-view.ts`. The dialog frame (`FormDialog`) and the optional reason (`ReasonField`) are in
+  `FormDialog.tsx`; the Floor and Printing dialogs now use the same frame.
+- Restaurant: a name of up to 60 characters; phone and email optional and checked as the server
+  checks them (a phone of 6 to 20 digits, with spaces, dashes and a leading + allowed). The logo is
+  uploaded as a menu photo, so choosing or replacing it needs `MENU_MANAGE` (the dialog says so
+  when it is missing); removing it does not. Opening hours go day by day, up to 4 windows a day,
+  each with both times and different ones; a window that closes before it opens closes after
+  midnight, and the page says "the next day". "Use Monday's hours every day" copies Monday to the
+  week. Windows are not checked for overlap. The business day ends at a time before 12:00; the
+  server refuses a change that would move today's business date, and the dialog shows its words.
+  Every dialog takes an optional reason for the audit log (at least 3 characters when given), and
+  every save sends the whole profile, as the server's PUT expects.
+- Invoice particulars: the state is chosen from a list (taken from the GSTIN when none is chosen);
+  the GSTIN's format, state code and check character are checked, and that it is from the chosen
+  state; a 6-digit PIN code and a 14-digit FSSAI number. An empty GSTIN means not registered.
+- Tax groups: each shows its total, its taxes in print order, the SAC code and how many menu items
+  use it. A new group starts with CGST and SGST rows and SAC 996331 (restaurant service). A name
+  is unique among active groups whatever its case; the SAC is 4 to 8 digits or none; up to 6
+  taxes, each code once (capital letters and digits, starting with a letter), rates typed as
+  percentages with up to 2 decimals, at most 100 % in all, and the total shown as it is typed. A
+  group with no taxes is nil-rated. Changing a group in use says how many items it applies to;
+  archiving one in use is refused by the server and the dialog shows why.
+- Invoice series: each shows the first number of this financial year, whether it starts again
+  every April, how many invoices it has issued and whether it is the default. A new series puts
+  the financial year in the number, with "/" and 6 digits, and shows its first number as it is
+  typed. A prefix is never used twice, even after its series is archived; numbers have at most 16
+  characters and leave room for 10,000 invoices a year. A series with invoices keeps its prefix and
+  format, so only its name changes. The default series has no Make default or Archive buttons.
+  Archive asks why. The page reads again on `RestaurantChanged`, `MenuDraftChanged`,
+  `MenuPublished` and `BillPrinted` (for the item and invoice counts).
+- Server: the refusal to archive a tax group in use says one thing for one ("1 menu item uses this
+  tax group. Give it another tax group first.") and is the text the Owner reads.
+- Playwright: Vikram (Manager) gives every day lunch from 12:00 to 15:30 and dinner from 19:00 to
+  01:00 by copying Monday's hours, then sees the Tax and invoice page with the Owner-only note and
+  no buttons. Asha (Owner) adds GST 12 % (CGST and SGST at 6 % each), confirming the password and
+  a recovery code; adds the series Catering with the prefix CAT, whose first number shows as it is
+  typed and which saves without asking again; then archives GST 12 % with a reason and finds it
+  among the archived groups. Both pages and every dialog pass axe, and both fit a 360 px phone.
 
 ## P4-04 Alert centre and system screen
 
