@@ -76,12 +76,12 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | [The LAN and the local server](local-server-and-lan.md) |      45 |        34 |                6 |             2 |        3 |              18 |                         2 |
 | [The pager channel](pager-channel.md)                   |      26 |        19 |                5 |             1 |        1 |               4 |                         1 |
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        22 |                4 |             1 |        2 |               6 |                         0 |
-| [The update pipeline](update-pipeline.md)               |      21 |        15 |                3 |             2 |        1 |              11 |                         1 |
+| [The update pipeline](update-pipeline.md)               |      21 |        16 |                3 |             1 |        1 |              10 |                         1 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        14 |                4 |             1 |        1 |               6 |                         1 |
 | [The Vendor Control Plane](control-plane.md)            |      22 |        16 |                5 |             0 |        1 |               7 |                         0 |
 | [The desktop shell](desktop-shell.md)                   |      14 |        11 |                2 |             0 |        1 |               5 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        13 |                4 |             0 |        1 |               5 |                         0 |
-| All                                                     |     195 |       144 |               33 |             7 |       11 |              62 |                         5 |
+| All                                                     |     195 |       145 |               33 |             6 |       11 |              61 |                         5 |
 
 Open threats and their plans, by date:
 
@@ -97,7 +97,6 @@ Open threats and their plans, by date:
 | [PC-I6](local-server-and-lan.md#pc-i6-a-local-windows-user-reads-the-data) A local Windows user reads the data                           | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [PC-S4](local-server-and-lan.md#pc-s4-a-rogue-server-or-a-man-in-the-middle-on-the-lan) A rogue server or a man in the middle on the LAN | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [PC-T7](local-server-and-lan.md#pc-t7-restoring-an-old-backup-to-hide-fraud) Restoring an old backup to hide fraud                       | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
-| [UPDATE-R3](update-pipeline.md#update-r3-which-commit-a-signed-installer-came-from) Which commit a signed installer came from            | Medium   | Not mitigated    | P8-03d         | 2026-10-22 |
 | [PC-D7](local-server-and-lan.md#pc-d7-ransomware-or-a-dead-disk) Ransomware or a dead disk                                               | Medium   | Partly mitigated | P8-03e         | 2026-10-24 |
 | [RELAY-S3](qr-relay-and-site.md#relay-s3-a-stolen-restaurant-credential) A stolen restaurant credential                                  | Low      | Partly mitigated | P8-03e         | 2026-10-24 |
 | [RELAY-S4](qr-relay-and-site.md#relay-s4-a-fake-qr-sticker) A fake QR sticker                                                            | Medium   | Not mitigated    | P8-03e         | 2026-10-24 |

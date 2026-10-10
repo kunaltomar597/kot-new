@@ -301,6 +301,74 @@ jobs:
             apps/desktop/staging/version-matrix.json
           retention-days: 14
 
+  release-evidence:
+    # UPDATE-R3: which commit and which build made a signed installer. A signed attestation
+    # (GitHub's build provenance) binds the installer, its release manifest and its SBOM to this
+    # commit and this run; `gh attestation verify <file> --repo <owner/repo>` checks it. Main only,
+    # and no certificate: the job only reads what the signing job published.
+    name: Release evidence
+    needs: [windows-installer]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      # The same pin as security.yml's SBOM job (a test keeps them equal).
+      CDXGEN_VERSION: 12.8.4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-installer
+          path: release
+
+      # The artifact keeps the folders below the two paths' common ancestor; the rest wants them flat.
+      - name: Flatten the downloaded files
+        run: find release -mindepth 2 -type f -exec mv -t release {} +
+
+      - name: SBOM of this commit
+        run: >-
+          pnpm dlx @cyclonedx/cdxgen@${CDXGEN_VERSION}
+          --type js --no-install-deps --spec-version 1.7
+          --output release/sbom.cdx.json .
+
+      - name: Release manifest (commit, run and the files' hashes)
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          node infra/ci/release-manifest.mjs --version "$version" --commit "$GITHUB_SHA" \
+            --run "$GITHUB_RUN_ID" --repository "$GITHUB_REPOSITORY" --out release/release-manifest.json \
+            release/RestaurantPlatform-Setup-*.exe release/version-matrix.json release/sbom.cdx.json
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release/RestaurantPlatform-Setup-*.exe
+            release/version-matrix.json
+            release/sbom.cdx.json
+            release/release-manifest.json
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-evidence
+          path: |
+            release/release-manifest.json
+            release/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90
+
   relay-supabase:
     # The relay's isolation and rule tests (P5-01) also run in the check job on plain PostgreSQL
     # with a Supabase prelude; here they run against a real local Supabase stack (ADR-0015).

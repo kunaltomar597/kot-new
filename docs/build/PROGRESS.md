@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03d2b2a).
+Last updated: 2026-10-11 (P8-03d2b2b1).
 
 What exists:
 
@@ -400,7 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d2b2b to d (UPDATE-R3, LICENCE-T5, the PC's threats and the four standards checklists; 9 threats still planned there), P8-03e the incident response
+- P8-03d2b2b2 to d (LICENCE-T5, the PC's threats and the four standards checklists; 9 threats still planned there), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -659,7 +659,9 @@ Recommended next WPs (dependencies met):
       threats still planned for P8-03d (PC-E2, I5, I6, S4, T7, D6; UPDATE-R3; LICENCE-T5;
       DESKTOP-E4); split:
       - [x] P8-03d2b2a UPDATE-S2: the update signer pinned by its issuer too
-      - [ ] P8-03d2b2b UPDATE-R3 (attestation, SBOM and commit with each release), LICENCE-T5
+      - [~] P8-03d2b2b UPDATE-R3 and LICENCE-T5, split:
+        - [x] P8-03d2b2b1 UPDATE-R3: attestation, SBOM and commit with each release
+        - [ ] P8-03d2b2b2 LICENCE-T5: what integrity checks can do on a customer's PC; the PC's file hashes on the heartbeat
       - [ ] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4)
       - [ ] P8-03d2b2d The four checklists
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
@@ -4405,6 +4407,22 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03d2b2b1 which commit a signed installer came from
+
+Decided: evidence is a new `release-evidence` job (main only, no certificate, no environment) after
+`windows-installer`: SBOM of the commit, `release-manifest.json` (version, full commit, run,
+repository, SHA-256 of installer, version matrix and SBOM) and GitHub build-provenance attestation of
+all four. P8-03d2b2b is split: LICENCE-T5 is a design question (integrity checks and obfuscation
+against a customer who is the PC's administrator, and files' hashes on the heartbeat) and goes to
+P8-03d2b2b2.
+
+Built: `infra/ci/release-manifest.mjs` and its tests, the job in `ci.yml` (actions pinned by commit:
+attest-build-provenance v4.2.2, download-artifact v8.0.2), the CDXGEN pin kept equal to
+`security.yml` by a test. UPDATE-R3 Mitigated (summary 34 with a plan). Manual task 31 has the
+`gh attestation verify` step. Not run here: the job itself (needs GitHub; no credentials on this
+Mac), so the artifact flattening step and the attestation are checked on the first push to main.
+Tests: `pnpm ci:test` 28, `pnpm security:threats`. Next: P8-03d2b2b2.
 
 ### 2026-10-11: P8-03d2b2a the update signer pinned by its issuer
 

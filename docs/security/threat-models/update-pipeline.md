@@ -274,13 +274,20 @@ A manager denies allowing an update during service, or the vendor cannot tell wh
 
 Nobody can prove which commit and which build made a signed installer.
 
-- Mitigation: CI writes an SBOM per commit; it is not attached to the release, and the release
-  does not name its commit or build.
-- Code: `.github/workflows/security.yml`.
-- Tests: none, provenance is CI's configuration.
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: a build attestation, the SBOM and the commit
-  with each release (SEC-013's checklist).
+- Mitigation: on every push to `main` the `release-evidence` job takes the installer and its
+  component version matrix, makes the commit's SBOM and a `release-manifest.json` (version, full
+  commit, CI run, repository and each file's SHA-256), and attests all four with GitHub's build
+  provenance. `gh attestation verify <installer> --repo <owner/repo>` names the commit and the run
+  that made it. The job has no certificate and no environment.
+- Code: `.github/workflows/ci.yml` (`release-evidence`), `infra/ci/release-manifest.mjs`
+  (`buildReleaseManifest`).
+- Tests: `infra/ci/release-manifest.test.mjs` "names the commit, the run and each file by its hash,
+  in a fixed order", "refuses a manifest without a full commit, a run, a repository or files",
+  "attests the installer, the manifest and the SBOM in a job of main only, without the
+  certificate".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated. The attestation exists once the repository's CI runs on GitHub; the release
+  process (manual task 31) says to verify it before an installer is given to a restaurant.
 
 ### Information disclosure
 
