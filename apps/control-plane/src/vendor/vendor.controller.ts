@@ -32,7 +32,7 @@ import { RateLimiter } from '../auth/rate-limiter.js';
 import { CpError } from '../errors/cp-error.js';
 import { ZodPipe } from '../http/zod.pipe.js';
 import { VendorAuthService } from './vendor-auth.service.js';
-import { Vendor, type VendorRequest, vendorOf } from './vendor.guard.js';
+import { StepUp, Vendor, type VendorRequest, vendorOf } from './vendor.guard.js';
 
 /** Vendor staff: signing in, setting up an account, the accounts and access reviews (VCP-001). */
 @Controller('vendor')
@@ -100,6 +100,7 @@ export class VendorController {
 
   @Post('users')
   @Vendor('USERS_MANAGE')
+  @StepUp()
   createUser(
     @Req() request: VendorRequest,
     @Body(new ZodPipe(CreateVendorUserRequest)) body: CreateVendorUserRequest,
@@ -109,6 +110,7 @@ export class VendorController {
 
   @Patch('users/:id')
   @Vendor('USERS_MANAGE')
+  @StepUp()
   updateUser(
     @Req() request: VendorRequest,
     @Param(new ZodPipe(VendorUserParams)) params: VendorUserParams,
@@ -121,6 +123,7 @@ export class VendorController {
   @Post('users/:id/reset')
   @HttpCode(200)
   @Vendor('USERS_MANAGE')
+  @StepUp()
   async resetUser(
     @Req() request: VendorRequest,
     @Res({ passthrough: true }) response: Response,
@@ -134,6 +137,7 @@ export class VendorController {
   @Post('access-reviews')
   @HttpCode(200)
   @Vendor('USERS_MANAGE')
+  @StepUp()
   async review(
     @Req() request: VendorRequest,
     @Body(new ZodPipe(VendorAccessReviewRequest)) body: VendorAccessReviewRequest,

@@ -109,6 +109,32 @@ export const VendorUserView = z.object({
 });
 export type VendorUserView = z.infer<typeof VendorUserView>;
 
+/** The header that carries a fresh authenticator code for a step-up operation (CP-S2). */
+export const STEP_UP_HEADER = 'x-rp-step-up';
+
+/**
+ * Operations that ask for the authenticator again, however recent the sign-in (ASVS L2
+ * re-authentication, CP-S2): restoring a restaurant's data, managing staff, publishing releases and
+ * pushing settings. The code must be one not used before (not the sign-in's). Refused with 403
+ * `STEP_UP_REQUIRED`, which does not end the session.
+ */
+export const STEP_UP_OPERATIONS = [
+  'createVendorUser',
+  'updateVendorUser',
+  'resetVendorUser',
+  'recordVendorAccessReview',
+  'publishVendorRelease',
+  'updateVendorRollout',
+  'pinVendorInstallation',
+  'issueRestoreCode',
+  'setFleetRemoteSettings',
+  'setInstallationRemoteSettings',
+] as const;
+
+export function needsStepUp(operationId: string): boolean {
+  return (STEP_UP_OPERATIONS as readonly string[]).includes(operationId);
+}
+
 /** Hours a request to reset a Super Admin waits for a second Super Admin. */
 export const VENDOR_RESET_REQUEST_HOURS = 24;
 

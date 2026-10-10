@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03d2a).
+Last updated: 2026-10-11 (P8-03d2b1).
 
 What exists:
 
@@ -400,7 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d2b the standards checklists (14 threats still planned there), P8-03e the incident response
+- P8-03d2b2 the standards checklists (10 threats still planned there), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -652,8 +652,12 @@ Recommended next WPs (dependencies met):
     - [x] P8-03d1 The Electron shell's hardening (DESKTOP-E2, E3, I3, R2, S1)
     - [x] P8-03d2a Phones and tablets: backups, PIN screen capture, lock-screen alerts, kiosk
           restrictions, manifest test, MDM policy (MOBILE-E2, E4, I3, I4, R2, S1, T3)
-    - [ ] P8-03d2b The checklists (ASVS, MASVS, ETSI, CIS) and the 14 PC, Control Plane, update and
-          licence threats still planned for P8-03d
+    - [x] P8-03d2b1 The Control Plane: the authenticator asked again for sensitive actions, the
+          audit log's copy for the host, reads classified, the CLI's host (CP-S2, R1; T5 and R2
+          wait for manual task 34)
+    - [ ] P8-03d2b2 The checklists (ASVS, MASVS, ETSI, CIS) and the 10 PC, update and licence
+          threats still planned for P8-03d (PC-E2, I5, I6, S4, T7, D6; UPDATE-R3, S2; LICENCE-T5;
+          DESKTOP-E4)
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
 - [ ] P8-05 Runbooks, manuals, training
@@ -4397,6 +4401,24 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03d2b1 the Control Plane's step-up and audit copy
+
+Built: `STEP_UP_OPERATIONS` and `x-rp-step-up` in the contracts (ten operations: staff accounts,
+access reviews, releases and rollouts, pins, restore codes, remote settings); `@StepUp()` and the
+guard check a code never used before (the sign-in's does not count), through
+`VendorAuthService.stepUp` (wrong codes count towards the 15-minute lock and are audited as
+`vendor.step_up_failed`; 403 `STEP_UP_REQUIRED`, the session stays); the web app's `StepUpPrompt`,
+`StepUpDialog` and the client asking before those calls; every audit entry also logged as an
+`"event":"audit"` line for the host's log store; `read-audit.test.ts` makes each new vendor read
+a decision; vendor access policy (step-up, audit copy, reads, the CLI's host); manual task 34.
+Threats: CP-S2 and CP-R1 Mitigated, CP-T5 and CP-R2 Partly mitigated until manual task 34.
+Tests: Control Plane 197, Control Plane web 79. Gotchas: Control Plane tests use `bearer(token)`,
+which now adds a fresh step-up code for sessions opened by `signInVendor` (or `knownSession`) and
+moves the service's `clock` to that code's time; `bearerOnly` sends none. Under `pnpm test` the
+relay's tests sometimes report "1 error" when the machine is loaded (they pass alone and on
+`--force`). Decided: the only audited reads are diagnostics bundles and restore codes, since all
+others show the Control Plane's own records.
 
 ### 2026-10-10: P8-03d2a phones and tablets hardening
 

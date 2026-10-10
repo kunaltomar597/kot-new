@@ -4214,6 +4214,15 @@ export const en = {
       codeHint: 'The 6-digit code in your authenticator app.',
       submit: 'Sign in',
     },
+    /** Asked again before restoring data, managing staff, publishing releases or pushing settings (CP-S2). */
+    stepUp: {
+      title: 'Confirm with your authenticator',
+      intro:
+        'This changes a restaurant or the vendor’s own access. Enter a new code from your authenticator app: wait for the next one if you just used it.',
+      code: 'Authenticator code',
+      codeHint: 'The 6-digit code in your authenticator app now.',
+      confirm: 'Confirm',
+    },
     setup: {
       title: 'Set up your account',
       badLink: 'This setup link is not valid. Ask your Super Admin for a new one.',

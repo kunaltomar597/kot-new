@@ -40,6 +40,9 @@ code from going live:
 - [ ] Rate limits at the edge in front of the Control Plane, the relay and the QR site, once they
       have a host, then run `infra/edge/check-edge.mjs` against staging (threats CP-D1, RELAY-D4):
       [`manual-tasks/32-edge-rate-limits.md`](manual-tasks/32-edge-rate-limits.md).
+- [ ] The Control Plane host's log store (the audit log's copy, kept 180 days) and the operator host
+      for the admin CLI (threats CP-T5, CP-R2):
+      [`manual-tasks/34-control-plane-host-logs.md`](manual-tasks/34-control-plane-host-logs.md).
 - [ ] Android checks on a real phone and tablet: backups off, PIN screens not captured, the private
       lock-screen alert, the kiosk's user restrictions, a rogue server refused (threats MOBILE-E2,
       R2, I4, S1): [`manual-tasks/33-android-device-checks.md`](manual-tasks/33-android-device-checks.md).

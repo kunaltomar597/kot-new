@@ -120,6 +120,10 @@ possible; when duties change, change the role and record why in the account chan
   the setup link. Keep at least three Super Admins so that one can be reset. With only two, the
   operator creates a new Super Admin with the CLI on the operator host
   (`vendor-user:create`, audited as `cli:<name>`), who then disables the old account.
+- Restoring a restaurant's data, managing staff accounts, publishing releases and pushing
+  settings ask for the authenticator again, however recent the sign-in. Enter a code that the app
+  shows now and that you have not used: after signing in, wait for the next code. A wrong code
+  counts towards the same lock as a wrong sign-in.
 - Disabling an account ends its sessions at once. Disable an account on the day its holder leaves.
 
 ## 6. Quarterly access review (SEC-018)
@@ -146,6 +150,19 @@ audit entry with the actor (`vendor:<id>` or `cli:<name>`), the target, and the 
 This includes notes, provisioning, licence changes, re-binds, reactivation codes, billing and
 account changes. The log is append-only: the database refuses changes and deletions. Support
 notes are append-only as well; a correction is a new note.
+
+Each entry is also written to the Control Plane's log (`"event":"audit"`) and kept 180 days in
+the hosting provider's log store in India, which no vendor staff account can change (SEC-015;
+manual task 34). A line may name a change that was rolled back: the database is the record.
+
+Reads: opening a diagnostics bundle and issuing a restore code are audited; every other screen
+shows the Control Plane's own records (fleet state, licences, versions, billing, notes), not a
+restaurant's business data. A new screen that shows business data must be audited, and the test
+`read-audit.test.ts` fails until each new read is classified.
+
+The admin CLI runs only on the operator host or in the deployment pipeline, never on a laptop.
+Only the operators named in the access review have a shell there, each under their own account
+with MFA and the provider's session recording; `CP_ACTOR` names the person (`cli:<name>`).
 
 Production access outside the Control Plane is audited too: database access goes through the
 hosting provider's audited sessions. The CLI records `CP_ACTOR`, which must name the person.

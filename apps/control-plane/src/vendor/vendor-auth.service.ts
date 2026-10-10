@@ -286,6 +286,58 @@ export class VendorAuthService {
     };
   }
 
+  /** Replaced by tests, which sign in at the time of their own codes. */
+  clock: () => Date = () => new Date();
+
+  /**
+   * Asks for the authenticator again (CP-S2): the code must be one never used, so the sign-in's
+   * does not count. A wrong code counts towards the same lock as a wrong sign-in; the session
+   * stays (403, not 401).
+   */
+  async stepUp(principal: VendorPrincipal, code: string | undefined): Promise<void> {
+    const now = this.clock();
+    const user = await this.prisma.vendorUser.findUnique({ where: { id: principal.userId } });
+    if (!canSignIn(user)) throw unauthorised();
+    if (user.lockedUntil !== null && user.lockedUntil > now) throw lockedError(user.lockedUntil);
+    const step =
+      code === undefined
+        ? null
+        : verifyTotp(open(this.key, user.totpSecret), code, now, user.totpLastStep);
+    const spent =
+      step === null
+        ? 0
+        : (
+            await this.prisma.vendorUser.updateMany({
+              where: { id: user.id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
+              data: { totpLastStep: step, failedSignIns: 0 },
+            })
+          ).count;
+    if (spent === 1) return;
+    if (code !== undefined) {
+      const tries = await this.prisma.$queryRaw<{ failures: number }[]>`
+        UPDATE vendor_users SET failed_sign_ins = failed_sign_ins + 1, updated_at = ${now}
+        WHERE id = ${user.id}::uuid RETURNING failed_sign_ins AS failures`;
+      const counted = tries[0]?.failures;
+      if (counted !== undefined && counted >= MAX_FAILURES) {
+        await this.lockIfOver(user.id, counted, now);
+      }
+      await this.prisma.transaction((tx) =>
+        this.audit.record(tx, {
+          actor: principal.actor,
+          action: 'vendor.step_up_failed',
+          targetType: 'vendor_user',
+          targetId: user.id,
+          details: {},
+        }),
+      );
+    }
+    throw new CpError(
+      403,
+      'STEP_UP_REQUIRED',
+      'Enter a new code from your authenticator app to do this.',
+    );
+  }
+
   /** The session behind a bearer token, kept alive; refused when ended, expired or idle. */
   async authenticate(token: string, now = new Date()): Promise<VendorPrincipal> {
     const session = await this.prisma.vendorSession.findUnique({

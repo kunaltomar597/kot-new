@@ -20,6 +20,7 @@ import { createTestApp, createTestDatabase, httpServer } from '../helpers/test-a
 import {
   bearer,
   codeFor,
+  knownSession,
   signInVendor,
   type TestVendor,
   vendorAccount,
@@ -118,6 +119,7 @@ describe('[VCP-001] [SEC-018] vendor staff accounts', () => {
               now.at,
             );
     adminToken = session.token;
+    knownSession(app, admin, adminToken);
     expect(session.capabilities).toContain('USERS_MANAGE');
     const me = VendorMeView.parse(
       (await server().get('/v1/vendor/me').set(bearer(adminToken))).body,

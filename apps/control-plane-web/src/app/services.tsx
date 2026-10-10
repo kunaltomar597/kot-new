@@ -1,11 +1,13 @@
 import type { VendorCapability } from '@rp/contracts/control-plane';
 import { createContext, type ReactNode, use, useEffect, useSyncExternalStore } from 'react';
 import { type CpApi, CpApiError, createCpApi } from './cp-api.js';
+import { StepUpPrompt } from './step-up.js';
 import { SessionStore, type SessionState, type TokenStorage } from './session.js';
 
 export interface Services {
   readonly api: CpApi;
   readonly session: SessionStore;
+  readonly stepUp: StepUpPrompt;
 }
 
 /** The API client and the session, wired so that a refused session signs the person out. */
@@ -13,17 +15,21 @@ export function createServices(options: {
   readonly baseUrl: string;
   readonly storage: TokenStorage;
   readonly fetch?: typeof fetch;
+  /** Tests answer the authenticator's question themselves. */
+  readonly stepUp?: StepUpPrompt;
 }): Services {
   const session = new SessionStore(options.storage);
+  const stepUp = options.stepUp ?? new StepUpPrompt();
   const api = createCpApi({
     baseUrl: options.baseUrl,
     ...(options.fetch !== undefined && { fetch: options.fetch }),
     token: () => session.token,
+    stepUp: () => stepUp.ask(),
     onSessionOver: () => {
       session.cleared(true);
     },
   });
-  return { api, session };
+  return { api, session, stepUp };
 }
 
 const ServicesContext = createContext<Services | null>(null);
@@ -60,6 +66,10 @@ function useServices(): Services {
 
 export function useApi(): CpApi {
   return useServices().api;
+}
+
+export function useStepUp(): StepUpPrompt {
+  return useServices().stepUp;
 }
 
 export function useSessionStore(): SessionStore {
