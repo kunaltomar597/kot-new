@@ -1,10 +1,12 @@
 import { MENU_IMPORT_SHEETS, type MenuImportSheet, type MenuImportSheets } from '@rp/domain';
 import readXlsxFile from 'read-excel-file/node';
-import { checkZipLimits } from './zip-limits.js';
+import { unpackWorkbook } from './zip-limits.js';
 
 export type WorkbookResult =
   | { readonly ok: true; readonly sheets: MenuImportSheets }
   | { readonly ok: false; readonly message: string };
+
+const UNREADABLE = 'The workbook could not be read. Save it again as .xlsx from Excel.';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -27,24 +29,24 @@ export function cellText(value: unknown): string {
 
 /** Reads the template's sheets from a .xlsx; sheet names are matched without case. */
 export async function readWorkbook(content: Buffer): Promise<WorkbookResult> {
-  const zip = checkZipLimits(content);
-  if (!zip.ok) {
+  // Unpacked here within the limits (PC-D4); the reader gets the parts again, stored.
+  const unpacked = await unpackWorkbook(content);
+  if (!unpacked.ok) {
     return {
       ok: false,
       message:
-        zip.reason === 'TOO_LARGE'
+        unpacked.reason === 'TOO_LARGE'
           ? 'The workbook unpacks to more than a menu needs. Remove other sheets or pictures.'
-          : 'The file is not an Excel workbook (.xlsx). Save it as .xlsx or send CSV sheets.',
+          : unpacked.reason === 'NOT_ZIP'
+            ? 'The file is not an Excel workbook (.xlsx). Save it as .xlsx or send CSV sheets.'
+            : UNREADABLE,
     };
   }
   let workbook: Awaited<ReturnType<typeof readXlsxFile>>;
   try {
-    workbook = await readXlsxFile(content);
+    workbook = await readXlsxFile(unpacked.archive);
   } catch {
-    return {
-      ok: false,
-      message: 'The workbook could not be read. Save it again as .xlsx from Excel.',
-    };
+    return { ok: false, message: UNREADABLE };
   }
   const sheets: Partial<Record<MenuImportSheet, string[][]>> = {};
   for (const { sheet, data } of workbook) {

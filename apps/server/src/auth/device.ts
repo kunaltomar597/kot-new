@@ -27,3 +27,18 @@ export interface DeviceAuthenticator {
   /** The paired device, or undefined when the request carries no valid device credential. */
   authenticate(request: Request): Promise<AuthenticatedDevice | undefined>;
 }
+
+/** The device each request proved, once checked before its body was read (PC-D1). */
+const checkedDevices = new WeakMap<Request, { readonly device: AuthenticatedDevice | undefined }>();
+
+/** Keeps what the device check found for this request, a paired device or none. */
+export function rememberDevice(request: Request, device: AuthenticatedDevice | undefined): void {
+  checkedDevices.set(request, { device });
+}
+
+/** What the device check found for this request, or undefined when it has not run yet. */
+export function rememberedDevice(
+  request: Request,
+): { readonly device: AuthenticatedDevice | undefined } | undefined {
+  return checkedDevices.get(request);
+}

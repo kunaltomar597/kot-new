@@ -73,7 +73,7 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 
 | Component                                               | Threats | Mitigated | Partly mitigated | Not mitigated | Accepted | Residual Medium | Residual High or Critical |
 | ------------------------------------------------------- | ------: | --------: | ---------------: | ------------: | -------: | --------------: | ------------------------: |
-| [The LAN and the local server](local-server-and-lan.md) |      45 |        27 |               12 |             3 |        3 |              22 |                         2 |
+| [The LAN and the local server](local-server-and-lan.md) |      45 |        31 |                9 |             2 |        3 |              18 |                         2 |
 | [The pager channel](pager-channel.md)                   |      26 |        19 |                5 |             1 |        1 |               4 |                         1 |
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        15 |                8 |             4 |        2 |               9 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        11 |                7 |             2 |        1 |              11 |                         2 |
@@ -81,16 +81,12 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | [The Vendor Control Plane](control-plane.md)            |      22 |         8 |               12 |             1 |        1 |               8 |                         1 |
 | [The desktop shell](desktop-shell.md)                   |      14 |         5 |                5 |             3 |        1 |               7 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        11 |                5 |             2 |        0 |               5 |                         0 |
-| All                                                     |     195 |       106 |               60 |            19 |       10 |              73 |                         8 |
+| All                                                     |     195 |       110 |               57 |            18 |       10 |              69 |                         8 |
 
 Open threats and their plans, by date:
 
 | Threat                                                                                                                                      | Residual | Status           | Plan           | By         |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
-| [PC-D1](local-server-and-lan.md#pc-d1-large-bodies-before-authentication) Large bodies before authentication                                | Medium   | Not mitigated    | P8-03b2c       | 2026-10-13 |
-| [PC-D4](local-server-and-lan.md#pc-d4-decompression-bombs-in-uploads) Decompression bombs in uploads                                        | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
-| [PC-I9](local-server-and-lan.md#pc-i9-diners-personal-data-kept-after-they-ask) Diners' personal data kept after they ask                   | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
-| [PC-T8](local-server-and-lan.md#pc-t8-formulas-in-exported-files) Formulas in exported files                                                | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
 | [LICENCE-D2](licence-mechanism.md#licence-d2-a-failed-fingerprint-read-taken-for-another-pc) A failed fingerprint read taken for another PC | Medium   | Not mitigated    | P8-03b3        | 2026-10-15 |
 | [LICENCE-D3](licence-mechanism.md#licence-d3-a-release-with-no-vendor-keys) A release with no vendor keys                                   | Medium   | Not mitigated    | P8-03b3        | 2026-10-15 |
 | [LICENCE-R3](licence-mechanism.md#licence-r3-tampering-nobody-looks-at) Tampering nobody looks at                                           | Low      | Partly mitigated | P8-03b3        | 2026-10-15 |

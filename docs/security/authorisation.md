@@ -82,7 +82,10 @@ stations only.
 ### Endpoints open to anyone
 
 Reviewed; widening this list is a security decision, and the sweep test fails until its list is
-changed too.
+changed too. The device token is checked before any request body is read: a caller without a paired
+device may send at most 16 KB, which every public endpoint needs a few hundred bytes of; only
+paired devices may send more (1 MB, and photos, menu files and AI imports on their own paths;
+PC-D1, `apps/server/src/http/body-limits.ts`).
 
 | Endpoint                                         | Why it is public                                                                                   |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |

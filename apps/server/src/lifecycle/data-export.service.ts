@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { DataExportView } from '@rp/contracts';
-import { financialYearFromStart, financialYearOf } from '@rp/domain';
+import { csvCell, financialYearFromStart, financialYearOf } from '@rp/domain';
 import pg from 'pg';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
@@ -34,14 +34,16 @@ const SECRET_COLUMN = /(_hash|secret)$/;
 
 const BATCH = 5_000;
 
-/** A value as a CSV field: objects and arrays as JSON. */
+/**
+ * A value as a CSV field: objects and arrays as JSON. Text a spreadsheet would run as a formula
+ * (a note typed as "=HYPERLINK(...)") gets a leading apostrophe (`csvCell`, PC-T8); the JSON
+ * lines keep it as typed.
+ */
 function csvField(value: unknown): string {
-  let text: string;
-  if (typeof value === 'string') text = value;
-  else if (typeof value === 'number' || typeof value === 'boolean') text = String(value);
-  else if (value === null || value === undefined) text = '';
-  else text = JSON.stringify(value);
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  if (typeof value === 'string' || typeof value === 'number') return csvCell(value);
+  if (typeof value === 'boolean') return String(value);
+  if (value === null || value === undefined) return '';
+  return csvCell(JSON.stringify(value));
 }
 
 /**
@@ -255,7 +257,8 @@ export class DataExportService {
 const README = `Restaurant data export (DATA-010)
 
 json/<table>.jsonl  every row of each table, one JSON object per line
-csv/<table>.csv     the same rows as CSV (values that are lists or objects are written as JSON)
+csv/<table>.csv     the same rows as CSV (values that are lists or objects are written as JSON;
+                    text that a spreadsheet would run as a formula starts with an apostrophe)
 invoice-register.csv  every invoice: number, date, status, customer, taxable value, taxes,
                     totals, in rupees
 invoices/FY<year>/<month>/<date>.pdf  every invoice of the day as printed

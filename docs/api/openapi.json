@@ -3699,7 +3699,7 @@
       "post": {
         "operationId": "eraseDinerContact",
         "summary": "Erase a diner's phone number on their request",
-        "description": "DATA-011, SEC-019: the number is cleared from every contact record and feedback keeps no link to it; invoices keep what tax law needs. Audited without the number.",
+        "description": "DATA-011, SEC-019: the number is cleared from every contact record, order and bill (matched on its last ten digits), and feedback keeps no link to it; invoices keep what tax law needs but send no more digital bills to it, and a digital bill still waiting for it is not sent. Audited without the number.",
         "tags": ["feedback"],
         "requestBody": {
           "required": true,
@@ -16675,9 +16675,12 @@
       "EraseDinerContactResponse": {
         "type": "object",
         "properties": {
-          "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "bills": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
         },
-        "required": ["erased"],
+        "required": ["erased", "orders", "bills", "invoices"],
         "additionalProperties": false
       },
       "ExportFormat": { "type": "string", "enum": ["CSV", "XLSX", "PDF"] },

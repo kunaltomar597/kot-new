@@ -164,7 +164,13 @@ those threats:
   - **P8-03b2c Bodies, uploads, exports and erasure** (PC-D1, PC-D4, PC-T8, PC-I9): a device
     check before the large body parsers, the workbook inflated with a limit on what comes out,
     `csvCell` in the data export and the invoice register, and erasure of a diner's number on
-    orders and bills.
+    orders and bills. Done (2026-10-10): the device token checked before any body is read, 16 KB
+    for a caller without a paired device and a larger announced body refused before it is read
+    (`apps/server/src/http/body-limits.ts`); the workbook's XML parts inflated by the server a
+    byte past the directory's size at most, and given to the reader again stored; `csvCell` in
+    the data export's CSV files and the invoice register; erasure clears the number on orders and
+    bills (matched on its last ten digits) and withdraws the invoices' consent, so no digital bill
+    goes to it again, leaving sent ones as they were. Four threats mitigated.
 - **P8-03b3 Fixes to the licence and the update pipeline.** The threats planned for P8-03b3: the
   clock guard, fingerprint reads, licence replay, reactivation reports, tamper alerts, builds
   without vendor keys, the updater's version check and pinned CI actions.

@@ -98,6 +98,36 @@ describe('[DATA-010] the full data export', () => {
     ).toBe(1);
   }, 120_000);
 
+  it('[SEC-004] neutralises formulas in its CSV files and the invoice register, the JSON keeping them as typed', async () => {
+    const formula = '=HYPERLINK("http://example.test","Click")';
+    const order = await prisma.order.findFirstOrThrow({ orderBy: { id: 'asc' } });
+    await prisma.order.update({ where: { id: order.id }, data: { notes: formula } });
+    const invoice = await prisma.invoice.findFirstOrThrow({ orderBy: { id: 'asc' } });
+    await prisma.invoice.update({ where: { id: invoice.id }, data: { customerName: '+1+2' } });
+    const owner = await signIn(app, kit, 'OWNER');
+    await prisma.session.update({
+      where: { id: owner.session.id },
+      data: { secondFactorAt: new Date() },
+    });
+    const started = await request(httpServer(app))
+      .post('/api/v1/data-export')
+      .set(authHeaders(kit.deviceId, owner.accessToken))
+      .send({ folder: mkdtempSync(join(tmpdir(), 'rp-export-formulas-')) });
+    expect(started.status, JSON.stringify(started.body)).toBe(202);
+    await app.get(DataExportService).settled();
+    const out = DataExportView.parse(started.body).folder;
+
+    const csv = readFileSync(join(out, 'csv', 'orders.csv'), 'utf8');
+    expect(csv).toContain(`"'=HYPERLINK(""http://example.test"",""Click"")"`);
+    expect(csv).not.toMatch(/(^|,)"?=HYPERLINK/m);
+    const json = readFileSync(join(out, 'json', 'orders.jsonl'), 'utf8');
+    expect(json).toContain(JSON.stringify(formula).slice(1, -1));
+    const register = readFileSync(join(out, 'invoice-register.csv'), 'utf8');
+    expect(register).toContain(`${invoice.invoiceNumber},`);
+    expect(register).toContain(",'+1+2,");
+    expect(register).not.toMatch(/,\+1\+2,/);
+  }, 120_000);
+
   it('wants the whole path of the folder', async () => {
     const owner = await signIn(app, kit, 'OWNER');
     await prisma.session.update({

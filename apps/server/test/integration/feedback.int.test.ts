@@ -193,7 +193,12 @@ describe('[DATA-011] erasing a diner’s number', () => {
       .set(as(owner))
       .send({ phone: '9876543210', reason: 'Asked at the counter' });
     expect(response.status, JSON.stringify(response.body)).toBe(200);
-    expect(EraseDinerContactResponse.parse(response.body)).toEqual({ erased: 1 });
+    expect(EraseDinerContactResponse.parse(response.body)).toEqual({
+      erased: 1,
+      orders: 0,
+      bills: 0,
+      invoices: 0,
+    });
     const contact = await prisma.dinerContact.findFirstOrThrow({});
     expect(contact.phone).toBeNull();
     expect(contact.erasedAt).not.toBeNull();

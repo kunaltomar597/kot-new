@@ -364,16 +364,17 @@ Someone restores last week's backup to remove the bills, voids or payments since
 Text a diner or a member of staff typed (a note, a name, a feedback comment) starts with `=` and
 runs as a formula when a spreadsheet opens an export.
 
-- Mitigation: reports and the audit export write cells through `csvCell`, which neutralises
-  formulas; the full data export and the invoice register only quote cells.
+- Mitigation: every CSV the server writes goes through `csvCell`, which neutralises formulas with
+  a leading apostrophe: the reports, the audit export, the full data export's tables and the
+  invoice register; the data export's JSON lines keep the text as typed (P8-03b2c).
 - Code: `packages/domain/src/csv.ts` (`csvCell`); `apps/server/src/lifecycle/data-export.service.ts`
-  (`csvField`); `apps/server/src/lifecycle/invoice-books.ts` (`csvField`).
+  (`csvField`); `apps/server/src/lifecycle/invoice-books.ts` (`writeInvoiceRegister`).
 - Tests: `packages/domain/test/csv.test.ts` "neutralises text a spreadsheet would run as a
   formula"; `apps/server/test/integration/audit-viewer.int.test.ts` "exports the log with its
-  filters, and not to people without it".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b2c by 2026-10-13: the data export's CSV files and the
-  invoice register use `csvCell` (the JSONL keeps the text as typed).
+  filters, and not to people without it"; `apps/server/test/integration/data-export.int.test.ts`
+  "neutralises formulas in its CSV files and the invoice register, the JSON keeping them as typed".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2c: the data export and the invoice register only quoted cells).
 
 ### Repudiation
 
@@ -576,17 +577,22 @@ A diagnostics bundle sent to the vendor carries secrets or diners' and staff's p
 A diner asks to be forgotten (DATA-011) and their number stays on orders and bills.
 
 - Mitigation: numbers are kept only with consent, with its purpose and words; erasure clears the
-  diner's contact, feedback and digital bills, and retention anonymises old personal data. Orders
-  and bills keep the number as typed.
+  diner's contact and feedback's link to it, and the number on every order and bill, matched on
+  its last ten digits however it was typed; invoices keep what tax law needs but lose the consent,
+  so no digital bill goes to the number again; a digital bill still waiting is not sent, one
+  already sent stays as it was; retention anonymises old personal data (P8-03b2c).
 - Code: `apps/server/src/feedback/feedback.service.ts` (`FeedbackService.erase`);
   `apps/server/src/lifecycle/retention.service.ts`.
 - Tests: `apps/server/test/integration/feedback.int.test.ts` "keeps a number only with consent,
   with its purpose and words", "lets the Owner erase it everywhere but invoices, audited without
-  the number"; `apps/server/test/integration/retention.int.test.ts` "removes old operational data
-  and anonymises old personal data, audited".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b2c by 2026-10-13: erasure also clears the number on orders
-  and bills (matched on its digits), and leaves digital bills already sent as they were.
+  the number"; `apps/server/test/integration/digital-bills.int.test.ts` "erases the number on
+  orders and bills however it was typed; invoices keep it but send no more bills to it", "does
+  not send a waiting bill once the diner’s number is erased; a sent one stays as it was";
+  `apps/server/test/integration/retention.int.test.ts` "removes old operational data and
+  anonymises old personal data, audited".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2c: orders and bills kept the number, and an invoice could still send
+  a digital bill to it).
 
 #### PC-I10 Metadata in menu photos
 
@@ -619,14 +625,20 @@ A server started outside the installer without TLS serves HTTP, WS and plain MQT
 Any host on the LAN, with no credential, sends many large request bodies; the server reads and
 parses them before it checks who is calling, and runs out of memory during service.
 
-- Mitigation: bodies are limited (1 MB, 7 MB for photos and menu files, 55 MB for AI imports), but
-  the parsers run before the device check.
-- Code: `apps/server/src/app.factory.ts` (`JSON_BODY_LIMIT`, `UPLOAD_BODY_LIMIT`,
-  `AI_IMPORT_BODY_LIMIT`).
-- Tests: `apps/server/test/integration/errors.int.test.ts` "limits request body size".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03b2c by 2026-10-13: a device-token check before the large
-  parsers, so only paired devices can send more than a small body.
+- Mitigation: the device token is checked before any body is read; a caller without a paired
+  device may send 16 KB (pairing, a device token and the first run need a few hundred bytes), and
+  a larger body it announces is refused before a byte is read; only paired devices get 1 MB, and
+  7 MB for photos and menu files or 55 MB for AI imports on those paths alone. A device whose token
+  no longer verifies hears `DEVICE_NOT_RECOGNISED`, so its client renews the token (P8-03b2c).
+- Code: `apps/server/src/http/body-limits.ts` (`bodyParsers`, `ANONYMOUS_BODY_LIMIT`,
+  `UPLOAD_BODY_LIMIT`, `AI_IMPORT_BODY_LIMIT`); `apps/server/src/auth/device.ts`
+  (`rememberDevice`).
+- Tests: `apps/server/test/integration/body-limits.int.test.ts` "reads no more than a small body
+  from a caller without a paired device, uploads included", "answers before the body arrives",
+  "tells a device whose token no longer verifies to renew it, without reading a large body";
+  `apps/server/test/integration/errors.int.test.ts` "limits request body size".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2c: the parsers ran before the device check).
 
 #### PC-D2 Lockouts used to stop the restaurant
 
@@ -676,16 +688,19 @@ updating during service.
 A manager's account uploads a photo or a menu spreadsheet that expands to gigabytes when read.
 
 - Mitigation: photos are refused over 5 MB or too many pixels; spreadsheets are refused when their
-  ZIP directory says they unpack too large. The spreadsheet reader streams the entries by their
-  local headers, so a directory that lies is not caught.
+  ZIP directory says they unpack too large, and the server inflates each part the reader needs
+  itself, stopping a byte past the size the directory gave, so a directory that lies is caught
+  too; the reader gets those parts again, stored, and inflates nothing (P8-03b2c).
 - Code: `apps/server/src/photos/photo-processing.ts` (`PHOTO_MAX_PIXELS`);
-  `apps/server/src/menu/import/zip-limits.ts` (`checkZipLimits`).
+  `apps/server/src/menu/import/zip-limits.ts` (`checkZipLimits`, `unpackWorkbook`).
 - Tests: `apps/server/test/unit/photo-processing.test.ts` "refuses a file over 5 MB and a picture
   with too many pixels"; `apps/server/test/unit/menu-workbook.test.ts` "refuses archives that
-  would unpack too large, and files that are not ZIPs".
-- Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03b2c by 2026-10-13: the workbook's entries are inflated with a
-  limit on what comes out, whatever the directory says.
+  would unpack too large, and files that are not ZIPs", "inflates the workbook with a limit on
+  what comes out, whatever the directory says", "gives the reader only the XML parts, stored, so
+  it inflates nothing itself".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2c: the reader inflated entries by their local headers without a
+  limit).
 
 #### PC-D5 A full disk or a stopped log archive
 

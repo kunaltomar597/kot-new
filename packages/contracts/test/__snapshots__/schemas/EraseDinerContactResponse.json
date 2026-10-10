@@ -1,13 +1,23 @@
 {
   "input": {
     "type": "object",
-    "properties": { "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } },
-    "required": ["erased"]
+    "properties": {
+      "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "bills": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["erased", "orders", "bills", "invoices"]
   },
   "output": {
     "type": "object",
-    "properties": { "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } },
-    "required": ["erased"],
+    "properties": {
+      "erased": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "orders": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "bills": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "invoices": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+    },
+    "required": ["erased", "orders", "bills", "invoices"],
     "additionalProperties": false
   }
 }

@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b2b).
+Last updated: 2026-10-10 (P8-03b2c).
 
 What exists:
 
@@ -60,7 +60,8 @@ What exists:
   a device's PIN lock with `unlockDevicePins`, `IDLE_HEADER` (`x-rp-idle-seconds`) and the
   settings `auth.deviceLockoutMaxFailures`, `auth.tabletLockoutMaxFailures` and
   `auth.refuseEasyPins` (P8-03b2a); a pager's sign-ins with a wrong secret on `PagerView`, and
-  the firmware problem `SECURE_VERSION_LOWER` (P8-03b2b). 964 tests.
+  the firmware problem `SECURE_VERSION_LOWER` (P8-03b2b); the orders, bills and invoices an
+  erasure reached, on `EraseDinerContactResponse` (P8-03b2c). 964 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -136,8 +137,12 @@ What exists:
   no faster than half the interval, retained, QoS 2 and will messages refused, a pager's button
   acknowledging only alerts sent to that pager and recorded with it, a pager connected only once
   the broker has it, failed sign-ins logged and counted per pager, no more pagers than the
-  licence allows, and no firmware with a lower anti-rollback version (P8-03b2b). 1237 tests (28
-  skipped: Windows only, a real install, or the performance runs).
+  licence allows, and no firmware with a lower anti-rollback version (P8-03b2b); the device token
+  checked before any body is read, so a caller without a paired device sends 16 KB at most, a
+  menu workbook inflated by the server with a limit on what comes out and given to its reader
+  stored, formulas neutralised in the data export's CSV files and the invoice register, and a
+  diner's number erased on orders and bills too, with the invoices' consent withdrawn
+  (P8-03b2c). 1246 tests (28 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -311,8 +316,9 @@ What exists:
   the eight components with 195 threats, their code, their tests and a dated plan for each one
   left open, checked on every build by `pnpm security:threats` (P8-03b1). P8-03b2a mitigated six
   (PIN guessing, lockouts, a tablet's PIN prompt, approvals used on another record, a phone left
-  signed in), P8-03b2b seven of the pager channel's and the PC's part of an eighth: 106
-  mitigated, 8 residual Highs, each planned.
+  signed in), P8-03b2b seven of the pager channel's and the PC's part of an eighth, P8-03b2c four
+  (large bodies before authentication, decompression bombs, formulas in exports, a diner's
+  number kept after erasure): 110 mitigated, 8 residual Highs, each planned.
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
@@ -325,9 +331,9 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b2c (bodies, uploads, exports and erasure), then P8-03b3 and P8-03b4: the fixes the
-  threat models planned, by their dates (the summary in `docs/security/threat-models/README.md`
-  lists each threat).
+- P8-03b3 (the licence and the update pipeline) and P8-03b4 (the Control Plane and the QR relay):
+  the fixes the threat models planned, by their dates (the summary in
+  `docs/security/threat-models/README.md` lists each threat).
 - Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
   incident response plan and the pack for the penetration testers (the external test needs the
   firm the Business Owner engages).
@@ -553,11 +559,11 @@ Recommended next WPs (dependencies met):
   - [x] P8-03a Authorisation sweep (local server and Control Plane)
   - [~] P8-03b STRIDE threat models
     - [x] P8-03b1 The threat models of the eight components, their checks, the High finding fixed
-    - [~] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
+    - [x] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
       - [x] P8-03b2a Sign-in and approvals (PIN budgets per device, easy PINs, lockout alerts,
             approvals bound to their record, the waiter phone's inactivity)
       - [x] P8-03b2b The pager broker's limits, acknowledgements and sign-in log
-      - [ ] P8-03b2c Bodies, uploads, exports and erasure
+      - [x] P8-03b2c Bodies, uploads, exports and erasure
     - [ ] P8-03b3 Threat-model fixes to the licence and the update pipeline
     - [ ] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
   - [ ] P8-03c DAST of the QR site, relay and Control Plane
@@ -808,6 +814,31 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b2c):
+
+737. A caller without a paired device may send a body of 16 KB at most (`ANONYMOUS_BODY_LIMIT`, a
+     constant: every public endpoint needs a few hundred bytes). A larger body announced without a
+     device token is answered 413 before a byte is read, and Node discards the rest; with a device
+     token that no longer verifies, the body is read off unparsed and the answer is 401
+     `DEVICE_NOT_RECOGNISED`, so the apps renew their token and send it again. Paired devices keep
+     1 MB, 7 MB on the upload paths and 55 MB for AI imports. The device check runs once per
+     request, before the parsers, and the authentication middleware reuses it.
+738. A menu workbook's XML parts are inflated by the server, each stopping one byte past the size
+     the ZIP's central directory gives: a part that comes out larger is refused as too large, one
+     that is shorter, fails its CRC, is encrypted, compressed another way or named twice as
+     damaged ("could not be read"). The reader gets the parts again in a stored ZIP, so it never
+     inflates; pictures and other parts are not inflated at all.
+739. The full data export's CSV files and the invoice register write text through `csvCell`: text
+     starting with `=`, `+`, `-`, `@`, a tab or a carriage return (other than a plain number) gets
+     a leading apostrophe; the JSON lines keep it as typed, and the export's README says so.
+740. Erasing a diner's number (DATA-011) also clears it on orders and bills, matched on its last ten
+     digits however it was typed (another number with the same last ten digits would be erased
+     too: erasure errs towards erasing), and withdraws the consent on the invoices that hold it.
+     Invoices keep the number for tax law, but no digital bill goes to it again, by hand or on
+     settling. A digital bill still queued is given up; one sent is left as it was. The response
+     and the audit entry give the counts (contacts, orders, bills, invoices, digital bills), never
+     the number.
 
 Decided 2026-10-10 (P8-03b2b):
 
@@ -4001,6 +4032,51 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b2c Bodies, uploads, exports and erasure
+
+Decisions 737 to 740. Four threats of the LAN and the local server mitigated (PC-D1, PC-D4, PC-T8,
+PC-I9); P8-03b2 is done.
+
+Built:
+
+- Server: `src/http/body-limits.ts` (`bodyParsers`): the device token checked before any body is
+  read, the parser chosen by the device and the path (16 KB without a paired device, 1 MB, 7 MB
+  for photos and menu files, 55 MB for AI imports), an announced oversize body without a device
+  token answered 413 at once, and 401 `DEVICE_NOT_RECOGNISED` for one with a token that no longer
+  verifies. `rememberDevice`/`rememberedDevice` (`src/auth/device.ts`) keep the check's result for
+  `AuthenticationMiddleware`. `src/menu/import/zip-limits.ts`: `unpackWorkbook` inflates the XML
+  parts with `maxOutputLength` and checks size and CRC, `storedZip` packs them again for
+  `read-excel-file`. `csvCell` in `data-export.service.ts` (`csvField`) and `invoice-books.ts`.
+  `FeedbackService.erase` clears orders' and bills' numbers by their last ten digits, withdraws the
+  invoices' consent and gives up only queued digital bills.
+- `@rp/contracts`: `EraseDinerContactResponse` gains `orders`, `bills` and `invoices`; the route's
+  description.
+- Docs: the four threats `Mitigated` (110 mitigated in all, 8 residual Highs);
+  `docs/security/authorisation.md` says what a caller without a device may send; `phase-8.md`.
+
+Tests: server 1246 (+9, 28 skipped; new `body-limits.int`, the workbook's unpacking in
+`menu-workbook`, formulas in `data-export.int`, erasure in `digital-bills.int`), contracts 964 (the
+erase response's schema snapshot). All other test tasks green; lint, typecheck, format, docs,
+compat and `pnpm security:threats` green. Traceability: Must 264/287.
+
+Not done or not verified:
+
+- Nothing of P8-03b2c is left. The phones' and the console's handling of a 401 for a large upload
+  with an expired device token is the api-client's renewal, already tested; no device check was
+  run.
+
+Gotchas:
+
+- Supertest (superagent) asks for `Connection: close`, so when the server answers before a large
+  body is all sent, it closes the connection and the client's write fails with ECONNRESET. A test
+  of an early answer must use Node's client with a keep-alive `Agent` (`body-limits.int`'s
+  `post`), as browsers and the apps keep connections alive. body-parser itself reads off a
+  refused body before it answers.
+- Tests that post more than 16 KB without a device token now get 413 before the route: send them
+  from a paired device (`authHeaders(kit.deviceId)`), as `errors.int`'s body size test does.
+- The design-capacity seed writes invoices without bills; a test that needs a bill creates one
+  (`digital-bills.int`).
 
 ### 2026-10-10: P8-03b2b The pager broker
 
