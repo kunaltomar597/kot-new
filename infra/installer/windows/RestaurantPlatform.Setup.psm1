@@ -967,6 +967,9 @@ function Get-RPWriteInstallationArgument {
     if ($Option.ContainsKey('UpdatePublisher') -and [string]$Option.UpdatePublisher -ne '') {
         $arguments += @('--update-publisher', [string]$Option.UpdatePublisher)
     }
+    if ($Option.ContainsKey('UpdateIssuer') -and [string]$Option.UpdateIssuer -ne '') {
+        $arguments += @('--update-issuer', [string]$Option.UpdateIssuer)
+    }
     $unsigned = 'off'
     if ($Option.ContainsKey('AllowUnsignedUpdates') -and [bool]$Option.AllowUnsignedUpdates) { $unsigned = 'on' }
     $arguments += @('--allow-unsigned-updates', $unsigned)
@@ -1014,6 +1017,7 @@ function Invoke-RPInstall {
         # The installer that is running, kept to go back to after a failed update (P7-04c).
         [string] $InstallerPath,
         [string] $UpdatePublisher,
+        [string] $UpdateIssuer,
         [switch] $AllowUnsignedUpdates,
         [string] $InstallationFile = (Get-RPDefaultInstallationFile),
         [int] $StartTimeoutSeconds = 180
@@ -1623,8 +1627,12 @@ function Get-RPAuthenticode {
     param([Parameter(Mandatory)] [string] $Path)
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
     $subject = $null
-    if ($null -ne $signature.SignerCertificate) { $subject = $signature.SignerCertificate.Subject }
-    [pscustomobject]@{ Status = [string]$signature.Status; Subject = $subject }
+    $issuer = $null
+    if ($null -ne $signature.SignerCertificate) {
+        $subject = $signature.SignerCertificate.Subject
+        $issuer = $signature.SignerCertificate.Issuer
+    }
+    [pscustomobject]@{ Status = [string]$signature.Status; Subject = $subject; Issuer = $issuer }
 }
 
 function Test-RPInstallerSignature {
@@ -1639,6 +1647,8 @@ function Test-RPInstallerSignature {
     param(
         [Parameter(Mandatory)] [string] $Path,
         [AllowNull()] [AllowEmptyString()] [string] $Publisher,
+        # UPDATE-S2: the authority that issued the signer's certificate; empty: not checked.
+        [AllowNull()] [AllowEmptyString()] [string] $Issuer,
         [switch] $AllowUnsigned
     )
     $fail = { param($Reason) [pscustomobject]@{ Ok = $false; Signer = $null; Reason = $Reason } }
@@ -1648,6 +1658,9 @@ function Test-RPInstallerSignature {
     $seen = Get-RPAuthenticode -Path $Path
     if ($seen.Status -eq 'Valid') {
         if ([string]::IsNullOrEmpty($Publisher) -or $seen.Subject -ceq $Publisher) {
+            if (-not [string]::IsNullOrEmpty($Publisher) -and -not [string]::IsNullOrEmpty($Issuer) -and $seen.Issuer -cne $Issuer) {
+                return (& $fail ('The installer''s certificate was issued by {0}, not by the vendor''s.' -f $seen.Issuer))
+            }
             return [pscustomobject]@{ Ok = $true; Signer = $seen.Subject; Reason = $null }
         }
         return (& $fail ('The installer is signed by {0}, not by the vendor.' -f $seen.Subject))
@@ -1675,6 +1688,7 @@ function Get-RPUpdatePolicy {
     $updates = Get-RPProperty $Installation 'updates'
     [pscustomobject]@{
         Publisher     = [string](Get-RPProperty $updates 'publisher')
+        Issuer        = [string](Get-RPProperty $updates 'issuer')
         AllowUnsigned = [bool](Get-RPProperty $updates 'allowUnsigned')
     }
 }
@@ -2000,7 +2014,7 @@ function Invoke-RPUpdateStep {
         return (& $failed 'The installer does not match the SHA-256 the server checked. Nothing was changed.')
     }
     $policy = Get-RPUpdatePolicy -Installation $Installation
-    $signature = Test-RPInstallerSignature -Path $installer -Publisher $policy.Publisher -AllowUnsigned:$policy.AllowUnsigned
+    $signature = Test-RPInstallerSignature -Path $installer -Publisher $policy.Publisher -Issuer $policy.Issuer -AllowUnsigned:$policy.AllowUnsigned
     if (-not $signature.Ok) {
         Remove-Item -LiteralPath $installer -Force
         return (& $failed ('{0} Nothing was changed.' -f $signature.Reason))

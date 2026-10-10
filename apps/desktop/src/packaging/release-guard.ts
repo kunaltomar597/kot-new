@@ -19,7 +19,11 @@ export interface ReleaseFacts {
   /** A code-signing certificate is given: electron-builder signs the installer as the vendor's. */
   readonly signed: boolean;
   /** The staged update settings (`staging/installer-defines.nsh`). */
-  readonly updates: { readonly publisher: boolean; readonly allowUnsigned: boolean };
+  readonly updates: {
+    readonly publisher: boolean;
+    readonly issuer: boolean;
+    readonly allowUnsigned: boolean;
+  };
   /** The system the payload's native modules were installed for. */
   readonly stagedOn: NodeJS.Platform;
   /** `--any-platform`: a test installer from a payload staged off Windows. */
@@ -73,6 +77,11 @@ export function releaseRefusals(facts: ReleaseFacts): string[] {
       'Stage a signed installer with RP_UPDATE_PUBLISHER, the certificate’s subject, or the PCs will refuse every update.',
     );
   }
+  if (facts.updates.publisher && !facts.updates.issuer) {
+    refusals.push(
+      'Stage a signed installer with RP_UPDATE_ISSUER, the issuer of the certificate, so a certificate with the vendor’s name from another authority is refused (UPDATE-S2).',
+    );
+  }
   const { licence, pagerFirmware } = facts.keys;
   if (licence.length === 0) {
     refusals.push(
@@ -112,6 +121,7 @@ export function stagedUpdateSettings(defines: string): ReleaseFacts['updates'] {
   const lines = defines.split(/\r?\n/).map((line) => line.trim());
   return {
     publisher: lines.some((line) => /^!define RP_UPDATE_PUBLISHER "[^"]/.test(line)),
+    issuer: lines.some((line) => /^!define RP_UPDATE_ISSUER "[^"]/.test(line)),
     allowUnsigned: lines.some((line) => /^!define RP_ALLOW_UNSIGNED_UPDATES\b/.test(line)),
   };
 }

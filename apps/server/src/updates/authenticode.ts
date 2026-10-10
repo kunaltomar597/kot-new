@@ -15,6 +15,8 @@ export interface SignatureSeen {
   readonly status: string;
   /** The signer certificate's subject, or null when unsigned. */
   readonly subject: string | null;
+  /** The signer certificate's issuer, or null when unsigned (absent where it was not read). */
+  readonly issuer?: string | null;
   /**
    * The product version the installer's version resource names (null: none); absent where it
    * was not read.
@@ -26,6 +28,8 @@ export type SignatureCheck = (file: string) => Promise<SignatureSeen>;
 
 export interface SignaturePolicy {
   readonly publisher: string | null;
+  /** The authority that must have issued the signer's certificate (UPDATE-S2); null: any. */
+  readonly issuer?: string | null;
   readonly allowUnsigned: boolean;
 }
 
@@ -48,12 +52,20 @@ export function judgeSignature(seen: SignatureSeen, policy: SignaturePolicy): Si
         ? { ok: true, signer: seen.subject }
         : { ok: false, reason: 'No publisher to check the signature against.' };
     }
-    return seen.subject === policy.publisher
-      ? { ok: true, signer: seen.subject }
-      : {
-          ok: false,
-          reason: `The installer is signed by ${seen.subject ?? 'someone else'}, not by the vendor.`,
-        };
+    if (seen.subject !== policy.publisher) {
+      return {
+        ok: false,
+        reason: `The installer is signed by ${seen.subject ?? 'someone else'}, not by the vendor.`,
+      };
+    }
+    // UPDATE-S2: a certificate with the vendor's name from another authority is not the vendor's.
+    if (policy.issuer !== undefined && policy.issuer !== null && seen.issuer !== policy.issuer) {
+      return {
+        ok: false,
+        reason: `The installer’s certificate was issued by ${seen.issuer ?? 'an unknown authority'}, not by the vendor’s.`,
+      };
+    }
+    return { ok: true, signer: seen.subject };
   }
   if (seen.status === 'NotSigned' && policy.allowUnsigned) return { ok: true, signer: null };
   return {
@@ -85,9 +97,10 @@ export const SIGNATURE_SCRIPT = [
   "$ProgressPreference = 'SilentlyContinue'",
   '$signature = Get-AuthenticodeSignature -LiteralPath $env:RP_SIGNED_FILE',
   '$subject = $null',
-  'if ($null -ne $signature.SignerCertificate) { $subject = $signature.SignerCertificate.Subject }',
+  '$issuer = $null',
+  'if ($null -ne $signature.SignerCertificate) { $subject = $signature.SignerCertificate.Subject; $issuer = $signature.SignerCertificate.Issuer }',
   '$version = (Get-Item -LiteralPath $env:RP_SIGNED_FILE).VersionInfo.ProductVersion',
-  '[Console]::Out.Write((@{ status = [string]$signature.Status; subject = $subject; productVersion = $version } | ConvertTo-Json -Compress))',
+  '[Console]::Out.Write((@{ status = [string]$signature.Status; subject = $subject; issuer = $issuer; productVersion = $version } | ConvertTo-Json -Compress))',
 ].join('\n');
 
 /** The check through Windows PowerShell 5.1, which every Windows PC has. */
@@ -138,6 +151,7 @@ export function powerShellSignatureCheck(
           const parsed = JSON.parse(Buffer.concat(stdout).toString('utf8')) as {
             status?: unknown;
             subject?: unknown;
+            issuer?: unknown;
             productVersion?: unknown;
           };
           const version =
@@ -145,6 +159,7 @@ export function powerShellSignatureCheck(
           resolve({
             status: typeof parsed.status === 'string' ? parsed.status : 'UnknownError',
             subject: typeof parsed.subject === 'string' ? parsed.subject : null,
+            issuer: typeof parsed.issuer === 'string' ? parsed.issuer : null,
             productVersion: version === '' ? null : version,
           });
         } catch (error) {

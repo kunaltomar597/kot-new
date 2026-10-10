@@ -362,8 +362,19 @@ describe('[ONB-002] the installer script’s settings', () => {
     expect(updateSettingsFrom({})).toEqual({ allowUnsigned: false });
     expect(updateSettingsFrom({ RP_ALLOW_UNSIGNED_UPDATES: '1' })).toEqual({ allowUnsigned: true });
     expect(
-      updateSettingsFrom({ RP_UPDATE_PUBLISHER: ' CN=Restaurant Platform Pvt Ltd, C=IN ' }),
-    ).toEqual({ publisher: 'CN=Restaurant Platform Pvt Ltd, C=IN', allowUnsigned: false });
+      updateSettingsFrom({
+        RP_UPDATE_PUBLISHER: ' CN=Restaurant Platform Pvt Ltd, C=IN ',
+        RP_UPDATE_ISSUER: ' CN=Vendor CA, O=Some CA, C=US ',
+      }),
+    ).toEqual({
+      publisher: 'CN=Restaurant Platform Pvt Ltd, C=IN',
+      issuer: 'CN=Vendor CA, O=Some CA, C=US',
+      allowUnsigned: false,
+    });
+    // [UPDATE-S2] a publisher without its issuer would pin the name alone.
+    expect(() => updateSettingsFrom({ RP_UPDATE_PUBLISHER: 'CN=Restaurant Platform' })).toThrow(
+      /RP_UPDATE_ISSUER/,
+    );
     expect(() =>
       updateSettingsFrom({ RP_UPDATE_PUBLISHER: 'CN=Vendor', RP_ALLOW_UNSIGNED_UPDATES: '1' }),
     ).toThrow(/never accepts unsigned updates/);
@@ -373,9 +384,15 @@ describe('[ONB-002] the installer script’s settings', () => {
         setupDir: 'x',
         minFreeGb: 20,
         cloud: {},
-        updates: { publisher: 'CN=Vendor "Ltd" $1', allowUnsigned: false },
+        updates: {
+          publisher: 'CN=Vendor "Ltd" $1',
+          issuer: 'CN=CA $2',
+          allowUnsigned: false,
+        },
       }),
-    ).toContain('!define RP_UPDATE_PUBLISHER "CN=Vendor $\\"Ltd$\\" $$1"');
+    ).toContain(
+      '!define RP_UPDATE_PUBLISHER "CN=Vendor $\\"Ltd$\\" $$1"\n!define RP_UPDATE_ISSUER "CN=CA $$2"',
+    );
     const test = nsisDefines({
       setupDir: 'x',
       minFreeGb: 20,
@@ -427,7 +444,7 @@ describe('[ONB-002] the installer script’s settings', () => {
             qrSiteUrl: 'https://c.in',
             errorDsn: 'https://d.in',
           },
-          updates: { publisher: 'CN=Vendor', allowUnsigned: false },
+          updates: { publisher: 'CN=Vendor', issuer: 'CN=CA', allowUnsigned: false },
         }).matchAll(/!define (RP_[A-Z_]+)/g),
         ...nsisDefines({
           setupDir: 'x',
@@ -625,14 +642,14 @@ describe('[UPD-007] [LIC-003] [PGR-011] the release guard (P8-03b3b)', () => {
     .toString('base64');
   const release: ReleaseFacts = {
     signed: true,
-    updates: { publisher: true, allowUnsigned: false },
+    updates: { publisher: true, issuer: true, allowUnsigned: false },
     stagedOn: 'win32',
     anyPlatform: false,
     keys: { licence: [licenceKey], pagerFirmware: [sha256('pager key')] },
   };
   const test: ReleaseFacts = {
     signed: false,
-    updates: { publisher: false, allowUnsigned: true },
+    updates: { publisher: false, issuer: false, allowUnsigned: true },
     stagedOn: 'win32',
     anyPlatform: false,
     keys: { licence: [], pagerFirmware: [] },
@@ -642,7 +659,10 @@ describe('[UPD-007] [LIC-003] [PGR-011] the release guard (P8-03b3b)', () => {
     expect(releaseRefusals(release)).toEqual([]);
     expect(releaseRefusals(test)).toEqual([]);
     expect(
-      releaseRefusals({ ...test, updates: { publisher: false, allowUnsigned: false } }),
+      releaseRefusals({
+        ...test,
+        updates: { publisher: false, issuer: false, allowUnsigned: false },
+      }),
     ).toEqual([]);
     expect(releaseRefusals({ ...test, stagedOn: 'darwin', anyPlatform: true })).toEqual([]);
     expect(releaseRefusals({ ...test, stagedOn: 'darwin' })).toEqual([
@@ -652,11 +672,26 @@ describe('[UPD-007] [LIC-003] [PGR-011] the release guard (P8-03b3b)', () => {
 
   it('refuses a signed build that takes unsigned updates or names no signer', () => {
     expect(
-      releaseRefusals({ ...release, updates: { publisher: true, allowUnsigned: true } }),
+      releaseRefusals({
+        ...release,
+        updates: { publisher: true, issuer: true, allowUnsigned: true },
+      }),
     ).toEqual([expect.stringMatching(/cannot accept unsigned updates/)]);
     expect(
-      releaseRefusals({ ...release, updates: { publisher: false, allowUnsigned: false } }),
+      releaseRefusals({
+        ...release,
+        updates: { publisher: false, issuer: false, allowUnsigned: false },
+      }),
     ).toEqual([expect.stringMatching(/RP_UPDATE_PUBLISHER/)]);
+  });
+
+  it('[UPDATE-S2] refuses a signed build that names a signer but not its issuer', () => {
+    expect(
+      releaseRefusals({
+        ...release,
+        updates: { publisher: true, issuer: false, allowUnsigned: false },
+      }),
+    ).toEqual([expect.stringMatching(/RP_UPDATE_ISSUER/)]);
   });
 
   it('refuses a signed build without the vendor’s licence key or pager firmware key', () => {
@@ -697,14 +732,23 @@ describe('[UPD-007] [LIC-003] [PGR-011] the release guard (P8-03b3b)', () => {
   });
 
   it('reads the update settings and the keys the staged installer carries', async () => {
-    const defines = (updates: { publisher?: string; allowUnsigned: boolean }) =>
+    const defines = (updates: { publisher?: string; issuer?: string; allowUnsigned: boolean }) =>
       stagedUpdateSettings(nsisDefines({ setupDir: 'x', minFreeGb: 20, cloud: {}, updates }));
-    expect(defines({ publisher: 'CN=Vendor', allowUnsigned: false })).toEqual({
+    expect(defines({ publisher: 'CN=Vendor', issuer: 'CN=CA', allowUnsigned: false })).toEqual({
       publisher: true,
+      issuer: true,
       allowUnsigned: false,
     });
-    expect(defines({ allowUnsigned: true })).toEqual({ publisher: false, allowUnsigned: true });
-    expect(defines({ allowUnsigned: false })).toEqual({ publisher: false, allowUnsigned: false });
+    expect(defines({ allowUnsigned: true })).toEqual({
+      publisher: false,
+      issuer: false,
+      allowUnsigned: true,
+    });
+    expect(defines({ allowUnsigned: false })).toEqual({
+      publisher: false,
+      issuer: false,
+      allowUnsigned: false,
+    });
 
     // A staged server as the stage step deploys it: its dist, and @rp/licensing in node_modules.
     const payloadWith = async (name: string, firmwareKeys: string) => {

@@ -36,7 +36,7 @@ The installer runs these in order; each can run again (repair) without losing da
 write-installation  writes the installation file. Options: --install-dir, --data-dir,
                     --product-version, --port, --mqtt-port, --pg-port, --control-plane-url,
                     --relay-url, --qr-site-url, --error-dsn, --tls-hostnames (comma-separated),
-                    --update-publisher (the signer updates must carry), --allow-unsigned-updates
+                    --update-publisher (the signer updates must carry), --update-issuer (its certificate's issuer), --allow-unsigned-updates
                     on|off (test builds only). On repair, values not given are kept.
 secrets             makes the secrets that are missing (Windows DPAPI on the restaurant PC).
 postgres-init       creates PostgreSQL's data folder on the data drive if there is none, and
@@ -78,6 +78,7 @@ const OPTIONS = {
   'error-dsn': { type: 'string' },
   'tls-hostnames': { type: 'string' },
   'update-publisher': { type: 'string' },
+  'update-issuer': { type: 'string' },
   'allow-unsigned-updates': { type: 'string' },
   'secret-store': { type: 'string' },
   minutes: { type: 'string' },
@@ -136,6 +137,7 @@ async function installationFrom(path: string, values: Values): Promise<Installat
     cloud,
     updates: {
       publisher: values['update-publisher'] ?? existing?.updates.publisher,
+      issuer: values['update-issuer'] ?? existing?.updates.issuer,
       allowUnsigned:
         values['allow-unsigned-updates'] === undefined
           ? existing?.updates.allowUnsigned

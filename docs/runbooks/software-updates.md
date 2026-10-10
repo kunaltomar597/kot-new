@@ -69,9 +69,10 @@ The installer's build names the signer every update must carry:
 | Build variable                | Meaning                                                                                                 |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `RP_UPDATE_PUBLISHER`         | The code-signing certificate's subject, e.g. `CN=..., O=..., L=..., C=IN`. Set it with the certificate. |
+| `RP_UPDATE_ISSUER`            | The issuer of that certificate, e.g. `CN=..., O=..., C=...` (UPDATE-S2). Required with a publisher.     |
 | `RP_ALLOW_UNSIGNED_UPDATES=1` | Test builds only: unsigned updates are accepted. Refused together with a publisher.                     |
 
-In CI they come from the repository variable `RP_UPDATE_PUBLISHER`, on pushes to `main` only.
+In CI they come from the repository variables `RP_UPDATE_PUBLISHER` and `RP_UPDATE_ISSUER`, on pushes to `main` only.
 While it is unset, and on every other branch and pull request, CI builds are unsigned test builds
 that accept unsigned updates; only `main` reaches the certificate, in the environment
 `release-signing` (SEC-013, `manual-tasks/01-github-access.md`). **Never install an unsigned build at a
@@ -79,7 +80,7 @@ restaurant**: each heartbeat says the PC takes unsigned updates, and the vendor'
 an alert until a signed build replaces it (`docs/runbooks/control-plane.md`).
 
 The release guard (`apps/desktop/src/packaging/release-guard.ts`) refuses a build signed with the
-certificate (`WIN_CSC_LINK`, or `CSC_LINK` when that is unset) that has no `RP_UPDATE_PUBLISHER`,
+certificate (`WIN_CSC_LINK`, or `CSC_LINK` when that is unset) that has no `RP_UPDATE_PUBLISHER` or `RP_UPDATE_ISSUER`,
 allows unsigned updates, was staged off Windows, or whose staged server has no vendor licence key
 (manual task 23) or no pager firmware key digest (manual task 30).
 

@@ -172,6 +172,33 @@ describe('[UPD-007] the installer’s signature', () => {
     });
   });
 
+  it('[UPDATE-S2] refuses the vendor’s name from another authority', () => {
+    const ca = 'CN=Real Code Signing CA, O=Real CA, C=US';
+    const policy = { publisher: vendor, issuer: ca, allowUnsigned: false };
+    expect(judgeSignature({ status: 'Valid', subject: vendor, issuer: ca }, policy)).toEqual({
+      ok: true,
+      signer: vendor,
+    });
+    const fake = judgeSignature(
+      { status: 'Valid', subject: vendor, issuer: 'CN=Cheap CA, C=XX' },
+      policy,
+    );
+    expect(fake).toEqual({
+      ok: false,
+      reason: 'The installer’s certificate was issued by CN=Cheap CA, C=XX, not by the vendor’s.',
+    });
+    // An issuer that was not read is not the vendor's authority either.
+    expect(judgeSignature({ status: 'Valid', subject: vendor }, policy).ok).toBe(false);
+    // The subject is still checked first, and a policy without an issuer checks the subject only.
+    expect(judgeSignature({ status: 'Valid', subject: 'CN=Other', issuer: ca }, policy).ok).toBe(
+      false,
+    );
+    expect(
+      judgeSignature({ status: 'Valid', subject: vendor }, { ...policy, issuer: null }).ok,
+    ).toBe(true);
+    expect(SIGNATURE_SCRIPT).toContain('SignerCertificate.Issuer');
+  });
+
   it('takes unsigned installers only on a test build, and never a damaged signature', () => {
     const test = { publisher: null, allowUnsigned: true };
     expect(judgeSignature({ status: 'NotSigned', subject: null }, test).ok).toBe(true);

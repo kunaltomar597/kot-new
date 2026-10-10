@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03d2b1).
+Last updated: 2026-10-11 (P8-03d2b2a).
 
 What exists:
 
@@ -400,7 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d2b2 the standards checklists (10 threats still planned there), P8-03e the incident response
+- P8-03d2b2b to d (UPDATE-R3, LICENCE-T5, the PC's threats and the four standards checklists; 9 threats still planned there), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -655,9 +655,13 @@ Recommended next WPs (dependencies met):
     - [x] P8-03d2b1 The Control Plane: the authenticator asked again for sensitive actions, the
           audit log's copy for the host, reads classified, the CLI's host (CP-S2, R1; T5 and R2
           wait for manual task 34)
-    - [ ] P8-03d2b2 The checklists (ASVS, MASVS, ETSI, CIS) and the 10 PC, update and licence
-          threats still planned for P8-03d (PC-E2, I5, I6, S4, T7, D6; UPDATE-R3, S2; LICENCE-T5;
-          DESKTOP-E4)
+    - [~] P8-03d2b2 The checklists (ASVS, MASVS, ETSI, CIS) and the PC, update and licence
+      threats still planned for P8-03d (PC-E2, I5, I6, S4, T7, D6; UPDATE-R3; LICENCE-T5;
+      DESKTOP-E4); split:
+      - [x] P8-03d2b2a UPDATE-S2: the update signer pinned by its issuer too
+      - [ ] P8-03d2b2b UPDATE-R3 (attestation, SBOM and commit with each release), LICENCE-T5
+      - [ ] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4)
+      - [ ] P8-03d2b2d The four checklists
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
 - [ ] P8-05 Runbooks, manuals, training
@@ -4401,6 +4405,22 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03d2b2a the update signer pinned by its issuer
+
+Decided: the pin is subject plus issuer, not the thumbprint, so the vendor can renew its
+certificate from the same authority without a new installer; a signed build is refused without
+`RP_UPDATE_ISSUER` (`releaseRefusals`, `updateSettingsFrom`); an installation file from before this
+(`updates.issuer` null) checks the subject only.
+
+Built: `issuer` on `SignatureSeen` / `SignaturePolicy` and in `judgeSignature`; the PowerShell reads
+`SignerCertificate.Issuer`; `updates.issuer` in the installation file, `--update-issuer` on
+`setup-cli`, `-UpdateIssuer` on the installer script, `RP_UPDATE_ISSUER` as build variable, NSIS
+define and server environment; `Test-RPInstallerSignature -Issuer`; CI passes the repository
+variable on `main` only. UPDATE-S2 Mitigated (summary 35 with a plan). Manual task 31 and the
+software-updates runbook say to set `RP_UPDATE_ISSUER` with the certificate.
+Tests: server unit (updates, installation), desktop 56, `ci:test`, Pester SoftwareUpdate 30,
+Install, Scripts, Update (run with `~/.local/bin/pwsh`). Next: P8-03d2b2b.
 
 ### 2026-10-11: P8-03d2b1 the Control Plane's step-up and audit copy
 

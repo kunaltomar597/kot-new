@@ -81,10 +81,23 @@ Describe '[UPD-007] the request and the installer' {
         Should -Invoke -ModuleName $ModuleName Get-RPAuthenticode -Times 5 -Exactly
     }
 
+    It '[UPDATE-S2] refuses a signer issued by another authority' {
+        $vendor = 'CN=Restaurant Platform Pvt Ltd, C=IN'
+        $ca = 'CN=Real Code Signing CA, O=Real CA, C=US'
+        $script:Seen = [pscustomobject]@{ Status = 'Valid'; Subject = $vendor; Issuer = $ca }
+        Mock -ModuleName $ModuleName Get-RPAuthenticode { $script:Seen }
+        (Test-RPInstallerSignature -Path 'x.exe' -Publisher $vendor -Issuer $ca).Ok | Should -BeTrue
+        $script:Seen = [pscustomobject]@{ Status = 'Valid'; Subject = $vendor; Issuer = 'CN=Cheap CA, C=XX' }
+        (Test-RPInstallerSignature -Path 'x.exe' -Publisher $vendor -Issuer $ca).Reason | Should -Be 'The installer''s certificate was issued by CN=Cheap CA, C=XX, not by the vendor''s.'
+        # No issuer named (an installation from before this check): the subject alone.
+        (Test-RPInstallerSignature -Path 'x.exe' -Publisher $vendor).Ok | Should -BeTrue
+    }
+
     It 'reads an installation file from before updates as checking nothing and allowing nothing' {
         $policy = Get-RPUpdatePolicy -Installation ([pscustomobject]@{ dataDir = 'D:\x' })
         $policy.Publisher | Should -Be ''
         $policy.AllowUnsigned | Should -BeFalse
+        $policy.Issuer | Should -Be ''
         $policy = Get-RPUpdatePolicy -Installation ([pscustomobject]@{ updates = [pscustomobject]@{ publisher = 'CN=A'; allowUnsigned = $false } })
         $policy.Publisher | Should -Be 'CN=A'
     }

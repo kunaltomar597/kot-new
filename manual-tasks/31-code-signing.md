@@ -24,7 +24,8 @@ or a commit.
 2. Put the signing service's credentials into that environment's secrets (never the repository's
    own secrets: every branch's workflow, a pull request's included, can read those).
 3. Put the certificate's subject (`Subject:` in its details, e.g. `CN=..., O=..., L=..., C=IN`)
-   into the repository variable `RP_UPDATE_PUBLISHER`.
+   into the repository variable `RP_UPDATE_PUBLISHER`, and its issuer (`Issuer:`, the authority
+   that signed it) into `RP_UPDATE_ISSUER`. A signed build is refused without both (UPDATE-S2).
 4. Tell Claude which signing service it is. Claude changes the "Windows installer" job to sign
    through it (electron-builder's custom `sign` hook calling the service's tool), keeping the
    signing to pushes to `main` (`infra/ci/signing-policy.test.mjs`).

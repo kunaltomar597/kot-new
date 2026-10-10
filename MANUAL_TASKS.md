@@ -30,7 +30,7 @@ code from going live:
       the GitHub environment `release-signing` (never the repository's own secrets, which every
       branch can read) as `WINDOWS_CERTIFICATE_P12` (the .p12 file in base64) and
       `WINDOWS_CERTIFICATE_PASSWORD`, and its subject (`certutil -dump`, "Subject:") into the
-      repository variable `RP_UPDATE_PUBLISHER`; the CI job "Windows installer" then signs pushes
+      repository variable `RP_UPDATE_PUBLISHER` (and its issuer, "Issuer:", into `RP_UPDATE_ISSUER`); the CI job "Windows installer" then signs pushes
       to `main`, and the installed PCs accept only updates signed with it
       (`docs/runbooks/windows-installer.md`, "Building it"; `docs/runbooks/software-updates.md`,
       "Signing"). Certificates issued since June 2023 keep their key in a hardware token or a

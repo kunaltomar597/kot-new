@@ -303,6 +303,9 @@
   !ifdef RP_UPDATE_PUBLISHER
     StrCpy $0 '$0 -UpdatePublisher "${RP_UPDATE_PUBLISHER}"'
   !endif
+  !ifdef RP_UPDATE_ISSUER
+    StrCpy $0 '$0 -UpdateIssuer "${RP_UPDATE_ISSUER}"'
+  !endif
   !ifdef RP_ALLOW_UNSIGNED_UPDATES
     StrCpy $0 '$0 -AllowUnsignedUpdates'
   !endif
