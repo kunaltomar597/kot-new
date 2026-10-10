@@ -14,6 +14,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.UserManager
 import android.provider.Settings
 import android.view.WindowManager
 import expo.modules.kotlin.exception.Exceptions
@@ -58,6 +59,7 @@ class RpKioskModule : Module() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
           policies.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
         }
+        for (restriction in KIOSK_RESTRICTIONS) policies.addUserRestriction(admin, restriction)
         policies.setKeyguardDisabled(admin, true)
         policies.setStatusBarDisabled(admin, true)
         policies.setGlobalSetting(
@@ -82,6 +84,8 @@ class RpKioskModule : Module() {
       if (policies(context).isDeviceOwnerApp(context.packageName)) {
         val admin = ComponentName(context, RpDeviceAdminReceiver::class.java)
         policies(context).setStatusBarDisabled(admin, false)
+        // A manager who leaves may need adb to service the tablet; entering again closes it.
+        policies(context).clearUserRestriction(admin, UserManager.DISALLOW_DEBUGGING_FEATURES)
       }
       mode(context)
     }
@@ -92,6 +96,17 @@ class RpKioskModule : Module() {
       val window = appContext.currentActivity?.window ?: throw Exceptions.MissingActivity()
       if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
       else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+      .runOnQueue(Queues.MAIN)
+
+    /**
+     * No screenshot, screen recording or recent-apps preview while a PIN pad shows (MOBILE-I4,
+     * SEC-010): `FLAG_SECURE` on the app's window.
+     */
+    AsyncFunction("secureScreen") { on: Boolean ->
+      val window = appContext.currentActivity?.window ?: throw Exceptions.MissingActivity()
+      if (on) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+      else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
       .runOnQueue(Queues.MAIN)
 
@@ -137,6 +152,21 @@ class RpKioskModule : Module() {
       tone.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, durationMs)
       Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, durationMs + 200L)
     }
+  }
+
+  private companion object {
+    /**
+     * What a diner could use to get out of the app or to its data (MOBILE-E2): a restart into
+     * safe mode, debugging over USB, a factory reset, other users and new accounts.
+     */
+    val KIOSK_RESTRICTIONS =
+      listOf(
+        UserManager.DISALLOW_SAFE_BOOT,
+        UserManager.DISALLOW_DEBUGGING_FEATURES,
+        UserManager.DISALLOW_FACTORY_RESET,
+        UserManager.DISALLOW_ADD_USER,
+        UserManager.DISALLOW_MODIFY_ACCOUNTS,
+      )
   }
 
   private fun context(): Context =

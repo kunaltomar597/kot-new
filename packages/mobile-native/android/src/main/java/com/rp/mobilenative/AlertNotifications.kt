@@ -34,7 +34,12 @@ import androidx.core.content.ContextCompat
  * [RpAlertService], which keeps the phone listening. The words come from JavaScript (NFR-L02).
  */
 object AlertNotifications {
-  const val ALERTS_CHANNEL = "rp.alerts.v1"
+  /**
+   * v2: the lock screen shows an alert's words only after unlocking (MOBILE-R2). An existing
+   * channel keeps the visibility it was made with, so the change needs a new channel; v1 goes.
+   */
+  const val ALERTS_CHANNEL = "rp.alerts.v2"
+  private const val OLD_ALERTS_CHANNEL = "rp.alerts.v1"
   const val LISTENING_CHANNEL = "rp.listening.v1"
 
   /** The service's notification. An alert's is [ALERT_ID] under its own tag. */
@@ -109,7 +114,7 @@ object AlertNotifications {
           enableVibration(true)
           vibrationPattern = VIBRATION
           setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), SOUND)
-          lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+          lockscreenVisibility = Notification.VISIBILITY_PRIVATE
         }
     val service =
       NotificationChannel(
@@ -122,6 +127,7 @@ object AlertNotifications {
           setSound(null, null)
           setShowBadge(false)
         }
+    manager.deleteNotificationChannel(OLD_ALERTS_CHANNEL)
     manager.createNotificationChannels(listOf(alerts, service))
   }
 
@@ -192,7 +198,7 @@ object AlertNotifications {
         .setContentTitle(alert.title)
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
-        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .setWhen(alert.postedAt)
         .setShowWhen(true)
         .setAutoCancel(false)
@@ -203,8 +209,20 @@ object AlertNotifications {
               alert.acknowledge,
               acknowledgeIntent(context, alert.id),
             )
+            // Acknowledging counts as the phone's holder, so a locked phone unlocks first (MOBILE-R2).
+            .setAuthenticationRequired(true)
             .build()
         )
+    // What anyone sees on the locked screen: that there is an alert, not what it says.
+    listening(context)?.let { shown ->
+      builder.setPublicVersion(
+        NotificationCompat.Builder(context, ALERTS_CHANNEL)
+          .setSmallIcon(R.drawable.rp_alert_bell)
+          .setContentTitle(shown.title)
+          .setWhen(alert.postedAt)
+          .build()
+      )
+    }
     if (alert.text.isNotEmpty()) {
       builder.setContentText(alert.text).setStyle(NotificationCompat.BigTextStyle().bigText(alert.text))
     }

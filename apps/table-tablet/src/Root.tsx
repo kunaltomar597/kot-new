@@ -8,6 +8,7 @@ import {
   watchUncaughtErrors,
 } from '@rp/mobile-core';
 import {
+  AndroidScreenGuard,
   AndroidApkInstaller,
   AndroidKiosk,
   AndroidServerTrust,
@@ -17,6 +18,7 @@ import {
   plainStore,
   secureStore,
 } from '@rp/mobile-native';
+import { setScreenGuard } from '@rp/ui-native';
 import Constants from 'expo-constants';
 import { useEffect, useState } from 'react';
 import { App } from './App';
@@ -42,6 +44,8 @@ interface Created {
  */
 async function createSession(): Promise<Created> {
   await installRandomValues();
+  // No screenshots or recent-apps preview of a PIN pad (MOBILE-I4); a device without it still works.
+  await AndroidScreenGuard.load().then(setScreenGuard, () => undefined);
   const store: KeyValueStore = await plainStore();
   const kiosk = await AndroidKiosk.load();
   const session = new DeviceSession({

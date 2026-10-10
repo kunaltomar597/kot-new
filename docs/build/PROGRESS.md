@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03d1).
+Last updated: 2026-10-10 (P8-03d2a).
 
 What exists:
 
@@ -400,7 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d the standards checklists (26 threats planned there), P8-03e the incident response
+- P8-03d2b the standards checklists (14 threats still planned there), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -650,8 +650,10 @@ Recommended next WPs (dependencies met):
             RELAY-D4); the edge's own rules wait for the hosting accounts (manual task 32)
   - [~] P8-03d Standards checklists, Electron review and MDM policy
     - [x] P8-03d1 The Electron shell's hardening (DESKTOP-E2, E3, I3, R2, S1)
-    - [ ] P8-03d2 The rest: the checklists, the MDM policy and the other 21 threats planned for
-          P8-03d (split further when started)
+    - [x] P8-03d2a Phones and tablets: backups, PIN screen capture, lock-screen alerts, kiosk
+          restrictions, manifest test, MDM policy (MOBILE-E2, E4, I3, I4, R2, S1, T3)
+    - [ ] P8-03d2b The checklists (ASVS, MASVS, ETSI, CIS) and the 14 PC, Control Plane, update and
+          licence threats still planned for P8-03d
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
 - [ ] P8-05 Runbooks, manuals, training
@@ -898,6 +900,17 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03d2a):
+
+790. P8-03d2 is split again: d2a the phones and tablets, d2b the checklists and the other threats.
+791. No root detection in the app (MOBILE-E4 accepted): it runs on the attacker's device and the
+     server trusts nothing the app decides; the MDM's compliance check refuses rooted devices. An
+     app-side Play Integrity call is a later WP if the Business Owner wants it (SEC-010 Should).
+792. A locked phone shows only "Alerts for <name>" for an alert, and Acknowledge needs unlocking.
+     The kiosk sets safe-boot, debugging, factory-reset, add-user and account restrictions itself.
+     The Kotlin cannot be built here, so MOBILE-E2, R2, I4 and S1 stay "Partly mitigated" until
+     manual task 33 is run on a device.
 
 Decided 2026-10-10 (P8-03d1):
 
@@ -4384,6 +4397,19 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03d2a phones and tablets hardening
+
+Built: `allowBackup: false` in both app configs; `AndroidManifest` test (only the device admin
+receiver is exported, with its system permission; permissions listed); `FLAG_SECURE` through
+`RpKiosk.secureScreen`, `AndroidScreenGuard`, and `setScreenGuard`/`useSecureScreen` in
+`@rp/ui-native` (the PIN pad holds it, ref-counted); lock-screen alert private with a public
+version and Acknowledge needing authentication; alerts channel v2; kiosk user restrictions;
+`docs/runbooks/mdm-policy.md`; manual task 33. Threats: MOBILE-I3 and T3 Mitigated, E4 Accepted,
+E2, R2, I4, S1 Partly mitigated pending the device checks. Tests: ui-native 31, mobile-native 45,
+waiter-app 71, table-tablet 32. Deferred: kiosk mode reported to managers' screens (needs a
+contract change; small WP), the checklists (d2b). Gotcha: the Kotlin changes are uncompiled;
+`setAuthenticationRequired` needs androidx.core 1.7+ (Expo 57 has it).
 
 ### 2026-10-10: P8-03d1 The Electron shell's hardening
 

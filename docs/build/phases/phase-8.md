@@ -320,6 +320,13 @@ debugging switch, the POS window has no developer tools or menu, devices and the
 refused, the CA pin decides on the PC's own address, and the shell logs to
 `<data folder>/logs/desktop-shell.log`. P8-03d2 is everything else above.
 
+P8-03d2a (2026-10-10) is the phones and tablets, as built: `allowBackup` off in both apps, a manifest
+test, `FLAG_SECURE` while a PIN pad shows (`setScreenGuard` in `@rp/ui-native`), a private
+lock-screen alert with Acknowledge after unlocking (channel `rp.alerts.v2`), the kiosk's user
+restrictions, `docs/runbooks/mdm-policy.md` (root detection left to the MDM) and manual task 33 for
+the device checks. P8-03d2b is the checklists (ASVS, MASVS, ETSI, CIS) and the PC, Control Plane,
+update and licence threats still planned for P8-03d.
+
 ### P8-03e Incident response plan and penetration-test support
 
 Requirements: SEC-016, SEC-017.

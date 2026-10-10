@@ -14,5 +14,6 @@ export * from './components/TableTile.js';
 export * from './components/TextField.js';
 export * from './components/Toast.js';
 export * from './glyphs.js';
+export * from './screen-guard.js';
 export * from './strings.js';
 export * from './theme.js';

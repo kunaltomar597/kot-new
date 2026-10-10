@@ -81,6 +81,9 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
     runtimeVersion: { policy: 'appVersion' },
     android: {
       package: `in.rp.waiter${suffix}`,
+      // Android's backup would copy the pinned CA's settings and the cache to the cloud or a
+      // computer (MOBILE-I3); the credentials are in the Keystore, which backups do not carry.
+      allowBackup: false,
       adaptiveIcon: {
         backgroundColor: '#E6F4FE',
         foregroundImage: './assets/android-icon-foreground.png',

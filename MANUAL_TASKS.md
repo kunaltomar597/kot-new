@@ -40,6 +40,9 @@ code from going live:
 - [ ] Rate limits at the edge in front of the Control Plane, the relay and the QR site, once they
       have a host, then run `infra/edge/check-edge.mjs` against staging (threats CP-D1, RELAY-D4):
       [`manual-tasks/32-edge-rate-limits.md`](manual-tasks/32-edge-rate-limits.md).
+- [ ] Android checks on a real phone and tablet: backups off, PIN screens not captured, the private
+      lock-screen alert, the kiosk's user restrictions, a rogue server refused (threats MOBILE-E2,
+      R2, I4, S1): [`manual-tasks/33-android-device-checks.md`](manual-tasks/33-android-device-checks.md).
 - [ ] Supabase organisation, Mumbai region (QR relay), then deploy the relay schema and give the
       edge functions and the Control Plane their logins:
       [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).
