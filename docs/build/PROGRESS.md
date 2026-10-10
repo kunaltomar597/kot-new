@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03e).
+Last updated: 2026-10-11 (P8-04a).
 
 What exists:
 
@@ -412,7 +412,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
+- P8-04b contextual help; P8-05 Runbooks, manuals and training material.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -676,7 +676,10 @@ Recommended next WPs (dependencies met):
         - [x] P8-03d2b2c2 PC-I6 (the database's own service account) and PC-S4 (CA name constraints)
       - [x] P8-03d2b2d The four checklists (ASVS, MASVS, ETSI, CIS; `pnpm security:checklists`)
   - [x] P8-03e Incident response plan and penetration-test support (the plan and the pack are written; naming the people, the tabletop exercise and the external test are manual task 36 [H])
-- [ ] P8-04 UX polish and accessibility audit
+- [~] P8-04 UX polish and accessibility audit
+  - [x] P8-04a The audit (`docs/usability/ux-audit.md`), the screen-states guard and the usability test scripts
+  - [ ] P8-04b Contextual help and first-use tips (NFR-U07, Should)
+  - [ ] P8-04c Usability results from the pilot, TalkBack pass [H]
 - [ ] P8-05 Runbooks, manuals, training
 - [ ] P8-06 Pilot readiness
 
@@ -4418,6 +4421,10 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-04a the UX audit, the screen-states guard and the usability scripts
+
+Found most of P8-04 already enforced: touch-target and axe tests exist in every web app, and the QR menu and console run axe in a real browser. Added `apps/console/test/screen-states.test.ts` (a loading state needs an error state; a list needs an empty state), `docs/usability/ux-audit.md` and `docs/usability/usability-test-scripts.md`. Deferred: contextual help (P8-04b), pilot results and a TalkBack pass (P8-04c [H]).
 
 ### 2026-10-11: P8-03e the incident response plan and the penetration-test pack
 
