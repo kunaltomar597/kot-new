@@ -149,7 +149,10 @@ export function credential(deviceId: string = PAGER_2): PagerCredentialResponse 
 }
 
 /** `RestaurantChanged` for a part, as the live connection delivers it. */
-export function changed(sequence: number, part: 'WAITER_ASSIGNMENTS' | 'DEVICES') {
+export function changed(
+  sequence: number,
+  part: 'WAITER_ASSIGNMENTS' | 'DEVICES' | 'FLOOR' | 'STATIONS' | 'PRINTERS',
+) {
   return {
     sequence,
     event: {

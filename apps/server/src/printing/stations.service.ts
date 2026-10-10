@@ -25,6 +25,12 @@ function stationNotFound(): AppError {
   return new AppError(404, 'STATION_NOT_FOUND', 'There is no such station.');
 }
 
+/** "1 menu item", "3 menu items", or nothing for none. */
+function countOf(count: number, one: string, other: string): string | null {
+  if (count === 0) return null;
+  return count === 1 ? `1 ${one}` : `${String(count)} ${other}`;
+}
+
 /**
  * Kitchen stations (P1-07a, KDS-002, KDS-008, ONB-004 step 6). Each one shows its tickets on the
  * kitchen screen, prints them, or both; a station that prints names its printer. Managers and the
@@ -103,10 +109,15 @@ export class StationsService {
         tx.device.count({ where: { stationId, status: 'ACTIVE' } }),
       ]);
       if (itemCount > 0 || screenCount > 0) {
+        // Managers read this as it is on the Stations and printers page (P4-03d).
+        const users = [
+          countOf(itemCount, 'menu item', 'menu items'),
+          countOf(screenCount, 'kitchen screen', 'kitchen screens'),
+        ].filter((part) => part !== null);
         throw new AppError(
           409,
           'STATION_IN_USE',
-          `${String(itemCount)} menu items and ${String(screenCount)} kitchen screens still use this station. Move them to another station first.`,
+          `This station is still used by ${users.join(' and ')}. Move ${itemCount + screenCount === 1 ? 'it' : 'them'} to another station first.`,
           { itemCount, screenCount },
         );
       }

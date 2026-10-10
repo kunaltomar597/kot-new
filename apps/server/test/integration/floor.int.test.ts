@@ -172,6 +172,10 @@ describe('[TBL-001] sections and tables', () => {
       .set(as(manager))
       .send({ reason: 'Monsoon' });
     expect([full.status, codeOf(full)]).toEqual([409, 'SECTION_NOT_EMPTY']);
+    // Managers read it as it is on the Floor page.
+    expect(ApiError.parse(full.body).message).toBe(
+      'The section still has a table. Move or archive it first.',
+    );
 
     await server()
       .post(`/api/v1/tables/${t7.id}/archive`)

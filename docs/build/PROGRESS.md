@@ -181,7 +181,10 @@ What exists:
   and how it buzzes, how it repeats and whether it goes on to the managers, edited with checks and
   "Back to the factory rule" (P4-03b); the Suggestions page: the rules with pause and remove, the
   pinned, boosted and blocked dishes with their words, and a preview of what a table is suggested
-  now (P4-03c). 314 tests, and 22 Playwright steps.
+  now (P4-03c); the Floor page (sections and tables: add, change, archive with a reason, restore)
+  and the Stations and printers page (printers with whether they print, a test page and sending
+  their tickets elsewhere; stations shown, printed or both) (P4-03d). 360 tests, and 23
+  Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -196,8 +199,7 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03d Floor, stations and printers (P4-03a done), then P4-03e Tax and invoice (see
-  phase-4.md).
+- P4-03e Tax and invoice (P4-03a done; see phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -305,7 +307,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-03a Settings from the catalogue
 - [x] P4-03b Notification rules
 - [x] P4-03c Recommendation rules with boost, pin and block
-- [ ] P4-03d Floor, stations and printers
+- [x] P4-03d Floor, stations and printers
 - [ ] P4-03e Tax and invoice
 - [ ] P4-04 Alert centre and system screen
 - [ ] P4-05 Full report suite
@@ -633,6 +635,37 @@ Decided 2026-10-05 (P4-03b):
      too.
 261. The page's heading is "Notification rules" (its link says "Notifications"), because the
      toasts' landmark is already called "Notifications".
+
+Decided 2026-10-10 (P4-03d):
+
+269. The floor and the stations and printers are two more pages of Settings (Floor, and Stations
+     and printers), with the rest of the restaurant's configuration, rather than pages of their
+     own in the dashboard's navigation.
+270. The Floor page is linked and opened only for people who may manage staff and sections
+     (`STAFF_MANAGE`), the permission the server's floor routes already require (BRD §4.2 puts
+     sections with staff); others who open Settings never see a page whose every change the
+     server would refuse. Stations and printers is for everyone who opens Settings
+     (`OPERATIONS_CONFIGURE`), as its routes are.
+271. A new section goes after every other and a new table after its section's tables, archived
+     ones included, so a restored one never shares a place with a new one; a new table is laid
+     for four, the database's default.
+272. An archived table keeps its label taken (labels name tables on old tickets and bills, as the
+     server already required): the dialog says so and to restore that table instead.
+273. Archived stations and printers are neither listed nor restored: the server has no restore
+     for them and their names are free again, so adding one anew does the same. Sections and
+     tables have Restore, which the server offers.
+274. A broken printer's tickets are sent elsewhere from the printers list (Send tickets
+     elsewhere, Print here again), each with a reason for the audit log, to another active
+     printer that prints its own tickets; the only such printer is chosen already.
+275. A test page that does not print is the printer's answer, shown as a toast in its words, not
+     an error of the page; the page then reads the printers again, since the server marks the
+     printer not printing.
+276. A new station shows and prints its tickets on the only printer there is, asks for one when
+     there are several, and shows them on a kitchen screen only when there is none.
+277. The hints for a floor without tables now point to Manage → Settings → Floor.
+278. The refusals managers now read as they are say one thing for one: "The section still has a
+     table. Move or archive it first." and "This station is still used by 1 menu item. Move it to
+     another station first."
 
 Decided 2026-10-10 (P4-03c):
 
@@ -1389,6 +1422,48 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P4-03d Floor, stations and printers
+
+Merged #79 (P4-03c) after fixing its one red job: the devices page test read the group headings
+right after the page heading, which shows while the list still loads, so on the loaded runner
+(coverage) they were not there yet. Reproduced by answering the device list 300 ms late; the test
+now waits for the groups.
+
+Built: console `floor-view.ts`, `FloorScreen.tsx`, `FloorDialogs.tsx`, `printing-view.ts`,
+`PrintingScreen.tsx` and `PrintingDialogs.tsx`, linked from `SettingsArea.tsx` (Floor only for
+`STAFF_MANAGE`). i18n: `floor.*`, `printing.*`, `settings.pages.floor` and
+`settings.pages.printing`, and the two hints for a floor without tables. Server: the section and
+station refusals say one thing for one table, menu item or screen. No contract, schema or route
+changes: the floor, station and printer routes existed (P1-02, P1-07a).
+
+Tests: server 752 (the floor and printing integration tests also check the refusals' words),
+console 360 (the floor's and printing's logic: sections and tables as listed, the
+section, table, printer and station forms' checks and requests, printers' health, the stations
+printing on a printer, where tickets can be sent; the Floor page with axe: lists, archived on
+request, add and rename a section, add a table after its section's tables with label checks and
+the server's refusal, change a table, archive with reasons and refusals, restore, live changes, a
+failed load, and the page hidden from a manager whose custom role does not manage staff; the
+Stations and printers page with axe: printers and stations in words, redirected and never-tried
+printers, add a network printer and three test pages (printed, not printed, printer gone), a USB
+printer's share name, sending tickets elsewhere and back with a refusal, add a station and make one
+screen-only, archive with a refusal, a printer stopping live, no printers), and 23 Playwright steps
+(was 22): Vikram adds table 11 on the terrace, a network printer at a stand-in printer that
+receives the test page, a station printing on it, sends the kitchen printer's tickets there and
+back, and archives the three; both pages and every dialog pass axe and fit a 360 px phone.
+
+Gotchas:
+
+- jsdom does not close a native `<dialog>` on Escape; click its Close button in tests.
+- "27 Sep" is "27 Sept" in newer ICU data for en-IN; match the month with `Sep.*`.
+- A stand-in network printer is a `net` server on 127.0.0.1 in the Playwright process: the real
+  server's transport connects, writes the ESC/POS bytes and closes, and the text reads as latin1.
+- Queries inside a section that also lists tables meet the tables' "Place" and "Archived" too;
+  scope to the section's heading block.
+
+Deferred: drag-and-drop floor layout and printer discovery stay in P6-05 (as planned).
+
+Decisions: 269 to 278.
 
 ### 2026-10-10: P4-03c Suggestions: rules, pinned, boosted and blocked dishes
 

@@ -128,10 +128,13 @@ export class FloorService {
       }
       const tableCount = await tx.diningTable.count({ where: { sectionId, archivedAt: null } });
       if (tableCount > 0) {
+        // Managers read this as it is on the Floor page (P4-03d).
         throw new AppError(
           409,
           'SECTION_NOT_EMPTY',
-          `The section still has ${String(tableCount)} tables. Move or archive them first.`,
+          tableCount === 1
+            ? 'The section still has a table. Move or archive it first.'
+            : `The section still has ${String(tableCount)} tables. Move or archive them first.`,
           { tableCount },
         );
       }

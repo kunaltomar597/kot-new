@@ -163,8 +163,9 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   audit log, and asks the Owner for the second factor when the server wants it. The server's
   checks across settings come back as the dialog's message. The page follows `SettingsChanged`
   and `RestaurantChanged`. The notification rules have their own page, so they are not listed
-  here; `SettingsArea.tsx` links the three pages (General, Notifications, Suggestions). A row is
-  `SettingRow.tsx`, shared with the Notifications page.
+  here; `SettingsArea.tsx` links the pages (General, Notifications, Suggestions, Floor for people
+  who manage staff and sections, Stations and printers). A row is `SettingRow.tsx`, shared with
+  the Notifications page.
 - Notifications (`/manage/settings/notifications`, P4-03b, NTF-002, NTF-003, PGR-006):
   `NotificationsScreen.tsx`, with the logic in `notification-rules-view.ts` (tested on its own)
   over `@rp/domain`'s rule helpers. N, R and the nudge messages come first (the General page's
@@ -191,6 +192,22 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   chosen dish in the order, and shows each suggestion with the reason the tablets show and where
   it comes from (pinned, your rule, often together, boosted, best seller). It reads again after
   every change on the page, a published menu and a dish's availability.
+- Floor (`/manage/settings/floor`, P4-03d, TBL-001, ONB-004 step 5; only for `STAFF_MANAGE`, as
+  the server's floor routes): `FloorScreen.tsx` and `FloorDialogs.tsx`, with the logic in
+  `floor-view.ts` (tested on its own). The sections in order with their tables in use, seats and
+  place, then each table's seats, place, state and paired tablet; archived ones on request, with
+  Restore. The section and table dialogs check names, labels (archived tables' included), seats,
+  section and place as the server does; a new table goes after its section's tables. Archive asks
+  why and keeps the server's refusal in the dialog. Reads again on `RestaurantChanged` and the
+  table events.
+- Stations and printers (`/manage/settings/printing`, P4-03d, KDS-008, ONB-004 step 6):
+  `PrintingScreen.tsx` and `PrintingDialogs.tsx`, with the logic in `printing-view.ts` (tested on
+  its own). Printers with their connection, paper, whether they print (in words), when they last
+  printed or since when they have not and why, where their tickets go while sent elsewhere and
+  the stations printing on them; Print a test page (the answer is a toast either way), Change,
+  Send tickets elsewhere or Print here again (with a reason), Archive. Stations with how they get
+  their tickets and their printer, flagged when it is not printing; Change, Archive. Reads again
+  on `RestaurantChanged` and `PrinterStatusChanged`.
 - Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
   `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
   Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console
@@ -241,7 +258,10 @@ the cashier too with a new pager text and three buzzes, setting N to 90 seconds 
 factory rule back on the Notifications page, and a manager adding a suggestion rule (Paneer Tikka,
 then Sweet Lassi with "Cools the spice"), blocking Sweet Lassi and pinning Gulab Jamun with
 "Fresh today" while the preview follows each change, then putting it all back on the Suggestions
-page. The tabs share one browser context, so
+page, and a manager adding table 11 on the Floor page, then a network printer on the Stations and
+printers page whose test page reaches a stand-in printer (a TCP server in the test, which checks
+the bytes it gets), a station printing on it, and sending the kitchen printer's tickets to it and
+back, before archiving the three. The tabs share one browser context, so
 they share the device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
 since the server's Content Security Policy refuses inline scripts, after entrance animations end
 (a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium

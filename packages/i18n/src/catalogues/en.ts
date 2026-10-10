@@ -169,7 +169,7 @@ export const en = {
     signedInAs: 'Signed in as {name}',
     tables: {
       title: 'Tables',
-      empty: 'No tables yet. A manager adds them in Manage → Floor.',
+      empty: 'No tables yet. A manager adds them in Manage → Settings → Floor.',
       view: 'Which tables to show',
       mine: 'My tables',
       all: 'All tables',
@@ -1129,6 +1129,8 @@ export const en = {
       general: 'General',
       notifications: 'Notifications',
       suggestions: 'Suggestions',
+      floor: 'Floor',
+      printing: 'Stations and printers',
     },
     general: {
       intro:
@@ -1851,6 +1853,234 @@ export const en = {
       },
     },
   },
+  /**
+   * The Floor settings page (P4-03d, TBL-001, ONB-004 step 5): sections and their tables, added,
+   * changed, archived with a reason and restored.
+   */
+  floor: {
+    title: 'Floor',
+    intro:
+      'The sections and their tables, as the POS, the waiter app, the table tablets and the kitchen tickets show them. Sections and tables are archived rather than deleted, so their history stays.',
+    loadFailed: 'The floor could not be loaded.',
+    addSection: 'Add a section',
+    showArchived: 'Show archived sections and tables',
+    none: 'No sections yet. Add one, then its tables.',
+    section: {
+      tables: '{count, plural, one {# table} other {# tables}}',
+      seats: '{count, plural, one {# seat} other {# seats}}',
+      place: 'Place {order}',
+      archived: 'Archived',
+      noTables: 'No tables in this section yet.',
+      addTable: 'Add a table',
+      edit: 'Change',
+      archive: 'Archive',
+      restore: 'Restore',
+      actionsFor: 'Actions for {name}',
+    },
+    table: {
+      name: 'Table {table}',
+      seats: '{count, plural, one {# seat} other {# seats}}',
+      place: 'Place {order}',
+      tablet: 'Tablet paired',
+      archived: 'Archived',
+      edit: 'Change',
+      archive: 'Archive',
+      restore: 'Restore',
+      actionsFor: 'Actions for table {table}',
+    },
+    sectionDialog: {
+      addTitle: 'Add a section',
+      editTitle: 'Change {name}',
+      name: 'Name',
+      nameHint: 'Such as “Ground floor” or “Terrace”, up to 40 characters.',
+      place: 'Place',
+      placeHint: 'From 0 to 999. Sections with lower numbers come first.',
+      saved: '{name} is saved.',
+      problems: {
+        nameRequired: 'Enter a name of up to 40 characters.',
+        nameTaken: 'Another section is called that. Choose another name.',
+        place: 'Enter a whole number from 0 to 999.',
+      },
+    },
+    tableDialog: {
+      addTitle: 'Add a table',
+      editTitle: 'Change table {table}',
+      label: 'Number or name',
+      labelHint:
+        'Shown to staff and on tickets and bills, such as “12” or “Terrace 3”. Up to 20 characters.',
+      capacity: 'Seats',
+      section: 'Section',
+      chooseSection: 'Choose a section',
+      place: 'Place in the section',
+      placeHint: 'From 0 to 9,999. Tables with lower numbers come first.',
+      saved: 'Table {table} is saved.',
+      problems: {
+        labelRequired: 'Enter a number or name of up to 20 characters.',
+        labelTaken: 'Another table is called that. Choose another.',
+        labelArchived: 'An archived table is called that. Restore it instead.',
+        capacity: 'Enter a whole number of seats from 1 to 50.',
+        sectionMissing: 'Choose a section.',
+        place: 'Enter a whole number from 0 to 9,999.',
+      },
+    },
+    archiveSection: {
+      title: 'Archive {name}?',
+      description:
+        'It disappears from every screen; you can restore it later. Move or archive its tables first.',
+      reason: 'Why',
+      confirm: 'Archive the section',
+    },
+    archiveTable: {
+      title: 'Archive table {table}?',
+      description:
+        'It disappears from the POS, the waiter app and the floor; its orders and bills stay, and you can restore it later.',
+      reason: 'Why',
+      confirm: 'Archive the table',
+    },
+    sectionArchived: '{name} is archived.',
+    sectionRestored: '{name} is restored.',
+    tableArchived: 'Table {table} is archived.',
+    tableRestored: 'Table {table} is restored.',
+  },
+  /**
+   * The Stations and printers settings page (P4-03d, KDS-008, ONB-004 step 6): each station's
+   * mode and printer, the printers with a test page, and sending a broken printer's tickets to
+   * another one.
+   */
+  printing: {
+    title: 'Stations and printers',
+    intro:
+      'Each kitchen station shows its tickets on a kitchen screen, prints them, or both. Printers take the tickets over the network or by USB on the restaurant PC, on 80 or 58 mm paper.',
+    loadFailed: 'The stations and printers could not be loaded.',
+    printers: {
+      title: 'Printers',
+      intro:
+        'Print a test page after adding or moving a printer. A printer that stops printing raises an alert; its tickets wait until it prints again or you send them to another printer.',
+      add: 'Add a printer',
+      none: 'No printers yet. Stations show their tickets on kitchen screens only.',
+      network: 'Network, {host} port {port}',
+      usb: 'USB, {host}',
+      paper: '{width} mm paper',
+      status: { READY: 'Printing', OFFLINE: 'Not printing', UNTRIED: 'Not tried yet' },
+      lastPrintedToday: 'Last printed at {time}',
+      lastPrintedEarlier: 'Last printed on {date} at {time}',
+      offlineToday: 'Not printing since {time}.',
+      offlineEarlier: 'Not printing since {date} at {time}.',
+      sentElsewhere: 'Sent elsewhere',
+      redirected: 'Its tickets print on {name} until you change it back.',
+      usedBy: 'Prints for {names}',
+      unused: 'No station prints here.',
+      test: 'Print a test page',
+      edit: 'Change',
+      redirect: 'Send tickets elsewhere',
+      unredirect: 'Print here again',
+      archive: 'Archive',
+      actionsFor: 'Actions for {name}',
+      testPrinted: 'The test page went to {name}. Check that it printed in full.',
+      testFailed: '{name} did not print. {error}',
+      archived: '{name} is archived.',
+      redirectedToast: '{name}’s tickets now print on {to}.',
+      unredirectedToast: '{name} prints its own tickets again.',
+    },
+    printerDialog: {
+      addTitle: 'Add a printer',
+      editTitle: 'Change {name}',
+      name: 'Name',
+      nameHint: 'Such as “Kitchen printer”, up to 40 characters.',
+      connection: 'Connected by',
+      connectionChoice: { NETWORK: 'Network (cable or Wi-Fi)', USB: 'USB, on the restaurant PC' },
+      host: 'IP address or host name',
+      hostHint: 'Printed on the printer’s self-test page, such as 192.168.1.50.',
+      share: 'Printer share name',
+      shareHint: 'The name the printer is shared under in Windows on the restaurant PC.',
+      port: 'Port',
+      portHint: 'Almost always 9100.',
+      paper: 'Paper width',
+      paperChoice: { '58': '58 mm', '80': '80 mm' },
+      saved: '{name} is saved.',
+      problems: {
+        nameRequired: 'Enter a name of up to 40 characters.',
+        nameTaken: 'Another printer is called that. Choose another name.',
+        host: 'Enter an IP address such as 192.168.1.50, or a host name.',
+        share: 'Enter the share name: letters, numbers, spaces, dots, dashes or underscores.',
+        port: 'Enter a port from 1 to 65,535.',
+      },
+    },
+    redirectDialog: {
+      title: 'Send {name}’s tickets elsewhere',
+      description:
+        'New tickets for {name}, and those waiting for it, print on the printer you choose until you change it back.',
+      to: 'Print them on',
+      choose: 'Choose a printer',
+      none: 'No other printer prints its own tickets.',
+      toMissing: 'Choose a printer.',
+      reason: 'Why',
+      reasonHint: 'At least 3 characters. It is kept in the audit log.',
+      reasonMissing: 'Give a reason of at least 3 characters.',
+      confirm: 'Send tickets there',
+    },
+    unredirectDialog: {
+      title: 'Print on {name} again?',
+      description:
+        'Its tickets stop going to {to} and print on {name} again. Print a test page first to check that it prints.',
+      reason: 'Why',
+      confirm: 'Print here again',
+    },
+    archivePrinter: {
+      title: 'Archive {name}?',
+      description:
+        'It is no longer offered to stations. Give the stations that print on it another printer first.',
+      reason: 'Why',
+      confirm: 'Archive the printer',
+    },
+    stations: {
+      title: 'Stations',
+      intro:
+        'Each dish is cooked at a station. A station that prints needs a printer; one that shows its tickets needs a kitchen screen, paired in Devices.',
+      add: 'Add a station',
+      none: 'No stations yet.',
+      mode: {
+        SCREEN: 'Kitchen screen only',
+        PRINT: 'Printer only',
+        BOTH: 'Kitchen screen and printer',
+      },
+      printsOn: 'Prints on {name}',
+      printerDown: '{name} is not printing',
+      edit: 'Change',
+      archive: 'Archive',
+      actionsFor: 'Actions for {name}',
+      archived: '{name} is archived.',
+    },
+    stationDialog: {
+      addTitle: 'Add a station',
+      editTitle: 'Change {name}',
+      name: 'Name',
+      nameHint:
+        'Such as “Tandoor” or “Bar”, up to 40 characters. Kitchen screens and tickets show it.',
+      mode: 'Its tickets are',
+      modeChoice: {
+        SCREEN: 'Shown on a kitchen screen',
+        PRINT: 'Printed',
+        BOTH: 'Shown on a kitchen screen and printed',
+      },
+      printer: 'Printer',
+      choosePrinter: 'Choose a printer',
+      noPrinters: 'Add a printer first, or show the tickets on a kitchen screen only.',
+      saved: '{name} is saved.',
+      problems: {
+        nameRequired: 'Enter a name of up to 40 characters.',
+        nameTaken: 'Another station is called that. Choose another name.',
+        printerMissing: 'Choose the printer it prints on.',
+      },
+    },
+    archiveStation: {
+      title: 'Archive {name}?',
+      description:
+        'Move its dishes and kitchen screens to another station first. Its tickets stay in the reports.',
+      reason: 'Why',
+      confirm: 'Archive the station',
+    },
+  },
   secondFactor: {
     title: 'Confirm it is you',
     description:
@@ -1937,7 +2167,7 @@ export const en = {
     toApprove: '{count} to approve',
     readyToServe: '{count, plural, one {# dish ready} other {# dishes ready}}',
     requests: '{count, plural, one {# request} other {# requests}}',
-    noTables: 'No tables yet. A manager adds them in Manage → Floor.',
+    noTables: 'No tables yet. A manager adds them in Manage → Settings → Floor.',
     summary: '{free} of {total} tables free',
     open: {
       title: 'Open {table}',
