@@ -467,15 +467,24 @@ PINs, passwords, tokens or keys written to `<data>\logs`, which support may late
 
 Error answers or public endpoints tell an attacker about the software.
 
-- Mitigation: unexpected errors answer with a code and a plain message, never the internal one.
-  `/version` is public and names the Node.js version.
+- Mitigation: unexpected errors answer with a code and a plain message, never the internal one;
+  a path nothing serves answers the API's 404, not Express's page. `/version` names only the
+  Node.js major line (the exact version is on the System page, for signed-in managers). Every
+  answer says it is not to be run as a page, framed, sniffed, cached or read by another site; the
+  DAST scan (P8-03c1) attacks every endpoint on each run of its CI job.
 - Code: `apps/server/src/errors/error-mapping.ts` (`mapError`);
-  `apps/server/src/health/health.controller.ts` (`HealthController`).
+  `apps/server/src/health/health.controller.ts` (`HealthController`);
+  `apps/server/src/http/security-headers.ts` (`API_SECURITY_HEADERS`);
+  `apps/server/src/http/request-pipeline.ts` (`notFoundOutsideApi`).
 - Tests: `apps/server/test/integration/errors.int.test.ts` "never leaks internal error messages";
-  `apps/server/test/unit/error-mapping.test.ts` "hides internal details of unexpected errors".
+  `apps/server/test/unit/error-mapping.test.ts` "hides internal details of unexpected errors";
+  `apps/server/test/integration/health.int.test.ts` "reports the version and build, with only the
+  major line of Node.js"; `apps/server/test/integration/console-static.int.test.ts` "puts the
+  security headers on every answer that is not a page of the console";
+  `infra/dast/test/scan.test.ts` "leaves no finding open on the local server and the console".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03c by 2026-10-19: `/version` without the Node.js version, and
-  the API's own security headers.
+- Status: Mitigated (P8-03c1: `/version` named the exact Node.js version; the API sent no
+  security headers of its own, and unknown paths outside it answered Express's HTML page).
 
 #### PC-I3 Events reaching screens that may not see them
 
@@ -497,17 +506,22 @@ people.
 Injected script in the console reads the device token or the session, or signs challenges with
 the device key.
 
-- Mitigation: the console's CSP allows only its own scripts and no framing; React escapes all
-  text; the device key cannot be exported. The tokens themselves are readable by script.
+- Mitigation: the console's CSP allows only its own scripts and no framing, and requires Trusted
+  Types with no policy at all: no string reaches an HTML or script sink, so markup that got into
+  the page cannot run script, and React escapes all text. Zod runs without `new Function`, so
+  the page needs no eval. The device key cannot be exported. Script that did run could still read
+  the tokens.
 - Code: `apps/server/src/http/console-static.ts` (`CONSOLE_SECURITY_HEADERS`);
-  `apps/console/src/app/storage.ts` (`BrowserStorage`); `packages/api-client/src/device-key.ts`.
+  `apps/console/src/app/zod-jitless.ts`; `apps/console/src/app/storage.ts` (`BrowserStorage`);
+  `packages/api-client/src/device-key.ts`.
 - Tests: `apps/server/test/integration/console-static.int.test.ts` "serves the app shell with
-  strict security headers, for every client-side route";
-  `apps/console/test/console-controller.test.ts` "stores and reloads the non-extractable key pair,
-  the device and the session".
+  strict security headers, for every client-side route", "lets no string reach a script or HTML
+  sink in the console (Trusted Types)"; `apps/console/e2e/console.e2e.ts` "every screen ran within
+  the CSP and Trusted Types (PC-I4)"; `apps/console/test/console-controller.test.ts` "stores and
+  reloads the non-extractable key pair, the device and the session";
+  `infra/dast/test/scan.test.ts` "leaves no finding open on the local server and the console".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c by 2026-10-19: Trusted Types in the console's CSP, and the
-  DAST scan of the console and API.
+- Status: Mitigated (P8-03c1: Trusted Types; the e2e run shows no screen breaks a rule).
 
 #### PC-I5 A stolen PC or disk
 
@@ -679,7 +693,7 @@ updating during service.
 - Tests: `apps/server/test/integration/realtime.int.test.ts` "refuses plain HTTP polling; only
   WebSocket is offered", "replays on request, and limits how often a connection may ask".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c by 2026-10-19: flood tests of the HTTPS server and the
+- Status: Partly mitigated. Plan: P8-03c2 by 2026-10-19: flood tests of the HTTPS server and the
   socket from the LAN (connections per device, handshakes, timeouts), and the limits they show
   are needed.
 

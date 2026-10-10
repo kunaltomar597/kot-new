@@ -72,7 +72,10 @@ heartbeats, the audit chain checks, and the alert webhook.
 Environment variables only; see `.env.example`.
 
 - `CP_ENV` is `development`, `staging` or `production`. Staging and production require
-  `sslmode=require` (or stricter) in `DATABASE_URL` and send HSTS.
+  `sslmode=require` (or stricter) in `DATABASE_URL` and send HSTS. Every answer carries the
+  security headers of `src/http/pipeline.ts` (`API_SECURITY_HEADERS`), the vendor web app's
+  pages a CSP with Trusted Types, and a path outside `/v1` that nothing served is the API's JSON
+  404 (P8-03c1, `docs/security/dast.md`).
 - `CP_TRUST_PROXY` is the number of reverse proxies in front of the service. It is needed so the
   enrolment rate limit sees the client's address, not the load balancer's.
 - Serve the API at the root of its host. The signature covers the path, so a proxy must not

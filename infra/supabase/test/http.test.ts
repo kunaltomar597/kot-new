@@ -220,3 +220,33 @@ describe('[RELAY-I5] the PCs’ function answers no browser', () => {
     expect(preflight.headers.get('access-control-allow-origin')).toBe(site);
   });
 });
+
+describe('[SEC-017] every answer keeps a browser from running, framing or sniffing it', () => {
+  const site = 'https://menu.example.in';
+  const expected = {
+    'content-security-policy':
+      "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'no-referrer',
+  };
+
+  it('sends the security headers on answers, refusals and preflights alike', async () => {
+    const answers = [
+      await submitOrder(
+        request('submit-order', { method: 'OPTIONS', headers: { origin: site } }),
+        context,
+      ),
+      await submitOrder(request('submit-order', { method: 'GET', headers: dinerHeaders }), context),
+      await serviceRequest(request('service-request', { headers: withoutToken }), context),
+      await server(request('server/orders', { method: 'GET' }), context),
+      await server(request('server/nothing', { method: 'GET' }), context),
+    ];
+    for (const response of answers) {
+      for (const [name, value] of Object.entries(expected)) {
+        expect(response.headers.get(name), `${String(response.status)} ${name}`).toBe(value);
+      }
+    }
+    expect(answers.map((response) => response.status)).toEqual([204, 405, 400, 401, 404]);
+  });
+});

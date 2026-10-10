@@ -10,6 +10,8 @@ import {
   correlationMiddleware,
   hstsMiddleware,
   keepRawBody,
+  notFoundOutsideApi,
+  securityHeadersMiddleware,
 } from './http/pipeline.js';
 import { webMiddleware } from './http/web-static.js';
 
@@ -33,6 +35,7 @@ export function configureControlPlaneApp(app: INestApplication): void {
   // The load balancer's address is not the client's (rate limits by address).
   express.set('trust proxy', config.trustProxy);
   express.use(correlationMiddleware);
+  express.use(securityHeadersMiddleware);
   if (config.env !== 'development') express.use(hstsMiddleware);
   // The vendor web app (P7-02e) on the same origin as the API; never for `/v1/...`.
   if (config.webDir !== undefined) express.use(webMiddleware(config.webDir));
@@ -47,6 +50,7 @@ export function configureControlPlaneApp(app: INestApplication): void {
   );
   express.use(json({ limit: JSON_BODY_LIMIT, verify: keepRawBody }));
   express.use(bodyParserErrorHandler);
+  express.use(notFoundOutsideApi(API_PREFIX));
   app.setGlobalPrefix(API_PREFIX);
   app.enableShutdownHooks();
 }

@@ -23,6 +23,9 @@ Built by: P0-06, P0-16, P7-04. Decisions: ADR-0010.
 Workflows (`.github/workflows/security.yml`): CodeQL, `pnpm audit --audit-level high`, dependency
 review (only when the repository variable `DEPENDENCY_REVIEW` is `true`, which needs the
 Dependency graph setting), gitleaks, licence check and a CycloneDX SBOM artefact, on every PR, on `main` and weekly.
+The `dast` job (P8-03c1) scans the four surfaces with OWASP ZAP (`infra/dast`, the container pinned
+by digest in `ZAP_IMAGE`) on `main`, weekly and by hand, not on pull requests, and keeps the
+reports; see `docs/security/dast.md`.
 
 Accepted audit advisories: none. If a high advisory has no fix yet, prefer a `pnpm.overrides` entry
 that forces a patched version; otherwise add its GHSA ID to pnpm's `auditConfig.ignoreGhsas` and

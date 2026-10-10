@@ -38,6 +38,17 @@ Never paste a password, key or token into a Claude session or a commit.
    - order something: within seconds it waits for approval on the waiter app or the POS;
    - approve it: the phone says "Your order has been sent to the kitchen".
 
+8. Check what the deployed site sends (P8-03c1; the scan in CI runs on plain http and cannot see
+   the host's TLS):
+
+   ```sh
+   curl -sI "https://menu.<your-domain>/t/<a table's code>" | grep -iE 'content-security|strict-transport|x-frame'
+   ```
+
+   The policy names a `'nonce-…'` that changes on every request, `Strict-Transport-Security`
+   is there, and `X-Frame-Options: DENY`. Then the host's own TLS: SSL Labs
+   (`https://www.ssllabs.com/ssltest/`) on the address grades it A or better.
+
 ## Results to report back
 
 ```
@@ -48,5 +59,6 @@ QR menu site
 - RELAY_ALLOWED_ORIGINS includes the site: yes/no
 - RP_QR_SITE_URL set on the pilot PC: yes/no
 - Phone test (menu shows / order reaches approval / "sent to the kitchen" shows): __/__/__
+- Headers (nonce changes / HSTS / X-Frame-Options): __/__/__; SSL Labs grade: __
 - Anything that did not match these steps:
 ```

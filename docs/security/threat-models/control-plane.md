@@ -343,7 +343,9 @@ A caller makes the Control Plane fetch an address inside the cloud (SSRF).
 
 - Mitigation: no endpoint takes an address; every outside service's address is configuration.
 - Code: `apps/control-plane/src/config/cp-config.ts` (`loadConfig`).
-- Tests: none, there is no request to an address a caller gives; P8-03c's scan confirms it.
+- Tests: none, there is no request to an address a caller gives. The DAST scan (P8-03c1) attacks
+  every endpoint, but ZAP's own SSRF rule needs callbacks over the internet, which the scan does
+  not make.
 - Risk: likelihood Low, impact Low: Low.
 - Status: Mitigated.
 
@@ -365,7 +367,7 @@ costs.
   `apps/control-plane/test/integration/digital-bills.int.test.ts` "refuses channels the vendor has
   not set up, and more bills than the day allows".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c by 2026-10-19: rate limits and a firewall at the edge in
+- Status: Partly mitigated. Plan: P8-03c2 by 2026-10-19: rate limits and a firewall at the edge in
   front of the Control Plane, checked by the DAST run.
 
 #### CP-D2 Locking vendor accounts

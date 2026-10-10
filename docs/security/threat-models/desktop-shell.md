@@ -139,14 +139,17 @@ events only to its standard output, which a window app does not keep.
 
 Injected script in the POS window reads the device token or the session.
 
-- Mitigation: see PC-I4: the console's CSP allows only its own scripts and React escapes all text;
-  the key cannot be exported, though script could read the tokens.
-- Code: `apps/server/src/http/console-static.ts` (`CONSOLE_SECURITY_HEADERS`).
+- Mitigation: see PC-I4: the console's CSP allows only its own scripts and requires Trusted Types
+  with no policy, so markup that got into the page runs no script; React escapes all text; the
+  key cannot be exported, though script that did run could read the tokens.
+- Code: `apps/server/src/http/console-static.ts` (`CONSOLE_SECURITY_HEADERS`);
+  `apps/console/src/app/zod-jitless.ts`.
 - Tests: `apps/server/test/integration/console-static.int.test.ts` "serves the app shell with strict
-  security headers".
+  security headers", "lets no string reach a script or HTML sink in the console (Trusted Types)";
+  `apps/console/e2e/console.e2e.ts` "every screen ran within the CSP and Trusted Types (PC-I4)";
+  `infra/dast/test/scan.test.ts` "leaves no finding open on the local server and the console".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c by 2026-10-19: Trusted Types and the DAST scan of the
-  console.
+- Status: Mitigated (P8-03c1: Trusted Types in the console's CSP).
 
 #### DESKTOP-I2 The camera or the microphone
 

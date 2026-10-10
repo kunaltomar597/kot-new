@@ -122,5 +122,7 @@ test('[SEC-003] the pages carry a strict Content-Security-Policy', async ({ requ
   const { baseUrl } = e2eState();
   const page = await request.get(`${baseUrl}/restaurants`, { headers: { accept: 'text/html' } });
   expect(page.headers()['content-security-policy']).toContain("default-src 'self'");
+  // Trusted Types (P8-03c1): the run above, with every page, logged no violation of them.
+  expect(page.headers()['content-security-policy']).toContain("trusted-types 'none'");
   expect(page.headers()['x-robots-tag']).toBe('noindex, nofollow');
 });

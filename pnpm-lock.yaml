@@ -355,6 +355,9 @@ importers:
       react-dom:
         specifier: ^19.3.0
         version: 19.3.0(react@19.3.0)
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@playwright/test':
         specifier: ^1.63.0
@@ -734,6 +737,33 @@ importers:
       test-renderer:
         specifier: ^1.3.0
         version: 1.3.0(@types/react@19.2.18)(react@19.2.3)
+
+  infra/dast:
+    devDependencies:
+      '@rp/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@rp/ordering':
+        specifier: workspace:*
+        version: link:../../packages/ordering
+      '@rp/relay':
+        specifier: workspace:*
+        version: link:../supabase
+      '@rp/test-postgres':
+        specifier: workspace:*
+        version: link:../../packages/test-postgres
+      '@rp/totp':
+        specifier: workspace:*
+        version: link:../../packages/totp
+      '@types/node':
+        specifier: ^22.20.4
+        version: 22.20.4
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
 
   infra/supabase:
     dependencies:

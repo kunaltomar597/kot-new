@@ -25,6 +25,8 @@ export default tseslint.config(
       // The Windows installer's staging folder and output (P0-16d).
       'apps/desktop/staging/**',
       'apps/desktop/release/**',
+      // ZAP's plans, scripts and reports from a DAST run (P8-03c1).
+      'infra/dast/reports/**',
     ],
   },
   js.configs.recommended,

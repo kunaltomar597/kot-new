@@ -41,6 +41,46 @@ describe('[VCP-001] the vendor web app on the API’s own origin', () => {
     expect((await request(httpServer(app)).get('/assets/missing.js')).status).toBe(404);
   });
 
+  it('[SEC-017] lets no string reach a script or HTML sink in the app (Trusted Types)', async () => {
+    const page = await request(httpServer(app)).get('/').set('accept', 'text/html');
+    const policy = page.headers['content-security-policy'];
+    expect(policy).toContain("require-trusted-types-for 'script'");
+    expect(policy).toContain("trusted-types 'none'");
+    expect(policy).not.toContain('unsafe-inline');
+  });
+
+  it('[SEC-017] puts the security headers on every answer that is not a page of the app', async () => {
+    const answers = [
+      await request(httpServer(app)).get('/v1/health').expect(200),
+      await request(httpServer(app)).get('/v1/nothing').expect(404),
+      await request(httpServer(app)).get('/v1/vendor/me').expect(401),
+      await request(httpServer(app)).get('/robots.txt').expect(404),
+      await request(httpServer(app)).get('/assets/missing.js').expect(404),
+      await request(httpServer(app))
+        .post('/v1/vendor/session')
+        .set('content-type', 'application/json')
+        .send('{"broken":')
+        .expect(400),
+    ];
+    for (const response of answers) {
+      expect(response.headers).toMatchObject({
+        'content-security-policy':
+          "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        'x-content-type-options': 'nosniff',
+        'x-frame-options': 'DENY',
+        'referrer-policy': 'no-referrer',
+        'cross-origin-resource-policy': 'same-origin',
+        'cache-control': 'no-store',
+      });
+      expect(response.headers['content-type']).toMatch(/^application\/json/);
+      expect(response.headers['x-powered-by']).toBeUndefined();
+    }
+    // A folder of the app's files is no redirect page: it is a route of the app.
+    const folder = await request(httpServer(app)).get('/assets').set('accept', 'text/html');
+    expect(folder.status).toBe(200);
+    expect(folder.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+  });
+
   it('never answers the API with the app', async () => {
     const health = await request(httpServer(app)).get('/v1/health').set('accept', 'text/html');
     expect(health.headers['content-type']).toContain('application/json');

@@ -1,0 +1,28 @@
+{
+  "$comment": "Findings of the DAST run (P8-03c1) looked at and decided. A High is never accepted. Keep a reason anyone can check; remove an entry once its finding is fixed (the run lists entries no finding needed). docs/security/dast.md explains each.",
+  "findings": [
+    {
+      "target": "*",
+      "alert": "2",
+      "name": "Private IP Disclosure",
+      "decision": "false-positive",
+      "reason": "The addresses are examples in help texts (192.168.1.20:8443 for the server, 192.168.1.50 for a printer) that each web app's script carries with the English catalogue of @rp/i18n; no address of a real machine is in it.",
+      "where": "^GET \\S+/(_next/static/chunks|assets)/[\\w.-]+\\.js$"
+    },
+    {
+      "target": "local-server",
+      "alert": "2",
+      "name": "Private IP Disclosure",
+      "decision": "false-positive",
+      "reason": "The printers' own LAN addresses, which the restaurant set up (P1-07a) and Manage → Kitchen and printers shows; only a signed-in person whose role may manage printers gets them, and they never leave the restaurant's network.",
+      "where": "^(GET|POST) \\S+/api/v1/printers(/[\\w-]*)*(\\?.*)?$"
+    },
+    {
+      "target": "local-server",
+      "alert": "10035",
+      "name": "Strict-Transport-Security Header Not Set",
+      "decision": "accepted",
+      "reason": "The server is on the restaurant's LAN with a certificate from the installation's own CA, and there is no plain-http listener to downgrade to. A browser that remembered HSTS could not open the console after a replaced PC renews the CA, a risk to service (NFR-A01) for no gain; decided in P8-03c1. Cloud surfaces send HSTS."
+    }
+  ]
+}

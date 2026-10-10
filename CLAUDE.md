@@ -105,7 +105,7 @@ packages/
   config/          Shared tool presets                                                     [grows]
   test-postgres/   Throwaway PostgreSQL cluster for integration tests                      [done]
 firmware/pager/    ESP-IDF project for the ESP32-S3 wrist pager                            [P0-H1, P2-05]
-infra/             supabase/ (relay), installer/ (Windows), ci/ (pipelines, signing)
+infra/             supabase/ (relay), installer/ (Windows), ci/ (pipelines, signing), dast/ (ZAP scans)
 docs/              brd/, build/, adr/, runbooks/, api/, owner/
 scripts/           brd catalogue builder, traceability
 .claude/           session-start hook (installs deps), /next-step skill

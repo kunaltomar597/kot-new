@@ -32,6 +32,8 @@ apps/desktop/release/
 # Playwright output (apps/console e2e)
 test-results/
 playwright-report/
+# ZAP's plans, scripts and reports from a DAST run (infra/dast, P8-03c1)
+infra/dast/reports/
 # ESP-IDF
 firmware/**/build/
 firmware/**/sdkconfig.old

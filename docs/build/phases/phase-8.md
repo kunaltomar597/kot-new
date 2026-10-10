@@ -251,6 +251,28 @@ security headers; fixes for the findings; results in `docs/security/dast.md`. Al
 whose plan names P8-03c in `docs/security/threat-models/` (the summary in its README lists them).
 Acceptance: no open High finding; the rest triaged; no threat left planned for P8-03c.
 
+Split (2026-10-10) in two, because the scans and the headers they check are one piece of work
+and the floods, which need load from the LAN and limits at the edge, are another:
+
+- **P8-03c1 The ZAP scans, security headers and the CSPs (done).** `infra/dast` (`@rp/dast`) starts the
+  four surfaces as they run for real (the QR site with its relay, the relay's functions, the
+  Control Plane with the vendor web app, the local server over HTTPS with the console), signs in
+  where a surface needs it, and runs OWASP ZAP's Automation Framework on each: the pages spidered
+  and passively scanned, the OpenAPI documents imported and actively scanned. Every finding is
+  judged against `infra/dast/triage.json`: a High is never accepted, everything else needs a
+  reason. Runnable on a developer's machine (`ZAP_PATH`) and in CI (the ZAP container, a job in
+  `security.yml`). Also: security headers on every API answer (local server, Control Plane,
+  relay); the QR site's CSP with a nonce per request instead of `'unsafe-inline'` scripts
+  (RELAY-T5); Trusted Types in the console's CSP, and the vendor web app's (PC-I4, DESKTOP-I1);
+  `/version` without the exact Node.js version (PC-I2); the results in `docs/security/dast.md`.
+  Acceptance: no open High finding, the rest triaged; those four threats no longer planned for
+  P8-03c.
+- **P8-03c2 Floods and rate limits.** PC-D3 (flood tests of the HTTPS server and the socket from
+  the LAN: connections per device, handshakes, timeouts, and the limits they show are needed),
+  CP-D1 (rate limits in front of the Control Plane), RELAY-D4 (reads of the menu and order status
+  throttled at the relay and the site). Acceptance: the flood tests pass; no threat left planned
+  for P8-03c2.
+
 ### P8-03d Standards checklists, Electron review and MDM policy
 
 Requirements: BRD §8.1 (OWASP ASVS L2, OWASP Top 10 and API Top 10, MASVS-L1 with resilience for

@@ -28,6 +28,11 @@ export const VersionResponse = z.object({
    * before P7-04d, which a newer app must still read.
    */
   clientApi: ClientApiRange.optional(),
+  /**
+   * The runtime's major line only, e.g. `v24` (PC-I2: an unauthenticated caller learns no patch
+   * level). Signed-in managers see the exact version on the System page. Kept because apps of
+   * client API 1.0 require it.
+   */
   node: z.string().min(1),
   buildId: z.string().optional(),
 });
