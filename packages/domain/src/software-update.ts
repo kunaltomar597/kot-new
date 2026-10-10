@@ -73,3 +73,22 @@ export function updateDownloadRetryMs(failures: number): number {
   const exponent = Math.min(Math.max(failures, 1) - 1, 20);
   return Math.min(UPDATE_DOWNLOAD_RETRY_MS * 2 ** exponent, UPDATE_DOWNLOAD_RETRY_MAX_MS);
 }
+
+/**
+ * How a PC checks the updates it installs (UPD-007), as its heartbeat says (P8-03b3b): `VENDOR`,
+ * only installers with the vendor's Authenticode signature; `UNSIGNED`, a test build that also
+ * takes unsigned installers, so anyone who can offer it one runs code as SYSTEM; `NONE`, a build
+ * that can check no signature and installs no update.
+ */
+export const UPDATE_SIGNING = ['VENDOR', 'UNSIGNED', 'NONE'] as const;
+export type UpdateSigning = (typeof UPDATE_SIGNING)[number];
+
+/** The update settings built into a PC's installation (`updates` in its installation file). */
+export function updateSigningOf(policy: {
+  readonly publisher: string | null;
+  readonly allowUnsigned: boolean;
+}): UpdateSigning {
+  // Allowing unsigned installers wins: one passes even where a publisher is named.
+  if (policy.allowUnsigned) return 'UNSIGNED';
+  return policy.publisher === null ? 'NONE' : 'VENDOR';
+}

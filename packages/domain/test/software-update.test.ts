@@ -3,6 +3,7 @@ import {
   isNewerVersion,
   UPDATE_DOWNLOAD_RETRY_MAX_MS,
   updateDownloadRetryMs,
+  updateSigningOf,
   updateTiming,
   type UpdateTimingInput,
 } from '../src/software-update.js';
@@ -124,5 +125,16 @@ describe('[UPD-002] versions and downloads', () => {
     expect(updateDownloadRetryMs(4)).toBe(40 * 60_000);
     expect(updateDownloadRetryMs(50)).toBe(UPDATE_DOWNLOAD_RETRY_MAX_MS);
     expect(updateDownloadRetryMs(0)).toBe(5 * 60_000);
+  });
+});
+
+describe('[UPD-007] how a PC checks its updates', () => {
+  it('says whether it takes only the vendor’s signature, unsigned installers too, or none', () => {
+    const vendor = 'CN=Restaurant Platform Pvt Ltd, C=IN';
+    expect(updateSigningOf({ publisher: vendor, allowUnsigned: false })).toBe('VENDOR');
+    expect(updateSigningOf({ publisher: null, allowUnsigned: true })).toBe('UNSIGNED');
+    // Unsigned installers pass even where a publisher is named, so that build counts as unsigned.
+    expect(updateSigningOf({ publisher: vendor, allowUnsigned: true })).toBe('UNSIGNED');
+    expect(updateSigningOf({ publisher: null, allowUnsigned: false })).toBe('NONE');
   });
 });

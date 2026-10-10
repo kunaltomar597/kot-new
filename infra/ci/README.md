@@ -11,6 +11,14 @@ Built by: P0-06, P0-16, P7-04. Decisions: ADR-0010.
 - `check-licenses.mjs`, `license-policy.json`: licence check for production dependencies
   (NFR-M07), `pnpm licenses:check`; its tests run with `pnpm ci:test`. GPL, AGPL and SSPL are
   blocked; any other licence not on the allow-list needs an entry in `exceptions` with a reason.
+- `pinned-actions.test.mjs` (`pnpm ci:test`): every GitHub Action in every workflow is pinned to a
+  full commit with its version in a comment (`uses: actions/checkout@<40 hex> # v7.0.1`), one
+  commit per Action across the workflows (threat model "The update pipeline", UPDATE-T1).
+  Dependabot moves the commit and the comment together; to add an Action, look up the commit of
+  its release tag (`git ls-remote https://github.com/<owner>/<repo> 'refs/tags/v1.2.3*'`, the
+  `^{}` line for an annotated tag).
+- `signing-policy.test.mjs` (`pnpm ci:test`): the code-signing certificate only for a push to
+  `main`, in the `release-signing` environment (UPDATE-E2).
 
 Workflows (`.github/workflows/security.yml`): CodeQL, `pnpm audit --audit-level high`, dependency
 review (only when the repository variable `DEPENDENCY_REVIEW` is `true`, which needs the

@@ -338,14 +338,20 @@ believes it is on another PC.
 A signed release built before the vendor's licence key exists trusts no licence, and every
 restaurant that installs it restricts from the next business day.
 
-- Mitigation: the keys' list is empty until manual task 23; nothing stops a signed build without
-  it.
+- Mitigation: the keys' list is empty until manual task 23. The release guard reads the keys
+  built into the staged server, what the installer will carry, and refuses a signed build while
+  the licence keys or the pager firmware key digests (manual task 30) are empty or not keys
+  (P8-03b3b). What remains: a key that is not the one in the KMS still builds; manual task 23
+  checks a licence the Control Plane signed against the release before it goes out.
 - Code: `packages/licensing/src/vendor-keys.ts` (`VENDOR_LICENCE_KEYS`);
+  `apps/server/src/pager-firmware/firmware-keys.ts` (`PAGER_FIRMWARE_KEY_DIGESTS`);
+  `apps/desktop/src/packaging/release-guard.ts` (`releaseRefusals`, `stagedKeys`);
   `apps/desktop/src/packaging/package-cli.ts`.
-- Tests: none, the build has no such check yet; P8-03b3b adds it with its test.
+- Tests: `apps/desktop/test/packaging.test.ts` "refuses a signed build without the vendor’s
+  licence key or pager firmware key", "reads the update settings and the keys the staged installer
+  carries".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Not mitigated. Plan: P8-03b3b by 2026-10-15: a signed build refuses to build while the
-  licence keys or the pager firmware keys are empty.
+- Status: Mitigated.
 
 ### Elevation of privilege
 

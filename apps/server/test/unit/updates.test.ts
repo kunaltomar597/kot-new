@@ -8,6 +8,7 @@ import { UPDATER_PICKUP_MS, UPDATER_RETRY_MS, Watchdog } from '../../src/service
 import { type RunCommand, WindowsServiceControl } from '../../src/service/windows-services.js';
 import { UPDATER_TASK } from '../../src/installation/installation.js';
 import {
+  installerVersionProblem,
   judgeSignature,
   powerShellSignatureCheck,
   SIGNATURE_SCRIPT,
@@ -195,12 +196,32 @@ describe('[UPD-007] the installer’s signature', () => {
     expect(SIGNATURE_SCRIPT).not.toMatch(/\.exe/);
   });
 
+  it('[UPD-002] refuses an installer that is not the version the release names', () => {
+    const seen = { status: 'Valid', subject: vendor };
+    expect(installerVersionProblem({ ...seen, productVersion: '1.2.0' }, '1.2.0')).toBeNull();
+    expect(installerVersionProblem({ ...seen, productVersion: '1.0.5' }, '1.2.0')).toBe(
+      'The installer installs version 1.0.5, not version 1.2.0 as the release says.',
+    );
+    expect(installerVersionProblem({ ...seen, productVersion: '1.2.0-rc.1' }, '1.2.0')).toMatch(
+      /version 1\.2\.0-rc\.1, not/,
+    );
+    expect(installerVersionProblem({ ...seen, productVersion: null }, '1.2.0')).toMatch(
+      /installs no version/,
+    );
+    // Not read (off Windows): the updater checks it before it runs the installer.
+    expect(installerVersionProblem(seen, '1.2.0')).toBeNull();
+    expect(SIGNATURE_SCRIPT).toContain(
+      '(Get-Item -LiteralPath $env:RP_SIGNED_FILE).VersionInfo.ProductVersion',
+    );
+  });
+
   it.runIf(process.platform === 'win32')('reads a real file’s signature on Windows', async () => {
     const file = join(folder(), 'unsigned.exe');
     writeFileSync(file, INSTALLER);
     const seen = await powerShellSignatureCheck()(file);
     expect(['NotSigned', 'UnknownError']).toContain(seen.status);
     expect(seen.subject).toBeNull();
+    expect(seen.productVersion).toBeNull();
   });
 });
 

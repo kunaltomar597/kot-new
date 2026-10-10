@@ -29,7 +29,8 @@ make firmware the pagers run. Keep it offline or in an HSM.
    adding it to `apps/server/src/pager-firmware/firmware-keys.ts`. PCs pass on only firmware signed
    by a key listed there. Up to three keys may be listed (the pagers have three key slots), so a
    key can be rotated: add the new one, release, burn it into the pagers, then remove the old one
-   a release later.
+   a release later. Until one is listed, a signed release refuses to build (the release guard,
+   `apps/desktop/src/packaging/release-guard.ts`), so do this before the first signed release.
 4. Burn the same digest into each production pager's eFuse when secure boot is enabled
    (P2-05's flashing procedure, manual task 15). A development pager without secure boot accepts
    any image, so test the PC's check with a signed image anyway.

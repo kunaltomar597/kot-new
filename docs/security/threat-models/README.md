@@ -76,21 +76,17 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | [The LAN and the local server](local-server-and-lan.md) |      45 |        31 |                9 |             2 |        3 |              18 |                         2 |
 | [The pager channel](pager-channel.md)                   |      26 |        19 |                5 |             1 |        1 |               4 |                         1 |
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        15 |                8 |             4 |        2 |               9 |                         0 |
-| [The update pipeline](update-pipeline.md)               |      21 |        11 |                7 |             2 |        1 |              11 |                         2 |
-| [The licence mechanism](licence-mechanism.md)           |      20 |        13 |                4 |             2 |        1 |               6 |                         1 |
+| [The update pipeline](update-pipeline.md)               |      21 |        14 |                4 |             2 |        1 |              12 |                         1 |
+| [The licence mechanism](licence-mechanism.md)           |      20 |        14 |                4 |             1 |        1 |               6 |                         1 |
 | [The Vendor Control Plane](control-plane.md)            |      22 |         8 |               12 |             1 |        1 |               8 |                         1 |
 | [The desktop shell](desktop-shell.md)                   |      14 |         5 |                5 |             3 |        1 |               7 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        11 |                5 |             2 |        0 |               5 |                         0 |
-| All                                                     |     195 |       113 |               55 |            17 |       10 |              68 |                         7 |
+| All                                                     |     195 |       117 |               52 |            16 |       10 |              69 |                         6 |
 
 Open threats and their plans, by date:
 
 | Threat                                                                                                                                   | Residual | Status           | Plan           | By         |
 | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
-| [LICENCE-D3](licence-mechanism.md#licence-d3-a-release-with-no-vendor-keys) A release with no vendor keys                                | Medium   | Not mitigated    | P8-03b3b       | 2026-10-15 |
-| [UPDATE-E3](update-pipeline.md#update-e3-an-unsigned-test-build-at-a-restaurant) An unsigned test build at a restaurant                  | Medium   | Partly mitigated | P8-03b3b       | 2026-10-15 |
-| [UPDATE-T1](update-pipeline.md#update-t1-a-compromised-dependency-or-action) A compromised dependency or Action                          | High     | Partly mitigated | P8-03b3b       | 2026-10-15 |
-| [UPDATE-T3](update-pipeline.md#update-t3-going-back-to-an-older-version) Going back to an older version                                  | Low      | Partly mitigated | P8-03b3b       | 2026-10-15 |
 | [UPDATE-E2](update-pipeline.md#update-e2-a-pull-request-signed-as-the-vendors) A pull request signed as the vendor's                     | Medium   | Partly mitigated | manual task 1  | 2026-10-17 |
 | [UPDATE-T6](update-pipeline.md#update-t6-unreviewed-code-on-main) Unreviewed code on main                                                | High     | Not mitigated    | manual task 1  | 2026-10-17 |
 | [CP-D3](control-plane.md#cp-d3-going-past-the-daily-ai-limit) Going past the daily AI limit                                              | Low      | Partly mitigated | P8-03b4        | 2026-10-17 |

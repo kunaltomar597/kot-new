@@ -386,6 +386,11 @@ describe('[S9] [UPD-004] [UPD-005] [UPD-003] an update that fails its health che
     expect(view?.installs).toMatchObject({ attempts: 1, failures: 1 });
     const alerts = await controlPlane.get(FleetService).alerts({ installationId });
     expect(alerts.map((alert) => alert.kind)).toContain('UPDATE_FAILED');
+    // UPD-007: this is a test build, which takes unsigned updates; the vendor sees it too.
+    expect(alerts.find((alert) => alert.kind === 'UNSIGNED_UPDATES')).toMatchObject({
+      resolvedAt: null,
+      details: { version: '1.1.0' },
+    });
 
     // The halted release is offered no more, so the PC does not try it again.
     expect((await pc.get(HeartbeatService).beat()).offeredUpdate).toBeNull();

@@ -28,6 +28,7 @@ import { AppError } from '../errors/app-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { readInstallApproval } from '../system/system-state.js';
 import {
+  installerVersionProblem,
   judgeSignature,
   powerShellSignatureCheck,
   type SignatureCheck,
@@ -433,12 +434,16 @@ export class UpdateAgentService implements OnApplicationBootstrap, OnModuleDestr
       });
       let signer: string | null = null;
       if (this.options.signatureCheck !== null) {
-        const verdict = judgeSignature(await this.options.signatureCheck(target), policy);
-        if (!verdict.ok) {
+        const seen = await this.options.signatureCheck(target);
+        const verdict = judgeSignature(seen, policy);
+        const problem = verdict.ok
+          ? installerVersionProblem(seen, offered.version)
+          : verdict.reason;
+        if (problem !== null) {
           await rm(target, { force: true });
-          throw new Error(verdict.reason);
+          throw new Error(problem);
         }
-        signer = verdict.signer;
+        signer = verdict.ok ? verdict.signer : null;
       }
       this.logger.log({ version: offered.version, signer }, 'The update is downloaded and checked');
       return { ...base, status: 'READY', error: null, failures: 0, retryAt: null, signer };

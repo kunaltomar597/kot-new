@@ -271,5 +271,11 @@ describe('fleet view helpers', () => {
     expect(alertDetail(fleetAlert({ kind: 'BACKUP_FAILED', details: null }), t)).toBe(
       'The latest backup failed',
     );
+    // UPD-007: a test build at a restaurant (P8-03b3b).
+    expect(
+      alertDetail(fleetAlert({ kind: 'UNSIGNED_UPDATES', details: { version: '1.5.0' } }), t),
+    ).toBe(
+      'Version 1.5.0 is a test build that installs unsigned updates. Reinstall it with a signed release.',
+    );
   });
 });

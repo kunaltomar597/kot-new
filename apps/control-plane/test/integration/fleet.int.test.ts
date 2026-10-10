@@ -120,6 +120,27 @@ describe('[VCP-005] [DATA-005] alerts from a heartbeat', () => {
     });
     expect(await alertsOf(pc.id ?? '')).toEqual([]);
   });
+
+  it('[UPD-007] alerts while a PC takes unsigned updates, until a signed build replaces it', async () => {
+    const pc = await enrolledInstallation(app);
+    await beat(pc, { updateSigning: 'NONE' });
+    await beat(pc);
+    expect(await alertsOf(pc.id ?? '')).toEqual([]);
+    await beat(pc, { updateSigning: 'UNSIGNED' });
+    await beat(pc, { updateSigning: 'UNSIGNED' });
+    const open = await alertsOf(pc.id ?? '');
+    expect(open).toMatchObject([{ kind: 'UNSIGNED_UPDATES', details: { version: '1.0.0' } }]);
+    await fleet.deliver();
+    expect(notifier.sent).toContain(
+      'Test Dhaba, Main PC: version 1.0.0 is a test build that installs unsigned updates. Reinstall it with a signed release.',
+    );
+    await beat(pc, { updateSigning: 'VENDOR' });
+    expect(await alertsOf(pc.id ?? '')).toEqual([]);
+    expect((await alertsOf(pc.id ?? '', 'ALL'))[0]).toMatchObject({
+      kind: 'UNSIGNED_UPDATES',
+      resolvedBy: 'system:fleet',
+    });
+  });
 });
 
 describe('[VCP-005] offline during business hours', () => {

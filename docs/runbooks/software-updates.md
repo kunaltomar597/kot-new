@@ -75,8 +75,13 @@ In CI they come from the repository variable `RP_UPDATE_PUBLISHER`, on pushes to
 While it is unset, and on every other branch and pull request, CI builds are unsigned test builds
 that accept unsigned updates; only `main` reaches the certificate, in the environment
 `release-signing` (SEC-013, `manual-tasks/01-github-access.md`). **Never install an unsigned build at a
-restaurant.** A build signed with the certificate (`WIN_CSC_LINK`) refuses to build without
-`RP_UPDATE_PUBLISHER` or with unsigned updates allowed.
+restaurant**: each heartbeat says the PC takes unsigned updates, and the vendor's fleet shows it as
+an alert until a signed build replaces it (`docs/runbooks/control-plane.md`).
+
+The release guard (`apps/desktop/src/packaging/release-guard.ts`) refuses a build signed with the
+certificate (`WIN_CSC_LINK`, or `CSC_LINK` when that is unset) that has no `RP_UPDATE_PUBLISHER`,
+allows unsigned updates, was staged off Windows, or whose staged server has no vendor licence key
+(manual task 23) or no pager firmware key digest (manual task 30).
 
 An installation with neither (for example, installed by hand from a build without a certificate)
 shows "Updates are unavailable here" on the System page. Install updates on it by hand.
@@ -87,15 +92,15 @@ version signed with the old certificate whose build names the new subject first.
 
 ## What can go wrong
 
-| What the System page or the vendor sees                  | What it means and what to do                                                                                                                                                                 |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "The download failed ... tried again at ..."             | No internet, or the file does not match the release (SHA-256, size, signature). It waits 5 minutes, then twice as long each time, up to 6 hours.                                             |
-| "The update waits: the backup before the update failed"  | Fix the backup (`backups.md`); the update tries again 30 minutes later.                                                                                                                      |
-| "... a migration was left half done"                     | The database needs support before any update. Restore the last backup or ask support.                                                                                                        |
-| `FAILED`, "The updater did not start"                    | The watchdog did not start the task within 10 minutes. Check that `RPWatchdog` runs and the task exists (`schtasks /Query /TN \RestaurantPlatform\Update`). Run the installer's repair.      |
-| `FAILED`, "... Nothing was changed"                      | The updater refused before stopping anything: wrong hash or signature, an older version, or the installed version's installer is missing from `installers`.                                  |
-| `ROLLED_BACK`                                            | The new version failed its health check. The previous version runs again with the database from just before the update. The release is not tried again by itself; "Install now" tries again. |
-| `FAILED`, "... Going back ... failed too. Call support." | See "When going back fails" below.                                                                                                                                                           |
+| What the System page or the vendor sees                  | What it means and what to do                                                                                                                                                                                             |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "The download failed ... tried again at ..."             | No internet, or the file does not match the release (SHA-256, size, signature, or the installer is another version than the release says). It waits 5 minutes, then twice as long each time, up to 6 hours.              |
+| "The update waits: the backup before the update failed"  | Fix the backup (`backups.md`); the update tries again 30 minutes later.                                                                                                                                                  |
+| "... a migration was left half done"                     | The database needs support before any update. Restore the last backup or ask support.                                                                                                                                    |
+| `FAILED`, "The updater did not start"                    | The watchdog did not start the task within 10 minutes. Check that `RPWatchdog` runs and the task exists (`schtasks /Query /TN \RestaurantPlatform\Update`). Run the installer's repair.                                  |
+| `FAILED`, "... Nothing was changed"                      | The updater refused before stopping anything: wrong hash or signature, an older version, an installer whose product version is not the one asked for, or the installed version's installer is missing from `installers`. |
+| `ROLLED_BACK`                                            | The new version failed its health check. The previous version runs again with the database from just before the update. The release is not tried again by itself; "Install now" tries again.                             |
+| `FAILED`, "... Going back ... failed too. Call support." | See "When going back fails" below.                                                                                                                                                                                       |
 
 The vendor sees every `ROLLED_BACK` and `FAILED` as a fleet alert. Repeated failures halt the
 rollout automatically (P7-04a).

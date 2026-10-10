@@ -5,6 +5,7 @@ import {
   timeOfDayOf,
   zonedTimeToUtc,
 } from './business-date.js';
+import type { UpdateSigning } from './software-update.js';
 
 /**
  * Fleet health (VCP-005, AUD-003, DATA-005, P7-03): when a restaurant is open, which alerts a PC's
@@ -67,18 +68,21 @@ export const FLEET_ALERT_KINDS = [
   'AUDIT_CHAIN_MISMATCH',
   'UPDATE_FAILED',
   'LICENCE_TAMPERING',
+  'UNSIGNED_UPDATES',
 ] as const;
 export type FleetAlertKind = (typeof FLEET_ALERT_KINDS)[number];
 
 /**
  * Alerts opened and closed from each heartbeat's state; a chain alert and a licence tampering
  * alert need a person. A failed update (P7-04a) is opened by the rollout and closes when the PC
- * runs that version or a newer one.
+ * runs that version or a newer one. A PC that takes unsigned updates closes its alert once it is
+ * reinstalled with a signed build.
  */
 export const SELF_RESOLVING_ALERTS: readonly FleetAlertKind[] = [
   'OFFLINE',
   'DISK_FULL',
   'BACKUP_FAILED',
+  'UNSIGNED_UPDATES',
 ];
 
 export interface FleetHealthInput {
@@ -102,6 +106,8 @@ export interface FleetHealthInput {
     readonly lastSuccessAt: string | null;
     readonly lastFailureAt: string | null;
   } | null;
+  /** How the PC checks its updates (P8-03b3b); null from PCs that do not say. */
+  readonly updateSigning: UpdateSigning | null;
 }
 
 /** How full a disk is, in whole per cent (rounded down, so 89.9 % is 89). */
@@ -125,8 +131,9 @@ export function offlineMinutesDuringHours(input: FleetHealthInput): number {
 
 /**
  * The alerts a PC's state calls for now (VCP-005, DATA-005): offline more than the threshold
- * during business hours, the data drive past the threshold, the latest backup failed. The audit
- * chain is checked separately, as heartbeats arrive (`checkChainHead`).
+ * during business hours, the data drive past the threshold, the latest backup failed, a test
+ * build that takes unsigned updates (UPD-007, threat model "The update pipeline", UPDATE-E3). The
+ * audit chain is checked separately, as heartbeats arrive (`checkChainHead`).
  */
 export function fleetAlertsDue(input: FleetHealthInput): Set<FleetAlertKind> {
   const due = new Set<FleetAlertKind>();
@@ -142,6 +149,7 @@ export function fleetAlertsDue(input: FleetHealthInput): Set<FleetAlertKind> {
   ) {
     due.add('BACKUP_FAILED');
   }
+  if (input.updateSigning === 'UNSIGNED') due.add('UNSIGNED_UPDATES');
   return due;
 }
 

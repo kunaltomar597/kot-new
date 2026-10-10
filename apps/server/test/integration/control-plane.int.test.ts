@@ -437,6 +437,26 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     expect(await readUpdateReport(prisma)).toBeNull();
   });
 
+  it('[UPD-007] tells the Control Plane how it checks its updates', async () => {
+    // This PC names no publisher and takes no unsigned installer: it installs no update, which
+    // alerts nobody. A test build that takes unsigned ones alerts the vendor (S9, update-exit).
+    expect((await heartbeats.beat()).lastError).toBeNull();
+    const client = new pg.Client({ connectionString: cpDatabase.url });
+    await client.connect();
+    try {
+      const { rows } = await client.query<{ signing: string | null; alerts: string }>(
+        `SELECT last_heartbeat->>'updateSigning' AS signing,
+                (SELECT count(*) FROM fleet_alerts a WHERE a.installation_id = i.id
+                   AND a.kind = 'UNSIGNED_UPDATES')::text AS alerts
+           FROM installations i WHERE i.id = $1`,
+        [installationId],
+      );
+      expect(rows).toEqual([{ signing: 'NONE', alerts: '0' }]);
+    } finally {
+      await client.end();
+    }
+  });
+
   it('[PGR-011] [UPD-003] hears of pager firmware, and reports what its pagers did with it', async () => {
     await controlPlane.get(AdminService).publishRelease(
       {

@@ -7,6 +7,7 @@ import {
   fleetAlertsDue,
   offlineMinutesDuringHours,
   openSince,
+  SELF_RESOLVING_ALERTS,
   tamperAlertDue,
   weekdayOf,
 } from '../src/fleet-health.js';
@@ -29,6 +30,7 @@ const healthy = (overrides: Partial<FleetHealthInput> = {}): FleetHealthInput =>
   disk: { totalBytes: 500, freeBytes: 250 },
   diskAlertPercent: 90,
   backup: { lastSuccessAt: '2026-10-02T00:30:00.000Z', lastFailureAt: null },
+  updateSigning: 'VENDOR',
   ...overrides,
 });
 
@@ -110,6 +112,16 @@ describe('[VCP-005] [DATA-005] fleet alert rules', () => {
       fleetAlertsDue(healthy({ backup: { ...failed, lastSuccessAt: '2026-10-02T01:00:00.000Z' } })),
     ).toEqual(new Set());
     expect(fleetAlertsDue(healthy({ backup: null }))).toEqual(new Set());
+  });
+
+  it('[UPD-007] alerts while a PC takes unsigned updates, a test build at a restaurant', () => {
+    expect(fleetAlertsDue(healthy({ updateSigning: 'UNSIGNED' }))).toEqual(
+      new Set(['UNSIGNED_UPDATES']),
+    );
+    // A build that installs no update at all, or a PC that does not say, is no such risk.
+    expect(fleetAlertsDue(healthy({ updateSigning: 'NONE' }))).toEqual(new Set());
+    expect(fleetAlertsDue(healthy({ updateSigning: null }))).toEqual(new Set());
+    expect(SELF_RESOLVING_ALERTS).toContain('UNSIGNED_UPDATES');
   });
 });
 

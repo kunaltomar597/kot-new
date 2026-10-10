@@ -554,6 +554,7 @@ enum FleetAlertKind {
   AUDIT_CHAIN_MISMATCH
   UPDATE_FAILED
   LICENCE_TAMPERING
+  UNSIGNED_UPDATES
 }
 
 /// A fleet alert (VCP-005): at most one open per PC and kind (a partial unique index).

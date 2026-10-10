@@ -15,7 +15,10 @@ Never paste the private key, or anything that unlocks it, into a Claude session 
 4. Send the public key line to Claude (or open a pull request) to add it to
    `packages/licensing/src/vendor-keys.ts`. Installations accept only licences signed by a key
    listed there; a new key is added next to the old one, and the old one is removed a release
-   later.
+   later. Until one is listed, a signed release refuses to build (the release guard,
+   `apps/desktop/src/packaging/release-guard.ts`). Before the first signed release goes out,
+   check it accepts a licence the Control Plane signed with the KMS key: the guard can tell a key
+   from no key, not the right key from another.
 5. Give the Control Plane the key. The signer (`apps/control-plane/src/licences/licence-signer.ts`)
    reads it from `CP_LICENCE_SIGNING_KEY` (PKCS#8 DER, base64) today. Best: once the cloud
    provider is chosen, ask Claude for a KMS adapter there, so the key never leaves the KMS. Until

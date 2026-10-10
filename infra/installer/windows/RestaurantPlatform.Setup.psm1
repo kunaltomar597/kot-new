@@ -1659,6 +1659,15 @@ function Test-RPInstallerSignature {
     & $fail ('The installer''s signature is not valid ({0}).' -f $seen.Status)
 }
 
+function Get-RPInstallerVersion {
+    <# The product version an installer's version resource names (electron-builder writes the build's version there), or $null. #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Path)
+    $version = (Get-Item -LiteralPath $Path).VersionInfo.ProductVersion
+    if ([string]::IsNullOrWhiteSpace($version)) { return $null }
+    $version.Trim()
+}
+
 function Get-RPUpdatePolicy {
     <# The installation file's update settings; an older file checks nothing and allows nothing. #>
     [CmdletBinding()]
@@ -1997,6 +2006,14 @@ function Invoke-RPUpdateStep {
         return (& $failed ('{0} Nothing was changed.' -f $signature.Reason))
     }
     if ($signature.Signer) { Write-RPLog ('The installer is signed by {0}.' -f $signature.Signer) }
+    # UPD-002: the installer is the version asked for, not an older signed one under its name.
+    $productVersion = Get-RPInstallerVersion -Path $installer
+    if ($productVersion -cne $version) {
+        Remove-Item -LiteralPath $installer -Force
+        $named = 'no version'
+        if ($productVersion) { $named = 'version {0}' -f $productVersion }
+        return (& $failed ('The installer installs {0}, not version {1} as asked. Nothing was changed.' -f $named, $version))
+    }
 
     # 2. The way back.
     $previous = Join-RPPath $folders.InstallersDir (Get-RPInstallerFileName $Current)
@@ -2089,6 +2106,7 @@ Export-ModuleMember -Function @(
     'Get-RPInstallerFile',
     'Get-RPParentPath',
     'Get-RPInstallerFileName',
+    'Get-RPInstallerVersion',
     'Get-RPProperty',
     'Get-RPUpdatePolicy',
     'Get-RPUpdaterAclPlan',

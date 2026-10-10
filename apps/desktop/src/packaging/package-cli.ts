@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { Arch, build, Platform } from 'electron-builder';
 import { builderConfig } from './builder-config.js';
 import { stagingLayout } from './payload.js';
+import { releaseRefusals, signedBuild, stagedKeys, stagedUpdateSettings } from './release-guard.js';
 import { readManifest } from './stage.js';
 
 /**
@@ -12,7 +13,8 @@ import { readManifest } from './stage.js';
  * apps/desktop/staging, into apps/desktop/release. It signs when the certificate is given
  * (WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD, from a CI secret). A payload staged off Windows has
  * native modules Windows cannot load, so it is refused unless --any-platform (to check that the
- * installer script builds). `--product-version` builds the same payload as another version.
+ * installer script builds), and always for a signed build; `release-guard.ts` says what else a
+ * signed build needs. `--product-version` builds the same payload as another version.
  */
 
 const projectDir = fileURLToPath(new URL('../../', import.meta.url));
@@ -21,25 +23,16 @@ const { values } = parseArgs({
 });
 const staging = stagingLayout(join(projectDir, 'staging'));
 const manifest = await readManifest(staging.root);
-// UPD-007: a signed build checks its updates' signer and never takes unsigned ones.
-const defines = readFileSync(staging.nsisDefines, 'utf8');
-if ((process.env.WIN_CSC_LINK ?? '') !== '') {
-  if (defines.includes('RP_ALLOW_UNSIGNED_UPDATES')) {
-    throw new Error(
-      'A signed installer cannot accept unsigned updates: stage it without RP_ALLOW_UNSIGNED_UPDATES.',
-    );
-  }
-  if (!defines.includes('RP_UPDATE_PUBLISHER')) {
-    throw new Error(
-      'Stage a signed installer with RP_UPDATE_PUBLISHER, the certificate’s subject, or the PCs will refuse every update.',
-    );
-  }
-}
-if (manifest.platform !== 'win32' && values['any-platform'] !== true) {
-  throw new Error(
-    `The payload was staged on ${manifest.platform}; stage it on Windows, or pass --any-platform to build a test installer.`,
-  );
-}
+// The release guard (UPD-007, LIC-003, PGR-011): a signed build checks its updates' signer, never
+// takes unsigned ones, is staged on Windows and carries the vendor's keys.
+const refusals = releaseRefusals({
+  signed: signedBuild(process.env),
+  updates: stagedUpdateSettings(readFileSync(staging.nsisDefines, 'utf8')),
+  stagedOn: manifest.platform,
+  anyPlatform: values['any-platform'] === true,
+  keys: await stagedKeys(staging.payload),
+});
+if (refusals.length > 0) throw new Error(refusals.join('\n'));
 const electronVersion = (
   JSON.parse(
     readFileSync(join(projectDir, 'node_modules', 'electron', 'package.json'), 'utf8'),

@@ -32,7 +32,8 @@
                 "BACKUP_FAILED",
                 "AUDIT_CHAIN_MISMATCH",
                 "UPDATE_FAILED",
-                "LICENCE_TAMPERING"
+                "LICENCE_TAMPERING",
+                "UNSIGNED_UPDATES"
               ]
             },
             "openedAt": {
@@ -114,7 +115,8 @@
                 "BACKUP_FAILED",
                 "AUDIT_CHAIN_MISMATCH",
                 "UPDATE_FAILED",
-                "LICENCE_TAMPERING"
+                "LICENCE_TAMPERING",
+                "UNSIGNED_UPDATES"
               ]
             },
             "openedAt": {

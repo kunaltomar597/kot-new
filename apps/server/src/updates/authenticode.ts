@@ -15,6 +15,11 @@ export interface SignatureSeen {
   readonly status: string;
   /** The signer certificate's subject, or null when unsigned. */
   readonly subject: string | null;
+  /**
+   * The product version the installer's version resource names (null: none); absent where it
+   * was not read.
+   */
+  readonly productVersion?: string | null;
 }
 
 export type SignatureCheck = (file: string) => Promise<SignatureSeen>;
@@ -60,14 +65,29 @@ export function judgeSignature(seen: SignatureSeen, policy: SignaturePolicy): Si
   };
 }
 
-/** The PowerShell that reads the signature; the file's path comes in an environment variable. */
+/**
+ * UPD-002: why an installer is not the version the release names, or null (threat model "The
+ * update pipeline", UPDATE-T3): an older signed installer under a newer one's name and SHA-256
+ * would install the older version. The updater checks again before it runs it.
+ */
+export function installerVersionProblem(seen: SignatureSeen, version: string): string | null {
+  if (seen.productVersion === undefined || seen.productVersion === version) return null;
+  const named = seen.productVersion === null ? 'no version' : `version ${seen.productVersion}`;
+  return `The installer installs ${named}, not version ${version} as the release says.`;
+}
+
+/**
+ * The PowerShell that reads the signature and the product version; the file's path comes in an
+ * environment variable.
+ */
 export const SIGNATURE_SCRIPT = [
   "$ErrorActionPreference = 'Stop'",
   "$ProgressPreference = 'SilentlyContinue'",
   '$signature = Get-AuthenticodeSignature -LiteralPath $env:RP_SIGNED_FILE',
   '$subject = $null',
   'if ($null -ne $signature.SignerCertificate) { $subject = $signature.SignerCertificate.Subject }',
-  '[Console]::Out.Write((@{ status = [string]$signature.Status; subject = $subject } | ConvertTo-Json -Compress))',
+  '$version = (Get-Item -LiteralPath $env:RP_SIGNED_FILE).VersionInfo.ProductVersion',
+  '[Console]::Out.Write((@{ status = [string]$signature.Status; subject = $subject; productVersion = $version } | ConvertTo-Json -Compress))',
 ].join('\n');
 
 /** The check through Windows PowerShell 5.1, which every Windows PC has. */
@@ -118,10 +138,14 @@ export function powerShellSignatureCheck(
           const parsed = JSON.parse(Buffer.concat(stdout).toString('utf8')) as {
             status?: unknown;
             subject?: unknown;
+            productVersion?: unknown;
           };
+          const version =
+            typeof parsed.productVersion === 'string' ? parsed.productVersion.trim() : '';
           resolve({
             status: typeof parsed.status === 'string' ? parsed.status : 'UnknownError',
             subject: typeof parsed.subject === 'string' ? parsed.subject : null,
+            productVersion: version === '' ? null : version,
           });
         } catch (error) {
           reject(error instanceof Error ? error : new Error(String(error)));
