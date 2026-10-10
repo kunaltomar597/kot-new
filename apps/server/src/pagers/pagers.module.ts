@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { EventsModule } from '../events/events.module.js';
+import { LicensingModule } from '../licensing/licensing.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { TlsModule } from '../tls/tls.module.js';
@@ -10,7 +11,14 @@ import { PagersService } from './pagers.service.js';
 
 /** Wrist pagers: the MQTT broker and pager administration (P2-04). */
 @Module({
-  imports: [AuthModule, EventsModule, NotificationsModule, SettingsModule, TlsModule],
+  imports: [
+    AuthModule,
+    EventsModule,
+    LicensingModule,
+    NotificationsModule,
+    SettingsModule,
+    TlsModule,
+  ],
   controllers: [PagersController],
   providers: [
     { provide: PAGER_OPTIONS, useValue: DEFAULT_PAGER_OPTIONS },

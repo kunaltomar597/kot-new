@@ -408,6 +408,9 @@ model Device {
   serial                    String?
   /// Peppered Argon2id hash of the pager's MQTT secret (SEC-012); the secret is shown once when issued (P2-04).
   mqttSecretHash            String?               @map("mqtt_secret_hash")
+  /// Sign-ins to the broker as this pager with a wrong secret since its credential was issued (PAGER-R3).
+  mqttSignInFailures        Int                   @default(0) @map("mqtt_sign_in_failures")
+  mqttSignInFailedAt        DateTime?             @map("mqtt_sign_in_failed_at") @db.Timestamptz(3)
   /// Last battery and signal: a pager's heartbeat (PGR-007), an app's health report (TAB-015).
   batteryPercent            Int?                  @map("battery_percent")
   rssi                      Int?
@@ -1202,39 +1205,41 @@ enum AlertStatus {
 /// Something a person must act on (NTF-001). P1-09 raises "ready, not collected" from the KDS
 /// (KDS-006); the notification engine (P2-03) adds rules, delivery, acknowledgement and escalation.
 model Alert {
-  id               String      @id @default(uuid(7)) @db.Uuid
-  restaurantId     String      @map("restaurant_id") @db.Uuid
-  businessDate     DateTime    @map("business_date") @db.Date
+  id                     String      @id @default(uuid(7)) @db.Uuid
+  restaurantId           String      @map("restaurant_id") @db.Uuid
+  businessDate           DateTime    @map("business_date") @db.Date
   /// e.g. "READY_NOT_COLLECTED".
-  type             String
-  status           AlertStatus @default(OPEN)
-  kotId            String?     @map("kot_id") @db.Uuid
-  kot              Kot?        @relation(fields: [kotId], references: [id])
-  tableId          String?     @map("table_id") @db.Uuid
-  raisedById       String?     @map("raised_by_id") @db.Uuid
-  raisedByDeviceId String?     @map("raised_by_device_id") @db.Uuid
+  type                   String
+  status                 AlertStatus @default(OPEN)
+  kotId                  String?     @map("kot_id") @db.Uuid
+  kot                    Kot?        @relation(fields: [kotId], references: [id])
+  tableId                String?     @map("table_id") @db.Uuid
+  raisedById             String?     @map("raised_by_id") @db.Uuid
+  raisedByDeviceId       String?     @map("raised_by_device_id") @db.Uuid
   /// What the alert says, e.g. the table and the items waiting.
-  payload          Json        @default("{}")
-  acknowledgedAt   DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
-  acknowledgedById String?     @map("acknowledged_by_id") @db.Uuid
+  payload                Json        @default("{}")
+  acknowledgedAt         DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
+  acknowledgedById       String?     @map("acknowledged_by_id") @db.Uuid
+  /// The pager, phone or screen the acknowledgement came from (PAGER-R2).
+  acknowledgedByDeviceId String?     @map("acknowledged_by_device_id") @db.Uuid
   /// The table session or order the alert is about (P2-03).
-  tableSessionId   String?     @map("table_session_id") @db.Uuid
-  orderId          String?     @map("order_id") @db.Uuid
+  tableSessionId         String?     @map("table_session_id") @db.Uuid
+  orderId                String?     @map("order_id") @db.Uuid
   /// One open alert per cause, e.g. "bill:<sessionId>": a repeated trigger does not stack alerts.
-  dedupeKey        String?     @map("dedupe_key")
+  dedupeKey              String?     @map("dedupe_key")
   /// Who is alerted now (the escalation adds the managers on duty).
-  recipientIds     String[]    @default([]) @map("recipient_ids") @db.Uuid
-  channels         String[]    @default([])
-  pagerText        String?     @map("pager_text")
+  recipientIds           String[]    @default([]) @map("recipient_ids") @db.Uuid
+  channels               String[]    @default([])
+  pagerText              String?     @map("pager_text")
   /// Persisted deadlines, so repeats and escalation survive a restart (P2-03).
-  escalateAt       DateTime?   @map("escalate_at") @db.Timestamptz(3)
-  nextRepeatAt     DateTime?   @map("next_repeat_at") @db.Timestamptz(3)
-  escalatedAt      DateTime?   @map("escalated_at") @db.Timestamptz(3)
-  escalatedTo      String[]    @default([]) @map("escalated_to") @db.Uuid
-  repeatCount      Int         @default(0) @map("repeat_count")
-  clearedAt        DateTime?   @map("cleared_at") @db.Timestamptz(3)
-  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  escalateAt             DateTime?   @map("escalate_at") @db.Timestamptz(3)
+  nextRepeatAt           DateTime?   @map("next_repeat_at") @db.Timestamptz(3)
+  escalatedAt            DateTime?   @map("escalated_at") @db.Timestamptz(3)
+  escalatedTo            String[]    @default([]) @map("escalated_to") @db.Uuid
+  repeatCount            Int         @default(0) @map("repeat_count")
+  clearedAt              DateTime?   @map("cleared_at") @db.Timestamptz(3)
+  createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([restaurantId, status])
   @@index([kotId])

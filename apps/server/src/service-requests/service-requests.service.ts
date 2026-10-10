@@ -244,7 +244,10 @@ export class ServiceRequestsService {
       if (!canTransition(serviceRequestMachine, row.state, 'ACKNOWLEDGE')) {
         return this.viewOf(tx, row);
       }
-      const updated = await this.apply(tx, row, ['ACKNOWLEDGE'], { staffId: principal.staffId });
+      const updated = await this.apply(tx, row, ['ACKNOWLEDGE'], {
+        staffId: principal.staffId,
+        deviceId: principal.deviceId,
+      });
       return this.viewOf(tx, updated);
     });
   }
@@ -348,7 +351,10 @@ export class ServiceRequestsService {
           data.acknowledgedAt = now;
           data.acknowledgedById = staffId;
           if (row.alertId !== null && staffId !== null) {
-            await this.notifications.acknowledgeInTx(tx, row.restaurantId, row.alertId, staffId);
+            await this.notifications.acknowledgeInTx(tx, row.restaurantId, row.alertId, {
+              staffId,
+              deviceId: by.deviceId ?? null,
+            });
           }
           out.push({
             type: 'ServiceRequestAcknowledged',

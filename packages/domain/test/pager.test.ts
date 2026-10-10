@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isLowBattery,
+  pagerHeartbeatTooSoon,
   pagerIsOffline,
   pagerLines,
   pagerMayPublish,
@@ -59,6 +60,16 @@ describe('[PGR-007] offline after three missed heartbeats', () => {
     expect(pagerIsOffline(ago(90), now, 30)).toBe(false);
     expect(pagerIsOffline(ago(91), now, 30)).toBe(true);
     expect(pagerIsOffline(null, now, 30)).toBe(true);
+  });
+});
+
+describe('[PGR-007] [SEC-012] heartbeats a pager may send', () => {
+  it('drops a heartbeat less than half the interval after the last one taken', () => {
+    expect(pagerHeartbeatTooSoon(null, 0, 30)).toBe(false);
+    expect(pagerHeartbeatTooSoon(1_000, 15_999, 30)).toBe(true);
+    expect(pagerHeartbeatTooSoon(1_000, 16_000, 30)).toBe(false);
+    // The interval is the restaurant's setting.
+    expect(pagerHeartbeatTooSoon(1_000, 16_000, 60)).toBe(true);
   });
 });
 

@@ -136,6 +136,8 @@ export class Restaurant {
     rssi: -60,
     firmwareVersion: '1.0.3',
     lastSeenAt: AT,
+    signInFailures: 0,
+    lastSignInFailureAt: null,
   };
   /** Ravi looks after the hall today. */
   assignments: WaiterAssignmentsResponse['current']['assignments'] = [

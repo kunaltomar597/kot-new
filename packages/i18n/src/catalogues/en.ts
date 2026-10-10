@@ -816,6 +816,8 @@ export const en = {
     lastSeen: 'Last seen {time}',
     neverSeen: 'Not seen yet',
     firmware: 'Firmware {version}',
+    signInFailures:
+      '{count, plural, one {# sign-in with a wrong secret} other {# sign-ins with a wrong secret}}, the last {date} {time}',
     update: {
       served: 'Pager firmware {version} is on this PC. Pagers update to it when they are free.',
       halted:

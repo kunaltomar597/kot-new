@@ -144,6 +144,10 @@ describe('[NTF-001] [NTF-003] [NTF-004] a bill request', () => {
       acknowledgedById: kit.staff.CASHIER,
       acknowledgedAt: now.toISOString(),
     });
+    // PAGER-R2: the device it came from is recorded with the person.
+    expect(
+      (await prisma.alert.findUniqueOrThrow({ where: { id: alert.id } })).acknowledgedByDeviceId,
+    ).toBe(kit.deviceId);
     expect(await events(alert.id, 'AlertAcknowledged')).toHaveLength(1);
     // Nothing repeats or escalates once acknowledged, however long it waits.
     later(600);

@@ -126,6 +126,13 @@ ACL lets it subscribe to `rp/<restaurant>/pagers/<itself>/alerts` and `/ota` and
 another pager's topics", "ignores a pager publishing where it may not"; `pager-firmware.int` "keeps a
 pager to its own firmware offers".
 
+A pager's button acknowledges only alerts sent to that pager, as its wearer, whoever wears it: a
+manager's pager has no manager's reach (P8-03b2b, PAGER-T1); the pager is recorded with the
+acknowledgement. Before sign-in the broker limits connections per address, the time to sign in,
+packet sizes and Argon2id checks at once; after it, retained, QoS 2 and over-large messages end the
+connection. Tests: `pagers.int` "acknowledges only alerts sent to it, also when a manager wears
+it"; `pager-broker-limits.int`.
+
 ## The QR relay (Supabase)
 
 Browsers never touch the database (QR-006): the diners' edge functions take a table's QR token and

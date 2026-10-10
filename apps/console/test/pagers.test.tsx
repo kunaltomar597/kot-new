@@ -1,3 +1,4 @@
+import { displayDateTime } from '@rp/domain';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PAGER_REFRESH_MS } from '../src/manage/staff/PagersScreen.js';
@@ -87,6 +88,35 @@ describe('[PGR-012] [PGR-013] the pagers', () => {
         .map((button) => button.textContent),
     ).toEqual([t('pagers.give'), t('pagers.newCredential')]);
     await expectNoAxeViolations(container);
+  });
+
+  it('[SEC-012] says how many sign-ins with a wrong secret a pager had (PAGER-R3)', async () => {
+    const last = '2026-09-28T04:31:00.000Z';
+    const fake = pagersServer(
+      pagerList([
+        pager({ signInFailures: 3, lastSignInFailureAt: last }),
+        pager({
+          deviceId: PAGER_2,
+          name: 'Pager 2',
+          serial: 'WP-0002',
+          staffId: null,
+        }),
+      ]),
+    );
+    await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
+    const failures = t('pagers.signInFailures', {
+      count: 3,
+      ...displayDateTime(new Date(last)),
+    });
+    expect(
+      within(await rowOf('Pager 1')).getByText(
+        `${t('pagers.firmware', { version: '1.0.3' })} · ${failures}`,
+      ),
+    ).toBeVisible();
+    // A pager without any says nothing about them.
+    expect(
+      within(await rowOf('Pager 2')).getByText(t('pagers.firmware', { version: '1.0.3' })),
+    ).toBeVisible();
   });
 
   it('registers a pager by its serial and shows its credential once', async () => {

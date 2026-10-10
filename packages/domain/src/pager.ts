@@ -103,6 +103,18 @@ export function pagerIsOffline(
   return now.getTime() - lastSeenAt.getTime() > 3 * heartbeatSeconds * 1000;
 }
 
+/**
+ * PAGER-D4: a heartbeat less than half the interval ⚙ after the last one the PC took is dropped,
+ * so a pager, or a copy of one, cannot keep the PC writing its state as fast as it can send.
+ */
+export function pagerHeartbeatTooSoon(
+  lastTakenAtMs: number | null,
+  nowMs: number,
+  heartbeatSeconds: number,
+): boolean {
+  return lastTakenAtMs !== null && nowMs - lastTakenAtMs < (heartbeatSeconds * 1000) / 2;
+}
+
 /** PGR-013: at or below the level ⚙ the battery counts as low. */
 export function isLowBattery(batteryPercent: number | null, lowBatteryPercent: number): boolean {
   return batteryPercent !== null && batteryPercent <= lowBatteryPercent;

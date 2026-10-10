@@ -150,7 +150,17 @@ those threats:
     PAGER-T1, PAGER-T4): packet, connection, sign-in time and Argon2 limits, heartbeat rate and
     retained messages, the connected-pager list, the licence's pager limit, acknowledgements only
     of alerts sent to the pager and recorded with it, failed sign-ins logged and counted, and no
-    firmware release with a lower secure version.
+    firmware release with a lower secure version. Done (2026-10-10): every TCP connection admitted
+    before its TLS handshake (4 sign-ins in progress per address, 64 in all, 256 connections), 10 s
+    to sign in, packets checked at their header (1 KB before sign-in, 4 KB after), 2 Argon2id
+    checks at once with 64 waiting (`apps/server/src/pagers/broker-limits.ts`); heartbeats faster
+    than half the interval dropped, retained, QoS 2 and will messages refused; a pager's button
+    acknowledges only alerts sent to it and the device is recorded with every acknowledgement; a
+    pager counts as connected once the broker has its client; failed sign-ins logged once a minute
+    per address and counted on the pager (shown on the Pagers page); the licence's pager limit;
+    firmware with a lower anti-rollback version refused. Seven threats mitigated; PAGER-T4's
+    remaining part is the pager's eFuse (P2-05). What the broker refuses is in
+    `firmware/pager/README.md` for P2-05.
   - **P8-03b2c Bodies, uploads, exports and erasure** (PC-D1, PC-D4, PC-T8, PC-I9): a device
     check before the large body parsers, the workbook inflated with a limit on what comes out,
     `csvCell` in the data export and the invoice register, and erasure of a diner's number on

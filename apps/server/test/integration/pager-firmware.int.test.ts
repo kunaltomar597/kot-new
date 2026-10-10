@@ -23,6 +23,7 @@ import {
   markFirmwareReportDelivered,
   readServedFirmware,
   saveOfferedFirmware,
+  saveServedFirmware,
 } from '../../src/pager-firmware/firmware-state.js';
 import {
   PAGER_FIRMWARE_OPTIONS,
@@ -42,13 +43,17 @@ import { until } from '../helpers/wait.js';
 
 const key = firmwareKey();
 const stranger = firmwareKey();
-const IMAGE = signFirmware(firmwareImage({ version: '1.1.0' }), key);
+const IMAGE = signFirmware(firmwareImage({ version: '1.1.0', secureVersion: 2 }), key);
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const files = new Map<string, Buffer>([
   ['https://downloads.example.com/pager/rp-pager-1.1.0.bin', IMAGE],
   [
     'https://downloads.example.com/pager/rp-pager-1.2.0.bin',
     signFirmware(firmwareImage({ version: '1.2.0' }), stranger),
+  ],
+  [
+    'https://downloads.example.com/pager/rp-pager-1.4.0.bin',
+    signFirmware(firmwareImage({ version: '1.4.0', secureVersion: 1 }), key),
   ],
 ]);
 
@@ -66,6 +71,8 @@ let now = new Date('2026-10-05T09:00:00.000Z');
 const fetched: string[] = [];
 let offline = false;
 const clients: MqttClient[] = [];
+/** The broker's clock for the heartbeat rate: each heartbeat comes a minute after the last. */
+let brokerMs = 0;
 
 const fakeFetch = ((url: string | URL | Request) => {
   const address = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
@@ -110,7 +117,7 @@ beforeAll(async () => {
     },
     overrides: [
       { provide: NOTIFICATION_OPTIONS, useValue: { tickMs: 0 } },
-      { provide: PAGER_OPTIONS, useValue: { offlineCheckMs: 0 } },
+      { provide: PAGER_OPTIONS, useValue: { offlineCheckMs: 0, clockMs: () => brokerMs } },
       {
         provide: PAGER_FIRMWARE_OPTIONS,
         useValue: {
@@ -183,6 +190,7 @@ async function connect(credential: PagerCredentialResponse): Promise<Pager> {
     credential,
     // Each heartbeat carries its own signal strength, so the test sees when it was stored.
     beat: async (body) => {
+      brokerMs += 60_000;
       rssi -= 1;
       const mine = rssi;
       await client.publishAsync(
@@ -271,6 +279,33 @@ describe('[PGR-011] [UPD-007] the release the vendor offers', () => {
     fetched.length = 0;
     await service.runOnce();
     expect(fetched).toEqual([]);
+  });
+
+  it('refuses for good a release that would lower the anti-rollback version', async () => {
+    const served = await readServedFirmware(prisma);
+    expect(served).toMatchObject({ version: '1.1.0', secureVersion: 2 });
+    // What a PC kept before P8-03b2b has no secure version: it is read from the image it serves.
+    const { secureVersion: _kept, ...older } = served!;
+    await saveServedFirmware(prisma, older);
+    // PAGER-T4: 1.4.0 is a newer version, signed by the trusted key, but goes back from 2 to 1.
+    await saveOfferedFirmware(prisma, {
+      update: release('1.4.0'),
+      halted: false,
+      forVersion: '1.1.0',
+    });
+    await service.runOnce();
+    expect((await readServedFirmware(prisma))?.version).toBe('1.1.0');
+    expect((await firmwareStatus()).incoming).toMatchObject({
+      version: '1.4.0',
+      problem: { code: 'SECURE_VERSION_LOWER', refused: true },
+    });
+    expect(
+      await prisma.auditLog.count({
+        where: { action: 'PAGER_FIRMWARE_REFUSED', after: { path: ['version'], equals: '1.4.0' } },
+      }),
+    ).toBe(1);
+    expect(readdirSync(firmwareDir(dataDir))).toEqual(['rp-pager-1.1.0.bin']);
+    await saveServedFirmware(prisma, served!);
   });
 
   it('refuses a download that is not the release, and tries a network failure again later', async () => {

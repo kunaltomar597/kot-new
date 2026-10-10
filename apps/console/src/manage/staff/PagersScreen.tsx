@@ -5,7 +5,7 @@ import type {
   PagerView,
   StaffView,
 } from '@rp/contracts';
-import { timeOfDayOf } from '@rp/domain';
+import { displayDateTime, timeOfDayOf } from '@rp/domain';
 import {
   Badge,
   Button,
@@ -384,6 +384,13 @@ function PagerRow({
     pager.firmwareVersion === null
       ? undefined
       : t('pagers.firmware', { version: pager.firmwareVersion }),
+    // PAGER-R3: an old credential, or someone trying one.
+    pager.signInFailures === 0 || pager.lastSignInFailureAt === null
+      ? undefined
+      : t('pagers.signInFailures', {
+          count: pager.signInFailures,
+          ...displayDateTime(new Date(pager.lastSignInFailureAt)),
+        }),
   ].filter((detail) => detail !== undefined);
   return (
     <li className="staff-row">

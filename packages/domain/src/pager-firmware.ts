@@ -37,6 +37,16 @@ export const PAGER_FIRMWARE_RULES = {
 export type PagerFirmwareRules = { readonly [K in keyof typeof PAGER_FIRMWARE_RULES]: number };
 
 /**
+ * PAGER-T4: firmware whose anti-rollback version (`secure_version` in its app description) is
+ * lower than that of the firmware the PC serves is never passed on, even when its version number
+ * is newer: it would take the pagers back to code with a flaw the vendor has closed. Pagers burn
+ * the version into an eFuse as well (P2-05); this keeps the PC from offering what they refuse.
+ */
+export function lowersSecureVersion(candidate: number, served: number | null): boolean {
+  return served !== null && candidate < served;
+}
+
+/**
  * One pager and one firmware version:
  * - `WAITING`: a manager pressed "Update now"; not offered yet;
  * - `OFFERED`: the offer went to the pager;

@@ -16,6 +16,7 @@ import { PrismaService, type TransactionClient } from '../database/prisma.servic
 import type { Device } from '../generated/prisma/client.js';
 import { AppError } from '../errors/app-error.js';
 import { CredentialHasher } from '../auth/credential-hasher.js';
+import { LicenceAgentService } from '../licensing/licence-agent.service.js';
 import { announceSetupChange } from '../restaurant/setup-changes.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { PagerBroker } from './pager-broker.js';
@@ -31,6 +32,8 @@ function view(device: Device): PagerView {
     rssi: device.rssi,
     firmwareVersion: device.firmwareVersion,
     lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
+    signInFailures: device.mqttSignInFailures,
+    lastSignInFailureAt: device.mqttSignInFailedAt?.toISOString() ?? null,
   };
 }
 
@@ -39,7 +42,7 @@ function view(device: Device): PagerView {
  * serial with a unique credential (shown once, stored as a peppered Argon2id hash), replace the
  * credential, and give the pager to a person or take it back, effective at once. Every change is
  * announced as `RestaurantChanged` `DEVICES` (P4-02b), so pager lists and the wearer's own pager
- * follow it.
+ * follow it. No more pagers than the licence allows (LIC-001, PAGER-E3).
  */
 @Injectable()
 export class PagersService {
@@ -49,6 +52,7 @@ export class PagersService {
     private readonly broker: PagerBroker,
     private readonly hasher: CredentialHasher,
     private readonly settings: SettingsService,
+    private readonly licence: LicenceAgentService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -91,7 +95,21 @@ export class PagersService {
   ): Promise<PagerCredentialResponse> {
     const secret = randomBytes(24).toString('base64url');
     const secretHash = await this.hasher.hash(secret);
+    const limit = await this.licence.limitFor('PAGER');
     const device = await this.prisma.transaction(async (tx) => {
+      // LIC-001: as for pairing other devices, under the same lock (PAGER-E3).
+      if (limit !== null) {
+        await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${'pair-limit:PAGER'}, 0))`;
+        const registered = await tx.device.count({ where: { type: 'PAGER', status: 'ACTIVE' } });
+        if (registered >= limit) {
+          throw new AppError(
+            409,
+            'DEVICE_LIMIT_REACHED',
+            `The licence allows ${String(limit)} paired pagers. Unpair one, or ask the vendor for more.`,
+            { type: 'PAGER', limit },
+          );
+        }
+      }
       const clash = await tx.device.findFirst({
         where: {
           restaurantId: principal.restaurantId,
@@ -135,9 +153,10 @@ export class PagersService {
     const secretHash = await this.hasher.hash(secret);
     const device = await this.prisma.transaction(async (tx) => {
       await this.find(tx, principal.restaurantId, deviceId);
+      // Failed sign-ins are counted from the new credential on (PAGER-R3).
       const updated = await tx.device.update({
         where: { id: deviceId },
-        data: { mqttSecretHash: secretHash },
+        data: { mqttSecretHash: secretHash, mqttSignInFailures: 0, mqttSignInFailedAt: null },
       });
       await this.record(tx, principal, 'PAGER_CREDENTIAL_REPLACED', deviceId, null, null);
       await this.announce(tx, principal, deviceId);

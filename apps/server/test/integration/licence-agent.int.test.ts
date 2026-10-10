@@ -214,6 +214,39 @@ describe('[LIC-003] [LIC-005] the licence on this PC', () => {
     expect(tablet.status, JSON.stringify(tablet.body)).toBe(201);
   });
 
+  it('[LIC-001] registers no more pagers than the licence allows (PAGER-E3)', async () => {
+    // The licence allows 10 pagers: nine are registered, the tenth may be, the eleventh not.
+    const existing = await Promise.all(
+      Array.from({ length: 9 }, (_, index) =>
+        prisma.device.create({
+          data: {
+            restaurantId: kit.restaurantId,
+            type: 'PAGER',
+            name: `Pager ${String(index)}`,
+            serial: `LIC-${String(index)}`,
+            status: 'ACTIVE',
+          },
+        }),
+      ),
+    );
+    const register = (serial: string) =>
+      server()
+        .post('/api/v1/pagers')
+        .set(as(manager))
+        .send({ serial, name: `Pager ${serial}`, staffId: null });
+    const tenth = await register('LIC-10');
+    expect(tenth.status, JSON.stringify(tenth.body)).toBe(201);
+    const eleventh = await register('LIC-11');
+    expect([eleventh.status, codeOf(eleventh)]).toEqual([409, 'DEVICE_LIMIT_REACHED']);
+    expect(ApiError.parse(eleventh.body).details).toEqual({ type: 'PAGER', limit: 10 });
+    // Unpairing one makes room again.
+    await prisma.device.updateMany({
+      where: { id: { in: existing.map((pager) => pager.id) } },
+      data: { status: 'REVOKED', revokedAt: new Date() },
+    });
+    expect((await register('LIC-12')).status).toBe(201);
+  });
+
   it('once a restriction applies: no new tables or orders; bills and reports still work', async () => {
     await agent.accept(
       answer({ licence: licence({ state: 'RESTRICTED', reason: 'Invoice unpaid for 60 days' }) }),
