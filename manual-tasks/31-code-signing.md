@@ -39,7 +39,11 @@ uses them.
 1. Push to `main`; the "Windows installer" job waits for the environment and then signs.
 2. Download the `windows-installer` artifact; on a Windows PC, right-click the installer →
    Properties → Digital Signatures: the company's name, "This digital signature is OK".
-3. Manual task 14 then installs it on a clean PC.
+3. Check where it came from (UPDATE-R3): `gh attestation verify RestaurantPlatform-Setup-<version>.exe
+--repo <owner>/<repo>` must succeed, and its commit and run must be the ones in the
+   `release-evidence` artifact's `release-manifest.json`. Do not give a restaurant an installer
+   that fails this.
+4. Manual task 14 then installs it on a clean PC.
 
 ## Results
 
@@ -48,5 +52,6 @@ Certificate: CA ______, type OV / EV, valid until ______
 Key held in: cloud HSM / hardware token: ______
 Signing service: ______
 Environment release-signing limited to main: yes / no
+Attestation verified (date): ______
 Signed installer checked on a PC (date): ______
 ```
