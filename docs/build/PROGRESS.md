@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03d2b2c2).
+Last updated: 2026-10-11 (P8-03d2b2d).
 
 What exists:
 
@@ -379,6 +379,11 @@ What exists:
   console under Trusted Types, in the POS window, and on the QR site under a nonce): 133
   mitigated. P8-03c2a mitigated PC-D3 (floods from the LAN, `flood.int.test.ts`): 134
   mitigated.
+- `docs/security/checklists/` (P8-03d2b2d): OWASP ASVS L2 with the Top 10s (81 controls), MASVS-L1 with
+  resilience (31), ETSI EN 303 645 (13) and CIS for the Windows host (17); each control Met, N/A with a
+  reason, or a Finding with a dated plan. `pnpm security:checklists` (in `pnpm check`) checks that
+  every file and threat named exists. 21 findings, all waiting for a person, an account, the
+  pager firmware (P2-05) or P8-03e.
 - `infra/dast` (`@rp/dast`, P8-03c1): the DAST harness. It starts the QR site with its relay, the
   relay's functions, the Control Plane with the vendor web app and the local server over HTTPS
   with the console, each from its build and signed in, runs OWASP ZAP's Automation Framework on
@@ -400,7 +405,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d2b2d (the four standards checklists), P8-03e the incident response
+- P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -648,7 +653,7 @@ Recommended next WPs (dependencies met):
       - [x] P8-03c2a Floods from the LAN (the HTTPS server and the socket, PC-D3)
       - [x] P8-03c2b Floods at the cloud's edges (the Control Plane, the relay's reads; CP-D1,
             RELAY-D4); the edge's own rules wait for the hosting accounts (manual task 32)
-  - [~] P8-03d Standards checklists, Electron review and MDM policy
+  - [x] P8-03d Standards checklists, Electron review and MDM policy
     - [x] P8-03d1 The Electron shell's hardening (DESKTOP-E2, E3, I3, R2, S1)
     - [x] P8-03d2a Phones and tablets: backups, PIN screen capture, lock-screen alerts, kiosk
           restrictions, manifest test, MDM policy (MOBILE-E2, E4, I3, I4, R2, S1, T3)
@@ -665,7 +670,7 @@ Recommended next WPs (dependencies met):
       - [x] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4), split:
         - [x] P8-03d2b2c1 PC-I5, E2, T7, D6 and DESKTOP-E4: BitLocker warning, PC runbook, readiness line
         - [x] P8-03d2b2c2 PC-I6 (the database's own service account) and PC-S4 (CA name constraints)
-      - [ ] P8-03d2b2d The four checklists
+      - [x] P8-03d2b2d The four checklists (ASVS, MASVS, ETSI, CIS; `pnpm security:checklists`)
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
 - [ ] P8-05 Runbooks, manuals, training
@@ -4409,6 +4414,21 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03d2b2d the four standards checklists
+
+Decided: a row is a control group (an ASVS section, a MASVS control, an ETSI provision, a CIS
+setting group), not each of ASVS's ~280 requirements. A control is Met only for what is built; what
+needs a person, an account or a device is a Finding with the plan its threat already had. ETSI's
+pager side is Findings until P2-05 (the firmware does not exist); the PC's side is Met. New: ETSI-5.2
+(a vulnerability disclosure policy, no contact exists yet) goes to P8-03e. No threat now names
+P8-03d as its plan.
+
+Built: `docs/security/checklists/` (README, `asvs.md`, `masvs.md`, `etsi-en-303-645.md`,
+`cis-windows.md`), `infra/ci/check-checklists.mjs` and `pnpm security:checklists` (in `pnpm check`),
+8 node tests in `check-checklists.test.mjs`. Gotcha: evidence must be a path starting with a known
+top folder (`apps/`, `docs/`, ...) or a threat id; root files other than `*.md` cannot be cited.
+Next: P8-03e (incident response plan, pen-test pack), then P8-04.
 
 ### 2026-10-11: P8-03d2b2c2 the database's own account and a name-constrained CA
 
