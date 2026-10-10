@@ -67,8 +67,9 @@ describe('[MGR-006] the devices', () => {
     expect(
       await screen.findByRole('heading', { level: 2, name: t('devices.title') }),
     ).toBeVisible();
+    // The page heading shows while the list still loads; the groups come with the list.
     expect(
-      screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent),
+      (await screen.findAllByRole('heading', { level: 3 })).map((heading) => heading.textContent),
     ).toEqual([
       t('devices.group.POS'),
       t('devices.group.MANAGER_BROWSER'),
