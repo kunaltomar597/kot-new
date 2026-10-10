@@ -69,7 +69,11 @@ class FakeWindow implements ShellWindow {
   }
 }
 
-function harness(options: { lock?: boolean; serverUpAfter?: number } = {}) {
+function harness(options: { lock?: boolean; serverUpAfter?: number; argv?: string[] } = {}) {
+  const logs: string[] = [];
+  const pickers = new Map<string, Parameters<ShellSession['onDevicePicker']>[1]>();
+  let devicePermission: (() => boolean) | undefined;
+  let menuRemoved = false;
   const windows: FakeWindow[] = [];
   const appListeners = new Map<string, () => void>();
   let request: Parameters<ShellSession['setPermissionRequestHandler']>[0] | undefined;
@@ -101,6 +105,12 @@ function harness(options: { lock?: boolean; serverUpAfter?: number } = {}) {
     setCertificateVerifyProc: (proc) => {
       certificate = proc;
     },
+    setDevicePermissionHandler: (handler) => {
+      devicePermission = handler;
+    },
+    onDevicePicker: (event, listener) => {
+      pickers.set(event, listener);
+    },
   };
   const deps: ShellDeps = {
     app,
@@ -110,7 +120,18 @@ function harness(options: { lock?: boolean; serverUpAfter?: number } = {}) {
       windows.push(window);
       return window;
     },
-    config: { consoleUrl: CONSOLE, fullScreen: true, openAtLogin: true, caFile: 'ca.crt' },
+    config: {
+      consoleUrl: CONSOLE,
+      fullScreen: true,
+      openAtLogin: true,
+      caFile: 'ca.crt',
+      logFile: undefined,
+    },
+    argv: options.argv ?? [],
+    removeMenu: () => {
+      menuRemoved = true;
+    },
+    log: (message) => logs.push(message),
     fetch: () => {
       healthCalls += 1;
       return Promise.resolve(
@@ -136,6 +157,10 @@ function harness(options: { lock?: boolean; serverUpAfter?: number } = {}) {
     quit: () => quit,
     loginItem: () => loginItem,
     healthCalls: () => healthCalls,
+    logs,
+    pickers,
+    devicePermission: () => devicePermission,
+    menuRemoved: () => menuRemoved,
   };
 }
 
@@ -263,5 +288,61 @@ describe('[NFR-A04] [SEC-011] the Electron shell', () => {
     first.window().close();
     first.appListeners.get('second-instance')?.();
     expect(first.window().focused).toBe(1);
+  });
+
+  it('[SEC-011] [DESKTOP-E2] quits when started with a remote debugging switch', async () => {
+    const h = harness({ argv: ['--remote-debugging-port=9222'] });
+    expect(await startShell(h.deps)).toBeUndefined();
+    expect(h.quit()).toBe(true);
+    expect(h.windows).toHaveLength(0);
+    expect(h.logs[0]).toContain('--remote-debugging-port=9222');
+  });
+
+  it('[SEC-011] [DESKTOP-I3] has no application menu', async () => {
+    const h = harness();
+    await startShell(h.deps);
+    expect(h.menuRemoved()).toBe(true);
+  });
+
+  it('[SEC-011] [DESKTOP-E3] refuses every device and cancels the pickers', async () => {
+    const h = harness();
+    await startShell(h.deps);
+    expect(h.devicePermission()?.()).toBe(false);
+    for (const picker of ['select-usb-device', 'select-serial-port', 'select-hid-device']) {
+      let prevented = false;
+      let chosen: string | undefined = 'unset';
+      h.pickers.get(picker)?.({ preventDefault: () => (prevented = true) }, (id) => (chosen = id));
+      expect([picker, prevented, chosen]).toEqual([picker, true, '']);
+    }
+    let chosen: string | undefined;
+    h.window().emit(
+      'select-bluetooth-device',
+      { preventDefault: () => undefined },
+      [],
+      (id: string) => (chosen = id),
+    );
+    expect(chosen).toBe('');
+  });
+
+  it('[SEC-011] [DESKTOP-R2] logs what it refuses, without paths', async () => {
+    const h = harness();
+    await startShell(h.deps);
+    h.request()({}, 'geolocation', () => undefined, { requestingUrl: CONSOLE });
+    h.certificate()(
+      { hostname: '127.0.0.1', errorCode: -202, certificate: { data: OTHER_CA } },
+      () => undefined,
+    );
+    h.window().emit(
+      'will-navigate',
+      { preventDefault: () => undefined },
+      'https://evil.example/a?token=1',
+    );
+    h.window().openHandler?.({ url: 'https://evil.example/b?token=2' });
+    const text = h.logs.join('\n');
+    expect(text).toContain('geolocation');
+    expect(text).toContain('certificate of 127.0.0.1');
+    expect(text).toContain('Refused to open https://evil.example');
+    expect(text).toContain('Refused a new window for https://evil.example');
+    expect(text).not.toContain('token');
   });
 });
