@@ -59,10 +59,122 @@ function serialNumber(): string {
   return bytes.toString('hex');
 }
 
-/** A new CA for this installation. */
+/** OID of the name constraints extension (RFC 5280 §4.2.1.10). */
+const NAME_CONSTRAINTS_OID = '2.5.29.30';
+
+/**
+ * What the CA may sign for (PC-S4): loopback and the private IPv4 ranges (RFC 1918 and link-local)
+ * and, for host names, `localhost`, `.local`, `.lan`, `.home.arpa` and the PC's own names. A stolen
+ * CA key then cannot make a certificate for a public site, because every client that enforces
+ * name constraints (browsers, Android, OpenSSL) refuses it.
+ */
+export const PRIVATE_IPV4_RANGES = [
+  '127.0.0.0/8',
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '169.254.0.0/16',
+] as const;
+export const LAN_DNS_SUFFIXES = ['localhost', 'local', 'lan', 'home.arpa'] as const;
+
+function derLength(length: number): Buffer {
+  if (length < 0x80) return Buffer.from([length]);
+  const bytes: number[] = [];
+  for (let rest = length; rest > 0; rest = Math.floor(rest / 256)) bytes.unshift(rest % 256);
+  return Buffer.from([0x80 | bytes.length, ...bytes]);
+}
+
+function tlv(tag: number, ...parts: Buffer[]): Buffer {
+  const body = Buffer.concat(parts);
+  return Buffer.concat([Buffer.from([tag]), derLength(body.length), body]);
+}
+
+function ipv4Bytes(address: string): number[] {
+  return address.split('.').map(Number);
+}
+
+function rangeBytes(range: string): number[] {
+  const [address = '', bits = '32'] = range.split('/');
+  const prefix = Number(bits);
+  const mask = [0, 1, 2, 3].map((index) => {
+    const inByte = Math.min(8, Math.max(0, prefix - index * 8));
+    return (0xff << (8 - inByte)) & 0xff;
+  });
+  return [...ipv4Bytes(address), ...mask];
+}
+
+/** The DER of a name constraints extension that permits only these ranges and DNS subtrees. */
+export function nameConstraintsDer(
+  dnsSuffixes: readonly string[],
+  ipRanges: readonly string[] = PRIVATE_IPV4_RANGES,
+): Buffer {
+  const subtree = (name: Buffer): Buffer => tlv(0x30, name);
+  const dns = dnsSuffixes.map((suffix) => subtree(tlv(0x82, Buffer.from(suffix, 'ascii'))));
+  const ips = ipRanges.map((range) => subtree(tlv(0x87, Buffer.from(rangeBytes(range)))));
+  return tlv(0x30, tlv(0xa0, ...dns, ...ips));
+}
+
+/** The permitted DNS subtrees and IPv4 ranges (address, mask) of a CA, or undefined if it has none. */
+export function nameConstraintsOf(
+  caPem: string,
+): { dns: string[]; ips: { address: number[]; mask: number[] }[] } | undefined {
+  const extension = new x509.X509Certificate(caPem).getExtension(NAME_CONSTRAINTS_OID);
+  if (!extension) return undefined;
+  const bytes = Buffer.from(extension.value);
+  const dns: string[] = [];
+  const ips: { address: number[]; mask: number[] }[] = [];
+  // Walk SEQUENCE { [0] { SEQUENCE { name }* } }: read the tag and length of each element.
+  const read = (at: number): { tag: number; start: number; end: number } => {
+    const tag = bytes[at] ?? 0;
+    let length = bytes[at + 1] ?? 0;
+    let start = at + 2;
+    if (length >= 0x80) {
+      const count = length & 0x7f;
+      length = 0;
+      for (let index = 0; index < count; index += 1) {
+        length = length * 256 + (bytes[start + index] ?? 0);
+      }
+      start += count;
+    }
+    return { tag, start, end: start + length };
+  };
+  const outer = read(0);
+  const permitted = read(outer.start);
+  for (let at = permitted.start; at < permitted.end;) {
+    const entry = read(at);
+    const name = read(entry.start);
+    const value = bytes.subarray(name.start, name.end);
+    if (name.tag === 0x82) dns.push(value.toString('ascii'));
+    else if (name.tag === 0x87 && value.length === 8) {
+      ips.push({ address: [...value.subarray(0, 4)], mask: [...value.subarray(4)] });
+    }
+    at = entry.end;
+  }
+  return { dns, ips };
+}
+
+/** The part of `names` the CA's name constraints allow it to sign; all of it for a CA without. */
+export function namesWithinConstraints(caPem: string, names: ServerNames): ServerNames {
+  const constraints = nameConstraintsOf(caPem);
+  if (constraints === undefined) return names;
+  return {
+    dnsNames: names.dnsNames.filter((name) =>
+      constraints.dns.some((suffix) => name === suffix || name.endsWith(`.${suffix}`)),
+    ),
+    ipAddresses: names.ipAddresses.filter((address) => {
+      const bytes = ipv4Bytes(address);
+      return constraints.ips.some(({ address: base, mask }) =>
+        bytes.every((byte, index) => ((byte ^ (base[index] ?? 0)) & (mask[index] ?? 0)) === 0),
+      );
+    }),
+  };
+}
+
+/** A new CA for this installation. `dnsNames` are the host names it may sign for besides the LAN suffixes. */
 export async function createCertificateAuthority(
   now: Date = new Date(),
   label: string = randomBytes(4).toString('hex'),
+  dnsNames: readonly string[] = [],
 ): Promise<KeyedCertificate> {
   const keys = await webcrypto.subtle.generateKey(KEY_ALGORITHM, true, ['sign', 'verify']);
   const certificate = await x509.X509CertificateGenerator.createSelfSigned({
@@ -79,6 +191,11 @@ export async function createCertificateAuthority(
         true,
       ),
       await x509.SubjectKeyIdentifierExtension.create(keys.publicKey),
+      new x509.Extension(
+        NAME_CONSTRAINTS_OID,
+        true,
+        nameConstraintsDer([...new Set([...LAN_DNS_SUFFIXES, ...dnsNames])]),
+      ),
     ],
   });
   return {

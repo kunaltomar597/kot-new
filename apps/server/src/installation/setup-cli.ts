@@ -25,7 +25,12 @@ import {
   writeInstallationFile,
 } from './installation.js';
 import { migrate } from './migrations.js';
-import { initPostgres, pgCtlRegisterArgs, runProgram } from './postgres-setup.js';
+import {
+  initPostgres,
+  pgCtlRegisterArgs,
+  pgServiceAccountArgs,
+  runProgram,
+} from './postgres-setup.js';
 import { createUpdateSnapshot, dropUpdateSnapshot } from './update-snapshot.js';
 import { writeServiceDefinitions } from './winsw.js';
 
@@ -210,8 +215,15 @@ export async function runSetupCli(
         return 1;
       }
       if ((await new WindowsServiceControl().state(SERVICE_NAMES.database)) !== 'MISSING') {
-        log(`The ${SERVICE_NAMES.database} service is already registered.`);
-        return 0;
+        // An installation from before PC-I6 ran it as Network Service: the installer has already
+        // given the new account its folders and stopped the service, so only the account changes.
+        const moved = await runProgram('sc.exe', pgServiceAccountArgs());
+        log(
+          moved.code === 0
+            ? `The ${SERVICE_NAMES.database} service is registered and runs under its own account.`
+            : `The ${SERVICE_NAMES.database} service is registered; its account was not changed: ${moved.output.trim()}`,
+        );
+        return moved.code === 0 ? 0 : 1;
       }
       const result = await runProgram(
         join(paths.pgBin, 'pg_ctl.exe'),

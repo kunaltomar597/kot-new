@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03d2b2c1).
+Last updated: 2026-10-11 (P8-03d2b2c2).
 
 What exists:
 
@@ -400,7 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d2b2c2 (database service account, CA name constraints) and d (the four standards checklists), P8-03e the incident response
+- P8-03d2b2d (the four standards checklists), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -662,9 +662,9 @@ Recommended next WPs (dependencies met):
       - [x] P8-03d2b2b UPDATE-R3 and LICENCE-T5, split:
         - [x] P8-03d2b2b1 UPDATE-R3: attestation, SBOM and commit with each release
         - [x] P8-03d2b2b2 LICENCE-T5: the server's files checked against the release's list; `CODE_MODIFIED` reported
-      - [~] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4), split:
+      - [x] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4), split:
         - [x] P8-03d2b2c1 PC-I5, E2, T7, D6 and DESKTOP-E4: BitLocker warning, PC runbook, readiness line
-        - [ ] P8-03d2b2c2 PC-I6 (the database's own service account) and PC-S4 (CA name constraints)
+        - [x] P8-03d2b2c2 PC-I6 (the database's own service account) and PC-S4 (CA name constraints)
       - [ ] P8-03d2b2d The four checklists
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
@@ -4409,6 +4409,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03d2b2c2 the database's own account and a name-constrained CA
+
+Decided: PC-I6: `pg_ctl register -U NT SERVICE\RPDatabase` (virtual account, no password). The ACL plan
+already names accounts by computed SID, so it does not need the service to exist (the earlier note
+said it did); only the folders' `NetworkService` entries became the database SID. An installation
+from before is moved by `sc config RPDatabase obj=` in `postgres-register`, with the database
+stopped first and the permissions set before. PC-S4: a new CA carries a critical name constraints
+extension (private IPv4 ranges; DNS `localhost`, `local`, `lan`, `home.arpa` and the PC's own names
+when the CA is made). A name outside it is left off the server certificate rather than stopping the
+server (a PC with a public address stays up). An existing CA is kept (replacing it re-pairs every
+device), so old installations stay unconstrained. ADR-0011 amended; both threats Mitigated (summary
+29 with a plan).
+
+Built: `nameConstraintsDer`, `nameConstraintsOf`, `namesWithinConstraints` in
+`apps/server/src/tls/certificates.ts`, used by `TlsStore`; `pgServiceAccount`,
+`pgServiceAccountArgs`; the ACL plan and install order in the PowerShell. Tests: server unit `tls`
+11 (a real TLS handshake: a LAN certificate connects, a public address is refused), `installation`,
+Pester `Permissions` 12 (all Pester 141 pass), `tls.int` 10. Not run here: the account change on a
+real Windows PC (manual task 35, step 4). Next: P8-03d2b2d.
 
 ### 2026-10-11: P8-03d2b2c1 the PC as a computer: BitLocker, accounts, network
 

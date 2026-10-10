@@ -195,15 +195,25 @@ export async function initPostgres(
 
 /**
  * `pg_ctl register`'s arguments for the database service: started by Windows at boot before anyone
- * signs in (NFR-A04), as Network Service, which owns nothing else of ours.
+ * signs in (NFR-A04), under its own virtual account `NT SERVICE\RPDatabase` (PC-I6): no password,
+ * and no other service shares it, as Network Service is shared by every service that uses it.
  */
+export function pgServiceAccount(): string {
+  return `NT SERVICE\\${SERVICE_NAMES.database}`;
+}
+
+/** `sc config` arguments that move an already registered database service to its own account. */
+export function pgServiceAccountArgs(): string[] {
+  return ['config', SERVICE_NAMES.database, 'obj=', pgServiceAccount()];
+}
+
 export function pgCtlRegisterArgs(installation: InstallationFile): string[] {
   return [
     'register',
     '-N',
     SERVICE_NAMES.database,
     '-U',
-    'NT AUTHORITY\\NetworkService',
+    pgServiceAccount(),
     '-D',
     installationPaths(installation).pgData,
     '-S',

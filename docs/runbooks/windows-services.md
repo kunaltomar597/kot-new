@@ -7,11 +7,11 @@ packaging (P0-16d) call what is described here.
 
 ## The services
 
-| Service      | Runs                                                     | Account                       | Starts                      |
-| ------------ | -------------------------------------------------------- | ----------------------------- | --------------------------- |
-| `RPDatabase` | PostgreSQL 16, data in `<data>\postgres`                 | `NT AUTHORITY\NetworkService` | at boot (`pg_ctl register`) |
-| `RPServer`   | the service host, which runs the server (`dist/main.js`) | `NT SERVICE\RPServer`         | at boot, after `RPDatabase` |
-| `RPWatchdog` | the watchdog                                             | LocalSystem                   | at boot                     |
+| Service      | Runs                                                     | Account                 | Starts                      |
+| ------------ | -------------------------------------------------------- | ----------------------- | --------------------------- |
+| `RPDatabase` | PostgreSQL 16, data in `<data>\postgres`                 | `NT SERVICE\RPDatabase` | at boot (`pg_ctl register`) |
+| `RPServer`   | the service host, which runs the server (`dist/main.js`) | `NT SERVICE\RPServer`   | at boot, after `RPDatabase` |
+| `RPWatchdog` | the watchdog                                             | LocalSystem             | at boot                     |
 
 All three start before anyone signs in. The POS window (the Electron shell, P0-16a) starts when
 someone signs in to Windows and waits until the server answers.

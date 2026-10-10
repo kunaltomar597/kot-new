@@ -46,7 +46,6 @@ $script:Sid = @{
     System         = 'S-1-5-18'
     Administrators = 'S-1-5-32-544'
     Users          = 'S-1-5-32-545'
-    NetworkService = 'S-1-5-20'
 }
 
 # Get-Disk's BusType by number (MSFT_Disk), for when it comes back as one.
@@ -461,8 +460,9 @@ function Get-RPFolderAclPlan {
         Rights are icacls': F full, M modify, RX read; (OI)(CI) also for what is inside; without
         them, the folder itself only. A protected folder inherits nothing.
         - The data folder: administrators, SYSTEM and the server's account (NT SERVICE\RPServer).
-          Network Service may only pass through it to its own folders.
-        - postgres: PostgreSQL's account (Network Service); the server may read it, not change it.
+          The database's account may only pass through it to its own folders.
+        - postgres: PostgreSQL's own virtual account (NT SERVICE\RPDatabase, PC-I6), which nothing else
+          shares; the server may read it, not change it.
         - backups\wal-staging: PostgreSQL hands its log files to the server there.
         - secrets: administrators, SYSTEM and the server only, nothing inherited.
         - tls: everyone signed in to Windows may read it, for the POS window's pinned CA
@@ -474,7 +474,8 @@ function Get-RPFolderAclPlan {
     param(
         [Parameter(Mandatory)] [string] $DataDir,
         [Parameter(Mandatory)] [string] $ProgramDataDir,
-        [string] $ServerSid = (Get-RPServiceSid $script:Services.Server)
+        [string] $ServerSid = (Get-RPServiceSid $script:Services.Server),
+        [string] $DatabaseSid = (Get-RPServiceSid $script:Services.Database)
     )
     $sid = $script:Sid
     $owners = @(
@@ -485,19 +486,19 @@ function Get-RPFolderAclPlan {
     @(
         [pscustomobject]@{
             Path = $data; Protect = $true
-            Grants = $owners + @((New-RPGrant $ServerSid '(OI)(CI)M'), (New-RPGrant $sid.NetworkService 'RX'))
+            Grants = $owners + @((New-RPGrant $ServerSid '(OI)(CI)M'), (New-RPGrant $DatabaseSid 'RX'))
         },
         [pscustomobject]@{
             Path = (Join-RPPath $data 'postgres'); Protect = $true
-            Grants = $owners + @((New-RPGrant $sid.NetworkService '(OI)(CI)F'), (New-RPGrant $ServerSid '(OI)(CI)RX'))
+            Grants = $owners + @((New-RPGrant $DatabaseSid '(OI)(CI)F'), (New-RPGrant $ServerSid '(OI)(CI)RX'))
         },
         [pscustomobject]@{
             Path = (Join-RPPath $data 'backups'); Protect = $false
-            Grants = @((New-RPGrant $sid.NetworkService 'RX'))
+            Grants = @((New-RPGrant $DatabaseSid 'RX'))
         },
         [pscustomobject]@{
             Path = (Join-RPPath $data 'backups', 'wal-staging'); Protect = $false
-            Grants = @((New-RPGrant $sid.NetworkService '(OI)(CI)M'))
+            Grants = @((New-RPGrant $DatabaseSid '(OI)(CI)M'))
         },
         [pscustomobject]@{
             Path = (Join-RPPath $data 'secrets'); Protect = $true
@@ -1091,6 +1092,9 @@ function Invoke-RPInstall {
         $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('postgres-init')
 
         # 5. The permissions, the database, the logins and the migrations.
+        # The database is stopped while its account changes (PC-I6): an installation from before
+        # ran it as Network Service, and the register step moves it to its own virtual account.
+        Stop-RPService -Name $script:Services.Database
         Set-RPFolderPermission -Plan $plan
         $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('postgres-register')
         Set-RPServiceRecovery -Name $script:Services.Database -Actions $script:DatabaseRecovery

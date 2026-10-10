@@ -27,6 +27,7 @@ import {
   managedHbaConf,
   managedPostgresSettings,
   pgCtlRegisterArgs,
+  pgServiceAccountArgs,
   withManagedBlock,
 } from '../../src/installation/postgres-setup.js';
 import {
@@ -211,7 +212,7 @@ describe('[DATA-001] [DATA-002] PostgreSQL on the data drive', () => {
       '-N',
       'RPDatabase',
       '-U',
-      'NT AUTHORITY\\NetworkService',
+      'NT SERVICE\\RPDatabase',
       '-D',
       join('D:\\RestaurantData', 'postgres'),
       '-S',
@@ -219,6 +220,16 @@ describe('[DATA-001] [DATA-002] PostgreSQL on the data drive', () => {
       '-w',
       '-t',
       '300',
+    ]);
+  });
+
+  it('[PC-I6] runs the database under its own virtual account, also on an installation from before', () => {
+    expect(pgCtlRegisterArgs(installation)).not.toContain('NT AUTHORITY\\NetworkService');
+    expect(pgServiceAccountArgs()).toEqual([
+      'config',
+      'RPDatabase',
+      'obj=',
+      'NT SERVICE\\RPDatabase',
     ]);
   });
 });
