@@ -4,6 +4,7 @@ BeforeAll {
     $script:Admins = 'S-1-5-32-544'
     $script:Users = 'S-1-5-32-545'
     $script:NetworkService = 'S-1-5-20'
+    $script:Database = Get-RPServiceSid 'RPDatabase'
     $script:Server = Get-RPServiceSid 'RPServer'
     $script:Plan = Get-RPFolderAclPlan -DataDir 'D:\RestaurantPlatform\' -ProgramDataDir 'C:\ProgramData\RestaurantPlatform'
     function Get-Entry([string] $Path) { $script:Plan | Where-Object Path -EQ $Path }
@@ -35,7 +36,7 @@ Describe '[SEC-006] [SEC-007] [AUD-004] the folders'' permissions' {
         $entry.Protect | Should -BeTrue
         $grants = Get-Grant 'D:\RestaurantPlatform'
         $grants[$script:Server] | Should -Be '(OI)(CI)M'
-        $grants[$script:NetworkService] | Should -Be 'RX'
+        $grants[$script:Database] | Should -Be 'RX'
         $grants[$script:Admins] | Should -Be '(OI)(CI)F'
         $grants[$script:System] | Should -Be '(OI)(CI)F'
         $grants.ContainsKey($script:Users) | Should -BeFalse
@@ -44,14 +45,14 @@ Describe '[SEC-006] [SEC-007] [AUD-004] the folders'' permissions' {
     It 'gives PostgreSQL its own folder, which the server may read but not change' {
         (Get-Entry 'D:\RestaurantPlatform\postgres').Protect | Should -BeTrue
         $grants = Get-Grant 'D:\RestaurantPlatform\postgres'
-        $grants[$script:NetworkService] | Should -Be '(OI)(CI)F'
+        $grants[$script:Database] | Should -Be '(OI)(CI)F'
         $grants[$script:Server] | Should -Be '(OI)(CI)RX'
     }
 
     It '[DATA-002] lets PostgreSQL hand its log files to the server for the continuous backup' {
-        (Get-Grant 'D:\RestaurantPlatform\backups')[$script:NetworkService] | Should -Be 'RX'
+        (Get-Grant 'D:\RestaurantPlatform\backups')[$script:Database] | Should -Be 'RX'
         (Get-Entry 'D:\RestaurantPlatform\backups\wal-staging').Protect | Should -BeFalse
-        (Get-Grant 'D:\RestaurantPlatform\backups\wal-staging')[$script:NetworkService] | Should -Be '(OI)(CI)M'
+        (Get-Grant 'D:\RestaurantPlatform\backups\wal-staging')[$script:Database] | Should -Be '(OI)(CI)M'
     }
 
     It 'lets everyone signed in read the CA the POS window pins, and the installation file' {
@@ -62,6 +63,14 @@ Describe '[SEC-006] [SEC-007] [AUD-004] the folders'' permissions' {
         $grants[$script:Users] | Should -Be '(OI)(CI)RX'
         $grants[$script:Server] | Should -Be '(OI)(CI)RX'
         $grants[$script:Admins] | Should -Be '(OI)(CI)F'
+    }
+
+    It '[PC-I6] runs PostgreSQL under its own account, never the shared Network Service' {
+        $script:Database | Should -Match '^S-1-5-80(-\d+){5}$'
+        $script:Database | Should -Not -Be $script:Server
+        foreach ($entry in $script:Plan) {
+            @($entry.Grants.Sid) | Should -Not -Contain $script:NetworkService
+        }
     }
 
     It 'never lets ordinary users or everyone change anything' {

@@ -213,10 +213,10 @@ name it before the service exists.
 
 | Folder                             | Inherits | Who                                                                                                    |
 | ---------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| `<data>`                           | no       | SYSTEM, Administrators: full. `RPServer`: modify. Network Service: pass through and list this folder.  |
-| `<data>\postgres`                  | no       | SYSTEM, Administrators, Network Service (PostgreSQL): full. `RPServer`: read.                          |
-| `<data>\backups`                   | yes      | Network Service may also pass through and list it.                                                     |
-| `<data>\backups\wal-staging`       | yes      | Network Service: modify. PostgreSQL hands its log files to the server here (P7-05c).                   |
+| `<data>`                           | no       | SYSTEM, Administrators: full. `RPServer`: modify. `RPDatabase`: pass through and list this folder.     |
+| `<data>\postgres`                  | no       | SYSTEM, Administrators, `RPDatabase` (PostgreSQL): full. `RPServer`: read.                             |
+| `<data>\backups`                   | yes      | `RPDatabase` may also pass through and list it.                                                        |
+| `<data>\backups\wal-staging`       | yes      | `RPDatabase`: modify. PostgreSQL hands its log files to the server here (P7-05c).                      |
 | `<data>\secrets`                   | no       | SYSTEM, Administrators: full. `RPServer`: modify. Nobody else.                                         |
 | `<data>\tls`                       | yes      | Users: read. The POS window, running as whoever signed in to Windows, reads `ca.crt`. Keys are sealed. |
 | `%ProgramData%\RestaurantPlatform` | no       | SYSTEM, Administrators: full. Users and `RPServer`: read. The installation file holds no secret.       |

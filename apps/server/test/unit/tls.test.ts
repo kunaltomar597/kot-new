@@ -2,6 +2,8 @@ import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { X509Certificate } from 'node:crypto';
+import { connect, createServer } from 'node:tls';
+import type { AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import type { SecretName, SecretStore } from '../../src/auth/secret-store.js';
 import {
@@ -9,6 +11,8 @@ import {
   expiryOf,
   fingerprintOf,
   isIssuedBy,
+  nameConstraintsOf,
+  namesWithinConstraints,
   issueServerCertificate,
   namesOf,
   needsRenewal,
@@ -161,5 +165,94 @@ describe('[SEC-006] TLS material at rest', () => {
     const results = await Promise.all([store.ensure(NAMES, NOW), store.ensure(NAMES, NOW)]);
     expect(results.map((result) => result.renewed)).toEqual([true, false]);
     expect(results[1].material.cert).toBe(results[0].material.cert);
+  });
+});
+
+describe('[SEC-001] [PC-S4] the CA may only sign for the LAN', () => {
+  async function handshake(
+    ca: string,
+    names: { dnsNames: string[]; ipAddresses: string[] },
+    caKeyed: Awaited<ReturnType<typeof createCertificateAuthority>>,
+  ): Promise<string | undefined> {
+    const server = await issueServerCertificate(caKeyed, names, NOW);
+    const listener = createServer({ key: server.privateKeyPem, cert: server.certificatePem });
+    listener.on('secureConnection', (socket) => socket.end());
+    listener.on('tlsClientError', () => undefined);
+    await new Promise<void>((resolve) =>
+      listener.listen(0, '127.0.0.1', () => {
+        resolve();
+      }),
+    );
+    const { port } = listener.address() as AddressInfo;
+    try {
+      return await new Promise<string | undefined>((resolve) => {
+        const socket = connect({
+          host: '127.0.0.1',
+          port,
+          ca,
+          checkServerIdentity: () => undefined,
+        });
+        socket.on('secureConnect', () => {
+          socket.destroy();
+          resolve(undefined);
+        });
+        socket.on('error', (error: NodeJS.ErrnoException) => {
+          resolve(error.code ?? error.message);
+        });
+      });
+    } finally {
+      listener.close();
+    }
+  }
+
+  it('carries a critical name constraints extension for private ranges and LAN names', async () => {
+    const ca = await createCertificateAuthority(NOW, 'nc', ['pos-pc']);
+    expect(nameConstraintsOf(ca.certificatePem)).toEqual({
+      dns: ['localhost', 'local', 'lan', 'home.arpa', 'pos-pc'],
+      ips: [
+        { address: [127, 0, 0, 0], mask: [255, 0, 0, 0] },
+        { address: [10, 0, 0, 0], mask: [255, 0, 0, 0] },
+        { address: [172, 16, 0, 0], mask: [255, 240, 0, 0] },
+        { address: [192, 168, 0, 0], mask: [255, 255, 0, 0] },
+        { address: [169, 254, 0, 0], mask: [255, 255, 0, 0] },
+      ],
+    });
+    expect(new X509Certificate(ca.certificatePem).ca).toBe(true);
+  });
+
+  it('keeps only the names and addresses inside the constraints', async () => {
+    const ca = await createCertificateAuthority(NOW, 'nc', ['pos-pc']);
+    expect(
+      namesWithinConstraints(ca.certificatePem, {
+        dnsNames: ['localhost', 'pos-pc', 'pos-pc.local', 'shop.lan', 'example.com', 'evil.test'],
+        ipAddresses: [
+          '127.0.0.1',
+          '192.168.1.10',
+          '10.1.2.3',
+          '172.31.0.1',
+          '172.32.0.1',
+          '8.8.8.8',
+        ],
+      }),
+    ).toEqual({
+      dnsNames: ['localhost', 'pos-pc', 'pos-pc.local', 'shop.lan'],
+      ipAddresses: ['127.0.0.1', '192.168.1.10', '10.1.2.3', '172.31.0.1'],
+    });
+  });
+
+  it('is enforced by TLS clients: a LAN certificate connects, a public address does not', async () => {
+    const ca = await createCertificateAuthority(NOW, 'nc');
+    const lan = { dnsNames: ['localhost'], ipAddresses: ['127.0.0.1', '192.168.1.10'] };
+    expect(await handshake(ca.certificatePem, lan, ca)).toBeUndefined();
+    const stolen = { dnsNames: ['bank.example.com'], ipAddresses: ['127.0.0.1', '8.8.8.8'] };
+    expect(await handshake(ca.certificatePem, stolen, ca)).toBeDefined();
+  });
+
+  it('drops names outside the constraints when the store issues the certificate, and stays stable', async () => {
+    const store = new TlsStore(mkdtempSync(join(tmpdir(), 'rp-tls-')), new MemorySecrets());
+    const wanted = { dnsNames: ['localhost', 'pos.local'], ipAddresses: ['127.0.0.1', '8.8.8.8'] };
+    const first = await store.ensure(wanted, NOW);
+    expect(first.material.names.ipAddresses).toEqual(['127.0.0.1']);
+    expect((await store.ensure(wanted, NOW)).renewed).toBe(false);
   });
 });

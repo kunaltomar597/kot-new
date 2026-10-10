@@ -136,20 +136,25 @@ change the traffic or to collect PINs.
 
 - Mitigation: TLS 1.2 or later with the installation's own CA; the phones and tablets pin the CA
   whose fingerprint is in the pairing QR code; the POS window pins it for the PC's own address;
-  managers' browsers trust `/ca.crt` after comparing its fingerprint.
+  managers' browsers trust `/ca.crt` after comparing its fingerprint. The CA is name-constrained
+  (critical extension): it may sign only for loopback and the private IPv4 ranges, and for
+  `localhost`, `.local`, `.lan`, `.home.arpa` and the PC's own names, so a stolen CA key cannot
+  make a certificate for a public site. The server leaves off a certificate any name or address
+  the CA may not sign.
 - Code: `apps/server/src/tls/tls-store.ts` (`serverTlsOptions`, `TLS_MIN_VERSION`);
+  `apps/server/src/tls/certificates.ts` (`nameConstraintsDer`, `namesWithinConstraints`);
   `apps/server/src/devices/devices.service.ts` (`issueCode`).
 - Tests: `apps/server/test/integration/tls.int.test.ts` "is rejected by a client that trusts
   another CA, or only the public ones", "accepts TLS 1.2 and refuses older protocols", "lets a
   device that pinned the CA open the real-time socket, and no other";
+  `apps/server/test/unit/tls.test.ts` "is enforced by TLS clients: a LAN certificate connects, a
+  public address does not", "keeps only the names and addresses inside the constraints";
   `packages/mobile-core/test/device-session.test.ts` "refuses a server whose CA is not the one in
   the QR code".
-- Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: a browser's first trust of `/ca.crt`
-  rests on a person comparing the fingerprint (`docs/runbooks/lan-tls.md`), and the CA has no name
-  constraints, so its key, if stolen from the PC, could sign for any site on the browsers that
-  trust it; P8-03d adds name constraints (amending ADR-0011) and the fingerprint check to the
-  installation checklist.
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03d2b2c2). A CA made before this has no constraints (replacing it would
+  re-pair every device, ADR-0011); a browser's first trust of `/ca.crt` rests on a person comparing
+  the fingerprint (`docs/runbooks/lan-tls.md`).
 
 #### PC-S5 Guessing a PIN
 
@@ -550,17 +555,20 @@ Another account on the PC, or another service, reads the secrets, the database f
 the backups.
 
 - Mitigation: the installer sets the folders' permissions by SID: secrets for administrators,
-  SYSTEM and the server only, nothing inherited. PostgreSQL runs as the shared Network Service
-  account, which any other service running as it can use.
+  SYSTEM and the server only, nothing inherited. PostgreSQL runs under its own virtual account
+  `NT SERVICE\RPDatabase`, which no other service shares; only it (and the server, read-only)
+  reaches the database folder, and an installation from before is moved to it when the installer
+  runs again.
 - Code: `infra/installer/windows/RestaurantPlatform.Setup.psm1` (`Get-RPFolderAclPlan`,
   `Set-RPFolderPermission`); `apps/server/src/installation/postgres-setup.ts`
-  (`pgCtlRegisterArgs`).
+  (`pgCtlRegisterArgs`, `pgServiceAccountArgs`).
 - Tests: `infra/installer/windows/tests/Permissions.Tests.ps1` "keeps the secrets to
-  administrators, SYSTEM and the server, inheriting nothing", "never lets ordinary users or
-  everyone change anything".
-- Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: the database service runs under its own
-  virtual account, checked in the Windows CI job.
+  administrators, SYSTEM and the server, inheriting nothing", "runs PostgreSQL under its own account,
+  never the shared Network Service", "never lets ordinary users or everyone change anything";
+  `apps/server/test/unit/installation.test.ts` "runs the database under its own virtual account".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03d2b2c2). The Pester tests and the account change run on Windows only
+  (the `windows-latest` job, and a person on a real PC: manual task 35).
 
 #### PC-I7 Backups read off the PC
 
