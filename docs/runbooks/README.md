@@ -47,3 +47,8 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `pager-firmware.md`: pager firmware through the restaurant PC: releasing signed firmware in the
   Control Plane, the PC's checks, when a pager is offered it, "Update now", what the pager does
   (P2-05) and support (P2-04b1, ADR-0018).
+- `installation.md`, `restore.md`, `update-and-rollback.md`: the front door for each job, with the
+  order of work and which detailed runbook to open (P8-05).
+- `support-playbook.md`: triage, the paper fallback, common problems and closing a ticket (P8-05).
+- `developer-onboarding.md`: setting up, where things are, the rules and the work loop (P8-05).
+- Manuals for each role and training video scripts: `docs/manuals/` (P8-05).
