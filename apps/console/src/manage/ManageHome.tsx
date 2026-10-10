@@ -4,6 +4,7 @@ import { Navigate, NavLink, Route, Routes } from 'react-router';
 import { AlertCentre } from '../alerts/AlertCentre.js';
 import { useConsoleState } from '../app/console-context.js';
 import { useT } from '../app/i18n.js';
+import { ScreenHelp } from '../help/ScreenHelp.js';
 import { OwnerSecurityScreen } from '../owner/OwnerSecurityScreen.js';
 import { DevicesScreen } from './devices/DevicesScreen.js';
 import { AiImportScreen } from './menu/AiImportScreen.js';
@@ -155,6 +156,7 @@ export function ManageHome() {
         ) : null}
       </nav>
       <div className="dashboard__content">
+        <ScreenHelp />
         <Routes>
           {operates ? (
             <>
