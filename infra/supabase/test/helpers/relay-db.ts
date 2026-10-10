@@ -6,13 +6,14 @@ import { inject } from 'vitest';
 import type { RelayDatabase } from '../../src/db.js';
 import { pgRelayDatabase } from '../../src/testing/index.js';
 
-/** The relay's own roles (ADR-0015). */
+/** The relay's own roles (ADR-0015), the last two of them logins. */
 export const RELAY_ROLES = [
   'relay_server',
   'relay_writer',
   'relay_diner',
   'relay_provisioner',
   'relay_edge',
+  'relay_control_plane',
 ] as const;
 /** Supabase's Data API roles: none of them may reach the relay. */
 export const API_ROLES = ['anon', 'authenticated', 'service_role', 'authenticator'] as const;

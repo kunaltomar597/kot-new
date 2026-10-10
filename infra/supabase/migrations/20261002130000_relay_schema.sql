@@ -23,8 +23,11 @@ $$;
 
 -- The edge functions switch to the role of whoever they act for, per transaction, and inherit
 -- nothing in between. relay_server is deliberately not among them: only a signed JWT carries it,
--- and only Realtime honours it.
-GRANT relay_writer, relay_diner, relay_provisioner TO relay_edge;
+-- and only Realtime honours it. Nor is relay_provisioner (RELAY-E3, P8-03b4b): the Control Plane
+-- has a login of its own for it (20261010180000_relay_threats.sql, which also takes it back where
+-- this migration had granted it). Roles are cluster-wide, so granting it here and revoking it
+-- there would flip it while another database of the cluster is migrated.
+GRANT relay_writer, relay_diner TO relay_edge;
 
 CREATE SCHEMA relay;
 COMMENT ON SCHEMA relay IS

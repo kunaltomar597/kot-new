@@ -39,10 +39,11 @@ file_size_limit = "5MiB"
 
 # Menu photos (MENU-008): public through the CDN, written only by edge functions for the
 # restaurant's own folder (P5-03). The local server re-encodes and strips EXIF first (SEC-004).
+# WebP only, as in the migrations (RELAY-T8): the `server` function stores nothing else.
 [storage.buckets.menu-photos]
 public = true
 file_size_limit = "2MiB"
-allowed_mime_types = ["image/webp", "image/jpeg", "image/png"]
+allowed_mime_types = ["image/webp"]
 
 [auth]
 # No user accounts in the relay: diners are anonymous and local servers hold scoped credentials.

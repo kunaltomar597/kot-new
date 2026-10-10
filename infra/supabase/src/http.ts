@@ -106,14 +106,20 @@ function logFailure(request: Request, error: unknown): void {
   );
 }
 
-/** Answers a request: CORS, then `work`, with failures turned into ApiError responses. */
+/**
+ * Answers a request: CORS for browsers (none for a function only PCs call, RELAY-I5), then
+ * `work`, with failures turned into ApiError responses.
+ */
 async function respond(
   request: Request,
   context: FunctionContext,
+  browsers: boolean,
   work: () => Promise<Response>,
 ): Promise<Response> {
-  const cors = corsHeaders(request, context.allowedOrigins);
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  const cors = browsers ? corsHeaders(request, context.allowedOrigins) : {};
+  if (browsers && request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
+  }
   let response: Response;
   try {
     response = await work();
@@ -137,7 +143,7 @@ async function respond(
 /** A function that takes one method: answers CORS preflights and refuses other methods. */
 export function serveWith(method: 'GET' | 'POST', handler: Handler): Handler {
   return (request, context) =>
-    respond(request, context, () => {
+    respond(request, context, true, () => {
       if (request.method !== method) {
         throw new HttpError(405, 'METHOD_NOT_ALLOWED', `Use ${method}.`, undefined, {
           allow: `${method}, OPTIONS`,
@@ -158,10 +164,26 @@ export interface Route {
   ) => Promise<Response>;
 }
 
+export interface RoutesOptions {
+  /**
+   * Whether browsers call the function: only then does it answer CORS preflights and send CORS
+   * headers. The `server` function is for restaurant PCs, which are no browsers (RELAY-I5).
+   */
+  readonly browsers: boolean;
+  /**
+   * Checks the caller before the route's handler reads anything of the body (RELAY-D3): a call
+   * without a well-formed credential is refused before its body is read.
+   */
+  readonly admit?: (request: Request) => void;
+}
+
 /** A function with several routes under its name, e.g. `server/presence`. */
-export function serveRoutes(routes: readonly Route[]): Handler {
+export function serveRoutes(
+  routes: readonly Route[],
+  options: RoutesOptions = { browsers: true },
+): Handler {
   return (request, context) =>
-    respond(request, context, () => {
+    respond(request, context, options.browsers, () => {
       const path = new URL(request.url).pathname;
       const matching = routes.filter((route) => route.path.test(path));
       if (matching.length === 0) throw new HttpError(404, 'NOT_FOUND', 'No such relay function.');
@@ -171,30 +193,71 @@ export function serveRoutes(routes: readonly Route[]): Handler {
         const allow = [...new Set(matching.map((candidate) => candidate.method))].join(', ');
         throw new HttpError(405, 'METHOD_NOT_ALLOWED', `Use ${allow}.`, undefined, { allow });
       }
+      options.admit?.(request);
       return route.handler(request, context, match);
     });
 }
 
-/** The largest body a function reads: a menu of 1,000 dishes is well under 2 MB. */
+/** The largest body the `server` function reads: a menu of 1,000 dishes is well under 2 MB. */
 export const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+/**
+ * The largest body a diner's function reads (RELAY-D3). The largest order a diner could send, 100
+ * lines with options, combos and long notes, is well under it (test/http.test.ts).
+ */
+export const DINER_BODY_MAX_BYTES = 512 * 1024;
+
+const tooLarge = (what: string) => new HttpError(413, 'PAYLOAD_TOO_LARGE', `${what} is too large.`);
+
+/**
+ * Reads a body of at most `maxBytes` (RELAY-D3): one whose announced length is larger is refused
+ * before anything is read, and one sent without a length (chunked) is refused as soon as more than
+ * that has arrived, so no caller makes a function hold more.
+ */
+async function readCapped(request: Request, maxBytes: number, what: string): Promise<Uint8Array> {
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (declared > maxBytes) throw tooLarge(what);
+  if (request.body === null) return new Uint8Array(0);
+  const reader: ReadableStreamDefaultReader<Uint8Array> = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > maxBytes) {
+      // Stop the sender; what it sent so far is dropped with the reader.
+      reader.cancel().catch(() => undefined);
+      throw tooLarge(what);
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
 
 /** Reads a binary body of at most `maxBytes` (a photo); anything bigger is a 413. */
 export async function readBytes(request: Request, maxBytes: number): Promise<Uint8Array> {
-  const declared = Number(request.headers.get('content-length') ?? '0');
-  if (declared > maxBytes) throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'The file is too large.');
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.length > maxBytes)
-    throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'The file is too large.');
+  const bytes = await readCapped(request, maxBytes, 'The file');
   if (bytes.length === 0) throw new HttpError(400, 'VALIDATION_FAILED', 'The file is empty.');
   return bytes;
 }
 
-/** Reads and checks a JSON body; a bad one is a 400 with the problems, never the input. */
-export async function readBody<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
-  const text = await request.text();
-  if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) {
-    throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'The body is too large.');
-  }
+/**
+ * Reads and checks a JSON body of at most `maxBytes`; a bad one is a 400 with the problems, never
+ * the input.
+ */
+export async function readBody<T>(
+  request: Request,
+  schema: z.ZodType<T>,
+  maxBytes = MAX_BODY_BYTES,
+): Promise<T> {
+  const text = new TextDecoder().decode(await readCapped(request, maxBytes, 'The body'));
   let input: unknown;
   try {
     input = JSON.parse(text);

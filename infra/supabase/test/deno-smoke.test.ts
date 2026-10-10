@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type ApiError,
   BROWSER_ID_HEADER,
   QrMenuResponse,
   QrOrderView,
@@ -13,6 +14,7 @@ import {
   TABLE_TOKEN_HEADER,
 } from '@rp/contracts/relay';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DINER_BODY_MAX_BYTES } from '../src/http.js';
 import { IDS, qrMenuDocument } from './helpers/qr-menu.js';
 import {
   letExpire,
@@ -229,6 +231,42 @@ describe.runIf(hasDeno)('[QR-006] the bundled functions under Deno', () => {
       [late.id],
     );
     expect(rows[0]?.status).toBe('EXPIRED');
+  });
+
+  it('[RELAY-D3] refuses a large body, announced or sent in chunks, and answers no browser from the PCs’ function', async () => {
+    const tooLarge = 'x'.repeat(DINER_BODY_MAX_BYTES + 1);
+    const announced = await call('submit-order', { method: 'POST', body: tooLarge });
+    expect(announced.status, denoLog.join('')).toBe(413);
+    expect(((await announced.json()) as ApiError).code).toBe('PAYLOAD_TOO_LARGE');
+    // Chunked, without a length: refused once the cap is passed, before the rest is sent.
+    const chunk = new Uint8Array(64 * 1024).fill(0x20);
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          if (sent >= 8 * 1024 * 1024) controller.close();
+          else {
+            sent += chunk.length;
+            controller.enqueue(chunk);
+          }
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const chunked = await call('submit-order', {
+      method: 'POST',
+      body,
+      duplex: 'half',
+    });
+    expect(chunked.status).toBe(413);
+    expect(sent).toBeLessThan(8 * 1024 * 1024);
+
+    const server = await call('server', {
+      path: 'server/orders',
+      headers: { authorization: `Bearer ${tenant.credential}` },
+    });
+    expect(server.status).toBe(200);
+    expect(server.headers.get('access-control-allow-origin')).toBeNull();
   });
 
   it('refuses an unknown table code', async () => {

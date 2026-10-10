@@ -8,7 +8,8 @@ export const RELAY_PROVISIONER = Symbol('RELAY_PROVISIONER');
 /**
  * What the Control Plane does in the QR relay (VCP-002): create (or rename) a restaurant, add a
  * scoped credential (the relay keeps only its SHA-256) and revoke one. Through the relay's own
- * functions, as its `relay_provisioner` role, never its tables.
+ * functions, as its `relay_provisioner` role, never its tables. The relay's `relay_control_plane`
+ * login may take that role and nothing else; the edge functions' login may not (RELAY-E3).
  */
 export interface RelayProvisioner {
   readonly configured: boolean;

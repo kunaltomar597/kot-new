@@ -84,7 +84,11 @@ These functions are `SECURITY DEFINER` and executable by no API role:
 - `relay.revoke_credential`
 - `relay.set_tenant_status`
 
-The Control Plane calls them through a provisioning edge function that holds its own secret (P7).
+The Control Plane calls them over a direct database connection as its own login,
+`relay_control_plane`, which may take `relay_provisioner` and nothing else (manual task 20). The
+edge functions' login, `relay_edge`, may take `relay_writer` and `relay_diner` only. (Corrected in
+P8-03b4b, RELAY-E3: this ADR said a provisioning edge function would do it, and `relay_edge` could
+take the provisioner's role too.)
 
 ### Order rules live in the table
 
@@ -128,8 +132,16 @@ sync agent (P5-03).
   driver-only difference was found: JSON parameters must be cast `::text::jsonb`.
 - Diners' functions turn off the platform's JWT check (`verify_jwt = false`) and check the
   table token themselves. Responses are `no-store`, and CORS allows only the QR site's origins.
+  The `server` function, which only PCs call, sends no CORS headers at all (RELAY-I5).
+- Bodies are read with a cap, refused by their announced length before anything is read and as
+  soon as more arrives: 512 KB for the diners' functions, 8 MB for `server` (2 MB for a photo).
+  A call without a table code or a credential of the right form has nothing of its body read
+  (RELAY-D3, P8-03b4b).
 - Rate limits are counted in the database (`relay.rate_limit_wait`), under per-table and
-  per-browser advisory locks, so a burst cannot slip past them.
+  per-browser advisory locks, so a burst cannot slip past them. Orders the restaurant rejected no
+  longer count against their table, only against their browser (RELAY-D1). Service requests have
+  their own, `relay.service_request_wait`: 10 a table and 6 a browser in 10 minutes, under the
+  same kind of locks (RELAY-D2). Both added in P8-03b4b.
 - `relay.expire_orders` runs every minute. An overdue order reads EXPIRED at once in any case.
 
 ### The local server's side (P5-02b)

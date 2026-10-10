@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b4a).
+Last updated: 2026-10-10 (P8-03b4b).
 
 What exists:
 
@@ -247,7 +247,13 @@ What exists:
     read the menu for a browser that has the latest (P8-01b).
   - The local server's function `server` (P5-02b): a Realtime session, presence with the QR
     settings, menu publishing, the tables with their code hashes, pickup and status reports.
-    124 tests in all, 3 of them under Deno.
+  - The threat model's fixes (P8-03b4b): orders the restaurant rejected no longer count against
+    their table; service requests limited per table (10) and per browser (6) in 10 minutes under
+    locks; bodies read with a cap (512 KB for diners, refused by their announced length first,
+    nothing read without a token or credential of the right form); no CORS on `server`; the
+    Control Plane's own login `relay_control_plane`, the functions' login no longer a
+    provisioner; menu photos WebP only in `config.toml` and the photos table too.
+    156 tests in all, 4 of them under Deno and 2 only on Supabase.
   - `@rp/relay/testing`: the relay in-process for other packages' tests (P5-03a).
 - `apps/qr-menu` (P5-05a): the public QR menu site on Next.js 16, a table's menu from the relay
   with search, filters, options, cart, sending and following orders, read-only when the restaurant
@@ -351,7 +357,10 @@ What exists:
   installer under a newer name, a test build at a restaurant, a release without the vendor's
   keys), P8-03b4a six of the Control Plane's and CP-T2 down from High to a plan for the bucket's
   object lock (sign-in races, Super Admin resets, diagnostics kept 30 days, https and masked
-  links, tenant isolation, daily limits): 123 mitigated, 5 residual Highs, each planned.
+  links, tenant isolation, daily limits), P8-03b4b six of the QR relay's (floods of orders and
+  service requests, large bodies, the functions' login provisioning, CORS on the PCs' function,
+  other files in the photo bucket): 129 mitigated, 5 residual Highs, each planned. P8-03b is
+  done: no threat is planned for it any more.
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
   Every GitHub Action is pinned to a commit with its version in a comment, one commit per Action
@@ -366,11 +375,11 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b4b (the QR relay): the last fixes the threat models planned for P8-03b (RELAY-D1, D2,
-  D3, E3, I5, T8; the summary in `docs/security/threat-models/README.md` lists each threat).
-- Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
-  incident response plan and the pack for the penetration testers (the external test needs the
-  firm the Business Owner engages).
+- P8-03c DAST of the QR site, the relay, the Control Plane and the local server, with the 7
+  threats planned there (the summary in `docs/security/threat-models/README.md` lists them).
+- Then P8-03d the standards checklists (26 threats planned there), P8-03e the incident response
+  plan and the pack for the penetration testers (the external test needs the firm the Business
+  Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
@@ -591,7 +600,7 @@ Recommended next WPs (dependencies met):
 - [ ] P8-02 Failure drills [H]
 - [~] P8-03 Security hardening and pentest readiness
   - [x] P8-03a Authorisation sweep (local server and Control Plane)
-  - [~] P8-03b STRIDE threat models
+  - [x] P8-03b STRIDE threat models
     - [x] P8-03b1 The threat models of the eight components, their checks, the High finding fixed
     - [x] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
       - [x] P8-03b2a Sign-in and approvals (PIN budgets per device, easy PINs, lockout alerts,
@@ -603,11 +612,11 @@ Recommended next WPs (dependencies met):
             codes, the licence tampering alert)
       - [x] P8-03b3b The update pipeline and the builds (pinned Actions, the updater's version
             check, unsigned updates reported, the release guard)
-    - [~] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
+    - [x] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
       - [x] P8-03b4a The Control Plane (sign-in races, backups a PC cannot purge, diagnostics
             kept 30 days, https and masked links, tenant isolation, daily limits under a lock,
             Super Admin resets by two)
-      - [ ] P8-03b4b The QR relay (order and service-request floods, body limits, the provisioning
+      - [x] P8-03b4b The QR relay (order and service-request floods, body limits, the provisioning
             login, the PCs' function without CORS, the photo bucket's types)
   - [ ] P8-03c DAST of the QR site, relay and Control Plane
   - [ ] P8-03d Standards checklists, Electron review and MDM policy
@@ -857,6 +866,36 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b4b):
+
+762. Orders the restaurant rejected (`REJECTED`, the waiter's or the PC's) no longer count against
+     their table's QR limit, so junk blocks the real diners there only until it is rejected; they
+     still count against the browser that sent them. Expired orders still count (nobody judged
+     them). The runbook (`docs/runbooks/qr-relay.md`) says to reject the junk and give the table a
+     new code.
+763. QR service requests get their own limit in the relay, `relay.service_request_wait`: 10 in
+     10 minutes per table (rejected ones not counted, as for orders) and 6 per browser across the
+     restaurant (before: 6 per browser at one table only, without a lock), under per-table and
+     per-browser advisory locks. Constants in the migration, not settings: the BRD gives no ⚙
+     value for them (QR-006's ⚙ is for orders), and the one-open-per-kind rule already bounds a
+     table. A press over the limit that finds an open request of its kind still gets it back.
+764. Bodies are read with a cap: refused by their announced length before anything is read, and
+     as soon as more than the cap arrives in chunks. The diners' functions take 512 KB (the
+     largest order a diner could send, 100 lines with options, combos and 500-letter Devanagari
+     notes, is about 60 % of it), `server` 8 MB, a photo 2 MB. A call without a table code or a
+     credential of the right form has nothing of its body read. Bodies are still read before the
+     database transaction, so a slow sender holds no connection.
+765. The Control Plane's provisioning login is `relay_control_plane` (NOLOGIN NOINHERIT until
+     manual task 20 gives it a password), a member of `relay_provisioner` only; `relay_edge`
+     loses that role. The first relay migration was edited in place to stop granting it (the
+     relay has never been deployed: manual task 20 is open) as well as the new migration revoking
+     it, because roles are cluster-wide and a grant in one migration and a revoke in another would
+     flip it while CI's shared PostgreSQL migrates another relay database. ADR-0015 corrected.
+766. The `server` function sends no CORS headers and answers no preflight (a 405), since only PCs
+     call it; the diners' functions keep CORS for the QR site's origins.
+767. Menu photos are WebP only in `config.toml` too, and the photos table's type check allows
+     only `image/webp`; the migration also sets the bucket's types where a bucket already exists.
 
 Decided 2026-10-10 (P8-03b4a), ADR-0021:
 
@@ -4203,6 +4242,61 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b4b The QR relay (P8-03b done)
+
+Decisions 762 to 767. Six threats of the QR relay mitigated: RELAY-D1, RELAY-D2, RELAY-D3,
+RELAY-E3, RELAY-I5 and RELAY-T8. 129 mitigated in all, 5 residual Highs; no threat is planned for
+P8-03b any more, so P8-03b is done.
+
+Built:
+
+- Relay migration `20261010180000_relay_threats.sql`: the `relay_control_plane` login (NOLOGIN
+  until manual task 20), a member of `relay_provisioner` only, and `relay_edge` no longer one (the
+  first migration no longer grants it either, decision 765); `relay.rate_limit_wait` without
+  `REJECTED` orders at the table; `relay.service_request_wait` with an index on the table's
+  requests; the photos table's type check WebP only, and the bucket's types set where it exists.
+- `infra/supabase/src/http.ts`: `readCapped` (the announced length first, then a capped read of
+  the stream, cancelled past the cap), `DINER_BODY_MAX_BYTES` (512 KB), `readBody`'s cap,
+  `RoutesOptions` (`browsers`, `admit`); `server.ts`'s `credentialOf` as the `admit` check and no
+  CORS; `diner.ts`'s `tableTokenOf`, checked by `submit-order` and `service-request` before their
+  bodies; `service-request.ts` asks `relay.service_request_wait` (and still returns an open request
+  of the kind over the limit).
+- `config.toml`: the bucket WebP only. `@rp/relay/testing`'s `provision` logs in as
+  `relay_control_plane`, as the Control Plane does. `@rp/contracts`' relay routes: 413 for the
+  diners' bodies and 429 for service requests (`docs/api/relay.openapi.json`).
+- Control Plane: the `CP_RELAY_DATABASE_URL` login named `relay_control_plane` in its
+  configuration's comments and `.env.example`.
+- Docs: the six threats in the relay's model and the summary; ADR-0015 (the two logins, caps, the
+  limits); `docs/runbooks/qr-relay.md` (who reaches what, the limits, a table flooded with junk,
+  checks after a deployment); manual task 20 (step 4a, the Control Plane's login, and the
+  bucket's check); `authorisation.md`; the relay README; `phase-8.md`.
+
+Tests: relay 156 (154 run here, 2 only on Supabase; +14: `http.test.ts` with the caps, the
+announced length, streams cut off, no body read without a token or credential, the largest order
+and no CORS on `server`; `roles.test.ts` with the two logins and the bucket's types;
+`diner-functions` rejected orders; `service-requests` the table's and the browser's limits and a
+burst, which lets three through without the lock; the Deno smoke test's large bodies and CORS);
+server's relay suites 73, Control Plane 180, contracts 965, the QR site's e2e 11/11 against the
+real relay; all 43 test tasks green; format, lint, typecheck, docs, compat, `pnpm security:threats`
+and `pnpm ci:test` green. Traceability: Must 264/287.
+
+Not done or not verified:
+
+- On Supabase itself: the `relay-supabase` CI job runs the new tests (bucket types included)
+  once GitHub is reachable (manual task 1); the logins' passwords are manual task 20.
+- The QR site still shows its generic error when a service request is refused for the limit;
+  only orders show the wait (P8-04 can word it).
+
+Gotchas:
+
+- Relay roles are cluster-wide and CI shares one PostgreSQL between packages: never grant a role
+  in one relay migration and revoke it in a later one, or a relay migrated by another package's
+  test flips it under `roles.test.ts`.
+- A `ReadableStream` test body needs `{ highWaterMark: 0 }` to count only what the reader pulls,
+  and Node's `Request` needs `duplex: 'half'` for it.
+- `serveRoutes`' `admit` runs after the route matched, so unknown routes and wrong methods still
+  answer 404/405 before the credential is looked at.
 
 ### 2026-10-10: P8-03b4a The Control Plane
 

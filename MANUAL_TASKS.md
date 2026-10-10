@@ -38,7 +38,8 @@ code from going live:
       the certificate comes with, and the job will call it from that environment instead:
       [`manual-tasks/31-code-signing.md`](manual-tasks/31-code-signing.md).
 - [ ] Supabase organisation, Mumbai region (QR relay), then deploy the relay schema and give the
-      edge functions their login: [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).
+      edge functions and the Control Plane their logins:
+      [`manual-tasks/20-supabase-relay.md`](manual-tasks/20-supabase-relay.md).
 - [ ] Host the QR menu site (Next.js, India region) on its domain:
       [`manual-tasks/21-qr-site.md`](manual-tasks/21-qr-site.md).
 - [ ] Legal review of the QR site's privacy notice and terms (drafts at `/privacy` and `/terms`).

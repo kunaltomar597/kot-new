@@ -13,8 +13,16 @@ import {
   orderView,
   publishedMenu,
   restaurantState,
+  tableTokenOf,
 } from './diner.js';
-import { type Handler, HttpError, json, readBody, serveWith } from './http.js';
+import {
+  DINER_BODY_MAX_BYTES,
+  type Handler,
+  HttpError,
+  json,
+  readBody,
+  serveWith,
+} from './http.js';
 
 /** The order with this idempotency key at the diner's table, if one was stored (ORD-013). */
 async function storedOrder(tx: Tx, idempotencyKey: string): Promise<OrderRow | undefined> {
@@ -36,7 +44,9 @@ export const submitOrder: Handler = serveWith('POST', async (request, context) =
   if (!browser.success) {
     throw new HttpError(400, 'VALIDATION_FAILED', `Send the browser's id in ${BROWSER_ID_HEADER}.`);
   }
-  const body = await readBody(request, QrSubmitOrderRequest);
+  // The headers first: a call without a token of the right form sends no body that is read.
+  tableTokenOf(request);
+  const body = await readBody(request, QrSubmitOrderRequest, DINER_BODY_MAX_BYTES);
   const answer = await context.db.transaction(async (tx): Promise<QrSubmitOrderResponse> => {
     const scope = await openTable(tx, request);
     const previous = await storedOrder(tx, body.idempotencyKey);

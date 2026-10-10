@@ -50,6 +50,11 @@ const dinerErrors = {
   },
 } as const satisfies Readonly<Record<number, RouteResponse>>;
 
+/** A diner's body over the cap, refused before it is read (RELAY-D3). */
+const dinerBodyTooLarge = {
+  413: { description: 'The body is larger than 512 KB (`PAYLOAD_TOO_LARGE`).', schema: ApiError },
+} as const satisfies Readonly<Record<number, RouteResponse>>;
+
 /** Errors of every function a local server calls. */
 const serverErrors = {
   400: { description: 'The request does not match the contract.', schema: ApiError },
@@ -110,6 +115,7 @@ export const RELAY_ROUTES = [
         description: 'The idempotency key was used at another table (`IDEMPOTENCY_KEY_REUSED`).',
         schema: ApiError,
       },
+      ...dinerBodyTooLarge,
       429: {
         description:
           'Too many orders from this table or this browser in the window (`RATE_LIMITED`, with ' +
@@ -278,7 +284,8 @@ export const RELAY_ROUTES = [
     description:
       'For tables without a tablet (QR-011), through the restaurant’s own service requests: the ' +
       'waiter is alerted, and asking for the bill also tells the cashier. One open request of ' +
-      'each kind per table: asking again finds the open one (`existing`). Needs `x-rp-browser`.',
+      'each kind per table: asking again finds the open one (`existing`). Limited per table and ' +
+      'per browser (RELAY-D2). Needs `x-rp-browser`.',
     tags: ['qr'],
     requirements: ['QR-011', 'QR-014'],
     capability: 'TABLE_TOKEN',
@@ -290,6 +297,13 @@ export const RELAY_ROUTES = [
         description:
           'The restaurant does not take requests from the QR page (`SERVICE_REQUESTS_OFF`), or ' +
           'the key was used for another request (`IDEMPOTENCY_KEY_REUSED`).',
+        schema: ApiError,
+      },
+      ...dinerBodyTooLarge,
+      429: {
+        description:
+          'Too many requests from this table (10) or this browser (6) in 10 minutes ' +
+          '(`RATE_LIMITED`, with `details.retryAfterSeconds` and a `Retry-After` header).',
         schema: ApiError,
       },
       503: {

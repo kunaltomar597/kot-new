@@ -276,6 +276,8 @@ export async function startRelay(options: {
       const client = await admin.connect();
       try {
         await client.query('BEGIN');
+        // As the Control Plane does it: its own login, which may take the provisioner's role only.
+        await client.query('SET LOCAL SESSION AUTHORIZATION relay_control_plane');
         await client.query('SET LOCAL ROLE relay_provisioner');
         await client.query('SELECT relay.provision_tenant($1, $2)', [tenantId, name]);
         await client.query('SELECT relay.add_credential($1, $2, $3)', [

@@ -141,8 +141,12 @@ it"; `pager-broker-limits.int`.
 Browsers never touch the database (QR-006): the diners' edge functions take a table's QR token and
 the browser's id, and the local server's function its own credential. Every relay table has
 Row-Level Security, deny by default, for three relay roles, none of which the Data API can use
-(SEC-005, ADR-0015). Tests: `infra/supabase/test/roles.test.ts`, `isolation.test.ts` (cross-tenant
-isolation, tokens), `diner-functions.test.ts` "opens nothing without a valid token".
+(SEC-005, ADR-0015). Two logins reach the database: the edge functions' (`relay_edge`), which may
+take the diner's or the writer's role only, and the Control Plane's (`relay_control_plane`), which
+may take the provisioner's role only (P8-03b4b). The PCs' function sends no CORS headers, and no
+function reads the body of a call without a token or credential of the right form. Tests:
+`infra/supabase/test/roles.test.ts`, `isolation.test.ts` (cross-tenant isolation, tokens),
+`diner-functions.test.ts` "opens nothing without a valid token", `http.test.ts`.
 
 ## The Vendor Control Plane
 

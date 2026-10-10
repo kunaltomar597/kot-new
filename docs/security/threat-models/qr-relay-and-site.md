@@ -245,13 +245,16 @@ A retry, a double tap or a replay sends the same order twice.
 
 A PC's credential uploads something that is not a WebP photo to the public bucket.
 
-- Mitigation: the function takes WebP only and the migration's bucket allows WebP only; the local
-  Supabase configuration also allows JPEG and PNG.
-- Code: `infra/supabase/config.toml`;
-  `infra/supabase/migrations/20261002230000_photo_sweep.sql`.
-- Tests: none, the bucket's types are configuration; P8-03b4b makes them agree and tests them.
+- Mitigation: the function takes only files that are WebP by their bytes; the bucket, the photos
+  table and the local Supabase configuration allow WebP only, and a bucket made before with JPEG
+  and PNG is corrected by the migration (P8-03b4b).
+- Code: `infra/supabase/src/server.ts` (`isWebp`); `infra/supabase/config.toml`;
+  `infra/supabase/migrations/20261010180000_relay_threats.sql` (`photos_content_type_check`).
+- Tests: `infra/supabase/test/roles.test.ts` "takes WebP only, in the table, the bucket and the
+  local configuration alike"; `infra/supabase/test/server-functions.test.ts` "takes WebP files of
+  the known sizes only, and not too large".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: WebP only in the configuration too.
+- Status: Mitigated.
 
 ### Repudiation
 
@@ -348,12 +351,17 @@ A diner's identity, location or orders end up kept or shared beyond what they ag
 
 The `server` function answers browsers from the QR site's origin, though only PCs call it.
 
-- Mitigation: every call needs the restaurant's credential in a header, which no page has.
-- Code: `infra/supabase/src/http.ts` (`corsHeaders`).
-- Tests: `infra/supabase/test/server-functions.test.ts` "is needed for every call".
+- Mitigation: every call needs the restaurant's credential in a header, which no page has; the
+  `server` function sends no CORS headers and takes no preflight, so no page can read its answers
+  even with one (P8-03b4b).
+- Code: `infra/supabase/src/http.ts` (`corsHeaders`, `RoutesOptions`); `infra/supabase/src/server.ts`
+  (`server`).
+- Tests: `infra/supabase/test/http.test.ts` "sends no CORS headers, even to the QR site, and takes
+  no preflight", "still answers the QR site from the diners’ functions";
+  `infra/supabase/test/server-functions.test.ts` "is needed for every call";
+  `infra/supabase/test/deno-smoke.test.ts` "answers no browser from the PCs’ function".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: the `server` function sends no CORS
-  headers.
+- Status: Mitigated.
 
 ### Denial of service
 
@@ -363,40 +371,59 @@ Someone holding a table's code sends junk orders, which use up the table's limit
 diners there cannot order for ten minutes.
 
 - Mitigation: orders are limited per table and per browser, under advisory locks so a burst does
-  not slip through; rejected orders still count against the table.
-- Code: `infra/supabase/migrations/20261002150000_qr_order_limits.sql` (`rate_limit_wait`).
+  not slip through; orders the waiter rejected no longer count against the table, only against
+  the browser that sent them, so junk blocks the real diners only until the waiter rejects it; a
+  manager gives the table a new code, which stops the sender at once (the runbook says when)
+  (P8-03b4b).
+- Code: `infra/supabase/migrations/20261010180000_relay_threats.sql` (`rate_limit_wait`);
+  `apps/server/src/floor/table-qr.service.ts` (`TableQrService.regenerate`);
+  `docs/runbooks/qr-relay.md`.
 - Tests: `infra/supabase/test/diner-functions.test.ts` "limits orders per table in the window,
   saying when to try again", "limits one browser across tables", "lets no burst slip past the
-  limit".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: rejected orders no longer count against
-  the table, and the runbook says to give the table a new code.
+  limit", "stops counting orders the restaurant rejected against the table, not their browser",
+  "stops a regenerated code at once".
+- Risk: likelihood Medium, impact Low: Low.
+- Status: Mitigated.
 
 #### RELAY-D2 Flooding a table with service requests
 
 Someone holding a table's code calls the waiter or asks for the bill again as soon as staff
 close the last request.
 
-- Mitigation: one open request of each kind per table; a limit per browser, which counts only at
-  that table, with no lock and a browser id the client chooses.
-- Code: `infra/supabase/src/service-request.ts`.
+- Mitigation: one open request of each kind per table; at most 10 requests in 10 minutes at a
+  table, whichever browsers send them (those the restaurant rejected not counted), and 6 from one
+  browser anywhere in the restaurant, counted under the table's and the browser's advisory locks
+  as orders are (P8-03b4b); a new code for the table stops the sender.
+- Code: `infra/supabase/src/service-request.ts`;
+  `infra/supabase/migrations/20261010180000_relay_threats.sql` (`service_request_wait`).
 - Tests: `infra/supabase/test/service-requests.test.ts` "raises one open request of each kind per
-  table, whoever presses", "limits one browser".
+  table, whoever presses", "limits a table to 10 requests in 10 minutes, whoever sends them,
+  rejected ones not counted", "limits one browser to 6 requests in 10 minutes across the
+  restaurant’s tables", "lets no burst of presses slip past the limit".
 - Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: a limit per table and per browser under a
-  lock, as orders have.
+- Status: Mitigated.
 
 #### RELAY-D3 Large bodies before any check
 
 Anyone sends 8 MB bodies to the functions; each is read whole before its size or the token is
 checked.
 
-- Mitigation: bodies over 8 MB are refused, after they were read.
-- Code: `infra/supabase/src/http.ts` (`MAX_BODY_BYTES`).
-- Tests: none, no test sends an oversized body yet; P8-03b4b adds it.
+- Mitigation: a body announced as larger than its function's cap is refused before any of it is
+  read, and one sent in chunks is refused as soon as more than the cap has arrived; the diners'
+  functions take 512 KB at most (the largest order a diner could send is well under it), the
+  `server` function 8 MB, a photo 2 MB; a call without a table code or a credential of the right
+  form has nothing of its body read. Bodies are read before the database transaction opens, so a
+  slow sender holds no connection (P8-03b4b).
+- Code: `infra/supabase/src/http.ts` (`readCapped`, `DINER_BODY_MAX_BYTES`, `MAX_BODY_BYTES`);
+  `infra/supabase/src/diner.ts` (`tableTokenOf`); `infra/supabase/src/server.ts`
+  (`credentialOf`).
+- Tests: `infra/supabase/test/http.test.ts` "refuses a body by its announced length before reading
+  any of it", "stops reading a body sent without a length as soon as it passes the cap", "reads no
+  body of a diner’s call without a table code, or a PC’s without a credential", "fits the largest
+  order a diner could send under the diners’ cap"; `infra/supabase/test/deno-smoke.test.ts`
+  "refuses a large body, announced or sent in chunks".
 - Risk: likelihood Medium, impact Low: Low.
-- Status: Not mitigated. Plan: P8-03b4b by 2026-10-17: `content-length` refused over the limit, the
-  body read with a cap, and a small cap for diners' functions.
+- Status: Mitigated.
 
 #### RELAY-D4 Unthrottled reads and their cost
 
@@ -459,14 +486,18 @@ A diner's order goes straight to the kitchen, or is held to fire later.
 The login the edge functions use also holds the provisioning role, so a flaw in a diner's function
 could create or change restaurants and credentials.
 
-- Mitigation: the functions switch to the diner's or the writer's role for each transaction; the
-  login itself still has the provisioning role, and no separate login exists for the Control
-  Plane.
-- Code: `infra/supabase/migrations/20261002130000_relay_schema.sql` (`relay_provisioner`).
-- Tests: `infra/supabase/test/roles.test.ts` "lets only the edge functions".
-- Risk: likelihood Low, impact High: Medium.
-- Status: Not mitigated. Plan: P8-03b4b by 2026-10-17: the functions' login loses the provisioning
-  role, and the Control Plane gets its own provisioning login (manual task 20 then creates it).
+- Mitigation: the functions switch to the diner's or the writer's role for each transaction, and
+  their login can no longer take the provisioning role; the Control Plane has its own login,
+  `relay_control_plane`, which can take that role and nothing else (P8-03b4b). Manual task 20
+  gives it a password and checks that `relay_edge` is no provisioner.
+- Code: `infra/supabase/migrations/20261010180000_relay_threats.sql` (`relay_control_plane`);
+  `apps/control-plane/src/support/relay-provisioner.ts` (`PgRelayProvisioner`).
+- Tests: `infra/supabase/test/roles.test.ts` "lets the edge functions switch to a writer or a
+  diner, never the provisioner, inheriting nothing", "lets only the two logins switch: the
+  functions’ to a writer or diner, the Control Plane’s to the provisioner", "lets the Control
+  Plane’s login provision a restaurant as the provisioner, and the functions’ login never".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated.
 
 #### RELAY-E4 Deleting records through the relay's roles
 
