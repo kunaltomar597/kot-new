@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-04b).
+Last updated: 2026-10-11 (P8-05).
 
 What exists:
 
@@ -412,7 +412,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-05 Runbooks, manuals and training material.
+- P8-06 Pilot readiness.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -680,7 +680,7 @@ Recommended next WPs (dependencies met):
   - [x] P8-04a The audit (`docs/usability/ux-audit.md`), the screen-states guard and the usability test scripts
   - [x] P8-04b Contextual help and first-use tips (NFR-U07, Should): a Help button and a one-time tip on every dashboard page
   - [ ] P8-04c Usability results from the pilot, TalkBack pass [H]
-- [ ] P8-05 Runbooks, manuals, training
+- [x] P8-05 Runbooks, manuals, training (Business Owner review and filming the videos remain)
 - [ ] P8-06 Pilot readiness
 
 ## Decisions
@@ -4421,6 +4421,10 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-05 runbooks, manuals and training scripts
+
+Documentation only. New runbooks: `installation.md`, `restore.md`, `update-and-rollback.md` (front doors that route to the detailed runbooks), `support-playbook.md` (triage, paper fallback, common problems) and `developer-onboarding.md`. New `docs/manuals/`: one manual per role (owner, manager, cashier, waiter, kitchen) and `training-video-scripts.md` (12 videos). Incident response already existed (`docs/security/incident-response.md`). Decided: manuals follow the permission matrix in `@rp/domain`; the paper-fallback procedure and severity response times in the playbook are defaults for the Business Owner to confirm. Deferred to a person: Business Owner review (the WP's acceptance), approving the video scripts and filming the videos. Gotcha: the manuals describe screens from the code and help text, not from a run of the app, so check them against the real screens at the first usability session.
 
 ### 2026-10-11: P8-04b contextual help and first-use tips
 
