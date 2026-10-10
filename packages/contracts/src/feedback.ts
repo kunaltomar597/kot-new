@@ -94,5 +94,10 @@ export type EraseDinerContactRequest = z.infer<typeof EraseDinerContactRequest>;
 export const EraseDinerContactResponse = z.object({
   /** Contact records whose number was erased. */
   erased: z.int().nonnegative(),
+  /** Orders and bills whose number was erased, matched on its last ten digits. */
+  orders: z.int().nonnegative(),
+  bills: z.int().nonnegative(),
+  /** Invoices that keep the number for tax law but no longer send a digital bill to it. */
+  invoices: z.int().nonnegative(),
 });
 export type EraseDinerContactResponse = z.infer<typeof EraseDinerContactResponse>;

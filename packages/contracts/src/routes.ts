@@ -3244,8 +3244,10 @@ export const ROUTES = [
     path: '/api/v1/diner-contacts/erase',
     summary: "Erase a diner's phone number on their request",
     description:
-      'DATA-011, SEC-019: the number is cleared from every contact record and feedback keeps no ' +
-      'link to it; invoices keep what tax law needs. Audited without the number.',
+      'DATA-011, SEC-019: the number is cleared from every contact record, order and bill ' +
+      '(matched on its last ten digits), and feedback keeps no link to it; invoices keep what ' +
+      'tax law needs but send no more digital bills to it, and a digital bill still waiting for ' +
+      'it is not sent. Audited without the number.',
     tags: ['feedback'],
     requirements: ['DATA-011', 'SEC-019', 'AUD-001'],
     capability: 'DATA_ADMIN',

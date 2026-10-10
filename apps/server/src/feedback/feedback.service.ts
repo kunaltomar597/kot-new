@@ -37,7 +37,7 @@ const errors = {
  * session); a phone number is kept only with explicit consent, recorded with its purpose, the
  * words agreed to, the time and the device (BILL-011, SEC-019). Managers read ratings by day and
  * the comments, never the numbers. On a diner's request the Owner erases a number everywhere but
- * invoices (DATA-011).
+ * invoices, which stop sending digital bills to it (DATA-011).
  */
 @Injectable()
 export class FeedbackService {
@@ -167,9 +167,12 @@ export class FeedbackService {
   }
 
   /**
-   * DATA-011: the number is cleared from every contact record and feedback keeps no link to it.
-   * The consent record stays (that it was given and withdrawn); invoices keep the customer details
-   * tax law needs. Audited, without the number.
+   * DATA-011: the number is cleared from every contact record, order and bill, and feedback keeps
+   * no link to it (PC-I9). Orders and bills hold a number as it was typed, so they are matched on
+   * its last ten digits, as `normalisePhone` reads it. Invoices keep the customer details tax law
+   * needs, but no longer consent to a digital bill on that number; a digital bill still waiting
+   * for it is not sent, and one already sent stays as it was. The consent record stays (that it
+   * was given and withdrawn). Audited, without the number.
    */
   async erase(
     principal: Principal,
@@ -177,9 +180,11 @@ export class FeedbackService {
     reason: string,
   ): Promise<EraseDinerContactResponse> {
     const number = normalisePhone(phone);
+    const digits = number.slice(-10);
+    const { restaurantId } = principal;
     return this.prisma.transaction(async (tx) => {
       const contacts = await tx.dinerContact.findMany({
-        where: { restaurantId: principal.restaurantId, phone: number },
+        where: { restaurantId, phone: number },
         select: { id: true },
       });
       const ids = contacts.map((contact) => contact.id);
@@ -194,9 +199,21 @@ export class FeedbackService {
           data: { dinerContactId: null },
         });
       }
+      const orders = await tx.$executeRaw`
+        UPDATE orders SET customer_phone = NULL, updated_at = now()
+        WHERE restaurant_id = ${restaurantId}::uuid AND customer_phone IS NOT NULL
+          AND right(regexp_replace(customer_phone, '[^0-9]', '', 'g'), 10) = ${digits}`;
+      const bills = await tx.$executeRaw`
+        UPDATE bills SET customer_phone = NULL, customer_phone_consent = false, updated_at = now()
+        WHERE restaurant_id = ${restaurantId}::uuid AND customer_phone IS NOT NULL
+          AND right(regexp_replace(customer_phone, '[^0-9]', '', 'g'), 10) = ${digits}`;
+      const invoices = await tx.$executeRaw`
+        UPDATE invoices SET customer_phone_consent = false, updated_at = now()
+        WHERE restaurant_id = ${restaurantId}::uuid AND customer_phone_consent
+          AND right(regexp_replace(customer_phone, '[^0-9]', '', 'g'), 10) = ${digits}`;
       // A digital bill still waiting to go to that number is not sent (BILL-012).
-      await tx.digitalBill.updateMany({
-        where: { restaurantId: principal.restaurantId, phone: number },
+      const { count: digitalBills } = await tx.digitalBill.updateMany({
+        where: { restaurantId, phone: number, status: 'QUEUED' },
         data: {
           phone: null,
           status: 'FAILED',
@@ -210,11 +227,11 @@ export class FeedbackService {
         entityId: null,
         actorId: principal.staffId,
         deviceId: principal.deviceId,
-        restaurantId: principal.restaurantId,
-        after: { contacts: ids.length },
+        restaurantId,
+        after: { contacts: ids.length, orders, bills, invoices, digitalBills },
         reason,
       });
-      return { erased: ids.length };
+      return { erased: ids.length, orders, bills, invoices };
     });
   }
 }

@@ -2,7 +2,7 @@ import { createWriteStream, type WriteStream } from 'node:fs';
 import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { addDays, DEFAULT_TIME_ZONE } from '@rp/domain';
+import { addDays, csvCell, DEFAULT_TIME_ZONE } from '@rp/domain';
 import { invoiceView } from '../billing/invoices.service.js';
 import type { PrismaService } from '../database/prisma.service.js';
 import { billTextLines } from '../printing/escpos.js';
@@ -46,11 +46,6 @@ export function rupees(paise: number): string {
   return `${sign}${String(Math.floor(value / 100))}.${String(value % 100).padStart(2, '0')}`;
 }
 
-export function csvField(value: string | number | null): string {
-  const text = value === null ? '' : String(value);
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
 interface RegisterRow {
   number: string;
   date: string;
@@ -88,7 +83,7 @@ function registerLine(row: RegisterRow): string {
     rupees(row.round_off),
     rupees(row.grand_total),
   ]
-    .map(csvField)
+    .map(csvCell)
     .join(',');
 }
 
@@ -113,7 +108,7 @@ export async function writeInvoiceRegister(
   const out = createWriteStream(file);
   let rows = 0;
   try {
-    await write(out, `${HEADER.map(csvField).join(',')}\r\n`);
+    await write(out, `${HEADER.map(csvCell).join(',')}\r\n`);
     for (let from = range.startDate; from <= range.endDate; from = nextMonth(from)) {
       const monthEnd = addDays(nextMonth(from), -1);
       const to = monthEnd < range.endDate ? monthEnd : range.endDate;

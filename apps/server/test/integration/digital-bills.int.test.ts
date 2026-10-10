@@ -1,6 +1,11 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
-import { ApiError, DigitalBillEntry, InvoiceDigitalBillsResponse } from '@rp/contracts';
+import {
+  ApiError,
+  DigitalBillEntry,
+  EraseDinerContactResponse,
+  InvoiceDigitalBillsResponse,
+} from '@rp/contracts';
 import {
   AdminService,
   CONTROL_PLANE_MIGRATIONS_DIR,
@@ -24,7 +29,13 @@ import {
   DigitalBillsService,
 } from '../../src/digital-bills/digital-bills.service.js';
 import { appendEvent } from '../../src/events/outbox.js';
-import { authHeaders, type AuthKit, createAuthKit, signIn } from '../helpers/auth-kit.js';
+import {
+  addDevice,
+  authHeaders,
+  type AuthKit,
+  createAuthKit,
+  signIn,
+} from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, testAdminUrl } from '../helpers/test-database.js';
 import { until } from '../helpers/wait.js';
@@ -357,7 +368,7 @@ describe('[BILL-012] [BILL-011] [SEC-002] digital bills from the restaurant PC',
     answer = () => ({ status: 200, body: { messages: [{ id: 'wamid.ok' }] } });
   });
 
-  it('[DATA-011] does not send a waiting bill once the diner’s number is erased', async () => {
+  it('[DATA-011] does not send a waiting bill once the diner’s number is erased; a sent one stays as it was', async () => {
     const cashier = await signIn(app, kit, 'CASHIER');
     const entry = DigitalBillEntry.parse(
       (
@@ -366,6 +377,11 @@ describe('[BILL-012] [BILL-011] [SEC-002] digital bills from the restaurant PC',
           .set(authHeaders(kit.deviceId, cashier.accessToken))
       ).body,
     );
+    const sent = await prisma.digitalBill.findMany({
+      where: { status: 'SENT' },
+      orderBy: { id: 'asc' },
+    });
+    expect(sent.length).toBeGreaterThan(0);
     const owner = await signIn(app, kit, 'OWNER');
     await prisma.session.update({
       where: { id: owner.session.id },
@@ -378,8 +394,92 @@ describe('[BILL-012] [BILL-011] [SEC-002] digital bills from the restaurant PC',
     expect(erased.status, JSON.stringify(erased.body)).toBe(200);
     const row = await prisma.digitalBill.findUniqueOrThrow({ where: { id: entry.id } });
     expect(row).toMatchObject({ status: 'FAILED', phone: null });
+    expect(
+      await prisma.digitalBill.findMany({ where: { status: 'SENT' }, orderBy: { id: 'asc' } }),
+    ).toEqual(sent);
     const before = received.length;
     await bills().runDue();
     expect(received).toHaveLength(before);
+  });
+
+  it('[DATA-011] erases the number on orders and bills however it was typed; invoices keep it but send no more bills to it', async () => {
+    const [first, second] = await prisma.order.findMany({ orderBy: { id: 'asc' }, take: 2 });
+    await prisma.order.update({
+      where: { id: first?.id ?? '' },
+      data: { customerPhone: '+91 98765-43219' },
+    });
+    await prisma.order.update({
+      where: { id: second?.id ?? '' },
+      data: { customerPhone: '98765 43218' },
+    });
+    // The seeded day has invoices without bills; a takeaway bill as the POS keeps it.
+    const bill = await prisma.bill.create({
+      data: {
+        restaurantId: kit.restaurantId,
+        businessDate: first?.businessDate ?? new Date(),
+        orderId: first?.id ?? '',
+        customerPhone: '098765 43219',
+        customerPhoneConsent: true,
+      },
+    });
+    const invoiceId = await settledInvoice('+91 9876543219', true);
+    // A POS of its own: the kit's has used up its sign-ins for the minute.
+    const pos = await addDevice(app, kit);
+    const cashier = await signIn(app, kit, 'CASHIER', pos);
+    const phoneOf = async () => {
+      const listed = await server()
+        .get(`/api/v1/invoices/${invoiceId}/digital-bills`)
+        .set(authHeaders(pos, cashier.accessToken));
+      return InvoiceDigitalBillsResponse.parse(listed.body).phone;
+    };
+    expect(await phoneOf()).not.toBeNull();
+
+    const owner = await signIn(app, kit, 'OWNER', pos);
+    await prisma.session.update({
+      where: { id: owner.session.id },
+      data: { secondFactorAt: new Date() },
+    });
+    const erased = await server()
+      .post('/api/v1/diner-contacts/erase')
+      .set(authHeaders(pos, owner.accessToken))
+      .send({ phone: '98765 43219', reason: 'Diner asked' });
+    expect(erased.status, JSON.stringify(erased.body)).toBe(200);
+    expect(EraseDinerContactResponse.parse(erased.body)).toEqual({
+      erased: 0,
+      orders: 1,
+      bills: 1,
+      invoices: 1,
+    });
+
+    expect(
+      (await prisma.order.findUniqueOrThrow({ where: { id: first?.id ?? '' } })).customerPhone,
+    ).toBeNull();
+    // Another number that only looks alike stays.
+    expect(
+      (await prisma.order.findUniqueOrThrow({ where: { id: second?.id ?? '' } })).customerPhone,
+    ).toBe('98765 43218');
+    expect(await prisma.bill.findUniqueOrThrow({ where: { id: bill.id } })).toMatchObject({
+      customerPhone: null,
+      customerPhoneConsent: false,
+    });
+    // The invoice keeps what tax law needs, without the consent to message it.
+    expect(await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } })).toMatchObject({
+      customerPhone: '+91 9876543219',
+      customerPhoneConsent: false,
+    });
+    expect(await phoneOf()).toBeNull();
+    const again = await server()
+      .post(`/api/v1/invoices/${invoiceId}/digital-bills`)
+      .set(authHeaders(pos, cashier.accessToken));
+    expect([again.status, ApiError.parse(again.body).code]).toEqual([
+      422,
+      'NO_DIGITAL_BILL_CONSENT',
+    ]);
+    const entry = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'DINER_CONTACT_ERASED' },
+      orderBy: { chainSeq: 'desc' },
+    });
+    expect(entry.after).toEqual({ contacts: 0, orders: 1, bills: 1, invoices: 1, digitalBills: 0 });
+    expect(JSON.stringify([entry.before, entry.after, entry.reason])).not.toContain('43219');
   });
 });

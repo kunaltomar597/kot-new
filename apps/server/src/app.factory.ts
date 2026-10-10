@@ -1,11 +1,12 @@
 import type { INestApplication, NestApplicationOptions } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { json } from 'express';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
 import { APP_CONFIG, type AppConfig, loadConfig } from './config/app-config.js';
+import { DEVICE_AUTHENTICATOR, type DeviceAuthenticator } from './auth/device.js';
 import { createSecretStore } from './auth/secret-store.js';
+import { bodyParsers } from './http/body-limits.js';
 import { clientVersionMiddleware } from './http/client-version.js';
 import { consoleMiddleware } from './http/console-static.js';
 import { caDownloadMiddleware } from './tls/ca-download.js';
@@ -17,15 +18,7 @@ export const API_PREFIX = 'api/v1';
 
 /** Options for `https.createServer`, as Nest takes them. */
 type HttpsOptions = NonNullable<NestApplicationOptions['httpsOptions']>;
-const JSON_BODY_LIMIT = '1mb';
-/**
- * A 5 MB photo (P1-04) or menu workbook (P1-05) as base64 is about 6.7 MB of JSON; only those
- * upload paths get this larger limit.
- */
-const UPLOAD_BODY_LIMIT = '7mb';
 const UPLOAD_PATHS = [`/${API_PREFIX}/photos`, `/${API_PREFIX}/menu/import`];
-/** Up to 40 MB of menu photos or PDFs for AI import (P6-04b), in base64. */
-const AI_IMPORT_BODY_LIMIT = '55mb';
 const AI_IMPORT_PATH = `/${API_PREFIX}/menu/ai-imports`;
 
 /**
@@ -40,15 +33,19 @@ export function configureApp(app: INestApplication): void {
   express.useLogger(app.get(Logger));
   express.disable('x-powered-by');
   // Order matters: correlation ID first, then the apps the server no longer serves (UPD-006),
-  // then the CA download and the console's files, then the JSON parser, then its error handler.
+  // then the CA download and the console's files, then the device check and the JSON parser it
+  // chooses (PC-D1), then the parser's error handler.
   express.use(correlationMiddleware);
   express.use(clientVersionMiddleware);
   express.use(caDownloadMiddleware(app.get(TlsService)));
   const { consoleDir } = app.get<AppConfig>(APP_CONFIG);
   if (consoleDir !== undefined) express.use(consoleMiddleware(consoleDir));
-  express.use(AI_IMPORT_PATH, json({ limit: AI_IMPORT_BODY_LIMIT }));
-  express.use(UPLOAD_PATHS, json({ limit: UPLOAD_BODY_LIMIT }));
-  express.use(json({ limit: JSON_BODY_LIMIT }));
+  express.use(
+    bodyParsers(app.get<DeviceAuthenticator>(DEVICE_AUTHENTICATOR), {
+      uploads: UPLOAD_PATHS,
+      aiImport: AI_IMPORT_PATH,
+    }),
+  );
   express.use(bodyParserErrorHandler);
   app.setGlobalPrefix(API_PREFIX);
   app.enableShutdownHooks();

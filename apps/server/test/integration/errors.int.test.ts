@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Public } from '../../src/auth/decorators.js';
 import { AppError } from '../../src/errors/app-error.js';
 import { ZodValidationPipe } from '../../src/validation/zod-validation.pipe.js';
+import { authHeaders, createAuthKit } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-database.js';
 
@@ -117,8 +118,11 @@ describe('[SEC-004] errors reach clients as ApiError bodies', () => {
   });
 
   it('limits request body size', async () => {
+    // From a paired device: anything larger from a caller without one is refused sooner (PC-D1).
+    const kit = await createAuthKit(app);
     const response = await request(httpServer(app))
       .post('/api/v1/probe/orders')
+      .set(authHeaders(kit.deviceId))
       .set('content-type', 'application/json')
       .send(JSON.stringify({ orderNote: 'x'.repeat(1_200_000) }))
       .expect(413);
