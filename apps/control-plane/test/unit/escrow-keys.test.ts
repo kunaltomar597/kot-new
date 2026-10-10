@@ -83,6 +83,7 @@ describe('[DATA-003] the vendor’s escrow key', () => {
     const production = {
       DATABASE_URL: 'postgresql://cp@db.example.in/cp?sslmode=require',
       CP_ENV: 'production',
+      CP_TRUST_PROXY: '1',
       CP_SECRET_KEY: randomBytes(32).toString('base64'),
     };
     expect(() => loadConfig({ ...production, CP_ESCROW_PRIVATE_KEY: PKCS8 })).toThrow(/KMS/);

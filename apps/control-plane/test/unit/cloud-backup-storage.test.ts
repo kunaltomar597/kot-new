@@ -196,6 +196,7 @@ describe('[DATA-003] where cloud backups may be kept', () => {
   const base = {
     DATABASE_URL: 'postgresql://cp@db.example.in/cp?sslmode=require',
     CP_ENV: 'production',
+    CP_TRUST_PROXY: '1',
     CP_SECRET_KEY: randomBytes(32).toString('base64'),
     CP_BACKUP_S3_BUCKET: 'rp-backups',
     CP_BACKUP_S3_ACCESS_KEY_ID: 'AKIA',

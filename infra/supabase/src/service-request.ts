@@ -19,6 +19,7 @@ import {
   serveRoutes,
   sqlStateOf,
 } from './http.js';
+import { readThrottle } from './read-throttle.js';
 
 export const REQUEST_COLUMNS = `id, type, status,
   (status = 'SUBMITTED' AND expires_at < now()) AS overdue,
@@ -142,6 +143,7 @@ async function raise(request: Request, context: FunctionContext): Promise<Respon
 
 /** GET service-request?id= (QR-011): a request of the token's table, as its diner sees it. */
 async function status(request: Request, context: FunctionContext): Promise<Response> {
+  readThrottle.admit(request);
   const query = QrServiceRequestQuery.safeParse(
     Object.fromEntries(new URL(request.url).searchParams),
   );

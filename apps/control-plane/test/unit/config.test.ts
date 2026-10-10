@@ -18,7 +18,12 @@ describe('[VCP-009] [SEC-002] Control Plane configuration', () => {
     ).toThrow(/sslmode=require/);
     const SECRET = Buffer.alloc(32, 1).toString('base64');
     expect(
-      loadConfig({ CP_ENV: 'production', DATABASE_URL: MANAGED, CP_SECRET_KEY: SECRET }).env,
+      loadConfig({
+        CP_ENV: 'production',
+        DATABASE_URL: MANAGED,
+        CP_SECRET_KEY: SECRET,
+        CP_TRUST_PROXY: '1',
+      }).env,
     ).toBe('production');
     expect(databaseUsesTls('not a url')).toBe(false);
   });
@@ -36,6 +41,7 @@ describe('[VCP-009] [SEC-002] Control Plane configuration', () => {
   it('[SEC-001] reaches every outside service over https in staging and production', () => {
     const production = {
       CP_ENV: 'production',
+      CP_TRUST_PROXY: '1',
       DATABASE_URL: MANAGED,
       CP_SECRET_KEY: Buffer.alloc(32, 1).toString('base64'),
     };
@@ -60,6 +66,17 @@ describe('[VCP-009] [SEC-002] Control Plane configuration', () => {
       // A developer's own machine may use plain http.
       expect(loadConfig({ DATABASE_URL: LOCAL, [variable]: url }).env).toBe('development');
     }
+  });
+
+  it('[SEC-001] needs the proxies in front counted while the request limits are on (CP-D1)', () => {
+    const production = {
+      CP_ENV: 'production',
+      DATABASE_URL: MANAGED,
+      CP_SECRET_KEY: Buffer.alloc(32, 1).toString('base64'),
+    };
+    expect(() => loadConfig(production)).toThrow(/CP_TRUST_PROXY/);
+    expect(loadConfig({ ...production, CP_TRUST_PROXY: '1' }).requestBurst).toBe(300);
+    expect(loadConfig({ ...production, CP_REQUEST_BURST: '0' }).requestBurst).toBe(0);
   });
 
   it('names wrong settings without echoing their values', () => {

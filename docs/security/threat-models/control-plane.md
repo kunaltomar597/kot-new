@@ -359,16 +359,30 @@ costs.
 - Mitigation: bodies are limited (64 kB, 5 MB for diagnostics, 28 MB for menus); AI reading and
   digital bills have daily limits per restaurant; the Control Plane sets the heartbeat interval.
   Rate limits are in each instance's memory; a PC starts 8 backup uploads a day at most (CP-T2).
+  Each client address gets 300 requests at once and then 30 a second (60 and 5 a second for digital
+  bill pages), before any body is read: 429 `RATE_LIMITED` with `Retry-After`; the health probe is
+  never limited; staging and production refuse to start without `CP_TRUST_PROXY`, since behind the
+  load balancer every caller would share one address. The edge in front counts across instances
+  (`infra/edge`).
 - Code: `apps/control-plane/src/app.factory.ts`; `apps/control-plane/src/auth/rate-limiter.ts`
-  (`RateLimiter`).
+  (`RateLimiter`); `apps/control-plane/src/http/request-limits.ts` (`requestLimitMiddleware`);
+  `apps/control-plane/src/config/cp-config.ts` (`CpConfigSchema`); `infra/edge/check-edge.mjs`.
 - Tests: `apps/control-plane/test/unit/error-mapping.test.ts` "answers bad JSON, oversized bodies,
   unknown routes"; `apps/control-plane/test/integration/menu-extractions.int.test.ts` "holds each
   restaurant to the daily number, and is off without a key";
   `apps/control-plane/test/integration/digital-bills.int.test.ts` "refuses channels the vendor has
-  not set up, and more bills than the day allows".
+  not set up, and more bills than the day allows";
+  `apps/control-plane/test/unit/request-limits.test.ts` "lets an address burst, then answers 429
+  RATE_LIMITED with Retry-After", "holds digital bill pages to a lower limit than the rest", "keeps
+  its memory bounded under a flood from many addresses";
+  `apps/control-plane/test/integration/request-limits.int.test.ts` "answers 429 RATE_LIMITED with
+  Retry-After once an address is past its burst", "still answers the health probe while an address
+  is limited"; `apps/control-plane/test/unit/config.test.ts` "needs the proxies in front counted
+  while the request limits are on (CP-D1)"; `infra/ci/check-edge.test.mjs` "check-edge: passes when
+  the edge limits, with Retry-After".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c2b by 2026-10-19: rate limits and a firewall at the edge in
-  front of the Control Plane, checked by the DAST run.
+- Status: Partly mitigated. Plan: manual task 32 by 2026-11-30: the rate limits and the firewall at
+  the edge in front of the Control Plane once it has a host, checked with `infra/edge/check-edge.mjs`.
 
 #### CP-D2 Locking vendor accounts
 

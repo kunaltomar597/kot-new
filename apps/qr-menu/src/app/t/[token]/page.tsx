@@ -3,7 +3,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Footer } from '../../../site/Footer';
 import { QrMenu } from '../../../site/QrMenu';
-import { fetchMenu, RelayCallError } from '../../../site/relay';
+import { sharedMenu } from '../../../site/menu-cache';
+import { RelayCallError } from '../../../site/relay';
 import { t } from '../../../site/server-i18n';
 
 // Live availability and the restaurant's presence: rendered for each visit, never cached.
@@ -27,7 +28,7 @@ export default async function TablePage({ params }: { params: Promise<{ token: s
   const relay = relayUrl();
   let menu;
   try {
-    menu = await fetchMenu(relay, token);
+    menu = await sharedMenu(relay, token);
   } catch (error) {
     if (error instanceof RelayCallError && error.status === 404) notFound();
     if (error instanceof RelayCallError && error.code === 'MENU_NOT_PUBLISHED') {
