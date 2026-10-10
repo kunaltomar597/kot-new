@@ -190,9 +190,11 @@ describe('[AUTH-007] [AUTH-009] pairing a device', () => {
       name: 'Table T7 tablet',
       tableId: T7,
     });
+    // The code the server issues, so the page's expiry is checked against the very same time.
+    const issued = pairingCode();
     const fake = devicesServer(devices(), [...devices(), tablet]).on('POST', CODES, () => ({
       status: 201,
-      body: pairingCode(),
+      body: issued,
     }));
     const { user, sockets } = await renderConsole({ fake, path: PATH, signedIn: 'MANAGER' });
     await user.click(await screen.findByRole('button', { name: t('devices.pair') }));
@@ -250,12 +252,10 @@ describe('[AUTH-007] [AUTH-009] pairing a device', () => {
     expect(code.getByText('ABCD-EFGH')).toBeVisible();
     expect(code.getByText('https://192.168.1.20:8443')).toBeVisible();
     expect(code.getByText('https://pos.local:8443')).toBeVisible();
-    expect(code.getByText(pairingCode().caSha256 ?? '')).toBeVisible();
+    expect(code.getByText(issued.caSha256 ?? '')).toBeVisible();
     expect(
       code.getByText(
-        t('devices.pairDialog.validUntil', {
-          time: timeOfDayOf(new Date(pairingCode().expiresAt)),
-        }),
+        t('devices.pairDialog.validUntil', { time: timeOfDayOf(new Date(issued.expiresAt)) }),
       ),
     ).toBeVisible();
     expect(code.getByRole('status')).toHaveTextContent(t('devices.pairDialog.waiting'));
