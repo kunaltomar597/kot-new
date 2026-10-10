@@ -374,7 +374,7 @@ As built:
   to as usual, Sweet Lassi is suggested again, and the rule is removed with a reason. The page and
   both dialogs pass axe.
 
-### P4-03d Floor, stations and printers
+### P4-03d Floor, stations and printers (done)
 
 Requirements: KDS-008, TBL-001, ONB-004 steps 5 and 6 (as lists; the drag-and-drop layout and
 printer discovery stay in P6-05).
@@ -382,6 +382,48 @@ Deliverables: sections and tables (add, rename, capacity, archive, restore); sta
 print or both, printer); printers (network or USB, 80 or 58 mm) with a test print.
 Acceptance: Playwright adds a table, a station and a printer and runs a test print against a fake
 printer.
+
+As built:
+
+- Console: Settings has two more pages. Floor (`/manage/settings/floor`) is linked and opened
+  only for people who may manage staff and sections (`STAFF_MANAGE`, as the server's floor routes
+  require); Stations and printers (`/manage/settings/printing`) for everyone who opens Settings
+  (`OPERATIONS_CONFIGURE`). The logic without React is in `floor-view.ts` and `printing-view.ts`.
+- Floor: the sections in their order, each with its tables in use and their seats and its place,
+  then its tables with seats, place, whether guests are seated and whether a tablet is paired;
+  "Show archived sections and tables" adds the archived ones with Restore. A section's name is
+  unique among active sections whatever its case, its place 0 to 999 (a new one goes after the
+  others). A table's label is unique among all tables, archived ones included (the dialog says to
+  restore the archived one instead), with 1 to 50 seats, an active section and a place 0 to 9,999;
+  a new table goes after its section's tables, and its place follows the section chosen until one
+  is typed. Archive asks why; the server's refusal (guests seated, a tablet paired, a section that
+  still has tables) stays in the dialog. A refused restore (a table whose section is archived) is
+  a toast. The page reads again on `RestaurantChanged` and on tables opening, closing, changing
+  state or moving.
+- Stations and printers: the active printers by name with how they connect (network address and
+  port, or the USB share), their paper, whether they print in words ("Printing", "Not printing",
+  "Not tried yet"), when they last printed or since when they have not with the server's reason,
+  where their tickets go while sent elsewhere, and the stations printing on them. Print a test
+  page answers with a toast either way (the printer's own words when it did not print) and reads
+  the page again. Send tickets elsewhere chooses another active printer that prints its own
+  tickets (the only one is chosen already) and asks why; Print here again asks why too. The
+  active stations by name say whether their tickets are shown on a kitchen screen, printed or
+  both, the printer, and when that printer is not printing. A new station shows and prints on the
+  only printer there is, asks for one when there are several, and is screen-only when there is
+  none. A printer's and a station's names are unique among active ones; a network printer needs an
+  IP address or host name and a port (9100 by default), a USB printer its share name (or a Linux
+  `/dev/usb/lpN`) and no port. Archive asks why; the server's refusal stays in the dialog. The page
+  reads again on `RestaurantChanged` and `PrinterStatusChanged`.
+- Server: the refusals managers now read as they are say one thing for one: "The section still has
+  a table. Move or archive it first." and "This station is still used by 1 menu item. Move it to
+  another station first."
+- Playwright: Vikram (Manager) adds table 11 to the Terrace for two, placed after the terrace's
+  tables; adds the network printer "Pastry printer" on 58 mm paper at a stand-in printer (a TCP
+  server in the test on 127.0.0.1) and prints a test page, which the stand-in receives ("TEST PAGE",
+  "Printer: Pastry printer", "Paper: 58 mm") and the page then shows as printing; adds the station
+  "Pastry" printing on it; sends the kitchen printer's tickets to it and back, with reasons; then
+  archives the station, the printer and the table with reasons. Both pages and every dialog pass axe,
+  and both pages fit a 360 px phone.
 
 ### P4-03e Tax and invoice
 

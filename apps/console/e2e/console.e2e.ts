@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { type AddressInfo, createServer } from 'node:net';
 import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { createTranslator } from '@rp/i18n';
@@ -128,6 +129,37 @@ function authenticatorCode(key: string): string {
   const digest = createHmac('sha1', Buffer.from(bytes)).update(counter).digest();
   const offset = (digest.at(-1) ?? 0) & 0x0f;
   return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/** A network receipt printer stand-in on this machine: it keeps every byte sent to it. */
+interface FakePrinter {
+  readonly port: number;
+  /** What it was sent, as the printer would read the bytes. */
+  received(): string;
+  close(): Promise<void>;
+}
+
+/** Starts a raw printing (port 9100 style) printer stand-in on a free port. */
+async function fakePrinter(): Promise<FakePrinter> {
+  const chunks: Buffer[] = [];
+  const listener = createServer((socket) => {
+    socket.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+  });
+  await new Promise<void>((resolve) => {
+    listener.listen(0, '127.0.0.1', resolve);
+  });
+  return {
+    port: (listener.address() as AddressInfo).port,
+    received: () => Buffer.concat(chunks).toString('latin1'),
+    close: () =>
+      new Promise((resolve) => {
+        listener.close(() => {
+          resolve();
+        });
+      }),
+  };
 }
 
 /**
@@ -1445,5 +1477,208 @@ test.describe.serial('the web console', () => {
     await expect(page.getByText(t('suggestions.rules.archived'))).toBeVisible();
     await expect(page.getByText(t('suggestions.rules.none'))).toBeVisible();
     await expect(page.getByText('Cools the spice')).toHaveCount(0);
+  });
+  test('[TBL-001] [KDS-008] [ONB-004] [MGR-007] a manager adds a table, a printer and a station, prints a test page on the printer and sends another printer’s tickets to it', async () => {
+    const printer = await fakePrinter();
+    const labelled = (text: string) => new RegExp(`^${escape(text)}`);
+    const settingsPages = page.getByRole('navigation', { name: t('settings.pages.label') });
+    const save = (dialog: ReturnType<Page['getByRole']>) =>
+      dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    const atPhoneWidth = async () => {
+      await page.setViewportSize({ width: 360, height: 780 });
+      expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+      await page.setViewportSize({ width: 1280, height: 720 });
+    };
+    try {
+      // The floor: table 11 on the terrace, for two, after the terrace's tables.
+      await settingsPages.getByRole('link', { name: t('settings.pages.floor') }).click();
+      await expect(page.getByRole('heading', { level: 2, name: t('floor.title') })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 3, name: 'Terrace' })).toBeVisible();
+      await expectAccessible(page);
+      await page
+        .getByRole('group', {
+          name: t('floor.section.actionsFor', { name: 'Terrace' }),
+          exact: true,
+        })
+        .getByRole('button', { name: t('floor.section.addTable') })
+        .click();
+      const tableDialog = page.getByRole('dialog', { name: t('floor.tableDialog.addTitle') });
+      await expect(tableDialog.getByLabel(labelled(t('floor.tableDialog.place')))).toHaveValue(
+        '11',
+      );
+      await tableDialog.getByLabel(labelled(t('floor.tableDialog.label'))).fill('11');
+      await tableDialog.getByLabel(labelled(t('floor.tableDialog.capacity'))).fill('2');
+      await expectAccessible(page);
+      await save(tableDialog);
+      await expect(page.getByText(t('floor.tableDialog.saved', { table: '11' }))).toBeVisible();
+      const table11 = page.getByRole('group', {
+        name: t('floor.table.actionsFor', { table: '11' }),
+        exact: true,
+      });
+      await expect(
+        page
+          .getByRole('listitem')
+          .filter({ has: table11 })
+          .getByText(t('floor.table.seats', { count: 2 })),
+      ).toBeVisible();
+      await atPhoneWidth();
+
+      // A network printer on 58 mm paper: the stand-in on this machine.
+      await settingsPages.getByRole('link', { name: t('settings.pages.printing') }).click();
+      await expect(
+        page.getByRole('heading', { level: 2, name: t('printing.title') }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('heading', { level: 4, name: 'Kitchen printer', exact: true }),
+      ).toBeVisible();
+      await expectAccessible(page);
+      await page.getByRole('button', { name: t('printing.printers.add') }).click();
+      const printerDialog = page.getByRole('dialog', {
+        name: t('printing.printerDialog.addTitle'),
+      });
+      await printerDialog
+        .getByLabel(labelled(t('printing.printerDialog.name')))
+        .fill('Pastry printer');
+      await printerDialog.getByLabel(labelled(t('printing.printerDialog.host'))).fill('127.0.0.1');
+      await printerDialog
+        .getByLabel(labelled(t('printing.printerDialog.port')))
+        .fill(String(printer.port));
+      await printerDialog
+        .getByRole('radio', { name: t('printing.printerDialog.paperChoice.58') })
+        .check();
+      await expectAccessible(page);
+      await save(printerDialog);
+      await expect(
+        page.getByText(t('printing.printerDialog.saved', { name: 'Pastry printer' })),
+      ).toBeVisible();
+      const pastryActions = page.getByRole('group', {
+        name: t('printing.printers.actionsFor', { name: 'Pastry printer' }),
+        exact: true,
+      });
+      const pastryRow = page.getByRole('listitem').filter({ has: pastryActions });
+      await expect(pastryRow.getByText(t('printing.printers.status.UNTRIED'))).toBeVisible();
+
+      // The test page reaches the printer, saying which printer and paper it is for.
+      await pastryActions.getByRole('button', { name: t('printing.printers.test') }).click();
+      await expect(
+        page.getByText(t('printing.printers.testPrinted', { name: 'Pastry printer' })),
+      ).toBeVisible();
+      await expect.poll(() => printer.received()).toContain('TEST PAGE');
+      expect(printer.received()).toContain('Printer: Pastry printer');
+      expect(printer.received()).toContain('Paper: 58 mm');
+      await expect(pastryRow.getByText(t('printing.printers.status.READY'))).toBeVisible();
+
+      // A station whose tickets print there.
+      await page.getByRole('button', { name: t('printing.stations.add') }).click();
+      const stationDialog = page.getByRole('dialog', {
+        name: t('printing.stationDialog.addTitle'),
+      });
+      await stationDialog.getByLabel(labelled(t('printing.stationDialog.name'))).fill('Pastry');
+      await stationDialog
+        .getByRole('radio', { name: t('printing.stationDialog.modeChoice.PRINT'), exact: true })
+        .check();
+      await stationDialog
+        .getByLabel(labelled(t('printing.stationDialog.printer')))
+        .selectOption({ label: 'Pastry printer' });
+      await expectAccessible(page);
+      await save(stationDialog);
+      await expect(
+        page.getByText(t('printing.stationDialog.saved', { name: 'Pastry' })),
+      ).toBeVisible();
+      const pastryStation = page.getByRole('group', {
+        name: t('printing.stations.actionsFor', { name: 'Pastry' }),
+        exact: true,
+      });
+      await expect(
+        page
+          .getByRole('listitem')
+          .filter({ has: pastryStation })
+          .getByText(t('printing.stations.printsOn', { name: 'Pastry printer' })),
+      ).toBeVisible();
+      await expect(
+        pastryRow.getByText(t('printing.printers.usedBy', { names: 'Pastry' })),
+      ).toBeVisible();
+      await expectAccessible(page);
+      await atPhoneWidth();
+
+      // The kitchen printer's tickets go to the pastry printer for a while, then come back.
+      const kitchenActions = page.getByRole('group', {
+        name: t('printing.printers.actionsFor', { name: 'Kitchen printer' }),
+        exact: true,
+      });
+      const kitchenRow = page.getByRole('listitem').filter({ has: kitchenActions });
+      await kitchenActions.getByRole('button', { name: t('printing.printers.redirect') }).click();
+      const redirect = page.getByRole('dialog', {
+        name: t('printing.redirectDialog.title', { name: 'Kitchen printer' }),
+      });
+      await redirect
+        .getByLabel(labelled(t('printing.redirectDialog.to')))
+        .selectOption({ label: 'Pastry printer' });
+      await redirect
+        .getByLabel(labelled(t('printing.redirectDialog.reason')))
+        .fill('Kitchen printer out of paper');
+      await expectAccessible(page);
+      await redirect.getByRole('button', { name: t('printing.redirectDialog.confirm') }).click();
+      await expect(
+        page.getByText(
+          t('printing.printers.redirectedToast', { name: 'Kitchen printer', to: 'Pastry printer' }),
+        ),
+      ).toBeVisible();
+      await expect(kitchenRow.getByText(t('printing.printers.sentElsewhere'))).toBeVisible();
+      await expect(
+        kitchenRow.getByText(t('printing.printers.redirected', { name: 'Pastry printer' })),
+      ).toBeVisible();
+      await kitchenActions.getByRole('button', { name: t('printing.printers.unredirect') }).click();
+      const back = page.getByRole('dialog', {
+        name: t('printing.unredirectDialog.title', { name: 'Kitchen printer' }),
+      });
+      await back.getByLabel(labelled(t('printing.unredirectDialog.reason'))).fill('Paper loaded');
+      await back.getByRole('button', { name: t('printing.unredirectDialog.confirm') }).click();
+      await expect(
+        page.getByText(t('printing.printers.unredirectedToast', { name: 'Kitchen printer' })),
+      ).toBeVisible();
+      await expect(kitchenRow.getByText(t('printing.printers.sentElsewhere'))).toHaveCount(0);
+
+      // Put the restaurant back: the station, then its printer, then the table, archived with reasons.
+      await pastryStation.getByRole('button', { name: t('printing.stations.archive') }).click();
+      const archiveStation = page.getByRole('dialog', {
+        name: t('printing.archiveStation.title', { name: 'Pastry' }),
+      });
+      await archiveStation
+        .getByLabel(labelled(t('printing.archiveStation.reason')))
+        .fill('Test over');
+      await archiveStation
+        .getByRole('button', { name: t('printing.archiveStation.confirm') })
+        .click();
+      await expect(
+        page.getByText(t('printing.stations.archived', { name: 'Pastry' })),
+      ).toBeVisible();
+      await pastryActions.getByRole('button', { name: t('printing.printers.archive') }).click();
+      const archivePrinter = page.getByRole('dialog', {
+        name: t('printing.archivePrinter.title', { name: 'Pastry printer' }),
+      });
+      await archivePrinter
+        .getByLabel(labelled(t('printing.archivePrinter.reason')))
+        .fill('Test over');
+      await archivePrinter
+        .getByRole('button', { name: t('printing.archivePrinter.confirm') })
+        .click();
+      await expect(
+        page.getByText(t('printing.printers.archived', { name: 'Pastry printer' })),
+      ).toBeVisible();
+      await expect(pastryActions).toHaveCount(0);
+
+      await settingsPages.getByRole('link', { name: t('settings.pages.floor') }).click();
+      await table11.getByRole('button', { name: t('floor.table.archive') }).click();
+      const archiveTable = page.getByRole('dialog', {
+        name: t('floor.archiveTable.title', { table: '11' }),
+      });
+      await archiveTable.getByLabel(labelled(t('floor.archiveTable.reason'))).fill('Test over');
+      await archiveTable.getByRole('button', { name: t('floor.archiveTable.confirm') }).click();
+      await expect(page.getByText(t('floor.tableArchived', { table: '11' }))).toBeVisible();
+      await expect(table11).toHaveCount(0);
+    } finally {
+      await printer.close();
+    }
   });
 });
