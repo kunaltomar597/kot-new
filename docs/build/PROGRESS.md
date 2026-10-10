@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-05.
+Last updated: 2026-10-10.
 
 What exists:
 
@@ -25,9 +25,9 @@ What exists:
   device type and a pager's Locate topic (P4-02c), and custom roles: a base role with what it
   adds and takes away, applied by `grantOf` to every permission decision, checked by
   `checkCustomRole`, a custom role that manages staff counting as a manager's, and discounts that
-  follow it (P4-02e), and each notification rule's pager vibration, what a manager may choose for
+  follow it (P4-02e), each notification rule's pager vibration, what a manager may choose for
   each alert, what stops a rule from working and a change kept to what differs from the factory
-  rule (P4-03b). 240 tests.
+  rule (P4-03b), and pinned, boosted and blocked dishes in the suggestions (P4-03c). 245 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -50,8 +50,9 @@ What exists:
   publishing would show something new, and `MenuDraftChanged` (P4-02d); custom roles, their
   routes and the custom role on sign-in, staff records and tiles (P4-02e); a settings catalogue
   with one pager heartbeat (set by the vendor) and one disk warning level (P4-03a); notification
-  rules with each alert's pager vibration, and a rule change that cannot work refused (P4-03b).
-  551 tests.
+  rules with each alert's pager vibration, and a rule change that cannot work refused (P4-03b);
+  the dishes' suggestion preferences, their routes and the PINNED and BOOSTED layers (P4-03c).
+  558 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -99,7 +100,8 @@ What exists:
   capability, order, table and discount rules, a change reaching its people on their next request
   with their screens signed in again, and people who stop taking orders taken off today's
   sections (P4-02e); the disk alert at `storage.warnPercent` (P4-03a); the pager's vibration
-  from each notification rule (P4-03b). 746 tests (4 skipped without a real install).
+  from each notification rule (P4-03b); pinned, boosted and blocked dishes, audited and applied
+  to the next suggestions at once (P4-03c). 752 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -146,7 +148,7 @@ What exists:
   line and dishes ready on the tiles (P2-02c); what an alert says on a screen (P2-06a); the
   reason shown with a suggestion and the suggestion a cart line came from (P3-04); "my tables"
   from the domain's planning helper (P4-02b); a sent line's actions with the person's custom role
-  (P4-02e). 39 tests.
+  (P4-02e); "Our pick" for a pinned or boosted dish (P4-03c). 40 tests.
 - `packages/test-postgres`: the throwaway PostgreSQL harness for integration tests, shared by the
   server and the Control Plane.
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
@@ -177,7 +179,9 @@ What exists:
   settings read-only and the Owner's second factor (P4-03a); the Notifications page: N, R and the
   nudge messages, and a rule per alert saying whom it alerts, where it shows, what the pager shows
   and how it buzzes, how it repeats and whether it goes on to the managers, edited with checks and
-  "Back to the factory rule" (P4-03b). 299 tests, and 21 Playwright steps.
+  "Back to the factory rule" (P4-03b); the Suggestions page: the rules with pause and remove, the
+  pinned, boosted and blocked dishes with their words, and a preview of what a table is suggested
+  now (P4-03c). 314 tests, and 22 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -192,8 +196,8 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-03c Recommendation rules with boost, pin and block (P3-04 and P4-03a done), then P4-03d and
-  P4-03e (see phase-4.md).
+- P4-03d Floor, stations and printers (P4-03a done), then P4-03e Tax and invoice (see
+  phase-4.md).
 - P4-04 Alert centre and system screen (P4-01 done; its data sources arrive in P7).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
@@ -300,7 +304,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-02e Custom roles (S)
 - [x] P4-03a Settings from the catalogue
 - [x] P4-03b Notification rules
-- [ ] P4-03c Recommendation rules with boost, pin and block
+- [x] P4-03c Recommendation rules with boost, pin and block
 - [ ] P4-03d Floor, stations and printers
 - [ ] P4-03e Tax and invoice
 - [ ] P4-04 Alert centre and system screen
@@ -629,6 +633,28 @@ Decided 2026-10-05 (P4-03b):
      too.
 261. The page's heading is "Notification rules" (its link says "Notifications"), because the
      toasts' landmark is already called "Notifications".
+
+Decided 2026-10-10 (P4-03c):
+
+262. The page is called Suggestions (Settings → Suggestions), the word the tablets, the waiter
+     app and the POS use, rather than "Recommendations".
+263. A dish is suggested as usual, pinned, boosted or blocked. Pinned dishes come first wherever
+     they can be served, before the rules (the next course and the best sold first among them);
+     boosted ones come before the best sellers and first among a rule's, a pairing's and a
+     category's dishes of the same course; blocked ones are never suggested, whatever a rule
+     says. The filters (stock, already ordered, veg only, channel) still apply to all of them.
+264. Pinned and boosted suggestions are layers of their own (PINNED and BOOSTED), tracked and
+     reported like the others (REC-008). A pinned or boosted dish may carry the restaurant's own
+     words (up to 60 characters), shown as its reason; without them it says "Our pick" (REC-006).
+265. A preference is changed by people who configure operations (`OPERATIONS_CONFIGURE`), like
+     the rules, applies to the next suggestions at once without publishing the menu, and is
+     audited on the dish with before, after and an optional reason.
+266. Each dish has one preference row, changed in place; "as usual" is NORMAL, not a delete. An
+     archived dish keeps its row but is neither listed nor suggested.
+267. A rule change that only reorders its places is no change: it is not written or audited.
+268. The preview reads the real suggestions from the server for a chosen place and, optionally,
+     one dish in the order (six at most, as a tablet shows them). It records no impressions, so
+     it never counts in the recommendation reports.
 
 Decided 2026-10-05 (P4-03a):
 
@@ -1363,6 +1389,49 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P4-03c Suggestions: rules, pinned, boosted and blocked dishes
+
+Built: `@rp/domain` `recommendations.ts`: `ITEM_PREFERENCES`, `ItemPreferenceDef`, the PINNED and
+BOOSTED layers and `recommend`'s `preferences` (pinned first, boosted before the best sellers and
+first among equals, blocked never). Contracts: `RecommendationPreference`,
+`RecommendationPreferenceRequest`, `RecommendationPreferenceView`, the list response and params,
+the PINNED and BOOSTED reasons, and the routes `listRecommendationPreferences` and
+`setRecommendationPreference`. `@rp/ordering`: "Our pick" for a pinned or boosted dish without
+words. Server: `recommendation_preferences` with migration
+`20261006000000_recommendation_preferences` (the layer enum gains PINNED and BOOSTED in their
+place), `RecommendationPreferencesService` and `RecommendationPreferencesController`, suggestions
+read with the preferences, and a rule change that only reorders its places treated as no change.
+i18n: `suggestions.*`, `settings.pages.suggestions`, `reco.reason.pick`. Console:
+`SuggestionsScreen.tsx`, `SuggestionDialogs.tsx` and `suggestions-view.ts`, linked from
+`SettingsArea.tsx`.
+
+Tests: domain 245 (pinned first wherever they can be served, boosted before the best sellers and
+first among a rule's, blocked never, even by a rule), contracts 558 (a preference request, its label
+only for pinned or boosted dishes, the reasons), ordering 40, server 752 (a manager pins, boosts and
+blocks dishes and the suggestions follow at once, each change audited with the reason; an archived
+or unknown dish is refused and a waiter may neither read nor change them; the list leaves out
+archived and NORMAL dishes, whose rows stay; the layers' order in the database), console 314 (the
+page's logic: rules in words, hours, dates and places, the dialog's checks, form and request, the
+dishes' order and the preview rows; the page: the rules with axe, adding a checked rule, change,
+pause, turn on and remove with a reason, no menu yet, the server's refusal in the dialog, pin with
+words, block and back, and the preview per place and dish), and 22 Playwright steps (was 21): Vikram
+adds a rule, blocks the dish it suggests, pins Gulab Jamun with "Fresh today", the preview follows
+each change, the page fits a 360 px phone, and everything is put back.
+
+Gotchas:
+
+- An ICU message's text in a regular expression needs escaping: "(optional)" in a field label is
+  a group, so a name built with `new RegExp` from it never matches.
+- The best sellers are counted once per daypart and kept for ten minutes, so a browser test cannot
+  count on the preview being empty or full before it orders anything; assert what a rule or a pin
+  puts there.
+- A Postgres enum value is added in place with `ALTER TYPE ... ADD VALUE ... BEFORE`, so the
+  layers keep their order for `ORDER BY` and the schema test.
+
+Deferred: none.
+
+Decisions: 262 to 268.
 
 ### 2026-10-05: P4-03b Notification rules
 

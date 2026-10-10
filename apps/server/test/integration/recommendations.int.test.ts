@@ -994,4 +994,33 @@ describe('[REC-009] [AUD-001] pinned, boosted and blocked dishes', () => {
       403,
     );
   });
+
+  it('keeps an archived dish’s preference but no longer lists it', async () => {
+    ids['Seasonal Soup'] = (
+      await prisma.item.create({
+        data: {
+          restaurantId: kit.restaurantId,
+          categoryId: id('Starters'),
+          name: 'Seasonal Soup',
+          basePrice: 15_000,
+          taxGroupId: id('gst'),
+          foodType: 'VEG',
+          stationId: id('kitchen'),
+        },
+      })
+    ).id;
+    expect((await setPreference('Seasonal Soup', { preference: 'PIN', label: null })).status).toBe(
+      200,
+    );
+    expect((await listPreferences()).map((entry) => entry.name)).toContain('Seasonal Soup');
+
+    await prisma.item.update({
+      where: { id: id('Seasonal Soup') },
+      data: { archivedAt: new Date() },
+    });
+    expect((await listPreferences()).map((entry) => entry.name)).not.toContain('Seasonal Soup');
+    expect(
+      await prisma.recommendationPreference.findFirst({ where: { itemId: id('Seasonal Soup') } }),
+    ).toMatchObject({ preference: 'PIN' });
+  });
 });
