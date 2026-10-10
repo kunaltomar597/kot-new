@@ -74,27 +74,19 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | Component                                               | Threats | Mitigated | Partly mitigated | Not mitigated | Accepted | Residual Medium | Residual High or Critical |
 | ------------------------------------------------------- | ------: | --------: | ---------------: | ------------: | -------: | --------------: | ------------------------: |
 | [The LAN and the local server](local-server-and-lan.md) |      45 |        27 |               12 |             3 |        3 |              22 |                         2 |
-| [The pager channel](pager-channel.md)                   |      26 |        12 |               10 |             3 |        1 |               4 |                         2 |
+| [The pager channel](pager-channel.md)                   |      26 |        19 |                5 |             1 |        1 |               4 |                         1 |
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        15 |                8 |             4 |        2 |               9 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        11 |                7 |             2 |        1 |              11 |                         2 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        10 |                6 |             3 |        1 |               7 |                         2 |
 | [The Vendor Control Plane](control-plane.md)            |      22 |         8 |               12 |             1 |        1 |               8 |                         1 |
 | [The desktop shell](desktop-shell.md)                   |      14 |         5 |                5 |             3 |        1 |               7 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        11 |                5 |             2 |        0 |               5 |                         0 |
-| All                                                     |     195 |        99 |               65 |            21 |       10 |              73 |                         9 |
+| All                                                     |     195 |       106 |               60 |            19 |       10 |              73 |                         8 |
 
 Open threats and their plans, by date:
 
 | Threat                                                                                                                                      | Residual | Status           | Plan           | By         |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
-| [PAGER-D3](pager-channel.md#pager-d3-flooding-the-broker-without-a-credential) Flooding the broker without a credential                     | High     | Not mitigated    | P8-03b2b       | 2026-10-13 |
-| [PAGER-D4](pager-channel.md#pager-d4-a-signed-in-pager-publishing-too-much) A signed-in pager publishing too much                           | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
-| [PAGER-D6](pager-channel.md#pager-d6-a-pager-the-pc-wrongly-thinks-is-connected) A pager the PC wrongly thinks is connected                 | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
-| [PAGER-E3](pager-channel.md#pager-e3-more-pagers-than-the-licence-allows) More pagers than the licence allows                               | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
-| [PAGER-R2](pager-channel.md#pager-r2-i-did-not-press-it) "I did not press it"                                                               | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
-| [PAGER-R3](pager-channel.md#pager-r3-failed-pager-sign-ins-leave-no-trace) Failed pager sign-ins leave no trace                             | Low      | Not mitigated    | P8-03b2b       | 2026-10-13 |
-| [PAGER-T1](pager-channel.md#pager-t1-a-forged-acknowledgement) A forged acknowledgement                                                     | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
-| [PAGER-T4](pager-channel.md#pager-t4-going-back-to-older-firmware) Going back to older firmware                                             | Low      | Partly mitigated | P8-03b2b       | 2026-10-13 |
 | [PC-D1](local-server-and-lan.md#pc-d1-large-bodies-before-authentication) Large bodies before authentication                                | Medium   | Not mitigated    | P8-03b2c       | 2026-10-13 |
 | [PC-D4](local-server-and-lan.md#pc-d4-decompression-bombs-in-uploads) Decompression bombs in uploads                                        | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
 | [PC-I9](local-server-and-lan.md#pc-i9-diners-personal-data-kept-after-they-ask) Diners' personal data kept after they ask                   | Medium   | Partly mitigated | P8-03b2c       | 2026-10-13 |
@@ -170,5 +162,6 @@ Open threats and their plans, by date:
 | [PAGER-I4](pager-channel.md#pager-i4-reading-a-stolen-pager) Reading a stolen pager                                                         | Medium   | Not mitigated    | P2-05          | 2026-12-15 |
 | [PAGER-S2](pager-channel.md#pager-s2-a-stolen-or-cloned-pager) A stolen or cloned pager                                                     | Medium   | Partly mitigated | P2-05          | 2026-12-15 |
 | [PAGER-S3](pager-channel.md#pager-s3-a-rogue-access-point-or-broker) A rogue access point or broker                                         | High     | Partly mitigated | P2-05          | 2026-12-15 |
+| [PAGER-T4](pager-channel.md#pager-t4-going-back-to-older-firmware) Going back to older firmware                                             | Low      | Partly mitigated | P2-05          | 2026-12-15 |
 
 <!-- threat-summary:end -->

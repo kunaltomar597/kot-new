@@ -258,6 +258,8 @@ describe('[TAB-004] [NTF-003] a diner calls from the table tablet', () => {
     expect(await alertOf(call.id)).toMatchObject({
       status: 'ACKNOWLEDGED',
       acknowledgedById: kit.staff.WAITER,
+      // PAGER-R2: with the device it came from.
+      acknowledgedByDeviceId: kit.deviceId,
     });
     later(600);
     await notifications().processDue();

@@ -158,6 +158,12 @@ export const PagerView = z.object({
   rssi: z.int().nullable(),
   firmwareVersion: z.string().nullable(),
   lastSeenAt: Timestamp.nullable(),
+  /**
+   * Sign-ins to the broker under this pager's name with a wrong secret since its credential was
+   * issued (PAGER-R3): a pager with an old credential, or someone trying credentials.
+   */
+  signInFailures: z.int().nonnegative(),
+  lastSignInFailureAt: Timestamp.nullable(),
 });
 export type PagerView = z.infer<typeof PagerView>;
 
@@ -192,7 +198,9 @@ export type MyPagerResponse = z.infer<typeof MyPagerResponse>;
  *   image of that version (refused);
  * - `NOT_SIGNED`, `UNTRUSTED_KEY`, `BAD_SIGNATURE`: its secure boot signature is missing, from a
  *   key the pagers do not trust, or wrong (refused);
- * - `NO_TRUSTED_KEY`: this software trusts no firmware key yet (tried again after an update).
+ * - `NO_TRUSTED_KEY`: this software trusts no firmware key yet (tried again after an update);
+ * - `SECURE_VERSION_LOWER`: its anti-rollback version is lower than that of the firmware the PC
+ *   serves, so it would take the pagers back to older code (refused, PAGER-T4).
  */
 export const PAGER_FIRMWARE_PROBLEMS = [
   'NOT_HTTPS',
@@ -209,6 +217,7 @@ export const PAGER_FIRMWARE_PROBLEMS = [
   'UNTRUSTED_KEY',
   'BAD_SIGNATURE',
   'NO_TRUSTED_KEY',
+  'SECURE_VERSION_LOWER',
 ] as const;
 export const PagerFirmwareProblem = z.enum(PAGER_FIRMWARE_PROBLEMS);
 export type PagerFirmwareProblem = z.infer<typeof PagerFirmwareProblem>;

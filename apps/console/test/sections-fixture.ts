@@ -126,6 +126,8 @@ export function pager(overrides: Partial<PagerView> = {}): PagerView {
     rssi: -60,
     firmwareVersion: '1.0.3',
     lastSeenAt: AT,
+    signInFailures: 0,
+    lastSignInFailureAt: null,
     ...overrides,
   };
 }

@@ -1,4 +1,5 @@
-import type { INestApplication } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { type INestApplication, Logger } from '@nestjs/common';
 import {
   DeviceAlertsResponse,
   type LoginResponse,
@@ -11,7 +12,7 @@ import {
 } from '@rp/contracts';
 import mqtt, { type MqttClient } from 'mqtt';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { NOTIFICATION_CLOCK, NOTIFICATION_OPTIONS } from '../../src/notifications/clock.js';
 import { NotificationsService } from '../../src/notifications/notifications.service.js';
@@ -41,6 +42,8 @@ let pagerB: PagerCredentialResponse;
 const tables: Record<string, string> = {};
 const now = new Date('2026-09-26T12:00:00.000Z');
 const clients: MqttClient[] = [];
+/** The broker's own clock, for the heartbeat rate and its log (the tests move it on). */
+let brokerMs = 0;
 
 beforeAll(async () => {
   database = await createTestDatabase();
@@ -50,7 +53,7 @@ beforeAll(async () => {
     overrides: [
       { provide: NOTIFICATION_CLOCK, useValue: { now: () => now } },
       { provide: NOTIFICATION_OPTIONS, useValue: { tickMs: 0 } },
-      { provide: PAGER_OPTIONS, useValue: { offlineCheckMs: 0 } },
+      { provide: PAGER_OPTIONS, useValue: { offlineCheckMs: 0, clockMs: () => brokerMs } },
     ],
   });
   prisma = app.get(PrismaService);
@@ -226,6 +229,8 @@ describe('[PGR-006] [PGR-008] [NFR-P03] alerts on the pager', () => {
     );
     const acknowledged = await prisma.alert.findUniqueOrThrow({ where: { id: alertId } });
     expect(acknowledged.acknowledgedById).toBe(kit.staff.WAITER);
+    // PAGER-R2: and the pager it came from.
+    expect(acknowledged.acknowledgedByDeviceId).toBe(pagerA.deviceId);
     await until(
       () => a.messages.find((entry) => entry.alertId === alertId && entry.state === 'ACKNOWLEDGED'),
       5_000,
@@ -309,9 +314,10 @@ describe('[WTR-006] [NTF-004] the waiter phone and the pager share one acknowled
     expect(
       a.messages.filter((entry) => entry.alertId === alertId && entry.state === 'ALERT'),
     ).toHaveLength(2);
-    expect(
-      (await prisma.alert.findUniqueOrThrow({ where: { id: alertId } })).acknowledgedById,
-    ).toBe(kit.staff.WAITER);
+    expect(await prisma.alert.findUniqueOrThrow({ where: { id: alertId } })).toMatchObject({
+      acknowledgedById: kit.staff.WAITER,
+      acknowledgedByDeviceId: phone,
+    });
   });
 
   it('keeps alerts meant for the POS and dashboard off the pager', async () => {
@@ -385,10 +391,19 @@ describe('[PGR-007] [PGR-013] heartbeats', () => {
     const broker = app.get(PagerBroker);
     // Heartbeats are timed by the engine's clock: 60 s later is fine, 91 s is three missed beats.
     expect(await broker.checkOffline(new Date(now.getTime() + 60_000))).toBe(0);
+    const closed = new Promise<void>((resolve) => {
+      a.client.once('close', () => {
+        resolve();
+      });
+    });
     expect(await broker.checkOffline(new Date(now.getTime() + 91_000))).toBe(1);
     expect((await prisma.device.findUniqueOrThrow({ where: { id: pagerA.deviceId } })).online).toBe(
       false,
     );
+    // PAGER-D6: its session is closed too, so the pager signs in again rather than counting as
+    // connected while it sends nothing.
+    await closed;
+    expect(broker.connectedPagers().map((pager) => pager.deviceId)).not.toContain(pagerA.deviceId);
   });
 });
 
@@ -493,5 +508,224 @@ describe('[AUTH-008] [SEC-012] [NTF-007] unpairing a pager', () => {
     });
     expect(audit.before).toMatchObject({ staffId: kit.staff.OWNER });
     await expect(connect(credential)).rejects.toThrow();
+  });
+});
+
+describe('[NTF-004] [SEC-012] what a pager may acknowledge (PAGER-T1, PAGER-R2)', () => {
+  it('acknowledges only alerts sent to it, also when a manager wears it', async () => {
+    const credential = await register('WP-0010', kit.staff.MANAGER);
+    const pager = await connect(credential);
+    // The waiter wears a connected pager, so the bill alert goes to them alone (NTF-007), not to
+    // the manager's pager: its id is no use to the manager's pager.
+    const waiters = await connect(await register('WP-0016', kit.staff.WAITER));
+    const billId = await requestBill('7');
+    await until(
+      () => waiters.messages.find((entry) => entry.alertId === billId),
+      5_000,
+      'the bill on the waiter’s pager',
+    );
+    await pager.client.publishAsync(credential.ackTopic, JSON.stringify({ alertId: billId }), {
+      qos: 1,
+    });
+    const nudge = await server()
+      .post('/api/v1/alerts/nudge')
+      .set(as(manager))
+      .send({ staffIds: [kit.staff.MANAGER], message: 'Check the pass' });
+    const [nudgeId] = (nudge.body as { alertIds: string[] }).alertIds;
+    await until(
+      () => pager.messages.find((entry) => entry.alertId === nudgeId),
+      5_000,
+      'the nudge on the manager’s pager',
+    );
+    await pager.client.publishAsync(credential.ackTopic, JSON.stringify({ alertId: nudgeId }), {
+      qos: 1,
+    });
+    await until(
+      async () =>
+        (await prisma.alert.findUniqueOrThrow({ where: { id: nudgeId ?? '' } })).status ===
+        'ACKNOWLEDGED',
+      5_000,
+      'the nudge acknowledged',
+    );
+    // Acks are handled in order: by now the bill's has been heard and refused.
+    expect(await prisma.alert.findUniqueOrThrow({ where: { id: billId } })).toMatchObject({
+      status: 'OPEN',
+      acknowledgedById: null,
+    });
+    expect(await prisma.alert.findUniqueOrThrow({ where: { id: nudgeId ?? '' } })).toMatchObject({
+      acknowledgedById: kit.staff.MANAGER,
+      acknowledgedByDeviceId: credential.deviceId,
+    });
+  });
+});
+
+describe('[PGR-008] [NTF-007] which pagers count as connected (PAGER-D6)', () => {
+  it('keeps the pager connected when its old session closes after the new one signed in', async () => {
+    const credential = await register('WP-0012', kit.staff.CASHIER);
+    const broker = app.get(PagerBroker);
+    const first = await connect(credential);
+    const firstClosed = new Promise<void>((resolve) => {
+      first.client.once('close', () => {
+        resolve();
+      });
+    });
+    // The pager comes back on a new connection before the broker noticed the old one dropped.
+    const second = await connect(credential);
+    await firstClosed;
+    expect(broker.isStaffConnected(kit.restaurantId, kit.staff.CASHIER)).toBe(true);
+    expect(
+      broker.connectedPagers().filter((pager) => pager.deviceId === credential.deviceId),
+    ).toHaveLength(1);
+    const nudge = await server()
+      .post('/api/v1/alerts/nudge')
+      .set(as(manager))
+      .send({ staffIds: [kit.staff.CASHIER], message: 'Till check' });
+    const [nudgeId] = (nudge.body as { alertIds: string[] }).alertIds;
+    await until(
+      () => second.messages.find((entry) => entry.alertId === nudgeId),
+      5_000,
+      'the nudge on the new session',
+    );
+    // Reachable, so not escalated at once (NTF-007).
+    expect(
+      (await prisma.alert.findUniqueOrThrow({ where: { id: nudgeId ?? '' } })).escalatedAt,
+    ).toBeNull();
+    await second.client.endAsync();
+    await until(
+      () => !broker.isStaffConnected(kit.restaurantId, kit.staff.CASHIER),
+      5_000,
+      'the pager gone',
+    );
+  });
+});
+
+describe('[PGR-007] [SEC-012] what a signed-in pager may send (PAGER-D4)', () => {
+  const storedRssi = async (deviceId: string) =>
+    (await prisma.device.findUniqueOrThrow({ where: { id: deviceId } })).rssi;
+
+  it('drops heartbeats faster than half the interval', async () => {
+    const credential = await register('WP-0013', null);
+    const pager = await connect(credential);
+    const beat = (rssi: number) =>
+      pager.client.publishAsync(
+        credential.heartbeatTopic,
+        JSON.stringify({ battery: 70, rssi, firmware: '1.0.3' }),
+        { qos: 1 },
+      );
+    await beat(-50);
+    await until(async () => (await storedRssi(credential.deviceId)) === -50, 5_000, 'the beat');
+    // 14 s later (the interval is 30 s): dropped. 15 s after the one taken: taken.
+    brokerMs += 14_000;
+    await beat(-51);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(await storedRssi(credential.deviceId)).toBe(-50);
+    brokerMs += 1_000;
+    await beat(-52);
+    await until(async () => (await storedRssi(credential.deviceId)) === -52, 5_000, 'the next');
+  });
+
+  it('drops acknowledgements beyond a burst of ten, then takes about one a second', async () => {
+    const credential = await register('WP-0017', kit.staff.OWNER);
+    const pager = await connect(credential);
+    const nudge = await server()
+      .post('/api/v1/alerts/nudge')
+      .set(as(manager))
+      .send({ staffIds: [kit.staff.OWNER], message: 'Call the bank' });
+    const [nudgeId = ''] = (nudge.body as { alertIds: string[] }).alertIds;
+    await until(
+      () => pager.messages.find((entry) => entry.alertId === nudgeId),
+      5_000,
+      'the nudge on the Owner’s pager',
+    );
+    const ack = (alertId: string) =>
+      pager.client.publishAsync(credential.ackTopic, JSON.stringify({ alertId }), { qos: 1 });
+    for (let index = 0; index < 10; index += 1) await ack(randomUUID());
+    // The eleventh in the same second is dropped, even for a real alert.
+    await ack(nudgeId);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect((await prisma.alert.findUniqueOrThrow({ where: { id: nudgeId } })).status).toBe('OPEN');
+    brokerMs += 1_000;
+    await ack(nudgeId);
+    await until(
+      async () =>
+        (await prisma.alert.findUniqueOrThrow({ where: { id: nudgeId } })).status ===
+        'ACKNOWLEDGED',
+      5_000,
+      'the acknowledgement a second later',
+    );
+  });
+
+  it('ends the connection of a pager that sends a retained or QoS 2 message', async () => {
+    const credential = await register('WP-0014', null);
+    for (const options of [{ qos: 1, retain: true }, { qos: 2 }] as const) {
+      brokerMs += 60_000;
+      const pager = await connect(credential);
+      const ended = new Promise<void>((resolve) => {
+        pager.client.once('close', () => {
+          resolve();
+        });
+      });
+      pager.client.publish(
+        credential.heartbeatTopic,
+        JSON.stringify({ battery: 70, rssi: -60, firmware: '1.0.3' }),
+        options,
+      );
+      await ended;
+    }
+    // Neither was taken as a heartbeat.
+    expect(await storedRssi(credential.deviceId)).toBeNull();
+  });
+});
+
+describe('[SEC-012] failed pager sign-ins (PAGER-R3)', () => {
+  it('logs and counts wrong secrets against the pager, from its newest credential on', async () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn');
+    // A new minute for the log, whatever the tests before it refused.
+    brokerMs += 60_000;
+    try {
+      const credential = await register('WP-0015', null);
+      await expect(connect(credential, 'wrong-1')).rejects.toThrow('Not authorized');
+      await expect(connect(credential, 'wrong-2')).rejects.toThrow('Not authorized');
+      const listed = async () =>
+        PagerListResponse.parse(
+          (await server().get('/api/v1/pagers').set(as(manager))).body,
+        ).pagers.find((pager) => pager.deviceId === credential.deviceId);
+      expect(await listed()).toMatchObject({
+        signInFailures: 2,
+        lastSignInFailureAt: now.toISOString(),
+      });
+      // One line a minute per address and pager, with the count since the last.
+      const lines = warn.mock.calls.filter(
+        ([fields]) =>
+          (fields as { reason?: string; deviceId?: string } | undefined)?.reason ===
+            'wrong-secret' && (fields as { deviceId?: string }).deviceId === credential.deviceId,
+      );
+      expect(lines).toEqual([
+        [
+          expect.objectContaining({ address: expect.any(String) as unknown, count: 1 }),
+          'Pager sign-in refused: wrong secret',
+        ],
+      ]);
+      brokerMs += 60_000;
+      await expect(connect(credential, 'wrong-3')).rejects.toThrow('Not authorized');
+      expect(warn).toHaveBeenLastCalledWith(
+        expect.objectContaining({ reason: 'wrong-secret', count: 2 }),
+        'Pager sign-in refused: wrong secret',
+      );
+      // A name that is no pager is logged, with nothing to count it against.
+      const stranger = randomUUID();
+      await expect(
+        connect({ ...credential, deviceId: stranger, mqttUsername: stranger }),
+      ).rejects.toThrow('Not authorized');
+      expect(warn).toHaveBeenLastCalledWith(
+        expect.objectContaining({ reason: 'not-a-pager', count: 1 }),
+        'Pager sign-in refused: no active pager by that name',
+      );
+      // A new credential starts the count again.
+      await server().post(`/api/v1/pagers/${credential.deviceId}/credential`).set(as(manager));
+      expect(await listed()).toMatchObject({ signInFailures: 0, lastSignInFailureAt: null });
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

@@ -53,7 +53,8 @@
                           "NOT_SIGNED",
                           "UNTRUSTED_KEY",
                           "BAD_SIGNATURE",
-                          "NO_TRUSTED_KEY"
+                          "NO_TRUSTED_KEY",
+                          "SECURE_VERSION_LOWER"
                         ]
                       },
                       "message": { "type": "string" },
@@ -179,7 +180,8 @@
                           "NOT_SIGNED",
                           "UNTRUSTED_KEY",
                           "BAD_SIGNATURE",
-                          "NO_TRUSTED_KEY"
+                          "NO_TRUSTED_KEY",
+                          "SECURE_VERSION_LOWER"
                         ]
                       },
                       "message": { "type": "string" },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  lowersSecureVersion,
   PAGER_FIRMWARE_RULES,
   type PagerFirmwareAttempt,
   type PagerFirmwareInput,
@@ -125,5 +126,15 @@ describe('[PGR-011] which pagers the PC offers its firmware to', () => {
     expect(verdict({ firmware: '1.1.0' }, { attempt: attempt('OFFERED', 1) })).toEqual({
       kind: 'UP_TO_DATE',
     });
+  });
+});
+
+describe('[PGR-011] [UPD-007] the anti-rollback version', () => {
+  it('refuses firmware whose secure version is lower than the one served', () => {
+    expect(lowersSecureVersion(1, 2)).toBe(true);
+    expect(lowersSecureVersion(2, 2)).toBe(false);
+    expect(lowersSecureVersion(3, 2)).toBe(false);
+    // The first firmware this PC serves has nothing to compare with.
+    expect(lowersSecureVersion(0, null)).toBe(false);
   });
 });

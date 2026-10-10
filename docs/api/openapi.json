@@ -20722,7 +20722,8 @@
           "NOT_SIGNED",
           "UNTRUSTED_KEY",
           "BAD_SIGNATURE",
-          "NO_TRUSTED_KEY"
+          "NO_TRUSTED_KEY",
+          "SECURE_VERSION_LOWER"
         ]
       },
       "PagerFirmwareResponse": {
@@ -20841,6 +20842,10 @@
           "firmwareVersion": { "type": ["string", "null"] },
           "lastSeenAt": {
             "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "signInFailures": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "lastSignInFailureAt": {
+            "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
           }
         },
         "required": [
@@ -20852,7 +20857,9 @@
           "batteryPercent",
           "rssi",
           "firmwareVersion",
-          "lastSeenAt"
+          "lastSeenAt",
+          "signInFailures",
+          "lastSignInFailureAt"
         ],
         "additionalProperties": false
       },

@@ -136,16 +136,18 @@ firmware.
 A pager, or a copy of one, acknowledges alerts it was not sent, stopping their repeats and
 escalation and falsifying response times.
 
-- Mitigation: a pager may publish only on its own `ack` topic, and acknowledges as its wearer. A
-  pager worn by a manager acknowledges with a manager's reach, so any alert in the restaurant whose
-  id it learns.
+- Mitigation: a pager may publish only on its own `ack` topic, and acknowledges, as its wearer,
+  only an alert sent to it (to its wearer, on the pager and app channels), whoever wears it: a
+  manager's pager has no manager's reach (P8-03b2b), as the waiter phone already did.
 - Code: `packages/domain/src/pager.ts` (`pagerMayPublish`);
-  `apps/server/src/notifications/notifications.service.ts` (`acknowledge`, `acknowledgeForDevice`).
-- Tests: `apps/server/test/integration/pagers.int.test.ts` "ignores a pager publishing where it
-  may not", "delivers an alert within 2 s, and the button acknowledges it everywhere".
+  `apps/server/src/notifications/notifications.service.ts` (`acknowledgeForPager`,
+  `acknowledgeForDevice`).
+- Tests: `apps/server/test/integration/pagers.int.test.ts` "acknowledges only alerts sent to it,
+  also when a manager wears it", "ignores a pager publishing where it may not", "delivers an alert
+  within 2 s, and the button acknowledges it everywhere".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: a pager acknowledges only alerts that
-  were sent to it, as the waiter phone already does.
+- Status: Mitigated (fixed in P8-03b2b: a pager worn by a manager acknowledged any alert in the
+  restaurant whose id it learned).
 
 #### PAGER-T2 Getting round the topic rules
 
@@ -184,14 +186,19 @@ their code.
 Someone gets the pagers to run an older, signed firmware with a known flaw.
 
 - Mitigation: only a newer version is offered, and never again one a pager rolled back from. The
-  image's secure version is read but not compared, and the pager's anti-rollback fuse is P2-05's.
+  PC refuses for good a release whose anti-rollback version (`secure_version`) is lower than that
+  of the firmware it serves, whatever its version number (P8-03b2b). The pager's anti-rollback
+  fuse is P2-05's.
 - Code: `apps/server/src/pager-firmware/pager-firmware.service.ts` (`PagerFirmwareService`);
-  `packages/domain/src/pager-firmware.ts` (`pagerFirmwareVerdict`).
+  `packages/domain/src/pager-firmware.ts` (`pagerFirmwareVerdict`, `lowersSecureVersion`).
 - Tests: `packages/domain/test/pager-firmware.test.ts` "leaves a pager on the same or a newer
-  version alone", "never offers a version again to a pager that rolled back from it".
+  version alone", "never offers a version again to a pager that rolled back from it", "refuses
+  firmware whose secure version is lower than the one served";
+  `apps/server/test/integration/pager-firmware.int.test.ts` "refuses for good a release that would
+  lower the anti-rollback version".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: the PC refuses a release whose secure
-  version is lower than the one it serves; P2-05 burns the anti-rollback fuse on the pager.
+- Status: Partly mitigated (the PC's part done in P8-03b2b). Plan: P2-05 by 2026-12-15: the pager
+  burns its anti-rollback version into eFuses, so it refuses older firmware from anywhere.
 
 #### PAGER-T5 Forged heartbeats or update reports
 
@@ -223,25 +230,36 @@ A manager registers, gives, takes back or replaces the credential of a pager and
 
 A waiter says the alert was acknowledged by someone else.
 
-- Mitigation: the acknowledgement records the wearer; it does not record that it came from the
-  pager rather than the phone.
-- Code: `apps/server/src/notifications/notifications.service.ts` (`acknowledge`).
+- Mitigation: the acknowledgement records the wearer and the device it came from: the pager, the
+  phone or the screen (P8-03b2b).
+- Code: `apps/server/src/notifications/notifications.service.ts` (`acknowledgeForPager`,
+  `acknowledgeForDevice`, `AcknowledgedBy`).
 - Tests: `apps/server/test/integration/pagers.int.test.ts` "delivers an alert within 2 s, and the
-  button acknowledges it everywhere".
-- Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: the acknowledgement records the pager it
-  came from.
+  button acknowledges it everywhere", "stops the pager repeats when the phone acknowledges, and
+  tells the pager"; `apps/server/test/integration/notifications.int.test.ts` "alerts the
+  responsible waiter and the cashier; acknowledging stops it everywhere";
+  `apps/server/test/integration/service-requests.int.test.ts` "repeats every R, escalates after N,
+  and stops when acknowledged".
+- Risk: likelihood Low, impact Low: Low.
+- Status: Mitigated (P8-03b2b).
 
 #### PAGER-R3 Failed pager sign-ins leave no trace
 
 Someone tries pagers' credentials against the broker and nobody can see it.
 
-- Mitigation: a failed sign-in is refused without a log line or a count.
-- Code: `apps/server/src/pagers/pager-broker.ts` (`authenticate`).
-- Tests: `apps/server/test/integration/pagers.int.test.ts` "refuses a wrong password and another
-  pager’s topics".
+- Mitigation: every refused sign-in is logged, at most once a minute per reason, address and
+  pager, with the count since the last line; a wrong secret under a pager's name is counted on the
+  pager until its credential is replaced, and the Pagers page shows how many and the last time
+  (P8-03b2b).
+- Code: `apps/server/src/pagers/pager-broker.ts` (`signInFailed`);
+  `apps/server/src/pagers/broker-limits.ts` (`ThrottledLog`);
+  `apps/console/src/manage/staff/PagersScreen.tsx` (`PagerRow`).
+- Tests: `apps/server/test/integration/pagers.int.test.ts` "logs and counts wrong secrets against
+  the pager, from its newest credential on"; `apps/server/test/unit/pager-broker-limits.test.ts`
+  "says each refusal from an address once a period, with the count since the last";
+  `apps/console/test/pagers.test.tsx` "says how many sign-ins with a wrong secret a pager had".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Not mitigated. Plan: P8-03b2b by 2026-10-13: failed sign-ins are logged and counted.
+- Status: Mitigated (P8-03b2b).
 
 ### Information disclosure
 
@@ -339,26 +357,44 @@ A pager is broken, switched off or ignored, and its wearer's alerts would wait f
 Any host on the LAN opens many connections to port 8883 and announces huge packets; the broker
 reads them before sign-in, and the POS server, in the same process, runs out of memory.
 
-- Mitigation: none yet: the broker sets no packet size, no connection limit and a 30-second
-  sign-in time.
-- Code: `apps/server/src/pagers/pager-broker.ts` (`PagerBroker`).
-- Tests: none, no test floods the broker yet; P8-03b2b adds them with the limits.
-- Risk: likelihood Medium, impact High: High.
-- Status: Not mitigated. Plan: P8-03b2b by 2026-10-13: a packet size limit before and after
-  sign-in, a connection limit, a short sign-in time and a limit on Argon2 checks at once.
+- Mitigation: every TCP connection is admitted first, before its TLS handshake: at most 4 sign-ins
+  in progress from one address (the PC's own excepted), 64 in all and 256 connections. The TLS
+  handshake and the CONNECT must come within 10 s. A packet announcing more than 1 KB before
+  sign-in, or 4 KB after, ends the connection at its header, before its body is read. At most 2
+  Argon2id checks run at once with 64 waiting; the rest are told "server unavailable" without one
+  (P8-03b2b). A flood from many addresses can still keep pagers from signing in while it lasts;
+  their wearers' alerts then reach the phones and escalate (NTF-007).
+- Code: `apps/server/src/pagers/broker-limits.ts` (`ConnectionGate`, `MqttPacketSizes`,
+  `LimitedConnection`, `TaskLimiter`); `apps/server/src/pagers/pager-broker.ts`
+  (`DEFAULT_PAGER_LIMITS`).
+- Tests: `apps/server/test/integration/pager-broker-limits.int.test.ts` "ends a connection whose
+  packet announces more than a CONNECT can be, at its header", "gives a connection the sign-in time
+  for its TLS handshake and its CONNECT", "takes a few sign-ins at a time from one address, and the
+  pager once they end", "checks one secret at a time with one waiting, and asks the rest to come
+  back"; `apps/server/test/unit/pager-broker-limits.test.ts` "says so at the header of a packet
+  over the limit, before its body", "limits sign-ins in progress and connections in all".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03b2b).
 
 #### PAGER-D4 A signed-in pager publishing too much
 
 A pager, or a copy, sends heartbeats as fast as it can, or retained or large messages.
 
-- Mitigation: each heartbeat is checked and stored; nothing limits their rate, retained messages
-  or their size.
-- Code: `apps/server/src/pagers/pager-broker.ts` (`PagerBroker`).
-- Tests: `apps/server/test/integration/pagers.int.test.ts` "ignores a pager publishing where it
-  may not".
-- Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: heartbeats faster than half the interval
-  are dropped, retained and large messages refused.
+- Mitigation: a heartbeat less than half the interval after the last one taken is dropped, and
+  acknowledgements beyond a burst of ten, then one a second; retained and QoS 2 messages, and any
+  packet over 4 KB, end the connection; a CONNECT with a will message is refused (P8-03b2b).
+- Code: `packages/domain/src/pager.ts` (`pagerHeartbeatTooSoon`);
+  `apps/server/src/pagers/broker-limits.ts` (`TokenBucket`);
+  `apps/server/src/pagers/pager-broker.ts` (`PagerBroker`).
+- Tests: `packages/domain/test/pager.test.ts` "drops a heartbeat less than half the interval after
+  the last one taken"; `apps/server/test/integration/pagers.int.test.ts` "drops heartbeats faster
+  than half the interval", "drops acknowledgements beyond a burst of ten, then takes about one a
+  second", "ends the connection of a pager that sends a retained or QoS 2 message";
+  `apps/server/test/integration/pager-broker-limits.int.test.ts` "ends a signed-in pager’s
+  connection on a packet over the limit", "refuses a will message, and a name that is no pager
+  without checking a secret".
+- Risk: likelihood Low, impact Low: Low.
+- Status: Mitigated (P8-03b2b).
 
 #### PAGER-D5 A firmware update stopping pagers in service
 
@@ -380,13 +416,17 @@ When a pager reconnects while its old session is still open, or its socket close
 sign-in check, the PC's list of connected pagers can be wrong for a while: alerts are not sent, or
 a waiter without a working pager counts as reachable and NTF-007's immediate escalation is skipped.
 
-- Mitigation: the offline check after three missed heartbeats corrects it.
+- Mitigation: a pager counts as connected only once the broker has its client, and by that client:
+  a session closing removes only its own entry, never a newer one of the same pager. A pager
+  marked offline after missed heartbeats has its session closed, so it signs in again; what a
+  closed session sent is ignored (P8-03b2b).
 - Code: `apps/server/src/pagers/pager-broker.ts` (`isStaffConnected`, `checkOffline`).
-- Tests: `apps/server/test/integration/pagers.int.test.ts` "sends open alerts again when the pager
-  reconnects".
+- Tests: `apps/server/test/integration/pagers.int.test.ts` "keeps the pager connected when its old
+  session closes after the new one signed in", "sends open alerts again when the pager
+  reconnects", "records battery and signal, alerts at low battery, and marks the pager offline
+  after 3 missed beats".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: a connection counts only once the broker
-  has it, and a closing session removes only its own entry.
+- Status: Mitigated (P8-03b2b).
 
 ### Elevation of privilege
 
@@ -420,12 +460,11 @@ A waiter gives themselves a manager's pager, or starts a firmware update during 
 A restaurant registers more pagers than its licence counts, as the device limits allow for other
 devices (LIC-001).
 
-- Mitigation: the licence's limits apply to pairing codes; registering a pager does not check
-  them.
+- Mitigation: registering a pager counts the active pagers against the licence's pager limit,
+  under the same lock as pairing other devices (P8-03b2b).
 - Code: `apps/server/src/pagers/pagers.service.ts` (`PagersService.create`);
   `apps/server/src/licensing/licence-agent.service.ts` (`limitFor`).
-- Tests: `apps/server/test/integration/licence-agent.int.test.ts` "pairs no more devices of a kind
-  than the licence allows".
-- Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b2b by 2026-10-13: registering a pager checks the licence's
-  pager limit.
+- Tests: `apps/server/test/integration/licence-agent.int.test.ts` "registers no more pagers than the
+  licence allows", "pairs no more devices of a kind than the licence allows".
+- Risk: likelihood Low, impact Low: Low.
+- Status: Mitigated (P8-03b2b).

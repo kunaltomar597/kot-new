@@ -20,6 +20,7 @@ import {
   DEFAULT_TIME_ZONE,
   inTimeWindow,
   isNewerVersion,
+  lowersSecureVersion,
   PAGER_FIRMWARE_MAX_BYTES,
   type PagerFirmwareAttempt,
   type PagerFirmwareState,
@@ -41,7 +42,7 @@ import { type ConnectedPager, PagerBroker } from '../pagers/pager-broker.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { TlsService } from '../tls/tls.service.js';
 import { downloadInstaller, UpdateDownloadError } from '../updates/update-download.js';
-import { checkFirmwareImage, FirmwareImageError } from './firmware-image.js';
+import { checkFirmwareImage, FirmwareImageError, readFirmwareImage } from './firmware-image.js';
 import { PAGER_FIRMWARE_KEY_DIGESTS } from './firmware-keys.js';
 import {
   firmwareDir,
@@ -296,12 +297,27 @@ export class PagerFirmwareService implements OnApplicationBootstrap, OnModuleDes
       );
       return;
     }
+    // PAGER-T4: a newer version number with an older anti-rollback version is going back.
+    const servedSecure = served === null ? null : await this.secureVersionOf(served);
+    if (lowersSecureVersion(checked.info.secureVersion, servedSecure)) {
+      await rm(target, { force: true });
+      await this.failed(
+        restaurantId,
+        release,
+        'SECURE_VERSION_LOWER',
+        `The image’s anti-rollback version is ${String(checked.info.secureVersion)}; the firmware served has ${String(servedSecure)}.`,
+        true,
+        0,
+      );
+      return;
+    }
     const accepted: ServedFirmware = {
       version: release.version,
       sha256: release.sha256,
       sizeBytes: release.sizeBytes,
       fileName,
       keyDigest: checked.keyDigest,
+      secureVersion: checked.info.secureVersion,
       acceptedAt: now.toISOString(),
     };
     await this.prisma.transaction(async (tx) => {
@@ -326,6 +342,20 @@ export class PagerFirmwareService implements OnApplicationBootstrap, OnModuleDes
     });
     this.logger.log({ version: release.version }, 'New pager firmware is checked and served');
     await this.removeOtherImages(fileName);
+  }
+
+  /**
+   * The served firmware's anti-rollback version: kept since P8-03b2b, read from its image for
+   * what an older version kept; null when the image cannot be read.
+   */
+  private async secureVersionOf(served: ServedFirmware): Promise<number | null> {
+    if (served.secureVersion !== undefined) return served.secureVersion;
+    try {
+      const image = await readFile(join(firmwareDir(this.config.dataDir), served.fileName));
+      return readFirmwareImage(image).secureVersion;
+    } catch {
+      return null;
+    }
   }
 
   /** The release is not served: refused for good, or a download to try again later. */

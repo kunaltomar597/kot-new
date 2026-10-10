@@ -22,6 +22,8 @@ export function firmwareImage(options: {
   project?: string;
   chipId?: number;
   bodyBytes?: number;
+  /** Its anti-rollback version (`secure_version`), 0 by default. */
+  secureVersion?: number;
 }): Buffer {
   const header = Buffer.alloc(24);
   header[0] = 0xe9;
@@ -37,6 +39,7 @@ export function firmwareImage(options: {
   segment.writeUInt32LE(256, 4);
   const desc = Buffer.alloc(256);
   desc.writeUInt32LE(0xabcd5432, 0);
+  desc.writeUInt32LE(options.secureVersion ?? 0, 4);
   desc.write(options.version, 16, 32, 'latin1');
   desc.write(options.project ?? 'rp-pager', 48, 32, 'latin1');
   desc.write('12:00:00', 80, 16, 'latin1');

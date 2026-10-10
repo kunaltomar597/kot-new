@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b2a).
+Last updated: 2026-10-10 (P8-03b2b).
 
 What exists:
 
@@ -27,7 +27,8 @@ What exists:
   from the PC a phone or tablet takes, and when a kiosk tablet installs it by itself (P7-04e2);
   when the PC offers its pager firmware to a pager, and when it gives up (P2-04b1); the PINs
   guessed first, counting wrong secrets towards a lock, and the kind of record each approval is
-  for (P8-03b2a). 403 tests.
+  for (P8-03b2a); a pager's heartbeat too soon after the last, and firmware that would lower the
+  anti-rollback version (P8-03b2b). 405 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -58,7 +59,8 @@ What exists:
   without its devices or a public one that does not say why (P8-03a); the `SIGN_IN_LOCKED` alert,
   a device's PIN lock with `unlockDevicePins`, `IDLE_HEADER` (`x-rp-idle-seconds`) and the
   settings `auth.deviceLockoutMaxFailures`, `auth.tabletLockoutMaxFailures` and
-  `auth.refuseEasyPins` (P8-03b2a). 964 tests.
+  `auth.refuseEasyPins` (P8-03b2a); a pager's sign-ins with a wrong secret on `PagerView`, and
+  the firmware problem `SECURE_VERSION_LOWER` (P8-03b2b). 964 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -129,8 +131,13 @@ What exists:
   minutes), against a table tablet only, never its managers, easily guessed PINs refused, every
   lockout alerting the managers and the Owner until lifted, a manager's approval good only for
   the record it names, and sessions kept alive only as of the person's last touch, as the app
-  says (P8-03b2a). 1212 tests (28 skipped: Windows only, a real install, or the performance
-  runs).
+  says (P8-03b2a); the pager broker's limits (connections per address and in all, 10 s to sign
+  in, packet sizes at their header before and after sign-in, Argon2id checks at once), heartbeats
+  no faster than half the interval, retained, QoS 2 and will messages refused, a pager's button
+  acknowledging only alerts sent to that pager and recorded with it, a pager connected only once
+  the broker has it, failed sign-ins logged and counted per pager, no more pagers than the
+  licence allows, and no firmware with a lower anti-rollback version (P8-03b2b). 1237 tests (28
+  skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -263,7 +270,8 @@ What exists:
   Playwright run scans one through Chromium's fake camera); the kitchen screen's sound made ready
   before the first touch, and a Playwright speed test of taps and screen changes (NFR-P07) on a
   restaurant of the design capacity's size (P8-01b); on the Devices page, a device that takes no
-  PINs after too many wrong ones, until when, and "Take PINs again" (P8-03b2a). 384 tests, and 25
+  PINs after too many wrong ones, until when, and "Take PINs again" (P8-03b2a); on the Pagers
+  page, a pager's sign-ins with a wrong secret and the last one (P8-03b2b). 385 tests, and 25
   Playwright steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
@@ -303,7 +311,8 @@ What exists:
   the eight components with 195 threats, their code, their tests and a dated plan for each one
   left open, checked on every build by `pnpm security:threats` (P8-03b1). P8-03b2a mitigated six
   (PIN guessing, lockouts, a tablet's PIN prompt, approvals used on another record, a phone left
-  signed in): 99 mitigated, 9 residual Highs, each planned.
+  signed in), P8-03b2b seven of the pager channel's and the PC's part of an eighth: 106
+  mitigated, 8 residual Highs, each planned.
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
@@ -316,9 +325,9 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b2b (the pager broker: PAGER-D3 is a residual High), then P8-03b2c, P8-03b3 and P8-03b4:
-  the fixes the threat models planned, by their dates (the summary in
-  `docs/security/threat-models/README.md` lists each threat).
+- P8-03b2c (bodies, uploads, exports and erasure), then P8-03b3 and P8-03b4: the fixes the
+  threat models planned, by their dates (the summary in `docs/security/threat-models/README.md`
+  lists each threat).
 - Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
   incident response plan and the pack for the penetration testers (the external test needs the
   firm the Business Owner engages).
@@ -547,7 +556,7 @@ Recommended next WPs (dependencies met):
     - [~] P8-03b2 Threat-model fixes on the restaurant PC (server, pager broker, data, waiter app)
       - [x] P8-03b2a Sign-in and approvals (PIN budgets per device, easy PINs, lockout alerts,
             approvals bound to their record, the waiter phone's inactivity)
-      - [ ] P8-03b2b The pager broker's limits, acknowledgements and sign-in log
+      - [x] P8-03b2b The pager broker's limits, acknowledgements and sign-in log
       - [ ] P8-03b2c Bodies, uploads, exports and erasure
     - [ ] P8-03b3 Threat-model fixes to the licence and the update pipeline
     - [ ] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
@@ -799,6 +808,40 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b2b):
+
+730. The pager broker's limits are constants of the server (`DEFAULT_PAGER_LIMITS`), not ⚙
+     settings: they protect the POS process, and the BRD sets none. 256 connections; 64 sign-ins
+     in progress in all and 4 from one address (the PC's own addresses are not limited per
+     address, for the load test and the set-up checks); 10 s for the TLS handshake and the
+     CONNECT; 1 KB per packet before sign-in, 4 KB after (a heartbeat with its firmware report is
+     under 400 bytes); 2 Argon2id checks at once with 64 waiting. A sign-in beyond that is answered
+     "server unavailable" (CONNACK 3) without a check and is not counted as a failure; the
+     firmware tries again after 1 to 5 s (`firmware/pager/README.md`).
+731. Failed pager sign-ins are logged at most once a minute per reason, address and pager, with
+     the count since the last line, and a wrong secret under a pager's name is counted on the
+     pager until its credential is replaced; the Pagers page shows the count and the last time.
+     Nothing locks a pager out: an attacker could then lock real pagers out, and a 192-bit secret
+     cannot be guessed.
+732. A pager's button acknowledges only alerts that reach its wearer on the pager and app
+     channels, whoever wears it: a manager's pager no longer has a manager's reach (only the POS,
+     the dashboard and the phone signed in as a manager do). Every acknowledgement records the
+     device it came from (`alerts.acknowledged_by_device_id`): the pager, the phone or the screen.
+     No screen shows it yet (none lists acknowledged alerts); it is kept for a dispute.
+733. Heartbeats less than half the interval after the last one taken are dropped, timed on a
+     monotonic clock per session (a new session's first is always taken), and acknowledgements
+     beyond a burst of ten, then one a second (each is a transaction). Retained and QoS 2 messages
+     end the connection, and a CONNECT with a will message is refused (CONNACK 5): the firmware
+     uses none of them.
+734. A pager the offline check marks offline has its session closed, so it signs in again; the
+     list of connected pagers then always matches the sessions, and what a closed session sent is
+     ignored (a heartbeat in flight no longer marks a revoked pager online).
+735. The PC refuses for good (`SECURE_VERSION_LOWER`) pager firmware whose anti-rollback version is
+     lower than that of the firmware it serves, whatever its version number. It keeps each served
+     image's secure version; for what an older PC kept, it reads it from the served image.
+736. Registering a pager checks the licence's pager limit under the same lock as pairing (409
+     `DEVICE_LIMIT_REACHED`), as for the other limited devices.
 
 Decided 2026-10-10 (P8-03b2a):
 
@@ -3958,6 +4001,56 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b2b The pager broker
+
+Decisions 730 to 736. Seven threats of the pager channel mitigated (PAGER-D3, the residual High,
+PAGER-D4, PAGER-D6, PAGER-E3, PAGER-R2, PAGER-R3, PAGER-T1) and the PC's part of PAGER-T4 (the
+pager's eFuse stays with P2-05).
+
+Built:
+
+- `@rp/domain`: `pagerHeartbeatTooSoon`, `lowersSecureVersion`.
+- `@rp/contracts`: `PagerView.signInFailures` and `lastSignInFailureAt`; `SECURE_VERSION_LOWER`.
+- Server: `src/pagers/broker-limits.ts` (`MqttPacketSizes` reads MQTT fixed headers as bytes
+  pass, `LimitedConnection` wraps each socket for aedes and ends it at an over-large header,
+  `ConnectionGate`, `TaskLimiter` for the Argon2id checks, `ThrottledLog`). `PagerBroker`: every
+  TCP connection admitted in a `connection` listener prepended before the TLS one (its ticket
+  found again by address and port after the handshake); `handshakeTimeout` and aedes'
+  `connectTimeout` from `signInMs`, and `tlsClientError` destroys the socket (Node only reports a
+  handshake timeout); sessions in a `WeakMap` by client from the sign-in, the connected list set at
+  `clientReady` and cleared only by its own client; wills refused at sign-in; retained and QoS 2
+  publishes refused; heartbeat rate per session on `PagerOptions.clockMs` and an acknowledgement
+  `TokenBucket`; the offline check closes the session; acks through
+  `NotificationsService.acknowledgeForPager`; wrong secrets counted on the device. Migration
+  `20261010140000_pager_broker_limits`. Every acknowledgement path passes its device
+  (`AcknowledgedBy`), service requests included. `PagersService.create` checks the licence's
+  limit. The firmware service keeps `secureVersion` in what it serves and refuses a lower one.
+- Console: the Pagers page's line for sign-ins with a wrong secret.
+- Docs: the pager-channel threat model (106 mitigated in all, 8 residual Highs),
+  `docs/security/authorisation.md`, and what the broker refuses in `firmware/pager/README.md`.
+
+Tests: server 1237 (+25, 28 skipped; new `pager-broker-limits.int` over MQTTS with tight limits
+and `pager-broker-limits` unit tests), domain 405, contracts 964 (5 schema snapshots), console 385,
+waiter app 70. The T1 test was checked to fail with the old manager reach.
+
+Not done or not verified:
+
+- P8-03b2c, as split.
+- The load test (`test/load/`, P8-01a) was not run again: its 30 pagers connect at once from the
+  PC's own address, which the gate does not limit per address, and 30 Argon2id checks two at a
+  time (16 ms each on this Mac) add about a quarter of a second to their reconnection after the
+  server restarts. Run it at the next performance check.
+
+Gotchas:
+
+- `PAGER_OPTIONS` takes any of `PagerBrokerLimits` besides `offlineCheckMs`; a test that sends
+  several heartbeats on one connection must move `clockMs` on (see `pager-firmware.int`'s
+  `brokerMs`), or the broker drops them.
+- An integration test against the broker over TLS: `config: { tls: true, mqtt: 'on' }`, `api(app)`
+  for REST (it trusts the CA) and `ca` from `TlsService.ca()` for mqtts.
+- `mqtt.connectAsync` does not reject when the server closes without a CONNACK; refusals the
+  pager must hear go through `authenticate` (CONNACK 5), as the will check does.
 
 ### 2026-10-10: P8-03b2a Sign-in and approvals
 

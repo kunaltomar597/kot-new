@@ -27,6 +27,8 @@ export const ServedFirmware = z.object({
   fileName: z.string().regex(/^rp-pager-[0-9A-Za-z.-]{5,64}\.bin$/),
   /** The trusted key that signed it. */
   keyDigest: z.string(),
+  /** Its anti-rollback version (PAGER-T4); absent in what a PC kept before P8-03b2b. */
+  secureVersion: z.int().nonnegative().optional(),
   acceptedAt: Instant,
 });
 export type ServedFirmware = z.infer<typeof ServedFirmware>;

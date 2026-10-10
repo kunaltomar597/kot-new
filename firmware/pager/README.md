@@ -21,6 +21,24 @@ pairing screen and the printed label must show:
 
 A bare serial in a supplier's QR code is read too.
 
+## What the broker refuses (P8-03b2b)
+
+The PC's broker protects the POS server it runs in (PAGER-D3, PAGER-D4 in
+`docs/security/threat-models/pager-channel.md`). P2-05's firmware must stay within it:
+
+- finish the TLS handshake and send CONNECT within 10 seconds of opening the connection;
+- a CONNECT of at most 1 KB, without a will message; every packet after sign-in at most 4 KB;
+- publish at QoS 0 or 1, never retained, only on its own `ack` and `heartbeat` topics; anything
+  else ends the connection;
+- a heartbeat less than half the interval (⚙ `pagers.heartbeatSeconds`, 30 s) after the last
+  one taken is dropped: send one on connecting and then every interval. Acknowledgements beyond
+  ten at once, then one a second, are dropped too;
+- three missed heartbeats end the session: sign in again;
+- a CONNACK of "server unavailable" (3) means too many sign-ins at once: try again after a
+  random 1 to 5 seconds. "Not authorized" (5) means a wrong or replaced credential: the pager
+  shows it and tries again with a growing wait, up to a minute; each attempt is counted on the
+  Pagers page.
+
 ## Over-the-air updates: what the server already does (P2-04b1)
 
 The restaurant PC passes on firmware the vendor releases in the Control Plane (PGR-011, ADR-0018,
