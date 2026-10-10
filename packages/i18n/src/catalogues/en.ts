@@ -597,6 +597,98 @@ export const en = {
     manage: 'Manage',
     notAllowed: 'Your role cannot open {mode}.',
   },
+  /** Contextual help for the dashboard pages and the first-use tips (NFR-U07). */
+  help: {
+    button: 'Help',
+    gotIt: 'Got it',
+    tipLabel: 'Tip for this page',
+    tryThis: 'Try this:',
+    overview: {
+      title: 'Your restaurant at a glance',
+      body: 'The cards show tables, dishes in the kitchen and open alerts. Below them, every table is a tile that changes colour as guests order, eat and ask for the bill.',
+      tip: 'Select an occupied table to see its order.',
+    },
+    orders: {
+      title: 'Orders as they happen',
+      body: 'This is the live feed of every order in progress, newest activity first. Late dishes are marked so you can act before the guest asks.',
+      tip: 'Use the filters to show only one table, station or late dishes.',
+    },
+    alerts: {
+      title: 'Things that need a person',
+      body: 'Alerts appear when a guest calls, a dish is late or something needs approval. They stay here until someone resolves them.',
+      tip: 'Select Resolve once the matter is dealt with, so nobody repeats it.',
+    },
+    reports: {
+      title: 'Sales and service reports',
+      body: 'Pick a report and a date range. Numbers follow the business day, which ends at the cut-off time, not at midnight.',
+      tip: 'Use Export to take a report into a spreadsheet.',
+    },
+    audit: {
+      title: 'The audit trail',
+      body: 'Every sensitive action is recorded here with who did it, who approved it and why. Records cannot be changed or deleted.',
+      tip: 'Filter by person or action to find one event.',
+    },
+    staff: {
+      title: 'Your team',
+      body: 'Add people, give each a role and a PIN, and plan today’s sections and pagers. A person who leaves is deactivated, never deleted.',
+      tip: 'Deactivate a leaver the same day so their PIN stops working.',
+    },
+    floor: {
+      title: 'Your floor plan',
+      body: 'Add tables and sections here. Waiters see the tables in the same order.',
+      tip: 'Give each table a short name that is printed on its QR code.',
+    },
+    qrCodes: {
+      title: 'Table QR codes',
+      body: 'Each table has its own QR code. Guests scan it to see the menu and order from their phone.',
+      tip: 'Print the codes and stick one on every table.',
+    },
+    menu: {
+      title: 'Your menu',
+      body: 'Add dishes, prices, tax groups and photos. A dish switched off disappears from every screen at once.',
+      tip: 'Mark a dish as unavailable when it runs out instead of deleting it.',
+    },
+    devices: {
+      title: 'Paired devices',
+      body: 'Phones, tablets and pagers that may use your system are listed here. Pair a new one with its QR code; remove one that is lost.',
+      tip: 'Revoke a lost device straight away.',
+    },
+    setup: {
+      title: 'Getting ready for service',
+      body: 'This checklist shows what is still missing before you can take your first order.',
+      tip: 'Work down the list from the top.',
+    },
+    restaurant: {
+      title: 'Your restaurant’s details',
+      body: 'Name, address, GST number, tax groups and invoice numbering. These appear on every bill.',
+      tip: 'Check your GST number twice; bills carry it.',
+    },
+    printing: {
+      title: 'Kitchen stations and printers',
+      body: 'Say which station cooks which dishes and which printer prints their tickets. Test a printer after you change it.',
+      tip: 'Print a test ticket after changing a printer.',
+    },
+    settings: {
+      title: 'Settings',
+      body: 'Each setting has a sensible starting value. Change one only when your restaurant works differently.',
+      tip: 'Read the line under a setting before you change it.',
+    },
+    system: {
+      title: 'Your server’s health',
+      body: 'Backups, updates and the state of the server. A green page means everything is fine.',
+      tip: 'Check that last night’s backup says Done.',
+    },
+    licence: {
+      title: 'Your licence',
+      body: 'Shows what your licence covers and when it ends. Renew before the date to keep working.',
+      tip: 'Contact support if the dates look wrong.',
+    },
+    security: {
+      title: 'Your sign-in security',
+      body: 'Shows where and when you signed in, and lets you change your PIN. Only the Owner sees this page.',
+      tip: 'Change your PIN if you think anyone has seen it.',
+    },
+  },
   /** The manager dashboard (P4-01, MGR-001 to MGR-003, MGR-011). */
   dashboard: {
     navigation: 'Dashboard',

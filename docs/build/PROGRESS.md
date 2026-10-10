@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-04a).
+Last updated: 2026-10-11 (P8-04b).
 
 What exists:
 
@@ -412,7 +412,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-04b contextual help; P8-05 Runbooks, manuals and training material.
+- P8-05 Runbooks, manuals and training material.
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -678,7 +678,7 @@ Recommended next WPs (dependencies met):
   - [x] P8-03e Incident response plan and penetration-test support (the plan and the pack are written; naming the people, the tabletop exercise and the external test are manual task 36 [H])
 - [~] P8-04 UX polish and accessibility audit
   - [x] P8-04a The audit (`docs/usability/ux-audit.md`), the screen-states guard and the usability test scripts
-  - [ ] P8-04b Contextual help and first-use tips (NFR-U07, Should)
+  - [x] P8-04b Contextual help and first-use tips (NFR-U07, Should): a Help button and a one-time tip on every dashboard page
   - [ ] P8-04c Usability results from the pilot, TalkBack pass [H]
 - [ ] P8-05 Runbooks, manuals, training
 - [ ] P8-06 Pilot readiness
@@ -4421,6 +4421,10 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-04b contextual help and first-use tips
+
+Every dashboard page now has a Help button (a short explanation in a dialog) and, the first time a person opens the page, a dismissible tip above it (`apps/console/src/help/`, `help.*` strings in `@rp/i18n`). What a person has seen is kept per person in `localStorage` on that device. Decided: the tip is an inline note, not a dialog, so it never blocks work or the screen reader's view of the page. Deferred: help on the POS and KDS modes and the phone apps; training videos are P8-05. Gotcha: `apps/console` tests read `@rp/i18n` from `dist`, so run `pnpm --filter @rp/i18n build` after adding strings.
 
 ### 2026-10-11: P8-04a the UX audit, the screen-states guard and the usability scripts
 

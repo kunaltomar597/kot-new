@@ -2046,3 +2046,30 @@ body {
     color: #000;
   }
 }
+
+.screen-help {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-end: var(--rp-space-2, 0.5rem);
+}
+
+.screen-help {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2, 0.5rem);
+}
+
+.screen-help__tip {
+  display: flex;
+  flex: 1 1 20rem;
+  align-items: center;
+  gap: var(--rp-space-2, 0.5rem);
+  padding: var(--rp-space-2, 0.5rem) var(--rp-space-3, 0.75rem);
+  border: 1px solid var(--rp-color-border, currentColor);
+  border-radius: var(--rp-radius-md, 0.5rem);
+}
+
+.screen-help__tip p {
+  flex: 1;
+  margin: 0;
+}
