@@ -43,7 +43,7 @@ shows the chain going back all the same. So:
   or with the Owner present;
 - after any restore, the Owner checks the System page's "last restore" line against what they did;
 - the Owner treats an unexpected "audit chain cut back" alert from the vendor as an incident
-  (the incident response plan, P8-03e).
+  ([the incident response plan](../security/incident-response.md), P8-03e).
 
 ## Yearly review
 

@@ -122,7 +122,9 @@ any of them by telling Claude.
 From BRD §19.2 and §19.3; details in `docs/owner/OWNER_CHECKLIST.md`.
 
 - [ ] Subscription agreement / EULA matching the licence states (LIC-005), DPA, privacy notices.
-- [ ] DPDP review with counsel; CERT-In point of contact.
+- [ ] DPDP review with counsel; CERT-In point of contact. The incident response plan's names, the first
+      tabletop exercise and the penetration test (SEC-016, SEC-017):
+      [`manual-tasks/36-incident-response-and-pentest.md`](manual-tasks/36-incident-response-and-pentest.md).
 - [ ] Pager certification (WPC, BIS) through a compliance consultant.
 - [ ] Penetration-testing firm (needed before the pilot, P8-03).
 - [ ] Pilot restaurant(s), baseline KPIs, the restaurant CA's confirmation of the invoice template

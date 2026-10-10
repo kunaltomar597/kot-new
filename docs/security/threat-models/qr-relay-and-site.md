@@ -111,8 +111,9 @@ tables out of service, rejects orders or reads diners' names.
   credential at once, and only that one"; `apps/server/test/integration/relay-sync.int.test.ts`
   "is kept sealed in the database, never as it is".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03e by 2026-10-24: nothing watches how a credential is used;
-  the incident plan says how to revoke one and issue the next.
+- Status: Partly mitigated. The incident response plan says how to revoke a credential and issue
+  the next (`docs/security/incident-response.md`, P8-03e). Plan: manual task 20 by 2026-11-30:
+  nothing watches how a credential is used; the relay's logs are read by hand until it does.
 
 #### RELAY-S4 A fake QR sticker
 
@@ -124,9 +125,10 @@ for payment or details.
 - Code: `apps/server/src/floor/table-tents.ts` (`tableTentsPdf`).
 - Tests: none, a sticker on a table is outside the software; the guidance is a procedure.
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03e by 2026-10-24: guidance for restaurants in the incident
-  plan's templates (tents that show tampering, staff who look at them, what to tell diners), with
-  the site on the vendor's own recognisable domain (manual task 21).
+- Status: Partly mitigated. The restaurants' guidance is written (tents that show tampering, staff
+  who look at them, what to tell diners: `docs/security/incident-templates.md`, and the playbook in
+  `docs/security/incident-response.md`, P8-03e). Plan: manual task 21 by 2026-11-30: the site on the
+  vendor's own recognisable domain.
 
 #### RELAY-S5 Forging a relay role
 
