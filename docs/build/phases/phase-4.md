@@ -494,13 +494,67 @@ dashboard's Alerts page (`/manage/alerts`, P4-01); this WP adds what the spec li
 the system screen as a fourth page.
 Acceptance: Playwright tests with seeded alerts.
 
-Device alerts for kitchen screens and table tablets (NTF-003) need a publisher: pagers report
-through heartbeats, but nothing yet says when a screen or tablet has been disconnected too long.
-Add it here: the gateway notes when a KDS or tablet's last live connection closes and, when it has
-not come back within a grace period (a new setting, e.g. `devices.offlineAfterSeconds`, default
-60 s, so a page reload raises nothing), publishes `DeviceStatusChanged` `online: false`, and
-`online: true` when it connects again (also after a server restart, from the stored `online`).
-The notification triggers already turn those into one alert per state.
+Built in two parts:
+
+### P4-04a Device and system alerts (done)
+
+Requirements: MGR-008, NTF-003 (a table tablet or kitchen screen offline), MGR-006 (status).
+Deliverables: device alerts for kitchen screens and table tablets (NTF-003) need a publisher:
+pagers report through heartbeats, but nothing yet says when a screen or tablet has been
+disconnected too long. The server keeps `online` for kitchen screens and table tablets: when one's
+last live connection closes and it has not come back within a grace period (a new setting,
+`devices.offlineAfterSeconds`, default 60 s, so a page reload raises nothing), it publishes
+`DeviceStatusChanged` `online: false`, and `online: true` as soon as it connects again (also after
+a server restart, from the stored `online`, with the grace counted from the start). The
+notification triggers already turn those into one alert per state. The alert centre puts the
+system alerts in words: a printer's own error and the tickets waiting for it, and how full the
+data drive is and how much is free.
+Acceptance: unit and integration tests for the grace period, reconnects and restarts; Playwright
+with seeded alerts: a kitchen screen that goes offline and comes back (its alert ends by itself),
+then an escalated table request, the kitchen's flag and a full data drive, each acknowledged in
+the alert centre.
+
+As built:
+
+- Server: `DeviceLiveness` (`src/devices/device-liveness.ts`, in the devices module) watches
+  kitchen screens and table tablets. `RealtimeGateway.onConnectionChange` tells it when a device's
+  first live connection opens and its last one closes. A device that connects is stored online
+  and announced at once (`DeviceStatusChanged` `online: true`, with its last battery reading); one
+  whose last connection closed is announced offline only after `devices.offlineAfterSeconds`
+  (new setting: 60 s by default, 10 s to an hour, managers change it), so a reload or a moment
+  out of Wi-Fi raises nothing. A check every 5 s applies the grace and puts right a connection
+  the stored state missed. After a restart every device stored online gets the grace from the
+  server's start. Only the change that flips `online` (a conditional update) announces it, so a
+  check and a connection racing never announce twice. The existing notification triggers raise
+  one alert per state, cleared when the device is back; pagers, waiter phones, consoles and
+  unpaired devices are left alone.
+- Alert words (`describeAlert` in `@rp/ordering`): a printer alert says the printer's own error
+  when it gave one ("Kitchen printer: Paper out") and otherwise that it is not printing, then how
+  many tickets wait for it; the disk alert says how full the data drive is and how much is free
+  ("The data drive is 86% full, with 12.4 GB free."), sizes in units of 1,024 as Windows shows
+  them (`sizeText`).
+- Playwright: Vikram (Manager) sets the offline alert to 10 seconds, pairs the kitchen screen
+  "Pass screen" in a second browser and closes it; the alert centre shows "Pass screen is not
+  connected…" under For you, and when the screen is opened again the alert ends by itself. The
+  screen is unpaired again. Then three seeded alerts (Ravi's water request at table 9 escalated
+  to the Owner, the kitchen's flag on KOT 99, the data drive 86 % full) show under Escalated to
+  the managers, Kitchen, and Devices and system, with their words; the page passes axe and fits a
+  360 px phone, and each is acknowledged.
+
+### P4-04b System screen
+
+Requirements: MGR-010, NFR-I03, DATA-006 (display), LIC-008 (display), UPD-004 ("Install now").
+Deliverables: the dashboard's System page (`/manage/system`) as the single support screen
+(NFR-I03): versions and service status (database, pager broker, printers, the Control Plane
+link), connected devices by type, storage (the data drive's use against the 80 % and 90 % levels,
+and by category: transactions, audit, photos, logs, backups), backups (what is set up; the backup
+runs arrive with P7-05), the licence (its state and days left; placeholder until P7-01), updates
+(this version, the release the Control Plane offers, the maintenance window, and "Install now",
+which records a manager's approval for the update agent of P7-04 and is refused while tables are
+open), and "Send diagnostics to support" (sends the health report to the Control Plane now; the
+log bundle is P7-08).
+Acceptance: Playwright with a seeded offered update: a manager sees the System page, cannot
+install while a table is open, installs once tables are closed, and sends diagnostics.
 
 ## P4-05 Full report suite
 

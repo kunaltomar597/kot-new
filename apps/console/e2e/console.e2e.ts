@@ -109,6 +109,53 @@ async function sentMinutesAgo(item: string, minutes: number): Promise<void> {
 }
 
 /**
+ * Three alerts put straight into the database, as the server would hold them: Ravi's water request
+ * at table 9 that went unanswered and was escalated to the Owner, the kitchen's flag on a naan left
+ * at the pass, and the Owner's alert that the data drive is 86 % full (the hourly disk check).
+ */
+async function seedAlerts(): Promise<void> {
+  const client = new pg.Client({ connectionString: process.env.RP_E2E_DATABASE_URL });
+  await client.connect();
+  try {
+    const { rows } = await client.query<{
+      restaurant: string;
+      table: string;
+      ravi: string;
+      asha: string;
+    }>(
+      `SELECT r.id AS restaurant, t.id AS table, ravi.id AS ravi, asha.id AS asha
+       FROM restaurants r
+       JOIN tables t ON t.restaurant_id = r.id AND t.label = '9'
+       JOIN staff ravi ON ravi.restaurant_id = r.id AND ravi.display_name = 'Ravi'
+       JOIN staff asha ON asha.restaurant_id = r.id AND asha.display_name = 'Asha (Owner)'`,
+    );
+    expect(rows).toHaveLength(1);
+    const [ids] = rows;
+    const { rowCount } = await client.query(
+      `INSERT INTO alerts (id, restaurant_id, business_date, type, table_id, payload, dedupe_key,
+                           recipient_ids, channels, escalated_at, escalated_to)
+       SELECT gen_random_uuid(), $1::uuid,
+              (now() AT TIME ZONE 'Asia/Kolkata' - interval '4 hours')::date,
+              alert.type, alert.table_id, alert.payload, alert.dedupe_key, alert.recipient_ids,
+              alert.channels, alert.escalated_at, alert.escalated_to
+       FROM (VALUES
+         ('WATER_REQUEST', $2::uuid, '{}'::jsonb, NULL, ARRAY[$3::uuid, $4::uuid],
+          ARRAY['PAGER', 'WAITER_APP'], now(), ARRAY[$4::uuid]),
+         ('READY_NOT_COLLECTED', $2::uuid, '{"kotNumber": 99, "items": ["Butter Naan"]}'::jsonb,
+          NULL, ARRAY[$3::uuid], ARRAY['PAGER', 'WAITER_APP'], NULL, ARRAY[]::uuid[]),
+         ('DISK_OR_BACKUP', NULL, '{"usedPercent": 86, "freeBytes": 13314398618}'::jsonb,
+          'disk', ARRAY[$4::uuid], ARRAY['DASHBOARD'], NULL, ARRAY[]::uuid[])
+       ) AS alert (type, table_id, payload, dedupe_key, recipient_ids, channels, escalated_at,
+                   escalated_to)`,
+      [ids?.restaurant, ids?.table, ids?.ravi, ids?.asha],
+    );
+    expect(rowCount).toBe(3);
+  } finally {
+    await client.end();
+  }
+}
+
+/**
  * The code an authenticator app shows now for a base32 key (RFC 6238: HMAC-SHA1, 30 s steps,
  * 6 digits), as the Owner's phone would.
  */
@@ -1832,5 +1879,129 @@ test.describe.serial('the web console', () => {
     await expect(row('GST 12 %').getByText(t('tax.archived'), { exact: true })).toBeVisible();
     await expectAccessible(page);
     await atPhoneWidth();
+  });
+
+  test('[MGR-008] [NTF-003] [NTF-004] [MGR-006] a kitchen screen that is switched off alerts the managers until it is back, and the alert centre shows an escalated request, the kitchen’s flag and a full data drive, each acknowledged', async ({
+    browser,
+  }) => {
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    const grace = t('settingItems.devices.offlineAfterSeconds.label');
+    const group = (name: string) =>
+      page.getByRole('region', { name: new RegExp(`^${escape(name)} \\(\\d+\\)$`) });
+    const alertIn = (name: string, title: string) =>
+      group(name)
+        .getByRole('listitem')
+        .filter({ has: page.getByText(title, { exact: true }) });
+    const acknowledge = (title: string) =>
+      page.getByRole('button', { name: t('alerts.acknowledgeOf', { title }), exact: true });
+    const device = (name: string) =>
+      page.getByRole('listitem').filter({
+        has: page.getByRole('heading', { level: 4, name: new RegExp(`^${escape(name)}`) }),
+      });
+
+    // A manager has screens and tablets reported after 10 seconds away instead of a minute.
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await page
+      .getByRole('button', { name: t('settings.row.changeLabel', { name: grace }), exact: true })
+      .click();
+    const graceDialog = page.getByRole('dialog', { name: grace, exact: true });
+    await graceDialog.getByLabel(new RegExp(`^${escape(grace)}`)).fill('10');
+    await graceDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(page.getByText(t('settings.dialog.saved', { name: grace }))).toBeVisible();
+
+    // A kitchen screen for the pass, showing every station's tickets.
+    await nav.getByRole('link', { name: t('dashboard.section.devices') }).click();
+    await page.getByRole('button', { name: t('devices.pair') }).click();
+    const pair = page.getByRole('dialog', { name: t('devices.pairDialog.title') });
+    await pair
+      .getByLabel(t('devices.pairDialog.type'))
+      .selectOption({ label: t('devices.type.KDS') });
+    await pair.getByLabel(/^Name( \*)?$/).fill('Pass screen');
+    await pair.getByRole('button', { name: t('devices.pairDialog.create') }).click();
+    const issued = page.getByRole('dialog', {
+      name: t('devices.pairDialog.codeTitle', { name: 'Pass screen' }),
+    });
+    const code = await issued.locator('code').first().innerText();
+    const kitchen = await browser.newContext();
+    const screen = await kitchen.newPage();
+    await screen.goto(server.url);
+    await screen.getByLabel(t('pairing.codeLabel')).fill(code);
+    await screen.getByRole('button', { name: t('pairing.submit') }).click();
+    await expect(screen).toHaveURL(/\/kds$/);
+    await expect(issued.getByRole('status')).toHaveText(
+      t('devices.pairDialog.paired', { name: 'Pass screen' }),
+    );
+    await issued.getByRole('button', { name: t('devices.pairDialog.done') }).click();
+
+    // Switched off: once it has been away 10 seconds, the managers on duty are alerted.
+    await screen.close();
+    await nav.getByRole('link', { name: t('dashboard.section.alerts') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('alerts.title') })).toBeVisible();
+    const offline = alertIn(t('alerts.centre.groups.mine'), t('alerts.offline'));
+    await expect(
+      offline.getByText(t('alerts.deviceOffline', { device: 'Pass screen' })),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(offline.getByRole('button', { name: t('alerts.acknowledge') })).toBeVisible();
+
+    // Switched on again: the screen shows the kitchen and its alert ends by itself.
+    const again = await kitchen.newPage();
+    await again.goto(server.url);
+    await expect(again).toHaveURL(/\/kds$/);
+    await expect(again.getByText('Pass screen')).toBeVisible();
+    await expect(page.getByText(t('alerts.deviceOffline', { device: 'Pass screen' }))).toHaveCount(
+      0,
+    );
+
+    // Borrowed for the test: it is unpaired again.
+    await nav.getByRole('link', { name: t('dashboard.section.devices') }).click();
+    await device('Pass screen')
+      .getByRole('button', { name: t('devices.unpair') })
+      .click();
+    const unpair = page.getByRole('dialog', {
+      name: t('devices.unpairDialog.title', { name: 'Pass screen' }),
+    });
+    await unpair.getByLabel(t('devices.unpairDialog.reason')).fill('Back to the store room');
+    await unpair.getByRole('button', { name: t('devices.unpairDialog.confirm') }).click();
+    await expect(page.getByText(t('devices.unpaired', { name: 'Pass screen' }))).toBeVisible();
+    await expect(again).toHaveURL(/\/pair$/);
+    await kitchen.close();
+
+    // An escalated water request, the kitchen's flag and a data drive filling up, each in its group.
+    // They are written straight into the database, which announces nothing: the page is read again.
+    await seedAlerts();
+    await nav.getByRole('link', { name: t('dashboard.section.alerts') }).click();
+    await page.reload();
+    const water = t('alerts.atTable', { table: '9', what: t('alerts.type.WATER_REQUEST') });
+    const naan = t('alerts.atTable', { table: '9', what: t('alerts.type.READY_NOT_COLLECTED') });
+    const disk = t('alerts.type.DISK_OR_BACKUP');
+    const escalated = alertIn(t('alerts.centre.groups.escalated'), water);
+    await expect(escalated.getByText(t('alerts.centre.escalated'), { exact: true })).toBeVisible();
+    await expect(
+      escalated.getByText(t('alerts.for', { name: 'Ravi, Asha (Owner)' })),
+    ).toBeVisible();
+    await expect(
+      alertIn(t('alerts.centre.groups.kitchen'), naan).getByText(
+        t('alerts.kot', { number: 99, items: 'Butter Naan' }),
+      ),
+    ).toBeVisible();
+    await expect(
+      alertIn(t('alerts.centre.groups.system'), disk).getByText(
+        t('alerts.diskFull', { percent: 86, free: '12.4 GB' }),
+      ),
+    ).toBeVisible();
+    await expectAccessible(page);
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // Each is acknowledged and leaves the alert centre.
+    for (const title of [water, naan, disk]) {
+      await acknowledge(title).click();
+      await expect(acknowledge(title)).toHaveCount(0);
+    }
   });
 });

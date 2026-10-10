@@ -399,7 +399,8 @@ model Device {
   batteryPercent         Int?         @map("battery_percent")
   rssi                   Int?
   firmwareVersion        String?      @map("firmware_version")
-  /// Connected and heard from within 3 heartbeats (pagers); kept current by the pager service.
+  /// Pagers: heard from within 3 heartbeats (the pager broker). Kitchen screens and table tablets:
+  /// a live connection, or one lost less than devices.offlineAfterSeconds ago (DeviceLiveness).
   online                 Boolean      @default(false)
   staff                  Staff?       @relation(fields: [staffId], references: [id])
   sessions               Session[]

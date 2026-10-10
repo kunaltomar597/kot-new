@@ -92,6 +92,9 @@ type RealtimeNamespace = Namespace<
 >;
 type RealtimeSocket = Socket<ClientToServer, ServerToClient, Record<string, never>, ConnectionData>;
 
+/** Told when a device's live connection opens, and when its last one closes (P4-04a). */
+export type ConnectionListener = (device: AuthenticatedDevice, connected: boolean) => void;
+
 /** A refused handshake; the client's `connect_error` carries `message` = code and `data`. */
 class ConnectRefusal extends Error {
   readonly data: { readonly code: string; readonly message: string };
@@ -121,6 +124,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
   private namespace: RealtimeNamespace | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly timers: NodeJS.Timeout[] = [];
+  private readonly connectionListeners = new Set<ConnectionListener>();
   private sweeping: Promise<void> | undefined;
 
   constructor(
@@ -190,6 +194,17 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     // Closes connections without the socket-level "disconnect", so clients reconnect by
     // themselves when the server is back (NFR-P11). Nest closes the HTTP server itself.
     io?.engine.close();
+  }
+
+  /**
+   * Tells `listener` when a device connects and when its last live connection closes, so a
+   * screen's or tablet's absence can be noticed (P4-04a, NTF-003). Returns the way to stop.
+   */
+  onConnectionChange(listener: ConnectionListener): () => void {
+    this.connectionListeners.add(listener);
+    return () => {
+      this.connectionListeners.delete(listener);
+    };
   }
 
   /**
@@ -299,7 +314,12 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
       void this.resync(socket, request, ack);
     });
     socket.on('disconnect', () => {
-      this.seen(socket.data.device);
+      const { device } = socket.data;
+      this.seen(device);
+      // Socket.io has taken it out of its rooms by now: another tab may still hold the device.
+      if (!this.isDeviceConnected(device.restaurantId, device.deviceId)) {
+        this.connectionChanged(device, false);
+      }
     });
     try {
       await this.bus.withPublishLock(async () => {
@@ -308,10 +328,21 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         await socket.join([...socket.data.rooms]);
         socket.emit(REALTIME_MESSAGES.sync, sync);
       });
+      if (socket.connected) this.connectionChanged(socket.data.device, true);
     } catch (error) {
       this.logger.error({ err: error }, 'Could not start a live connection');
       // Transport-level close: the client reconnects and tries again.
       socket.conn.close();
+    }
+  }
+
+  private connectionChanged(device: AuthenticatedDevice, connected: boolean): void {
+    for (const listener of this.connectionListeners) {
+      try {
+        listener(device, connected);
+      } catch (error) {
+        this.logger.error({ err: error }, 'A connection listener failed');
+      }
     }
   }
 

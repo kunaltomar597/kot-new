@@ -76,9 +76,43 @@ function detailOf(alert: AlertView, t: Translator): string | null {
       const percent = numberOf(payload.batteryPercent);
       return percent === null ? null : t('alerts.deviceBattery', { device, percent });
     }
+    case 'PRINTER_OFFLINE': {
+      const printer = textOf(payload.printerName);
+      if (printer === null) return null;
+      const error = textOf(payload.error);
+      const queued = numberOf(payload.queued) ?? 0;
+      const why =
+        error === null
+          ? t('alerts.printerDown', { printer })
+          : t('alerts.printerError', { printer, error });
+      return queued > 0 ? `${why} ${t('alerts.printerQueued', { count: queued })}` : why;
+    }
+    case 'DISK_OR_BACKUP': {
+      const percent = numberOf(payload.usedPercent);
+      const free = numberOf(payload.freeBytes);
+      if (percent === null || free === null) return null;
+      return t('alerts.diskFull', { percent, free: sizeText(free, t) });
+    }
     default:
       return null;
   }
+}
+
+const SIZE_UNITS = ['bytes', 'KB', 'MB', 'GB', 'TB'] as const;
+
+/**
+ * A size in bytes as Windows Explorer shows it, in units of 1,024: "850 MB", "12.4 GB" (one
+ * decimal below 100 of a unit).
+ */
+export function sizeText(bytes: number, t: Translator): string {
+  let value = Math.max(0, bytes);
+  let unit = 0;
+  while (value >= 1_024 && unit < SIZE_UNITS.length - 1) {
+    value /= 1_024;
+    unit += 1;
+  }
+  const rounded = unit === 0 || value >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
+  return t('ui.size', { value: String(rounded), unit: SIZE_UNITS[unit] ?? 'TB' });
 }
 
 /** "Just now", "4 min ago", "1 h 05 min ago": how long an alert has waited (clocks drift). */

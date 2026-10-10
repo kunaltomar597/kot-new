@@ -150,6 +150,17 @@ backup, updates and diagnostics.
   (`isLiveOnly`), and the broker publishes it to a pager on `.../locate`. Pairing, renaming,
   moving and unpairing are announced as `RestaurantChanged` `DEVICES`. `last_seen_at` is written
   by device authentication (at most once a minute) and when a live connection closes.
+- Kitchen screens and table tablets offline (P4-04a, NTF-003): `DeviceLiveness`
+  (`src/devices/device-liveness.ts`) keeps their `online` from the gateway's connection changes
+  (`RealtimeGateway.onConnectionChange`, fired when a device's first connection opens and its last
+  one closes). Connecting is announced at once as `DeviceStatusChanged` `online: true`; a device
+  whose last connection closed is announced `online: false` only after
+  `devices.offlineAfterSeconds` (60 s by default), so a reload raises nothing. A check every 5 s
+  (`DEVICE_LIVENESS_OPTIONS`, 0 in tests that call `check(now)` themselves) applies the grace and
+  puts right a connection the stored state missed. After a restart the grace counts from the
+  start, so a device stored online has time to reconnect. Only the change that flips `online`
+  announces it, so racing checks never announce twice. The notification triggers turn the events
+  into one alert per state, cleared when the device is back.
 - Tests: `test/helpers/auth-kit.ts` registers devices with an Ed25519 key and gets real device
   tokens through the challenge flow; `authHeaders(deviceId, accessToken)` sends both.
 

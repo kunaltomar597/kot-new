@@ -283,6 +283,17 @@ export const SETTINGS = [
     requirements: ['TAB-015', 'NTF-003'],
     unit: 'percent',
   }),
+  setting({
+    key: 'devices.offlineAfterSeconds',
+    schema: int(10, 3_600),
+    defaultValue: 60,
+    scope: 'RESTAURANT',
+    capability: 'OPERATIONS_CONFIGURE',
+    description:
+      'A table tablet or kitchen screen without a live connection this long raises an offline alert; a quick reload raises none.',
+    requirements: ['NTF-003', 'MGR-006'],
+    unit: 'seconds',
+  }),
 
   // Orders, billing and payments (ORD, BILL)
   setting({

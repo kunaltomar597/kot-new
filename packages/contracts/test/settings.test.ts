@@ -72,6 +72,7 @@ describe('[MGR-007] [UPD-010] settings catalogue', () => {
       'kds.readyNotCollectedMinutes': 3, // KDS-006
       'kds.autoEscalateNotCollected': false, // KDS-006 (S)
       'devices.lowBatteryAlertPercent': 20, // TAB-015
+      'devices.offlineAfterSeconds': 60, // NTF-003 (our default: a reload raises nothing)
       'pager.lowBatteryPercent': 15, // PGR-013
       'pagers.heartbeatSeconds': 30, // PGR-007
       'qr.submissionsPerWindow': 5, // QR-006

@@ -34,6 +34,8 @@ export const en = {
       region: 'Notifications',
       dismiss: 'Dismiss notification',
     },
+    /** A size in bytes, in units of 1,024 as Windows shows them. */
+    size: '{value} {unit, select, KB {KB} MB {MB} GB {GB} TB {TB} other {bytes}}',
   },
   connection: {
     online: 'Connected to the restaurant server',
@@ -85,6 +87,10 @@ export const en = {
       '{type, select, PAGER {The pager} TABLE_TABLET {The table tablet} KDS {The kitchen screen} other {A device}}',
     deviceBattery: '{device}: {percent}% battery left. Charge it soon.',
     deviceOffline: '{device} is not connected. Check it is switched on and in Wi-Fi range.',
+    printerError: '{printer}: {error}',
+    printerDown: '{printer} is not printing.',
+    printerQueued: '{count, plural, one {# ticket waits for it.} other {# tickets wait for it.}}',
+    diskFull: 'The data drive is {percent}% full, with {free} free.',
     /** Android notifications on the waiter phone (P2-06b, WTR-005). */
     notification: {
       listeningTitle: 'Alerts for {name}',
@@ -1304,6 +1310,10 @@ export const en = {
       lowBatteryAlertPercent: {
         label: 'Low battery alert for tablets and kitchen screens',
         hint: 'A table tablet or kitchen screen at or below this level raises a low-battery alert.',
+      },
+      offlineAfterSeconds: {
+        label: 'Offline alert for tablets and kitchen screens',
+        hint: 'A table tablet or kitchen screen that has not been connected for this long raises an alert. A quick reload raises none.',
       },
     },
     orders: {

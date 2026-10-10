@@ -1,7 +1,7 @@
 import type { AlertView } from '@rp/contracts';
 import { createTranslator } from '@rp/i18n';
 import { describe, expect, it } from 'vitest';
-import { alertAge, describeAlert } from '../src/alert-text.js';
+import { alertAge, describeAlert, sizeText } from '../src/alert-text.js';
 
 const t = createTranslator();
 
@@ -113,6 +113,47 @@ describe('[WTR-006] [NFR-U04] what an alert says on the waiter app and the POS',
     expect(
       describeAlert({ ...device, payload: { ...pager, batteryPercent: null } }, t).detail,
     ).toBeNull();
+  });
+
+  it('[NTF-003] [MGR-008] says which printer stopped, in its own words, and what waits for it', () => {
+    const printer = alert({ type: 'PRINTER_OFFLINE', tableLabel: null });
+    const down = {
+      printerName: 'Kitchen printer',
+      error: 'No printer answers at 192.168.1.50:9100. Check its IP address.',
+      queued: 3,
+    };
+    expect(describeAlert({ ...printer, payload: down }, t)).toEqual({
+      title: 'Printer offline',
+      detail:
+        'Kitchen printer: No printer answers at 192.168.1.50:9100. Check its IP address. 3 tickets wait for it.',
+    });
+    expect(describeAlert({ ...printer, payload: { ...down, queued: 1 } }, t).detail).toBe(
+      'Kitchen printer: No printer answers at 192.168.1.50:9100. Check its IP address. 1 ticket waits for it.',
+    );
+    expect(
+      describeAlert({ ...printer, payload: { ...down, error: null, queued: 0 } }, t).detail,
+    ).toBe('Kitchen printer is not printing.');
+  });
+
+  it('[NTF-003] [DATA-006] says how full the data drive is and how much is free', () => {
+    const disk = alert({ type: 'DISK_OR_BACKUP', tableLabel: null });
+    expect(
+      describeAlert({ ...disk, payload: { usedPercent: 86, freeBytes: 13_314_398_618 } }, t),
+    ).toEqual({
+      title: 'Disk or backup needs attention',
+      detail: 'The data drive is 86% full, with 12.4 GB free.',
+    });
+    expect(describeAlert({ ...disk, payload: {} }, t).detail).toBeNull();
+  });
+
+  it('writes sizes as Windows shows them', () => {
+    expect(sizeText(0, t)).toBe('0 bytes');
+    expect(sizeText(900, t)).toBe('900 bytes');
+    expect(sizeText(1_536, t)).toBe('1.5 KB');
+    expect(sizeText(850 * 1_024 * 1_024, t)).toBe('850 MB');
+    expect(sizeText(12.44 * 1_024 ** 3, t)).toBe('12.4 GB');
+    expect(sizeText(3 * 1_024 ** 4, t)).toBe('3 TB');
+    expect(sizeText(5 * 1_024 ** 5, t)).toBe('5120 TB');
   });
 
   it('has words for every kind of alert', () => {
