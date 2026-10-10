@@ -24,6 +24,9 @@ support playbook. Created by the WPs that build each capability (P0-16, P7-04, P
 - `windows-services.md`: the restaurant PC's services (database, server, watchdog), what happens
   when something fails, the installation file, secrets in DPAPI, the database logins, the set-up
   tool and the maintenance flag (P0-16b).
+- `windows-host.md`: the PC as a computer: the standard and administrator accounts, BitLocker,
+  Windows Update, separate staff Wi-Fi, Assigned Access, restoring backups and the yearly review
+  (P8-03d2b2c).
 - `windows-installer.md`: the installer's PowerShell: the data drive, folder permissions, the
   services' accounts and recovery, the firewall for the staff network, repair, and uninstalling
   with the data kept or deleted with the Owner's permission (P0-16c).

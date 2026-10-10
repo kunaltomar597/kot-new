@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03d2b2b2).
+Last updated: 2026-10-11 (P8-03d2b2c1).
 
 What exists:
 
@@ -400,7 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d2b2c and d (the PC's threats and the four standards checklists), P8-03e the incident response
+- P8-03d2b2c2 (database service account, CA name constraints) and d (the four standards checklists), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -662,7 +662,9 @@ Recommended next WPs (dependencies met):
       - [x] P8-03d2b2b UPDATE-R3 and LICENCE-T5, split:
         - [x] P8-03d2b2b1 UPDATE-R3: attestation, SBOM and commit with each release
         - [x] P8-03d2b2b2 LICENCE-T5: the server's files checked against the release's list; `CODE_MODIFIED` reported
-      - [ ] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4)
+      - [~] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4), split:
+        - [x] P8-03d2b2c1 PC-I5, E2, T7, D6 and DESKTOP-E4: BitLocker warning, PC runbook, readiness line
+        - [ ] P8-03d2b2c2 PC-I6 (the database's own service account) and PC-S4 (CA name constraints)
       - [ ] P8-03d2b2d The four checklists
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
@@ -4407,6 +4409,26 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03d2b2c1 the PC as a computer: BitLocker, accounts, network
+
+Decided: no software can stop a Windows administrator, so PC-E2, DESKTOP-E4, PC-T7 and PC-D6 are
+procedures (`docs/runbooks/windows-host.md`, a new readiness line for the Windows accounts, the staff
+range asked for on the Wi-Fi line, manual task 35) and keep a plan or an acceptance. PC-I5 is
+software: the server asks Windows (`Get-BitLockerVolume`, PowerShell 5.1, at most every 10 minutes)
+whether the data drive is protected; `storage.encryption` on the System page, a red notice on
+`NOT_ENCRYPTED`, silent on `UNKNOWN` (not Windows, or not allowed). Suspended protection reads as not
+protected. PC-I5 Mitigated (summary 31 with a plan). P8-03d2b2c is split: PC-I6 (the database
+under its own virtual account: the folder permissions need the service to exist first, so it needs
+the Windows CI job) and PC-S4 (CA name constraints, amending ADR-0011) go to P8-03d2b2c2.
+
+Built: `apps/server/src/system/disk-encryption.ts`, `DiskEncryption` in contracts (docs regenerated),
+strings, readiness item `accounts`. Tests: server unit `disk-encryption` 3, console `system` 24+1.
+Not run here: the PowerShell on a real PC (needs Windows and BitLocker; manual task 35).
+Also fixed: `control-plane.int.test.ts` failed on `main` since P8-03d2b2b2 (the test server has a
+product version but no file list, so `CODE_MODIFIED`); it now stubs `checkServerFiles`. Run the
+integration tests of a WP that touches the licence agent.
+Next: P8-03d2b2c2.
 
 ### 2026-10-11: P8-03d2b2b2 LICENCE-T5 the server's files checked against the release
 

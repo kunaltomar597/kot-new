@@ -355,9 +355,10 @@ Someone restores last week's backup to remove the bills, voids or payments since
   factor, restarts, and restores before starting"; `packages/domain/test/fleet-health.test.ts`
   "detects a chain cut back, rewritten or emptied".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: a Windows administrator can run
-  `pg_restore` by hand without the audit entry, which only the heartbeat shows; P8-03d's checklist
-  for the PC keeps daily work off administrator accounts (PC-E2).
+- Status: Partly mitigated. Accepted: a Windows administrator can run `pg_restore` by hand without
+  the audit entry, which only the heartbeat shows; the PC runbook keeps daily work off
+  administrator accounts and tells the Owner to treat an unexpected "audit chain cut back" alert
+  as an incident (PC-E2, `docs/runbooks/windows-host.md`).
 
 #### PC-T8 Formulas in exported files
 
@@ -529,14 +530,19 @@ The PC or its disk is taken; the database, logs and WAL archive are plain files,
 machine keys are on the same disk.
 
 - Mitigation: backups are encrypted; secrets are sealed with DPAPI. Without BitLocker, the disk
-  gives up everything. The site-readiness checklist recommends BitLocker; nothing checks it.
-- Code: `apps/server/src/auth/dpapi.ts`; `apps/console/src/manage/setup/ReadinessChecklist.tsx`.
+  gives up everything, so the server asks Windows whether the data drive is protected (every ten
+  minutes at most) and the System page warns while it is not; BitLocker is on the site-readiness
+  checklist and in the PC runbook (`docs/runbooks/windows-host.md`).
+- Code: `apps/server/src/auth/dpapi.ts`; `apps/server/src/system/disk-encryption.ts`
+  (`diskEncryption`, `parseProtectionStatus`); `apps/console/src/manage/setup/ReadinessChecklist.tsx`.
 - Tests: `apps/server/test/unit/dpapi-secret-store.test.ts` "fails without caching when the
-  secrets cannot be unprotected (another PC)".
-- Risk: likelihood Medium, impact High: High.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: BitLocker becomes a requirement of the
-  CIS checklist for the PC and the installation runbook, and the System page warns while the data
-  drive is not encrypted.
+  secrets cannot be unprotected (another PC)";
+  `apps/server/test/unit/disk-encryption.test.ts` "reads BitLocker’s protection status, suspended
+  protection being not protected", "asks about the data folder’s drive, remembers the answer";
+  `apps/console/test/system.test.tsx` "warns while the data drive is not encrypted (PC-I5)".
+- Risk: likelihood Low, impact High: Medium.
+- Status: Mitigated (P8-03d2b2c). The warning is visible only to someone who looks; the installer
+  turns BitLocker on (manual task 35).
 
 #### PC-I6 A local Windows user reads the data
 
@@ -762,15 +768,16 @@ The restaurant runs guests and staff on one network, so a diner's phone reaches 
 
 - Mitigation: the installer's firewall rules open the server's ports to the staff subnet when one
   is given, else to the local subnet; guests still need a paired device and a PIN for anything.
+  Separate staff and guest networks are a line on the site-readiness checklist, which asks for the
+  staff range to give the installer, and a row in the PC runbook (SEC-008).
 - Code: `infra/installer/windows/RestaurantPlatform.Setup.psm1` (`Get-RPFirewallRuleSpec`,
   `ConvertTo-RPRemoteAddress`).
 - Tests: `infra/installer/windows/tests/Firewall.Tests.ps1` "opens them to the staff subnet only,
   when the installer is given one", "refuses what is not a staff subnet, or one as wide as the
   internet".
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: separate staff and guest networks become a
-  checked item of the site checklist and the installation runbook (SEC-008), with the staff subnet
-  given to the installer.
+- Status: Partly mitigated. Plan: manual task 35 by 2026-10-31: whether the restaurant's router
+  really separates the networks is checked on site from a guest phone.
 
 #### PC-D7 Ransomware or a dead disk
 
@@ -810,12 +817,15 @@ restaurant, can unprotect every DPAPI secret, reach the database superuser, disa
 rewrite the chain and forge tokens.
 
 - Mitigation: none in software can stop an administrator; the controls are who holds the account.
-- Code: `apps/server/src/auth/dpapi.ts`.
+  The PC runbook (`docs/runbooks/windows-host.md`) has the POS run under a standard Windows
+  account, the administrator's password kept by the Owner, BitLocker on (PC-I5), and the site
+  checklist has a line for the accounts. An administrator's changes still show: the audit chain's
+  heartbeat check (PC-T7) and the code integrity check (LICENCE-T5) report to the vendor.
+- Code: `apps/server/src/auth/dpapi.ts`; `apps/console/src/manage/setup/ReadinessChecklist.tsx`.
 - Tests: none, an administrator holds every key on the PC by design; the controls are procedures.
-- Risk: likelihood Medium, impact High: High.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: the CIS checklist for the PC and the
-  installation runbook: daily work under a standard Windows account with the POS window, the
-  administrator's password kept by the Owner, BitLocker on (PC-I5).
+- Risk: likelihood Low, impact High: Medium.
+- Status: Partly mitigated. Plan: manual task 35 by 2026-10-31: the check on the first real
+  installation that the POS runs under a standard account and who holds the administrator's.
 
 #### PC-E3 Staff powers from a table tablet or a kitchen screen
 

@@ -73,7 +73,7 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 
 | Component                                               | Threats | Mitigated | Partly mitigated | Not mitigated | Accepted | Residual Medium | Residual High or Critical |
 | ------------------------------------------------------- | ------: | --------: | ---------------: | ------------: | -------: | --------------: | ------------------------: |
-| [The LAN and the local server](local-server-and-lan.md) |      45 |        34 |                6 |             2 |        3 |              18 |                         2 |
+| [The LAN and the local server](local-server-and-lan.md) |      45 |        35 |                7 |             0 |        3 |              20 |                         0 |
 | [The pager channel](pager-channel.md)                   |      26 |        19 |                5 |             1 |        1 |               4 |                         1 |
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        22 |                4 |             1 |        2 |               6 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        16 |                3 |             1 |        1 |              10 |                         1 |
@@ -81,7 +81,7 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | [The Vendor Control Plane](control-plane.md)            |      22 |        16 |                5 |             0 |        1 |               7 |                         0 |
 | [The desktop shell](desktop-shell.md)                   |      14 |        11 |                2 |             0 |        1 |               5 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        13 |                4 |             0 |        1 |               5 |                         0 |
-| All                                                     |     195 |       145 |               33 |             5 |       12 |              62 |                         4 |
+| All                                                     |     195 |       146 |               34 |             3 |       12 |              64 |                         2 |
 
 Open threats and their plans, by date:
 
@@ -89,13 +89,8 @@ Open threats and their plans, by date:
 | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
 | [UPDATE-E2](update-pipeline.md#update-e2-a-pull-request-signed-as-the-vendors) A pull request signed as the vendor's                     | Medium   | Partly mitigated | manual task 1  | 2026-10-17 |
 | [UPDATE-T6](update-pipeline.md#update-t6-unreviewed-code-on-main) Unreviewed code on main                                                | High     | Not mitigated    | manual task 1  | 2026-10-17 |
-| [DESKTOP-E4](desktop-shell.md#desktop-e4-leaving-the-pos-window-for-windows) Leaving the POS window for Windows                          | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
-| [PC-D6](local-server-and-lan.md#pc-d6-attacks-from-guest-wi-fi-on-a-flat-network) Attacks from guest Wi-Fi on a flat network             | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
-| [PC-E2](local-server-and-lan.md#pc-e2-a-windows-administrator-on-the-pc) A Windows administrator on the PC                               | High     | Not mitigated    | P8-03d         | 2026-10-22 |
-| [PC-I5](local-server-and-lan.md#pc-i5-a-stolen-pc-or-disk) A stolen PC or disk                                                           | High     | Not mitigated    | P8-03d         | 2026-10-22 |
 | [PC-I6](local-server-and-lan.md#pc-i6-a-local-windows-user-reads-the-data) A local Windows user reads the data                           | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [PC-S4](local-server-and-lan.md#pc-s4-a-rogue-server-or-a-man-in-the-middle-on-the-lan) A rogue server or a man in the middle on the LAN | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
-| [PC-T7](local-server-and-lan.md#pc-t7-restoring-an-old-backup-to-hide-fraud) Restoring an old backup to hide fraud                       | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [PC-D7](local-server-and-lan.md#pc-d7-ransomware-or-a-dead-disk) Ransomware or a dead disk                                               | Medium   | Partly mitigated | P8-03e         | 2026-10-24 |
 | [RELAY-S3](qr-relay-and-site.md#relay-s3-a-stolen-restaurant-credential) A stolen restaurant credential                                  | Low      | Partly mitigated | P8-03e         | 2026-10-24 |
 | [RELAY-S4](qr-relay-and-site.md#relay-s4-a-fake-qr-sticker) A fake QR sticker                                                            | Medium   | Not mitigated    | P8-03e         | 2026-10-24 |
@@ -103,6 +98,9 @@ Open threats and their plans, by date:
 | [MOBILE-I4](phones-and-tablets.md#mobile-i4-pins-in-screenshots-and-the-recent-apps-list) PINs in screenshots and the recent apps list   | Low      | Partly mitigated | manual task 33 | 2026-10-31 |
 | [MOBILE-R2](phones-and-tablets.md#mobile-r2-alerts-acknowledged-from-the-lock-screen) Alerts acknowledged from the lock screen           | Low      | Partly mitigated | manual task 33 | 2026-10-31 |
 | [MOBILE-S1](phones-and-tablets.md#mobile-s1-a-rogue-server-or-a-man-in-the-middle) A rogue server or a man in the middle                 | Medium   | Partly mitigated | manual task 33 | 2026-10-31 |
+| [DESKTOP-E4](desktop-shell.md#desktop-e4-leaving-the-pos-window-for-windows) Leaving the POS window for Windows                          | Medium   | Partly mitigated | manual task 35 | 2026-10-31 |
+| [PC-D6](local-server-and-lan.md#pc-d6-attacks-from-guest-wi-fi-on-a-flat-network) Attacks from guest Wi-Fi on a flat network             | Medium   | Partly mitigated | manual task 35 | 2026-10-31 |
+| [PC-E2](local-server-and-lan.md#pc-e2-a-windows-administrator-on-the-pc) A Windows administrator on the PC                               | Medium   | Partly mitigated | manual task 35 | 2026-10-31 |
 | [RELAY-I3](qr-relay-and-site.md#relay-i3-the-relays-own-secrets) The relay's own secrets                                                 | Medium   | Partly mitigated | manual task 20 | 2026-11-30 |
 | [RELAY-I4](qr-relay-and-site.md#relay-i4-diners-privacy) Diners' privacy                                                                 | Low      | Partly mitigated | manual task 21 | 2026-11-30 |
 | [LICENCE-I3](licence-mechanism.md#licence-i3-the-vendors-signing-key-leaking) The vendor's signing key leaking                           | Medium   | Partly mitigated | manual task 23 | 2026-11-30 |

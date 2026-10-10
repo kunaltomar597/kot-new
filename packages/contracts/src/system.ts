@@ -69,6 +69,13 @@ export type StorageCategory = z.infer<typeof StorageCategory>;
 export const StorageLevel = z.enum(['OK', 'WARNING', 'CRITICAL', 'UNKNOWN']);
 export type StorageLevel = z.infer<typeof StorageLevel>;
 
+/**
+ * BitLocker on the data drive (PC-I5): UNKNOWN where it cannot be read (not Windows, or not
+ * allowed to ask).
+ */
+export const DiskEncryption = z.enum(['ENCRYPTED', 'NOT_ENCRYPTED', 'UNKNOWN']);
+export type DiskEncryption = z.infer<typeof DiskEncryption>;
+
 const Bytes = z.int().nonnegative();
 
 /**
@@ -168,6 +175,8 @@ export const SystemStatusResponse = z.object({
     level: StorageLevel,
     warnPercent: z.int(),
     criticalPercent: z.int(),
+    /** Whether the data drive is encrypted; the page warns on NOT_ENCRYPTED. */
+    encryption: DiskEncryption,
     /** Null for a category not measured (no backups set up yet, say). */
     categories: z.array(z.object({ category: StorageCategory, bytes: Bytes.nullable() })),
     /**

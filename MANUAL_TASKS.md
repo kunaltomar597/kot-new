@@ -43,6 +43,9 @@ code from going live:
 - [ ] The Control Plane host's log store (the audit log's copy, kept 180 days) and the operator host
       for the admin CLI (threats CP-T5, CP-R2):
       [`manual-tasks/34-control-plane-host-logs.md`](manual-tasks/34-control-plane-host-logs.md).
+- [ ] The restaurant PC's accounts, BitLocker and separate staff Wi-Fi, at each installation and
+      yearly (threats PC-E2, DESKTOP-E4, PC-D6):
+      [`manual-tasks/35-windows-host-checks.md`](manual-tasks/35-windows-host-checks.md).
 - [ ] Android checks on a real phone and tablet: backups off, PIN screens not captured, the private
       lock-screen alert, the kiosk's user restrictions, a rogue server refused (threats MOBILE-E2,
       R2, I4, S1): [`manual-tasks/33-android-device-checks.md`](manual-tasks/33-android-device-checks.md).

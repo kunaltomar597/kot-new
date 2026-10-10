@@ -14,9 +14,10 @@ import {
 import { startRelay, type TestRelay } from '@rp/relay/testing';
 import { createMigratedDatabase, type TestDatabase } from '@rp/test-postgres';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { SendDiagnosticsResponse } from '@rp/contracts';
 import pg from 'pg';
+import type * as ServerFiles from '../../src/integrity/server-files.js';
 import { AuditService } from '../../src/audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../../src/auth/secret-store.js';
 import { readOfferedUpdate } from '../../src/cloud/control-plane-state.js';
@@ -43,6 +44,13 @@ import { authHeaders, createAuthKit, signIn } from '../helpers/auth-kit.js';
 import { createTestApp, httpServer } from '../helpers/test-app.js';
 import { createTestDatabase, testAdminUrl } from '../helpers/test-database.js';
 import { until } from '../helpers/wait.js';
+
+// LICENCE-T5: this server has a product version (it is "installed") but no list of its files, which
+// would be reported as tampering; the check itself is tested in server-files.test.ts.
+vi.mock('../../src/integrity/server-files.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof ServerFiles>()),
+  checkServerFiles: () => Promise.resolve('intact' as const),
+}));
 
 /**
  * P0-17 acceptance: the real local server enrols with a real Vendor Control Plane, posts

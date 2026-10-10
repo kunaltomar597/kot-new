@@ -37,6 +37,7 @@ import { RelaySyncService } from '../relay/relay-sync.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { AppBuildsService } from '../updates/app-builds.service.js';
 import { UpdateAgentService } from '../updates/update-agent.service.js';
+import { diskEncryption } from './disk-encryption.js';
 import {
   CATEGORY_FOLDERS,
   directoryBytes,
@@ -99,6 +100,7 @@ export class SystemService {
       settings,
       postgres,
       space,
+      encryption,
       categories,
       devices,
       offered,
@@ -114,6 +116,7 @@ export class SystemService {
       this.settings.snapshot(restaurantId),
       this.postgresVersion(),
       driveSpace(this.config.dataDir),
+      diskEncryption(this.config.dataDir),
       this.categories(),
       this.deviceRows(restaurantId),
       readOfferedUpdate(this.prisma),
@@ -171,6 +174,7 @@ export class SystemService {
         level: storageLevel(percent, warnPercent, criticalPercent),
         warnPercent,
         criticalPercent,
+        encryption,
         categories,
         retention: {
           operationalDays: settings.get('retention.operationalDays'),
