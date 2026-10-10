@@ -51,18 +51,17 @@ are what that review must close. Related: [the LAN and the local server](local-s
 A program on the PC listens where the server should, and the POS window shows its page.
 
 - Mitigation: the shell's certificate rule accepts on the PC's own address only a certificate
-  issued by the installation's CA; the CA's folder is read-only to users. When Windows itself
-  already trusts the certificate (an antivirus program's root, for example), the rule accepts it
-  before checking the pin.
+  issued by the installation's CA; the CA's folder is read-only to users. The pin decides even
+  when Windows itself trusts the certificate (an antivirus program's root, for example).
 - Code: `apps/desktop/src/security.ts` (`certificateVerdict`, `isIssuedBy`);
   `apps/desktop/src/shell.ts` (`setCertificateVerifyProc`).
 - Tests: `apps/desktop/test/security.test.ts` "trusts the server on this PC by the installation’s
-  CA, and nothing else"; `apps/desktop/test/shell.test.ts` "applies the permission and certificate
+  CA, and nothing else", "lets the pin decide on this PC even when Windows trusts the
+  certificate"; `apps/desktop/test/shell.test.ts` "applies the permission and certificate
   rules to its session"; `infra/installer/windows/tests/Permissions.Tests.ps1` "lets everyone
   signed in read the CA the POS window pins, and the installation file".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: on the PC's own address the pin decides,
-  whatever Windows trusts.
+- Status: Mitigated (P8-03d1: the pin decides, whatever Windows trusts).
 
 #### DESKTOP-S2 A copied POS terminal
 
@@ -126,12 +125,15 @@ Someone at the POS denies an action taken there.
 A refused navigation, certificate or permission leaves no trace, because the shell writes its
 events only to its standard output, which a window app does not keep.
 
-- Mitigation: none yet.
-- Code: `apps/desktop/src/main.ts`.
-- Tests: none, the shell has no log file yet; P8-03d adds it.
+- Mitigation: the shell writes each refusal, crash and reopened window to
+  `<data folder>/logs/desktop-shell.log` (an address by its origin only, never a path or query),
+  kept to 1 MB with the last 1 MB beside it; the diagnostics bundle reads that folder.
+- Code: `apps/desktop/src/file-log.ts` (`fileLog`); `apps/desktop/src/main.ts`;
+  `apps/desktop/src/config.ts` (`shellConfig`).
+- Tests: `apps/desktop/test/file-log.test.ts` "appends one dated line per event, creating the
+  folder"; `apps/desktop/test/shell.test.ts` "logs what it refuses, without paths".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: the shell writes its events to a log file the
-  diagnostics bundle includes.
+- Status: Mitigated (P8-03d1).
 
 ### Information disclosure
 
@@ -169,14 +171,14 @@ The page, or something it loads, turns on the PC's camera or microphone.
 Staff open the developer tools (Ctrl+Shift+I) or the default menu, and read the session or the
 device token, or run their own script as the POS.
 
-- Mitigation: none: the web preferences leave the developer tools on and the default application
-  menu is there, only hidden.
+- Mitigation: the web preferences turn the developer tools off and the shell removes the
+  application menu, so Ctrl+Shift+I and F12 do nothing.
 - Code: `apps/desktop/src/security.ts` (`WEB_PREFERENCES`); `apps/desktop/src/main.ts`.
 - Tests: `apps/desktop/test/security.test.ts` "runs the console with context isolation and the
-  sandbox, and no Node.js".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: no application menu, and no developer tools
-  outside development.
+  sandbox, and no Node.js", "has no developer tools, and finds the debugging switches";
+  `apps/desktop/test/shell.test.ts` "has no application menu".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03d1).
 
 ### Denial of service
 
@@ -212,27 +214,31 @@ Script in the console reaches Node.js or the main process, and so the PC.
 Someone starts the shell with `--remote-debugging-port`, which no fuse covers, and drives the
 signed-in console from another program.
 
-- Mitigation: none yet.
-- Code: `apps/desktop/src/main.ts`; `apps/desktop/src/packaging/builder-config.ts`
-  (`ELECTRON_FUSES`).
+- Mitigation: the shell quits at once when its command line has a remote debugging, inspector,
+  debug port or `--js-flags` switch, and logs it; the fuses cover Node.js's own options.
+- Code: `apps/desktop/src/security.ts` (`debuggingSwitchIn`); `apps/desktop/src/shell.ts`
+  (`startShell`); `apps/desktop/src/packaging/builder-config.ts` (`ELECTRON_FUSES`).
 - Tests: `apps/desktop/test/packaging.test.ts` "no Node.js mode, options or debugger, and only its
-  checked app.asar".
-- Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: the shell quits when started with a remote
-  debugging switch.
+  checked app.asar"; `apps/desktop/test/shell.test.ts` "quits when started with a remote
+  debugging switch"; `apps/desktop/test/security.test.ts` "has no developer tools, and finds the
+  debugging switches".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03d1). A person who can start the shell with a switch is an administrator
+  of the PC (PC-E2).
 
 #### DESKTOP-E3 USB, serial, HID and Bluetooth devices
 
 The page asks for a USB, serial, HID or Bluetooth device through the browser's device APIs.
 
-- Mitigation: the permission rule refuses what it does not name, but the shell sets no device
-  permission handler and does not cancel the device pickers.
-- Code: `apps/desktop/src/security.ts` (`isAllowedPermission`).
+- Mitigation: the permission rule refuses what it does not name, the device permission handler
+  refuses every device, and the USB, serial, HID and Bluetooth pickers are cancelled.
+- Code: `apps/desktop/src/security.ts` (`isAllowedPermission`); `apps/desktop/src/shell.ts`
+  (`startShell`).
 - Tests: `apps/desktop/test/security.test.ts` "allows notifications and the camera to the console,
-  nothing else and nobody else".
+  nothing else and nobody else";
+  `apps/desktop/test/shell.test.ts` "refuses every device and cancels the pickers".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: a device permission handler that refuses,
-  and the pickers cancelled.
+- Status: Mitigated (P8-03d1).
 
 #### DESKTOP-E4 Leaving the POS window for Windows
 

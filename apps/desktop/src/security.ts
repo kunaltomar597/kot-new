@@ -19,7 +19,20 @@ export const WEB_PREFERENCES = {
   spellcheck: false,
   navigateOnDragDrop: false,
   safeDialogs: true,
+  // No developer tools in the POS window (DESKTOP-I3): they would read its session.
+  devTools: false,
 } as const;
+
+/**
+ * Chromium and Node.js switches that open the running console to another program (DESKTOP-E2).
+ * No fuse covers Chromium's remote debugging, so the shell quits when it is started with one.
+ */
+const DEBUGGING_SWITCH = /^--?(remote-debugging-|remote-allow-origins|inspect|debug|js-flags)/i;
+
+/** The first debugging switch in the command line, if there is one. */
+export function debuggingSwitchIn(argv: readonly string[]): string | undefined {
+  return argv.find((argument) => DEBUGGING_SWITCH.test(argument));
+}
 
 /** The loopback names the shell's server may answer on. */
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
@@ -61,15 +74,19 @@ export interface CertificateCheck {
  * Chromium decide. The server on this PC uses the installation's own CA (ADR-0011), which Windows
  * does not know. On a loopback address the shell trusts a certificate signed by that CA (`caPem`,
  * the server's `ca.crt`) and refuses any other; a process on this PC that is not the server
- * cannot pass as it. Any other address, or no CA to pin, is left to Chromium's normal checks.
+ * cannot pass as it, even with a certificate Windows trusts. Any other address, or no CA to pin,
+ * is left to Chromium's normal checks.
  */
 export function certificateVerdict(
   check: CertificateCheck,
   caPem: string | undefined,
 ): 0 | -2 | -3 {
-  if (check.errorCode === 0) return 0;
-  if (!isLoopbackHost(check.hostname) || caPem === undefined) return -3;
-  return isIssuedBy(check.certificatePem, caPem) ? 0 : -2;
+  // On this PC's own address the pin decides, whatever Windows trusts (DESKTOP-S1): a root that
+  // an antivirus program installed does not make another process the server.
+  if (isLoopbackHost(check.hostname) && caPem !== undefined) {
+    return isIssuedBy(check.certificatePem, caPem) ? 0 : -2;
+  }
+  return check.errorCode === 0 ? 0 : -3;
 }
 
 /**

@@ -315,6 +315,11 @@ backups and screen capture, build provenance, LIC-007's integrity checks).
 Acceptance: every control met, not applicable with a reason, or a finding with a plan; no threat
 left planned for P8-03d.
 
+Split (2026-10-10): P8-03d1 is the Electron shell's hardening, as built: the shell quits on a
+debugging switch, the POS window has no developer tools or menu, devices and their pickers are
+refused, the CA pin decides on the PC's own address, and the shell logs to
+`<data folder>/logs/desktop-shell.log`. P8-03d2 is everything else above.
+
 ### P8-03e Incident response plan and penetration-test support
 
 Requirements: SEC-016, SEC-017.

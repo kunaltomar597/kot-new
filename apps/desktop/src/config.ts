@@ -14,6 +14,11 @@ export interface ShellConfig {
    * being `RP_DATA_DIR` or the installation file's.
    */
   readonly caFile: string | undefined;
+  /**
+   * Where the shell writes its own events (DESKTOP-R2): `RP_SHELL_LOG_FILE`, else
+   * `<data folder>/logs/desktop-shell.log`, where the diagnostics bundle reads the logs from.
+   */
+  readonly logFile: string | undefined;
 }
 
 /**
@@ -62,6 +67,7 @@ export function shellConfig(
   installation: InstallationSettings = {},
 ): ShellConfig {
   const port = env.RP_SHELL_PORT ?? env.PORT ?? String(installation.port ?? 8080);
+  const dataDir = env.RP_DATA_DIR ?? installation.dataDir;
   const url = new URL(env.RP_SHELL_URL ?? `https://127.0.0.1:${port}/`);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     throw new Error('RP_SHELL_URL must be an http(s) address');
@@ -70,7 +76,10 @@ export function shellConfig(
     consoleUrl: url.href,
     fullScreen: env.RP_SHELL_FULLSCREEN === '1' || env.RP_SHELL_FULLSCREEN === 'true',
     openAtLogin: env.RP_SHELL_OPEN_AT_LOGIN !== '0' && env.RP_SHELL_OPEN_AT_LOGIN !== 'false',
-    caFile: env.RP_SHELL_CA_FILE ?? caFileIn(env.RP_DATA_DIR ?? installation.dataDir),
+    caFile: env.RP_SHELL_CA_FILE ?? caFileIn(dataDir),
+    logFile:
+      env.RP_SHELL_LOG_FILE ??
+      (dataDir === undefined ? undefined : join(dataDir, 'logs', 'desktop-shell.log')),
   };
 }
 

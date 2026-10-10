@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, Menu, session } from 'electron';
 import { createTranslator } from '@rp/i18n';
 import { installationFileOf, installationSettings, shellConfig } from './config.js';
+import { fileLog } from './file-log.js';
 import { startShell } from './shell.js';
 
 // The shell's entry point (P0-16a): Electron's own objects, wired to `startShell`.
@@ -18,9 +19,37 @@ function readInstallationFile(): string | undefined {
 
 const config = shellConfig(process.env, installationSettings(readInstallationFile()));
 
+const writeLog = fileLog(config.logFile);
+
 void startShell({
   app,
-  session: () => session.defaultSession,
+  session: () => {
+    const { defaultSession } = session;
+    return {
+      setPermissionRequestHandler: (handler) => {
+        defaultSession.setPermissionRequestHandler(handler);
+      },
+      setPermissionCheckHandler: (handler) => {
+        defaultSession.setPermissionCheckHandler(handler);
+      },
+      setCertificateVerifyProc: (proc) => {
+        defaultSession.setCertificateVerifyProc(proc);
+      },
+      setDevicePermissionHandler: (handler) => {
+        defaultSession.setDevicePermissionHandler(handler);
+      },
+      onDevicePicker: (event, listener) => {
+        defaultSession.on(event as 'select-usb-device', (pickerEvent, _details, callback) => {
+          listener(pickerEvent, callback);
+        });
+      },
+    };
+  },
+  // Electron's own first entry is the program; the rest are what a person typed.
+  argv: process.argv.slice(1),
+  removeMenu: () => {
+    Menu.setApplicationMenu(null);
+  },
   createWindow: (options) => new BrowserWindow(options),
   config,
   // Chromium's network stack, so the shell's certificate rule applies to the health check too.
@@ -37,5 +66,8 @@ void startShell({
   },
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   text: { title: t('desktop.title'), starting: t('desktop.starting') },
-  log: (message) => process.stdout.write(`${message}\n`),
+  log: (message) => {
+    process.stdout.write(`${message}\n`);
+    writeLog(message);
+  },
 });

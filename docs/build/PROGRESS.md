@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03c2b).
+Last updated: 2026-10-10 (P8-03d1).
 
 What exists:
 
@@ -641,14 +641,17 @@ Recommended next WPs (dependencies met):
             Super Admin resets by two)
       - [x] P8-03b4b The QR relay (order and service-request floods, body limits, the provisioning
             login, the PCs' function without CORS, the photo bucket's types)
-  - [~] P8-03c DAST of the QR site, relay and Control Plane
+  - [x] P8-03c DAST of the QR site, relay and Control Plane
     - [x] P8-03c1 The ZAP scans of the four surfaces, security headers, the CSPs (nonces, Trusted
           Types), `/version`
-    - [ ] P8-03c2 Floods and rate limits
+    - [x] P8-03c2 Floods and rate limits
       - [x] P8-03c2a Floods from the LAN (the HTTPS server and the socket, PC-D3)
       - [x] P8-03c2b Floods at the cloud's edges (the Control Plane, the relay's reads; CP-D1,
             RELAY-D4); the edge's own rules wait for the hosting accounts (manual task 32)
-  - [ ] P8-03d Standards checklists, Electron review and MDM policy
+  - [~] P8-03d Standards checklists, Electron review and MDM policy
+    - [x] P8-03d1 The Electron shell's hardening (DESKTOP-E2, E3, I3, R2, S1)
+    - [ ] P8-03d2 The rest: the checklists, the MDM policy and the other 21 threats planned for
+          P8-03d (split further when started)
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
 - [ ] P8-05 Runbooks, manuals, training
@@ -895,6 +898,16 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03d1):
+
+788. P8-03d is split: P8-03d1 hardens the Electron shell (five of the 26 threats); P8-03d2 holds
+     the checklists, the MDM policy and the rest.
+789. The POS window never has developer tools, also in development (a developer uses the console in
+     a browser). The shell quits at start with any remote-debugging, inspector, debug-port or
+     `--js-flags` switch. On the PC's own address the CA pin decides even when Windows trusts the
+     certificate. The shell's log is `<data folder>/logs/desktop-shell.log`, 1 MB then one old file,
+     with addresses by origin only. DESKTOP-E4 (Assigned Access) stays with P8-03d2's CIS list.
 
 Decided 2026-10-10 (P8-03c2b):
 
@@ -4371,6 +4384,19 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03d1 The Electron shell's hardening
+
+Decisions 788 and 789. Five threats closed: DESKTOP-E2, E3, I3, R2, S1 (summary now 41 with a plan).
+
+Built: `debuggingSwitchIn` and `devTools: false` in `security.ts`; `startShell` quits on a debugging
+switch, removes the menu, refuses every device and cancels the USB, serial, HID and Bluetooth
+pickers, and logs each refusal; `certificateVerdict` lets the pin decide on the loopback address;
+`src/file-log.ts` and `ShellConfig.logFile` (`RP_SHELL_LOG_FILE`); `main.ts` wires them. Tests:
+desktop 55 (new: file-log 3, shell 4, security 2), `pnpm security:threats` green.
+
+Not done: P8-03d2 (checklists, MDM policy, 21 other threats). A real Electron run of the new
+handlers (Windows) is part of manual task 14's check on a clean PC.
 
 ### 2026-10-10: P8-03c2b Floods at the cloud's edges
 

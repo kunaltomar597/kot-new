@@ -79,9 +79,9 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | [The update pipeline](update-pipeline.md)               |      21 |        14 |                4 |             2 |        1 |              12 |                         1 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        14 |                4 |             1 |        1 |               6 |                         1 |
 | [The Vendor Control Plane](control-plane.md)            |      22 |        14 |                7 |             0 |        1 |               8 |                         0 |
-| [The desktop shell](desktop-shell.md)                   |      14 |         6 |                4 |             3 |        1 |               7 |                         0 |
+| [The desktop shell](desktop-shell.md)                   |      14 |        11 |                2 |             0 |        1 |               5 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        11 |                5 |             2 |        0 |               5 |                         0 |
-| All                                                     |     195 |       134 |               39 |            12 |       10 |              66 |                         5 |
+| All                                                     |     195 |       139 |               37 |             9 |       10 |              64 |                         5 |
 
 Open threats and their plans, by date:
 
@@ -93,12 +93,7 @@ Open threats and their plans, by date:
 | [CP-R2](control-plane.md#cp-r2-changes-through-the-admin-cli) Changes through the admin CLI                                              | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [CP-S2](control-plane.md#cp-s2-a-stolen-vendor-session) A stolen vendor session                                                          | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [CP-T5](control-plane.md#cp-t5-editing-the-vendors-audit-log) Editing the vendor's audit log                                             | Low      | Partly mitigated | P8-03d         | 2026-10-22 |
-| [DESKTOP-E2](desktop-shell.md#desktop-e2-chromiums-debugging-switches) Chromium's debugging switches                                     | Medium   | Not mitigated    | P8-03d         | 2026-10-22 |
-| [DESKTOP-E3](desktop-shell.md#desktop-e3-usb-serial-hid-and-bluetooth-devices) USB, serial, HID and Bluetooth devices                    | Low      | Partly mitigated | P8-03d         | 2026-10-22 |
 | [DESKTOP-E4](desktop-shell.md#desktop-e4-leaving-the-pos-window-for-windows) Leaving the POS window for Windows                          | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
-| [DESKTOP-I3](desktop-shell.md#desktop-i3-developer-tools-in-the-pos-window) Developer tools in the POS window                            | Medium   | Not mitigated    | P8-03d         | 2026-10-22 |
-| [DESKTOP-R2](desktop-shell.md#desktop-r2-the-shells-own-events-lost) The shell's own events lost                                         | Low      | Not mitigated    | P8-03d         | 2026-10-22 |
-| [DESKTOP-S1](desktop-shell.md#desktop-s1-a-fake-server-on-the-pcs-own-address) A fake server on the PC's own address                     | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [LICENCE-T5](licence-mechanism.md#licence-t5-patching-the-server) Patching the server                                                    | High     | Not mitigated    | P8-03d         | 2026-10-22 |
 | [MOBILE-E2](phones-and-tablets.md#mobile-e2-a-diner-leaving-the-kiosk) A diner leaving the kiosk                                         | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [MOBILE-E4](phones-and-tablets.md#mobile-e4-a-rooted-phone) A rooted phone                                                               | Low      | Not mitigated    | P8-03d         | 2026-10-22 |

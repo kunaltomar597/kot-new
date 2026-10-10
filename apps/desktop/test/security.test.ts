@@ -9,6 +9,7 @@ import {
 } from '../src/config.js';
 import {
   certificateVerdict,
+  debuggingSwitchIn,
   isAllowedNavigation,
   isAllowedPermission,
   WEB_PREFERENCES,
@@ -58,6 +59,30 @@ describe('[SEC-011] the shell’s hardening', () => {
     expect(certificateVerdict({ ...local, hostname: 'pos.example.com', errorCode: 0 }, CA)).toBe(0);
   });
 
+  it('[DESKTOP-S1] lets the pin decide on this PC even when Windows trusts the certificate', () => {
+    const trusted = { hostname: '127.0.0.1', errorCode: 0, certificatePem: OTHER_CA };
+    expect(certificateVerdict(trusted, CA)).toBe(-2);
+    expect(certificateVerdict({ ...trusted, certificatePem: SERVER }, CA)).toBe(0);
+    expect(certificateVerdict(trusted, undefined)).toBe(0);
+  });
+
+  it('[DESKTOP-E2] [DESKTOP-I3] has no developer tools, and finds the debugging switches', () => {
+    expect(WEB_PREFERENCES.devTools).toBe(false);
+    expect(debuggingSwitchIn([])).toBeUndefined();
+    expect(debuggingSwitchIn(['--no-sandbox'])).toBeUndefined();
+    for (const switchName of [
+      '--remote-debugging-port=0',
+      '--remote-debugging-pipe',
+      '--remote-allow-origins=*',
+      '--inspect=9229',
+      '--inspect-brk',
+      '--debug-port=5858',
+      '--js-flags=--expose-gc',
+    ]) {
+      expect(debuggingSwitchIn(['x', switchName])).toBe(switchName);
+    }
+  });
+
   it('allows notifications and the camera to the console, nothing else and nobody else', () => {
     expect(isAllowedPermission('notifications', CONSOLE, CONSOLE)).toBe(true);
     expect(isAllowedPermission('media', 'https://127.0.0.1:8080/manage/pagers', CONSOLE)).toBe(
@@ -82,6 +107,7 @@ describe('[NFR-A04] starting with the PC', () => {
       fullScreen: false,
       openAtLogin: true,
       caFile: undefined,
+      logFile: undefined,
     });
     expect(
       shellConfig({
@@ -95,6 +121,7 @@ describe('[NFR-A04] starting with the PC', () => {
       fullScreen: true,
       openAtLogin: false,
       caFile: join('D:', 'RestaurantData', 'tls', 'ca.crt'),
+      logFile: join('D:', 'RestaurantData', 'logs', 'desktop-shell.log'),
     });
     expect(shellConfig({ RP_SHELL_CA_FILE: 'ca.pem', RP_DATA_DIR: 'D:' }).caFile).toBe('ca.pem');
     // On the restaurant PC the installer writes the installation file, not the environment.
