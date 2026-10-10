@@ -7,8 +7,8 @@ role-based modes:
 - KDS (`/kds`): kitchen station screens, device-authenticated (Phase 1);
 - Manager dashboard (`/manage`): overview, live order feed and alert centre (P4-01, P2-06c),
   staff and the Owner's sign-in security (P4-02a), today's sections and pagers (P4-02b), devices
-  (P4-02c), the menu editor (P4-02d), custom roles (P4-02e) and settings (P4-03a); more
-  configuration and reports (Phase 4).
+  (P4-02c), the menu editor (P4-02d), custom roles (P4-02e) and settings (P4-03a to P4-03e);
+  more configuration and reports (Phase 4).
 
 Which modes and dashboard pages a person gets comes from the permission matrix with their custom
 role applied (`src/app/modes.ts`, `grantOf` in `@rp/domain`, AUTH-012): the POS for those who
@@ -208,6 +208,24 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   Send tickets elsewhere or Print here again (with a reason), Archive. Stations with how they get
   their tickets and their printer, flagged when it is not printing; Change, Archive. Reads again
   on `RestaurantChanged` and `PrinterStatusChanged`.
+- Restaurant (`/manage/settings/restaurant`, P4-03e, ONB-004 steps 1 and 4, BRD §9.4):
+  `RestaurantScreen.tsx` and `RestaurantDialogs.tsx`, with the logic in `restaurant-view.ts`
+  (tested on its own). The name, phone, email and logo (choosing a logo uploads a menu photo, so
+  it needs `MENU_MANAGE`), the opening hours day by day (up to 4 windows a day, past midnight
+  allowed, Monday's hours copied to the week on request) and when the business day ends (before
+  12:00; the server's refusal while it would move today's business date stays in the dialog).
+  Every save sends the whole profile with an optional reason. Reads again on `RestaurantChanged`.
+- Tax and invoice (`/manage/settings/tax`, P4-03e, MGR-007, AUTH-006, BILL-002 to BILL-004):
+  `TaxScreen.tsx` and `TaxDialogs.tsx`, with the logic in `tax-view.ts` (tested on its own). The
+  invoice particulars (legal name, address, state, GSTIN checked for format, state and check
+  character, FSSAI number), the tax groups (total, taxes, SAC, items using them) and the invoice
+  series (first number this year, yearly or running, invoices issued, default). The Owner adds,
+  changes, archives and chooses the default behind the second factor (`useSecondFactor`);
+  managers see the page with a note and no buttons. Rates are typed as percentages and sent as
+  basis points; a series shows its first number as it is typed, and one with invoices keeps its
+  prefix and format. Reads again on `RestaurantChanged`, menu changes and `BillPrinted`.
+- `FormDialog.tsx`: the dialog frame (Cancel and Save, the server's refusal as an alert) and the
+  optional audit reason that the settings dialogs share.
 - Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
   `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
   Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console

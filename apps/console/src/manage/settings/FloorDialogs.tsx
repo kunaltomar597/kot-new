@@ -1,9 +1,10 @@
 import type { FloorResponse, SectionView, TableView } from '@rp/contracts';
-import { Button, Dialog, Select, TextField } from '@rp/ui-web';
-import { type ReactNode, useId, useState } from 'react';
+import { Select, TextField } from '@rp/ui-web';
+import { useState } from 'react';
 import { useConsole } from '../../app/console-context.js';
 import { useT } from '../../app/i18n.js';
 import { messageOf } from '../../app/messages.js';
+import { FormDialog } from './FormDialog.js';
 import {
   activeSections,
   checkSection,
@@ -20,61 +21,6 @@ import {
   tableFormOf,
   tableRequestOf,
 } from './floor-view.js';
-
-/** A dialog's form with Cancel and Save, the server's refusal shown above the buttons. */
-function FormDialog({
-  title,
-  busy,
-  error,
-  onSave,
-  onClose,
-  children,
-}: {
-  title: string;
-  busy: boolean;
-  error: string | undefined;
-  onSave: () => void;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const t = useT();
-  const formId = useId();
-  return (
-    <Dialog
-      open
-      onClose={onClose}
-      dismissible={!busy}
-      title={title}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={busy}>
-            {t('settings.dialog.cancel')}
-          </Button>
-          <Button type="submit" form={formId} loading={busy}>
-            {t('settings.dialog.save')}
-          </Button>
-        </>
-      }
-    >
-      <form
-        id={formId}
-        className="console-form"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSave();
-        }}
-      >
-        {children}
-        {error === undefined ? null : (
-          <p role="alert" className="console-notice console-notice--danger">
-            {error}
-          </p>
-        )}
-      </form>
-    </Dialog>
-  );
-}
 
 /** Adds a section or changes its name and place (TBL-001); the server audits it. */
 export function SectionDialog({
@@ -133,7 +79,7 @@ export function SectionDialog({
       }
       busy={busy}
       error={error}
-      onSave={() => {
+      onConfirm={() => {
         void save();
       }}
       onClose={onClose}
@@ -233,7 +179,7 @@ export function TableDialog({
       }
       busy={busy}
       error={error}
-      onSave={() => {
+      onConfirm={() => {
         void save();
       }}
       onClose={onClose}

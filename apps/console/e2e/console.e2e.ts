@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { type AddressInfo, createServer } from 'node:net';
 import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { calendarDateOf, financialYearOf, formatInvoiceNumber } from '@rp/domain';
 import { createTranslator } from '@rp/i18n';
 import pg from 'pg';
 import { type RunningServer, startServer } from './server.js';
@@ -12,7 +13,7 @@ import { type RunningServer, startServer } from './server.js';
  * P0-14b acceptance: a real browser pairs with the real server, people sign in with their PIN and
  * land in their mode, and the offline banner shows while the server is down (NFR-P11). Later work
  * packages add their flows: the POS floor, orders, the kitchen display, the manager dashboard on a
- * desktop and a phone, billing, alerts, staff, devices, the menu editor and custom roles.
+ * desktop and a phone, billing, alerts, staff, devices, the menu editor, custom roles and settings.
  */
 
 const t = createTranslator();
@@ -1680,5 +1681,156 @@ test.describe.serial('the web console', () => {
     } finally {
       await printer.close();
     }
+  });
+
+  test('[ONB-004] [MGR-007] [AUTH-006] [BILL-003] [BILL-004] a manager sets the opening hours and sees the tax settings read only, then the Owner adds a tax group and an invoice series after the second factor', async () => {
+    const labelled = (text: string) => new RegExp(`^${escape(text)}( \\*)?$`);
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    const settingsPages = page.getByRole('navigation', { name: t('settings.pages.label') });
+    const save = (dialog: ReturnType<Page['getByRole']>) =>
+      dialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    const row = (name: string) =>
+      page
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('heading', { level: 4, name, exact: true }) });
+    const atPhoneWidth = async () => {
+      await page.setViewportSize({ width: 360, height: 780 });
+      expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+      await page.setViewportSize({ width: 1280, height: 720 });
+    };
+
+    // A manager gives every day lunch and a dinner that closes after midnight.
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await settingsPages.getByRole('link', { name: t('settings.pages.restaurant') }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('restaurant.title') }),
+    ).toBeVisible();
+    await expect(page.getByText(t('restaurant.hours.closed'), { exact: true })).toHaveCount(7);
+    await expectAccessible(page);
+    await page.getByRole('button', { name: t('restaurant.hours.changeLabel') }).click();
+    const hours = page.getByRole('dialog', { name: t('restaurant.hoursDialog.title') });
+    const monday = t('restaurant.days.MON');
+    const mondayHours = (number: number) =>
+      hours.getByRole('group', {
+        name: t('restaurant.hoursDialog.hoursLegend', { day: monday, number }),
+        exact: true,
+      });
+    const lunchAndDinner = [
+      [1, '12:00', '15:30'],
+      [2, '19:00', '01:00'],
+    ] as const;
+    for (const [number, opens, closes] of lunchAndDinner) {
+      await hours
+        .getByRole('button', { name: t('restaurant.hoursDialog.addLabel', { day: monday }) })
+        .click();
+      await mondayHours(number)
+        .getByLabel(labelled(t('restaurant.hoursDialog.opens')))
+        .fill(opens);
+      await mondayHours(number)
+        .getByLabel(labelled(t('restaurant.hoursDialog.closes')))
+        .fill(closes);
+    }
+    await expect(mondayHours(2).getByText(t('restaurant.hoursDialog.overnight'))).toBeVisible();
+    await hours
+      .getByRole('button', { name: t('restaurant.hoursDialog.copy', { day: monday }) })
+      .click();
+    await expectAccessible(page);
+    await save(hours);
+    await expect(page.getByText(t('restaurant.hoursDialog.saved'))).toBeVisible();
+    const everyDay = [
+      t('restaurant.hours.window', { start: '12:00', end: '15:30' }),
+      t('restaurant.hours.windowOvernight', { start: '19:00', end: '01:00' }),
+    ].join(', ');
+    await expect(page.getByText(everyDay, { exact: true })).toHaveCount(7);
+    await atPhoneWidth();
+
+    // The tax settings are the Owner's: a manager sees them, with a note and nothing to change.
+    await settingsPages.getByRole('link', { name: t('settings.pages.tax') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('tax.title') })).toBeVisible();
+    await expect(page.getByText(t('tax.ownerOnly'))).toBeVisible();
+    await expect(row('GST 5 %')).toBeVisible();
+    await expect(row('Dine-in').getByText(t('tax.series.default'), { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: t('tax.groups.add') })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: t('tax.series.add') })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: t('tax.legal.changeLabel') })).toHaveCount(0);
+    await expectAccessible(page);
+
+    // The Owner adds GST 12 %, CGST and SGST at 6 % each, confirming the second factor.
+    await page.getByRole('button', { name: t('login.signOut') }).click();
+    await page.getByRole('button', { name: /^Asha \(Owner\)/ }).click();
+    await page.keyboard.type('1111');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await settingsPages.getByRole('link', { name: t('settings.pages.tax') }).click();
+    await expect(page.getByText(t('tax.secondFactor'))).toBeVisible();
+    await page.getByRole('button', { name: t('tax.groups.add') }).click();
+    const group = page.getByRole('dialog', { name: t('tax.groupDialog.addTitle') });
+    await group.getByLabel(labelled(t('tax.groupDialog.name'))).fill('GST 12 %');
+    for (const number of [1, 2]) {
+      await group
+        .getByRole('group', { name: t('tax.groupDialog.taxLegend', { number }), exact: true })
+        .getByLabel(labelled(t('tax.groupDialog.rate')))
+        .fill('6');
+    }
+    await expect(group.getByText(t('tax.groupDialog.total', { rate: '12' }))).toBeVisible();
+    await expectAccessible(page);
+    await save(group);
+    const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
+    await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(OWNER_PASSWORD);
+    await confirm.getByRole('button', { name: t('secondFactor.useRecovery') }).click();
+    await confirm
+      .getByLabel(t('secondFactor.recoveryCode'), { exact: false })
+      .fill(recoveryCodes[3] ?? '');
+    await confirm.getByRole('button', { name: t('secondFactor.confirm') }).click();
+    await expect(page.getByText(t('tax.groupDialog.saved', { name: 'GST 12 %' }))).toBeVisible();
+    const taxes = ['CGST', 'SGST']
+      .map((code) => t('tax.groups.component', { code, rate: '6' }))
+      .join(' + ');
+    await expect(row('GST 12 %').getByText(taxes, { exact: true })).toBeVisible();
+    await expect(row('GST 12 %').getByText(t('tax.groups.items', { count: 0 }))).toBeVisible();
+
+    // A series for catering shows its first number as the prefix is typed. The confirmation
+    // still holds, so saving it asks for nothing more.
+    const firstCatering = formatInvoiceNumber(
+      { prefix: 'CAT', includeFinancialYear: true, separator: '/', sequencePadding: 6 },
+      financialYearOf(calendarDateOf(new Date(), 'Asia/Kolkata')),
+      1,
+    );
+    await page.getByRole('button', { name: t('tax.series.add') }).click();
+    const series = page.getByRole('dialog', { name: t('tax.seriesDialog.addTitle') });
+    await series.getByLabel(labelled(t('tax.seriesDialog.name'))).fill('Catering');
+    await series.getByLabel(labelled(t('tax.seriesDialog.prefix'))).fill('cat');
+    await expect(series.getByLabel(labelled(t('tax.seriesDialog.prefix')))).toHaveValue('CAT');
+    await expect(
+      series.getByText(t('tax.seriesDialog.example', { example: firstCatering })),
+    ).toBeVisible();
+    await expectAccessible(page);
+    await save(series);
+    await expect(page.getByText(t('tax.seriesDialog.saved', { name: 'Catering' }))).toBeVisible();
+    await expect(confirm).toHaveCount(0);
+    await expect(
+      row('Catering').getByText(t('tax.series.firstNumber', { example: firstCatering })),
+    ).toBeVisible();
+
+    // GST 12 % goes again, with a reason, and is listed among the archived groups.
+    await page
+      .getByRole('group', { name: t('tax.groups.actionsFor', { name: 'GST 12 %' }), exact: true })
+      .getByRole('button', { name: t('tax.groups.archive') })
+      .click();
+    const archive = page.getByRole('dialog', {
+      name: t('tax.archiveGroup.title', { name: 'GST 12 %' }),
+    });
+    await archive.getByLabel(labelled(t('tax.archiveGroup.reason'))).fill('Added by mistake');
+    await archive.getByRole('button', { name: t('tax.archiveGroup.confirm') }).click();
+    await expect(page.getByText(t('tax.groups.archivedToast', { name: 'GST 12 %' }))).toBeVisible();
+    await expect(row('GST 12 %')).toHaveCount(0);
+    await page.getByLabel(t('tax.showArchived')).check();
+    await expect(row('GST 12 %').getByText(t('tax.archived'), { exact: true })).toBeVisible();
+    await expectAccessible(page);
+    await atPhoneWidth();
   });
 });
