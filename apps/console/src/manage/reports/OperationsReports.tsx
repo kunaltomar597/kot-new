@@ -1,4 +1,5 @@
 import type {
+  ApprovalTimeReportResponse,
   KitchenReportResponse,
   RecommendationReportResponse,
   TableReportResponse,
@@ -20,8 +21,9 @@ import {
 import { FeedbackReport } from './FeedbackReport.js';
 import { useReport } from './use-report.js';
 
-type Slug = 'kitchen' | 'tables' | 'suggestions' | 'feedback';
+type Slug = 'approvals' | 'kitchen' | 'tables' | 'suggestions' | 'feedback';
 type Translate = ReturnType<typeof useT>;
+type ApprovalDayRow = ApprovalTimeReportResponse['days'][number];
 type StationRow = KitchenReportResponse['stations'][number];
 type DishRow = KitchenReportResponse['items'][number];
 type TableRow = TableReportResponse['tables'][number];
@@ -29,6 +31,70 @@ type LayerRow = RecommendationReportResponse['layers'][number];
 type SuggestedRow = RecommendationReportResponse['items'][number];
 
 const seconds = (value: number | null, t: Translate) => (value === null ? '–' : duration(value, t));
+
+/**
+ * Pilot KPI (risk R-04): how long customer orders wait for a waiter to approve them, against the
+ * target for the median.
+ */
+function Approvals({ range }: { range: ReportRange }) {
+  const t = useT();
+  const { api } = useConsole();
+  const { data, reload } = useReport(
+    (wanted) => api.getApprovalTimeReport({ query: wanted }),
+    range,
+  );
+  return (
+    <ReportBody data={data} reload={reload}>
+      {(report) => (
+        <ReportSection id="report-approvals" title={t('reportsPage.report.approvals')}>
+          <p>
+            {report.meetsTarget === null
+              ? t('reportsPage.approvals.none')
+              : t(
+                  report.meetsTarget ? 'reportsPage.approvals.met' : 'reportsPage.approvals.missed',
+                  { target: report.targetSeconds },
+                )}
+          </p>
+          <StatTiles
+            stats={[
+              {
+                label: t('reportsPage.approvals.median'),
+                value: seconds(report.totals.medianSeconds, t),
+              },
+              {
+                label: t('reportsPage.approvals.p95'),
+                value: seconds(report.totals.p95Seconds, t),
+              },
+              { label: t('reportsPage.approvals.orders'), value: String(report.totals.orders) },
+              {
+                label: t('reportsPage.approvals.over'),
+                value: String(report.totals.overTarget),
+              },
+              { label: t('reportsPage.approvals.rejected'), value: String(report.rejected) },
+            ]}
+          />
+          <Table<ApprovalDayRow>
+            caption={t('reportsPage.approvals.days')}
+            columns={[
+              textColumn('date', t('reportsPage.columns.date'), (row) => row.businessDate),
+              numberColumn('orders', t('reportsPage.approvals.orders'), (row) => row.orders),
+              textColumn('median', t('reportsPage.approvals.median'), (row) =>
+                seconds(row.medianSeconds, t),
+              ),
+              textColumn('p95', t('reportsPage.approvals.p95'), (row) =>
+                seconds(row.p95Seconds, t),
+              ),
+              numberColumn('over', t('reportsPage.approvals.over'), (row) => row.overTarget),
+            ]}
+            rows={report.days}
+            rowKey={(row) => row.businessDate}
+            empty={t('reportsPage.none')}
+          />
+        </ReportSection>
+      )}
+    </ReportBody>
+  );
+}
 
 /** RPT-010: how long dishes take to cook and to be collected, by station and dish. */
 function Kitchen({ range }: { range: ReportRange }) {
@@ -260,6 +326,8 @@ function Suggestions({ range }: { range: ReportRange }) {
 
 export function OperationsReport({ slug, range }: { slug: Slug; range: ReportRange }) {
   switch (slug) {
+    case 'approvals':
+      return <Approvals range={range} />;
     case 'kitchen':
       return <Kitchen range={range} />;
     case 'tables':

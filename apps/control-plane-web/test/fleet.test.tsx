@@ -166,6 +166,30 @@ describe('[VCP-005] [NFR-O03] the fleet page', () => {
   });
 });
 
+describe('[NFR-A02] a PC’s availability', () => {
+  it('shows the share of open minutes the PC was reachable, against the target', async () => {
+    const cp = fleetPlane('READ_ONLY').on('getInstallationAvailability', ({ params }) => ({
+      installationId: params.id,
+      timeZone: 'Asia/Kolkata',
+      from: '2026-10-01',
+      to: '2026-10-02',
+      targetBp: 9_990,
+      meetsTarget: false,
+      totals: { openMinutes: 960, downMinutes: 29, availabilityBp: 9_698 },
+      days: [
+        { date: '2026-10-01', openMinutes: 480, downMinutes: 0, availabilityBp: 10_000 },
+        { date: '2026-10-02', openMinutes: 480, downMinutes: 29, availabilityBp: 9_396 },
+      ],
+    }));
+    const { container } = renderApp({ cp, path: `/installations/${INSTALLATION_ID}` });
+    expect(
+      await screen.findByText('96.98 % over 2 days (29 of 960 open minutes silent). Below target'),
+    ).toBeVisible();
+    expect(screen.getByText('93.96 %')).toBeVisible();
+    await expectNoAxeViolations(container);
+  });
+});
+
 describe('[UPD-003] a failed update', () => {
   it('lets Support close the alert of a PC that will not run that version', async () => {
     const failed = fleetAlert({

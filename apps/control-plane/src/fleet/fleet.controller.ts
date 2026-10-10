@@ -1,6 +1,8 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
 import {
   type AuditHeadListResponse,
+  AvailabilityQuery,
+  type AvailabilityResponse,
   FleetAlertParams,
   FleetAlertQuery,
   type FleetAlertListResponse,
@@ -49,5 +51,14 @@ export class FleetController {
     @Param(new ZodPipe(VendorInstallationParams)) params: VendorInstallationParams,
   ): Promise<AuditHeadListResponse> {
     return { heads: await this.fleet.auditHeads(params.id) };
+  }
+
+  @Get('installations/:id/availability')
+  @Vendor('FLEET_VIEW')
+  availability(
+    @Param(new ZodPipe(VendorInstallationParams)) params: VendorInstallationParams,
+    @Query(new ZodPipe(AvailabilityQuery)) query: AvailabilityQuery,
+  ): Promise<AvailabilityResponse> {
+    return this.fleet.availability(params.id, query);
   }
 }

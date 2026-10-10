@@ -170,6 +170,7 @@ import {
   InvoiceRegisterQuery,
   InvoiceRegisterResponse,
   ItemSalesResponse,
+  ApprovalTimeReportResponse,
   KitchenReportResponse,
   PaymentModesResponse,
   OrderDrillDownParams,
@@ -4832,6 +4833,20 @@ export const ROUTES = [
     request: { query: ReportRangeQuery },
     responses: {
       200: { description: 'The report.', schema: FeedbackReportResponse },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'getApprovalTimeReport',
+    method: 'GET',
+    path: '/api/v1/reports/approvals',
+    summary: 'How long customer orders wait for a waiter to approve them (pilot KPI, risk R-04)',
+    tags: ['reports'],
+    requirements: ['RPT-003', 'RPT-018', 'ORD-004'],
+    capability: 'REPORTS_VIEW_EXPORT',
+    request: { query: ReportRangeQuery },
+    responses: {
+      200: { description: 'The report.', schema: ApprovalTimeReportResponse },
       ...standardErrors,
     },
   },

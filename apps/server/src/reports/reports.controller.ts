@@ -7,6 +7,7 @@ import {
   InvoiceRegisterQuery,
   type InvoiceRegisterResponse,
   type ItemSalesResponse,
+  type ApprovalTimeReportResponse,
   type KitchenReportResponse,
   OrderDrillDownParams,
   type OrderDrillDownResponse,
@@ -93,6 +94,15 @@ export class ReportsController {
     @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
   ): Promise<CancellationReportResponse> {
     return this.suite.cancellations(restaurantOf(request), range);
+  }
+
+  @Get('approvals')
+  @RequireCapability('REPORTS_VIEW_EXPORT')
+  approvals(
+    @Req() request: AuthenticatedRequest,
+    @Query(new ZodValidationPipe(ReportRangeQuery)) range: ReportRangeQuery,
+  ): Promise<ApprovalTimeReportResponse> {
+    return this.suite.approvalTimes(restaurantOf(request), range);
   }
 
   @Get('kitchen')

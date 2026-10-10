@@ -1,3 +1,4 @@
+import { AVAILABILITY_TARGET_BP } from '@rp/contracts/control-plane';
 import { Card, Table } from '@rp/ui-web';
 import { when, whenOrDash } from '../app/format.js';
 import { useT } from '../app/i18n.js';
@@ -8,9 +9,12 @@ import { AlertsTable } from './AlertsTable.js';
 import { diskShown } from './fleet-view.js';
 import { BackupText, CloudBackupText, ChainText, OnlineBadge } from './PcHealth.js';
 
+/** Basis points as per cent with two decimals: 9,990 is 99.90. */
+const percentOf = (bp: number) => (bp / 100).toFixed(2);
+
 /**
  * One PC's health from its latest heartbeat (VCP-005), its alerts, open and closed, and the audit
- * chain heads it reported (AUD-003).
+ * chain heads it reported (AUD-003), and its availability in trading hours (NFR-A02).
  */
 export function InstallationHealth({ installationId }: { installationId: string }) {
   const t = useT();
@@ -23,6 +27,11 @@ export function InstallationHealth({ installationId }: { installationId: string 
   const heads = useLoad(
     (signal) => api.listAuditHeads({ params: { id: installationId }, signal }),
     `heads:${installationId}`,
+  );
+  const availability = useLoad(
+    (signal) =>
+      api.getInstallationAvailability({ params: { id: installationId }, query: {}, signal }),
+    `availability:${installationId}`,
   );
   const reload = () => {
     fleet.reload();
@@ -135,6 +144,68 @@ export function InstallationHealth({ installationId }: { installationId: string 
               showPlace={false}
               onResolved={reload}
             />
+          )}
+        </LoadView>
+      </Card>
+      <Card title={t('vendorApp.fleet.availability')} headingLevel={2}>
+        <p className="cp-hint">
+          {t('vendorApp.fleet.availabilityIntro', { target: percentOf(AVAILABILITY_TARGET_BP) })}
+        </p>
+        <LoadView
+          data={availability.data}
+          reload={availability.reload}
+          failed={t('vendorApp.fleet.availabilityFailed')}
+        >
+          {(view) => (
+            <>
+              <p>
+                {view.totals.availabilityBp === null
+                  ? t('vendorApp.fleet.availabilityNone')
+                  : `${t('vendorApp.fleet.availabilitySummary', {
+                      percent: percentOf(view.totals.availabilityBp),
+                      days: view.days.length,
+                      down: view.totals.downMinutes,
+                      open: view.totals.openMinutes,
+                    })}. ${t(
+                      view.meetsTarget === true
+                        ? 'vendorApp.fleet.availabilityMet'
+                        : 'vendorApp.fleet.availabilityMissed',
+                    )}`}
+              </p>
+              <Table
+                caption={t('vendorApp.fleet.availability')}
+                hideCaption
+                rows={view.days}
+                rowKey={(day) => day.date}
+                empty={t('vendorApp.fleet.availabilityNone')}
+                columns={[
+                  {
+                    key: 'date',
+                    header: t('vendorApp.fleet.availabilityDay'),
+                    cell: (day) => day.date,
+                  },
+                  {
+                    key: 'open',
+                    header: t('vendorApp.fleet.availabilityOpen'),
+                    align: 'end',
+                    cell: (day) => String(day.openMinutes),
+                  },
+                  {
+                    key: 'down',
+                    header: t('vendorApp.fleet.availabilityDown'),
+                    align: 'end',
+                    cell: (day) => String(day.downMinutes),
+                  },
+                  {
+                    key: 'share',
+                    header: t('vendorApp.fleet.availabilityShare'),
+                    align: 'end',
+                    cell: (day) =>
+                      day.availabilityBp === null ? '—' : `${percentOf(day.availabilityBp)} %`,
+                  },
+                ]}
+              />
+            </>
           )}
         </LoadView>
       </Card>

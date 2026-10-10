@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-06a).
+Last updated: 2026-10-11 (P8-06b).
 
 What exists:
 
@@ -412,7 +412,6 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-06b Pilot KPI views (approval-time report, availability view).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -683,7 +682,8 @@ Recommended next WPs (dependencies met):
 - [x] P8-05 Runbooks, manuals, training (Business Owner review and filming the videos remain)
 - [~] P8-06 Pilot readiness
   - [x] P8-06a The strict traceability gate, UAT plan, go-live checklist and KPI plan
-  - [ ] P8-06b Pilot KPI views: approval time (R-04), availability over time; then the pilot itself [H]
+  - [x] P8-06b Pilot KPI views: approval time (R-04) and availability over time
+  - [ ] P8-06c The pilot itself: UAT, baselines, 4 weeks live [H]
 
 ## Decisions
 
@@ -4423,6 +4423,10 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-06b pilot KPI views
+
+Two views. (1) `GET /api/v1/reports/approvals` (`ApprovalTimeReportResponse`, `APPROVAL_TARGET_SECONDS` = 90): per customer order (tablet, QR) the wait from placing to the first approval that sent it on (`min(sent_at) - min(created_at)` over approved lines), median, p95 and the count over target per day and in total, plus rejected orders; a console report "Approval time" under Operations. (2) `GET /v1/vendor/installations/:id/availability?days=` on the Control Plane (`AvailabilityResponse`, `AVAILABILITY_TARGET_BP` = 9,990) and an "Availability in trading hours" card on the installation page: `availabilityOf` in `@rp/domain` counts an open minute (from the PC's reported opening hours; every minute if none) as down when the PC had been silent longer than the offline limit, the same rule as the OFFLINE alert; minutes before the first heartbeat are not counted; days are in the PC's time zone, up to 31. Decided: no export for the approval report (it is not an RPT export type); the median, not the mean, is judged against 90 s. Gotchas: the heartbeat table has no purge yet, so the view reads whatever history exists; the per-minute loop costs about 45k steps for 31 days. Deferred to P8-06c: the pilot itself (people, devices, 4 weeks), which also records the baselines in `docs/build/pilot/kpi-plan.md`.
 
 ### 2026-10-11: P8-06a the pilot gate
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  availabilityOf,
   checkChainHead,
   checkCheckpoint,
   diskUsedPercent,
@@ -210,5 +211,67 @@ describe('[SEC-015] [LIC-007] tampering that calls for a person', () => {
     ]);
     // Older than the week: not repeated any more.
     expect(tamperAlertDue([...twice, { kind: 'CLOCK_SKEW', at: daysAgo(8) }], now)).toEqual([]);
+  });
+});
+
+describe('availabilityOf', () => {
+  const beatsEvery = (from: string, to: string, minutes: number) => {
+    const out: Date[] = [];
+    for (let t = ist(from).getTime(); t <= ist(to).getTime(); t += minutes * 60_000) {
+      out.push(new Date(t));
+    }
+    return out;
+  };
+  const base = {
+    from: ist('2026-10-02T11:00:00'),
+    to: ist('2026-10-02T15:00:00'),
+    offlineAfterMinutes: 30,
+    businessHours: { timeZone: IST, hours: HOURS },
+  };
+
+  it('[NFR-A02] counts a PC that reports every 5 minutes as fully available', () => {
+    const figures = availabilityOf({
+      ...base,
+      heartbeats: beatsEvery('2026-10-02T10:00:00', '2026-10-02T15:00:00', 5),
+    });
+    expect(figures).toEqual({ openMinutes: 240, downMinutes: 0, availabilityBp: 10_000 });
+  });
+
+  it('[NFR-A02] counts only the silence past the threshold, during opening hours', () => {
+    // Silent from 12:00 to 13:00: minutes 12:31 to 13:00 are down (30 after the threshold).
+    const heartbeats = [
+      ...beatsEvery('2026-10-02T10:00:00', '2026-10-02T12:00:00', 5),
+      ...beatsEvery('2026-10-02T13:00:00', '2026-10-02T15:00:00', 5),
+    ];
+    const figures = availabilityOf({ ...base, heartbeats });
+    expect(figures.downMinutes).toBe(29);
+    expect(figures.availabilityBp).toBe(Math.round((211 / 240) * 10_000));
+  });
+
+  it('[NFR-A02] does not count closed hours', () => {
+    const figures = availabilityOf({
+      ...base,
+      from: ist('2026-10-02T15:00:00'),
+      to: ist('2026-10-02T19:00:00'),
+      heartbeats: [ist('2026-10-02T14:00:00')],
+    });
+    expect(figures).toEqual({ openMinutes: 0, downMinutes: 0, availabilityBp: null });
+  });
+
+  it('[NFR-A02] starts at the first heartbeat ever received', () => {
+    const figures = availabilityOf({ ...base, heartbeats: [ist('2026-10-02T14:00:00')] });
+    expect(figures.openMinutes).toBe(60);
+  });
+
+  it('[NFR-A02] counts every minute when no hours are known', () => {
+    const figures = availabilityOf({
+      ...base,
+      businessHours: null,
+      from: ist('2026-10-02T00:00:00'),
+      to: ist('2026-10-02T01:00:00'),
+      heartbeats: [ist('2026-10-02T00:00:00')],
+    });
+    expect(figures.openMinutes).toBe(60);
+    expect(figures.downMinutes).toBe(29);
   });
 });

@@ -267,3 +267,55 @@ export function tamperAlertDue(
   }
   return [...kinds].sort();
 }
+
+/** What a PC's heartbeats say about how often it was reachable while the restaurant was open. */
+export interface AvailabilityFigures {
+  /** Minutes the restaurant was open in the period. */
+  readonly openMinutes: number;
+  /** Open minutes in which the PC had been silent longer than the offline threshold. */
+  readonly downMinutes: number;
+  /** Basis points of the open minutes the PC was reachable; null when never open. */
+  readonly availabilityBp: number | null;
+}
+
+export interface AvailabilityInput {
+  /** The period: `from` included, `to` excluded. */
+  readonly from: Date;
+  readonly to: Date;
+  /** Arrival times of the heartbeats, in any order; those before `from` set the starting state. */
+  readonly heartbeats: readonly Date[];
+  /** VCP-005 ⚙: how long a silence may last before the PC counts as offline. */
+  readonly offlineAfterMinutes: number;
+  /** Null or empty hours: every minute counts as open, as for the offline alert. */
+  readonly businessHours: FleetHealthInput['businessHours'];
+}
+
+/**
+ * Local availability in trading hours (BRD §2, ≥ 99.9 %): a minute is down when the PC had been
+ * silent for more than the offline threshold at that minute, the same rule as the OFFLINE alert,
+ * and the restaurant was open. Minutes before the first heartbeat ever received are not counted,
+ * because the PC did not exist for the Control Plane yet.
+ */
+export function availabilityOf(input: AvailabilityInput): AvailabilityFigures {
+  const MINUTE = 60_000;
+  const beats = input.heartbeats.map((beat) => beat.getTime()).sort((a, b) => a - b);
+  const first = beats[0];
+  const hours = input.businessHours;
+  const scheduled = hours !== null && hours.hours.length > 0;
+  const start = Math.max(Math.ceil(input.from.getTime() / MINUTE) * MINUTE, first ?? Infinity);
+  let open = 0;
+  let down = 0;
+  let cursor = 0; // index of the first heartbeat after the minute being looked at
+  for (let at = start; at < input.to.getTime(); at += MINUTE) {
+    if (scheduled && openSince(new Date(at), hours.hours, hours.timeZone) === null) continue;
+    open += 1;
+    while (cursor < beats.length && (beats[cursor] ?? Infinity) <= at) cursor += 1;
+    const last = beats[cursor - 1];
+    if (last !== undefined && at - last > input.offlineAfterMinutes * MINUTE) down += 1;
+  }
+  return {
+    openMinutes: open,
+    downMinutes: down,
+    availabilityBp: open === 0 ? null : Math.round(((open - down) / open) * 10_000),
+  };
+}

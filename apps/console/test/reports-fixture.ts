@@ -1,6 +1,7 @@
 import type {
   DiscountReportResponse,
   InvoiceRegisterResponse,
+  ApprovalTimeReportResponse,
   KitchenReportResponse,
   OrderDrillDownResponse,
   RecommendationReportResponse,
@@ -142,6 +143,19 @@ export function registerPage(from: string, to: string, offset: number): InvoiceR
     offset,
     nextOffset: offset === 0 ? 200 : null,
     invoices: Array.from({ length: count }, (_, index) => invoice(offset + index + 1)),
+  };
+}
+
+export function approvalReport(from: string, to: string): ApprovalTimeReportResponse {
+  const times = { orders: 12, medianSeconds: 75, p95Seconds: 210, overTarget: 3 };
+  return {
+    from,
+    to,
+    targetSeconds: 90,
+    meetsTarget: true,
+    rejected: 1,
+    days: [{ businessDate: from, ...times }],
+    totals: times,
   };
 }
 
