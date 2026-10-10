@@ -188,7 +188,7 @@ async function orderOf(response: request.Response): Promise<OrderView> {
 describe('[ORD-001] [ORD-014] submitting an order', () => {
   let session: TableSessionView;
 
-  it('[WTR-012] prices every line on the server and sends staff orders to the kitchen by station', async () => {
+  it('[ORD-006] [WTR-012] prices every line on the server and sends staff orders to the kitchen by station', async () => {
     session = await openTable('T1');
     const response = await submit({
       idempotencyKey: randomUUID(),
@@ -445,7 +445,7 @@ describe('[ORD-001] [ORD-014] submitting an order', () => {
 });
 
 describe('[TBL-007] [TBL-008] listing orders for the POS', () => {
-  it('lists a table session’s orders oldest first, with item states', async () => {
+  it('[ORD-009] lists a table session’s orders (rounds) oldest first, with item states', async () => {
     const session = await openTable('T2');
     for (const name of ['Dal', 'Roti']) {
       const response = await submit({

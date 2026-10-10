@@ -15,6 +15,11 @@ import * as prettier from 'prettier';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const strict = process.argv.includes('--strict');
 const catalog = JSON.parse(readFileSync(join(root, 'docs', 'brd', 'requirements.json'), 'utf8'));
+// Must requirements only a person or hardware can prove (P8-06). Strict mode accepts them as
+// pending evidence, listed in the report, never as covered.
+const manualEvidence = JSON.parse(
+  readFileSync(join(root, 'docs', 'build', 'manual-evidence.json'), 'utf8'),
+).entries;
 const known = new Map(catalog.requirements.map((requirement) => [requirement.id, requirement]));
 
 const SKIP_DIRS = new Set([
@@ -66,11 +71,15 @@ const byPriority = {
   C: { total: 0, covered: 0 },
 };
 const uncoveredMust = [];
+const pendingEvidence = [];
 for (const requirement of catalog.requirements) {
   const bucket = byPriority[requirement.priority];
   bucket.total += 1;
   if (coverage.has(requirement.id)) bucket.covered += 1;
-  else if (requirement.priority === 'M') uncoveredMust.push(requirement);
+  else if (requirement.priority === 'M') {
+    if (manualEvidence[requirement.id]) pendingEvidence.push(requirement);
+    else uncoveredMust.push(requirement);
+  }
 }
 
 const lines = [
@@ -101,6 +110,11 @@ for (const requirement of uncoveredMust) {
     `- ${requirement.id}: ${requirement.text.slice(0, 110)}${requirement.text.length > 110 ? '…' : ''}`,
   );
 }
+lines.push('', '## Must requirements proved by a person or hardware (pending evidence)', '');
+for (const requirement of pendingEvidence) {
+  const entry = manualEvidence[requirement.id];
+  lines.push(`- ${requirement.id}: ${entry.reason} Evidence: ${entry.evidence}`);
+}
 if (unknown.size > 0) {
   lines.push('', '## References to unknown requirement IDs (fix these)', '');
   for (const [id, files] of unknown) lines.push(`- ${id}: ${[...files].sort().join(', ')}`);
@@ -121,6 +135,17 @@ if (unknown.size > 0) {
     `Unknown requirement IDs referenced in tests: ${[...unknown.keys()].join(', ')}\n`,
   );
   process.exitCode = 1;
+}
+for (const id of Object.keys(manualEvidence)) {
+  if (coverage.has(id) || !known.has(id)) {
+    process.stdout.write(`manual-evidence.json lists ${id}, which a test covers or is unknown.\n`);
+    process.exitCode = 1;
+  }
+}
+if (pendingEvidence.length > 0) {
+  process.stdout.write(
+    `${pendingEvidence.length} Must requirements wait for evidence from a person.\n`,
+  );
 }
 if (strict && uncoveredMust.length > 0) {
   process.stdout.write(`${uncoveredMust.length} Must requirements have no test.\n`);
