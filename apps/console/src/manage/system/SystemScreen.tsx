@@ -351,6 +351,11 @@ export function SystemScreen() {
               />
             </>
           )}
+          {storage.encryption === 'NOT_ENCRYPTED' ? (
+            <p role="alert" className="console-notice console-notice--danger">
+              {t('systemPage.storage.notEncrypted')}
+            </p>
+          ) : null}
           {storage.level === 'WARNING' || storage.level === 'CRITICAL' ? (
             <p
               role="alert"

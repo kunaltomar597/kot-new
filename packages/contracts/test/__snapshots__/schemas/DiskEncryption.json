@@ -1,0 +1,4 @@
+{
+  "input": { "type": "string", "enum": ["ENCRYPTED", "NOT_ENCRYPTED", "UNKNOWN"] },
+  "output": { "type": "string", "enum": ["ENCRYPTED", "NOT_ENCRYPTED", "UNKNOWN"] }
+}

@@ -2649,6 +2649,11 @@ export const en = {
         title: 'Disk encryption',
         detail: 'BitLocker turned on, with the recovery key kept somewhere safe away from the PC.',
       },
+      accounts: {
+        title: 'Windows accounts',
+        detail:
+          'The POS runs under a standard Windows account, not an administrator. The Owner keeps the administrator password, and nobody else knows it.',
+      },
       ups: {
         title: 'UPS',
         detail: 'At least 15 minutes of battery for the PC, the router and the printers.',
@@ -2656,7 +2661,7 @@ export const en = {
       wifiSeparate: {
         title: 'Separate staff and guest Wi-Fi',
         detail:
-          'The staff network (PC, phones, tablets, printers, pagers) on its own SSID or VLAN, apart from guest Wi-Fi.',
+          'The staff network (PC, phones, tablets, printers, pagers) on its own SSID or VLAN, apart from guest Wi-Fi. Write its address range (for example 192.168.10.0/24) in the notes: the installer asks for it.',
       },
       coverage: {
         title: '2.4 GHz coverage',
@@ -2739,6 +2744,8 @@ export const en = {
         LOGS: 'Logs',
         BACKUPS: 'Backups',
       },
+      notEncrypted:
+        'The drive is not encrypted. Anyone who takes this PC or its disk can read every bill and customer number. Turn on BitLocker and keep the recovery key away from the PC, or ask support.',
       notMeasured: 'Not set up',
       retention:
         'Old alerts, service calls, logs and temporary files are removed after {days} days, and a diner’s number after {months} months without a visit. Orders, bills and the audit trail are kept until the Owner archives them.',

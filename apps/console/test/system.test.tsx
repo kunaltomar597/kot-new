@@ -431,6 +431,18 @@ describe('[MGR-010] [NFR-I03] the System page', () => {
     expect(storage.getByText(t('systemPage.storage.level.CRITICAL'))).toBeVisible();
     await expectNoAxeViolations(container);
   });
+
+  it('[SEC-007] warns while the data drive is not encrypted (PC-I5)', async () => {
+    const plain = systemStatus();
+    const { container } = await renderConsole({
+      fake: systemServer({ ...plain, storage: { ...plain.storage, encryption: 'NOT_ENCRYPTED' } }),
+      path: PATH,
+      signedIn: 'MANAGER',
+    });
+    const storage = await section(t('systemPage.storage.title'));
+    expect(storage.getByRole('alert')).toHaveTextContent(t('systemPage.storage.notEncrypted'));
+    await expectNoAxeViolations(container);
+  });
 });
 
 describe('[UPD-004] "Install now"', () => {

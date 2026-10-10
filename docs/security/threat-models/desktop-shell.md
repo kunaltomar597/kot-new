@@ -245,10 +245,12 @@ The page asks for a USB, serial, HID or Bluetooth device through the browser's d
 Staff leave the full-screen POS window (Alt+Tab, the Windows key) and use the PC's desktop, under
 whatever account the POS runs as.
 
-- Mitigation: the window is full screen; nothing keeps staff in it.
+- Mitigation: the window is full screen; the PC runbook has the POS run under a standard Windows
+  account (PC-E2) and offers Windows' Assigned Access, which locks that account to the POS window,
+  where the PC is on the floor (`docs/runbooks/windows-host.md`).
 - Code: `apps/desktop/src/shell.ts`.
 - Tests: `apps/desktop/test/shell.test.ts` "shows the start-up page until the server answers, then
   the console, full screen".
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: the POS under a standard Windows account
-  (PC-E2), with Windows' Assigned Access where the restaurant wants the PC locked to the POS.
+- Status: Partly mitigated. Plan: manual task 35 by 2026-10-31: Assigned Access tried on a real PC
+  where the restaurant wants it.

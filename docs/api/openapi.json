@@ -16626,6 +16626,7 @@
         "required": ["kind", "reason"],
         "additionalProperties": false
       },
+      "DiskEncryption": { "type": "string", "enum": ["ENCRYPTED", "NOT_ENCRYPTED", "UNKNOWN"] },
       "DomainEvent": {
         "oneOf": [
           { "$ref": "#/components/schemas/MenuPublished" },
@@ -23727,6 +23728,7 @@
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
               },
+              "encryption": { "$ref": "#/components/schemas/DiskEncryption" },
               "categories": {
                 "type": "array",
                 "items": {
@@ -23778,6 +23780,7 @@
               "level",
               "warnPercent",
               "criticalPercent",
+              "encryption",
               "categories",
               "retention"
             ],

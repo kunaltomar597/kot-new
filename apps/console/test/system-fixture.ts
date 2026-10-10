@@ -29,6 +29,7 @@ export function systemStatus(overrides: Partial<SystemStatusResponse> = {}): Sys
       level: 'OK',
       warnPercent: 80,
       criticalPercent: 90,
+      encryption: 'ENCRYPTED',
       retention: {
         operationalDays: 90,
         dinerContactMonths: 24,

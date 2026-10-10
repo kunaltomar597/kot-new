@@ -7,6 +7,7 @@ export const READINESS_ITEMS = [
   'pc',
   'backupDrive',
   'bitlocker',
+  'accounts',
   'ups',
   'wifiSeparate',
   'coverage',

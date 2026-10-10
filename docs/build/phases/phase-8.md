@@ -335,7 +335,7 @@ checklists and the PC, update and licence threats.
 
 P8-03d2b2 (2026-10-11) is split: **a** UPDATE-S2, the update signer pinned by its issuer as well as its
 subject (`RP_UPDATE_ISSUER`; done); **b** UPDATE-R3 (b1, done: the `release-evidence` job) and LICENCE-T5 (b2); **c** the PC's threats (PC-E2, I5,
-I6, S4, T7, D6; DESKTOP-E4); **d** the four checklists.
+I6, S4, T7, D6; DESKTOP-E4; c1 done: the procedures and the BitLocker warning; c2: I6 and S4); **d** the four checklists.
 
 ### P8-03e Incident response plan and penetration-test support
 
