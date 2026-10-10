@@ -225,6 +225,7 @@ export const SERIOUS_TAMPER_KINDS: readonly string[] = [
   'LICENCE_TAMPERED',
   'RECORD_TAMPERED',
   'OTHER_PC',
+  'CODE_MODIFIED',
 ];
 /** The clock's reports (set back, held back, far from the Control Plane's) alert when repeated. */
 export const CLOCK_TAMPER_KINDS: readonly string[] = ['CLOCK_ROLLBACK', 'CLOCK_SKEW'];

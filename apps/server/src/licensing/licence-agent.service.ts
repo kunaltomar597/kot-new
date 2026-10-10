@@ -45,6 +45,7 @@ import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AppError } from '../errors/app-error.js';
 import { appendEvent } from '../events/outbox.js';
+import { checkServerFiles, SERVER_FOLDER } from '../integrity/server-files.js';
 import { FINGERPRINT_READER, type FingerprintReader, type Identifiers } from './pc-fingerprint.js';
 
 const FILE_KEY = 'licence.file';
@@ -52,6 +53,7 @@ const RECORD_KEY = 'licence.record';
 const SECRET_KEY = 'licence.reactivation_secret';
 /** How often the licence is judged again, so a restriction applies at the business day's start. */
 const CHECK_EVERY_MS = 60_000;
+const FILES_CHECK_EVERY_MS = 3_600_000;
 /** Hardware rarely changes: the fingerprint is read again every few hours. */
 const FINGERPRINT_EVERY_MS = 6 * 60 * 60 * 1_000;
 /** A read that said too little (fewer than three identifiers) is tried again this much later. */
@@ -105,6 +107,7 @@ const LicenceRecord = z.object({
           'LICENCE_TAMPERED',
           'RECORD_TAMPERED',
           'OTHER_PC',
+          'CODE_MODIFIED',
         ]),
         at: z.iso.datetime(),
       }),
@@ -146,6 +149,8 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
   private readonly checkListeners = new Set<() => Promise<unknown>>();
   /** One check at a time: the record is read, judged and written as a whole. */
   private running: Promise<LicenceStatus> | undefined;
+
+  private filesChecked: { at: number; modified: boolean } | undefined;
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -399,6 +404,22 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     return run;
   }
 
+  /**
+   * LICENCE-T5: whether the server's files differ from the release's list, looked at again every
+   * hour. It only reports; a patched PC is the vendor's to follow up (the alert), not restricted.
+   */
+  private async filesModified(): Promise<boolean> {
+    const now = Date.now();
+    if (this.filesChecked === undefined || now - this.filesChecked.at >= FILES_CHECK_EVERY_MS) {
+      const verdict = await checkServerFiles(
+        SERVER_FOLDER,
+        this.config.productVersion !== undefined,
+      ).catch(() => 'unchecked' as const);
+      this.filesChecked = { at: now, modified: verdict === 'modified' };
+    }
+    return this.filesChecked.modified;
+  }
+
   private async evaluate(clock: Date): Promise<LicenceStatus> {
     const enrolment = await readEnrolment(this.prisma);
     const file = await this.readFile();
@@ -456,6 +477,7 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
       events.push({ kind: 'LICENCE_TAMPERED', at });
     }
     if (status.problem === 'OTHER_PC') events.push({ kind: 'OTHER_PC', at });
+    if (await this.filesModified()) events.push({ kind: 'CODE_MODIFIED', at });
     await this.update(
       (current) => ({
         ...current,

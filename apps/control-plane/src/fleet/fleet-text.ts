@@ -48,6 +48,7 @@ const TAMPERING: Readonly<Record<string, string>> = {
   LICENCE_TAMPERED: 'the licence file was changed or an older one put back',
   RECORD_TAMPERED: 'the PC’s licence record was edited',
   OTHER_PC: 'the licence is on another PC',
+  CODE_MODIFIED: 'the server’s program files differ from the release’s',
   CLOCK_ROLLBACK: 'the clock was set or held back, again and again',
   CLOCK_SKEW: 'the clock is far off, again and again',
   REACTIVATION_CODE_NOT_ISSUED: 'a reactivation code the vendor never issued',
