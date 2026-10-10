@@ -49,3 +49,4 @@ export * from './recommendations.js';
 export * from './order-feed.js';
 export * from './staff.js';
 export * from './lockout.js';
+export * from './code-integrity.js';

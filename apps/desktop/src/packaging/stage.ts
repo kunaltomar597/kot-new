@@ -284,6 +284,12 @@ export async function stage(options: StageOptions): Promise<StageManifest> {
     }
     if (missing.length > 0) throw new Error(`The payload lacks ${missing.join(', ')}`);
     await checkServerLoads(folder('server'));
+    // LIC-007: the server checks its own files against this list while it runs.
+    log('Listing the server’s files with their checksums.');
+    await run(process.execPath, [
+      join(folder('server'), 'dist', 'integrity', 'write-cli.js'),
+      folder('server'),
+    ]);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }

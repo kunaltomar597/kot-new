@@ -4,7 +4,14 @@
     "properties": {
       "kind": {
         "type": "string",
-        "enum": ["CLOCK_ROLLBACK", "CLOCK_SKEW", "LICENCE_TAMPERED", "RECORD_TAMPERED", "OTHER_PC"]
+        "enum": [
+          "CLOCK_ROLLBACK",
+          "CLOCK_SKEW",
+          "LICENCE_TAMPERED",
+          "RECORD_TAMPERED",
+          "OTHER_PC",
+          "CODE_MODIFIED"
+        ]
       },
       "at": {
         "type": "string",
@@ -19,7 +26,14 @@
     "properties": {
       "kind": {
         "type": "string",
-        "enum": ["CLOCK_ROLLBACK", "CLOCK_SKEW", "LICENCE_TAMPERED", "RECORD_TAMPERED", "OTHER_PC"]
+        "enum": [
+          "CLOCK_ROLLBACK",
+          "CLOCK_SKEW",
+          "LICENCE_TAMPERED",
+          "RECORD_TAMPERED",
+          "OTHER_PC",
+          "CODE_MODIFIED"
+        ]
       },
       "at": {
         "type": "string",

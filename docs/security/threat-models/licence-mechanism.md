@@ -193,15 +193,26 @@ Offline, the customer puts back an older ACTIVE licence file over a newer one th
 The server ships as JavaScript on a PC the customer administers; they edit it to skip the checks.
 
 - Mitigation: the installer is signed and Program Files is writable by administrators only; the
-  POS window's Electron fuses check its own `app.asar`. The server and `@rp/licensing` have no
-  integrity check or obfuscation (LIC-007).
-- Code: `apps/desktop/src/packaging/builder-config.ts` (`ELECTRON_FUSES`).
-- Tests: `apps/desktop/test/packaging.test.ts` "no Node.js mode, options or debugger, and only its
-  checked app.asar".
-- Risk: likelihood Medium, impact High: High.
-- Status: Not mitigated. Plan: P8-03d by 2026-10-22: decide what LIC-007's integrity checks and
-  obfuscation can do on a customer's PC, and how the Control Plane notices a patched PC (the
-  heartbeat's version and the files' hashes).
+  POS window's Electron fuses check its own `app.asar`. The installer's build lists every code file
+  of the server and of the `@rp` packages it carries with its SHA-256 (`integrity.json`); the
+  server compares them at start-up and every hour, and a difference, or no list on an installed
+  server, is reported as the tamper event `CODE_MODIFIED`. It alerts at once at the Control Plane
+  (SEC-015) like a changed licence file. The release's own list is attested with the installer
+  (UPDATE-R3), so the vendor can compare a PC's files with the release.
+- Decided: no obfuscation. The customer administers the PC, so obfuscated code only slows a
+  patcher by hours while it makes support, crash reports and audits harder; LIC-007's "obfuscation"
+  is met by the signed installer and the integrity list. A restriction is not applied for modified
+  files (only reported): the vendor follows up with the restaurant.
+- Code: `apps/server/src/integrity/server-files.ts` (`checkServerFiles`, `writeIntegrityManifest`);
+  `packages/domain/src/code-integrity.ts` (`judgeIntegrity`);
+  `apps/desktop/src/packaging/stage.ts` (`stage` writes the list).
+- Tests: `apps/server/test/unit/server-files.test.ts` "[LIC-007] finds a patched, a removed and an
+  added file"; `packages/domain/test/code-integrity.test.ts` "[LIC-007] names files that changed,
+  are gone or were added".
+- Risk: likelihood Low, impact High: Medium.
+- Status: Accepted: whoever patches the licence checks can patch the integrity
+  check too, so this catches careless edits and replaced files, not a determined administrator;
+  the vendor's real controls are the signed licence, the renewals and the contract.
 
 ### Repudiation
 

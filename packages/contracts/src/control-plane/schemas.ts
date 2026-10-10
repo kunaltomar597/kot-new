@@ -163,6 +163,7 @@ export const TAMPER_KINDS = [
   'LICENCE_TAMPERED',
   'RECORD_TAMPERED',
   'OTHER_PC',
+  'CODE_MODIFIED',
 ] as const;
 export const TamperEvent = z.object({ kind: z.enum(TAMPER_KINDS), at: Timestamp });
 export type TamperEvent = z.infer<typeof TamperEvent>;

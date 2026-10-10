@@ -191,6 +191,9 @@ describe('[SEC-015] [LIC-007] tampering that calls for a person', () => {
         now,
       ),
     ).toEqual(['OTHER_PC', 'RECORD_TAMPERED']);
+    expect(tamperAlertDue([{ kind: 'CODE_MODIFIED', at: daysAgo(0) }], now)).toEqual([
+      'CODE_MODIFIED',
+    ]);
     expect(tamperAlertDue([], now, true)).toEqual(['REACTIVATION_CODE_NOT_ISSUED']);
     expect(tamperAlertDue([], now)).toEqual([]);
   });

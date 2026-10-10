@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-03d2b2b1).
+Last updated: 2026-10-11 (P8-03d2b2b2).
 
 What exists:
 
@@ -400,7 +400,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03d2b2b2 to d (LICENCE-T5, the PC's threats and the four standards checklists; 9 threats still planned there), P8-03e the incident response
+- P8-03d2b2c and d (the PC's threats and the four standards checklists), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
 - P8-04 UX polish and accessibility audit; P8-05 Runbooks, manuals and training material.
@@ -659,9 +659,9 @@ Recommended next WPs (dependencies met):
       threats still planned for P8-03d (PC-E2, I5, I6, S4, T7, D6; UPDATE-R3; LICENCE-T5;
       DESKTOP-E4); split:
       - [x] P8-03d2b2a UPDATE-S2: the update signer pinned by its issuer too
-      - [~] P8-03d2b2b UPDATE-R3 and LICENCE-T5, split:
+      - [x] P8-03d2b2b UPDATE-R3 and LICENCE-T5, split:
         - [x] P8-03d2b2b1 UPDATE-R3: attestation, SBOM and commit with each release
-        - [ ] P8-03d2b2b2 LICENCE-T5: what integrity checks can do on a customer's PC; the PC's file hashes on the heartbeat
+        - [x] P8-03d2b2b2 LICENCE-T5: the server's files checked against the release's list; `CODE_MODIFIED` reported
       - [ ] P8-03d2b2c The PC's threats (PC-E2, I5, I6, S4, T7, D6; DESKTOP-E4)
       - [ ] P8-03d2b2d The four checklists
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
@@ -4407,6 +4407,22 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-03d2b2b2 LICENCE-T5 the server's files checked against the release
+
+Decided: no obfuscation (the customer administers the PC; it would only slow a patcher and hurt
+support); detection instead. The installer build lists every code file of the server and its `@rp`
+packages with SHA-256 (`integrity.json`, written by `dist/integrity/write-cli.js` in `stage`); the
+server checks them at start-up and hourly through the licence agent, and a difference, or no list on
+an installed server (`productVersion` known), is the tamper event `CODE_MODIFIED`, a serious kind
+that alerts at once (`LICENCE_TAMPERING`). Reported only, not restricted. LICENCE-T5 is Accepted at
+residual Medium (a determined administrator can patch the check too).
+
+Built: `judgeIntegrity` (domain), `apps/server/src/integrity/`, the kind in contracts, domain, the
+Control Plane's and its web app's texts and `en.ts`; threat model and summary (195 threats, 33 with
+a plan). Tests: domain code-integrity and fleet-health, server unit `server-files`. Not run here:
+the agent's hourly check on a real installed layout (needs the Windows installer; first packaged run).
+Next: P8-03d2b2c.
 
 ### 2026-10-11: P8-03d2b2b1 which commit a signed installer came from
 

@@ -4694,6 +4694,7 @@ export const en = {
           LICENCE_TAMPERED: 'the licence file changed or an older one put back',
           RECORD_TAMPERED: 'the PC’s licence record edited',
           OTHER_PC: 'the licence on another PC',
+          CODE_MODIFIED: 'the server’s program files changed',
           CLOCK_ROLLBACK: 'the clock set or held back, again and again',
           CLOCK_SKEW: 'the clock far off, again and again',
           REACTIVATION_CODE_NOT_ISSUED: 'a reactivation code the vendor never issued',

@@ -6644,7 +6644,8 @@
               "CLOCK_SKEW",
               "LICENCE_TAMPERED",
               "RECORD_TAMPERED",
-              "OTHER_PC"
+              "OTHER_PC",
+              "CODE_MODIFIED"
             ]
           },
           "at": {
