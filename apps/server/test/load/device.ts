@@ -156,14 +156,23 @@ export class SimulatedDevice {
   }
 
   /** Times a call under its operation's name and counts its failure; rethrows it. */
-  async call<T>(operation: string, run: () => Promise<T>): Promise<T> {
+  /**
+   * Runs a REST call and times it. A failure counts against the run unless `expected` says the
+   * person was meant to meet it (the server refusing for a reason the run caused itself); it is
+   * thrown either way.
+   */
+  async call<T>(
+    operation: string,
+    run: () => Promise<T>,
+    expected: (error: unknown) => boolean = () => false,
+  ): Promise<T> {
     const started = performance.now();
     try {
       const value = await run();
       this.metrics.http.of(operation).add(performance.now() - started);
       return value;
     } catch (error) {
-      countError(this.metrics, errorKey(operation, error));
+      if (!expected(error)) countError(this.metrics, errorKey(operation, error));
       throw error;
     }
   }

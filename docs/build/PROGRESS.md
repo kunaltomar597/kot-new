@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03c1).
+Last updated: 2026-10-10 (P8-03c2a).
 
 What exists:
 
@@ -68,7 +68,8 @@ What exists:
   updates, `updateSigning` on its heartbeat, and the `UNSIGNED_UPDATES` fleet alert (P8-03b3b);
   a Super Admin's reset asked for on `VendorUserView` and its 202 answer
   (`VendorResetRequestedView`), `CLOUD_BACKUPS_PER_DAY`, `CLOUD_BACKUP_CLOCK_MARGIN_MS` and
-  `DIAGNOSTICS_KEEP_DAYS` (P8-03b4a). 965 tests.
+  `DIAGNOSTICS_KEEP_DAYS` (P8-03b4a); the socket's `TOO_MANY_CONNECTIONS` refusal (P8-03c2a).
+  965 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -156,8 +157,13 @@ What exists:
   one reported to the vendor (P8-03b3a); an installer whose product version is not the release's
   refused with its signature after the download, and each heartbeat saying how the PC checks its
   updates (P8-03b3b); security headers on every answer, the API's JSON 404 outside it, Trusted
-  Types in the console's CSP and only Node.js's major line on `/version` (P8-03c1). 1254 tests
-  (28 skipped: Windows only, a real install, or the performance runs).
+  Types in the console's CSP and only Node.js's major line on `/version` (P8-03c1); limits on
+  floods from the LAN: connections per address counted before their TLS handshake and how fast
+  they come, requests per address (429 and the connection closed), the handshake and the headers
+  within 10 s, every connection closed when the server stops, and on the socket 16 connections
+  and 60 handshakes a minute per device and a connection that stops reading cut off, with the
+  PC's own address never limited (P8-03c2a). 1274 tests (28 skipped: Windows only, a real
+  install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -343,7 +349,8 @@ What exists:
   `windows/ci/Test-Installer.ps1` checks the built installer in the CI job "Windows installer".
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
-  error mapping, and the resuming Socket.io connection) (P0-14a).
+  error mapping, and the resuming Socket.io connection) (P0-14a), which retries a device refused
+  for too many connections (P8-03c2a).
 - `packages/design-tokens` and `packages/ui-web`: themes (light, dark, KDS), tokens as TS and CSS,
   React 19 component library with PinPad, dialogs, toasts, status chips, Money and state views;
   Storybook 10 workbench (P0-13, ADR-0009); QR codes drawn in the browser (P4-02a, ADR-0014);
@@ -370,6 +377,7 @@ What exists:
   done: no threat is planned for it any more. `dast.md`: the OWASP ZAP scans of the four
   surfaces (P8-03c1), with P8-03c1's four threats mitigated (internals in answers, script in the
   console under Trusted Types, in the POS window, and on the QR site under a nonce): 133
+  mitigated. P8-03c2a mitigated PC-D3 (floods from the LAN, `flood.int.test.ts`): 134
   mitigated.
 - `infra/dast` (`@rp/dast`, P8-03c1): the DAST harness. It starts the QR site with its relay, the
   relay's functions, the Control Plane with the vendor web app and the local server over HTTPS
@@ -392,8 +400,8 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03c2 Floods and rate limits: the HTTPS server and the socket from the LAN (PC-D3), the
-  Control Plane (CP-D1) and the relay's reads (RELAY-D4), the three threats planned there.
+- P8-03c2b Floods at the cloud's edges: rate limits in front of the Control Plane (CP-D1) and the
+  relay's reads throttled at the relay and the QR site (RELAY-D4), the two threats planned there.
 - Then P8-03d the standards checklists (26 threats planned there), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
@@ -638,8 +646,10 @@ Recommended next WPs (dependencies met):
   - [~] P8-03c DAST of the QR site, relay and Control Plane
     - [x] P8-03c1 The ZAP scans of the four surfaces, security headers, the CSPs (nonces, Trusted
           Types), `/version`
-    - [ ] P8-03c2 Floods and rate limits (the HTTPS server and socket, the Control Plane, the
-          relay's reads)
+    - [ ] P8-03c2 Floods and rate limits
+      - [x] P8-03c2a Floods from the LAN (the HTTPS server and the socket, PC-D3)
+      - [ ] P8-03c2b Floods at the cloud's edges (the Control Plane, the relay's reads; CP-D1,
+            RELAY-D4)
   - [ ] P8-03d Standards checklists, Electron review and MDM policy
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
@@ -887,6 +897,43 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03c2a):
+
+778. P8-03c2 is split into P8-03c2a (floods from the LAN: the local server's HTTPS port and its
+     socket, PC-D3) and P8-03c2b (the Control Plane's and the relay's edges, CP-D1 and RELAY-D4),
+     because the LAN and the cloud are limited in different places.
+779. The HTTPS port's limits are constants (`DEFAULT_SERVER_LIMITS`), not settings: the BRD gives
+     no ⚙ value, and they protect the POS server as the pager broker's do. Every TCP connection is
+     counted before its TLS handshake: 256 open per address (an access point that translates
+     addresses puts every phone and tablet behind one), 4,096 in all, 120 new at once then 20 a
+     second per address; past these the connection is closed at once. Requests: 400 at once then
+     100 a second per address, then 429 `RATE_LIMITED` with `Retry-After: 1` and
+     `Connection: close`, so a flooding host must open new connections, which are counted too.
+     Timers: the TLS handshake and a request's headers within 10 s (as the pager broker's
+     sign-in), checked every second; a whole request within 300 s (Node's default: a 55 MB AI
+     import over slow Wi-Fi); 5 s idle between requests (Node's default).
+780. The PC's own addresses (127.0.0.0/8, ::1) are never limited per address: the POS window, the
+     service host's checks, the load test and the DAST scan connect from there, and a host on the
+     LAN cannot appear as one of them.
+781. On the socket, per device: 16 live connections and 60 handshakes a minute, counted after the
+     device token's signature (HS256, cheap) and before the database is asked, refused with the
+     new connect error `TOO_MANY_CONNECTIONS`. The newest is refused rather than the oldest
+     closed, since closing the oldest makes a device with too many tabs reconnect in a loop. Apps
+     of this build retry it with their backoff; apps of the previous build stop their live
+     connection on a refusal they do not know until they restart, which no device within the
+     limits meets (an addition to the protocol; the client API is unchanged).
+782. A connection that stops reading is cut off when the sweep (every 3 s) finds over 1,000
+     messages waiting for it with none written since the previous sweep, or over 10,000 in any
+     case. Its TCP connection is destroyed: Socket.io's polite close waits for the waiting
+     messages to go out first. The app reconnects and resyncs when it reads again.
+783. The server closes every open connection when it stops (Nest's `forceCloseConnections`):
+     Node stops timing out connections that never sent a request once its `close()` begins, so a
+     host holding a few kept an update, a restore's restart or a service stop waiting for ever
+     (found by the flood test). Clients reconnect and resync as after a restart (NFR-P11).
+784. Refusals are logged once a minute per kind and address (or device) with their count, as the
+     pager broker's are (PAGER-R3). There is no alert to the managers: the limits absorb a flood,
+     and an alert that a flooding host can raise would page the managers on its behalf.
 
 Decided 2026-10-10 (P8-03c1):
 
@@ -4298,6 +4345,12 @@ Security-sensitive PRs for the P8-03 human review:
   sessions only on staff devices (sign-in, refresh and `SessionService`), no pairing code for a
   pager, the Control Plane's development object-store routes and their grant schema, and the two
   authorisation sweeps with their lists of public endpoints.
+- P8-03c2a (merged locally): the HTTPS port's limits per address before the TLS handshake and
+  before any request is read (`limitFloods`), the exemption of the PC's own addresses (a reviewer
+  should check that nothing on the PC, a proxy or a port forward, makes a LAN host arrive as
+  loopback), the socket's limits per device checked between the device token's signature and the
+  database (`authenticateToken`'s `beforeLookup`), and a stalled connection's TCP socket
+  destroyed.
 
 Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md`):
 
@@ -4305,6 +4358,87 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03c2a Floods from the LAN
+
+Split P8-03c2 into P8-03c2a (this one) and P8-03c2b (the Control Plane's and the relay's edges:
+CP-D1, RELAY-D4). Decisions 778 to 784. PC-D3 mitigated: 134 mitigated in all, 5 residual Highs,
+46 threats with a plan.
+
+Built:
+
+- `apps/server/src/http/flood-limits.ts`: `limitFloods`, applied by `configureApp` (its request
+  limit runs third, after the correlation id and the security headers), with `ServerLimits`,
+  `DEFAULT_SERVER_LIMITS` and `httpsLimitOptions` (the handshake's timeout and the check interval,
+  which `httpsOptionsFor` gives `https.createServer`). Every TCP connection is counted per address
+  before its TLS handshake, with how fast they come; requests per address get 429
+  `RATE_LIMITED`, `Retry-After: 1` and `Connection: close`; Node's header, request and idle
+  timers; refusals logged once a minute with their count.
+- `apps/server/src/common/flood-limits.ts`: `ConnectionGate`, `TokenBucket` (now with `full`),
+  `ThrottledLog` and `isLoopback` moved out of the pager broker's `broker-limits.ts` (which
+  re-exports them), and `KeyedBuckets`, a token bucket per key that forgets full ones.
+- `NEST_APP_OPTIONS.forceCloseConnections`: the flood test found that connections held without a
+  request kept the server from stopping.
+- The socket (`RealtimeGateway`): `maxConnectionsPerDevice` (16), `handshakesPerMinutePerDevice`
+  (60) and `maxUnsentPerConnection` (1,000) in `RealtimeOptions`; a device's handshake is counted
+  by `reserve` from `authenticateToken`'s new `beforeLookup` hook, between the token's signature
+  and the database; each connection's `unsent` and `flushed` follow engine.io's `packetCreate`
+  and `flush`, and the sweep destroys a stalled connection's TCP socket (`reading`).
+- `@rp/contracts`: `REALTIME_CONNECT_ERRORS.tooManyConnections`; `@rp/api-client` retries it like
+  a starting server.
+- Tests: `test/unit/flood-limits.test.ts` (the buckets, and the limits on a plain HTTP server with
+  a clock of its own); `test/integration/flood.int.test.ts` (over HTTPS from 127.0.0.1 and ::1:
+  the handshake, slow headers and idle timeouts, the connections per address and how fast they
+  come, 429 with the connection closed, a stop while connections are held, a device's sockets and
+  handshakes, a connection that stops reading, and a flood at full speed from a worker thread
+  against the production limits while another device's screen and request are timed);
+  `createTestApp`'s `host` and `serverLimits`; the realtime test client's `checkServerIdentity`.
+- Docs: PC-D3 in the threat model and its summary; `dast.md` (what ZAP does not flood);
+  `docs/security/README.md`; the server README ("Floods from the LAN"); `phase-8.md` (as built, and
+  a flood drill from a laptop on the staff Wi-Fi added to P8-02).
+
+Flood figures (this Mac, 3 s from one host, 50 lanes): about 14,000 requests sent, about 13,100
+refused at the connection, 95 answered 429, about 700 answered; without the limits about 21,000
+were answered. Another device's event reached its screen in 12 ms (27 ms without the limits) and
+its request was answered in 2 ms (40 ms).
+
+Tests: server 1274 (+20: 9 unit, 11 integration; 28 skipped), api-client 43 (+1), contracts
+965, console 385, Control Plane 183, relay 157; all 44 test tasks green; format, lint, typecheck,
+contract docs, compat and `pnpm security:threats` green. Traceability: Must 264/287.
+
+Also fixed: the short rush (`load-rush.int.test.ts`, every build) failed once with
+`approveOrder 409 OUT_OF_STOCK`: a manager took a dish off while a diner's order waited for its
+waiter, and the server rightly refused to send it. The simulated waiter now turns such an order
+down (`rejectOrder`), and `SimulatedDevice.call` takes the refusals a run causes itself
+(`expected`) without counting them as failures.
+
+Not done or not verified:
+
+- P8-03c2b, as split.
+- The limits on the restaurant's Windows PC and Wi-Fi: the flood test ran on this Mac (and runs in
+  CI on Linux); a flood from a laptop on the staff Wi-Fi is now a drill of P8-02 [H].
+- Apps of the previous build stop their live connection when refused with `TOO_MANY_CONNECTIONS`
+  until they restart (decision 781); no device within the limits meets it.
+
+Gotchas:
+
+- Node stops checking `headersTimeout` once `server.close()` begins (it clears the interval), so
+  connections that never sent a request kept `app.close()` waiting for ever:
+  `forceCloseConnections`.
+- `handshakeTimeout` and `connectionsCheckingInterval` are read only when the server is created:
+  they go in `httpsOptionsFor`. Plain HTTP (development, most tests) keeps Node's 30 s check.
+- Socket.io's `disconnect(true)` and engine.io's `close()` wait for the write buffer to drain,
+  which never happens for a client that stopped reading: destroy `socket.request.socket`.
+- Right after a burst of events a reading client has hundreds of messages waiting (engine.io
+  hands them over one write callback at a time), so a backlog counts as stalled only with no
+  `flush` since the last sweep.
+- Two hosts in one test: listen on `::` and connect from 127.0.0.1 and ::1. The certificate has no
+  ::1, so connect with `servername: 'localhost'`, and give Socket.io `checkServerIdentity` (engine.io
+  passes it to the WebSocket though its type leaves it out). supertest always uses 127.0.0.1.
+- A flood made in the test's own thread competes with the server for the event loop: `flood()`
+  runs it in a worker thread (`eval: true`, CommonJS).
+- `trustLoopback` is true by default, so no other test meets the limits; set it false, with
+  `host: '::'`, to test them.
 
 ### 2026-10-10: P8-03c1 The ZAP scans, security headers and the CSPs
 

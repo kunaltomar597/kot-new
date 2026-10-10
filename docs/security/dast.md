@@ -111,14 +111,18 @@ included; nothing in it is secret, and it fits the speed budget (QR-012), but P8
   attacks mostly fail the shared Zod schemas before any handler runs, which is the point of them
   (SEC-004). The integration tests drive the handlers with valid input.
 - **The socket and the pager broker** are not HTTP: their handshakes, rooms, limits and ACL are
-  in `realtime.int.test.ts`, `pager-broker-limits.int.test.ts` and `authorisation.md`; floods of
-  them are P8-03c2.
+  in `realtime.int.test.ts`, `pager-broker-limits.int.test.ts` and `authorisation.md`.
+- **Floods.** ZAP sends one request at a time. Floods of the local server's HTTPS port and its
+  socket from the LAN are `apps/server/test/integration/flood.int.test.ts` (P8-03c2a, PC-D3): the
+  limits per address and per device, the timeouts, and a host flooding at full speed while
+  another device keeps its screen live. ZAP scans from the PC's own address, which those limits
+  leave alone.
 - **Callbacks over the internet.** ZAP's out-of-band rules (SSRF, Log4Shell) need a callback
   server on the internet, which the scan does not use. No endpoint fetches an address a caller
   gives (CP-I5).
 - **The deployments.** The scans run on plain http on this machine (the local server on its own
   HTTPS). The hosts' TLS, HSTS and edge limits are checked where they are set up: the QR site's
   headers and TLS in manual task 21, the relay's on Supabase in manual task 20, the Control
-  Plane's when it is hosted; rate limits at the edge are P8-03c2.
+  Plane's when it is hosted; rate limits at the edge are P8-03c2b.
 - **The penetration test.** DAST finds what a scanner finds. The testers of P8-03e get these
   reports, the threat models and the authorisation sweep as their starting point.

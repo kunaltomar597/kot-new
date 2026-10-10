@@ -685,17 +685,44 @@ and waiters and locks them out during service, again and again.
 A host on the LAN opens many connections or sends requests as fast as it can, so screens stop
 updating during service.
 
-- Mitigation: the socket is WebSocket only, with 16 KB messages, a 10-second handshake and a rate
-  limit on `resync`; pairing, sign-in and device authentication are rate-limited. There is no cap
-  on sockets per device.
-- Code: `apps/server/src/realtime/realtime.gateway.ts` (`RealtimeGateway`);
+- Mitigation: every TCP connection to the HTTPS port is counted before its TLS handshake: 256 open
+  at once per address and 4,096 in all, and an address opens 120 at once, then 20 a second; past
+  either, the connection is closed at once. Requests from an address: 400 at once, then 100 a
+  second; past that, 429 with `Retry-After` and the connection closed, so the host must open a new
+  one, which is counted too. The TLS handshake and a request's headers must arrive within 10 s, a
+  connection idle between requests closes after 5 s, and the server closes every connection when
+  it stops, so connections held open never keep an update or a restore waiting. The PC's own
+  address (the POS window) is not limited. The socket is WebSocket only, with 16 KB messages, a
+  10-second handshake and a rate limit on `resync`; a device has 16 live connections and 60
+  handshakes a minute at most, counted after its token's signature and before the database is
+  asked, and a connection that stops reading is cut off once 1,000 messages wait for it with none
+  written since the last sweep (or 10,000 in any case). Pairing, sign-in and device
+  authentication are rate-limited. In the flood test one host sent about 14,000 requests in 3 s
+  and about 700 were answered (about 21,000 without the limits); meanwhile another device's event
+  reached its screen in 12 ms and its request was answered in 2 ms (P8-03c2a, on a development
+  Mac). A host that takes many addresses, or fills the Wi-Fi itself, is for the network: the
+  staff network's isolation and the access points (§11).
+- Code: `apps/server/src/http/flood-limits.ts` (`limitFloods`, `DEFAULT_SERVER_LIMITS`);
+  `apps/server/src/common/flood-limits.ts` (`ConnectionGate`, `KeyedBuckets`);
+  `apps/server/src/app.factory.ts` (`NEST_APP_OPTIONS`);
+  `apps/server/src/realtime/realtime.gateway.ts` (`RealtimeGateway`, `DEFAULT_REALTIME_OPTIONS`);
   `apps/server/src/auth/rate-limiter.ts` (`RateLimiter`).
-- Tests: `apps/server/test/integration/realtime.int.test.ts` "refuses plain HTTP polling; only
-  WebSocket is offered", "replays on request, and limits how often a connection may ask".
+- Tests: `apps/server/test/integration/flood.int.test.ts` "closes a connection that never
+  finishes its TLS handshake", "closes a connection whose request headers trickle in
+  (Slowloris)", "closes a connection left idle after its answer", "holds an address to its open
+  connections, while another address is served", "stops at once while a host holds connections
+  that never send a request", "closes connections an address opens too fast, before their
+  handshake", "answers 429 to an address sending requests too fast, and closes its connection",
+  "keeps another device’s screen live and its requests answered within a second", "refuses a
+  device’s connections over its limit, and no other device’s", "refuses a device that opens
+  connections too fast, and no other device", "cuts off a connection that stops reading, while
+  others get every event"; `apps/server/test/unit/flood-limits.test.ts` "never limits the PC’s
+  own address when it is trusted"; `apps/server/test/integration/realtime.int.test.ts` "refuses
+  plain HTTP polling; only WebSocket is offered", "replays on request, and limits how often a
+  connection may ask".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c2 by 2026-10-19: flood tests of the HTTPS server and the
-  socket from the LAN (connections per device, handshakes, timeouts), and the limits they show
-  are needed.
+- Status: Mitigated (P8-03c2a: nothing limited the connections, how fast they came or how long
+  they stayed open, nor a device's sockets).
 
 #### PC-D4 Decompression bombs in uploads
 

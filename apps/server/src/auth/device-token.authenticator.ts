@@ -3,7 +3,7 @@ import { DEVICE_TOKEN_HEADER } from '@rp/contracts';
 import type { Request } from 'express';
 import { PrismaService } from '../database/prisma.service.js';
 import type { AuthenticatedDevice, DeviceAuthenticator } from './device.js';
-import { DeviceTokenService } from './device-token.service.js';
+import { type DeviceTokenClaims, DeviceTokenService } from './device-token.service.js';
 
 /** The device token header's value; empty when missing. */
 function deviceTokenOf(request: Request): string {
@@ -31,11 +31,17 @@ export class DeviceTokenAuthenticator implements DeviceAuthenticator {
 
   /**
    * The paired device a device token belongs to; also used for socket handshakes (P0-12). Always
-   * verified; a missing token simply fails verification (CWE-807).
+   * verified; a missing token simply fails verification (CWE-807). `beforeLookup` sees the
+   * token's device once its signature is checked, before the database is asked, and may refuse it
+   * by throwing (the socket's limits per device, PC-D3).
    */
-  async authenticateToken(token: string): Promise<AuthenticatedDevice | undefined> {
+  async authenticateToken(
+    token: string,
+    beforeLookup?: (claims: DeviceTokenClaims) => void,
+  ): Promise<AuthenticatedDevice | undefined> {
     const claims = await this.tokens.verify(token);
     if (claims === undefined) return undefined;
+    beforeLookup?.(claims);
     const device = await this.prisma.device.findFirst({
       where: { id: claims.deviceId, restaurantId: claims.restaurantId, status: 'ACTIVE' },
     });

@@ -1,5 +1,15 @@
 import type { Socket } from 'node:net';
 import { Duplex } from 'node:stream';
+import type { GateTicket } from '../common/flood-limits.js';
+
+// Shared with the HTTPS server's limits (P8-03c2a); imported from here by the broker and its tests.
+export {
+  ConnectionGate,
+  type GateLimits,
+  type GateTicket,
+  ThrottledLog,
+  TokenBucket,
+} from '../common/flood-limits.js';
 
 /**
  * The pager broker's defences against flooding (PAGER-D3, PAGER-D4, P8-03b2b). The broker runs in
@@ -55,81 +65,6 @@ export class MqttPacketSizes {
       this.phase = this.left === 0 ? 'TYPE' : 'BODY';
     }
     return undefined;
-  }
-}
-
-/** A connection's place in the broker's count, released when it signs in and when it closes. */
-export interface GateTicket {
-  /** The connection signed in: it no longer counts as a sign-in in progress. */
-  signedIn(): void;
-  /** The connection closed. */
-  closed(): void;
-}
-
-export interface GateLimits {
-  /** Connections at once, signed in or not. */
-  readonly maxConnections: number;
-  /** Connections not signed in yet, in all. */
-  readonly maxPending: number;
-  /** Connections not signed in yet from one address. */
-  readonly maxPendingPerAddress: number;
-  /** The PC's own addresses are not limited per address (the load test, the set-up checks). */
-  readonly trustLoopback: boolean;
-}
-
-function isLoopback(address: string): boolean {
-  return address === '::1' || address.startsWith('127.') || address.startsWith('::ffff:127.');
-}
-
-/**
- * Admits connections up to the limits (PAGER-D3). Each pager has one session, so signed-in
- * connections are as many as the pagers; what a host on the LAN can open without a credential is
- * a few connections at a time, each for the sign-in time.
- */
-export class ConnectionGate {
-  private open = 0;
-  private pending = 0;
-  private readonly pendingBy = new Map<string, number>();
-
-  constructor(private readonly limits: GateLimits) {}
-
-  /** A ticket for a new connection from the address, or undefined when it must be refused. */
-  admit(address: string | undefined): GateTicket | undefined {
-    const from = address ?? 'unknown';
-    const byAddress = this.pendingBy.get(from) ?? 0;
-    if (this.open >= this.limits.maxConnections || this.pending >= this.limits.maxPending) {
-      return undefined;
-    }
-    const limited = !(this.limits.trustLoopback && isLoopback(from));
-    if (limited && byAddress >= this.limits.maxPendingPerAddress) return undefined;
-    this.open += 1;
-    this.pending += 1;
-    this.pendingBy.set(from, byAddress + 1);
-    let state: 'PENDING' | 'SIGNED_IN' | 'CLOSED' = 'PENDING';
-    const release = () => {
-      this.pending -= 1;
-      const left = (this.pendingBy.get(from) ?? 1) - 1;
-      if (left <= 0) this.pendingBy.delete(from);
-      else this.pendingBy.set(from, left);
-    };
-    return {
-      signedIn: () => {
-        if (state !== 'PENDING') return;
-        state = 'SIGNED_IN';
-        release();
-      },
-      closed: () => {
-        if (state === 'CLOSED') return;
-        if (state === 'PENDING') release();
-        state = 'CLOSED';
-        this.open -= 1;
-      },
-    };
-  }
-
-  /** Connections open now, and how many of them have not signed in. */
-  counts(): { open: number; pending: number } {
-    return { open: this.open, pending: this.pending };
   }
 }
 
@@ -205,30 +140,6 @@ export class LimitedConnection extends Duplex {
   }
 }
 
-/** Takes up to `burst` at once, then one each `everyMs` (PAGER-D4). */
-export class TokenBucket {
-  private tokens: number;
-
-  constructor(
-    private readonly burst: number,
-    private readonly everyMs: number,
-    private lastMs: number,
-  ) {
-    this.tokens = burst;
-  }
-
-  take(nowMs: number): boolean {
-    const earned = Math.floor((nowMs - this.lastMs) / this.everyMs);
-    if (earned > 0) {
-      this.tokens = Math.min(this.burst, this.tokens + earned);
-      this.lastMs += earned * this.everyMs;
-    }
-    if (this.tokens === 0) return false;
-    this.tokens -= 1;
-    return true;
-  }
-}
-
 export const BUSY = Symbol('BUSY');
 
 /**
@@ -261,36 +172,6 @@ export class TaskLimiter {
       // The place passes to the next task waiting, or is given back.
       if (next === undefined) this.running -= 1;
       else next();
-    }
-  }
-}
-
-/**
- * Says each kind of refusal from an address at most once a period, with how many there were
- * since, so a flood is visible in the log without filling it (PAGER-R3).
- */
-export class ThrottledLog {
-  private readonly last = new Map<string, { at: number; since: number }>();
-
-  constructor(
-    private readonly periodMs: number,
-    private readonly write: (key: string, count: number) => void,
-    private readonly now: () => number,
-  ) {}
-
-  note(key: string): void {
-    const now = this.now();
-    const entry = this.last.get(key);
-    if (entry !== undefined && now - entry.at < this.periodMs) {
-      entry.since += 1;
-      return;
-    }
-    this.write(key, (entry?.since ?? 0) + 1);
-    this.last.set(key, { at: now, since: 0 });
-    if (this.last.size > 1_000) {
-      for (const [old, value] of this.last) {
-        if (now - value.at >= this.periodMs) this.last.delete(old);
-      }
     }
   }
 }

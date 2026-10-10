@@ -1,3 +1,4 @@
+import type { PeerCertificate } from 'node:tls';
 import {
   type DomainEvent,
   REALTIME_MESSAGES,
@@ -19,8 +20,14 @@ export interface ConnectFailure {
   readonly code: string | undefined;
 }
 
-/** TLS options of a socket over `wss:` (P0-15): the CA it trusts. */
-export type TlsSocketOptions = Pick<Partial<ManagerOptions & SocketOptions>, 'ca'>;
+/**
+ * TLS options of a socket over `wss:` (P0-15): the CA it trusts, and the name its certificate is
+ * checked for when that is not the address (a device at `::1` in the flood tests, PC-D3).
+ * Engine.io passes `checkServerIdentity` to the WebSocket, though its type leaves it out.
+ */
+export type TlsSocketOptions = Pick<Partial<ManagerOptions & SocketOptions>, 'ca'> & {
+  readonly checkServerIdentity?: (host: string, certificate: PeerCertificate) => Error | undefined;
+};
 
 function openSocket(
   url: string,

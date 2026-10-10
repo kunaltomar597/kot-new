@@ -65,7 +65,9 @@ NFR-P05 and NFR-P06 against the deployed relay (manual task 20) with the harness
 Requirements: S2 to S5, S7, S14, NFR-A01 to NFR-A04, §7.3 failure table.
 Deliverables: scripted drills for internet outage, server restart mid-service, printer failure, pager
 out of range/battery dead, move table with tickets in progress, escalation; power-cut recovery on the
-lab PC; results recorded.
+lab PC; a laptop on the staff Wi-Fi flooding the lab PC during service (PC-D3: the flood test of
+P8-03c2a, `apps/server/test/integration/flood.int.test.ts`, ran on a development machine, not on the
+Windows PC and its Wi-Fi); results recorded.
 Acceptance: every drill passes; no lost or duplicate orders/KOTs.
 
 ## P8-03 Security hardening and penetration-test readiness
@@ -271,7 +273,27 @@ and the floods, which need load from the LAN and limits at the edge, are another
   the LAN: connections per device, handshakes, timeouts, and the limits they show are needed),
   CP-D1 (rate limits in front of the Control Plane), RELAY-D4 (reads of the menu and order status
   throttled at the relay and the site). Acceptance: the flood tests pass; no threat left planned
-  for P8-03c2.
+  for P8-03c2. Split (2026-10-10) in two, because the LAN and the cloud's edges are limited in
+  different places:
+  - **P8-03c2a Floods from the LAN (PC-D3) (done).** The local server's HTTPS port: connections
+    per address and in all, how fast an address opens them and sends requests (429 and the
+    connection closed), the TLS handshake and the request headers within 10 s; the socket: live
+    connections and handshakes per device, a connection that stops reading closed; the PC's own
+    address never limited. Flood tests from two addresses over HTTPS. Acceptance: the flood tests
+    pass, the load test's rush is not limited; PC-D3 mitigated. As built: `limitFloods` in
+    `apps/server/src/http/flood-limits.ts` with `DEFAULT_SERVER_LIMITS` (256 connections per
+    address, 4,096 in all, 120 new at once then 20 a second, 400 requests at once then 100 a
+    second, 10 s for the handshake and the headers, 5 s idle), the mechanisms shared with the
+    pager broker in `src/common/flood-limits.ts`; `forceCloseConnections`, since connections held
+    without a request kept the server from stopping; per device on the socket 16 connections and
+    60 handshakes a minute (`TOO_MANY_CONNECTIONS`, retried by the apps), and a connection with
+    1,000 messages waiting and none written in a sweep destroyed; `flood.int.test.ts` from
+    127.0.0.1 and ::1, with a flood at full speed from a worker thread against the production
+    limits.
+  - **P8-03c2b Floods at the cloud's edges (CP-D1, RELAY-D4).** Rate limits in the Control Plane
+    and the configuration of the edge in front of it; the relay's reads throttled per table and
+    the QR site's menu fetch made cheap; the checks against a deployment. Acceptance: no threat
+    left planned for P8-03c2.
 
 ### P8-03d Standards checklists, Electron review and MDM policy
 

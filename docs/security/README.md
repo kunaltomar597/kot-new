@@ -5,13 +5,13 @@ security as measurable compliance with recognised standards plus an independent 
 these documents are the evidence for that, with links to the code and the tests that prove each
 point.
 
-| Document                                           | What it covers                                                                                                                                                              | Requirements                         | WP      |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------- |
-| [authorisation.md](authorisation.md)               | Who may call what, on every surface (REST, socket, MQTT, relay, Control Plane), and the tests that check it on every build                                                  | SEC-003, SEC-017, AUTH-010, AUTH-009 | P8-03a  |
-| [Threat models (STRIDE)](threat-models/README.md)  | LAN and local server, pager channel, QR relay and site, update pipeline, licence, Control Plane, desktop, phones and tablets; `pnpm security:threats` checks their evidence | SEC-000                              | P8-03b  |
-| [DAST](dast.md)                                    | OWASP ZAP scans of the QR site, the relay, the Control Plane and the local server; each finding fixed or triaged                                                            | SEC-017                              | P8-03c1 |
-| ASVS L2, MASVS, ETSI EN 303 645 and CIS checklists | Each control with its evidence; the Electron review; the MDM policy                                                                                                         | §8.1, SEC-010, SEC-011               | P8-03d  |
-| Incident response plan; penetration-test pack      | Severities, contacts, CERT-In 6-hour and DPDP reporting; scope, rules and accounts for the testing firm                                                                     | SEC-016, SEC-017                     | P8-03e  |
+| Document                                           | What it covers                                                                                                                                                              | Requirements                         | WP     |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------ |
+| [authorisation.md](authorisation.md)               | Who may call what, on every surface (REST, socket, MQTT, relay, Control Plane), and the tests that check it on every build                                                  | SEC-003, SEC-017, AUTH-010, AUTH-009 | P8-03a |
+| [Threat models (STRIDE)](threat-models/README.md)  | LAN and local server, pager channel, QR relay and site, update pipeline, licence, Control Plane, desktop, phones and tablets; `pnpm security:threats` checks their evidence | SEC-000                              | P8-03b |
+| [DAST](dast.md)                                    | OWASP ZAP scans of the QR site, the relay, the Control Plane and the local server; each finding fixed or triaged; the flood tests of the local server from the LAN          | SEC-017, SEC-009                     | P8-03c |
+| ASVS L2, MASVS, ETSI EN 303 645 and CIS checklists | Each control with its evidence; the Electron review; the MDM policy                                                                                                         | §8.1, SEC-010, SEC-011               | P8-03d |
+| Incident response plan; penetration-test pack      | Severities, contacts, CERT-In 6-hour and DPDP reporting; scope, rules and accounts for the testing firm                                                                     | SEC-016, SEC-017                     | P8-03e |
 
 Related, elsewhere:
 
