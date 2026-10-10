@@ -12,6 +12,7 @@ import { RemoteSettingsScreen } from './remote/RemoteSettingsScreen.js';
 import { FleetScreen } from './fleet/FleetScreen.js';
 import { StaffScreen } from './staff/StaffScreen.js';
 import { type Services, ServicesProvider, useSession } from './app/services.js';
+import { StepUpDialog } from './components/StepUpDialog.js';
 import { Layout, RequireCapability } from './screens/Layout.js';
 import { SetupScreen } from './screens/SetupScreen.js';
 import { SignInScreen } from './screens/SignInScreen.js';
@@ -78,6 +79,7 @@ export function App({ services, translator }: { services: Services; translator: 
       <ServicesProvider services={services}>
         <ToastProvider>
           <AppRoutes />
+          <StepUpDialog />
         </ToastProvider>
       </ServicesProvider>
     </I18nProvider>

@@ -8,7 +8,8 @@ import { CpApiError, CpUnavailableError } from './cp-api.js';
  */
 export function messageOf(error: unknown, t: Translator): string {
   if (error instanceof CpApiError) {
-    if (error.status === 403) return t('vendorApp.errors.forbidden');
+    if (error.status === 403 && !error.code.startsWith('STEP_UP'))
+      return t('vendorApp.errors.forbidden');
     return error.message;
   }
   if (error instanceof CpUnavailableError) {

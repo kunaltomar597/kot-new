@@ -3,6 +3,8 @@ import {
   CONTROL_PLANE_ROUTES,
   type ControlPlaneAccess,
   type ControlPlaneOperationId,
+  needsStepUp,
+  STEP_UP_HEADER,
 } from '@rp/contracts/control-plane';
 import type { RouteDefinition } from '@rp/contracts';
 import type { z } from 'zod';
@@ -81,6 +83,8 @@ export interface CpClientOptions {
   readonly token: () => string | undefined;
   /** A signed-in call was refused with 401: the session is over. */
   readonly onSessionOver?: () => void;
+  /** Asks the person for a fresh authenticator code (CP-S2); undefined when they cancel. */
+  readonly stepUp?: () => Promise<string | undefined>;
   readonly timeoutMs?: number;
 }
 
@@ -125,6 +129,13 @@ export function createCpApi(options: CpClientOptions): CpApi {
     const token = options.token();
     if (route.capability !== 'PUBLIC' && token !== undefined) {
       headers.authorization = `Bearer ${token}`;
+    }
+    if (needsStepUp(operationId)) {
+      const code = await options.stepUp?.();
+      if (code === undefined) {
+        throw new CpApiError(403, 'STEP_UP_CANCELLED', 'The authenticator code was not given.');
+      }
+      headers[STEP_UP_HEADER] = code;
     }
     const body = input.body === undefined ? undefined : JSON.stringify(input.body);
     if (body !== undefined) headers['content-type'] = 'application/json';

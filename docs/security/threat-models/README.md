@@ -78,10 +78,10 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        22 |                4 |             1 |        2 |               6 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        14 |                4 |             2 |        1 |              12 |                         1 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        14 |                4 |             1 |        1 |               6 |                         1 |
-| [The Vendor Control Plane](control-plane.md)            |      22 |        14 |                7 |             0 |        1 |               8 |                         0 |
+| [The Vendor Control Plane](control-plane.md)            |      22 |        16 |                5 |             0 |        1 |               7 |                         0 |
 | [The desktop shell](desktop-shell.md)                   |      14 |        11 |                2 |             0 |        1 |               5 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        13 |                4 |             0 |        1 |               5 |                         0 |
-| All                                                     |     195 |       141 |               36 |             7 |       11 |              64 |                         5 |
+| All                                                     |     195 |       143 |               34 |             7 |       11 |              63 |                         5 |
 
 Open threats and their plans, by date:
 
@@ -89,10 +89,6 @@ Open threats and their plans, by date:
 | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
 | [UPDATE-E2](update-pipeline.md#update-e2-a-pull-request-signed-as-the-vendors) A pull request signed as the vendor's                     | Medium   | Partly mitigated | manual task 1  | 2026-10-17 |
 | [UPDATE-T6](update-pipeline.md#update-t6-unreviewed-code-on-main) Unreviewed code on main                                                | High     | Not mitigated    | manual task 1  | 2026-10-17 |
-| [CP-R1](control-plane.md#cp-r1-vendor-staff-deny-an-action) Vendor staff deny an action                                                  | Low      | Partly mitigated | P8-03d         | 2026-10-22 |
-| [CP-R2](control-plane.md#cp-r2-changes-through-the-admin-cli) Changes through the admin CLI                                              | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
-| [CP-S2](control-plane.md#cp-s2-a-stolen-vendor-session) A stolen vendor session                                                          | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
-| [CP-T5](control-plane.md#cp-t5-editing-the-vendors-audit-log) Editing the vendor's audit log                                             | Low      | Partly mitigated | P8-03d         | 2026-10-22 |
 | [DESKTOP-E4](desktop-shell.md#desktop-e4-leaving-the-pos-window-for-windows) Leaving the POS window for Windows                          | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
 | [LICENCE-T5](licence-mechanism.md#licence-t5-patching-the-server) Patching the server                                                    | High     | Not mitigated    | P8-03d         | 2026-10-22 |
 | [PC-D6](local-server-and-lan.md#pc-d6-attacks-from-guest-wi-fi-on-a-flat-network) Attacks from guest Wi-Fi on a flat network             | Medium   | Partly mitigated | P8-03d         | 2026-10-22 |
@@ -120,6 +116,8 @@ Open threats and their plans, by date:
 | [UPDATE-I1](update-pipeline.md#update-i1-the-signing-certificate-leaking) The signing certificate leaking                                | Medium   | Partly mitigated | manual task 31 | 2026-11-30 |
 | [CP-D1](control-plane.md#cp-d1-flooding-the-control-plane) Flooding the Control Plane                                                    | Low      | Partly mitigated | manual task 32 | 2026-11-30 |
 | [RELAY-D4](qr-relay-and-site.md#relay-d4-unthrottled-reads-and-their-cost) Unthrottled reads and their cost                              | Low      | Partly mitigated | manual task 32 | 2026-11-30 |
+| [CP-R2](control-plane.md#cp-r2-changes-through-the-admin-cli) Changes through the admin CLI                                              | Medium   | Partly mitigated | manual task 34 | 2026-11-30 |
+| [CP-T5](control-plane.md#cp-t5-editing-the-vendors-audit-log) Editing the vendor's audit log                                             | Low      | Partly mitigated | manual task 34 | 2026-11-30 |
 | [PAGER-I1](pager-channel.md#pager-i1-reading-alerts-on-the-air) Reading alerts on the air                                                | Low      | Partly mitigated | P2-05          | 2026-12-15 |
 | [PAGER-I4](pager-channel.md#pager-i4-reading-a-stolen-pager) Reading a stolen pager                                                      | Medium   | Not mitigated    | P2-05          | 2026-12-15 |
 | [PAGER-S2](pager-channel.md#pager-s2-a-stolen-or-cloned-pager) A stolen or cloned pager                                                  | Medium   | Partly mitigated | P2-05          | 2026-12-15 |

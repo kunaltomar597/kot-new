@@ -1,6 +1,6 @@
 import { type CanActivate, type ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { VendorCapability } from '@rp/contracts/control-plane';
+import { STEP_UP_HEADER, type VendorCapability } from '@rp/contracts/control-plane';
 import type { Request } from 'express';
 import { CpError } from '../errors/cp-error.js';
 import { type VendorPrincipal, VendorAuthService } from './vendor-auth.service.js';
@@ -14,6 +14,14 @@ export const VENDOR_ROUTE = 'cp:vendor';
  */
 export const Vendor = (capability?: VendorCapability) =>
   SetMetadata(VENDOR_ROUTE, capability ?? 'SESSION');
+
+export const VENDOR_STEP_UP = 'cp:vendor-step-up';
+
+/**
+ * The endpoint asks for the authenticator again (CP-S2): a code in `x-rp-step-up` that was not
+ * used before, even by the sign-in. Contracts list these operations in `STEP_UP_OPERATIONS`.
+ */
+export const StepUp = () => SetMetadata(VENDOR_STEP_UP, true);
 
 export type VendorRequest = Request & { vendor?: VendorPrincipal };
 
@@ -49,6 +57,14 @@ export class VendorGuard implements CanActivate {
     const principal = await this.auth.authenticate(token);
     if (required !== 'SESSION' && !VendorAuthService.allows(principal, required)) {
       throw new CpError(403, 'FORBIDDEN', 'Your role does not allow this.');
+    }
+    const stepUp = this.reflector.getAllAndOverride<boolean | undefined>(VENDOR_STEP_UP, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (stepUp === true) {
+      const code = request.headers[STEP_UP_HEADER];
+      await this.auth.stepUp(principal, typeof code === 'string' ? code : undefined);
     }
     request.vendor = principal;
     return true;

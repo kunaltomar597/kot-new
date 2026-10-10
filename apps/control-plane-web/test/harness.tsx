@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router';
 import { expect } from 'vitest';
 import { App } from '../src/App.js';
 import { createServices, type Services } from '../src/app/services.js';
+import { StepUpPrompt } from '../src/app/step-up.js';
 import type { TokenStorage } from '../src/app/session.js';
 import { FakeControlPlane, FakeRefusal } from './fake-cp.js';
 import {
@@ -17,6 +18,13 @@ import {
   REMOTE_DEFINITIONS,
   tenantDetail,
 } from './fixtures.js';
+
+/** Answers the authenticator question at once, as a person with the app at hand would. */
+function answeringStepUp(): StepUpPrompt {
+  const prompt = new StepUpPrompt();
+  prompt.ask = () => Promise.resolve('123456');
+  return prompt;
+}
 
 /** Session storage for a test: starts with a token when someone is signed in. */
 export function memoryStorage(token?: string): TokenStorage & { value: string | undefined } {
@@ -92,7 +100,12 @@ export function renderApp({
   services: Services;
 } {
   const storage = memoryStorage(signedIn ? 'session-token' : undefined);
-  const services = createServices({ baseUrl: '', storage, fetch: cp.fetch });
+  const services = createServices({
+    baseUrl: '',
+    storage,
+    fetch: cp.fetch,
+    stepUp: answeringStepUp(),
+  });
   const user = userEvent.setup();
   const view = render(
     <MemoryRouter initialEntries={[path]}>

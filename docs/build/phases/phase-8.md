@@ -327,6 +327,12 @@ restrictions, `docs/runbooks/mdm-policy.md` (root detection left to the MDM) and
 the device checks. P8-03d2b is the checklists (ASVS, MASVS, ETSI, CIS) and the PC, Control Plane,
 update and licence threats still planned for P8-03d.
 
+P8-03d2b1 (2026-10-11) is the Control Plane's, as built: ten sensitive operations
+(`STEP_UP_OPERATIONS`) ask for a new authenticator code in `x-rp-step-up` (CP-S2); every audit entry
+is also a log line for the host (CP-T5); every vendor read is classified (CP-R1); the access policy
+names the CLI's host (CP-R2); manual task 34 for the host's log store. P8-03d2b2 is the
+checklists and the PC, update and licence threats.
+
 ### P8-03e Incident response plan and penetration-test support
 
 Requirements: SEC-016, SEC-017.

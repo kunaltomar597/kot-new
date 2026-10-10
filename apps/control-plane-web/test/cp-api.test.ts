@@ -80,3 +80,42 @@ describe('the Control Plane client', () => {
     await expect(api.listVendorTenants()).rejects.toThrow();
   });
 });
+
+describe('[VCP-001] [SEC-018] the authenticator asked again (CP-S2)', () => {
+  const answer = () =>
+    Promise.resolve(
+      new Response(JSON.stringify({ users: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+  it('sends the new code with a step-up operation and with no other', async () => {
+    const fetched = vi.fn<typeof fetch>(answer);
+    const api = createCpApi({
+      baseUrl: '',
+      fetch: fetched,
+      token: () => 'secret',
+      stepUp: () => Promise.resolve('654321'),
+    });
+    await api.recordVendorAccessReview({ body: { keep: [], note: 'Q4 review' } });
+    await api.listVendorUsers();
+    const headers = fetched.mock.calls.map(([, init]) => init?.headers as Record<string, string>);
+    expect(headers[0]?.['x-rp-step-up']).toBe('654321');
+    expect(headers[1]).not.toHaveProperty('x-rp-step-up');
+  });
+
+  it('sends nothing when the person cancels, and a refused code does not end the session', async () => {
+    const fetched = vi.fn<typeof fetch>(answer);
+    const api = createCpApi({
+      baseUrl: '',
+      fetch: fetched,
+      token: () => 'secret',
+      stepUp: () => Promise.resolve(undefined),
+    });
+    await expect(
+      api.recordVendorAccessReview({ body: { keep: [], note: 'Q4 review' } }),
+    ).rejects.toMatchObject({ code: 'STEP_UP_CANCELLED' });
+    expect(fetched).not.toHaveBeenCalled();
+  });
+});

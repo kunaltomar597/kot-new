@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import {
+  STEP_UP_HEADER,
   type VendorRole,
   VendorSessionView,
   VendorSetupResponse,
@@ -51,7 +52,34 @@ export async function signInVendor(app: INestApplication, vendor: TestVendor): P
   const session = await app
     .get(VendorAuthService)
     .signIn({ email: vendor.email, password: vendor.password, code }, 'test', at);
-  return VendorSessionView.parse(session).token;
+  const { token } = VendorSessionView.parse(session);
+  knownSession(app, vendor, token);
+  return token;
 }
 
-export const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+/** Lets `bearer` add step-up codes for a session the test opened itself. */
+export function knownSession(app: INestApplication, vendor: TestVendor, token: string): void {
+  signedIn.set(token, { app, vendor });
+}
+
+const signedIn = new Map<string, { app: INestApplication; vendor: TestVendor }>();
+
+/**
+ * The step-up header (CP-S2) with a fresh code, valid at the time the code is for: the service's
+ * clock is moved there, as the guard reads it.
+ */
+export function stepUp(token: string): Record<string, string> {
+  const who = signedIn.get(token);
+  if (who === undefined) return {};
+  const { code, at } = codeFor(who.vendor);
+  who.app.get(VendorAuthService).clock = () => at;
+  return { [STEP_UP_HEADER]: code };
+}
+
+/**
+ * The bearer header of a session, with a fresh step-up code too, so a test need not think of it;
+ * the tests of the step-up itself send their own headers with `bearerOnly`.
+ */
+export const bearer = (token: string) => ({ authorization: `Bearer ${token}`, ...stepUp(token) });
+
+export const bearerOnly = (token: string) => ({ authorization: `Bearer ${token}` });

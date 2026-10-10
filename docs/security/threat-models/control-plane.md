@@ -88,19 +88,27 @@ A vendor's session is taken from their browser (script in the web app, a laptop 
 - Mitigation: sessions last 8 hours, or 30 minutes unused; the token is kept in `sessionStorage`
   and sent as a header (no cookies, no CSRF); the web app's CSP allows only its own scripts;
   disabling or resetting an account ends its sessions, and the role is read again on every
-  request. Sensitive actions do not ask for the authenticator again.
-- Code: `apps/control-plane/src/vendor/vendor-auth.service.ts` (`authenticate`);
+  request. Restoring a restaurant's data, managing staff, publishing releases and pushing settings
+  ask for the authenticator again (`STEP_UP_OPERATIONS`): a code never used before, not the
+  sign-in's, in `x-rp-step-up`; a wrong one counts towards the account lock and is audited, and
+  the session stays (403 `STEP_UP_REQUIRED`).
+- Code: `apps/control-plane/src/vendor/vendor-auth.service.ts` (`authenticate`, `stepUp`);
+  `apps/control-plane/src/vendor/vendor.guard.ts` (`StepUp`);
+  `apps/control-plane-web/src/components/StepUpDialog.tsx`;
   `apps/control-plane-web/src/app/session.ts`; `apps/control-plane/src/http/web-static.ts`
   (`WEB_SECURITY_HEADERS`).
 - Tests: `apps/control-plane/test/integration/vendor-staff.int.test.ts` "ends a session on
   sign-out, and after 30 minutes without use"; `apps/control-plane/test/integration/web-app.int.test.ts`
   "serves the app with strict security headers, and its routes from the shell";
   `apps/control-plane-web/test/cp-api.test.ts` "turns a refusal into an error with its code, and a
-  401 ends the session".
-- Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: the authenticator asked again before
-  restoring a restaurant's data, managing staff, publishing releases and pushing settings (ASVS
-  L2's re-authentication).
+  401 ends the session";
+  `apps/control-plane/test/integration/step-up.int.test.ts` "refuses every listed operation without
+  a fresh code, and keeps the session", "accepts a new code once, and refuses it again", "counts
+  wrong codes towards the account lock and audits them";
+  `apps/control-plane-web/test/cp-api.test.ts` "sends the new code with a step-up operation and
+  with no other".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03d2b1).
 
 #### CP-S3 A stolen installation key, or a PC posing as another restaurant
 
@@ -213,15 +221,19 @@ A menu photo carries text that tells the AI model to do something else (prompt i
 Someone with database access changes or removes audit entries to hide what they did.
 
 - Mitigation: triggers refuse updates, deletes and truncation, and entries are written in the
-  change's own transaction. The database owner can drop the triggers; there is no chain and no
-  copy elsewhere.
+  change's own transaction. Each entry is also written to the Control Plane's log as a JSON line
+  (`"event":"audit"`) for the hosting provider's log store, which the database owner cannot reach.
+  The line is written before the transaction commits, so it can name a change that rolled back;
+  the database is the record. The database owner can still drop the triggers; there is no hash
+  chain.
 - Code: `apps/control-plane/prisma/migrations/20260926100000_control_plane_v0/migration.sql`
   (`cp_audit_log_guard`); `apps/control-plane/src/audit/audit.service.ts` (`AuditService`).
 - Tests: `apps/control-plane/test/integration/admin.int.test.ts` "keeps the audit log
-  append-only".
+  append-only"; `apps/control-plane/test/unit/audit-copy.test.ts` "writes each entry to the log as
+  well as the table, with its actor, action and target".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: the audit log copied to the hosting
-  provider's log store in India and kept 180 days (SEC-015).
+- Status: Partly mitigated. Plan: manual task 34 by 2026-11-30: the host's log store in India keeps
+  these lines 180 days (SEC-015).
 
 ### Repudiation
 
@@ -230,17 +242,19 @@ Someone with database access changes or removes audit entries to hide what they 
 A vendor staff member denies opening a restaurant's data or changing it.
 
 - Mitigation: every change records the staff member with a reason, including the access review,
-  restore codes (with how the Owner was verified) and opening a diagnostics bundle. Other reads
-  are not audited.
+  restore codes (with how the Owner was verified) and opening a diagnostics bundle. Decided
+  (P8-03d2b1): those are the only reads that show the contents of a restaurant's data; every other
+  read shows the Control Plane's own records (fleet state, licences, versions, billing, notes),
+  and a new read route must be classified on purpose.
 - Code: `apps/control-plane/src/audit/audit.service.ts` (`AuditService`).
 - Tests: `apps/control-plane/test/integration/vendor-staff.int.test.ts` "records the quarterly
   access review, disabling every account not kept";
   `apps/control-plane/test/integration/diagnostics.int.test.ts` "lists bundles for every role, and
   opens one only for Support, audited"; `apps/control-plane/test/integration/key-escrow.int.test.ts`
-  "issues a code only for Support, only with something to restore, and tells the Owner".
+  "issues a code only for Support, only with something to restore, and tells the Owner";
+  `apps/control-plane/test/unit/read-audit.test.ts` "has a decision for every vendor read".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: decide which reads of a restaurant's data
-  are audited (SEC-018's "all production access").
+- Status: Mitigated (P8-03d2b1).
 
 #### CP-R2 Changes through the admin CLI
 
@@ -252,8 +266,8 @@ The admin CLI talks to the database directly; its actor is whatever name the ope
 - Tests: `apps/control-plane/test/integration/admin.int.test.ts` "creates a tenant and
   installation, publishes a release and revokes, all audited".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: where the CLI may run, who may run it and
-  how the host records it, in the access policy's checklist.
+- Status: Partly mitigated. Plan: manual task 34 by 2026-11-30: the operator host and the host's
+  record of its sessions, as the access policy (section 7) now requires.
 
 ### Information disclosure
 

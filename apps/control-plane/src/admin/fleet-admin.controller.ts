@@ -38,7 +38,7 @@ import type { z } from 'zod';
 import { ZodPipe } from '../http/zod.pipe.js';
 import { type LicenceSummary, LicencesService } from '../licences/licences.service.js';
 import { ReleasesService } from '../releases/releases.service.js';
-import { Vendor, type VendorRequest, vendorOf } from '../vendor/vendor.guard.js';
+import { StepUp, Vendor, type VendorRequest, vendorOf } from '../vendor/vendor.guard.js';
 import { AdminService } from './admin.service.js';
 import { FleetAdminService } from './fleet-admin.service.js';
 
@@ -217,6 +217,7 @@ export class FleetAdminController {
 
   @Post('releases')
   @Vendor('RELEASES_MANAGE')
+  @StepUp()
   publish(
     @Req() request: VendorRequest,
     @Body(new ZodPipe(PublishReleaseRequest)) body: z.output<typeof PublishReleaseRequest>,
@@ -230,6 +231,7 @@ export class FleetAdminController {
 
   @Put('releases/:id/rollout')
   @Vendor('RELEASES_MANAGE')
+  @StepUp()
   rollout(
     @Req() request: VendorRequest,
     @Param(new ZodPipe(VendorReleaseParams)) params: VendorReleaseParams,
@@ -240,6 +242,7 @@ export class FleetAdminController {
 
   @Put('installations/:id/pin')
   @Vendor('RELEASES_MANAGE')
+  @StepUp()
   async pin(
     @Req() request: VendorRequest,
     @Param(new ZodPipe(VendorInstallationParams)) params: VendorInstallationParams,

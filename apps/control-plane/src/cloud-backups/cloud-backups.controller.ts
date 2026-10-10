@@ -30,7 +30,7 @@ import { type InstallationRequest, installationOf } from '../auth/installation.g
 import { Public } from '../auth/public.decorator.js';
 import { CpError } from '../errors/cp-error.js';
 import { ZodPipe } from '../http/zod.pipe.js';
-import { Vendor, type VendorRequest, vendorOf } from '../vendor/vendor.guard.js';
+import { StepUp, Vendor, type VendorRequest, vendorOf } from '../vendor/vendor.guard.js';
 import { BackupEscrowService } from './backup-escrow.service.js';
 import { CloudBackupsService, OBJECT_STORE } from './cloud-backups.service.js';
 import { BadDigestError, LocalObjectStore } from './local-object-store.js';
@@ -98,6 +98,7 @@ export class CloudBackupsController {
 
   @Post('vendor/installations/:id/restore-codes')
   @Vendor('BACKUP_RESTORE')
+  @StepUp()
   issueRestoreCode(
     @Req() request: VendorRequest,
     @Param(new ZodPipe(VendorInstallationParams)) params: VendorInstallationParams,
