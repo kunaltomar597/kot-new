@@ -5643,6 +5643,108 @@
         "x-requirements": ["KDS-008", "ONB-004"]
       }
     },
+    "/api/v1/recommendation-preferences": {
+      "get": {
+        "operationId": "listRecommendationPreferences",
+        "summary": "The dishes pinned, boosted or blocked from suggestions",
+        "description": "REC-009: every dish not archived whose preference is not NORMAL.",
+        "tags": ["recommendations"],
+        "responses": {
+          "200": {
+            "description": "The preferences.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationPreferenceListResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-009"]
+      }
+    },
+    "/api/v1/recommendation-preferences/{itemId}": {
+      "put": {
+        "operationId": "setRecommendationPreference",
+        "summary": "Pin, boost or block a dish, or put it back to normal",
+        "description": "REC-009: pinned dishes come first wherever they can be served, boosted ones before the best sellers and first among a rule's, blocked ones never. Applies at once, without publishing the menu. Audited with before, after and the reason; a change that changes nothing writes nothing.",
+        "tags": ["recommendations"],
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RecommendationPreferenceRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The dish’s preference now.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendationPreferenceView" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "404": {
+            "description": "No such dish, or it is archived.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["REC-009", "AUD-001"]
+      }
+    },
     "/api/v1/recommendation-rules": {
       "get": {
         "operationId": "listRecommendationRules",
@@ -14176,7 +14278,51 @@
         "type": "string",
         "enum": ["IMPRESSION", "TAP", "ADD_TO_CART", "ORDERED"]
       },
-      "RecommendationLayer": { "type": "string", "enum": ["RULE", "LEARNED", "BEST_SELLER"] },
+      "RecommendationLayer": {
+        "type": "string",
+        "enum": ["PINNED", "RULE", "LEARNED", "BOOSTED", "BEST_SELLER"]
+      },
+      "RecommendationPreference": { "type": "string", "enum": ["NORMAL", "PIN", "BOOST", "BLOCK"] },
+      "RecommendationPreferenceListResponse": {
+        "type": "object",
+        "properties": {
+          "preferences": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecommendationPreferenceView" }
+          }
+        },
+        "required": ["preferences"],
+        "additionalProperties": false
+      },
+      "RecommendationPreferenceParams": {
+        "type": "object",
+        "properties": { "itemId": { "$ref": "#/components/schemas/Id" } },
+        "required": ["itemId"],
+        "additionalProperties": false
+      },
+      "RecommendationPreferenceRequest": {
+        "type": "object",
+        "properties": {
+          "preference": { "$ref": "#/components/schemas/RecommendationPreference" },
+          "label": {
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 60 }, { "type": "null" }]
+          },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 200 }
+        },
+        "required": ["preference", "label"],
+        "additionalProperties": false
+      },
+      "RecommendationPreferenceView": {
+        "type": "object",
+        "properties": {
+          "itemId": { "$ref": "#/components/schemas/Id" },
+          "preference": { "$ref": "#/components/schemas/RecommendationPreference" },
+          "label": { "type": ["string", "null"] },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        },
+        "required": ["itemId", "preference", "label", "updatedAt"],
+        "additionalProperties": false
+      },
       "RecommendationReason": {
         "oneOf": [
           {
@@ -14208,6 +14354,24 @@
               }
             },
             "required": ["kind", "daypart"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "PINNED" },
+              "label": { "type": ["string", "null"] }
+            },
+            "required": ["kind", "label"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "const": "BOOSTED" },
+              "label": { "type": ["string", "null"] }
+            },
+            "required": ["kind", "label"],
             "additionalProperties": false
           }
         ]

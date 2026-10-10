@@ -163,8 +163,8 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   audit log, and asks the Owner for the second factor when the server wants it. The server's
   checks across settings come back as the dialog's message. The page follows `SettingsChanged`
   and `RestaurantChanged`. The notification rules have their own page, so they are not listed
-  here; `SettingsArea.tsx` links the two pages. A row is `SettingRow.tsx`, shared with the
-  Notifications page.
+  here; `SettingsArea.tsx` links the three pages (General, Notifications, Suggestions). A row is
+  `SettingRow.tsx`, shared with the Notifications page.
 - Notifications (`/manage/settings/notifications`, P4-03b, NTF-002, NTF-003, PGR-006):
   `NotificationsScreen.tsx`, with the logic in `notification-rules-view.ts` (tested on its own)
   over `@rp/domain`'s rule helpers. N, R and the nudge messages come first (the General page's
@@ -177,6 +177,20 @@ screens come with P1-08, P1-09, P1-12 and P4-01 to P4-07.
   after N", the repeat, "Back to the factory rule" and an optional reason. The rule is checked
   with `ruleProblems` before it is sent; saving reads `notifications.rules` again and changes only
   this event's entry (`withRule`), keeping only what differs from the factory rule.
+- Suggestions (`/manage/settings/suggestions`, P4-03c, REC-002, REC-009, REC-006):
+  `SuggestionsScreen.tsx`, with the logic in `suggestions-view.ts` (tested on its own). Before the
+  first publish it says to publish the menu. Rules: "If the order has X, suggest Y" (a dish or
+  any dish of a category, by the published menu's names; one no longer on the published menu
+  says so), the words shown with it (the restaurant's own or what the tablets say without them),
+  priority, hours, dates and where it shows, with Change, Pause or Turn on, and Remove with a
+  reason. `SuggestionDialogs.tsx` holds the rule dialog (checked as the server checks it; saved
+  unchanged sends nothing) and the dish dialog: pin, boost, block or back as usual, the words
+  shown with a pinned or boosted dish and an optional reason for the audit log. The dishes list
+  shows pinned, then boosted, then blocked dishes by name. The preview asks the server what a
+  table tablet, the QR menu, the waiter app or the POS would suggest now, with nothing or a
+  chosen dish in the order, and shows each suggestion with the reason the tablets show and where
+  it comes from (pinned, your rule, often together, boosted, best seller). It reads again after
+  every change on the page, a published menu and a dish's availability.
 - Locate (`src/screens/LocateOverlay.tsx`, MGR-006): on every screen of a paired console, a
   `DeviceLocateRequested` for this device shows "This is <name>" and chimes every 3 seconds (Web
   Audio, unlocked by the first touch or key press) until OK or 15 seconds. A renamed console
@@ -224,7 +238,10 @@ a recovery code, giving it to Ravi, and Ravi settling a table's bill by UPI, a m
 changing the kitchen's amber age and the cashier's discount limit on the Settings page while the
 Owner turns on the service charge after a recovery code, and a manager sending water requests to
 the cashier too with a new pager text and three buzzes, setting N to 90 seconds and putting the
-factory rule back on the Notifications page. The tabs share one browser context, so
+factory rule back on the Notifications page, and a manager adding a suggestion rule (Paneer Tikka,
+then Sweet Lassi with "Cools the spice"), blocking Sweet Lassi and pinning Gulab Jamun with
+"Fresh today" while the preview follows each change, then putting it all back on the Suggestions
+page. The tabs share one browser context, so
 they share the device key, as screens of one terminal would. axe runs through the browser's debugging protocol,
 since the server's Content Security Policy refuses inline scripts, after entrance animations end
 (a dialog fading in would fail colour contrast). In cloud sessions they use the preinstalled Chromium

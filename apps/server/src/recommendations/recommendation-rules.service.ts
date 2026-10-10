@@ -69,13 +69,13 @@ export function ruleDef(row: RecommendationRule): RecommendationRuleDef {
   };
 }
 
-/** What a rule does, to tell whether a change changes anything. */
+/** What a rule does, to tell whether a change changes anything (its channels in any order). */
 function settingsOf(rule: RecommendationRuleView | RecommendationRuleRequest): string {
   return canonicalJson({
     when: rule.when,
     suggest: rule.suggest,
     priority: rule.priority,
-    channels: rule.channels,
+    channels: [...rule.channels].sort(),
     timeWindow: rule.timeWindow,
     activeFrom: rule.activeFrom,
     activeUntil: rule.activeUntil,

@@ -1,5 +1,12 @@
-import { MenuSnapshot } from '@rp/contracts';
-import { CAPABILITIES, ORDER_ITEM_STATES, ORDER_SOURCES, ROLES, TABLE_STATES } from '@rp/domain';
+import { MenuSnapshot, RECOMMENDATION_PREFERENCES } from '@rp/contracts';
+import {
+  CAPABILITIES,
+  ORDER_ITEM_STATES,
+  ORDER_SOURCES,
+  RECOMMENDATION_LAYERS,
+  ROLES,
+  TABLE_STATES,
+} from '@rp/domain';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuditService } from '../../src/audit/audit.service.js';
@@ -10,6 +17,8 @@ import { PrismaService } from '../../src/database/prisma.service.js';
 import {
   OrderItemState,
   OrderSource,
+  RecommendationLayer,
+  RecommendationPreferenceKind,
   StaffRole,
   TableState,
 } from '../../src/generated/prisma/enums.js';
@@ -169,7 +178,22 @@ describe('[SEC-005] [INT-005] schema conventions', () => {
     expect(Object.values(OrderSource)).toEqual([...ORDER_SOURCES]);
     expect(Object.values(TableState)).toEqual([...TABLE_STATES]);
     expect(Object.values(StaffRole)).toEqual([...ROLES]);
+    expect(Object.values(RecommendationLayer)).toEqual([...RECOMMENDATION_LAYERS]);
+    expect(Object.values(RecommendationPreferenceKind)).toEqual([...RECOMMENDATION_PREFERENCES]);
     expect(CAPABILITIES.length).toBeGreaterThan(0);
+  });
+
+  it('[REC-009] keeps the suggestion layers in their order in the database too', async () => {
+    const labels = async (type: string) =>
+      (
+        await query<{ enumlabel: string }>(
+          `SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+           WHERE t.typname = $1 ORDER BY e.enumsortorder`,
+          [type],
+        )
+      ).map((row) => row.enumlabel);
+    expect(await labels('RecommendationLayer')).toEqual([...RECOMMENDATION_LAYERS]);
+    expect(await labels('RecommendationPreferenceKind')).toEqual([...RECOMMENDATION_PREFERENCES]);
   });
 });
 

@@ -15,6 +15,10 @@ overrides:
   mysql2@<3.22.0: ^3.22.0
   # GHSA-ggr8-5vv4-36mx, via @prisma/config 7.10.0.
   deepmerge-ts@<8.0.0: ^8.0.0
+  # GHSA-pqg4-j6r4-53mv, via react-native's react-devtools-core (Android apps' dev tools).
+  shell-quote@>=1.8.4 <1.11.0: ^1.11.0
+  # GHSA-68fv-2mgg-jv7q, via @vitest/coverage-v8's magicast (tests only).
+  source-map-js@<1.2.2: ^1.2.2
 
 # Advisories with no fixed release, accepted after review (reasons and review dates in
 # infra/ci/README.md). Remove each one when a fix ships.

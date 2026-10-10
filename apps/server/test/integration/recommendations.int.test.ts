@@ -4,6 +4,8 @@ import {
   ApiError,
   type DomainEvent,
   type LoginResponse,
+  RecommendationPreferenceListResponse,
+  RecommendationPreferenceView,
   RecommendationRuleListResponse,
   RecommendationRuleView,
   RecommendationsResponse,
@@ -369,6 +371,17 @@ describe('[REC-002] [AUD-001] recommendation rules', () => {
       }),
     };
     expect((await put({ ...breads, priority: 10 })).status).toBe(200);
+    expect(await auditOf(id('rule breads'))).toHaveLength(1);
+    // The same channels in another order are no change either.
+    expect(
+      (
+        await put({
+          ...breads,
+          priority: 10,
+          channels: ['QR', 'TABLE_TABLET', 'WAITER_APP', 'POS'],
+        })
+      ).status,
+    ).toBe(200);
     expect(await auditOf(id('rule breads'))).toHaveLength(1);
 
     const changed = await put({ ...breads, priority: 20 });
@@ -802,5 +815,212 @@ describe('[REC-008] tracking per layer and item', () => {
     } as DomainEvent;
     await prisma.transaction((tx) => app.get(RecommendationOrders).handle(submittedEvent, tx));
     expect(await prisma.recommendationEvent.count({ where: { kind: 'ORDERED' } })).toBe(1);
+  });
+});
+
+describe('[REC-009] [AUD-001] pinned, boosted and blocked dishes', () => {
+  const setPreference = (itemName: string, body: object, login: LoginResponse = manager) =>
+    server()
+      .put(`/api/v1/recommendation-preferences/${id(itemName)}`)
+      .set(as(login))
+      .send(body);
+  const listPreferences = async () => {
+    const response = await server().get('/api/v1/recommendation-preferences').set(as(manager));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    return RecommendationPreferenceListResponse.parse(response.body).preferences.map((entry) => ({
+      name: Object.entries(ids).find(([, value]) => value === entry.itemId)?.[0],
+      ...entry,
+    }));
+  };
+  const preferenceAudit = (itemName: string) =>
+    prisma.auditLog.findMany({
+      where: { entityId: id(itemName), action: 'RECOMMENDATION_PREFERENCE_CHANGED' },
+      orderBy: { chainSeq: 'asc' },
+    });
+
+  it('lets a manager pin, boost and block dishes, audited, the latest change first', async () => {
+    const pinned = await setPreference('Gulab Jamun', {
+      preference: 'PIN',
+      label: 'Made this morning',
+      reason: 'Fresh batch',
+    });
+    expect(pinned.status, JSON.stringify(pinned.body)).toBe(200);
+    expect(RecommendationPreferenceView.parse(pinned.body)).toMatchObject({
+      itemId: id('Gulab Jamun'),
+      preference: 'PIN',
+      label: 'Made this morning',
+    });
+    expect((await setPreference('Dal Makhani', { preference: 'BOOST', label: null })).status).toBe(
+      200,
+    );
+    expect(
+      (await setPreference('Raita', { preference: 'BLOCK', label: null, reason: 'Out of curd' }))
+        .status,
+    ).toBe(200);
+    expect((await listPreferences()).map((entry) => [entry.name, entry.preference])).toEqual([
+      ['Raita', 'BLOCK'],
+      ['Dal Makhani', 'BOOST'],
+      ['Gulab Jamun', 'PIN'],
+    ]);
+    expect(await preferenceAudit('Gulab Jamun')).toEqual([
+      expect.objectContaining({
+        entityType: 'menu_item',
+        actorId: kit.staff.MANAGER,
+        before: { preference: 'NORMAL', label: null },
+        after: { preference: 'PIN', label: 'Made this morning' },
+        reason: 'Fresh batch',
+      }),
+    ]);
+    // The same again changes nothing and writes nothing.
+    expect(
+      (await setPreference('Gulab Jamun', { preference: 'PIN', label: 'Made this morning' }))
+        .status,
+    ).toBe(200);
+    expect(await preferenceAudit('Gulab Jamun')).toHaveLength(1);
+  });
+
+  it('never suggests a blocked dish, puts a pinned one first and a boosted one before the best sellers', async () => {
+    const suggestions = await suggest({ channel: 'WAITER_APP', cart: [id('Chicken Biryani')] });
+    // Raita, the biryani rule's dish, is blocked; the bread rule still applies.
+    expect(names(suggestions)).toEqual([
+      'Gulab Jamun',
+      'Butter Naan',
+      'Dal Makhani',
+      'Masala Chaas',
+      'Veg Biryani',
+      'Paneer Tikka',
+    ]);
+    expect(suggestions.recommendations.map((entry) => entry.layer)).toEqual([
+      'PINNED',
+      'RULE',
+      'BOOSTED',
+      'BEST_SELLER',
+      'BEST_SELLER',
+      'BEST_SELLER',
+    ]);
+    expect(suggestions.recommendations[0]?.reason).toEqual({
+      kind: 'PINNED',
+      label: 'Made this morning',
+    });
+    expect(suggestions.recommendations[2]?.reason).toEqual({ kind: 'BOOSTED', label: null });
+    // The table tablet too, at once, without publishing the menu.
+    const atTable = await suggestAt('T2');
+    expect(names(atTable)[0]).toBe('Gulab Jamun');
+    expect(names(atTable)).not.toContain('Raita');
+    // A pinned dish that is sold out is not suggested until it is back.
+    const setJamun = (available: boolean) =>
+      server()
+        .put(`/api/v1/menu/items/${id('Gulab Jamun')}/availability`)
+        .set(as(manager))
+        .send({ available, stockCount: null });
+    expect((await setJamun(false)).status).toBe(200);
+    expect(names(await suggestAt('T2'))).not.toContain('Gulab Jamun');
+    expect((await setJamun(true)).status).toBe(200);
+    expect(names(await suggestAt('T2'))[0]).toBe('Gulab Jamun');
+  });
+
+  it('[REC-008] counts a pinned dish shown and ordered under its own layer', async () => {
+    const shown = await server()
+      .post('/api/v1/devices/current/recommendations/events')
+      .set(tablet('T2'))
+      .send({
+        events: [
+          { kind: 'IMPRESSION', itemId: id('Gulab Jamun'), layer: 'PINNED', ruleId: null },
+          { kind: 'TAP', itemId: id('Dal Makhani'), layer: 'BOOSTED', ruleId: null },
+        ],
+      });
+    expect(shown.status, JSON.stringify(shown.body)).toBe(204);
+    expect(
+      await prisma.recommendationEvent.count({
+        where: { itemId: id('Gulab Jamun'), layer: 'PINNED', kind: 'IMPRESSION' },
+      }),
+    ).toBe(1);
+    const t1 = await prisma.tableSession.findFirstOrThrow({
+      where: { tableId: id('T1'), status: 'OPEN' },
+    });
+    const submitted = await order(t1.id, [
+      { itemId: id('Gulab Jamun'), recommendation: { layer: 'PINNED', ruleId: null } },
+    ]);
+    if (submitted.status !== 'ACCEPTED') throw new Error('The order was not accepted');
+    const jamun = await prisma.orderItem.findFirstOrThrow({
+      where: { orderId: submitted.orderId, itemId: id('Gulab Jamun') },
+    });
+    expect(jamun.recommendationLayer).toBe('PINNED');
+    const counted = await until(
+      async () =>
+        (await prisma.recommendationEvent.findFirst({
+          where: { kind: 'ORDERED', orderItemId: jamun.id },
+        })) ?? undefined,
+      5_000,
+      'the pinned dish ORDERED',
+    );
+    expect(counted).toMatchObject({ layer: 'PINNED', itemId: id('Gulab Jamun'), ruleId: null });
+  });
+
+  it('puts a dish back to normal, and refuses what cannot be', async () => {
+    const back = await setPreference('Raita', {
+      preference: 'NORMAL',
+      label: null,
+      reason: 'Curd delivered',
+    });
+    expect(back.status).toBe(200);
+    expect(RecommendationPreferenceView.parse(back.body).preference).toBe('NORMAL');
+    expect((await listPreferences()).map((entry) => entry.name)).not.toContain('Raita');
+    expect(names(await suggest({ channel: 'WAITER_APP', cart: [id('Chicken Biryani')] }))).toEqual(
+      expect.arrayContaining(['Raita']) as unknown,
+    );
+    expect((await preferenceAudit('Raita')).map((entry) => entry.reason)).toEqual([
+      'Out of curd',
+      'Curd delivered',
+    ]);
+    // The row stays, NORMAL: preferences are changed, never deleted.
+    expect(
+      await prisma.recommendationPreference.findFirst({ where: { itemId: id('Raita') } }),
+    ).toMatchObject({ preference: 'NORMAL', label: null });
+
+    const words = await setPreference('Raita', { preference: 'BLOCK', label: 'Never' });
+    expect(words.status).toBe(400);
+    const archived = await setPreference('Retired Kebab', { preference: 'PIN', label: null });
+    expect(codeOf(archived)).toBe('ITEM_NOT_FOUND');
+    const unknown = await server()
+      .put(`/api/v1/recommendation-preferences/${randomUUID()}`)
+      .set(as(manager))
+      .send({ preference: 'PIN', label: null });
+    expect(unknown.status).toBe(404);
+    expect(
+      (await setPreference('Raita', { preference: 'BLOCK', label: null }, waiter)).status,
+    ).toBe(403);
+    expect((await server().get('/api/v1/recommendation-preferences').set(as(waiter))).status).toBe(
+      403,
+    );
+  });
+
+  it('keeps an archived dish’s preference but no longer lists it', async () => {
+    ids['Seasonal Soup'] = (
+      await prisma.item.create({
+        data: {
+          restaurantId: kit.restaurantId,
+          categoryId: id('Starters'),
+          name: 'Seasonal Soup',
+          basePrice: 15_000,
+          taxGroupId: id('gst'),
+          foodType: 'VEG',
+          stationId: id('kitchen'),
+        },
+      })
+    ).id;
+    expect((await setPreference('Seasonal Soup', { preference: 'PIN', label: null })).status).toBe(
+      200,
+    );
+    expect((await listPreferences()).map((entry) => entry.name)).toContain('Seasonal Soup');
+
+    await prisma.item.update({
+      where: { id: id('Seasonal Soup') },
+      data: { archivedAt: new Date() },
+    });
+    expect((await listPreferences()).map((entry) => entry.name)).not.toContain('Seasonal Soup');
+    expect(
+      await prisma.recommendationPreference.findFirst({ where: { itemId: id('Seasonal Soup') } }),
+    ).toMatchObject({ preference: 'PIN' });
   });
 });

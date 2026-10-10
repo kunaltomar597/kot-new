@@ -11,6 +11,9 @@ import {
   recommend,
   type RecommendationInput,
   type RecommendationRuleDef,
+  type ItemPreferenceDef,
+  ITEM_PREFERENCES,
+  RECOMMENDATION_LAYERS,
   ruleIsOn,
   timeOfDayOf,
 } from '../src/index.js';
@@ -352,6 +355,128 @@ describe('[REC-001] [REC-006] layers and reasons', () => {
     const first = recommend(input({ ordered: ['dal-makhani', 'naan'] }));
     const second = recommend(input({ ordered: ['naan', 'dal-makhani'] }));
     expect(second).toEqual(first);
+  });
+});
+
+describe('[REC-009] pinned, boosted and blocked dishes', () => {
+  const prefer = (
+    itemId: string,
+    preference: ItemPreferenceDef['preference'],
+    label: string | null = null,
+  ): ItemPreferenceDef => ({ itemId, preference, label });
+
+  it('never suggests a blocked dish, whichever layer would have', () => {
+    const rules = [
+      rule('biryani-raita'),
+      rule('biryani-desserts', {
+        priority: 40,
+        suggest: { kind: 'CATEGORY', categoryId: 'desserts' },
+      }),
+    ];
+    const learned = [{ fromItemId: 'veg-biryani', toItemId: 'lassi', score: 5 }];
+    const blocked = ['raita', 'gulab-jamun', 'lassi', 'butter-chicken'];
+    const preferences = blocked.map((itemId) => prefer(itemId, 'BLOCK'));
+    const suggested = ids({ rules, learned, preferences, ordered: ['veg-biryani'], limit: 20 });
+    for (const dish of blocked) expect(suggested, dish).not.toContain(dish);
+    expect(suggested).toEqual(['naan', 'dal-makhani', 'paneer-tikka']);
+    // Blocking the dish in the order does not stop the rules it starts.
+    expect(
+      ids({ rules, preferences: [prefer('veg-biryani', 'BLOCK')], ordered: ['veg-biryani'] })[0],
+    ).toBe('raita');
+    // A pin cannot be blocked too: one preference per dish, and the block is what it is.
+    expect(ITEM_PREFERENCES).toEqual(['PIN', 'BOOST', 'BLOCK']);
+  });
+
+  it('puts a pinned dish first, before the rules, in the restaurant’s words when it gave some', () => {
+    const rules = [rule('biryani-raita')];
+    const suggestions = recommend(
+      input({
+        rules,
+        preferences: [prefer('gulab-jamun', 'PIN', 'Made this morning'), prefer('lassi', 'PIN')],
+        ordered: ['veg-biryani'],
+        limit: 4,
+      }),
+    );
+    expect(suggestions.map(({ itemId, layer }) => `${layer}:${itemId}`)).toEqual([
+      // Both are courses after the next one (breads), so the one sold more comes first.
+      'PINNED:lassi',
+      'PINNED:gulab-jamun',
+      'RULE:raita',
+      'BEST_SELLER:naan',
+    ]);
+    expect(suggestions[0]?.reason).toEqual({ kind: 'PINNED', label: null });
+    expect(suggestions[1]?.reason).toEqual({ kind: 'PINNED', label: 'Made this morning' });
+    for (const suggestion of suggestions) expect(suggestion.reason.kind).toBe(suggestion.layer);
+    // A pinned dish the rule names too is suggested once, as pinned.
+    expect(
+      recommend(input({ rules, preferences: [prefer('raita', 'PIN')], ordered: ['veg-biryani'] }))
+        .filter((suggestion) => suggestion.itemId === 'raita')
+        .map((suggestion) => suggestion.layer),
+    ).toEqual(['PINNED']);
+  });
+
+  it('[REC-005] pins only what can be served: not sold out, on the channel, veg for a veg table', () => {
+    const preferences = [
+      prefer('kulfi', 'PIN'),
+      prefer('chef-special', 'PIN'),
+      prefer('chicken-tikka', 'PIN'),
+      prefer('dal-makhani', 'PIN'),
+    ];
+    expect(ids({ preferences, vegOnly: true, limit: 2 })).toEqual(['dal-makhani', 'paneer-tikka']);
+    expect(ids({ preferences, channel: 'WAITER_APP', limit: 3 })).toEqual([
+      'chicken-tikka',
+      'chef-special',
+      'dal-makhani',
+    ]);
+    // In the order already and not repeatable: not suggested again, pinned or not.
+    expect(ids({ preferences, ordered: ['dal-makhani'] })).not.toContain('dal-makhani');
+  });
+
+  it('puts a boosted dish before the best sellers and first among a rule’s, after the rules', () => {
+    const rules = [
+      rule('biryani-desserts', { suggest: { kind: 'CATEGORY', categoryId: 'beverages' } }),
+    ];
+    const learned = [
+      { fromItemId: 'veg-biryani', toItemId: 'naan', score: 9 },
+      { fromItemId: 'veg-biryani', toItemId: 'gulab-jamun', score: 2 },
+    ];
+    const preferences = [
+      prefer('raita', 'BOOST', 'Fresh today'),
+      prefer('gulab-jamun', 'BOOST'),
+      prefer('lassi', 'BOOST'),
+    ];
+    const suggestions = recommend(
+      input({ rules, learned, preferences, ordered: ['veg-biryani'], limit: 5 }),
+    );
+    expect(suggestions.map(({ itemId, layer }) => `${layer}:${itemId}`)).toEqual([
+      // The rule's drinks: the boosted lassi (mojito is not available anyway).
+      'RULE:lassi',
+      // Learned pairings: the boosted dessert before the stronger naan.
+      'LEARNED:gulab-jamun',
+      'LEARNED:naan',
+      // Boosted, not sold at lunch: before every best seller.
+      'BOOSTED:raita',
+      'BEST_SELLER:butter-chicken',
+    ]);
+    expect(suggestions[3]?.reason).toEqual({ kind: 'BOOSTED', label: 'Fresh today' });
+    for (const suggestion of suggestions) expect(suggestion.reason.kind).toBe(suggestion.layer);
+    // Within a rule's category the boosted dish comes first, the next course still before it.
+    const mains = [
+      rule('naan-mains', {
+        when: { kind: 'ITEM', itemId: 'naan' },
+        suggest: { kind: 'CATEGORY', categoryId: 'mains' },
+      }),
+    ];
+    expect(
+      ids({ rules: mains, preferences: [prefer('egg-curry', 'BOOST')], ordered: ['naan'] }).slice(
+        0,
+        2,
+      ),
+    ).toEqual(['egg-curry', 'butter-chicken']);
+  });
+
+  it('lists the pinned and boosted layers in their place', () => {
+    expect(RECOMMENDATION_LAYERS).toEqual(['PINNED', 'RULE', 'LEARNED', 'BOOSTED', 'BEST_SELLER']);
   });
 });
 

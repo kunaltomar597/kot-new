@@ -1307,4 +1307,143 @@ test.describe.serial('the web console', () => {
       rule(water).getByText(t('notificationRules.row.changed'), { exact: true }),
     ).toHaveCount(0);
   });
+
+  test('[REC-002] [REC-009] [REC-006] [MGR-007] a manager adds a suggestion rule, blocks the dish it suggests, pins a dessert with words of its own, and the preview follows each change', async () => {
+    const ruleTitle = t('suggestions.rules.row.title', {
+      when: 'Paneer Tikka',
+      suggest: 'Sweet Lassi',
+    });
+    const preview = page.getByRole('list', { name: t('suggestions.preview.list') });
+    const suggested = (name: string) =>
+      preview
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('heading', { level: 4, name, exact: true }) });
+    const dishes = page.getByRole('region', { name: t('suggestions.dishes.title') });
+    const dishDialog = page.getByRole('dialog', { name: t('suggestions.dishes.dialog.addTitle') });
+    const reason = new RegExp(`^${escape(t('settings.dialog.reason'))}`);
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+
+    await page.getByRole('button', { name: t('login.signOut'), exact: true }).click();
+    await page.getByRole('button', { name: /^Vikram \(Manager\)/ }).click();
+    await page.keyboard.type('2222');
+    await expect(page).toHaveURL(/\/manage$/);
+    await nav.getByRole('link', { name: t('dashboard.section.settings') }).click();
+    await page
+      .getByRole('navigation', { name: t('settings.pages.label') })
+      .getByRole('link', { name: t('settings.pages.suggestions') })
+      .click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('suggestions.title') }),
+    ).toBeVisible();
+    await expect(page.getByText(t('suggestions.rules.none'))).toBeVisible();
+    await expect(page.getByText(t('suggestions.dishes.none'))).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 3, name: t('suggestions.preview.title') }),
+    ).toBeVisible();
+    await expectAccessible(page);
+
+    // If the order has Paneer Tikka, suggest Sweet Lassi with the restaurant's own words.
+    await page.getByRole('button', { name: t('suggestions.rules.add') }).click();
+    const ruleDialog = page.getByRole('dialog', { name: t('suggestions.rules.dialog.addTitle') });
+    await ruleDialog
+      .getByRole('group', { name: t('suggestions.rules.dialog.when'), exact: true })
+      .getByRole('combobox')
+      .selectOption({ label: 'Paneer Tikka' });
+    await ruleDialog
+      .getByRole('group', { name: t('suggestions.rules.dialog.suggest'), exact: true })
+      .getByRole('combobox')
+      .selectOption({ label: 'Sweet Lassi' });
+    await ruleDialog
+      .getByLabel(new RegExp(`^${escape(t('suggestions.rules.dialog.label'))}`))
+      .fill('Cools the spice');
+    await expectAccessible(page);
+    await ruleDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(page.getByText(t('suggestions.rules.dialog.saved'))).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 4, name: ruleTitle, exact: true }),
+    ).toBeVisible();
+
+    // A table that ordered Paneer Tikka is offered Sweet Lassi, saying why.
+    await page.getByLabel(t('suggestions.preview.dish')).selectOption({ label: 'Paneer Tikka' });
+    await expect(suggested('Sweet Lassi').getByText('Cools the spice')).toBeVisible();
+    await expect(
+      suggested('Sweet Lassi').getByText(t('suggestions.preview.layer.RULE'), { exact: true }),
+    ).toBeVisible();
+
+    // Sweet Lassi is blocked: never suggested, whatever the rules say.
+    await page.getByRole('button', { name: t('suggestions.dishes.add') }).click();
+    await dishDialog.getByRole('combobox').selectOption({ label: 'Sweet Lassi' });
+    await dishDialog
+      .getByRole('radio', { name: t('suggestions.dishes.dialog.choice.BLOCK') })
+      .check();
+    await dishDialog.getByLabel(reason).fill('Out of curd today');
+    await dishDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(
+      page.getByText(t('suggestions.dishes.dialog.saved.BLOCK', { name: 'Sweet Lassi' })),
+    ).toBeVisible();
+    await expect(suggested('Sweet Lassi')).toHaveCount(0);
+
+    // Gulab Jamun is pinned with words of its own: first on every table that can serve it.
+    await page.getByRole('button', { name: t('suggestions.dishes.add') }).click();
+    await dishDialog.getByRole('combobox').selectOption({ label: 'Gulab Jamun' });
+    await expect(
+      dishDialog.getByRole('radio', { name: t('suggestions.dishes.dialog.choice.PIN') }),
+    ).toBeChecked();
+    await dishDialog
+      .getByLabel(new RegExp(`^${escape(t('suggestions.dishes.dialog.label'))}`))
+      .fill('Fresh today');
+    await expectAccessible(page);
+    await dishDialog.getByRole('button', { name: t('settings.dialog.save') }).click();
+    await expect(
+      page.getByText(t('suggestions.dishes.dialog.saved.PIN', { name: 'Gulab Jamun' })),
+    ).toBeVisible();
+    await expect(preview.getByRole('heading', { level: 4 }).first()).toHaveText('Gulab Jamun');
+    await expect(suggested('Gulab Jamun').getByText('Fresh today')).toBeVisible();
+    await expect(
+      suggested('Gulab Jamun').getByText(t('suggestions.preview.layer.PINNED'), { exact: true }),
+    ).toBeVisible();
+    await expect(
+      dishes.getByText(t('suggestions.dishes.shows', { text: 'Fresh today' })),
+    ).toBeVisible();
+    await expect(
+      dishes.getByText(t('suggestions.dishes.preference.BLOCK'), { exact: true }),
+    ).toBeVisible();
+    await expectAccessible(page);
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // Both dishes back as usual, and the rule removed with a reason.
+    for (const name of ['Gulab Jamun', 'Sweet Lassi']) {
+      await dishes
+        .getByRole('button', { name: t('suggestions.dishes.changeLabel', { name }), exact: true })
+        .click();
+      const change = page.getByRole('dialog', {
+        name: t('suggestions.dishes.dialog.title', { name }),
+      });
+      await change
+        .getByRole('radio', { name: t('suggestions.dishes.dialog.choice.NORMAL') })
+        .check();
+      await change.getByRole('button', { name: t('settings.dialog.save') }).click();
+      await expect(
+        page.getByText(t('suggestions.dishes.dialog.saved.NORMAL', { name })),
+      ).toBeVisible();
+    }
+    await expect(page.getByText(t('suggestions.dishes.none'))).toBeVisible();
+    await expect(suggested('Sweet Lassi').getByText('Cools the spice')).toBeVisible();
+    await page
+      .getByRole('group', { name: t('suggestions.rules.row.actionsFor', { title: ruleTitle }) })
+      .getByRole('button', { name: t('suggestions.rules.row.archive') })
+      .click();
+    const remove = page.getByRole('dialog', { name: t('suggestions.rules.archiveDialog.title') });
+    await remove
+      .getByLabel(new RegExp(`^${escape(t('suggestions.rules.archiveDialog.reason'))}`))
+      .fill('Summer menu over');
+    await remove
+      .getByRole('button', { name: t('suggestions.rules.archiveDialog.confirm') })
+      .click();
+    await expect(page.getByText(t('suggestions.rules.archived'))).toBeVisible();
+    await expect(page.getByText(t('suggestions.rules.none'))).toBeVisible();
+    await expect(page.getByText('Cools the spice')).toHaveCount(0);
+  });
 });

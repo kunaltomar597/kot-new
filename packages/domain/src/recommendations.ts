@@ -5,8 +5,10 @@ import { DomainError } from './errors.js';
  * The recommendation engine's logic (P3-04, REC-001 to REC-007, NFR-M02): the restaurant's own
  * rules first, then pairings learned from its orders (P6-02), then its best sellers for the time
  * of day, each filtered the same way (REC-005) and each with the reason it is suggested (REC-006).
- * The input is the table's order, never a person's history (REC-007). The server loads the data,
- * counts the best sellers and calls `recommend`; the phones and the tablet only show the result.
+ * The manager's pinned dishes come before all of them, boosted ones before the best sellers, and
+ * blocked ones never (REC-009, P4-03c). The input is the table's order, never a person's history
+ * (REC-007). The server loads the data, counts the best sellers and calls `recommend`; the phones
+ * and the tablet only show the result.
  */
 
 export const RECO_CHANNELS = ['POS', 'WAITER_APP', 'TABLE_TABLET', 'QR'] as const;
@@ -14,9 +16,37 @@ export type RecoChannel = (typeof RECO_CHANNELS)[number];
 
 export type RecoFoodType = 'VEG' | 'NON_VEG' | 'EGG';
 
-/** Where a suggestion came from, highest precedence first (REC-001). */
-export const RECOMMENDATION_LAYERS = ['RULE', 'LEARNED', 'BEST_SELLER'] as const;
+/**
+ * Where a suggestion came from, highest precedence first: the three layers of REC-001, with the
+ * manager's pinned dishes before them and boosted ones before the best sellers (REC-009).
+ */
+export const RECOMMENDATION_LAYERS = [
+  'PINNED',
+  'RULE',
+  'LEARNED',
+  'BOOSTED',
+  'BEST_SELLER',
+] as const;
 export type RecommendationLayer = (typeof RECOMMENDATION_LAYERS)[number];
+
+/**
+ * How the manager wants a dish suggested (REC-009): pinned dishes come first wherever they can be
+ * served, boosted ones before the best sellers and first among a rule's or a pairing's, and
+ * blocked ones never. Every other dish is suggested as the layers find it.
+ */
+export const ITEM_PREFERENCES = ['PIN', 'BOOST', 'BLOCK'] as const;
+export type ItemPreference = (typeof ITEM_PREFERENCES)[number];
+
+/** One dish's preference (REC-009). */
+export interface ItemPreferenceDef {
+  readonly itemId: string;
+  readonly preference: ItemPreference;
+  /**
+   * The restaurant's own words shown with a pinned or boosted dish ("Chef's special"); null for
+   * the standard reason.
+   */
+  readonly label: string | null;
+}
 
 /** The time-of-day windows best sellers are counted in (REC-004, `reco.dayparts` ⚙). */
 export const DAYPARTS = ['BREAKFAST', 'LUNCH', 'EVENING', 'DINNER'] as const;
@@ -99,7 +129,9 @@ export type RecommendationReason =
       readonly becauseOf: string;
     }
   | { readonly kind: 'LEARNED'; readonly becauseOf: string }
-  | { readonly kind: 'BEST_SELLER'; readonly daypart: Daypart | null };
+  | { readonly kind: 'BEST_SELLER'; readonly daypart: Daypart | null }
+  /** Pinned or boosted by the restaurant (REC-009), in its own words when it gave some. */
+  | { readonly kind: 'PINNED' | 'BOOSTED'; readonly label: string | null };
 
 export interface Recommendation {
   readonly itemId: string;
@@ -113,6 +145,8 @@ export interface RecommendationInput {
   readonly rules: readonly RecommendationRuleDef[];
   /** Empty until learned pairings exist (P6-02, REC-003). */
   readonly learned?: readonly LearnedPair[];
+  /** The manager's pinned, boosted and blocked dishes (REC-009); none when left out. */
+  readonly preferences?: readonly ItemPreferenceDef[];
   /** The best sellers of the time of day now (all day when `daypart` is null), in any order. */
   readonly bestSellers: readonly ItemCount[];
   readonly daypart: Daypart | null;
@@ -170,11 +204,13 @@ export function ruleIsOn(
 }
 
 /**
- * Up to `limit` suggestions for a table, in order: the rules its order triggers (by priority),
- * then learned pairings, then best sellers; a lower layer fills the places a higher one leaves.
- * Every layer drops what cannot be served on this channel now (not available, sold out, archived),
- * what is in the order already unless repeatable, and anything not veg when the table shows veg
- * only; within a layer the next course comes first (REC-005). No item is suggested twice.
+ * Up to `limit` suggestions for a table, in order: the dishes the manager pinned, the rules its
+ * order triggers (by priority), learned pairings, the dishes the manager boosted, then best
+ * sellers; a lower layer fills the places a higher one leaves. Every layer drops what cannot be
+ * served on this channel now (not available, sold out, archived), what is in the order already
+ * unless repeatable, anything not veg when the table shows veg only (REC-005), and what the
+ * manager blocked (REC-009); within a layer the next course comes first, then boosted dishes. No
+ * item is suggested twice.
  */
 export function recommend(input: RecommendationInput): Recommendation[] {
   if (!Number.isInteger(input.limit) || input.limit < 0) {
@@ -186,6 +222,11 @@ export function recommend(input: RecommendationInput): Recommendation[] {
   const categories = new Map(input.categories.map((category) => [category.id, category]));
   const courses = courseIndexes(input.categories, input.courseSequence);
   const sold = new Map(input.bestSellers.map((count) => [count.itemId, count.quantity]));
+  const preferences = new Map((input.preferences ?? []).map((entry) => [entry.itemId, entry]));
+  const preferenceOf = (itemId: string): ItemPreference | undefined =>
+    preferences.get(itemId)?.preference;
+  /** 0 for a boosted dish, 1 for any other: boosted first among equals (REC-009). */
+  const boostRank = (itemId: string): number => (preferenceOf(itemId) === 'BOOST' ? 0 : 1);
 
   /** An item's category and the category above it, if any. */
   const categoriesOf = (item: RecoItem): string[] => {
@@ -222,6 +263,7 @@ export function recommend(input: RecommendationInput): Recommendation[] {
   };
   const byCourseThenSales = (a: RecoItem, b: RecoItem): number =>
     courseRank(a) - courseRank(b) ||
+    boostRank(a.id) - boostRank(b.id) ||
     (sold.get(b.id) ?? 0) - (sold.get(a.id) ?? 0) ||
     a.name.localeCompare(b.name, 'en-IN') ||
     a.id.localeCompare(b.id);
@@ -232,7 +274,8 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     item.stockCount !== 0 &&
     item.channels.includes(input.channel) &&
     (!input.vegOnly || item.foodType === 'VEG') &&
-    (item.repeatable || !ordered.has(item.id));
+    (item.repeatable || !ordered.has(item.id)) &&
+    preferenceOf(item.id) !== 'BLOCK';
 
   const chosen: Recommendation[] = [];
   const taken = new Set<string>();
@@ -242,7 +285,7 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     chosen.push({ itemId: item.id, layer, reason });
   };
   const byCategory = new Map<string, RecoItem[]>();
-  /** A category's items with its sub-categories', the next course and the best sold first. */
+  /** A category's items with its sub-categories', the next course, boosted and best sold first. */
   const inCategory = (categoryId: string): RecoItem[] => {
     let found = byCategory.get(categoryId);
     if (found === undefined) {
@@ -253,6 +296,20 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     }
     return found;
   };
+
+  /** The manager's dishes with a preference, the next course and the best sold first. */
+  const preferred = (preference: ItemPreference): RecoItem[] =>
+    input.items.filter((item) => preferenceOf(item.id) === preference).sort(byCourseThenSales);
+  const featured = (item: RecoItem, kind: 'PINNED' | 'BOOSTED'): RecommendationReason => ({
+    kind,
+    label: preferences.get(item.id)?.label ?? null,
+  });
+
+  // Before every layer: the dishes the manager pinned, wherever they can be served (REC-009).
+  for (const item of preferred('PIN')) {
+    if (chosen.length >= input.limit) break;
+    take(item, 'PINNED', featured(item, 'PINNED'));
+  }
 
   // Layer 1: the restaurant's rules, highest priority first (REC-002).
   const rules = input.rules
@@ -281,10 +338,10 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     }
   }
 
-  // Layer 2: pairings learned from this restaurant's orders, strongest first (P6-02).
+  // Layer 2: pairings learned from this restaurant's orders, boosted then strongest first (P6-02).
   const learned = [...(input.learned ?? [])]
     .filter((pair) => ordered.has(pair.fromItemId))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => boostRank(a.toItemId) - boostRank(b.toItemId) || b.score - a.score);
   for (const pair of learned) {
     if (chosen.length >= input.limit) break;
     const from = items.get(pair.fromItemId);
@@ -292,6 +349,12 @@ export function recommend(input: RecommendationInput): Recommendation[] {
     if (from !== undefined && item !== undefined) {
       take(item, 'LEARNED', { kind: 'LEARNED', becauseOf: from.name });
     }
+  }
+
+  // Then the dishes the manager boosted, before the best sellers (REC-009).
+  for (const item of preferred('BOOST')) {
+    if (chosen.length >= input.limit) break;
+    take(item, 'BOOSTED', featured(item, 'BOOSTED'));
   }
 
   // Layer 3: best sellers of the time of day, the next course first (REC-004).

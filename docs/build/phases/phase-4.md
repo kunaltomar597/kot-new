@@ -325,13 +325,54 @@ As built:
   to 90 seconds and the rules say so, the page fits a 360 px phone, and he puts the factory rule
   back. The page and the dialog pass axe.
 
-### P4-03c Recommendation rules with boost, pin and block
+### P4-03c Recommendation rules with boost, pin and block (done)
 
 Requirements: REC-002, REC-009 (S), REC-006.
 Deliverables: the Recommendations page: rules (if the order has item or category X, suggest item or
 category Y, with priority, time window, dates, channels and label), pause, archive with a reason;
 boost, pin and block per item (new in `@rp/domain`, contracts and server, audited).
 Acceptance: a blocked item is never suggested, a pinned one comes first; Playwright.
+
+As built:
+
+- Domain (`recommendations.ts`): `ITEM_PREFERENCES` (PIN, BOOST, BLOCK) and two new layers in
+  `RECOMMENDATION_LAYERS`, now PINNED, RULE, LEARNED, BOOSTED, BEST_SELLER. `recommend` takes the
+  dishes' `preferences`: pinned dishes come first wherever they can be served (the next course and
+  the best sold first among them); boosted ones come before the best sellers and first among a
+  rule's, a pairing's and a category's dishes of the same course; blocked ones are never
+  suggested, whatever a rule says. A pinned or boosted suggestion's reason is
+  `{ kind: 'PINNED' | 'BOOSTED', label }`; `@rp/ordering` `describeRecommendation` shows the
+  label or "Our pick" (`reco.reason.pick`).
+- Contracts: `RecommendationPreference` (NORMAL, PIN, BOOST, BLOCK),
+  `RecommendationPreferenceRequest` (the preference, a label of up to 60 characters for a pinned
+  or boosted dish only, an optional reason), `RecommendationPreferenceView`, the list response,
+  and the routes `listRecommendationPreferences` (`GET /recommendation-preferences`) and
+  `setRecommendationPreference` (`PUT /recommendation-preferences/:itemId`).
+- Server: `recommendation_preferences` (one row per dish, changed in place and back to NORMAL
+  rather than deleted; a label only for PIN and BOOST, checked by the database too) and the
+  PINNED and BOOSTED values in the `RecommendationLayer` enum in their order (migration
+  `20261006000000_recommendation_preferences`). `RecommendationPreferencesService` lists the
+  active dishes that are not NORMAL and sets one (OPERATIONS_CONFIGURE; only an active dish, 404
+  `ITEM_NOT_FOUND`), locked while it changes and audited on the dish
+  (`RECOMMENDATION_PREFERENCE_CHANGED`, before, after, reason); suggestions read the preferences
+  on every request, so a change applies at once without publishing the menu. A rule change that
+  only reorders its channels is no change.
+- Console: Settings has a third page, Suggestions (`/manage/settings/suggestions`). It lists the
+  rules ("If the order has Paneer Tikka, suggest Sweet Lassi", the words shown with it, priority,
+  hours, dates and places) with Change, Pause or Turn on, and Remove with a reason; the rule
+  dialog chooses a dish or any dish of a category for each side from the published menu, the
+  priority, the places, optional hours and dates and the words, checked as the server checks
+  them. The dishes list shows the pinned, boosted and blocked dishes with their words; the dish
+  dialog pins, boosts, blocks or puts one back as usual with an optional reason. The preview asks
+  the server what a table tablet, the QR menu, the waiter app or the POS would suggest now, with
+  nothing or a chosen dish in the order, and shows each suggestion's reason and layer; it reads
+  again after every change. Before the first publish the page says to publish the menu.
+- Playwright: Vikram (Manager) adds "If the order has Paneer Tikka, suggest Sweet Lassi" with "Cools
+  the spice", and the preview with Paneer Tikka ordered shows Sweet Lassi with those words as "Your
+  rule"; once Sweet Lassi is blocked it leaves the preview; Gulab Jamun, pinned with "Fresh today",
+  comes first, "Pinned", with its words; the page fits a 360 px phone; then both dishes are set back
+  to as usual, Sweet Lassi is suggested again, and the rule is removed with a reason. The page and
+  both dialogs pass axe.
 
 ### P4-03d Floor, stations and printers
 

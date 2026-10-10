@@ -504,14 +504,23 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   POS (`GET /api/v1/recommendations`, ORDER_CREATE, a table session or a takeaway cart) and the
   table tablet (`GET /api/v1/devices/current/recommendations`, its own open table). It loads the
   published menu with live availability (a combo outside its hours counts as unavailable), the
-  active rules, the table's sent and pending lines plus the cart, and calls `@rp/domain`
-  `recommend` at the restaurant's local time (`RECOMMENDATION_CLOCK`, replaced in tests).
+  active rules, the pinned, boosted and blocked dishes, the table's sent and pending lines plus
+  the cart, and calls `@rp/domain` `recommend` at the restaurant's local time
+  (`RECOMMENDATION_CLOCK`, replaced in tests).
 - `best-sellers.ts` ranks quantities over `reco.bestSellerDays` business dates in the daypart's
   hours (`reco.dayparts`), counting top-level lines that reached the kitchen; each ranking is
   cached for ten minutes and refreshed in the background. Tests that add orders and need them
   counted at once call `BestSellers.invalidate()`.
 - `recommendation-rules.service.ts`: the rules API (`/api/v1/recommendation-rules`,
-  OPERATIONS_CONFIGURE), audited; rules are archived, never deleted.
+  OPERATIONS_CONFIGURE), audited; rules are archived, never deleted. A change that only reorders
+  a rule's channels is no change.
+- `recommendation-preferences.service.ts` (P4-03c, REC-009): the dishes pinned, boosted or blocked
+  (`GET /api/v1/recommendation-preferences`, `PUT /api/v1/recommendation-preferences/:itemId`,
+  OPERATIONS_CONFIGURE). One row per dish in `recommendation_preferences`, changed in place and
+  back to NORMAL rather than deleted, locked while it changes; each change is audited on the dish
+  (`RECOMMENDATION_PREFERENCE_CHANGED`, before, after, reason) and applies to the next suggestions
+  without publishing the menu. Only an active dish can be set (404 `ITEM_NOT_FOUND`); the list
+  leaves out archived dishes and NORMAL ones.
 - Tracking: `POST .../recommendations/events` records IMPRESSION, TAP and ADD_TO_CART (at most 50
   a call); `recommendation-orders.ts` is the durable consumer that records ORDERED for each order
   line sent with its `recommendation`, once per line.
