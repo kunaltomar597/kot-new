@@ -65,10 +65,14 @@ export interface RealtimeConnectionOptions extends RealtimeHandlers {
 }
 
 const SEEN_LIMIT = 2_000;
-/** Refusals worth retrying as they are: the server is starting or had a hiccup. */
+/**
+ * Refusals worth retrying as they are: the server is starting or had a hiccup, or the device had
+ * too many connections (its old ones close in the meantime).
+ */
 const TRANSIENT = new Set<string>([
   REALTIME_CONNECT_ERRORS.starting,
   REALTIME_CONNECT_ERRORS.internalError,
+  REALTIME_CONNECT_ERRORS.tooManyConnections,
 ]);
 
 /**

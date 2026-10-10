@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { configureApp, httpsOptionsFor, NEST_APP_OPTIONS } from '../../src/app.factory.js';
+import { DEFAULT_SERVER_LIMITS, type ServerLimits } from '../../src/http/flood-limits.js';
 import { LOG_DESTINATION, type LogDestination } from '../../src/config/config.module.js';
 import { AppModule } from '../../src/app.module.js';
 import { type AppConfig, AppConfigSchema } from '../../src/config/app-config.js';
@@ -50,8 +51,16 @@ export async function createTestApp(options: {
   beforeInit?: (app: INestApplication) => void;
   /** The port to listen on (default: any free one), e.g. to start again where clients expect. */
   port?: number;
+  /**
+   * The address to listen on (default 127.0.0.1); `::` takes both 127.0.0.1 and ::1, two
+   * addresses for the flood tests (PC-D3).
+   */
+  host?: string;
+  /** The server's flood limits (PC-D3), over the production defaults. */
+  serverLimits?: Partial<ServerLimits>;
 }): Promise<INestApplication> {
   const config = testConfig({ databaseUrl: options.databaseUrl, ...options.config });
+  const limits: ServerLimits = { ...DEFAULT_SERVER_LIMITS, ...options.serverLimits };
   let builder = Test.createTestingModule({
     imports: [AppModule.forRoot(config)],
     controllers: options.controllers ?? [],
@@ -64,16 +73,16 @@ export async function createTestApp(options: {
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication({
     ...NEST_APP_OPTIONS,
-    ...(config.tls && { httpsOptions: await httpsOptionsFor(config) }),
+    ...(config.tls && { httpsOptions: await httpsOptionsFor(config, limits) }),
   });
-  configureApp(app);
+  configureApp(app, limits);
   options.beforeInit?.(app);
   await app.init();
   // Always on a port of its own at 127.0.0.1. Left alone, supertest listens on the IPv6 wildcard
   // for each request and then connects to 127.0.0.1, where another process (a test database,
   // a relay function under Deno) may hold the same port number: macOS lets a wildcard and a
   // specific address share it, and the request then ends in "socket hang up".
-  await app.listen(options.port ?? 0, '127.0.0.1');
+  await app.listen(options.port ?? 0, options.host ?? '127.0.0.1');
   return app;
 }
 

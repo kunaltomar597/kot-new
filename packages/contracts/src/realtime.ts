@@ -118,4 +118,9 @@ export const REALTIME_CONNECT_ERRORS = {
   internalError: 'INTERNAL_ERROR',
   /** The app's client API is older than the server serves (UPD-006): update the app; no retry. */
   clientTooOld: 'CLIENT_TOO_OLD',
+  /**
+   * The device has too many live connections, or opened too many in the last minute (PC-D3); the
+   * app retries later, by when its old connections have closed.
+   */
+  tooManyConnections: 'TOO_MANY_CONNECTIONS',
 } as const;

@@ -610,6 +610,34 @@ later runs copy the restaurant in about 30 s. With `pg_stat_statements` loaded i
 the busiest statements of a rush are a query away. The server's log is in the run's data folder. A
 short version runs in the integration suite on every build (`test/integration/load-rush.int.test.ts`).
 
+## Floods from the LAN (P8-03c2a, PC-D3)
+
+A host on the staff network must not be able to hold the server's connections, keep it busy, or
+stall another device's screen. `src/http/flood-limits.ts` (`limitFloods`, applied by `configureApp`;
+the mechanisms in `src/common/flood-limits.ts`, shared with the pager broker) sets, per
+`DEFAULT_SERVER_LIMITS`:
+
+- every TCP connection counted before its TLS handshake: 256 open per address, 4,096 in all, and
+  an address opens 120 at once then 20 a second; past that the connection is closed at once;
+- requests: 400 at once then 100 a second per address; past that 429 `RATE_LIMITED` with
+  `Retry-After: 1` and `Connection: close`;
+- Node's timers: the TLS handshake and a request's headers within 10 s (checked every second;
+  HTTPS only, since Node takes the interval when it creates the server), a whole request within
+  300 s, 5 s idle between requests; and every connection closed when the server stops
+  (`forceCloseConnections`), since Node stops timing out the others once it begins closing.
+
+The PC's own address is never limited (the POS window, the set-up checks, the load test, the DAST
+scan). On the socket (`RealtimeOptions`): 16 live connections and 60 handshakes a minute per device,
+counted after the token's signature is checked and before the database is asked, refused with
+`TOO_MANY_CONNECTIONS` (the apps retry); a connection with over 1,000 messages waiting and none
+written since the last sweep (3 s), or over 10,000, has its TCP connection destroyed. Refusals are
+logged once a minute per kind and address or device, with their count.
+
+`test/integration/flood.int.test.ts` floods the server over HTTPS from two addresses of the machine
+(127.0.0.1 and ::1; the server listens on `::` and does not trust its own address there), with
+small limits per test, and once with the production limits from a worker thread while another
+device's screen and requests are timed.
+
 ## Windows services (P0-16b)
 
 On the restaurant PC the server runs under the **service host** (`src/service/service-host.ts`,

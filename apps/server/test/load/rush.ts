@@ -1000,6 +1000,9 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
     );
   }
 
+  /** A dish of the order went off the menu while it waited for its waiter (an availability change). */
+  const ranOut = (error: unknown) => (error as { code?: unknown }).code === 'OUT_OF_STOCK';
+
   // Waiters: their phone's screens, approvals, and what they do when alerted.
   for (const [index, phone] of phones.entries()) {
     const waiter = restaurant.people.waiters[index];
@@ -1019,9 +1022,26 @@ export async function runRush(options: RushOptions): Promise<RushResult> {
           approving.add(order.id);
           react(phone, shape.pace.approve, async () => {
             kitchenAt.set(order.id, performance.now());
-            await phone.call('approveOrder', () =>
-              phone.api.approveOrder({ params: { orderId: order.id }, body: {} }),
-            );
+            try {
+              await phone.call(
+                'approveOrder',
+                () => phone.api.approveOrder({ params: { orderId: order.id }, body: {} }),
+                ranOut,
+              );
+            } catch (error) {
+              if (!ranOut(error)) throw error;
+              // A manager took a dish off while the order waited: the server refuses to send it,
+              // and the waiter turns the order down. It stays out of the ticket check.
+              kitchenAt.delete(order.id);
+              await phone.call('rejectOrder', () =>
+                phone.api.rejectOrder({
+                  params: { orderId: order.id },
+                  body: { reason: 'A dish just ran out' },
+                }),
+              );
+              count('diners’ orders turned down, a dish having run out');
+              return;
+            }
             awaitingApproval.delete(order.id);
             count('diners’ orders approved');
           });

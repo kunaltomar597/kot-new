@@ -439,7 +439,7 @@ view of the site fetches the menu again, which costs the vendor and slows the re
 - Code: `infra/supabase/config.toml`; `apps/qr-menu/src/site/relay.ts`.
 - Tests: none, throttling belongs to the edge in front of the functions and the site.
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03c2 by 2026-10-19: rate limits at the edge (the site's host and
+- Status: Not mitigated. Plan: P8-03c2b by 2026-10-19: rate limits at the edge (the site's host and
   Supabase), checked by the DAST run.
 
 #### RELAY-D5 The relay or the internet down

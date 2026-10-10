@@ -367,7 +367,7 @@ costs.
   `apps/control-plane/test/integration/digital-bills.int.test.ts` "refuses channels the vendor has
   not set up, and more bills than the day allows".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c2 by 2026-10-19: rate limits and a firewall at the edge in
+- Status: Partly mitigated. Plan: P8-03c2b by 2026-10-19: rate limits and a firewall at the edge in
   front of the Control Plane, checked by the DAST run.
 
 #### CP-D2 Locking vendor accounts

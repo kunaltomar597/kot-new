@@ -27,6 +27,8 @@ import { authErrors } from '../auth/auth-errors.js';
 import type { AuthenticatedDevice } from '../auth/device.js';
 import { DeviceTokenAuthenticator } from '../auth/device-token.authenticator.js';
 import type { Principal } from '../auth/principal.js';
+import { RateLimiter } from '../auth/rate-limiter.js';
+import { ThrottledLog } from '../common/flood-limits.js';
 import { SessionService } from '../auth/session.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { AppError } from '../errors/app-error.js';
@@ -47,6 +49,16 @@ export interface RealtimeOptions {
   readonly pingTimeoutMs: number;
   /** Resync requests allowed per connection per minute; more get a full-refresh answer. */
   readonly resyncsPerMinute: number;
+  /** Live connections of one device at once (PC-D3); more are refused until some close. */
+  readonly maxConnectionsPerDevice: number;
+  /** Handshakes of one device per minute (PC-D3): each may replay events under the publish lock. */
+  readonly handshakesPerMinutePerDevice: number;
+  /**
+   * Messages waiting for a connection that stopped reading (PC-D3): past this with nothing
+   * written to it since the last sweep, or past ten times this, the sweep cuts it off; the app
+   * reconnects and resyncs when it reads again.
+   */
+  readonly maxUnsentPerConnection: number;
 }
 
 export const DEFAULT_REALTIME_OPTIONS: RealtimeOptions = {
@@ -58,7 +70,16 @@ export const DEFAULT_REALTIME_OPTIONS: RealtimeOptions = {
   pingIntervalMs: 10_000,
   pingTimeoutMs: 10_000,
   resyncsPerMinute: 10,
+  // An app has one; a browser tab each; a few more while dead ones wait for the ping timeout.
+  maxConnectionsPerDevice: 16,
+  // An app reconnects at most every second or so, even on Wi-Fi that drops and comes back.
+  handshakesPerMinutePerDevice: 60,
+  // A reconnecting app's replay goes out in one flush; a reading app empties this at once.
+  maxUnsentPerConnection: 1_000,
 };
+
+/** Refusals of a device's connections are logged once a minute per device, with their count. */
+const REFUSAL_LOG_PERIOD_MS = 60_000;
 
 const REPLAY_BATCH = 500;
 const MAX_CLIENT_MESSAGE_BYTES = 16 * 1024;
@@ -81,6 +102,10 @@ interface ConnectionData {
   rooms: readonly string[];
   resume: { lastSequence?: number | undefined; streamId?: string | undefined };
   resyncs: number[];
+  /** Messages made for the connection and not yet handed to its transport (PC-D3). */
+  unsent: number;
+  /** Whether messages were handed to its transport since the last sweep. */
+  flushed: boolean;
 }
 
 type RealtimeServer = Server<ClientToServer, ServerToClient, Record<string, never>, ConnectionData>;
@@ -122,6 +147,21 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
   private unsubscribe: (() => void) | undefined;
   private readonly timers: NodeJS.Timeout[] = [];
   private sweeping: Promise<void> | undefined;
+  /** Each device's live connections, and its handshakes in progress (PC-D3). */
+  private readonly liveByDevice = new Map<string, number>();
+  private readonly admittingByDevice = new Map<string, number>();
+  private readonly handshakes = new RateLimiter();
+  private readonly refusals = new ThrottledLog(
+    REFUSAL_LOG_PERIOD_MS,
+    (key, count) => {
+      const [reason, deviceId] = key.split('|') as [string, string];
+      this.logger.warn(
+        { reason, deviceId, count },
+        'Refused or closed a device’s live connections',
+      );
+    },
+    () => performance.now(),
+  );
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -239,36 +279,80 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     if (client !== undefined && clientCompatibility(SERVER_CLIENT_API, client.api) === 'TOO_OLD') {
       throw ConnectRefusal.from(clientTooOld(client));
     }
-    const device = await this.devices.authenticateToken(handshake.data.deviceToken);
-    if (device === undefined) throw ConnectRefusal.from(authErrors.deviceNotRecognised());
-    if (device.type === 'PAGER') {
+    let reserved: string | undefined;
+    try {
+      const device = await this.devices.authenticateToken(
+        handshake.data.deviceToken,
+        ({ deviceId }) => {
+          // Before the database is asked: a device's handshakes and connections are limited.
+          this.reserve(deviceId);
+          reserved = deviceId;
+        },
+      );
+      if (device === undefined) throw ConnectRefusal.from(authErrors.deviceNotRecognised());
+      if (device.type === 'PAGER') {
+        throw new ConnectRefusal(
+          REALTIME_CONNECT_ERRORS.deviceNotAllowed,
+          'Pagers receive their alerts over MQTT, not this connection.',
+        );
+      }
+      // Always checked; without a token it simply fails and the device connects on its own
+      // (CWE-807). A token that is sent must be valid.
+      const accessToken = handshake.data.accessToken ?? '';
+      // A (re)connection is the app's doing, not the person's: it keeps no idle session alive.
+      const session = await this.sessions.authenticate(
+        accessToken,
+        device,
+        Number.POSITIVE_INFINITY,
+      );
+      let principal: Principal | undefined;
+      if ('principal' in session) principal = session.principal;
+      else if (accessToken !== '') throw ConnectRefusal.from(session.failure);
+
+      socket.data = {
+        device,
+        principal,
+        rooms: roomsForConnection({
+          device,
+          ...(principal !== undefined && {
+            person: { staffId: principal.staffId, role: principal.role },
+            sectionIds: await this.sectionsOf(principal),
+          }),
+        }),
+        resume: { lastSequence: handshake.data.lastSequence, streamId: handshake.data.streamId },
+        resyncs: [],
+        unsent: 0,
+        flushed: false,
+      };
+    } finally {
+      if (reserved !== undefined) this.release(this.admittingByDevice, reserved);
+    }
+  }
+
+  /**
+   * Counts a handshake of the device, or refuses it (PC-D3): too many live connections now (the
+   * ones in progress included), or too many handshakes in the last minute.
+   */
+  private reserve(deviceId: string): void {
+    const now =
+      (this.liveByDevice.get(deviceId) ?? 0) + (this.admittingByDevice.get(deviceId) ?? 0);
+    if (
+      now >= this.options.maxConnectionsPerDevice ||
+      !this.handshakes.attempt(deviceId, this.options.handshakesPerMinutePerDevice, 60_000)
+    ) {
+      this.refusals.note(`too-many-connections|${deviceId}`);
       throw new ConnectRefusal(
-        REALTIME_CONNECT_ERRORS.deviceNotAllowed,
-        'Pagers receive their alerts over MQTT, not this connection.',
+        REALTIME_CONNECT_ERRORS.tooManyConnections,
+        'This device has too many live connections. The app will retry.',
       );
     }
-    // Always checked; without a token it simply fails and the device connects on its own
-    // (CWE-807). A token that is sent must be valid.
-    const accessToken = handshake.data.accessToken ?? '';
-    // A (re)connection is the app's doing, not the person's: it keeps no idle session alive.
-    const session = await this.sessions.authenticate(accessToken, device, Number.POSITIVE_INFINITY);
-    let principal: Principal | undefined;
-    if ('principal' in session) principal = session.principal;
-    else if (accessToken !== '') throw ConnectRefusal.from(session.failure);
+    this.admittingByDevice.set(deviceId, (this.admittingByDevice.get(deviceId) ?? 0) + 1);
+  }
 
-    socket.data = {
-      device,
-      principal,
-      rooms: roomsForConnection({
-        device,
-        ...(principal !== undefined && {
-          person: { staffId: principal.staffId, role: principal.role },
-          sectionIds: await this.sectionsOf(principal),
-        }),
-      }),
-      resume: { lastSequence: handshake.data.lastSequence, streamId: handshake.data.streamId },
-      resyncs: [],
-    };
+  private release(counts: Map<string, number>, deviceId: string): void {
+    const left = (counts.get(deviceId) ?? 1) - 1;
+    if (left <= 0) counts.delete(deviceId);
+    else counts.set(deviceId, left);
   }
 
   private refusal(error: unknown): ConnectRefusal {
@@ -307,6 +391,20 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
    * is being published, so it neither misses nor reorders an event.
    */
   private async start(socket: RealtimeSocket): Promise<void> {
+    const { deviceId } = socket.data.device;
+    this.liveByDevice.set(deviceId, (this.liveByDevice.get(deviceId) ?? 0) + 1);
+    socket.once('disconnect', () => {
+      this.release(this.liveByDevice, deviceId);
+    });
+    // Engine.io holds messages back while the transport is still writing earlier ones; a
+    // connection that stops reading makes them pile up here (PC-D3).
+    socket.conn.on('packetCreate', () => {
+      socket.data.unsent += 1;
+    });
+    socket.conn.on('flush', (written: readonly unknown[]) => {
+      socket.data.unsent -= written.length;
+      socket.data.flushed = true;
+    });
     socket.on(REALTIME_MESSAGES.resync, (request: unknown, ack: unknown) => {
       void this.resync(socket, request, ack);
     });
@@ -436,7 +534,7 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
   private async checkConnections(): Promise<void> {
     const namespace = this.namespace;
     if (namespace === undefined) return;
-    const sockets = [...namespace.sockets.values()];
+    const sockets = [...namespace.sockets.values()].filter((socket) => this.reading(socket));
     if (sockets.length === 0) return;
     try {
       // Sessions first, devices second: unpairing revokes the device and its sessions in one
@@ -494,6 +592,24 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     } catch (error) {
       this.logger.warn({ err: error }, 'Could not re-check live connections; will retry');
     }
+  }
+
+  /**
+   * Whether the connection still reads what it is sent; one that stopped while messages piled up
+   * is cut off (PC-D3): many waiting and none written since the last sweep, or far too many. A
+   * paired device that stops reading but answers pings would otherwise keep the server buffering
+   * for it all day. Its TCP connection is destroyed: closing it politely would wait for those
+   * messages to go out first, which they never do.
+   */
+  private reading(socket: RealtimeSocket): boolean {
+    const { unsent, flushed } = socket.data;
+    socket.data.flushed = false;
+    const limit = this.options.maxUnsentPerConnection;
+    // A reading app may have many waiting just after a burst of events; it gets them out.
+    if (unsent <= limit || (flushed && unsent <= limit * 10)) return true;
+    this.refusals.note(`stopped-reading|${socket.data.device.deviceId}`);
+    socket.request.socket.destroy();
+    return false;
   }
 
   /** A device's binding changed (its stations, say): its connections reconnect to new rooms. */
