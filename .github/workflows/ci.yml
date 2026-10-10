@@ -222,6 +222,8 @@ jobs:
       # build never does (the build step refuses it). Never install an unsigned build at a
       # restaurant.
       RP_UPDATE_PUBLISHER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RP_UPDATE_PUBLISHER || '' }}
+      # UPDATE-S2: the authority that issued that certificate (the signer is pinned by both).
+      RP_UPDATE_ISSUER: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RP_UPDATE_ISSUER || '' }}
       RP_ALLOW_UNSIGNED_UPDATES: ${{ (github.event_name != 'push' || github.ref != 'refs/heads/main' || vars.RP_UPDATE_PUBLISHER == '') && '1' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

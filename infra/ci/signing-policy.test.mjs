@@ -27,6 +27,10 @@ describe('[SEC-013] [SEC-006] code signing in CI', () => {
     assert.ok(line(/^\s+environment:.*release-signing/).includes(MAIN));
   });
 
+  it('[UPDATE-S2] pins the signer by its issuer too, on main only', () => {
+    assert.ok(line(/^\s+RP_UPDATE_ISSUER:/).includes(`${MAIN} && vars.RP_UPDATE_ISSUER`));
+  });
+
   it('builds everything else as unsigned test builds that take unsigned updates', () => {
     assert.ok(
       line(/^\s+RP_ALLOW_UNSIGNED_UPDATES:/).includes(

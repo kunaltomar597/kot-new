@@ -37,6 +37,8 @@ param(
     [string] $InstallerPath,
     # UPD-007: the Authenticode signer updates must carry (the code-signing certificate's subject).
     [string] $UpdatePublisher,
+    # UPDATE-S2: the authority that issued that certificate.
+    [string] $UpdateIssuer,
     # A test build only: updates may be unsigned.
     [switch] $AllowUnsignedUpdates,
     [string] $InstallationFile,

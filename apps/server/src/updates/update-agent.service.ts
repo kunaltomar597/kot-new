@@ -252,6 +252,7 @@ export class UpdateAgentService implements OnApplicationBootstrap, OnModuleDestr
     }
     const policy: SignaturePolicy = {
       publisher: this.config.updatePublisher ?? null,
+      issuer: this.config.updateIssuer ?? null,
       allowUnsigned: this.config.updateAllowUnsigned,
     };
     const problem = signaturePolicyProblem(policy);

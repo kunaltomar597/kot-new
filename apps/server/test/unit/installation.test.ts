@@ -383,6 +383,8 @@ describe('[UPD-007] [UPD-005] the set-up tool and updates', () => {
           '1.0.0',
           '--update-publisher',
           'CN=Restaurant Platform Pvt Ltd, C=IN',
+          '--update-issuer',
+          'CN=Real Code Signing CA, O=Real CA, C=US',
           '--allow-unsigned-updates',
           'off',
         ],
@@ -395,10 +397,12 @@ describe('[UPD-007] [UPD-005] the set-up tool and updates', () => {
     let written = await readInstallationFile(file);
     expect(written.updates).toEqual({
       publisher: 'CN=Restaurant Platform Pvt Ltd, C=IN',
+      issuer: 'CN=Real Code Signing CA, O=Real CA, C=US',
       allowUnsigned: false,
     });
     expect(serverEnvironment(written, passwords)).toMatchObject({
       RP_UPDATE_PUBLISHER: 'CN=Restaurant Platform Pvt Ltd, C=IN',
+      RP_UPDATE_ISSUER: 'CN=Real Code Signing CA, O=Real CA, C=US',
     });
     expect(serverEnvironment(written, passwords)).not.toHaveProperty('RP_UPDATE_ALLOW_UNSIGNED');
     expect(await runSetupCli([...base, '--allow-unsigned-updates', 'on'], {}, out)).toBe(0);
@@ -410,6 +414,7 @@ describe('[UPD-007] [UPD-005] the set-up tool and updates', () => {
     // An installation file from before P7-04c checks nothing and allows nothing.
     expect(InstallationFile.parse({ ...installation, updates: undefined }).updates).toEqual({
       publisher: null,
+      issuer: null,
       allowUnsigned: false,
     });
     expect(installationPaths(written).updatesDir).toBe(join(folder, 'data', 'updates'));

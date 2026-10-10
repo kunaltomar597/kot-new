@@ -88,14 +88,23 @@ A compromised Control Plane, or someone between it and the PC, offers an install
 
 Someone obtains a code-signing certificate whose subject reads like the vendor's.
 
-- Mitigation: the signer's subject must match exactly, and the certificate must chain to a root
-  Windows trusts; the issuer and the thumbprint are not checked.
+- Mitigation: the signer's subject must match exactly, the certificate must chain to a root
+  Windows trusts, and its issuer must be the one the installer's build named
+  (`RP_UPDATE_ISSUER`, kept in the installation file as `updates.issuer`), on the PC and in the
+  updater. A signed build is refused without the issuer, so a certificate with the vendor's name
+  from another authority is not accepted. The thumbprint is not pinned, so the vendor can renew
+  its certificate from the same authority without a new installer.
 - Code: `apps/server/src/updates/authenticode.ts` (`judgeSignature`);
-  `infra/installer/windows/RestaurantPlatform.Setup.psm1` (`Test-RPInstallerSignature`).
-- Tests: `apps/server/test/unit/updates.test.ts` "accepts only a valid signature by the vendor".
-- Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03d by 2026-10-22: the signer is pinned by its issuer as well
-  as its subject, on the PC and in the updater.
+  `infra/installer/windows/RestaurantPlatform.Setup.psm1` (`Test-RPInstallerSignature`);
+  `apps/desktop/src/packaging/nsis.ts` (`updateSettingsFrom`);
+  `apps/desktop/src/packaging/release-guard.ts` (`releaseRefusals`).
+- Tests: `apps/server/test/unit/updates.test.ts` "refuses the vendor’s name from another
+  authority"; `infra/installer/windows/tests/SoftwareUpdate.Tests.ps1` "refuses a signer issued by
+  another authority"; `apps/desktop/test/packaging.test.ts` "refuses a signed build that names
+  a signer but not its issuer".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Mitigated (P8-03d2b2a). The variable `RP_UPDATE_ISSUER` is set with the certificate
+  (`docs/runbooks/software-updates.md`).
 
 #### UPDATE-S3 A spoofed update for the phones and tablets
 

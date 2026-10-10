@@ -64,6 +64,8 @@ export const InstallationFile = z.strictObject({
   updates: z
     .strictObject({
       publisher: z.string().min(3).max(500).nullable().default(null),
+      /** The authority that issued the signer's certificate (UPDATE-S2); null: not checked. */
+      issuer: z.string().min(3).max(500).nullable().default(null),
       allowUnsigned: z.boolean().default(false),
     })
     .prefault({}),
@@ -251,6 +253,7 @@ export function serverEnvironment(
   if (installation.updates.publisher !== null) {
     env.RP_UPDATE_PUBLISHER = installation.updates.publisher;
   }
+  if (installation.updates.issuer !== null) env.RP_UPDATE_ISSUER = installation.updates.issuer;
   if (installation.updates.allowUnsigned) env.RP_UPDATE_ALLOW_UNSIGNED = 'on';
   const { controlPlaneUrl, relayUrl, qrSiteUrl, errorDsn } = installation.cloud;
   if (controlPlaneUrl !== undefined) env.RP_CONTROL_PLANE_URL = controlPlaneUrl;

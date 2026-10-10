@@ -44,11 +44,14 @@ export function cloudSettingsFrom(
 
 /**
  * How the installed PC checks updates (UPD-007, P7-04c): the Authenticode signer every update
- * must carry (`RP_UPDATE_PUBLISHER`, the code-signing certificate's subject), or, for a test build
+ * must carry (`RP_UPDATE_PUBLISHER`, the code-signing certificate's subject, and
+ * `RP_UPDATE_ISSUER`, the authority that issued it), or, for a test build
  * only, unsigned updates (`RP_ALLOW_UNSIGNED_UPDATES=1`). Neither: the PC refuses updates.
  */
 export interface UpdateSettings {
   readonly publisher?: string;
+  /** The authority that issued that certificate (`RP_UPDATE_ISSUER`, UPDATE-S2). */
+  readonly issuer?: string;
   readonly allowUnsigned: boolean;
 }
 
@@ -64,7 +67,13 @@ export function updateSettingsFrom(
     if (!/^[^\r\n]{3,500}$/.test(publisher)) {
       throw new Error('RP_UPDATE_PUBLISHER is the certificate subject, e.g. CN=..., O=..., C=IN');
     }
-    return { publisher, allowUnsigned: false };
+    const issuer = env.RP_UPDATE_ISSUER?.trim();
+    if (issuer === undefined || !/^[^\r\n]{3,500}$/.test(issuer)) {
+      throw new Error(
+        'RP_UPDATE_ISSUER is the issuer of the certificate, e.g. CN=..., O=..., C=...: a name alone is not enough to pin the signer',
+      );
+    }
+    return { publisher, issuer, allowUnsigned: false };
   }
   return { allowUnsigned };
 }
@@ -101,6 +110,9 @@ export function nsisDefines(options: NsisDefinesOptions): string {
   const updates = options.updates;
   if (updates?.publisher !== undefined) {
     lines.push(`!define RP_UPDATE_PUBLISHER "${nsisString(updates.publisher)}"`);
+  }
+  if (updates?.issuer !== undefined) {
+    lines.push(`!define RP_UPDATE_ISSUER "${nsisString(updates.issuer)}"`);
   }
   if (updates?.allowUnsigned === true) lines.push('!define RP_ALLOW_UNSIGNED_UPDATES');
   return `${lines.join('\n')}\n`;
