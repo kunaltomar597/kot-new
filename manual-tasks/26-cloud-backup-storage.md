@@ -18,19 +18,30 @@ S3-compatible storage in an Indian region works the same way.
    - Region: **Asia Pacific (Mumbai) ap-south-1** (or Hyderabad ap-south-2). The Control Plane
      refuses any other region in staging and production.
    - Block all public access: on.
-   - Versioning: off (the Control Plane keeps its own retention).
+   - Versioning: **on**.
    - Default encryption: SSE-S3 (the files are already encrypted on the PC; this is a second
      layer).
-   - Object lock: off.
-2. Management, Lifecycle rule "abort incomplete uploads": all objects, "Delete expired object
-   delete markers or incomplete multipart uploads", incomplete uploads after **3 days**. This
-   clears uploads a PC lost its internet in the middle of.
+   - Object Lock: **on** (it can only be turned on when the bucket is created). Then, in
+     Properties, Object Lock, default retention: **Governance** mode, **35 days**. A backup the
+     Control Plane's retention deletes only gets a delete marker; its data stays for 35 days, so
+     nobody holding the Control Plane's access key (or the key of a PC taken over) can destroy the
+     restaurant's last month of backups (threat CP-T2 in
+     `docs/security/threat-models/control-plane.md`).
+2. Management, two lifecycle rules for all objects:
+   - "abort incomplete uploads": "Delete expired object delete markers or incomplete multipart
+     uploads", incomplete uploads after **3 days**. This clears uploads a PC lost its internet in
+     the middle of.
+   - "expire old versions": "Permanently delete noncurrent versions of objects" **36 days** after
+     they become noncurrent, and "Delete expired object delete markers". This is what finally
+     removes a backup the Control Plane's retention deleted.
 3. No CORS rule is needed: the PCs upload from the server, not from a browser.
 
 ## 2. The Control Plane's access
 
 1. IAM, create a user (or, better, a role for the Control Plane's service): `rp-control-plane-backups`.
-2. Attach this policy, with your bucket's name:
+2. Attach this policy, with your bucket's name. It deliberately leaves out
+   `s3:DeleteObjectVersion`, `s3:BypassGovernanceRetention` and `s3:PutObjectRetention`: the
+   Control Plane deletes a backup only as a delete marker, and never shortens the lock.
 
    ```json
    {
@@ -80,8 +91,12 @@ Deploy the Control Plane again.
 3. In the vendor web app, the PC's page shows "Cloud backup: Newest made ...".
 4. In S3, the object `backups/<installation id>/<id>.rpbk` exists, and its size matches the file
    in the PC's `backups\full` folder.
+5. With the access key from section 2, deleting an object's version must be refused: `aws s3api
+delete-object --bucket rp-backups-staging --key <the object's key> --version-id <its version>`
+   answers AccessDenied.
 
 ## Report back
 
-- the bucket's name and region (not the keys);
+- the bucket's name and region (not the keys), and that Object Lock shows Governance, 35 days;
+- whether deleting an object's version was refused (step 4.5);
 - whether step 4 worked, and how long the upload took for the backup's size.

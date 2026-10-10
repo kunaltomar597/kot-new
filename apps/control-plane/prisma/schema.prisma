@@ -54,30 +54,33 @@ enum VendorRole {
 
 /// A vendor staff account (VCP-001, SEC-018): password and authenticator, both mandatory.
 model VendorUser {
-  id             String     @id @db.Uuid
+  id               String     @id @db.Uuid
   /// Lower case.
-  email          String     @unique
-  name           String
-  role           VendorRole
+  email            String     @unique
+  name             String
+  role             VendorRole
   /// Argon2id, peppered with the Control Plane's secret key; null until set up.
-  passwordHash   String?    @map("password_hash")
+  passwordHash     String?    @map("password_hash")
   /// The authenticator's secret, sealed with the Control Plane's secret key.
-  totpSecret     String?    @map("totp_secret")
+  totpSecret       String?    @map("totp_secret")
   /// The last authenticator step used: a code is never accepted twice.
-  totpLastStep   Int?       @map("totp_last_step")
+  totpLastStep     Int?       @map("totp_last_step")
   /// Set when the authenticator was confirmed: only then can the account sign in.
-  activatedAt    DateTime?  @map("activated_at") @db.Timestamptz(3)
+  activatedAt      DateTime?  @map("activated_at") @db.Timestamptz(3)
   /// SHA-256 of the one-time setup token (a new account, or a reset).
-  setupTokenHash String?    @unique @map("setup_token_hash")
-  setupExpiresAt DateTime?  @map("setup_expires_at") @db.Timestamptz(3)
-  failedSignIns  Int        @default(0) @map("failed_sign_ins")
-  lockedUntil    DateTime?  @map("locked_until") @db.Timestamptz(3)
-  disabledAt     DateTime?  @map("disabled_at") @db.Timestamptz(3)
-  lastSignInAt   DateTime?  @map("last_sign_in_at") @db.Timestamptz(3)
+  setupTokenHash   String?    @unique @map("setup_token_hash")
+  setupExpiresAt   DateTime?  @map("setup_expires_at") @db.Timestamptz(3)
+  failedSignIns    Int        @default(0) @map("failed_sign_ins")
+  lockedUntil      DateTime?  @map("locked_until") @db.Timestamptz(3)
+  disabledAt       DateTime?  @map("disabled_at") @db.Timestamptz(3)
+  lastSignInAt     DateTime?  @map("last_sign_in_at") @db.Timestamptz(3)
   /// The last quarterly access review that kept the account (SEC-018).
-  reviewedAt     DateTime?  @map("reviewed_at") @db.Timestamptz(3)
-  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  reviewedAt       DateTime?  @map("reviewed_at") @db.Timestamptz(3)
+  /// A Super Admin's reset asked for by another Super Admin, done only when a third approves.
+  resetRequestedBy String?    @map("reset_requested_by") @db.Uuid
+  resetRequestedAt DateTime?  @map("reset_requested_at") @db.Timestamptz(3)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   sessions VendorSession[]
 
@@ -661,6 +664,7 @@ model CloudBackup {
   installation Installation @relation(fields: [installationId], references: [id])
 
   @@index([installationId, status, backupCreatedAt])
+  @@index([installationId, startedAt])
   @@map("cloud_backups")
 }
 

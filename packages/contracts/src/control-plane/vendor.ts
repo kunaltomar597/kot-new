@@ -94,8 +94,23 @@ export const VendorUserView = z.object({
   /** The last quarterly access review that kept this account (SEC-018). */
   reviewedAt: Timestamp.nullable(),
   createdAt: Timestamp,
+  /**
+   * A Super Admin's account only: the reset another Super Admin asked for, carried out when a
+   * third resets it too before it lapses (threat CP-E3).
+   */
+  resetRequest: z
+    .object({
+      requestedById: Id,
+      requestedBy: z.string(),
+      requestedAt: Timestamp,
+      expiresAt: Timestamp,
+    })
+    .nullable(),
 });
 export type VendorUserView = z.infer<typeof VendorUserView>;
+
+/** Hours a request to reset a Super Admin waits for a second Super Admin. */
+export const VENDOR_RESET_REQUEST_HOURS = 24;
 
 /** Email, password and the authenticator's code together: MFA is never optional (VCP-001). */
 export const VendorSignInRequest = z.strictObject({
@@ -152,6 +167,10 @@ export const VendorSetupTokenView = z.object({
   setupExpiresAt: Timestamp,
 });
 export type VendorSetupTokenView = z.infer<typeof VendorSetupTokenView>;
+
+/** A Super Admin's reset asked for: nothing changed until another Super Admin resets it too. */
+export const VendorResetRequestedView = z.object({ user: VendorUserView });
+export type VendorResetRequestedView = z.infer<typeof VendorResetRequestedView>;
 
 export const UpdateVendorUserRequest = z
   .strictObject({

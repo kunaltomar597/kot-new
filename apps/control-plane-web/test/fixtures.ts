@@ -32,6 +32,7 @@ export function vendorUser(
     lastSignInAt: '2026-10-01T04:30:00.000Z',
     reviewedAt: null,
     createdAt: '2026-09-01T04:30:00.000Z',
+    resetRequest: null,
     ...overrides,
   };
 }

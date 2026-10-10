@@ -12,6 +12,7 @@ import { z } from 'zod';
 import type { AuthenticatedInstallation } from '../auth/installation.guard.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
+import { lockFor } from '../database/advisory-lock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { CpError } from '../errors/cp-error.js';
 import type { DigitalBill } from '../generated/prisma/client.js';
@@ -115,44 +116,46 @@ export class DigitalBillsService implements OnApplicationBootstrap, OnModuleDest
     if (existing?.status === 'SENT') return this.view(existing);
 
     const now = new Date();
-    if (existing === null) {
-      const today = await this.prisma.digitalBill.count({
-        where: {
-          installationId: installation.id,
-          createdAt: { gt: new Date(now.getTime() - DAY_MS) },
-        },
-      });
-      if (today >= this.config.digitalBillDailyLimit) {
-        throw new CpError(
-          429,
-          'DIGITAL_BILL_LIMIT',
-          'This restaurant has sent as many digital bills as it may today. Try again tomorrow.',
-        );
-      }
-    }
     const id = existing?.id ?? newId();
     const expiresAt = existing?.expiresAt ?? new Date(now.getTime() + request.keepDays * DAY_MS);
-    // Kept before it is sent, so the link opens the moment the message arrives.
+    // Kept before it is sent, so the link opens the moment the message arrives. Counted under the
+    // PC's lock, so bills sent together cannot pass the day's number (as menus, threat CP-D3).
     const bill =
       existing === null
-        ? await this.prisma.digitalBill.create({
-            data: {
-              id,
-              installationId: installation.id,
-              requestId: request.id,
-              channel: request.channel,
-              phoneMasked: maskPhone(request.phone),
-              tokenHash: DigitalBillsService.hashOf(this.tokenFor(id)),
-              restaurantName: request.restaurantName,
-              invoiceNumber: request.invoiceNumber,
-              invoiceDate: new Date(request.invoiceDate),
-              grandTotal: request.grandTotal,
-              lines: request.lines,
-              expiresAt,
-              status: 'FAILED',
-              error: 'Being sent.',
-              retryable: true,
-            },
+        ? await this.prisma.transaction(async (tx) => {
+            await lockFor(tx, `digital-bill:${installation.id}`);
+            const today = await tx.digitalBill.count({
+              where: {
+                installationId: installation.id,
+                createdAt: { gt: new Date(now.getTime() - DAY_MS) },
+              },
+            });
+            if (today >= this.config.digitalBillDailyLimit) {
+              throw new CpError(
+                429,
+                'DIGITAL_BILL_LIMIT',
+                'This restaurant has sent as many digital bills as it may today. Try again tomorrow.',
+              );
+            }
+            return tx.digitalBill.create({
+              data: {
+                id,
+                installationId: installation.id,
+                requestId: request.id,
+                channel: request.channel,
+                phoneMasked: maskPhone(request.phone),
+                tokenHash: DigitalBillsService.hashOf(this.tokenFor(id)),
+                restaurantName: request.restaurantName,
+                invoiceNumber: request.invoiceNumber,
+                invoiceDate: new Date(request.invoiceDate),
+                grandTotal: request.grandTotal,
+                lines: request.lines,
+                expiresAt,
+                status: 'FAILED',
+                error: 'Being sent.',
+                retryable: true,
+              },
+            });
           })
         : await this.prisma.digitalBill.update({
             where: { id },

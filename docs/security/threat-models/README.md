@@ -78,10 +78,10 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | [The QR relay and site](qr-relay-and-site.md)           |      29 |        15 |                8 |             4 |        2 |               9 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        14 |                4 |             2 |        1 |              12 |                         1 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        14 |                4 |             1 |        1 |               6 |                         1 |
-| [The Vendor Control Plane](control-plane.md)            |      22 |         8 |               12 |             1 |        1 |               8 |                         1 |
+| [The Vendor Control Plane](control-plane.md)            |      22 |        14 |                7 |             0 |        1 |               8 |                         0 |
 | [The desktop shell](desktop-shell.md)                   |      14 |         5 |                5 |             3 |        1 |               7 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        11 |                5 |             2 |        0 |               5 |                         0 |
-| All                                                     |     195 |       117 |               52 |            16 |       10 |              69 |                         6 |
+| All                                                     |     195 |       123 |               47 |            15 |       10 |              69 |                         5 |
 
 Open threats and their plans, by date:
 
@@ -89,19 +89,12 @@ Open threats and their plans, by date:
 | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
 | [UPDATE-E2](update-pipeline.md#update-e2-a-pull-request-signed-as-the-vendors) A pull request signed as the vendor's                     | Medium   | Partly mitigated | manual task 1  | 2026-10-17 |
 | [UPDATE-T6](update-pipeline.md#update-t6-unreviewed-code-on-main) Unreviewed code on main                                                | High     | Not mitigated    | manual task 1  | 2026-10-17 |
-| [CP-D3](control-plane.md#cp-d3-going-past-the-daily-ai-limit) Going past the daily AI limit                                              | Low      | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [CP-E3](control-plane.md#cp-e3-one-super-admin-taking-over-another) One Super Admin taking over another                                  | Medium   | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [CP-I2](control-plane.md#cp-i2-personal-data-in-diagnostics-bundles) Personal data in diagnostics bundles                                | Low      | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [CP-I3](control-plane.md#cp-i3-secrets-and-links-in-configuration-and-logs) Secrets and links in configuration and logs                  | Low      | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [CP-I4](control-plane.md#cp-i4-one-restaurant-reading-anothers-data) One restaurant reading another's data                               | Medium   | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [CP-S1](control-plane.md#cp-s1-guessing-or-stuffing-vendor-passwords) Guessing or stuffing vendor passwords                              | Medium   | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [CP-T2](control-plane.md#cp-t2-a-compromised-pc-deleting-its-own-cloud-backups) A compromised PC deleting its own cloud backups          | High     | Not mitigated    | P8-03b4        | 2026-10-17 |
-| [RELAY-D1](qr-relay-and-site.md#relay-d1-flooding-a-table-with-orders) Flooding a table with orders                                      | Medium   | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [RELAY-D2](qr-relay-and-site.md#relay-d2-flooding-a-table-with-service-requests) Flooding a table with service requests                  | Low      | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [RELAY-D3](qr-relay-and-site.md#relay-d3-large-bodies-before-any-check) Large bodies before any check                                    | Low      | Not mitigated    | P8-03b4        | 2026-10-17 |
-| [RELAY-E3](qr-relay-and-site.md#relay-e3-the-functions-login-can-provision-restaurants) The functions' login can provision restaurants   | Medium   | Not mitigated    | P8-03b4        | 2026-10-17 |
-| [RELAY-I5](qr-relay-and-site.md#relay-i5-cross-origin-answers-from-the-pcs-function) Cross-origin answers from the PCs' function         | Low      | Partly mitigated | P8-03b4        | 2026-10-17 |
-| [RELAY-T8](qr-relay-and-site.md#relay-t8-other-files-in-the-photo-bucket) Other files in the photo bucket                                | Low      | Partly mitigated | P8-03b4        | 2026-10-17 |
+| [RELAY-D1](qr-relay-and-site.md#relay-d1-flooding-a-table-with-orders) Flooding a table with orders                                      | Medium   | Partly mitigated | P8-03b4b       | 2026-10-17 |
+| [RELAY-D2](qr-relay-and-site.md#relay-d2-flooding-a-table-with-service-requests) Flooding a table with service requests                  | Low      | Partly mitigated | P8-03b4b       | 2026-10-17 |
+| [RELAY-D3](qr-relay-and-site.md#relay-d3-large-bodies-before-any-check) Large bodies before any check                                    | Low      | Not mitigated    | P8-03b4b       | 2026-10-17 |
+| [RELAY-E3](qr-relay-and-site.md#relay-e3-the-functions-login-can-provision-restaurants) The functions' login can provision restaurants   | Medium   | Not mitigated    | P8-03b4b       | 2026-10-17 |
+| [RELAY-I5](qr-relay-and-site.md#relay-i5-cross-origin-answers-from-the-pcs-function) Cross-origin answers from the PCs' function         | Low      | Partly mitigated | P8-03b4b       | 2026-10-17 |
+| [RELAY-T8](qr-relay-and-site.md#relay-t8-other-files-in-the-photo-bucket) Other files in the photo bucket                                | Low      | Partly mitigated | P8-03b4b       | 2026-10-17 |
 | [CP-D1](control-plane.md#cp-d1-flooding-the-control-plane) Flooding the Control Plane                                                    | Low      | Partly mitigated | P8-03c         | 2026-10-19 |
 | [DESKTOP-I1](desktop-shell.md#desktop-i1-script-in-the-console-reading-its-session) Script in the console reading its session            | Low      | Partly mitigated | P8-03c         | 2026-10-19 |
 | [PC-D3](local-server-and-lan.md#pc-d3-flooding-the-server-or-the-socket) Flooding the server or the socket                               | Low      | Partly mitigated | P8-03c         | 2026-10-19 |
@@ -141,6 +134,7 @@ Open threats and their plans, by date:
 | [RELAY-I3](qr-relay-and-site.md#relay-i3-the-relays-own-secrets) The relay's own secrets                                                 | Medium   | Partly mitigated | manual task 20 | 2026-11-30 |
 | [RELAY-I4](qr-relay-and-site.md#relay-i4-diners-privacy) Diners' privacy                                                                 | Low      | Partly mitigated | manual task 21 | 2026-11-30 |
 | [LICENCE-I3](licence-mechanism.md#licence-i3-the-vendors-signing-key-leaking) The vendor's signing key leaking                           | Medium   | Partly mitigated | manual task 23 | 2026-11-30 |
+| [CP-T2](control-plane.md#cp-t2-a-compromised-pc-deleting-its-own-cloud-backups) A compromised PC deleting its own cloud backups          | Low      | Partly mitigated | manual task 26 | 2026-11-30 |
 | [UPDATE-S3](update-pipeline.md#update-s3-a-spoofed-update-for-the-phones-and-tablets) A spoofed update for the phones and tablets        | Medium   | Partly mitigated | manual task 29 | 2026-11-30 |
 | [PAGER-S4](pager-channel.md#pager-s4-firmware-from-a-spoofed-source) Firmware from a spoofed source                                      | Medium   | Partly mitigated | manual task 30 | 2026-11-30 |
 | [DESKTOP-T1](desktop-shell.md#desktop-t1-a-changed-app-or-executable) A changed app or executable                                        | Medium   | Partly mitigated | manual task 31 | 2026-11-30 |

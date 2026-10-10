@@ -127,6 +127,45 @@ describe('[UPD-008] [VCP-007] diagnostics bundles', () => {
     expect(audit.actor).toMatch(/^vendor:/);
   });
 
+  it('[SEC-018] deletes a bundle 30 days after it arrived, audited (threat CP-I2)', async () => {
+    const send = async () =>
+      DiagnosticsUploadResponse.parse(
+        (
+          await signedPost(
+            app,
+            pc,
+            '/v1/diagnostics',
+            JSON.stringify({ bundle: bundle(), note: null, sentBy: null }),
+          )
+        ).body,
+      ).id;
+    const old = await send();
+    const recent = await send();
+    const now = new Date();
+    const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000);
+    await prisma.diagnosticsBundle.update({
+      where: { id: old },
+      data: { receivedAt: daysAgo(31) },
+    });
+    await prisma.diagnosticsBundle.update({
+      where: { id: recent },
+      data: { receivedAt: daysAgo(29) },
+    });
+    expect(await app.get(DiagnosticsService).purge(now)).toBe(1);
+    expect(await prisma.diagnosticsBundle.findUnique({ where: { id: old } })).toBeNull();
+    expect(await prisma.diagnosticsBundle.findUnique({ where: { id: recent } })).not.toBeNull();
+    expect(
+      await prisma.auditEntry.findFirstOrThrow({ where: { action: 'diagnostics.removed' } }),
+    ).toMatchObject({
+      actor: 'system:retention',
+      targetId: pc.id,
+      details: { bundleIds: [old], keptDays: 30 },
+    });
+    const opened = await server().get(`/v1/vendor/diagnostics/${old}`).set(as('SUPPORT'));
+    expect(opened.status).toBe(404);
+    expect(await app.get(DiagnosticsService).purge(now)).toBe(0);
+  });
+
   it('refuses a bundle larger than 4 MB, and one that is not a bundle', async () => {
     const big = await signedPost(
       app,

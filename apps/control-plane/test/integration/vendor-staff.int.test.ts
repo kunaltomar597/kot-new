@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import {
   ApiError,
   VendorMeView,
+  VendorResetRequestedView,
   VendorSessionView,
   VendorSetupTokenView,
   VendorUserListResponse,
@@ -13,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AdminService } from '../../src/admin/admin.service.js';
 import { runCli } from '../../src/cli.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import type { CpError } from '../../src/errors/cp-error.js';
 import { VendorAuthService } from '../../src/vendor/vendor-auth.service.js';
 import { createTestApp, createTestDatabase, httpServer } from '../helpers/test-app.js';
 import {
@@ -69,7 +71,8 @@ describe('[VCP-001] [SEC-018] vendor staff accounts', () => {
     const early = await server()
       .post('/v1/vendor/session')
       .send({ email: 'asha@vendor.example', password: 'whatever it is', code: '000000' });
-    expect([early.status, codeOf(early)]).toEqual([423, 'VENDOR_ACCOUNT_DISABLED']);
+    // As a wrong password is answered: no answer says the account exists (threat CP-S1).
+    expect([early.status, codeOf(early)]).toEqual([401, 'VENDOR_UNAUTHENTICATED']);
     const weak = await server().post('/v1/vendor/setup').send({ token, password: 'short' });
     expect(weak.status).toBe(400);
     const setup = await server()
@@ -156,6 +159,87 @@ describe('[VCP-001] [SEC-018] vendor staff accounts', () => {
     ).toBeGreaterThanOrEqual(6);
   });
 
+  it('counts tries sent together before checking them, and spends a code once', async () => {
+    const auth = app.get(VendorAuthService);
+    const victim = await vendorAccount(app, 'READ_ONLY');
+    const victimId = (await prisma.vendorUser.findUniqueOrThrow({ where: { email: victim.email } }))
+      .id;
+    // Twelve guesses at once (the service, past the address's rate limit): five are checked, the
+    // rest find the account locked.
+    const statusOf = (result: PromiseSettledResult<unknown>) =>
+      result.status === 'rejected' ? (result.reason as CpError).status : 201;
+    const guesses = await Promise.allSettled(
+      Array.from({ length: 12 }, () =>
+        auth.signIn({ email: victim.email, password: 'a wrong password', code: '123456' }, 't'),
+      ),
+    );
+    const statuses = guesses.map(statusOf);
+    expect(statuses.filter((status) => status === 401).length).toBeLessThanOrEqual(5);
+    expect(statuses.filter((status) => status === 423).length).toBeGreaterThanOrEqual(7);
+    expect(
+      await prisma.auditEntry.count({
+        where: { action: 'vendor.sign_in_failed', targetId: victimId },
+      }),
+    ).toBeLessThanOrEqual(5);
+    const right = codeFor(victim);
+    await expect(
+      auth.signIn({ email: victim.email, password: victim.password, code: right.code }, 't'),
+    ).rejects.toMatchObject({ status: 423, code: 'VENDOR_ACCOUNT_LOCKED' });
+
+    // The same code in two sign-ins at once: one session, the other refused.
+    const twice = await vendorAccount(app, 'READ_ONLY');
+    const used = codeFor(twice);
+    const both = await Promise.allSettled(
+      [0, 1].map(() =>
+        auth.signIn(
+          { email: twice.email, password: twice.password, code: used.code },
+          't',
+          used.at,
+        ),
+      ),
+    );
+    expect(both.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(both.find((result) => result.status === 'rejected')).toMatchObject({
+      reason: { code: 'VENDOR_UNAUTHENTICATED' },
+    });
+  });
+
+  it('answers an unknown email, a disabled account and a wrong password alike, locks too', async () => {
+    const auth = app.get(VendorAuthService);
+    const tries = (email: string, password = 'a wrong password') =>
+      auth.signIn({ email, password, code: '123456' }, 't').then(
+        () => undefined,
+        (error: unknown) => error as CpError,
+      );
+    const unknown = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      unknown.push(await tries('nobody@vendor.example'));
+    }
+    const wrong = { status: 401, code: 'VENDOR_UNAUTHENTICATED' };
+    expect(unknown.map((error) => ({ status: error?.status, code: error?.code }))).toEqual([
+      ...Array.from({ length: 5 }, () => wrong),
+      { status: 423, code: 'VENDOR_ACCOUNT_LOCKED' },
+    ]);
+    expect(unknown[0]?.message).toBe('The email, password or code is not right.');
+
+    const gone = await vendorAccount(app, 'SUPPORT');
+    await prisma.vendorUser.update({
+      where: { email: gone.email },
+      data: { disabledAt: new Date() },
+    });
+    const disabled = await tries(gone.email, gone.password);
+    expect({ status: disabled?.status, code: disabled?.code }).toEqual(wrong);
+    expect(disabled?.message).toBe(unknown[0]?.message);
+    expect(
+      await prisma.auditEntry.findFirstOrThrow({
+        where: {
+          action: 'vendor.sign_in_failed',
+          details: { path: ['email'], equals: gone.email },
+        },
+      }),
+    ).toMatchObject({ details: { reason: 'CANNOT_SIGN_IN' } });
+  });
+
   it('lets each role do only what it is for', async () => {
     const reader = await vendorAccount(app, 'READ_ONLY');
     const readerToken = await signInVendor(app, reader);
@@ -213,6 +297,10 @@ describe('[VCP-001] [SEC-018] vendor staff accounts', () => {
       .post(`/v1/vendor/users/${supportId}/reset`)
       .set(bearer(adminToken));
     expect(VendorSetupTokenView.parse(reset.body).user.active).toBe(false);
+    const selfReset = await server()
+      .post(`/v1/vendor/users/${me.user.id}/reset`)
+      .set(bearer(adminToken));
+    expect([selfReset.status, codeOf(selfReset)]).toEqual([409, 'VENDOR_SELF_CHANGE']);
     expect(
       await prisma.auditEntry.count({
         where: {
@@ -220,6 +308,76 @@ describe('[VCP-001] [SEC-018] vendor staff accounts', () => {
         },
       }),
     ).toBeGreaterThanOrEqual(3);
+  });
+
+  it('resets a Super Admin only when two other Super Admins do it, within a day', async () => {
+    const second = await vendorAccount(app, 'SUPER_ADMIN');
+    const secondToken = await signInVendor(app, second);
+    const target = await vendorAccount(app, 'SUPER_ADMIN');
+    const targetToken = await signInVendor(app, target);
+    const targetId = (await prisma.vendorUser.findUniqueOrThrow({ where: { email: target.email } }))
+      .id;
+    const resetAs = (token: string) =>
+      server().post(`/v1/vendor/users/${targetId}/reset`).set(bearer(token));
+
+    const asked = await resetAs(adminToken);
+    expect(asked.status, JSON.stringify(asked.body)).toBe(202);
+    const waiting = VendorResetRequestedView.parse(asked.body).user;
+    const adminRow = await prisma.vendorUser.findUniqueOrThrow({ where: { email: admin.email } });
+    expect(waiting).toMatchObject({
+      active: true,
+      resetRequest: { requestedById: adminRow.id, requestedBy: adminRow.name },
+    });
+    expect(asked.body).not.toHaveProperty('setupToken');
+    // Nothing changed yet: the account still signs in, and asking again changes nothing.
+    expect((await server().get('/v1/vendor/me').set(bearer(targetToken))).status).toBe(200);
+    expect((await resetAs(adminToken)).status).toBe(202);
+    const listed = VendorUserListResponse.parse(
+      (await server().get('/v1/vendor/users').set(bearer(secondToken))).body,
+    ).users.find((user) => user.id === targetId);
+    expect(listed?.resetRequest?.requestedById).toBe(adminRow.id);
+
+    const done = await resetAs(secondToken);
+    expect(done.status, JSON.stringify(done.body)).toBe(200);
+    expect(VendorSetupTokenView.parse(done.body).user).toMatchObject({
+      active: false,
+      resetRequest: null,
+    });
+    expect((await server().get('/v1/vendor/me').set(bearer(targetToken))).status).toBe(401);
+    expect(
+      await prisma.auditEntry.findFirstOrThrow({
+        where: { action: 'vendor.user_reset', targetId },
+      }),
+    ).toMatchObject({ details: { requestedBy: expect.stringMatching(/^vendor:/) as unknown } });
+    expect(
+      await prisma.auditEntry.count({ where: { action: 'vendor.user_reset_requested', targetId } }),
+    ).toBe(1);
+
+    // A request lapses after 24 hours: the next Super Admin then asks afresh.
+    const auth = app.get(VendorAuthService);
+    const other = await vendorAccount(app, 'SUPER_ADMIN');
+    const otherId = (await prisma.vendorUser.findUniqueOrThrow({ where: { email: other.email } }))
+      .id;
+    const first = await auth.authenticate(adminToken);
+    const later = await auth.authenticate(secondToken);
+    const start = new Date();
+    expect((await auth.reset(otherId, first, start)).done).toBe(false);
+    const lapsed = await auth.reset(otherId, later, new Date(start.getTime() + 25 * 3_600_000));
+    expect(lapsed.done).toBe(false);
+    expect(lapsed.view.user.resetRequest?.requestedById).toBe(later.userId);
+
+    // Nor does a request from a Super Admin who has since been disabled.
+    const third = await vendorAccount(app, 'SUPER_ADMIN');
+    const thirdId = (await prisma.vendorUser.findUniqueOrThrow({ where: { email: third.email } }))
+      .id;
+    expect((await auth.reset(thirdId, later)).done).toBe(false);
+    await prisma.vendorUser.update({
+      where: { id: later.userId },
+      data: { disabledAt: new Date() },
+    });
+    const after = await auth.reset(thirdId, first);
+    expect(after.done).toBe(false);
+    expect(after.view.user.resetRequest?.requestedById).toBe(first.userId);
   });
 
   it('records the quarterly access review, disabling every account not kept', async () => {

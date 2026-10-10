@@ -65,20 +65,21 @@ remote settings, digital bills, AI menu reading). Written in P8-03b (2026-10-10)
 
 Someone tries leaked passwords against vendor accounts, or many guesses at once against one.
 
-- Mitigation: sign-in needs the password and the authenticator; five failures lock the account for
-  15 minutes; 20 tries per 15 minutes per address; unknown e-mails take the same time; passwords of
-  12 characters or more. The failure count is read before it is written, so guesses sent in
-  parallel get more than five tries, and an account that is disabled or not set up answers
-  differently.
+- Mitigation: sign-in needs the password and the authenticator; each try is counted in one
+  statement before the password is checked, so guesses sent together get five at most before the
+  account locks for 15 minutes; a code's step is spent only if no other sign-in spent it; 20 tries
+  per 15 minutes per address; passwords of 12 characters or more. An unknown email, a disabled
+  account and one not set up get the answer a wrong password gets, in the same time, and lock
+  after five tries too (counted in each instance's memory, so several instances allow five each).
 - Code: `apps/control-plane/src/vendor/vendor-auth.service.ts` (`VendorAuthService.signIn`,
-  `spendHashTime`); `apps/control-plane/src/auth/rate-limiter.ts` (`RateLimiter`);
+  `lockIfOver`, `spendHashTime`); `apps/control-plane/src/auth/rate-limiter.ts` (`RateLimiter`);
   `packages/contracts/src/control-plane/vendor.ts` (`Password`).
 - Tests: `apps/control-plane/test/integration/vendor-staff.int.test.ts` "signs in only with email,
   password and the authenticator", "never accepts the same code twice, and locks after five
-  failures".
+  failures", "counts tries sent together before checking them, and spends a code once", "answers
+  an unknown email, a disabled account and a wrong password alike, locks too".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: the failure count and the code's step
-  updated atomically, and one answer for unknown, disabled and wrong.
+- Status: Mitigated.
 
 #### CP-S2 A stolen vendor session
 
@@ -159,16 +160,23 @@ Someone records a PC's request and sends it again, or changes its body.
 Ransomware on a restaurant PC, or someone with its key, uploads tiny backups dated in the future;
 retention then keeps those and deletes every real one.
 
-- Mitigation: retention keeps the newest backup of each of the last 30 days and 12 months, by the
-  date the PC sends, which is not checked. The bucket has no versioning or object lock yet.
+- Mitigation: retention keeps the newest backup of each of the last 30 days and 12 months by the
+  time the Control Plane stored it, never by the date the PC gives; a backup dated more than 10
+  minutes after the Control Plane's clock is refused (signed requests already need the PC's clock
+  within 5 minutes); a PC starts 8 files in 24 hours at most, counted under a lock per PC. A
+  compromised PC can therefore replace only the day's own backup: every backup stored before it
+  went wrong stays for its 30 days and months. Someone with the vendor's S3 credentials could still
+  delete objects until the bucket has versioning and an object lock.
 - Code: `apps/control-plane/src/cloud-backups/cloud-backups.service.ts` (`CloudBackupsService`,
-  `prune`); `packages/domain/src/backups.ts` (`backupsToRemove`).
-- Tests: `apps/control-plane/test/integration/cloud-backups.int.test.ts` "takes a backup in parts
-  and stores it byte for byte".
-- Risk: likelihood Medium, impact High: High.
-- Status: Not mitigated. Plan: P8-03b4 by 2026-10-17: a backup's date must be close to the Control
-  Plane's clock, retention goes by the times the Control Plane recorded, and a PC may complete only
-  a few backups a day; the bucket's object lock joins manual task 26.
+  `prune`); `packages/contracts/src/control-plane/cloud-backups.ts` (`CLOUD_BACKUPS_PER_DAY`,
+  `CLOUD_BACKUP_CLOCK_MARGIN_MS`); `packages/domain/src/backups.ts` (`backupsToRemove`).
+- Tests: `apps/control-plane/test/integration/cloud-backups.int.test.ts` "keeps backups by the day
+  the Control Plane stored them, whatever date the PC gives", "refuses a backup dated after the
+  Control Plane’s time", "starts 8 files a day per PC at most, each tried again as often as
+  needed", "keeps the newest of each of the last 30 days and 12 months per PC".
+- Risk: likelihood Low, impact Medium: Low.
+- Status: Partly mitigated. Plan: manual task 26 by 2026-11-30: the bucket with versioning and an
+  object lock (governance mode, 35 days), and no permission to delete an object's versions.
 
 #### CP-T3 Harmful settings or releases from a vendor staffer
 
@@ -275,49 +283,59 @@ Someone at the vendor, or who took the Control Plane, restores a restaurant's da
 Diagnostics bundles hold restaurants' logs and stay at the vendor for ever.
 
 - Mitigation: the PC scrubs the bundle and a manager allows it; lists show only metadata; opening
-  one needs Support and is audited; bundles are limited to 4 MB. They are never deleted, though
-  the access policy promises 30 days.
-- Code: `apps/control-plane/src/diagnostics/diagnostics.service.ts` (`DiagnosticsService`).
+  one needs Support and is audited; bundles are limited to 4 MB; each is deleted 30 days after it
+  arrived, as the access policy says, looked for every hour and audited.
+- Code: `apps/control-plane/src/diagnostics/diagnostics.service.ts` (`DiagnosticsService`,
+  `purge`); `packages/contracts/src/control-plane/diagnostics.ts` (`DIAGNOSTICS_KEEP_DAYS`).
 - Tests: `apps/control-plane/test/integration/diagnostics.int.test.ts` "lists bundles for every
   role, and opens one only for Support, audited", "refuses a bundle larger than 4 MB, and one that
-  is not a bundle".
+  is not a bundle", "deletes a bundle 30 days after it arrived, audited".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: bundles are deleted after 30 days,
-  audited.
+- Status: Mitigated.
 
 #### CP-I3 Secrets and links in configuration and logs
 
 A secret travels in clear, or a digital bill's private link is written to the logs.
 
 - Mitigation: configuration errors name the setting without its value; the database needs TLS and
-  the Control Plane its own key outside development; the request log redacts the authorisation
-  and signature headers; error reports are scrubbed. The AI, WhatsApp and error services may be
-  `http:` in production, and the request log writes a bill's link.
-- Code: `apps/control-plane/src/config/cp-config.ts` (`loadConfig`);
-  `apps/control-plane/src/app.module.ts` (`REDACTED`).
+  the Control Plane its own key outside development, and so does every outside service: the AI
+  provider, WhatsApp, the error service, the alert webhook, S3, the KMS and the public address
+  must be `https:` in staging and production; the request log redacts the authorisation and
+  signature headers and writes a bill's link and a grant's address with their token masked, as
+  does an unexpected error's log line and report; error reports are scrubbed.
+- Code: `apps/control-plane/src/config/cp-config.ts` (`loadConfig`, `OUTSIDE_SERVICES`);
+  `apps/control-plane/src/http/log-redaction.ts` (`maskedRequest`, `REQUEST_LOG_REDACTION`);
+  `apps/control-plane/src/errors/cp-exception.filter.ts` (`CpExceptionFilter`).
 - Tests: `apps/control-plane/test/unit/config.test.ts` "names wrong settings without echoing their
   values", "needs its own secret key in staging and production", "needs TLS to the database in
-  staging and production"; `apps/control-plane/test/integration/error-reporting.int.test.ts`
-  "reports an unexpected error, scrubbed, and answers without internals".
+  staging and production", "reaches every outside service over https in staging and production";
+  `apps/control-plane/test/unit/log-redaction.test.ts` "writes no bill link, grant or credential
+  header"; `apps/control-plane/test/integration/error-reporting.int.test.ts` "reports an
+  unexpected error, scrubbed, and answers without internals".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: https for every outside service in
-  production, and the tokens in bill and grant addresses masked in the request log.
+- Status: Mitigated.
 
 #### CP-I4 One restaurant reading another's data
 
 A restaurant's PC, or a mistake in a query, reaches another restaurant's rows in the shared
 database.
 
-- Mitigation: every installation endpoint scopes its query to the PC's installation and restaurant,
-  and the sweep keeps PCs and vendor staff to their own endpoints. SEC-005 asks for Row-Level
-  Security on every Control Plane table; there is none, and no ADR records the choice.
-- Code: `apps/control-plane/src/auth/installation.guard.ts` (`InstallationGuard`).
-- Tests: `apps/control-plane/test/integration/menu-extractions.int.test.ts` "keeps a draft to its
-  own restaurant"; `apps/control-plane/test/integration/authorisation-sweep.int.test.ts` "keeps
+- Mitigation: every installation endpoint takes the PC's installation and restaurant from the
+  database row behind its signature and scopes its query to them; the ids a PC chooses (heartbeats,
+  digital bills, backup files and keys) are unique per installation; a test calls every PC
+  endpoint with another restaurant's ids and fails for a PC endpoint it has no case for; the sweep
+  keeps PCs and vendor staff to their own endpoints. ADR-0021 records isolation in the application
+  instead of SEC-005's Row-Level Security: the tables have none, so a query that forgets its
+  installation is caught by the test, not the database.
+- Code: `apps/control-plane/src/auth/installation.guard.ts` (`InstallationGuard`);
+  `docs/adr/0021-control-plane-tenant-isolation.md`.
+- Tests: `apps/control-plane/test/integration/tenant-isolation.int.test.ts` "has a case for every
+  endpoint a restaurant PC may call", "leaves the other restaurant’s things as they were";
+  `apps/control-plane/test/integration/menu-extractions.int.test.ts` "keeps a draft to its own
+  restaurant"; `apps/control-plane/test/integration/authorisation-sweep.int.test.ts` "keeps
   restaurant PCs and vendor staff to their own endpoints".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: an ADR for isolation in the application
-  instead of RLS, and a test that calls every PC endpoint with another PC's ids.
+- Status: Mitigated.
 
 #### CP-I5 Requests to an address a caller chooses
 
@@ -338,7 +356,7 @@ costs.
 
 - Mitigation: bodies are limited (64 kB, 5 MB for diagnostics, 28 MB for menus); AI reading and
   digital bills have daily limits per restaurant; the Control Plane sets the heartbeat interval.
-  Rate limits are in each instance's memory, and nothing limits how often a PC uploads.
+  Rate limits are in each instance's memory; a PC starts 8 backup uploads a day at most (CP-T2).
 - Code: `apps/control-plane/src/app.factory.ts`; `apps/control-plane/src/auth/rate-limiter.ts`
   (`RateLimiter`).
 - Tests: `apps/control-plane/test/unit/error-mapping.test.ts` "answers bad JSON, oversized bodies,
@@ -366,13 +384,18 @@ Someone who knows a vendor's e-mail locks the account again and again.
 
 A restaurant sends many menu readings at once and all of them pass the daily limit's count.
 
-- Mitigation: the count is taken outside the transaction that creates the reading.
+- Mitigation: the count is taken under a lock per restaurant, in the transaction that creates the
+  reading, so readings sent together cannot pass the daily number; digital bills are counted the
+  same way per PC.
 - Code: `apps/control-plane/src/menu-import/menu-extractions.service.ts`
-  (`MenuExtractionsService`).
+  (`MenuExtractionsService`); `apps/control-plane/src/digital-bills/digital-bills.service.ts`
+  (`DigitalBillsService`); `apps/control-plane/src/database/advisory-lock.ts` (`lockFor`).
 - Tests: `apps/control-plane/test/integration/menu-extractions.int.test.ts` "holds each restaurant
-  to the daily number, and is off without a key".
+  to the daily number, and is off without a key", "counts readings sent together against the day’s
+  number"; `apps/control-plane/test/integration/digital-bills.int.test.ts` "counts bills sent
+  together against the day’s number".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: the count under a lock per restaurant.
+- Status: Mitigated.
 
 ### Elevation of privilege
 
@@ -411,11 +434,17 @@ what it does not show.
 A Super Admin resets another Super Admin's account and gets the set-up link, so they can sign in as
 them.
 
-- Mitigation: nobody resets their own account or removes the last Super Admin; the reset is
-  audited. The set-up link goes back to the person who reset it.
-- Code: `apps/control-plane/src/vendor/vendor-auth.service.ts` (`reset`).
+- Mitigation: nobody resets or changes their own account or removes the last Super Admin; a Super
+  Admin's account is reset only when two other Super Admins do it within 24 hours: the first asks
+  (nothing changes yet; audited), the second carries the reset out and gets the set-up link
+  (audited with both). Two Super Admins together can still take a third's account; with two Super
+  Admins only, neither can reset the other, and the operator creates a new one with the CLI (the
+  access policy).
+- Code: `apps/control-plane/src/vendor/vendor-auth.service.ts` (`reset`);
+  `packages/contracts/src/control-plane/vendor.ts` (`VENDOR_RESET_REQUEST_HOURS`).
 - Tests: `apps/control-plane/test/integration/vendor-staff.int.test.ts` "adds, changes, disables
-  and resets accounts, never oneself or the last Super Admin".
+  and resets accounts, never oneself or the last Super Admin", "resets a Super Admin only when two
+  other Super Admins do it, within a day"; `apps/control-plane-web/test/admin.test.tsx` "asks for a
+  Super Admin’s reset, and carries out one another Super Admin asked for".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: resetting a Super Admin needs a second
-  Super Admin's approval.
+- Status: Mitigated.

@@ -4545,6 +4545,13 @@ export const en = {
       resetTitle: 'Reset sign-in for {name}?',
       resetIntro:
         'For a lost phone or forgotten password. Their sessions end now, and they set up a new password and authenticator from a new link.',
+      resetSuperAdminIntro:
+        'A Super Admin’s sign-in is reset only when two other Super Admins agree. You ask now; when another Super Admin resets it too within 24 hours, their sessions end and that Super Admin gets the setup link.',
+      resetApproveIntro:
+        '{name} asked to reset this sign-in. If you reset it too, their sessions end now and you get the setup link to give them.',
+      resetAsked: 'Reset asked for by {name} until {until}',
+      resetWaiting: 'Waiting for another Super Admin',
+      resetRequested: 'Reset asked for. Another Super Admin must reset it too within 24 hours.',
       linkTitle: 'Setup link for {name}',
       link: 'Setup link',
       linkHint: 'Give it to them in person or by phone, never by email. It works until {until}.',

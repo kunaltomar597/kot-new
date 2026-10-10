@@ -75,8 +75,9 @@ Vendor staff see business data only through:
      The quarterly access review (§6) checks every restore code against its ticket.
 
 A bundle or restore is handled only for the ticket it was given for, and kept no longer than that
-ticket needs (at most 30 days for a diagnostics bundle). It is never copied to personal devices,
-chat tools or email.
+ticket needs. The Control Plane deletes every diagnostics bundle 30 days after it arrived, and
+audits it (`diagnostics.removed`); a copy taken for a ticket goes with the ticket's closing. A
+bundle or restore is never copied to personal devices, chat tools or email.
 
 ## 4. Roles and least privilege (SEC-018)
 
@@ -108,11 +109,17 @@ possible; when duties change, change the role and record why in the account chan
 - Every account needs a password (at least 12 characters) **and** an authenticator app code
   (TOTP). An account cannot be used until both are set up through its one-time setup link,
   which is valid for 72 hours.
-- Five failed sign-ins lock the account for 15 minutes.
+- Five failed sign-ins lock the account for 15 minutes, however fast they come. A wrong email, a
+  disabled account and a wrong password get the same answer.
 - A session ends after 8 hours, or after 30 minutes without use, or at sign-out.
 - A lost authenticator: a Super Admin resets the account. This ends its sessions and issues a new
   setup link. Hand the link over in person or by phone, never in the same channel as the email
-  address.
+  address. Nobody resets their own account.
+- A Super Admin's account takes two other Super Admins: the first presses Reset (nothing changes
+  yet, and the Staff page shows the request), the second presses Reset within 24 hours and gets
+  the setup link. Keep at least three Super Admins so that one can be reset. With only two, the
+  operator creates a new Super Admin with the CLI on the operator host
+  (`vendor-user:create`, audited as `cli:<name>`), who then disables the old account.
 - Disabling an account ends its sessions at once. Disable an account on the day its holder leaves.
 
 ## 6. Quarterly access review (SEC-018)

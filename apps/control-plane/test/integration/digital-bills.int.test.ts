@@ -183,6 +183,17 @@ describe('[BILL-012] [SEC-002] digital bills', () => {
     expect([over.status, ApiError.parse(over.body).code]).toEqual([429, 'DIGITAL_BILL_LIMIT']);
   });
 
+  it('counts bills sent together against the day’s number', async () => {
+    const busy = await enrolledInstallation(app);
+    const sent = await Promise.all(
+      Array.from({ length: 9 }, () =>
+        signedPost(app, busy, '/v1/digital-bills', JSON.stringify(bill())),
+      ),
+    );
+    expect(sent.filter((response) => response.status === 200)).toHaveLength(6);
+    expect(sent.filter((response) => response.status === 429)).toHaveLength(3);
+  });
+
   it('opens nothing without a signature or with a wrong link', async () => {
     const unsigned = await request(httpServer(app))
       .post('/v1/digital-bills')

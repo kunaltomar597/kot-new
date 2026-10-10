@@ -34,6 +34,7 @@ import { FleetController } from './fleet/fleet.controller.js';
 import { FleetService } from './fleet/fleet.service.js';
 import { RemoteSettingsController } from './remote-settings/remote-settings.controller.js';
 import { RemoteSettingsService } from './remote-settings/remote-settings.service.js';
+import { REQUEST_LOG_REDACTION } from './http/log-redaction.js';
 import { PgRelayProvisioner, RELAY_PROVISIONER } from './support/relay-provisioner.js';
 import { SupportController } from './support/support.controller.js';
 import { SupportService } from './support/support.service.js';
@@ -53,18 +54,6 @@ import {
 } from './menu-import/menu-extractor.js';
 import { ReleasesService } from './releases/releases.service.js';
 import { UpdatesController } from './releases/updates.controller.js';
-
-/** Never logged: signatures, enrolment codes and proofs (SEC-015). */
-const REDACTED = [
-  'req.headers.authorization',
-  'req.headers["x-api-key"]',
-  'req.headers.cookie',
-  'req.headers["x-rp-signature"]',
-  'code',
-  '*.code',
-  'proof',
-  '*.proof',
-];
 
 /** The AI provider for menu import, when its key is set (SEC-002); otherwise import is off. */
 function menuExtractorFor(config: CpConfig): MenuExtractor {
@@ -100,7 +89,7 @@ export class ControlPlaneModule {
               const id = (request as IncomingMessage & { id?: unknown }).id;
               return typeof id === 'string' ? { correlationId: id } : {};
             },
-            redact: { paths: REDACTED, censor: '[REDACTED]' },
+            ...REQUEST_LOG_REDACTION,
             ...(config.logPretty && config.env === 'development'
               ? { transport: { target: 'pino-pretty', options: { singleLine: true } } }
               : {}),

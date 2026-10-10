@@ -10,6 +10,9 @@ import { Id, Timestamp } from '../common.js';
 /** The largest bundle the Control Plane takes, as JSON. */
 export const DIAGNOSTICS_MAX_BYTES = 4 * 1024 * 1024;
 
+/** Days the Control Plane keeps a bundle before deleting it (the vendor access policy). */
+export const DIAGNOSTICS_KEEP_DAYS = 30;
+
 const Scalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
 export const DiagnosticsBundle = z.object({

@@ -1,5 +1,11 @@
-import { Injectable } from '@nestjs/common';
 import {
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common';
+import {
+  DIAGNOSTICS_KEEP_DAYS,
   DIAGNOSTICS_MAX_BYTES,
   DIAGNOSTICS_REQUEST_DAYS,
   type DiagnosticsRequestView,
@@ -52,6 +58,10 @@ function requestView(row: RequestRow, now: Date): DiagnosticsRequestView {
   };
 }
 
+/** How often bundles past their keeping time are looked for. */
+const PURGE_EVERY_MS = 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
+
 const closed = () =>
   new CpError(
     409,
@@ -62,14 +72,61 @@ const closed = () =>
 /**
  * Diagnostics bundles (UPD-008, VCP-007): a PC sends one when its manager allows it; vendor staff
  * list them and open one. Opening is support's only way into a restaurant's logs, so every
- * opening is audited (the vendor access policy).
+ * opening is audited (the vendor access policy). A bundle is deleted 30 days after it arrived,
+ * audited (threat CP-I2); the request it answered keeps its id.
  */
 @Injectable()
-export class DiagnosticsService {
+export class DiagnosticsService implements OnApplicationBootstrap, OnModuleDestroy {
+  private readonly logger = new Logger(DiagnosticsService.name);
+  private timer: NodeJS.Timeout | undefined;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  onApplicationBootstrap(): void {
+    this.timer = setInterval(() => {
+      void this.purge().catch((error: unknown) => {
+        this.logger.warn({ err: error }, 'Old diagnostics bundles stay for now');
+      });
+    }, PURGE_EVERY_MS);
+    this.timer.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.timer !== undefined) clearInterval(this.timer);
+  }
+
+  /** Deletes the bundles kept 30 days, each PC's audited together; returns how many. */
+  async purge(now = new Date()): Promise<number> {
+    const old = await this.prisma.diagnosticsBundle.findMany({
+      where: { receivedAt: { lt: new Date(now.getTime() - DIAGNOSTICS_KEEP_DAYS * DAY_MS) } },
+      select: { id: true, installationId: true },
+      orderBy: { receivedAt: 'asc' },
+      take: 500,
+    });
+    const byInstallation = new Map<string, string[]>();
+    for (const row of old) {
+      byInstallation.set(row.installationId, [
+        ...(byInstallation.get(row.installationId) ?? []),
+        row.id,
+      ]);
+    }
+    for (const [installationId, ids] of byInstallation) {
+      await this.prisma.transaction(async (tx) => {
+        await tx.diagnosticsBundle.deleteMany({ where: { id: { in: ids } } });
+        await this.audit.record(tx, {
+          actor: 'system:retention',
+          action: 'diagnostics.removed',
+          targetType: 'installation',
+          targetId: installationId,
+          details: { bundleIds: ids, keptDays: DIAGNOSTICS_KEEP_DAYS },
+        });
+      });
+    }
+    return old.length;
+  }
 
   async receive(
     installationId: string,

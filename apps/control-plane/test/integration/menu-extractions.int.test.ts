@@ -228,6 +228,14 @@ describe('[ONB-006] [VCP-008] reading a printed menu', () => {
     expect(off.status).toBe(503);
     expect((off.body as { code: string }).code).toBe('AI_IMPORT_UNAVAILABLE');
   });
+
+  it('[SEC-002] counts readings sent together against the day’s number (threat CP-D3)', async () => {
+    // The neighbour has read one today; ten at once leave it at six.
+    const sent = await Promise.all(Array.from({ length: 10 }, () => send(neighbour, [photo()])));
+    expect(sent.filter((response) => response.status === 202)).toHaveLength(5);
+    expect(sent.filter((response) => response.status === 429)).toHaveLength(5);
+    await extractions.settled();
+  });
 });
 
 const ids: Record<string, string> = {};

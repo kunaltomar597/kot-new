@@ -42,6 +42,14 @@ export function accountStatus(user: VendorUserView, now = new Date()): AccountSt
   return 'ACTIVE';
 }
 
+/** What resetting an account does: a Super Admin's takes two other Super Admins. */
+function resetIntro(user: VendorUserView | undefined, t: ReturnType<typeof useT>): string {
+  if (user?.role !== 'SUPER_ADMIN') return t('vendorApp.staff.resetIntro');
+  return user.resetRequest === null
+    ? t('vendorApp.staff.resetSuperAdminIntro')
+    : t('vendorApp.staff.resetApproveIntro', { name: user.resetRequest.requestedBy });
+}
+
 /** The one-time setup link for an account, on this app's own address. */
 export function setupLink(token: string, origin = globalThis.location.origin): string {
   return `${origin}/setup#${token}`;
@@ -424,13 +432,26 @@ export function StaffScreen() {
                   cell: (user) => {
                     const status = accountStatus(user);
                     return (
-                      <Badge tone={STATUS_TONE[status]}>
-                        {status === 'LOCKED'
-                          ? t('vendorApp.staff.state.LOCKED', {
-                              until: when(user.lockedUntil ?? ''),
-                            })
-                          : t(`vendorApp.staff.state.${status}`)}
-                      </Badge>
+                      <>
+                        <Badge tone={STATUS_TONE[status]}>
+                          {status === 'LOCKED'
+                            ? t('vendorApp.staff.state.LOCKED', {
+                                until: when(user.lockedUntil ?? ''),
+                              })
+                            : t(`vendorApp.staff.state.${status}`)}
+                        </Badge>
+                        {user.resetRequest === null ? null : (
+                          <>
+                            <br />
+                            <span className="cp-hint">
+                              {t('vendorApp.staff.resetAsked', {
+                                name: user.resetRequest.requestedBy,
+                                until: when(user.resetRequest.expiresAt),
+                              })}
+                            </span>
+                          </>
+                        )}
+                      </>
                     );
                   },
                 },
@@ -461,7 +482,9 @@ export function StaffScreen() {
                         >
                           {t('vendorApp.staff.change')}
                         </Button>
-                        {user.disabled ? null : (
+                        {user.disabled ? null : user.resetRequest?.requestedById === selfId ? (
+                          <span className="cp-hint">{t('vendorApp.staff.resetWaiting')}</span>
+                        ) : (
                           <Button
                             variant="ghost"
                             aria-label={t('vendorApp.staff.resetFor', { name: user.name })}
@@ -524,7 +547,7 @@ export function StaffScreen() {
         title={t('vendorApp.staff.resetTitle', {
           name: open?.kind === 'reset' ? open.user.name : '',
         })}
-        description={t('vendorApp.staff.resetIntro')}
+        description={resetIntro(open?.kind === 'reset' ? open.user : undefined, t)}
         confirmLabel={t('vendorApp.staff.reset')}
         cancelLabel={t('vendorApp.actions.cancel')}
         tone="danger"
@@ -537,7 +560,9 @@ export function StaffScreen() {
             (reset) => {
               setBusy(false);
               close();
-              setIssued(reset);
+              // A Super Admin's reset waits for another Super Admin (202): nothing to hand out.
+              if ('setupToken' in reset) setIssued(reset);
+              else toast.show({ title: t('vendorApp.staff.resetRequested'), tone: 'success' });
               reload();
             },
             (failure: unknown) => {

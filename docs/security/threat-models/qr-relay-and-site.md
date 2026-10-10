@@ -249,9 +249,9 @@ A PC's credential uploads something that is not a WebP photo to the public bucke
   Supabase configuration also allows JPEG and PNG.
 - Code: `infra/supabase/config.toml`;
   `infra/supabase/migrations/20261002230000_photo_sweep.sql`.
-- Tests: none, the bucket's types are configuration; P8-03b4 makes them agree and tests them.
+- Tests: none, the bucket's types are configuration; P8-03b4b makes them agree and tests them.
 - Risk: likelihood Low, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: WebP only in the configuration too.
+- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: WebP only in the configuration too.
 
 ### Repudiation
 
@@ -352,7 +352,7 @@ The `server` function answers browsers from the QR site's origin, though only PC
 - Code: `infra/supabase/src/http.ts` (`corsHeaders`).
 - Tests: `infra/supabase/test/server-functions.test.ts` "is needed for every call".
 - Risk: likelihood Low, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: the `server` function sends no CORS
+- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: the `server` function sends no CORS
   headers.
 
 ### Denial of service
@@ -369,7 +369,7 @@ diners there cannot order for ten minutes.
   saying when to try again", "limits one browser across tables", "lets no burst slip past the
   limit".
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: rejected orders no longer count against
+- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: rejected orders no longer count against
   the table, and the runbook says to give the table a new code.
 
 #### RELAY-D2 Flooding a table with service requests
@@ -383,7 +383,7 @@ close the last request.
 - Tests: `infra/supabase/test/service-requests.test.ts` "raises one open request of each kind per
   table, whoever presses", "limits one browser".
 - Risk: likelihood Medium, impact Low: Low.
-- Status: Partly mitigated. Plan: P8-03b4 by 2026-10-17: a limit per table and per browser under a
+- Status: Partly mitigated. Plan: P8-03b4b by 2026-10-17: a limit per table and per browser under a
   lock, as orders have.
 
 #### RELAY-D3 Large bodies before any check
@@ -393,9 +393,9 @@ checked.
 
 - Mitigation: bodies over 8 MB are refused, after they were read.
 - Code: `infra/supabase/src/http.ts` (`MAX_BODY_BYTES`).
-- Tests: none, no test sends an oversized body yet; P8-03b4 adds it.
+- Tests: none, no test sends an oversized body yet; P8-03b4b adds it.
 - Risk: likelihood Medium, impact Low: Low.
-- Status: Not mitigated. Plan: P8-03b4 by 2026-10-17: `content-length` refused over the limit, the
+- Status: Not mitigated. Plan: P8-03b4b by 2026-10-17: `content-length` refused over the limit, the
   body read with a cap, and a small cap for diners' functions.
 
 #### RELAY-D4 Unthrottled reads and their cost
@@ -465,7 +465,7 @@ could create or change restaurants and credentials.
 - Code: `infra/supabase/migrations/20261002130000_relay_schema.sql` (`relay_provisioner`).
 - Tests: `infra/supabase/test/roles.test.ts` "lets only the edge functions".
 - Risk: likelihood Low, impact High: Medium.
-- Status: Not mitigated. Plan: P8-03b4 by 2026-10-17: the functions' login loses the provisioning
+- Status: Not mitigated. Plan: P8-03b4b by 2026-10-17: the functions' login loses the provisioning
   role, and the Control Plane gets its own provisioning login (manual task 20 then creates it).
 
 #### RELAY-E4 Deleting records through the relay's roles
