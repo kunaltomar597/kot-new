@@ -51,7 +51,7 @@ afterAll(async () => {
   await database.drop();
 });
 
-describe('[AUD-005] the audit viewer', () => {
+describe('[AUD-005] [MGR-009] the audit viewer', () => {
   it('lists the day’s entries newest first, naming who, where and why', async () => {
     const response = await list({});
     expect(response.status, JSON.stringify(response.body)).toBe(200);

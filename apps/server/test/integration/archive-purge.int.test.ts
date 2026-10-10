@@ -110,7 +110,7 @@ afterAll(async () => {
 });
 
 describe('[DATA-008] [AUD-004] archive-then-purge of a financial year', () => {
-  it('offers whole years oldest first, with the statutory warning', async () => {
+  it('[AUD-007] offers whole years oldest first, with the statutory warning', async () => {
     const view = await archives();
     expect(view.years.map((year) => year.financialYear)).toEqual(['2023-24', '2024-25', '2025-26']);
     expect(view.years[0]).toMatchObject({
@@ -278,7 +278,7 @@ describe('[DATA-008] [AUD-004] archive-then-purge of a financial year', () => {
     }
   }, 120_000);
 
-  it('never lets the application role delete what the purge may (AUD-004)', async () => {
+  it('[AUD-007] never lets the application role delete what the purge may (AUD-004)', async () => {
     const [row] = await admin<{ app: boolean; purge: boolean }>(
       `SELECT has_table_privilege('rp_app', 'invoices', 'DELETE') AS app,
               has_table_privilege('rp_purge', 'invoices', 'DELETE') AS purge`,

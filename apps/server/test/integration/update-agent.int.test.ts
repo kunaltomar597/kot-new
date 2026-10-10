@@ -189,7 +189,7 @@ describe('[UPD-004] [UPD-005] [UPD-007] the update agent', () => {
     expect(fetches).toBe(1);
   });
 
-  it('tries a failed download again later, and refuses a bad signature or another version', async () => {
+  it('[SEC-014] [UPD-007] tries a failed download again later, and refuses a bad signature or another version', async () => {
     // A re-published release (another file) is downloaded again; this attempt fails.
     await saveOfferedUpdate(prisma, release({ sha256: 'b'.repeat(64) }));
     failFetch = true;

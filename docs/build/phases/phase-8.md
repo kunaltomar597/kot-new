@@ -371,4 +371,7 @@ Requirements: BRD §18.3 acceptance, §2 KPIs, R-04 (approval time), R-06.
 Deliverables: `pnpm trace --strict` passes (every Must requirement linked to a passing test); UAT
 plan and results; go-live checklist; KPI measurement plan and dashboards for the pilot (approval
 time, ack time, ready-to-pickup, attach rate, availability); pilot feedback loop.
+Split: P8-06a (done) is the strict trace gate with `docs/build/manual-evidence.json`, the UAT plan,
+go-live checklist and KPI plan in `docs/build/pilot/`; P8-06b is the approval-time and availability
+views, then the pilot itself [H].
 Acceptance: pilot entry criteria met and signed off by the Business Owner.

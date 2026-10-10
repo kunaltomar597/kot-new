@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-11 (P8-05).
+Last updated: 2026-10-11 (P8-06a).
 
 What exists:
 
@@ -412,7 +412,7 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-06 Pilot readiness.
+- P8-06b Pilot KPI views (approval-time report, availability view).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -681,7 +681,9 @@ Recommended next WPs (dependencies met):
   - [x] P8-04b Contextual help and first-use tips (NFR-U07, Should): a Help button and a one-time tip on every dashboard page
   - [ ] P8-04c Usability results from the pilot, TalkBack pass [H]
 - [x] P8-05 Runbooks, manuals, training (Business Owner review and filming the videos remain)
-- [ ] P8-06 Pilot readiness
+- [~] P8-06 Pilot readiness
+  - [x] P8-06a The strict traceability gate, UAT plan, go-live checklist and KPI plan
+  - [ ] P8-06b Pilot KPI views: approval time (R-04), availability over time; then the pilot itself [H]
 
 ## Decisions
 
@@ -4421,6 +4423,10 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P8-06a the pilot gate
+
+`pnpm trace --strict` now passes: Must 277/287 covered by tests, the other 10 listed in `docs/build/manual-evidence.json` (hardware, a signed agreement, a GitHub setting or the pilot itself). Strict mode accepts those as pending evidence, never as covered; it fails if a listed requirement gains a test (remove the entry) or is unknown. Tagged existing tests for ORD-006, ORD-009, MGR-009, AUTH-014, AUD-007, SEC-014. New tests: `apps/server/test/unit/module-boundaries.test.ts` (INT-001, INT-003: the core never imports pagers, recommendations, relay or service requests) and `packages/domain/test/repo-rules.test.ts` (NFR-M02, M03, M04, L01, SEC-016). New docs in `docs/build/pilot/`: `uat-plan.md` (S1-S14 mapped to tests and to the people-and-devices run, role scripts U-01 to U-12), `go-live-checklist.md` (with the evidence table and the Business Owner's sign-off), `kpi-plan.md` (each BRD §2 KPI's source, rhythm, baselines and the feedback loop). Decided: the pilot length stays at the BRD's 4 weeks. Deferred to P8-06b: a report for customer-order approval time (R-04) and an availability-over-time view; the pilot itself needs people. S3, S4, S5 and S14 have no test tagged with their scenario ID; the UAT plan points at the tests that cover them (watchdog, print queue, notifications), so re-tag them if a later session wants a one-to-one map.
 
 ### 2026-10-11: P8-05 runbooks, manuals and training scripts
 

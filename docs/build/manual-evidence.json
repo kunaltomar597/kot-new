@@ -1,0 +1,45 @@
+{
+  "note": "Must requirements that only a person, hardware or a signed agreement can prove. `pnpm trace --strict` accepts them as pending evidence, not as passed: the pilot entry criteria (docs/build/pilot/go-live-checklist.md) list each one and the Business Owner signs it off. Remove an entry when a test covers the requirement.",
+  "entries": {
+    "ONB-008": {
+      "reason": "Remote onboarding is a screen-sharing session the restaurant starts with the vendor.",
+      "evidence": "UAT script U-12 in docs/build/pilot/uat-plan.md, recorded at the pilot."
+    },
+    "TAB-016": {
+      "reason": "First order placed unaided within 2 minutes needs real diners (BRD §7.4).",
+      "evidence": "UAT script U-09 and docs/usability/usability-test-scripts.md, run at the pilot (P8-04c)."
+    },
+    "PGR-002": {
+      "reason": "Battery life of at least 14 hours is measured on the prototype pager.",
+      "evidence": "manual-tasks/10-pager-battery.md (P0-H1)."
+    },
+    "PGR-004": {
+      "reason": "Off-the-shelf watch hardware is chosen by a person after the battery test.",
+      "evidence": "manual-tasks/10-pager-battery.md (P0-H1) and open item OI-04."
+    },
+    "PGR-009": {
+      "reason": "Power management is proved only by the battery test on the device.",
+      "evidence": "manual-tasks/10-pager-battery.md (P0-H1) and manual-tasks/15-pager-firmware.md (P2-05)."
+    },
+    "PGR-010": {
+      "reason": "Secure boot and flash encryption are fused on production hardware with the signing key.",
+      "evidence": "manual-tasks/15-pager-firmware.md (P2-05) and manual-tasks/30-pager-firmware-signing.md."
+    },
+    "LIC-009": {
+      "reason": "The licence states must match the subscription agreement, which the Business Owner signs.",
+      "evidence": "OI-08 in MANUAL_TASKS.md and the Business Owner's sign-off in the go-live checklist."
+    },
+    "UPD-009": {
+      "reason": "A remote screen-sharing session is started by the restaurant; there is no remote shell to test.",
+      "evidence": "UAT script U-12 in docs/build/pilot/uat-plan.md and docs/runbooks/support-playbook.md."
+    },
+    "NFR-M05": {
+      "reason": "Pull request review is a GitHub branch-protection setting, not code.",
+      "evidence": "MANUAL_TASKS.md, GitHub access task (protect main, required reviewers; two for security-sensitive code)."
+    },
+    "NFR-U06": {
+      "reason": "Usability targets are measured in the pilot with at least 5 users per role.",
+      "evidence": "docs/usability/usability-test-scripts.md, run at the pilot (P8-04c)."
+    }
+  }
+}

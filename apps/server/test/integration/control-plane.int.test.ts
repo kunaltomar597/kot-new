@@ -287,7 +287,7 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     expect(alerts[0]?.details).toMatchObject({ reason: 'REWRITTEN', byAuditCheck: true });
   });
 
-  it('[UPD-008] [VCP-007] sends a manager’s diagnostics to support, who can open them', async () => {
+  it('[UPD-008] [AUTH-014] [VCP-007] sends a manager’s diagnostics to support, who can open them', async () => {
     const sent = await request(httpServer(server))
       .post('/api/v1/system/diagnostics')
       .set(await asManager())
@@ -311,7 +311,7 @@ describe('[VCP-005] [SEC-002] enrolment and heartbeats (P0-17)', () => {
     ).toBe(1);
   });
 
-  it('[UPD-008] lets a manager answer support’s requests: one allowed, one declined', async () => {
+  it('[UPD-008] [AUTH-014] lets a manager answer support’s requests: one allowed, one declined', async () => {
     const diagnostics = controlPlane.get(CpDiagnosticsService);
     const support = { userId: randomUUID(), actor: 'vendor:support' };
     const first = await diagnostics.request(installationId, 'Bills print twice', support);
