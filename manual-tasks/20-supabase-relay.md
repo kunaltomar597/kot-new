@@ -71,6 +71,29 @@ without a password; set one now.
    supabase secrets set --workdir infra RELAY_DB_URL='postgresql://relay_edge.<ref>:<password>@<pooler-host>:6543/postgres'
    ```
 
+### 4a. Give the Control Plane its own login
+
+The Control Plane creates each restaurant in the relay and its credential (VCP-002) through its own
+login, `relay_control_plane`, which can take the provisioning role and nothing else. The edge
+functions' login cannot provision (RELAY-E3). Like `relay_edge`, it is created without a password.
+
+1. Generate another password the same way as in step 4 and save it in your password manager.
+2. In the **SQL editor**, run:
+
+   ```sql
+   ALTER ROLE relay_control_plane WITH LOGIN PASSWORD '<the password>';
+   ```
+
+3. Build the connection string from **Connect → Direct connection** (port `5432`, user
+   `relay_control_plane`, `sslmode=require`) and store it in the Control Plane's secret manager as
+   `CP_RELAY_DATABASE_URL` (P7 deployment). It never goes in the repository or a function secret.
+4. Check that the edge functions' login cannot provision. In the SQL editor:
+
+   ```sql
+   SELECT pg_has_role('relay_edge', 'relay_provisioner', 'MEMBER');           -- false
+   SELECT pg_has_role('relay_control_plane', 'relay_provisioner', 'MEMBER');  -- true
+   ```
+
 ### 4b. Deploy the edge functions
 
 1. Set which sites may call the functions from a browser: the QR menu's address, without a
@@ -172,7 +195,8 @@ Then check the photo bucket:
 SELECT id, public, file_size_limit, allowed_mime_types FROM storage.buckets WHERE id = 'menu-photos';
 ```
 
-You should see one row: `true`, `2097152` and `{image/webp}`.
+You should see one row: `true`, `2097152` and `{image/webp}` (WebP only, RELAY-T8; the migration
+`20261010180000_relay_threats.sql` also corrects a bucket made earlier with JPEG and PNG).
 
 If you set `RELAY_JWT_SECRET`, check the Realtime doorbell once the pilot restaurant is connected:
 about 15 seconds after the local server starts, its System page should say "New QR orders arrive
@@ -196,6 +220,8 @@ Supabase relay deployment
 - Migrations applied (dev/staging/prod): __/__/__
 - Exposed schemas exclude relay (dev/staging/prod): __/__/__
 - relay_edge login set and RELAY_DB_URL secret stored (dev/staging/prod): __/__/__
+- relay_control_plane login set, CP_RELAY_DATABASE_URL stored, relay_edge not a provisioner
+  (dev/staging/prod): __/__/__
 - Functions deployed, RELAY_ALLOWED_ORIGINS set, qr-menu answers 404 for a made-up code: __/__/__
 - RELAY_JWT_SECRET set (Realtime) or left out (polling) (dev/staging/prod): __/__/__
 - System page says "New QR orders arrive instantly" (pilot): yes/no

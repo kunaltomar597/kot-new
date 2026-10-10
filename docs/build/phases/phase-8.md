@@ -230,7 +230,15 @@ those threats:
     rejected orders not counted against the table, service requests limited per table and per
     browser under a lock, bodies refused by `content-length` and read with a cap, the functions'
     login without the provisioning role and a provisioning login for the Control Plane, no CORS
-    on the PCs' function, and the photo bucket WebP only in every configuration.
+    on the PCs' function, and the photo bucket WebP only in every configuration. Done
+    (2026-10-10): `relay.rate_limit_wait` no longer counts `REJECTED` orders against the table;
+    `relay.service_request_wait` (10 a table, 6 a browser in 10 minutes, rejected ones not counted
+    at the table) under per-table and per-browser advisory locks; `readCapped` in
+    `infra/supabase/src/http.ts` (512 KB for the diners' functions, 8 MB for `server`), with the
+    table code or the credential checked for its form before any body is read; the
+    `relay_control_plane` login, a member of `relay_provisioner` only, and `relay_edge` no longer
+    one; `serveRoutes(..., { browsers: false })` for `server`; WebP only in `config.toml` and the
+    photos table. Six threats mitigated; `docs/runbooks/qr-relay.md`. P8-03b is done.
 
 Acceptance of each fix part: no threat planned for it is left open; `pnpm security:threats` passes.
 

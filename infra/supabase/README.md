@@ -11,8 +11,12 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
   - Every table has Row-Level Security, with policies for three roles: `relay_server` (a local
     server's Realtime subscription), `relay_writer` (edge functions acting for a local server) and
     `relay_diner` (edge functions acting for a browser).
+  - Two logins, both created without a password (manual task 20 gives them one): `relay_edge`
+    (the edge functions; it may take `relay_writer` or `relay_diner` only) and
+    `relay_control_plane` (provisioning restaurants; it may take `relay_provisioner` only).
   - Tokens and credentials are stored only as SHA-256 hashes.
-  - The order rules are triggers.
+  - The order rules are triggers. Orders and service requests are limited per table and per
+    browser under advisory locks (`relay.rate_limit_wait`, `relay.service_request_wait`).
   - Retention is `relay.purge()`, run hourly by pg_cron.
 - `src/`: the edge functions, as Fetch API handlers tested on Node.
   - `qr-menu`, `submit-order` and `order-status` are for diners' browsers (P5-02a);
@@ -52,4 +56,7 @@ Adding a migration:
 Deploying to the real projects is
 [manual task 20](../../manual-tasks/20-supabase-relay.md).
 
-Built by: P5-01 (database), P5-02 (edge functions), P5-03c (photos), P5-03d (Realtime).
+Operating it: [the QR relay runbook](../../docs/runbooks/qr-relay.md).
+
+Built by: P5-01 (database), P5-02 (edge functions), P5-03c (photos), P5-03d (Realtime), P8-03b4b
+(the threat model's fixes: the two logins, the limits, capped bodies, no CORS for PCs, WebP only).

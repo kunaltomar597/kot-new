@@ -80,8 +80,9 @@ export const CpConfigSchema = z
     /** Heartbeats asked of an installation whose licence is not active (LIC-006: within 1 min). */
     licenceHeartbeatSeconds: z.coerce.number().int().min(60).max(600).default(60),
     /**
-     * The QR relay's database, as a login allowed the `relay_provisioner` role only (VCP-002), from
-     * the secret manager. Unset: restaurants cannot be provisioned for QR ordering from here.
+     * The QR relay's database, as its `relay_control_plane` login, which may take the
+     * `relay_provisioner` role only (VCP-002, RELAY-E3; manual task 20), from the secret manager.
+     * Unset: restaurants cannot be provisioned for QR ordering from here.
      */
     relayDatabaseUrl: z
       .string()

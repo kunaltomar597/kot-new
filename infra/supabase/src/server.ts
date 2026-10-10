@@ -46,21 +46,27 @@ interface ServerScope {
   readonly credentialId: string;
 }
 
-/** Checks the credential and acts for its restaurant's local server. */
-async function openServer(tx: Tx, request: Request): Promise<ServerScope> {
+const credentialRejected = () =>
+  new HttpError(401, 'CREDENTIAL_REJECTED', 'The relay credential was not accepted.');
+
+/**
+ * The credential in the call's `Authorization` header. Checked before any body is read
+ * (RELAY-D3), so a caller without one of the right form sends nothing that is read.
+ */
+function credentialOf(request: Request): string {
   const match = /^Bearer (\S+)$/.exec(request.headers.get('authorization') ?? '');
   const credential = RelayCredential.safeParse(match?.[1]);
-  const rejected = new HttpError(
-    401,
-    'CREDENTIAL_REJECTED',
-    'The relay credential was not accepted.',
-  );
-  if (!credential.success) throw rejected;
+  if (!credential.success) throw credentialRejected();
+  return credential.data;
+}
+
+/** Checks the credential and acts for its restaurant's local server. */
+async function openServer(tx: Tx, request: Request): Promise<ServerScope> {
   const [row] = await tx.query<{ tenant_id: string; credential_id: string }>(
     'SELECT tenant_id, credential_id FROM relay.verify_credential($1)',
-    [credential.data],
+    [credentialOf(request)],
   );
-  if (row === undefined) throw rejected;
+  if (row === undefined) throw credentialRejected();
   await actAsServer(tx, row.tenant_id);
   return { tenantId: row.tenant_id, credentialId: row.credential_id };
 }
@@ -508,19 +514,26 @@ async function sweepPhotos(request: Request, context: FunctionContext): Promise<
   return json(200, answer);
 }
 
-export const server = serveRoutes([
-  { method: 'POST', path: /\/server\/session$/, handler: session },
-  { method: 'POST', path: /\/server\/presence$/, handler: presence },
-  { method: 'PUT', path: /\/server\/menu$/, handler: publishMenu },
-  { method: 'PUT', path: /\/server\/tables$/, handler: syncTables },
-  { method: 'GET', path: /\/server\/orders$/, handler: pickup },
-  { method: 'POST', path: /\/server\/orders\/([^/]+)\/status$/, handler: updateOrder },
-  { method: 'GET', path: /\/server\/service-requests$/, handler: pickupRequests },
-  { method: 'POST', path: /\/server\/photos\/sweep$/, handler: sweepPhotos },
-  { method: 'PUT', path: /\/server\/photos\/([^/]+)\/(\d+)$/, handler: uploadPhoto },
-  {
-    method: 'POST',
-    path: /\/server\/service-requests\/([^/]+)\/status$/,
-    handler: updateRequest,
-  },
-]);
+/**
+ * Only restaurant PCs call this function: it sends no CORS headers, so no page can read its
+ * answers (RELAY-I5), and it reads no body of a call without a credential (RELAY-D3).
+ */
+export const server = serveRoutes(
+  [
+    { method: 'POST', path: /\/server\/session$/, handler: session },
+    { method: 'POST', path: /\/server\/presence$/, handler: presence },
+    { method: 'PUT', path: /\/server\/menu$/, handler: publishMenu },
+    { method: 'PUT', path: /\/server\/tables$/, handler: syncTables },
+    { method: 'GET', path: /\/server\/orders$/, handler: pickup },
+    { method: 'POST', path: /\/server\/orders\/([^/]+)\/status$/, handler: updateOrder },
+    { method: 'GET', path: /\/server\/service-requests$/, handler: pickupRequests },
+    { method: 'POST', path: /\/server\/photos\/sweep$/, handler: sweepPhotos },
+    { method: 'PUT', path: /\/server\/photos\/([^/]+)\/(\d+)$/, handler: uploadPhoto },
+    {
+      method: 'POST',
+      path: /\/server\/service-requests\/([^/]+)\/status$/,
+      handler: updateRequest,
+    },
+  ],
+  { browsers: false, admit: credentialOf },
+);

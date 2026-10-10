@@ -125,6 +125,14 @@ const ordersOf = async (tenantId: string) =>
     )
   ).rows;
 
+/** The restaurant picks the order up and its waiter rejects it, as the sync agent reports. */
+const rejectOrder = (tenantId: string, orderId: string) =>
+  db.as('relay_writer', { tenant_id: tenantId }, async (client) => {
+    for (const status of ['RECEIVED', 'REJECTED']) {
+      await client.query('UPDATE relay.qr_orders SET status = $2 WHERE id = $1', [orderId, status]);
+    }
+  });
+
 const setLimit = (tenantId: string, perWindow: number) =>
   db.as('relay_writer', { tenant_id: tenantId }, (client) =>
     client.query(
@@ -351,6 +359,29 @@ describe('[QR-006] rate limits', () => {
     // One order from the seed is already at this table.
     expect(responses.filter((response) => response.status === 200)).toHaveLength(2);
     expect(responses.filter((response) => response.status === 429)).toHaveLength(4);
+  });
+
+  it('[RELAY-D1] stops counting orders the restaurant rejected against the table, not their browser', async () => {
+    const tenant = await seedTenant(db, 'Junk Table');
+    await publishMenu(db, tenant.id, 2, qrMenuDocument());
+    await setLimit(tenant.id, 3);
+    const junk = 'browser-junk-sender';
+    const diner = 'browser-real-diner';
+    const at = (table: 0 | 1, browser: string) => ({ token: tenant.tables[table].token, browser });
+    // The seed's order and two from the junk sender fill the table.
+    const sent = [
+      (await accepted(order(), at(0, junk))).order.id,
+      (await accepted(order(), at(0, junk))).order.id,
+    ];
+    expect((await submit(order(), at(0, diner))).status).toBe(429);
+    // The waiter rejects the junk; the diners at the table can order again.
+    for (const id of sent) await rejectOrder(tenant.id, id);
+    await accepted(order(), at(0, diner));
+    // The junk sender's browser still carries both: one more anywhere, then it waits.
+    await accepted(order(), at(1, junk));
+    const limited = await submit(order(), at(1, junk));
+    expect(limited.status).toBe(429);
+    expect(codeOf(limited.body)).toBe('RATE_LIMITED');
   });
 
   it('does not count a replay against the limit', async () => {

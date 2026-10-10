@@ -166,6 +166,88 @@ describe('[QR-011] a diner calls a waiter or asks for the bill', () => {
   });
 });
 
+/** Staff close a request (DONE through RECEIVED) or the restaurant rejects it, by the superuser. */
+async function close(id: string, status: 'DONE' | 'REJECTED'): Promise<void> {
+  for (const step of status === 'DONE' ? ['RECEIVED', 'DONE'] : ['REJECTED']) {
+    await db.admin.query('UPDATE relay.qr_service_requests SET status = $2 WHERE id = $1', [
+      id,
+      step,
+    ]);
+  }
+}
+
+/** Raises a request and returns its id, failing the test when it is not taken. */
+async function raised(...args: Parameters<typeof ask>): Promise<string> {
+  const response = await ask(...args);
+  expect(response.status, JSON.stringify(response.body)).toBe(200);
+  return QrServiceRequestResponse.parse(response.body).request.id;
+}
+
+describe('[RELAY-D2] [QR-011] limits per table and per browser', () => {
+  it('limits a table to 10 requests in 10 minutes, whoever sends them, rejected ones not counted', async () => {
+    const tenant = await seedTenant(db, 'Pestered Table');
+    await publishMenu(db, tenant.id, 2, qrMenuDocument());
+    const table = tenant.tables[1].token;
+    // One the restaurant rejected does not count against the table: ten more fit after it.
+    await close(await raised('WAITER', table, 'browser-pester-rejected'), 'REJECTED');
+    for (let index = 0; index < 10; index += 1) {
+      const browser = `browser-pester-${String(index).padStart(4, '0')}`;
+      await close(await raised('WAITER', table, browser), 'DONE');
+    }
+    const limited = await ask('WAITER', table, 'browser-pester-new-one');
+    expect(limited.status).toBe(429);
+    expect(codeOf(limited.body)).toBe('RATE_LIMITED');
+    const wait = (limited.body as ApiError).details?.retryAfterSeconds;
+    expect(wait).toBeGreaterThan(590);
+    expect(wait).toBeLessThanOrEqual(600);
+    // The table next to it is not affected.
+    await raised('WAITER', tenant.tables[0].token, 'browser-next-table');
+  });
+
+  it('limits one browser to 6 requests in 10 minutes across the restaurant’s tables', async () => {
+    const tenant = await seedTenant(db, 'Wandering Asker');
+    await publishMenu(db, tenant.id, 2, qrMenuDocument());
+    const browser = 'browser-wandering-asker';
+    for (let index = 0; index < 6; index += 1) {
+      const table = index % 2 === 0 ? tenant.tables[0] : tenant.tables[1];
+      await close(await raised('WATER', table.token, browser), 'REJECTED');
+    }
+    const limited = await ask('WATER', tenant.tables[0].token, browser);
+    expect(limited.status).toBe(429);
+    expect(Number((limited.body as ApiError).details?.retryAfterSeconds)).toBeGreaterThan(0);
+  });
+
+  it('lets no burst of presses slip past the limit', async () => {
+    const tenant = await seedTenant(db, 'Burst Buttons');
+    await publishMenu(db, tenant.id, 2, qrMenuDocument());
+    const browser = 'browser-burst-buttons';
+    for (let index = 0; index < 4; index += 1) {
+      await close(await raised('WATER', tenant.tables[1].token, browser), 'DONE');
+    }
+    // Three kinds at once from the same browser: two fit under its six, the third waits.
+    const responses = await Promise.all(
+      (['WATER', 'WAITER', 'BILL'] as const).map((type) =>
+        ask(type, tenant.tables[1].token, browser),
+      ),
+    );
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 200, 429]);
+  });
+
+  it('still finds the open request when a press comes over the limit', async () => {
+    const tenant = await seedTenant(db, 'Open Over Limit');
+    await publishMenu(db, tenant.id, 2, qrMenuDocument());
+    const browser = 'browser-open-over-limit';
+    for (let index = 0; index < 5; index += 1) {
+      await close(await raised('WATER', tenant.tables[1].token, browser), 'DONE');
+    }
+    const open = await raised('BILL', tenant.tables[1].token, browser);
+    const again = QrServiceRequestResponse.parse(
+      (await ask('BILL', tenant.tables[1].token, browser)).body,
+    );
+    expect(again).toMatchObject({ existing: true, request: { id: open } });
+  });
+});
+
 describe('[QR-011] the restaurant picks requests up and says how they went', () => {
   it('lists its own waiting requests and moves them on, as the diner sees', async () => {
     const tenant = await seedTenant(db, 'Pickup Requests');

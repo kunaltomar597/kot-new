@@ -14,8 +14,11 @@ import { HttpError } from './http.js';
  * token, the restaurant's live state, and an order as its diner sees it.
  */
 
-/** Opens the token's table and acts for its diner; anything else is TABLE_NOT_FOUND. */
-export async function openTable(tx: Tx, request: Request): Promise<TableScope> {
+/**
+ * The table's QR token from its header, of the right form. The functions that take a body check
+ * it before reading the body (RELAY-D3).
+ */
+export function tableTokenOf(request: Request): string {
   const token = TableToken.safeParse(request.headers.get(TABLE_TOKEN_HEADER));
   if (!token.success) {
     throw new HttpError(
@@ -24,7 +27,12 @@ export async function openTable(tx: Tx, request: Request): Promise<TableScope> {
       `Send the table's QR token in ${TABLE_TOKEN_HEADER}.`,
     );
   }
-  const scope = await resolveTable(tx, token.data);
+  return token.data;
+}
+
+/** Opens the token's table and acts for its diner; anything else is TABLE_NOT_FOUND. */
+export async function openTable(tx: Tx, request: Request): Promise<TableScope> {
+  const scope = await resolveTable(tx, tableTokenOf(request));
   if (scope === undefined) {
     throw new HttpError(
       404,

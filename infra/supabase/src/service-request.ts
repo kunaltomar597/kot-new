@@ -9,8 +9,9 @@ import {
   type QrServiceRequestView,
 } from '@rp/contracts/relay';
 import { isoUtc, type Tx } from './db.js';
-import { openTable, publishedMenu, restaurantState } from './diner.js';
+import { openTable, publishedMenu, restaurantState, tableTokenOf } from './diner.js';
 import {
+  DINER_BODY_MAX_BYTES,
   type FunctionContext,
   HttpError,
   json,
@@ -18,9 +19,6 @@ import {
   serveRoutes,
   sqlStateOf,
 } from './http.js';
-
-/** Requests one browser may make at a table in ten minutes, beyond the one-open-per-kind rule. */
-const PER_BROWSER = 6;
 
 export const REQUEST_COLUMNS = `id, type, status,
   (status = 'SUBMITTED' AND expires_at < now()) AS overdue,
@@ -57,13 +55,18 @@ async function find(tx: Tx, where: string, params: unknown[]): Promise<RequestRo
   return row;
 }
 
-/** POST service-request (QR-011): call a waiter or ask for the bill, once per kind at a time. */
+/**
+ * POST service-request (QR-011): call a waiter or ask for the bill, once per kind at a time, and
+ * within the relay's limits per table and per browser (RELAY-D2).
+ */
 async function raise(request: Request, context: FunctionContext): Promise<Response> {
   const browser = BrowserId.safeParse(request.headers.get(BROWSER_ID_HEADER));
   if (!browser.success) {
     throw new HttpError(400, 'VALIDATION_FAILED', `Send the browser's id in ${BROWSER_ID_HEADER}.`);
   }
-  const body = await readBody(request, QrServiceRequestBody);
+  // The headers first: a call without a token of the right form sends no body that is read.
+  tableTokenOf(request);
+  const body = await readBody(request, QrServiceRequestBody, DINER_BODY_MAX_BYTES);
   const answer = await context.db.transaction(async (tx): Promise<QrServiceRequestResponse> => {
     const scope = await openTable(tx, request);
     const state = await restaurantState(tx, scope);
@@ -97,18 +100,22 @@ async function raise(request: Request, context: FunctionContext): Promise<Respon
       );
     const already = await open();
     if (already !== undefined) return { existing: true, request: requestView(already) };
-    const [recent] = await tx.query<{ count: number }>(
-      `SELECT count(*)::int AS count FROM relay.qr_service_requests
-       WHERE browser_id = $1 AND submitted_at > now() - interval '10 minutes'`,
+    // Waits for the table's and the browser's locks, so two presses at once are counted in turn.
+    const [limit] = await tx.query<{ wait: number }>(
+      'SELECT relay.service_request_wait($1) AS wait',
       [browser.data],
     );
-    if ((recent?.count ?? 0) >= PER_BROWSER) {
+    const wait = limit?.wait ?? 0;
+    if (wait > 0) {
+      // Another phone at the table may have raised the same kind while this one waited.
+      const opened = await open();
+      if (opened !== undefined) return { existing: true, request: requestView(opened) };
       throw new HttpError(
         429,
         'RATE_LIMITED',
         'Too many requests just now. Please wait a moment or call a waiter.',
-        { retryAfterSeconds: 600 },
-        { 'retry-after': '600' },
+        { retryAfterSeconds: wait },
+        { 'retry-after': String(wait) },
       );
     }
     try {

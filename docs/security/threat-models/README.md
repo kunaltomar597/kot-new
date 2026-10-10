@@ -75,13 +75,13 @@ Written by `pnpm security:threats --write` from the models; do not edit it by ha
 | ------------------------------------------------------- | ------: | --------: | ---------------: | ------------: | -------: | --------------: | ------------------------: |
 | [The LAN and the local server](local-server-and-lan.md) |      45 |        31 |                9 |             2 |        3 |              18 |                         2 |
 | [The pager channel](pager-channel.md)                   |      26 |        19 |                5 |             1 |        1 |               4 |                         1 |
-| [The QR relay and site](qr-relay-and-site.md)           |      29 |        15 |                8 |             4 |        2 |               9 |                         0 |
+| [The QR relay and site](qr-relay-and-site.md)           |      29 |        21 |                4 |             2 |        2 |               7 |                         0 |
 | [The update pipeline](update-pipeline.md)               |      21 |        14 |                4 |             2 |        1 |              12 |                         1 |
 | [The licence mechanism](licence-mechanism.md)           |      20 |        14 |                4 |             1 |        1 |               6 |                         1 |
 | [The Vendor Control Plane](control-plane.md)            |      22 |        14 |                7 |             0 |        1 |               8 |                         0 |
 | [The desktop shell](desktop-shell.md)                   |      14 |         5 |                5 |             3 |        1 |               7 |                         0 |
 | [The phones and tablets](phones-and-tablets.md)         |      18 |        11 |                5 |             2 |        0 |               5 |                         0 |
-| All                                                     |     195 |       123 |               47 |            15 |       10 |              69 |                         5 |
+| All                                                     |     195 |       129 |               43 |            13 |       10 |              67 |                         5 |
 
 Open threats and their plans, by date:
 
@@ -89,12 +89,6 @@ Open threats and their plans, by date:
 | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | -------------- | ---------- |
 | [UPDATE-E2](update-pipeline.md#update-e2-a-pull-request-signed-as-the-vendors) A pull request signed as the vendor's                     | Medium   | Partly mitigated | manual task 1  | 2026-10-17 |
 | [UPDATE-T6](update-pipeline.md#update-t6-unreviewed-code-on-main) Unreviewed code on main                                                | High     | Not mitigated    | manual task 1  | 2026-10-17 |
-| [RELAY-D1](qr-relay-and-site.md#relay-d1-flooding-a-table-with-orders) Flooding a table with orders                                      | Medium   | Partly mitigated | P8-03b4b       | 2026-10-17 |
-| [RELAY-D2](qr-relay-and-site.md#relay-d2-flooding-a-table-with-service-requests) Flooding a table with service requests                  | Low      | Partly mitigated | P8-03b4b       | 2026-10-17 |
-| [RELAY-D3](qr-relay-and-site.md#relay-d3-large-bodies-before-any-check) Large bodies before any check                                    | Low      | Not mitigated    | P8-03b4b       | 2026-10-17 |
-| [RELAY-E3](qr-relay-and-site.md#relay-e3-the-functions-login-can-provision-restaurants) The functions' login can provision restaurants   | Medium   | Not mitigated    | P8-03b4b       | 2026-10-17 |
-| [RELAY-I5](qr-relay-and-site.md#relay-i5-cross-origin-answers-from-the-pcs-function) Cross-origin answers from the PCs' function         | Low      | Partly mitigated | P8-03b4b       | 2026-10-17 |
-| [RELAY-T8](qr-relay-and-site.md#relay-t8-other-files-in-the-photo-bucket) Other files in the photo bucket                                | Low      | Partly mitigated | P8-03b4b       | 2026-10-17 |
 | [CP-D1](control-plane.md#cp-d1-flooding-the-control-plane) Flooding the Control Plane                                                    | Low      | Partly mitigated | P8-03c         | 2026-10-19 |
 | [DESKTOP-I1](desktop-shell.md#desktop-i1-script-in-the-console-reading-its-session) Script in the console reading its session            | Low      | Partly mitigated | P8-03c         | 2026-10-19 |
 | [PC-D3](local-server-and-lan.md#pc-d3-flooding-the-server-or-the-socket) Flooding the server or the socket                               | Low      | Partly mitigated | P8-03c         | 2026-10-19 |
