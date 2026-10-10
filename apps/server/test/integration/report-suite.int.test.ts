@@ -8,6 +8,7 @@ import {
   DayEndPreview,
   DiscountReportResponse,
   InvoiceView,
+  ApprovalTimeReportResponse,
   KitchenReportResponse,
   type LoginResponse,
   OverrideResponse,
@@ -656,6 +657,53 @@ describe('[RPT-010] kitchen performance', () => {
       averagePickupSeconds: 60,
       notifyManager: 1,
     });
+  });
+});
+
+describe('[ORD-004] how long customer orders wait for approval (pilot risk R-04)', () => {
+  it('takes the median and p95 of the orders customers placed, and counts those rejected', async () => {
+    // Four customer orders on a day of their own, waiting 30, 60, 120 and 400 s; a fifth rejected.
+    const day = '2026-09-01';
+    const placed = new Date(`${day}T10:00:00.000Z`);
+    const waits = [30, 60, 120, 400];
+    for (const [index, seconds] of [...waits, 0].entries()) {
+      const orderId = await order({ source: 'POS', orderType: 'TAKEAWAY', lines: [line('Water')] });
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { source: index % 2 === 0 ? 'QR' : 'TABLE_TABLET', businessDate: new Date(day) },
+      });
+      await prisma.orderItem.updateMany({
+        where: { orderId },
+        data: {
+          businessDate: new Date(day),
+          createdAt: placed,
+          ...(index < waits.length
+            ? {
+                approvedById: kit.staff.WAITER,
+                sentAt: new Date(placed.getTime() + seconds * 1_000),
+              }
+            : { state: 'REJECTED', sentAt: null, approvedById: null }),
+        },
+      });
+    }
+    const response = await server()
+      .get('/api/v1/reports/approvals')
+      .query({ from: day, to: day })
+      .set(as(manager));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const approvals = ApprovalTimeReportResponse.parse(response.body);
+    expect(approvals).toMatchObject({
+      targetSeconds: 90,
+      meetsTarget: true,
+      rejected: 1,
+      totals: { orders: 4, medianSeconds: 90, p95Seconds: 358, overTarget: 2 },
+    });
+    expect(approvals.days).toEqual([
+      { businessDate: day, orders: 4, medianSeconds: 90, p95Seconds: 358, overTarget: 2 },
+    ]);
+    const empty = ApprovalTimeReportResponse.parse((await report('approvals')).body);
+    expect(empty).toMatchObject({ meetsTarget: null, totals: { orders: 0, medianSeconds: null } });
+    expect((await report('approvals', cashier)).status).toBe(403);
   });
 });
 

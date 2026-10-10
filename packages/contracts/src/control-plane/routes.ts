@@ -83,6 +83,8 @@ import {
 } from './diagnostics.js';
 import {
   AuditHeadListResponse,
+  AvailabilityQuery,
+  AvailabilityResponse,
   FleetAlertListResponse,
   FleetAlertParams,
   FleetAlertQuery,
@@ -985,6 +987,21 @@ export const CONTROL_PLANE_ROUTES = [
       ...vendorErrors,
       404: { description: 'No such alert.', schema: ApiError },
       409: { description: 'Already closed, or it closes by itself.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getInstallationAvailability',
+    method: 'GET',
+    path: '/v1/vendor/installations/:id/availability',
+    summary: 'Local availability in trading hours from the heartbeat history, per day',
+    tags: ['vendor'],
+    requirements: ['VCP-005', 'NFR-A02'],
+    capability: 'FLEET_VIEW',
+    request: { params: VendorInstallationParams, query: AvailabilityQuery },
+    responses: {
+      200: { description: 'The availability.', schema: AvailabilityResponse },
+      ...vendorErrors,
+      404: { description: 'No such installation.', schema: ApiError },
     },
   },
   {

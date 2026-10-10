@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeServer } from './fake-server.js';
 import { expectNoAxeViolations, renderConsole, server, signsInAs, t } from './harness.js';
 import {
+  approvalReport,
   discountReport,
   kitchenReport,
   ORDER_ID,
@@ -38,6 +39,10 @@ function reportsServer(): FakeServer {
       const { from, to } = rangeOf(call.path);
       const offset = Number(new URL(`http://x${call.path}`).searchParams.get('offset') ?? 0);
       return { status: 200, body: registerPage(from, to, offset) };
+    })
+    .on('GET', '/api/v1/reports/approvals', (call) => {
+      const { from, to } = rangeOf(call.path);
+      return { status: 200, body: approvalReport(from, to) };
     })
     .on('GET', '/api/v1/reports/kitchen', (call) => {
       const { from, to } = rangeOf(call.path);
@@ -263,6 +268,23 @@ describe('[RPT-010] [RPT-012] operations reports', () => {
     expect(
       screen.getByText(t('reportsPage.suggestions.ordersValue', { withSuggestion: 5, orders: 30 })),
     ).toBeVisible();
+  });
+});
+
+describe('[ORD-004] approval time of customer orders', () => {
+  it('shows the median against the target, the slowest 5 % and a row for each day', async () => {
+    const { container } = await renderConsole({
+      fake: reportsServer(),
+      path: `/manage/reports/approvals?from=${TODAY}&to=${TODAY}`,
+      signedIn: 'MANAGER',
+    });
+    expect(await screen.findByText(t('reportsPage.approvals.met', { target: 90 }))).toBeVisible();
+    expect(
+      screen.getAllByText(t('reportsPage.duration.minutesSeconds', { minutes: 1, seconds: 15 }))
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByRole('table', { name: t('reportsPage.approvals.days') })).toBeVisible();
+    await expectNoAxeViolations(container);
   });
 });
 

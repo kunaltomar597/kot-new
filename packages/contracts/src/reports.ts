@@ -543,6 +543,37 @@ const KitchenTimes = z.object({
   averagePickupSeconds: Seconds,
 });
 
+/** Pilot risk R-04: the median time a customer's order may wait for a waiter's approval. */
+export const APPROVAL_TARGET_SECONDS = 90;
+
+const ApprovalTimes = z.object({
+  /** Customer orders (tablet and QR) approved in the period. */
+  orders: Count,
+  /** Whole seconds from the customer's order to its approval; null without any. */
+  medianSeconds: Seconds,
+  p95Seconds: Seconds,
+  /** Approved orders that waited longer than the target. */
+  overTarget: Count,
+});
+
+/**
+ * Pilot KPI (BRD §2, risk R-04): how long customer orders wait for approval. Measured per order,
+ * from the customer placing it to the first approval that sent it to the kitchen; orders that
+ * were rejected are counted, not timed.
+ */
+export const ApprovalTimeReportResponse = z.object({
+  from: IsoDate,
+  to: IsoDate,
+  /** The median must stay within this many seconds. */
+  targetSeconds: z.int().min(1),
+  /** Null when no customer order was approved in the period. */
+  meetsTarget: z.boolean().nullable(),
+  rejected: Count,
+  days: z.array(ApprovalTimes.extend({ businessDate: IsoDate })),
+  totals: ApprovalTimes,
+});
+export type ApprovalTimeReportResponse = z.infer<typeof ApprovalTimeReportResponse>;
+
 /** RPT-010: kitchen performance by station and by dish, and "Notify manager" presses. */
 export const KitchenReportResponse = z.object({
   from: IsoDate,

@@ -5,17 +5,23 @@ comes from, who reads it and when.
 
 ## 1. What is measured, and from where
 
-| KPI                                      | Target                        | Source in the product                                             | Status                   |
-| ---------------------------------------- | ----------------------------- | ----------------------------------------------------------------- | ------------------------ |
-| Approved order to visible on KDS         | p95 ≤ 1 s                     | Server timestamps; `pnpm --filter @rp/server test:perf` on the PC | Measured by the load run |
-| Ready to pager vibrates                  | p95 ≤ 2 s                     | Pager heartbeat and ack timestamps; lab rig (task 16)             | Needs the rig            |
-| Service request to acknowledgement       | median ≤ 60 s                 | Staff report, RPT-003                                             | In the product           |
-| Ready to picked up                       | 25 % lower than the baseline  | Kitchen performance report, RPT-010                               | In the product           |
-| Customer order waiting for approval      | median ≤ 90 s (risk R-04)     | Approval timestamps on orders                                     | Report to build (P8-06b) |
-| Recommendation attach rate               | ≥ 8 % of tablet and QR orders | Recommendation report, RPT-012                                    | In the product           |
-| Voids, discounts, reprints with a person | 100 %                         | Audit log; the suspicious-activity report (RPT-014)               | In the product           |
-| New restaurant live                      | ≤ 1 business day              | Onboarding records, timing in `docs/build/onboarding-timing.md`   | Recorded at install      |
-| Local availability in trading hours      | ≥ 99.9 %                      | Heartbeat history in the Control Plane; the System page           | Needs a monthly view     |
+| KPI                                      | Target                        | Source in the product                                                | Status                   |
+| ---------------------------------------- | ----------------------------- | -------------------------------------------------------------------- | ------------------------ |
+| Approved order to visible on KDS         | p95 ≤ 1 s                     | Server timestamps; `pnpm --filter @rp/server test:perf` on the PC    | Measured by the load run |
+| Ready to pager vibrates                  | p95 ≤ 2 s                     | Pager heartbeat and ack timestamps; lab rig (task 16)                | Needs the rig            |
+| Service request to acknowledgement       | median ≤ 60 s                 | Staff report, RPT-003                                                | In the product           |
+| Ready to picked up                       | 25 % lower than the baseline  | Kitchen performance report, RPT-010                                  | In the product           |
+| Customer order waiting for approval      | median ≤ 90 s (risk R-04)     | Manager Reports → Operations → Approval time (median, slowest 5 %)   | In the product (P8-06b)  |
+| Recommendation attach rate               | ≥ 8 % of tablet and QR orders | Recommendation report, RPT-012                                       | In the product           |
+| Voids, discounts, reprints with a person | 100 %                         | Audit log; the suspicious-activity report (RPT-014)                  | In the product           |
+| New restaurant live                      | ≤ 1 business day              | Onboarding records, timing in `docs/build/onboarding-timing.md`      | Recorded at install      |
+| Local availability in trading hours      | ≥ 99.9 %                      | Control Plane: an installation's page, Availability in trading hours | In the product (P8-06b)  |
+
+The approval-time report times each customer order (tablet and QR) from the customer placing it to
+the first approval that sent it on. The availability view counts an open minute as down when the PC
+had been silent longer than the offline limit (30 minutes by default), the same rule as the OFFLINE
+alert, and shows the last 30 days with a row for each day. It judges 99.9 % (NFR-A02); site power loss and
+hardware failure are excluded by the vendor writing them off in the weekly review, not by the view.
 
 ## 2. Rhythm
 

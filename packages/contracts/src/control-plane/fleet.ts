@@ -1,6 +1,6 @@
 import { FLEET_ALERT_KINDS } from '@rp/domain';
 import { z } from 'zod';
-import { Id, Timestamp } from '../common.js';
+import { Id, IsoDate, Timestamp } from '../common.js';
 import {
   ComponentVersion,
   HeartbeatBackup,
@@ -114,3 +114,40 @@ export type AuditHeadView = z.infer<typeof AuditHeadView>;
 
 export const AuditHeadListResponse = z.object({ heads: z.array(AuditHeadView) });
 export type AuditHeadListResponse = z.infer<typeof AuditHeadListResponse>;
+
+/** BRD §2: local availability in trading hours, in basis points (99.9 %). */
+export const AVAILABILITY_TARGET_BP = 9_990;
+export const AVAILABILITY_MAX_DAYS = 31;
+
+export const AvailabilityQuery = z.strictObject({
+  /** The last this many days, today included. */
+  days: z.coerce.number().int().min(1).max(AVAILABILITY_MAX_DAYS).default(30),
+});
+export type AvailabilityQuery = z.output<typeof AvailabilityQuery>;
+
+const AvailabilityFigures = z.object({
+  /** Minutes the restaurant was open (all minutes when the PC reports no opening hours). */
+  openMinutes: z.int().min(0),
+  /** Open minutes in which the PC had been silent past the offline threshold. */
+  downMinutes: z.int().min(0),
+  /** Basis points of the open minutes the PC was reachable; null when never open. */
+  availabilityBp: z.int().min(0).max(10_000).nullable(),
+});
+
+/**
+ * Local availability in trading hours from the heartbeat history (BRD §2, VCP-005): the whole
+ * period and each day, in the restaurant's time zone. Days before the PC's first heartbeat are
+ * left out.
+ */
+export const AvailabilityResponse = z.object({
+  installationId: Id,
+  timeZone: z.string(),
+  from: IsoDate,
+  to: IsoDate,
+  targetBp: z.int(),
+  /** Null when the period had no open minutes to judge. */
+  meetsTarget: z.boolean().nullable(),
+  totals: AvailabilityFigures,
+  days: z.array(AvailabilityFigures.extend({ date: IsoDate })),
+});
+export type AvailabilityResponse = z.infer<typeof AvailabilityResponse>;

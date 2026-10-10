@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  CancellationReportResponse,
-  DiscountReportResponse,
-  KitchenReportResponse,
-  RecommendationReportResponse,
-  ReportRangeQuery,
-  ReprintReportResponse,
-  SourceSalesResponse,
-  StaffPerformanceResponse,
-  TableReportResponse,
+import {
+  APPROVAL_TARGET_SECONDS,
+  type ApprovalTimeReportResponse,
+  type CancellationReportResponse,
+  type DiscountReportResponse,
+  type KitchenReportResponse,
+  type RecommendationReportResponse,
+  type ReportRangeQuery,
+  type ReprintReportResponse,
+  type SourceSalesResponse,
+  type StaffPerformanceResponse,
+  type TableReportResponse,
 } from '@rp/contracts';
 import { BASIS_POINTS_PER_WHOLE, divideRounded } from '@rp/domain';
 import { isoDateOf } from '../common/business-dates.js';
@@ -475,6 +477,74 @@ export class ReportSuiteService {
         billReprints: events.filter((event) => event.kind === 'BILL_REPRINT').length,
         billEdits: events.filter((event) => event.kind === 'BILL_EDIT').length,
       },
+    };
+  }
+
+  /**
+   * Pilot KPI (risk R-04): how long customer orders (tablet and QR) wait for approval, per order,
+   * from the customer placing it to the first approval that sent it on; rejected orders are
+   * counted and not timed.
+   */
+  async approvalTimes(
+    restaurantId: string,
+    range: ReportRangeQuery,
+  ): Promise<ApprovalTimeReportResponse> {
+    const { from, to } = range;
+    const target = APPROVAL_TARGET_SECONDS;
+    const rows = await this.prisma.$queryRaw<
+      {
+        business_date: Date | null;
+        orders: bigint;
+        median: number | null;
+        p95: number | null;
+        over: bigint;
+      }[]
+    >`
+      WITH waits AS (
+        SELECT o.id, o.business_date,
+               extract(epoch FROM min(oi.sent_at) - min(oi.created_at)) AS seconds
+        FROM orders o JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.restaurant_id = ${restaurantId}::uuid AND o.source IN ('TABLE_TABLET', 'QR')
+          AND o.business_date BETWEEN ${from}::date AND ${to}::date
+          AND oi.approved_by_id IS NOT NULL AND oi.sent_at IS NOT NULL
+        GROUP BY o.id, o.business_date
+      )
+      SELECT business_date,
+             count(*) AS orders,
+             percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds)::float8 AS median,
+             percentile_cont(0.95) WITHIN GROUP (ORDER BY seconds)::float8 AS p95,
+             count(*) FILTER (WHERE seconds > ${target}) AS over
+      FROM waits GROUP BY ROLLUP (business_date) ORDER BY business_date`;
+    const rejected = await this.prisma.$queryRaw<{ n: bigint }[]>`
+      SELECT count(DISTINCT o.id) AS n
+      FROM orders o JOIN order_items oi ON oi.order_id = o.id
+      WHERE o.restaurant_id = ${restaurantId}::uuid AND o.source IN ('TABLE_TABLET', 'QR')
+        AND o.business_date BETWEEN ${from}::date AND ${to}::date
+        AND oi.state = 'REJECTED'`;
+    const whole = (value: number | null) =>
+      value === null ? null : Math.max(0, Math.round(value));
+    const figures = (row: (typeof rows)[number]) => ({
+      orders: num(row.orders),
+      medianSeconds: whole(row.median),
+      p95Seconds: whole(row.p95),
+      overTarget: num(row.over),
+    });
+    // ROLLUP adds the grand total as the row without a date.
+    const totalRow = rows.find((row) => row.business_date === null);
+    const totals = totalRow
+      ? figures(totalRow)
+      : { orders: 0, medianSeconds: null, p95Seconds: null, overTarget: 0 };
+    return {
+      ...range,
+      targetSeconds: target,
+      meetsTarget: totals.medianSeconds === null ? null : totals.medianSeconds <= target,
+      rejected: num(rejected[0]?.n),
+      days: rows.flatMap((row) =>
+        row.business_date === null
+          ? []
+          : [{ businessDate: isoDateOf(row.business_date), ...figures(row) }],
+      ),
+      totals,
     };
   }
 

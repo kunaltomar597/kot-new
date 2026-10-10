@@ -7,6 +7,9 @@ import {
 } from '@nestjs/common';
 import {
   type AuditHeadView,
+  AVAILABILITY_TARGET_BP,
+  type AvailabilityQuery,
+  type AvailabilityResponse,
   type FleetAlertKind,
   type FleetAlertQuery,
   type FleetAlertView,
@@ -15,6 +18,9 @@ import {
   HeartbeatRequest,
 } from '@rp/contracts/control-plane';
 import {
+  addDays,
+  availabilityOf,
+  calendarDateOf,
   type ChainHead,
   type ChainVerdict,
   checkChainHead,
@@ -26,6 +32,7 @@ import {
   offlineMinutesDuringHours,
   SELF_RESOLVING_ALERTS,
   tamperAlertDue,
+  zonedTimeToUtc,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
@@ -502,6 +509,67 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
       verifiedAt: row.verifiedAt?.toISOString() ?? null,
       superseded: row.supersededAt !== null,
     }));
+  }
+
+  /**
+   * Local availability in trading hours over the last `days` days, from the heartbeat history
+   * (NFR-A02): the whole period and each day in the restaurant's time zone.
+   */
+  async availability(
+    installationId: string,
+    query: AvailabilityQuery,
+    now = new Date(),
+  ): Promise<AvailabilityResponse> {
+    const { days } = query;
+    const installation = await this.installation(this.prisma, installationId);
+    const businessHours = reportOf(installation.lastHeartbeat)?.businessHours ?? null;
+    const timeZone = businessHours?.timeZone ?? 'Asia/Kolkata';
+    const to = calendarDateOf(now, timeZone);
+    const from = addDays(to, -(days - 1));
+    const start = zonedTimeToUtc(from, '00:00', timeZone);
+    // The latest heartbeat before the period says whether the PC was already silent at its start.
+    const [before, within] = await Promise.all([
+      this.prisma.heartbeat.findFirst({
+        where: { installationId, receivedAt: { lt: start } },
+        orderBy: { receivedAt: 'desc' },
+        select: { receivedAt: true },
+      }),
+      this.prisma.heartbeat.findMany({
+        where: { installationId, receivedAt: { gte: start } },
+        orderBy: { receivedAt: 'asc' },
+        select: { receivedAt: true },
+      }),
+    ]);
+    const heartbeats = [...(before ? [before] : []), ...within].map((row) => row.receivedAt);
+    const figuresFor = (fromAt: Date, toAt: Date) =>
+      availabilityOf({
+        from: fromAt,
+        to: toAt < now ? toAt : now,
+        heartbeats,
+        offlineAfterMinutes: this.config.offlineAlertMinutes,
+        businessHours,
+      });
+    const perDay = [];
+    for (let date = from; date <= to; date = addDays(date, 1)) {
+      const figures = figuresFor(
+        zonedTimeToUtc(date, '00:00', timeZone),
+        zonedTimeToUtc(addDays(date, 1), '00:00', timeZone),
+      );
+      if (figures.openMinutes > 0) perDay.push({ date, ...figures });
+    }
+    const open = perDay.reduce((sum, day) => sum + day.openMinutes, 0);
+    const down = perDay.reduce((sum, day) => sum + day.downMinutes, 0);
+    const availabilityBp = open === 0 ? null : Math.round(((open - down) / open) * 10_000);
+    return {
+      installationId,
+      timeZone,
+      from,
+      to,
+      targetBp: AVAILABILITY_TARGET_BP,
+      meetsTarget: availabilityBp === null ? null : availabilityBp >= AVAILABILITY_TARGET_BP,
+      totals: { openMinutes: open, downMinutes: down, availabilityBp },
+      days: perDay,
+    };
   }
 
   /** Every PC's health from its latest heartbeat (VCP-005, NFR-O03). */

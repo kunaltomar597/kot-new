@@ -1,9 +1,10 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import {
   ActivationCodeView,
   ApiError,
   AuditListResponse,
+  AvailabilityResponse,
   VendorLicenceView,
   VendorReleaseListResponse,
   VendorTenantDetail,
@@ -229,5 +230,37 @@ describe('[VCP-006] [VCP-001] releases and the audit trail, by role', () => {
       ).body,
     );
     expect(page.entries).toHaveLength(2);
+  });
+});
+
+describe('[NFR-A02] local availability from the heartbeat history', () => {
+  it('shows the days a PC was silent past the threshold, to fleet viewers only', async () => {
+    const hour = 3_600_000;
+    const start = Date.now() - 6 * hour;
+    // A beat every 10 minutes for the first 2 hours, silence for 2 hours, then every 10 minutes.
+    const times = [];
+    for (let at = start; at <= start + 2 * hour; at += 600_000) times.push(at);
+    for (let at = start + 4 * hour; at <= Date.now(); at += 600_000) times.push(at);
+    await prisma.heartbeat.createMany({
+      data: times.map((at) => ({
+        installationId,
+        id: randomUUID(),
+        sentAt: new Date(at),
+        receivedAt: new Date(at),
+        payload: {},
+      })),
+    });
+    const url = `/v1/vendor/installations/${installationId}/availability`;
+    expect((await server().get(url)).status).toBe(401);
+    const response = await server().get(url).query({ days: 2 }).set(as('READ_ONLY'));
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const view = AvailabilityResponse.parse(response.body);
+    expect(view.targetBp).toBe(9_990);
+    expect(view.totals.downMinutes).toBeGreaterThan(60);
+    expect(view.totals.availabilityBp).toBeLessThan(9_990);
+    expect(view.meetsTarget).toBe(false);
+    expect(view.days.length).toBeGreaterThan(0);
+    const bad = await server().get(url).query({ days: 0 }).set(as('READ_ONLY'));
+    expect(bad.status).toBe(400);
   });
 });
