@@ -11,6 +11,9 @@ Built by: P0-06, P0-16, P7-04. Decisions: ADR-0010.
 - `check-licenses.mjs`, `license-policy.json`: licence check for production dependencies
   (NFR-M07), `pnpm licenses:check`; its tests run with `pnpm ci:test`. GPL, AGPL and SSPL are
   blocked; any other licence not on the allow-list needs an entry in `exceptions` with a reason.
+- `check-checklists.mjs` (`pnpm security:checklists`, in `pnpm check`): the standards checklists in
+  `docs/security/checklists/` (BRD §8.1, SEC-010, SEC-011): statuses, evidence files and threats that
+  exist, findings with a plan; its tests run with `pnpm ci:test`.
 - `pinned-actions.test.mjs` (`pnpm ci:test`): every GitHub Action in every workflow is pinned to a
   full commit with its version in a comment (`uses: actions/checkout@<40 hex> # v7.0.1`), one
   commit per Action across the workflows (threat model "The update pipeline", UPDATE-T1).
