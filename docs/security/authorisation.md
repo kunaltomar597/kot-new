@@ -154,6 +154,11 @@ endpoint's capability (`vendorMay`, SEC-018). Restaurant PCs and vendor staff ca
 endpoints. Tests: `signed-requests.int`, `vendor-staff.int` "lets each role do only what it is
 for", and the sweep below.
 
+Object level (SEC-005, ADR-0021): a PC's installation and restaurant come from the row behind its
+signature, and every PC endpoint looks its objects up within them; the tables have no Row-Level
+Security. `tenant-isolation.int` calls each of the 12 PC endpoints with another restaurant's ids
+and fails for a PC endpoint it has no case for.
+
 ## The desktop shell
 
 The Electron shell loads only the PC's own console, with context isolation, the sandbox, no

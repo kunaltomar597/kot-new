@@ -62,8 +62,8 @@ code from going live:
 - [ ] Error reporting: a Sentry-compatible service (best in India), two projects and their DSNs in
       the Control Plane's secret manager and the installer's CI secret:
       [`manual-tasks/24-error-reporting.md`](manual-tasks/24-error-reporting.md).
-- [ ] Cloud backup storage: an S3 bucket in India (ap-south-1) per environment, its access key
-      in the Control Plane's secret manager:
+- [ ] Cloud backup storage: an S3 bucket in India (ap-south-1) per environment, with versioning
+      and a 35-day object lock, its access key in the Control Plane's secret manager:
       [`manual-tasks/26-cloud-backup-storage.md`](manual-tasks/26-cloud-backup-storage.md).
 - [ ] Backup key escrow: the restore policy with counsel (OI-10) and the KMS key in India:
       [`manual-tasks/27-key-escrow.md`](manual-tasks/27-key-escrow.md).

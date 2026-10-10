@@ -14,6 +14,18 @@ const Sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
 /** The largest backup file taken: S3's 10,000 parts of up to 5 GiB, with room to spare. */
 export const CLOUD_BACKUP_MAX_BYTES = 2 * 1024 ** 4;
 
+/**
+ * Uploads a PC may start in 24 hours (counting each file once, however often it is tried again):
+ * the nightly backup, the backup before an update, and a few taken by hand (threat CP-T2).
+ */
+export const CLOUD_BACKUPS_PER_DAY = 8;
+
+/**
+ * How far after the Control Plane's clock a backup may say it was made: signed requests already
+ * need the PC's clock within 5 minutes of it (threat CP-T2).
+ */
+export const CLOUD_BACKUP_CLOCK_MARGIN_MS = 10 * 60_000;
+
 /** A full backup's file name, as the restaurant PC makes it (P7-05a). */
 export const BACKUP_FILE_NAME = /^rp-backup-\d{8}T\d{6}Z-(nightly|manual)\.rpbk$/;
 /** An archived financial year's file name (DATA-008, P7-06b). */

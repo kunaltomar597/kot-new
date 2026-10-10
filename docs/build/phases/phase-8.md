@@ -207,7 +207,30 @@ those threats:
 - **P8-03b4 Fixes in the Control Plane and the QR relay.** The threats planned for P8-03b4: backup
   dates and retention, diagnostics retention, vendor sign-in races, tenant isolation (an ADR and a
   cross-tenant test), https for every service, bill links in logs, the relay's service-request and
-  order limits, body limits, the provisioning role and the photo bucket.
+  order limits, body limits, the provisioning role and the photo bucket. Split (2026-10-10) into
+  two, by component, as P8-03b2 and P8-03b3 were (13 threats):
+  - **P8-03b4a The Control Plane** (CP-S1, CP-T2, CP-I2, CP-I3, CP-I4, CP-D3, CP-E3): each
+    sign-in try counted before it is checked and a code's step spent once, one answer for an
+    unknown email, a disabled account and a wrong password; retention by the times the Control
+    Plane stored each backup, no backup dated after its clock and a few a day per PC; diagnostics
+    deleted after 30 days; https for every outside service and the bill and grant tokens masked in
+    the request log; ADR-0021 and a test that calls every PC endpoint with another restaurant's
+    ids; the AI limit counted under a lock; a Super Admin's reset by two other Super Admins.
+    Done (2026-10-10): `VendorAuthService.signIn` claims a try in one `UPDATE` before Argon2 and
+    spends the step with a conditional update, and counts emails without a usable account in
+    memory so they lock alike; `CloudBackupsService` keeps by `completedAt`, refuses a date more
+    than 10 minutes ahead (`CLOUD_BACKUP_DATE`) and starts 8 files a day per PC under an advisory
+    lock (`CLOUD_BACKUP_LIMIT`), the bucket's object lock in manual task 26;
+    `DiagnosticsService.purge` hourly, audited; `OUTSIDE_SERVICES` in the configuration and
+    `src/http/log-redaction.ts`; `tenant-isolation.int.test.ts` with a case per PC endpoint of the
+    registry; `lockFor` for AI menus and digital bills; reset requests on `vendor_users`, a 202
+    for the first Super Admin and the setup link for the second, shown on the Staff page. Six
+    threats mitigated, CP-T2 partly (the object lock is the vendor's to set up).
+  - **P8-03b4b The QR relay** (RELAY-D1, RELAY-D2, RELAY-D3, RELAY-E3, RELAY-I5, RELAY-T8):
+    rejected orders not counted against the table, service requests limited per table and per
+    browser under a lock, bodies refused by `content-length` and read with a cap, the functions'
+    login without the provisioning role and a provisioning login for the Control Plane, no CORS
+    on the PCs' function, and the photo bucket WebP only in every configuration.
 
 Acceptance of each fix part: no threat planned for it is left open; `pnpm security:threats` passes.
 

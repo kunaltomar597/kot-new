@@ -13,6 +13,7 @@ import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { CpError } from './cp-error.js';
 import { CP_ERROR_REPORTER } from './error-reporting.js';
+import { maskedPath } from '../http/log-redaction.js';
 
 export interface MappedError {
   readonly status: number;
@@ -122,13 +123,10 @@ export class CpExceptionFilter implements ExceptionFilter {
     const correlationId = typeof request.id === 'string' ? request.id : undefined;
     const mapped = mapError(exception, correlationId);
     if (mapped.unexpected) {
-      this.logger.error({ err: exception, correlationId, path: request.path }, 'Unhandled error');
+      const path = maskedPath(request.path);
+      this.logger.error({ err: exception, correlationId, path }, 'Unhandled error');
       // NFR-O02: scrubbed in @rp/error-reporting before it leaves.
-      this.reporter?.report(exception, {
-        correlationId,
-        method: request.method,
-        path: request.path,
-      });
+      this.reporter?.report(exception, { correlationId, method: request.method, path });
     }
     response.status(mapped.status).json(mapped.body);
   }

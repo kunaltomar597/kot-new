@@ -1,9 +1,21 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import {
   CreateVendorUserRequest,
   UpdateVendorUserRequest,
   VendorAccessReviewRequest,
   type VendorMeView,
+  type VendorResetRequestedView,
   type VendorSessionView,
   VendorSetupConfirmRequest,
   VendorSetupRequest,
@@ -14,7 +26,7 @@ import {
   VendorUserParams,
   type VendorUserView,
 } from '@rp/contracts/control-plane';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { Public } from '../auth/public.decorator.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
 import { CpError } from '../errors/cp-error.js';
@@ -105,14 +117,18 @@ export class VendorController {
     return this.auth.update(params.id, body, vendorOf(request));
   }
 
+  /** 200 with the setup token, or 202 when a Super Admin's reset waits for a second one. */
   @Post('users/:id/reset')
   @HttpCode(200)
   @Vendor('USERS_MANAGE')
-  resetUser(
+  async resetUser(
     @Req() request: VendorRequest,
+    @Res({ passthrough: true }) response: Response,
     @Param(new ZodPipe(VendorUserParams)) params: VendorUserParams,
-  ): Promise<VendorSetupTokenView> {
-    return this.auth.reset(params.id, vendorOf(request));
+  ): Promise<VendorSetupTokenView | VendorResetRequestedView> {
+    const outcome = await this.auth.reset(params.id, vendorOf(request));
+    if (!outcome.done) response.status(202);
+    return outcome.view;
   }
 
   @Post('access-reviews')

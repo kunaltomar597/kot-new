@@ -104,6 +104,7 @@ import {
   VendorSetupConfirmRequest,
   VendorSetupRequest,
   VendorSetupResponse,
+  VendorResetRequestedView,
   VendorSetupTokenView,
   VendorSignInRequest,
   VendorUserListResponse,
@@ -407,15 +408,23 @@ export const CONTROL_PLANE_ROUTES = [
     method: 'POST',
     path: '/v1/vendor/users/:id/reset',
     summary: 'Reset a lost password or authenticator: a new setup token, shown once',
-    description: 'The account signs in again only after setting a new password and authenticator.',
+    description:
+      'The account signs in again only after setting a new password and authenticator. Never ' +
+      'one’s own account. A Super Admin’s account takes two other Super Admins: the first one ' +
+      'asks (202), the second carries the reset out and gets the setup token.',
     tags: ['vendor'],
     requirements: ['VCP-001', 'SEC-018'],
     capability: 'USERS_MANAGE',
     request: { params: VendorUserParams },
     responses: {
       200: { description: 'The account and its new setup token.', schema: VendorSetupTokenView },
+      202: {
+        description: 'A Super Admin’s reset asked for; another Super Admin must reset it too.',
+        schema: VendorResetRequestedView,
+      },
       ...vendorErrors,
       404: { description: 'No such account.', schema: ApiError },
+      409: { description: 'One’s own account.', schema: ApiError },
     },
   },
   {
@@ -1018,7 +1027,8 @@ export const CONTROL_PLANE_ROUTES = [
     description:
       'DATA-003: the file is encrypted on the PC with its own backup key; the PC PUTs each part ' +
       'straight to object storage in India. Starting the same file again (same SHA-256) answers ' +
-      'COMPLETE with no parts.',
+      'COMPLETE with no parts. A PC starts 8 files in 24 hours at most, none dated after the ' +
+      'Control Plane’s time.',
     tags: ['backups'],
     requirements: ['DATA-003'],
     capability: 'INSTALLATION',
@@ -1026,6 +1036,14 @@ export const CONTROL_PLANE_ROUTES = [
     responses: {
       201: { description: 'Where to put the parts.', schema: StartCloudBackupResponse },
       ...signedErrors,
+      422: {
+        description: 'The backup says it was made after the Control Plane’s time.',
+        schema: ApiError,
+      },
+      429: {
+        description: 'The PC started as many uploads as it may in 24 hours.',
+        schema: ApiError,
+      },
       503: { description: 'The cloud backup is not set up here.', schema: ApiError },
     },
   },

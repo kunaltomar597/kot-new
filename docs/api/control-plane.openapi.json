@@ -136,7 +136,7 @@
       "post": {
         "operationId": "startCloudBackup",
         "summary": "Start uploading the night’s encrypted backup: signed URLs for its parts",
-        "description": "DATA-003: the file is encrypted on the PC with its own backup key; the PC PUTs each part straight to object storage in India. Starting the same file again (same SHA-256) answers COMPLETE with no parts.",
+        "description": "DATA-003: the file is encrypted on the PC with its own backup key; the PC PUTs each part straight to object storage in India. Starting the same file again (same SHA-256) answers COMPLETE with no parts. A PC starts 8 files in 24 hours at most, none dated after the Control Plane’s time.",
         "tags": ["backups"],
         "requestBody": {
           "required": true,
@@ -169,6 +169,18 @@
           },
           "403": {
             "description": "The vendor revoked this installation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "422": {
+            "description": "The backup says it was made after the Control Plane’s time.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "429": {
+            "description": "The PC started as many uploads as it may in 24 hours.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -3834,7 +3846,7 @@
       "post": {
         "operationId": "resetVendorUser",
         "summary": "Reset a lost password or authenticator: a new setup token, shown once",
-        "description": "The account signs in again only after setting a new password and authenticator.",
+        "description": "The account signs in again only after setting a new password and authenticator. Never one’s own account. A Super Admin’s account takes two other Super Admins: the first one asks (202), the second carries the reset out and gets the setup token.",
         "tags": ["vendor"],
         "parameters": [
           {
@@ -3854,6 +3866,14 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/VendorSetupTokenView" }
+              }
+            }
+          },
+          "202": {
+            "description": "A Super Admin’s reset asked for; another Super Admin must reset it too.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VendorResetRequestedView" }
               }
             }
           },
@@ -3877,6 +3897,12 @@
           },
           "404": {
             "description": "No such account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "One’s own account.",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
             }
@@ -7505,6 +7531,12 @@
           "installs"
         ]
       },
+      "VendorResetRequestedView": {
+        "type": "object",
+        "properties": { "user": { "$ref": "#/components/schemas/VendorUserView" } },
+        "required": ["user"],
+        "additionalProperties": false
+      },
       "VendorRole": {
         "type": "string",
         "enum": ["SUPER_ADMIN", "ONBOARDING", "SUPPORT", "FINANCE", "READ_ONLY"]
@@ -7904,6 +7936,34 @@
             "type": "string",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "resetRequest": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "requestedById": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "requestedBy": { "type": "string" },
+                  "requestedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  }
+                },
+                "required": ["requestedById", "requestedBy", "requestedAt", "expiresAt"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
           }
         },
         "required": [
@@ -7916,7 +7976,8 @@
           "lockedUntil",
           "lastSignInAt",
           "reviewedAt",
-          "createdAt"
+          "createdAt",
+          "resetRequest"
         ],
         "additionalProperties": false
       },

@@ -51,7 +51,11 @@ let controlPlane: INestApplication;
 let server: INestApplication;
 let kit: AuthKit;
 let installationId: string;
-let clock = new Date();
+/**
+ * The PC's clock for backups, moved on by the tests: it starts days back, so the backups it makes
+ * are never dated after the Control Plane's own clock, which refuses those (threat CP-T2).
+ */
+let clock = new Date(Date.now() - 4 * 24 * HOUR);
 let storageDown = false;
 const dataDir = mkdtempSync(join(tmpdir(), 'rp-cloud-'));
 
@@ -193,7 +197,7 @@ describe('[DATA-003] the nightly backup in the cloud', () => {
   it('[DATA-005] [NFR-A04] waits and retries when storage fails, and alerts after a day without', async () => {
     const cloud = server.get(CloudBackupService);
     clock = new Date(clock.getTime() + 27 * HOUR);
-    await nightly();
+    const runId = await nightly();
     storageDown = true;
     expect(await cloud.runIfDue()).toBe('FAILED');
     expect((await overview()).cloud).toMatchObject({ state: 'FAILING' });
@@ -208,8 +212,13 @@ describe('[DATA-003] the nightly backup in the cloud', () => {
     expect(await cloud.runIfDue()).toBe('UPLOADED');
     expect((await overview()).cloud.state).toBe('OK');
     expect(await openAlerts()).toBe(0);
-    // The upload given up was cleared away at the Control Plane.
-    expect(await controlPlane.get(CloudBackupsService).list(installationId)).toHaveLength(2);
+    // The upload given up was cleared away at the Control Plane, which keeps the newest backup of
+    // each of its own days (threat CP-T2): both were stored today, so the one stored now.
+    const run = await server
+      .get(PrismaService)
+      .backupRun.findUniqueOrThrow({ where: { id: runId } });
+    const kept = await controlPlane.get(CloudBackupsService).list(installationId);
+    expect(kept.map((backup) => backup.fileName)).toEqual([run.fileName]);
   });
 
   it('only sends the newest of the backups waiting', async () => {

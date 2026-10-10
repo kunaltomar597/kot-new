@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  CLOUD_BACKUP_CLOCK_MARGIN_MS,
+  CLOUD_BACKUPS_PER_DAY,
   cloudFileKindOf,
   type CloudBackupView,
   CompleteCloudBackupRequest,
@@ -9,6 +11,7 @@ import {
 import { backupsToRemove } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
+import { lockFor } from '../database/advisory-lock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { CpError } from '../errors/cp-error.js';
 import type { CloudBackup } from '../generated/prisma/client.js';
@@ -21,6 +24,7 @@ export const OBJECT_STORE = Symbol('OBJECT_STORE');
 const UPLOAD_URL_SECONDS = 24 * 60 * 60;
 /** An upload still not complete after this is given up and its parts removed. */
 const STALE_UPLOAD_MS = 2 * 24 * 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
 
 const errors = {
   off: () =>
@@ -51,6 +55,11 @@ function view(row: CloudBackup): CloudBackupView {
  * backup file, PUTs the parts straight to object storage with the signed URLs it gets, then
  * completes it. The file is encrypted on the PC with a key the Control Plane does not hold. The
  * retention keeps the newest of each of the last 30 days and 12 months per PC (BRD §9.3).
+ *
+ * A PC is not trusted with what is kept (threat CP-T2: ransomware on it, or its stolen key): the
+ * retention goes by when the Control Plane stored each backup, never by the date the PC gives, a
+ * date after the Control Plane's clock is refused, and a PC starts 8 files a day at most. So
+ * whatever a PC sends, the backups stored before it went wrong stay for their 30 days and months.
  */
 @Injectable()
 export class CloudBackupsService {
@@ -81,6 +90,14 @@ export class CloudBackupsService {
     if (stored !== null) {
       return { id: stored.id, status: 'COMPLETE', partSize: stored.partSize, parts: [], expiresAt };
     }
+    const createdAt = new Date(request.backupCreatedAt);
+    if (createdAt.getTime() > now.getTime() + CLOUD_BACKUP_CLOCK_MARGIN_MS) {
+      throw new CpError(
+        422,
+        'CLOUD_BACKUP_DATE',
+        'The backup says it was made later than now. Check the PC’s clock.',
+      );
+    }
     // An earlier attempt at the same file that never finished: given up, its parts removed.
     const earlier = await this.prisma.cloudBackup.findMany({
       where: { installationId, sha256: request.sha256, status: 'UPLOADING' },
@@ -89,22 +106,43 @@ export class CloudBackupsService {
 
     const id = newId();
     const objectKey = `backups/${installationId}/${id}.rpbk`;
-    const upload = await store.startUpload(objectKey, request.sizeBytes, UPLOAD_URL_SECONDS);
-    await this.prisma.cloudBackup.create({
-      data: {
-        id,
-        installationId,
-        objectKey,
-        fileName: request.fileName,
-        backupCreatedAt: new Date(request.backupCreatedAt),
-        sizeBytes: BigInt(request.sizeBytes),
-        sha256: request.sha256,
-        keyId: request.keyId,
-        kind: cloudFileKindOf(request.fileName),
-        uploadId: upload.uploadId,
-        partSize: upload.partSize,
-        startedAt: now,
-      },
+    const upload = await this.prisma.transaction(async (tx) => {
+      // One start at a time per PC, so starts sent together cannot pass the day's number.
+      await lockFor(tx, `cloud-backup:${installationId}`);
+      const today = await tx.cloudBackup.findMany({
+        where: {
+          installationId,
+          startedAt: { gt: new Date(now.getTime() - DAY_MS) },
+          sha256: { not: request.sha256 },
+        },
+        distinct: ['sha256'],
+        select: { sha256: true },
+      });
+      if (today.length >= CLOUD_BACKUPS_PER_DAY) {
+        throw new CpError(
+          429,
+          'CLOUD_BACKUP_LIMIT',
+          `This PC started ${String(CLOUD_BACKUPS_PER_DAY)} backups in the last day. The next one goes later.`,
+        );
+      }
+      const started = await store.startUpload(objectKey, request.sizeBytes, UPLOAD_URL_SECONDS);
+      await tx.cloudBackup.create({
+        data: {
+          id,
+          installationId,
+          objectKey,
+          fileName: request.fileName,
+          backupCreatedAt: createdAt,
+          sizeBytes: BigInt(request.sizeBytes),
+          sha256: request.sha256,
+          keyId: request.keyId,
+          kind: cloudFileKindOf(request.fileName),
+          uploadId: started.uploadId,
+          partSize: started.partSize,
+          startedAt: now,
+        },
+      });
+      return started;
     });
     return {
       id,
@@ -216,7 +254,8 @@ export class CloudBackupsService {
 
   /**
    * Retention (BRD §9.3: 30 daily and 12 monthly by default) for one PC, and uploads left
-   * unfinished for two days. Removed objects keep their row, marked DELETED.
+   * unfinished for two days. Removed objects keep their row, marked DELETED. Days and months are
+   * those the Control Plane stored each backup in, never the date the PC gave (threat CP-T2).
    */
   async prune(installationId: string, now = new Date()): Promise<string[]> {
     const store = this.storeOrFail();
@@ -234,7 +273,7 @@ export class CloudBackupsService {
     });
     const remove = new Set(
       backupsToRemove(
-        kept.map((row) => ({ name: row.id, takenAt: row.backupCreatedAt })),
+        kept.map((row) => ({ name: row.id, takenAt: row.completedAt ?? row.startedAt })),
         this.config.backupKeepDaily,
         0,
         undefined,

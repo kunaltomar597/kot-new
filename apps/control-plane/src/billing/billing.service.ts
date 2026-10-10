@@ -31,6 +31,7 @@ import {
 import { AuditService } from '../audit/audit.service.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
 import { PrismaService, type TransactionClient } from '../database/prisma.service.js';
+import { lockFor } from '../database/advisory-lock.js';
 import { CpError } from '../errors/cp-error.js';
 import type {
   Plan,
@@ -462,7 +463,7 @@ export class BillingService implements OnApplicationBootstrap, OnModuleDestroy {
   private async nextNumber(tx: TransactionClient, periodStart: string): Promise<string> {
     const year = financialYearOf(periodStart).label;
     const prefix = `SUB/${year}/`;
-    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${prefix}, 0))`;
+    await lockFor(tx, prefix);
     const count = await tx.vendorInvoice.count({ where: { number: { startsWith: prefix } } });
     return `${prefix}${String(count + 1).padStart(5, '0')}`;
   }

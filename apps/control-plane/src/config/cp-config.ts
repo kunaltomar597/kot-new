@@ -18,6 +18,20 @@ const booleanFlag = z
 /** The India regions cloud backups may be stored in (DATA-003): Mumbai and Hyderabad. */
 export const INDIA_REGIONS: readonly string[] = ['ap-south-1', 'ap-south-2'];
 
+/**
+ * The outside services' addresses, with their environment variables: staging and production
+ * reach each over https only (threat CP-I3), since each call carries a key or personal data.
+ */
+const OUTSIDE_SERVICES = [
+  ['aiBaseUrl', 'CP_AI_BASE_URL'],
+  ['whatsappApiUrl', 'CP_WHATSAPP_API_URL'],
+  ['errorDsn', 'CP_ERROR_DSN'],
+  ['alertWebhookUrl', 'CP_ALERT_WEBHOOK_URL'],
+  ['publicUrl', 'CP_PUBLIC_URL'],
+  ['backupS3Endpoint', 'CP_BACKUP_S3_ENDPOINT'],
+  ['escrowKmsEndpoint', 'CP_ESCROW_KMS_ENDPOINT'],
+] as const;
+
 /** True when the connection string makes PostgreSQL use TLS (`sslmode=require` or stricter). */
 export function databaseUsesTls(databaseUrl: string): boolean {
   try {
@@ -196,16 +210,15 @@ export const CpConfigSchema = z
           'staging and production need sslmode=require (or stricter) in CP_RELAY_DATABASE_URL',
       });
     }
-    if (
-      config.env !== 'development' &&
-      config.alertWebhookUrl !== undefined &&
-      !config.alertWebhookUrl.startsWith('https://')
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['alertWebhookUrl'],
-        message: 'staging and production need an https:// CP_ALERT_WEBHOOK_URL',
-      });
+    for (const [setting, variable] of OUTSIDE_SERVICES) {
+      const url = config[setting];
+      if (config.env !== 'development' && url !== undefined && !url.startsWith('https://')) {
+        context.addIssue({
+          code: 'custom',
+          path: [setting],
+          message: `staging and production need an https:// ${variable}`,
+        });
+      }
     }
     if ((config.whatsappToken === undefined) !== (config.whatsappPhoneNumberId === undefined)) {
       context.addIssue({
@@ -222,17 +235,6 @@ export const CpConfigSchema = z
         code: 'custom',
         path: ['publicUrl'],
         message: 'digital bills need CP_PUBLIC_URL and CP_DIGITAL_BILL_KEY for their links',
-      });
-    }
-    if (
-      config.env !== 'development' &&
-      config.publicUrl !== undefined &&
-      !config.publicUrl.startsWith('https://')
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['publicUrl'],
-        message: 'staging and production need an https:// CP_PUBLIC_URL',
       });
     }
     if (config.backupStore === 'local' && config.backupLocalDir === undefined) {
@@ -272,17 +274,6 @@ export const CpConfigSchema = z
         code: 'custom',
         path: ['backupS3Region'],
         message: `cloud backups must stay in India: CP_BACKUP_S3_REGION is one of ${INDIA_REGIONS.join(', ')}`,
-      });
-    }
-    if (
-      config.env !== 'development' &&
-      config.backupStore === 's3' &&
-      !config.backupS3Endpoint.startsWith('https://')
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['backupS3Endpoint'],
-        message: 'staging and production need an https:// CP_BACKUP_S3_ENDPOINT',
       });
     }
     // OI-10: in staging and production the escrow key never leaves the KMS.

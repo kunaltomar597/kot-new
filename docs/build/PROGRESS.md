@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b3b).
+Last updated: 2026-10-10 (P8-03b4a).
 
 What exists:
 
@@ -65,8 +65,10 @@ What exists:
   the firmware problem `SECURE_VERSION_LOWER` (P8-03b2b); the orders, bills and invoices an
   erasure reached, on `EraseDinerContactResponse` (P8-03b2c); the reactivation code a PC took, on
   its heartbeat, and the `LICENCE_TAMPERING` fleet alert (P8-03b3a); how the PC checks its
-  updates, `updateSigning` on its heartbeat, and the `UNSIGNED_UPDATES` fleet alert (P8-03b3b).
-  964 tests.
+  updates, `updateSigning` on its heartbeat, and the `UNSIGNED_UPDATES` fleet alert (P8-03b3b);
+  a Super Admin's reset asked for on `VendorUserView` and its 202 answer
+  (`VendorResetRequestedView`), `CLOUD_BACKUPS_PER_DAY`, `CLOUD_BACKUP_CLOCK_MARGIN_MS` and
+  `DIAGNOSTICS_KEEP_DAYS` (P8-03b4a). 965 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -164,8 +166,14 @@ What exists:
   fingerprint of three identifiers or more, the reactivation codes issued kept and the one a PC
   took checked against them, and a licence tampering alert, in the vendor web app too, closed by
   Support with a reason (P8-03b3a); an alert for a PC that takes unsigned updates, closing by
-  itself once a signed build replaces it (P8-03b3b). 154 tests. Not deployed yet (hosting account
-  pending).
+  itself once a signed build replaces it (P8-03b3b); vendor sign-in that counts each try before
+  checking it, spends a code once and answers an unknown or disabled account as a wrong password,
+  a Super Admin reset only by two other Super Admins (shown on the Staff page), cloud backups kept
+  by the days the Control Plane stored them, dated no later than its clock and 8 a day per PC,
+  diagnostics deleted after 30 days, every outside service on https outside development, bill
+  links and storage grants masked in the request log, daily limits counted under a lock, and a
+  test that calls every PC endpoint with another restaurant's ids (ADR-0021) (P8-03b4a). 180
+  tests. Not deployed yet (hosting account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
@@ -341,7 +349,9 @@ What exists:
   licence put back, a failed fingerprint read, forged reactivation codes, tampering nobody looks
   at), P8-03b3b four of the update pipeline's and the licence's (Actions by tag, an older
   installer under a newer name, a test build at a restaurant, a release without the vendor's
-  keys): 117 mitigated, 6 residual Highs, each planned.
+  keys), P8-03b4a six of the Control Plane's and CP-T2 down from High to a plan for the bucket's
+  object lock (sign-in races, Super Admin resets, diagnostics kept 30 days, https and masked
+  links, tenant isolation, daily limits): 123 mitigated, 5 residual Highs, each planned.
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
   Every GitHub Action is pinned to a commit with its version in a comment, one commit per Action
@@ -356,9 +366,8 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b4 (the Control Plane and the QR relay): the last fixes the threat models planned for
-  P8-03b, by their dates (the summary in `docs/security/threat-models/README.md` lists each
-  threat).
+- P8-03b4b (the QR relay): the last fixes the threat models planned for P8-03b (RELAY-D1, D2,
+  D3, E3, I5, T8; the summary in `docs/security/threat-models/README.md` lists each threat).
 - Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
   incident response plan and the pack for the penetration testers (the external test needs the
   firm the Business Owner engages).
@@ -594,7 +603,12 @@ Recommended next WPs (dependencies met):
             codes, the licence tampering alert)
       - [x] P8-03b3b The update pipeline and the builds (pinned Actions, the updater's version
             check, unsigned updates reported, the release guard)
-    - [ ] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
+    - [~] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
+      - [x] P8-03b4a The Control Plane (sign-in races, backups a PC cannot purge, diagnostics
+            kept 30 days, https and masked links, tenant isolation, daily limits under a lock,
+            Super Admin resets by two)
+      - [ ] P8-03b4b The QR relay (order and service-request floods, body limits, the provisioning
+            login, the PCs' function without CORS, the photo bucket's types)
   - [ ] P8-03c DAST of the QR site, relay and Control Plane
   - [ ] P8-03d Standards checklists, Electron review and MDM policy
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
@@ -843,6 +857,54 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b4a), ADR-0021:
+
+754. P8-03b4 is split into P8-03b4a (the Control Plane: CP-S1, T2, I2, I3, I4, D3, E3) and
+     P8-03b4b (the QR relay: RELAY-D1, D2, D3, E3, I5, T8), by component, as P8-03b2 and P8-03b3
+     were.
+755. Vendor sign-in counts each try in one `UPDATE ... RETURNING` before the password is checked;
+     a try that finds the count past five locks the account and is answered as locked. A code's
+     step is spent with a conditional update (only if no later step was spent), so two sign-ins
+     with one code give one session. An unknown email, a disabled account and one not set up are
+     answered exactly as a wrong password (401, the same message, the Argon2 time) and lock after
+     five tries too, counted in each instance's memory (several instances allow five each); the
+     lock itself still says so, as staff need to know to wait. The audit entry keeps the real
+     reason (`UNKNOWN_EMAIL`, `CANNOT_SIGN_IN`, `PASSWORD`, `CODE`, `CODE_USED`).
+756. A Super Admin's account is reset only when two other Super Admins do it within 24 hours
+     (`VENDOR_RESET_REQUEST_HOURS`): the first gets 202 and nothing changes (audited
+     `vendor.user_reset_requested`); the second gets the setup link (audited `vendor.user_reset`
+     with `requestedBy`). Asking again neither moves the 24 hours nor audits twice; a lapsed
+     request, or one whose asker is no longer an active Super Admin, is replaced by the next
+     asker's. Other roles' accounts need one Super Admin, as before. Nobody resets their own
+     account (new: 409 `VENDOR_SELF_CHANGE`). With two Super Admins only, the operator creates a
+     third with the CLI; the access policy says to keep three.
+757. Cloud backup retention goes by `completed_at`, the time the Control Plane stored the backup,
+     not the date the PC gives (which stays what the vendor and the restore tool are shown). A
+     backup dated more than 10 minutes after the Control Plane's clock is refused (422
+     `CLOUD_BACKUP_DATE`); an old date is not refused, since retention no longer reads it and an
+     archived year can wait days for its upload. A PC starts 8 distinct files in 24 hours at most
+     (429 `CLOUD_BACKUP_LIMIT`, under an advisory lock per PC); the same file again is a retry and
+     always allowed. The bucket's versioning and a 35-day governance-mode object lock (with no
+     permission to delete versions) are manual task 26's, which CP-T2's plan now names.
+758. Diagnostics bundles are deleted (the rows, not just their content) 30 days after they arrive
+     (`DIAGNOSTICS_KEEP_DAYS`, the access policy's figure), checked hourly in each instance, and
+     audited per PC as `diagnostics.removed` by `system:retention`. A support request keeps the id
+     of the bundle that answered it; opening it then answers 404.
+759. Outside development, every outside service's address must be `https:` (AI provider,
+     WhatsApp, error service, alert webhook, S3, KMS, the public address): one list,
+     `OUTSIDE_SERVICES`. The request log masks the last part of `/v1/bills/<token>` and
+     `/v1/object-store/<grant>` and the `token`/`grant` path parameters (`REQUEST_LOG_REDACTION`),
+     and an unexpected error's logged and reported path is masked the same way.
+760. Tenant isolation in the Control Plane stays in the application, not Row-Level Security
+     (ADR-0021, substituting for SEC-005's RLS there; the relay keeps RLS): the installation guard
+     decides the tenant from the signature, every PC endpoint scopes by it, and
+     `tenant-isolation.int.test.ts` calls each of the 12 PC endpoints with another restaurant's
+     ids, failing for a PC endpoint of the registry it has no case for. A future tenant-scoped
+     path other than a PC (an Owner portal, a reporting login) gets RLS before it ships.
+761. The AI menu limit (per restaurant) and the digital bill limit (per PC) are counted under a
+     transaction-scoped advisory lock with the row they allow (`lockFor`, which the invoice
+     numbering now uses too).
 
 Decided 2026-10-10 (P8-03b3b):
 
@@ -4120,6 +4182,12 @@ Security-sensitive PRs for the P8-03 human review:
   (`firmware-image.ts`) and the trusted key list, the public firmware download with its one-time
   token, the pager's new `ota` topic in the broker's ACL, and the reports a pager may send about
   offers (only for versions offered to it, once).
+- P8-03b4a (merged locally): vendor sign-in (the try counted before the check, the step spent
+  once, one answer for unknown and disabled accounts with their in-memory lock), the two-person
+  reset of a Super Admin, cloud backup retention by the Control Plane's times with the date check
+  and the daily number, the request log's masking of bill links and grants, the https rule, and
+  ADR-0021 with the cross-tenant test (a reviewer should check that every PC endpoint really
+  scopes by installation, not only that the test passes).
 - P8-03b1 (merged locally): CI's code-signing gate and the `release-signing` environment, the
   REVOKE of UPDATE on payments, cash movements and day-ends, the pager broker dropping an unpaired
   pager, TLS required in production, the redaction of `x-override-token`, and the threat models
@@ -4135,6 +4203,67 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b4a The Control Plane
+
+Split P8-03b4 into P8-03b4a (this one) and P8-03b4b (the QR relay). Decisions 754 to 761,
+ADR-0021. Seven threats of the Control Plane answered: CP-S1, CP-E3, CP-I2, CP-I3, CP-I4 and CP-D3
+mitigated, CP-T2 (the residual High) down to Low with the bucket's object lock left to manual task 26. 123 mitigated in all, 5 residual Highs.
+
+Built:
+
+- `@rp/contracts`: `VendorUserView.resetRequest`, `VendorResetRequestedView` and the reset
+  route's 202 and 409, `VENDOR_RESET_REQUEST_HOURS`; `CLOUD_BACKUPS_PER_DAY`,
+  `CLOUD_BACKUP_CLOCK_MARGIN_MS` and the start route's 422 and 429; `DIAGNOSTICS_KEEP_DAYS`.
+- Control Plane: migration `20261010170000_control_plane_threats` (the reset request on
+  `vendor_users`, an index for the day's uploads); `VendorAuthService.signIn` (`canSignIn`,
+  `lockIfOver`, the in-memory count for emails without a usable account) and `reset` (the
+  request, a row lock, the second Super Admin); the controller's 202; `CloudBackupsService.start`
+  (the date check, the day's number under `lockFor`) and `prune` by `completedAt`;
+  `DiagnosticsService.purge` on an hourly timer; `OUTSIDE_SERVICES` in `cp-config.ts`;
+  `src/http/log-redaction.ts` (`REQUEST_LOG_REDACTION`, `maskedPath`) used by the logger and the
+  exception filter; `src/database/advisory-lock.ts` (`lockFor`) for AI menus, digital bills and
+  invoice numbers.
+- Vendor web app: the Staff page shows a reset asked for (by whom, until when), "Waiting for
+  another Super Admin" on one's own request, the dialog's text for asking and for carrying out,
+  and a toast for the 202; `CpResponse` takes 202.
+- Tests: `tenant-isolation.int.test.ts` (a case per PC endpoint of the registry);
+  `vendor-staff.int` (parallel guesses, one code twice, unknown and disabled accounts, the
+  two-person reset, no self-reset); `cloud-backups.int` (retention by stored day, future dates,
+  the day's number sent together); `diagnostics.int` (the purge); `menu-extractions.int` and
+  `digital-bills.int` (limits under parallel sends); unit `config.test` (https for each service)
+  and `log-redaction.test` (a real pino-http logger on a server); the vendor web app's two-person
+  reset. The test helper sets vendor accounts up through the service (the API's set-up limit of
+  20 per address was reached by the new tests).
+- Docs: ADR-0021; the Control Plane model's seven threats, the relay's six plans renamed
+  P8-03b4b, the summary; the runbook (https, isolation, backup limits), the access policy
+  (diagnostics deleted, one answer at sign-in, the two-person reset, three Super Admins), manual
+  task 26 (versioning, object lock, lifecycle, the IAM policy without version deletes),
+  `authorisation.md`, the Control Plane README, `ARCHITECTURE.md`, `phase-8.md`.
+
+Tests: Control Plane 180 (+26), contracts 965 (+1, 5 schema snapshots changed), vendor web 75
+(+1), server 1252 (28 skipped; `cloud-backup.int` adjusted: its PC clock starts days back, and both
+backups stored the same day keep the newest); all other test tasks green; vendor web e2e 2/2;
+format, lint, typecheck, docs, compat, `pnpm security:threats` and `pnpm ci:test` green. The race
+tests were run five times each. Traceability: Must 264/287.
+
+Not done or not verified:
+
+- P8-03b4b, as split.
+- The object lock needs the bucket (manual task 26); the local object store does not model it.
+- With several Control Plane instances, an unknown email locks after five tries per instance;
+  real accounts lock once for all (the count is in the database).
+
+Gotchas:
+
+- `test/helpers/vendor.ts`' `vendorAccount` no longer goes through `/v1/vendor/setup`: a test of
+  the API's set-up steps must call them itself (and stays under 20 per file and address).
+- `CloudBackupsService` retention reads `completedAt`: a test that wants backups on different
+  days drives `start` and `complete` with `now` (`storeAt` in `cloud-backups.int`); HTTP uploads in
+  one test all land on the same day, and only the newest is kept.
+- A server test that moves the PC's clock forward for backups must start it in the past, or the
+  Control Plane refuses the backups as dated after its own clock.
+- `DigitalBillView.id` is the PC's request id, not the bill's row id.
 
 ### 2026-10-10: P8-03b3b The update pipeline and the builds
 

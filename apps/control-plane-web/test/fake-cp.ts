@@ -27,6 +27,14 @@ export class FakeRefusal extends Error {
   }
 }
 
+/** An answer with a status of its own (a 202 rather than the route's first success). */
+export class FakeAnswer {
+  constructor(
+    readonly status: number,
+    readonly body: unknown,
+  ) {}
+}
+
 const ROUTES = CONTROL_PLANE_ROUTES.map((route) => ({
   route,
   names: [...route.path.matchAll(/:([A-Za-z]+)/g)].map((match) => match[1] ?? ''),
@@ -94,6 +102,7 @@ export class FakeControlPlane {
     }
     try {
       const result = await handler(call);
+      if (result instanceof FakeAnswer) return json(result.status, result.body);
       const statuses = Object.keys(route.responses).map(Number);
       const status = statuses.find((code) => code >= 200 && code < 300) ?? 200;
       return status === 204 ? new Response(null, { status }) : json(status, result);

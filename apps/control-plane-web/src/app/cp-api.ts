@@ -41,7 +41,7 @@ type CpArgs<Op extends ControlPlaneOperationId> =
 
 type Responses<Op extends ControlPlaneOperationId> = RouteOf<Op>['responses'];
 export type CpResponse<Op extends ControlPlaneOperationId> = {
-  [Status in keyof Responses<Op>]: Status extends 200 | 201 | 204
+  [Status in keyof Responses<Op>]: Status extends 200 | 201 | 202 | 204
     ? Responses<Op>[Status] extends { readonly schema: infer Schema extends z.ZodType }
       ? z.output<Schema>
       : undefined

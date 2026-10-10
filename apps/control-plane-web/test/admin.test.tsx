@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { detailsText } from '../src/audit/AuditScreen.js';
 import { megabytes, releaseRequestOf } from '../src/releases/ReleasesScreen.js';
 import { accountStatus, setupLink } from '../src/staff/StaffScreen.js';
-import { vendorUser } from './fixtures.js';
+import { FakeAnswer } from './fake-cp.js';
+import { USER_ID, vendorUser } from './fixtures.js';
 import { controlPlane, expectNoAxeViolations, renderApp } from './harness.js';
 
 const RELEASE = {
@@ -252,6 +253,78 @@ describe('[VCP-001] [SEC-018] staff accounts', () => {
     await user.click(within(confirm).getByRole('button', { name: 'Reset sign-in' }));
     const shown = await screen.findByRole('dialog', { name: 'Setup link for Ravi Kumar' });
     expect(within(shown).getByLabelText('Setup link')).toHaveTextContent('R'.repeat(43));
+  });
+
+  it('asks for a Super Admin’s reset, and carries out one another Super Admin asked for', async () => {
+    const KIRAN = '0190a1b2-0000-7000-8000-0000000000b1';
+    const DEV = '0190a1b2-0000-7000-8000-0000000000b2';
+    const MOHAN = '0190a1b2-0000-7000-8000-0000000000b3';
+    const asked = (by: string, name: string) => ({
+      requestedById: by,
+      requestedBy: name,
+      requestedAt: '2026-10-02T04:00:00.000Z',
+      expiresAt: '2026-10-03T04:00:00.000Z',
+    });
+    const admins = () => ({
+      users: [
+        vendorUser('SUPER_ADMIN'),
+        vendorUser('SUPER_ADMIN', { id: KIRAN, name: 'Kiran', email: 'kiran@vendor.example' }),
+        vendorUser('SUPER_ADMIN', {
+          id: DEV,
+          name: 'Dev',
+          email: 'dev@vendor.example',
+          resetRequest: asked(KIRAN, 'Kiran'),
+        }),
+        vendorUser('SUPER_ADMIN', {
+          id: MOHAN,
+          name: 'Mohan',
+          email: 'mohan@vendor.example',
+          resetRequest: asked(USER_ID, 'Asha Rao'),
+        }),
+      ],
+    });
+    const cp = controlPlane('SUPER_ADMIN')
+      .on('listVendorUsers', admins)
+      .on('resetVendorUser', ({ params }) =>
+        params.id === KIRAN
+          ? new FakeAnswer(202, {
+              user: vendorUser('SUPER_ADMIN', {
+                id: KIRAN,
+                name: 'Kiran',
+                resetRequest: asked(USER_ID, 'Asha Rao'),
+              }),
+            })
+          : {
+              user: vendorUser('SUPER_ADMIN', { id: DEV, name: 'Dev', active: false }),
+              setupToken: 'D'.repeat(43),
+              setupExpiresAt: '2026-10-05T04:00:00.000Z',
+            },
+      );
+    const { user, container } = renderApp({ cp, path: '/staff' });
+    // A reset this Super Admin asked for waits for another one: nothing to press.
+    expect(await screen.findByText('Waiting for another Super Admin')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Reset sign-in for Mohan' })).toBeNull();
+    expect(screen.getByText(/^Reset asked for by Kiran until/)).toBeVisible();
+    await expectNoAxeViolations(container);
+
+    await user.click(screen.getByRole('button', { name: 'Reset sign-in for Kiran' }));
+    const ask = await screen.findByRole('dialog', { name: 'Reset sign-in for Kiran?' });
+    expect(ask).toHaveTextContent('only when two other Super Admins agree');
+    await user.click(within(ask).getByRole('button', { name: 'Reset sign-in' }));
+    expect(
+      await screen.findByText(
+        'Reset asked for. Another Super Admin must reset it too within 24 hours.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('dialog', { name: /^Setup link/ })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Reset sign-in for Dev' }));
+    const approve = await screen.findByRole('dialog', { name: 'Reset sign-in for Dev?' });
+    expect(approve).toHaveTextContent('Kiran asked to reset this sign-in.');
+    await user.click(within(approve).getByRole('button', { name: 'Reset sign-in' }));
+    const shown = await screen.findByRole('dialog', { name: 'Setup link for Dev' });
+    expect(within(shown).getByLabelText('Setup link')).toHaveTextContent('D'.repeat(43));
+    expect(cp.callsOf('resetVendorUser').map((call) => call.params.id)).toEqual([KIRAN, DEV]);
   });
 
   it('records the quarterly access review, disabling whoever is unticked', async () => {

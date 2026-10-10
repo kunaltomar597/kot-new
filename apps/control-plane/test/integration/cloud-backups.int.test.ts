@@ -5,9 +5,11 @@ import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import {
   ApiError,
+  CLOUD_BACKUPS_PER_DAY,
   CloudBackupListResponse,
   CloudBackupView,
   FleetResponse,
+  StartCloudBackupRequest,
   StartCloudBackupResponse,
 } from '@rp/contracts/control-plane';
 import type { TestDatabase } from '@rp/test-postgres';
@@ -90,6 +92,20 @@ async function upload(
   const parts = await putParts(body, file.bytes);
   const path = `/v1/cloud-backups/${body.id}/complete`;
   return { body, parts, path };
+}
+
+/** Starts, uploads and completes a backup through the service, at the Control Plane's `now`. */
+async function storeAt(
+  installation: TestInstallation,
+  file: { bytes: Buffer; sha256: string },
+  createdAt: string,
+  now: Date,
+) {
+  const service = app.get(CloudBackupsService);
+  const request = StartCloudBackupRequest.parse(JSON.parse(startBody(file, createdAt)));
+  const started = await service.start(installation.id ?? '', request, now);
+  const parts = await putParts(started, file.bytes);
+  return service.complete(installation.id ?? '', started.id, { parts }, now);
 }
 
 beforeAll(async () => {
@@ -188,12 +204,10 @@ describe('[DATA-003] uploading a backup to the cloud', () => {
 
   it('[DATA-002] keeps the newest of each of the last 30 days and 12 months per PC (§9.3)', async () => {
     const service = app.get(CloudBackupsService);
-    // 60 nightly backups for the other PC, one a day.
+    // 60 nightly backups for the other PC, one a day, each stored half an hour after it was made.
     for (let day = 0; day < 60; day += 1) {
       const createdAt = new Date(Date.UTC(2026, 7, 1 + day, 23, 0, 0)).toISOString();
-      const file = backupFile(100);
-      const { path, parts } = await upload(other, file, createdAt);
-      expect((await signedPost(app, other, path, JSON.stringify({ parts }))).status).toBe(200);
+      await storeAt(other, backupFile(100), createdAt, new Date(Date.parse(createdAt) + 1_800_000));
     }
     const kept = await service.list(other.id ?? '');
     // 2 August to 30 September in India: the 30 days of September, and August's last night.
@@ -221,6 +235,67 @@ describe('[DATA-003] uploading a backup to the cloud', () => {
     );
     const row = fleet.installations.find((entry) => entry.installationId === pc.id);
     expect(row?.cloudBackupAt).toBe('2026-10-03T23:00:00.000Z');
+  });
+});
+
+describe('[DATA-003] a PC that cannot be trusted with what is kept (threat CP-T2)', () => {
+  let rogue: TestInstallation;
+  const day = (n: number) => new Date(Date.UTC(2026, 9, n, 6, 0, 0));
+  beforeAll(async () => {
+    rogue = await enrolledInstallation(app);
+  });
+
+  it('keeps backups by the day the Control Plane stored them, whatever date the PC gives', async () => {
+    // Five backups that all say they were made on the same night, stored on five days.
+    for (let n = 1; n <= 5; n += 1) {
+      await storeAt(rogue, backupFile(100), '2026-01-01T00:00:00Z', day(n));
+    }
+    expect(await app.get(CloudBackupsService).list(rogue.id ?? '')).toHaveLength(5);
+  });
+
+  it('refuses a backup dated after the Control Plane’s time', async () => {
+    const service = app.get(CloudBackupsService);
+    const now = day(6);
+    const dated = (minutes: number) =>
+      StartCloudBackupRequest.parse(
+        JSON.parse(
+          startBody(backupFile(100), new Date(now.getTime() + minutes * 60_000).toISOString()),
+        ),
+      );
+    await expect(service.start(rogue.id ?? '', dated(11), now)).rejects.toMatchObject({
+      status: 422,
+      code: 'CLOUD_BACKUP_DATE',
+    });
+    // The PC's clock may be a few minutes ahead.
+    expect((await service.start(rogue.id ?? '', dated(5), now)).status).toBe('UPLOADING');
+  });
+
+  it('starts 8 files a day per PC at most, each tried again as often as needed', async () => {
+    expect(CLOUD_BACKUPS_PER_DAY).toBe(8);
+    const service = app.get(CloudBackupsService);
+    const now = day(20);
+    const start = (file: { bytes: Buffer; sha256: string }, at = now) =>
+      service.start(
+        rogue.id ?? '',
+        StartCloudBackupRequest.parse(JSON.parse(startBody(file, '2026-10-19T23:00:00Z'))),
+        at,
+      );
+    const files = Array.from({ length: CLOUD_BACKUPS_PER_DAY + 1 }, () => backupFile(100));
+    // Sent together: no more than the day's number get through.
+    const started = await Promise.allSettled(files.map((file) => start(file)));
+    expect(started.filter((result) => result.status === 'fulfilled')).toHaveLength(
+      CLOUD_BACKUPS_PER_DAY,
+    );
+    const refused = started.findIndex((result) => result.status === 'rejected');
+    expect(started[refused]).toMatchObject({
+      reason: { status: 429, code: 'CLOUD_BACKUP_LIMIT' },
+    });
+    const allowed = files.filter((_, index) => index !== refused);
+    // A file already started today may be started again (a retry after a failed upload).
+    expect((await start(allowed[0]!)).status).toBe('UPLOADING');
+    // The next day, the refused one goes.
+    const next = await start(files[refused]!, new Date(now.getTime() + 24 * 3_600_000 + 1));
+    expect(next.status).toBe('UPLOADING');
   });
 });
 

@@ -114,3 +114,22 @@ Schema changes follow the local server's routine (`apps/server/README.md`): edit
   database per test file.
 - `@rp/control-plane/testing` exports what the local server's acceptance test (P0-17b) needs to
   run a real Control Plane beside it.
+- `test/integration/tenant-isolation.int.test.ts` calls every endpoint a PC may call with another
+  restaurant's ids (SEC-005, ADR-0021). A new PC endpoint fails it until it has its case there.
+- `test/helpers/vendor.ts` sets accounts up through the service; the API's own set-up steps, and
+  their limit of 20 tries per address, are tested in `vendor-staff.int.test.ts`.
+
+## Security (P8-03b4a)
+
+What the Control Plane's threat model (`docs/security/threat-models/control-plane.md`) asked for:
+
+- Vendor sign-in counts each try before checking it, spends an authenticator code once, and
+  answers an unknown email or a disabled account as a wrong password (CP-S1).
+- A Super Admin's account is reset only by two other Super Admins (CP-E3).
+- Cloud backups are kept by the days the Control Plane stored them, dated no later than its clock,
+  8 a day per PC (CP-T2).
+- Diagnostics bundles are deleted 30 days after they arrive (CP-I2).
+- Outside services are `https:` in staging and production; the request log masks bill links and
+  storage grants (`src/http/log-redaction.ts`, CP-I3).
+- Daily limits (AI menus, digital bills) are counted under a lock (`src/database/advisory-lock.ts`,
+  CP-D3).

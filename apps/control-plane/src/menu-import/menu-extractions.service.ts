@@ -14,6 +14,7 @@ import {
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthenticatedInstallation } from '../auth/installation.guard.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
+import { lockFor } from '../database/advisory-lock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { CpError } from '../errors/cp-error.js';
 import type { MenuExtraction } from '../generated/prisma/client.js';
@@ -83,17 +84,6 @@ export class MenuExtractionsService implements OnApplicationBootstrap, OnModuleD
         'Reading menus from photos is not available yet. Use the Excel template instead.',
       );
     }
-    const since = new Date(Date.now() - DAY_MS);
-    const today = await this.prisma.menuExtraction.count({
-      where: { tenantId: installation.tenantId, createdAt: { gte: since } },
-    });
-    if (today >= this.config.aiDailyLimit) {
-      throw new CpError(
-        429,
-        CONTROL_PLANE_ERRORS.aiImportLimit,
-        `This restaurant has read ${String(this.config.aiDailyLimit)} menus today. Try again tomorrow.`,
-      );
-    }
     const files = request.files.map((file, position) => ({
       id: newId(),
       position,
@@ -104,6 +94,22 @@ export class MenuExtractionsService implements OnApplicationBootstrap, OnModuleD
     const bytes = files.reduce((total, file) => total + file.content.length, 0);
     const id = newId();
     const created = await this.prisma.transaction(async (tx) => {
+      // Counted under the restaurant's lock, so readings sent together cannot pass the day's
+      // number (threat CP-D3).
+      await lockFor(tx, `menu-extraction:${installation.tenantId}`);
+      const today = await tx.menuExtraction.count({
+        where: {
+          tenantId: installation.tenantId,
+          createdAt: { gte: new Date(Date.now() - DAY_MS) },
+        },
+      });
+      if (today >= this.config.aiDailyLimit) {
+        throw new CpError(
+          429,
+          CONTROL_PLANE_ERRORS.aiImportLimit,
+          `This restaurant has read ${String(this.config.aiDailyLimit)} menus today. Try again tomorrow.`,
+        );
+      }
       const row = await tx.menuExtraction.create({
         data: {
           id,

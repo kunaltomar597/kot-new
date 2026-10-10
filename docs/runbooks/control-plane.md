@@ -23,6 +23,13 @@ For staging and production:
 - Serve the API at the root of its host name. Signed requests cover the path, so rewriting it
   breaks them.
 - Health check: `GET /v1/health` answers 200 when the database is up and 503 when it is not.
+- Every outside service is reached over `https:` (the AI provider, WhatsApp, the error service,
+  the alert webhook, S3, the KMS and `CP_PUBLIC_URL`); staging and production refuse to start with
+  an `http:` address for any of them. The request log never writes a digital bill's link or a
+  signed storage address: their tokens show as `[REDACTED]`.
+- Tenants share one database and are kept apart by the PC's signature, not Row-Level Security
+  (ADR-0021). Every endpoint a PC may call has its case in
+  `test/integration/tenant-isolation.int.test.ts`; a new one fails CI until it has.
 
 ## Deploying a version of the service
 
@@ -149,7 +156,15 @@ record; the bytes go straight from the PC to storage, and the Control Plane cann
   their backups locally.
 - **Retention (BRD §9.3):** per PC, the newest backup of each of the last
   `CP_BACKUP_KEEP_DAILY` (30) days and `CP_BACKUP_KEEP_MONTHLY` (12) calendar months, applied
-  after each upload. When a restaurant's contract ends, delete its cloud backups within 30 days,
+  after each upload. The days and months are those the Control Plane stored each backup on, never
+  the date the PC gives, so a PC taken over (ransomware, a stolen key) cannot push the older
+  backups out: it can replace only the day's own (threat CP-T2).
+- **Limits:** a PC starts 8 files in 24 hours at most (retries of one file count once); the next
+  is answered `CLOUD_BACKUP_LIMIT` (429), and the PC tries again an hour later. A backup dated
+  more than 10 minutes after the Control Plane's clock is refused as `CLOUD_BACKUP_DATE` (422):
+  the PC's clock is wrong, and its other signed requests are failing too (`CLOCK_SKEW`). A PC that
+  hits the limit every day is worth a look: it is taking backups by hand all day, or it is not
+  itself. When a restaurant's contract ends, delete its cloud backups within 30 days,
   after notice and once the restaurant's CA confirms (a manual step for now). A removed backup keeps its
   record as DELETED. Uploads not completed in two days are aborted and their parts removed; the
   bucket's lifecycle rule removes any left behind.
