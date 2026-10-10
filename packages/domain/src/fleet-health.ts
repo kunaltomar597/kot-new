@@ -66,12 +66,14 @@ export const FLEET_ALERT_KINDS = [
   'BACKUP_FAILED',
   'AUDIT_CHAIN_MISMATCH',
   'UPDATE_FAILED',
+  'LICENCE_TAMPERING',
 ] as const;
 export type FleetAlertKind = (typeof FLEET_ALERT_KINDS)[number];
 
 /**
- * Alerts opened and closed from each heartbeat's state; a chain alert needs a person. A failed
- * update (P7-04a) is opened by the rollout and closes when the PC runs that version or a newer one.
+ * Alerts opened and closed from each heartbeat's state; a chain alert and a licence tampering
+ * alert need a person. A failed update (P7-04a) is opened by the rollout and closes when the PC
+ * runs that version or a newer one.
  */
 export const SELF_RESOLVING_ALERTS: readonly FleetAlertKind[] = [
   'OFFLINE',
@@ -204,4 +206,55 @@ export function checkCheckpoint(
   return answer.hash === known.hash
     ? { ok: true }
     : { ok: false, reason: 'REWRITTEN', sequence: known.sequence };
+}
+
+/**
+ * What a PC reports as tampering (LIC-007) that alerts at once (SEC-015): a licence file or the
+ * sealed record changed, or the licence on another PC. A reactivation code the vendor never
+ * issued alerts too (`tamperAlertDue`'s `unissuedCode`).
+ */
+export const SERIOUS_TAMPER_KINDS: readonly string[] = [
+  'LICENCE_TAMPERED',
+  'RECORD_TAMPERED',
+  'OTHER_PC',
+];
+/** The clock's reports (set back, held back, far from the Control Plane's) alert when repeated. */
+export const CLOCK_TAMPER_KINDS: readonly string[] = ['CLOCK_ROLLBACK', 'CLOCK_SKEW'];
+/** SEC-015's "repeated tamper events": this many clock reports within the window. */
+export const CLOCK_TAMPER_REPEATS = 3;
+export const CLOCK_TAMPER_WINDOW_DAYS = 7;
+
+export interface TamperReport {
+  readonly kind: string;
+  /** When the Control Plane received it (the PC's own time may be what is wrong). */
+  readonly at: string;
+}
+
+/**
+ * Whether a PC's tamper reports call for a fleet alert (SEC-015, LIC-007), and for which kinds.
+ * `reports` are those the Control Plane received since the last alert of this kind was closed,
+ * the new ones included; `now` is when the newest arrived. A serious kind, or a reactivation code
+ * the vendor never issued, alerts at once; the clock's kinds once reported on
+ * `CLOCK_TAMPER_REPEATS` occasions within `CLOCK_TAMPER_WINDOW_DAYS` (a PC reports each kind once
+ * a day at most), since a PC with a flat clock battery is more common than a customer holding the
+ * clock back, and a person should not be called for one report.
+ */
+export function tamperAlertDue(
+  reports: readonly TamperReport[],
+  now: Date,
+  unissuedCode = false,
+): readonly string[] {
+  const kinds = new Set<string>();
+  if (unissuedCode) kinds.add('REACTIVATION_CODE_NOT_ISSUED');
+  for (const report of reports) {
+    if (SERIOUS_TAMPER_KINDS.includes(report.kind)) kinds.add(report.kind);
+  }
+  const since = now.getTime() - CLOCK_TAMPER_WINDOW_DAYS * 86_400_000;
+  const clock = reports.filter(
+    (report) => CLOCK_TAMPER_KINDS.includes(report.kind) && Date.parse(report.at) > since,
+  );
+  if (clock.length >= CLOCK_TAMPER_REPEATS) {
+    for (const report of clock) kinds.add(report.kind);
+  }
+  return [...kinds].sort();
 }

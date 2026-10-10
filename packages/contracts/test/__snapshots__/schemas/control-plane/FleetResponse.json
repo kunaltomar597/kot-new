@@ -214,7 +214,8 @@
                   "DISK_FULL",
                   "BACKUP_FAILED",
                   "AUDIT_CHAIN_MISMATCH",
-                  "UPDATE_FAILED"
+                  "UPDATE_FAILED",
+                  "LICENCE_TAMPERING"
                 ]
               }
             }
@@ -470,7 +471,8 @@
                   "DISK_FULL",
                   "BACKUP_FAILED",
                   "AUDIT_CHAIN_MISMATCH",
-                  "UPDATE_FAILED"
+                  "UPDATE_FAILED",
+                  "LICENCE_TAMPERING"
                 ]
               }
             }

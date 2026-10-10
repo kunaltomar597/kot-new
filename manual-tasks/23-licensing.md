@@ -55,4 +55,6 @@ pnpm --filter @rp/control-plane cli licence:code --installation <id> --until 202
 
 A state change reaches an online restaurant within a minute while its licence is not active
 (within five minutes otherwise). Read a reactivation code to the Owner only after checking who is
-calling; it is shown once.
+calling; it is shown once. A code reaches 60 days at most (the PC takes none further). The PC
+reports the code it took at its next heartbeat; one the vendor never issued opens a licence
+tampering alert (`docs/runbooks/control-plane.md`, "Licence tampering").

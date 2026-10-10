@@ -65,12 +65,13 @@ Every PC reports every 5 minutes: versions, disk, devices and how many are conne
 errors since the last report, backups (from P7-05), its opening hours and its audit chain head.
 The Control Plane opens one alert per PC and kind:
 
-| Alert                | When                                                                                                                                  | Closes                               |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| Offline              | Silent for more than `CP_OFFLINE_ALERT_MINUTES` (30) of the restaurant's opening hours. A PC without opening hours counts every hour. | By itself, at the next heartbeat     |
-| Disk full            | Data drive more than `CP_DISK_ALERT_PERCENT` (90 %) full                                                                              | By itself, when space is freed       |
-| Backup failed        | The latest backup failed                                                                                                              | By itself, after a successful backup |
-| Audit chain mismatch | The PC's local audit log changed after it was reported (AUD-003)                                                                      | Only by a person, with a reason      |
+| Alert                | When                                                                                                                                                                                                                               | Closes                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Offline              | Silent for more than `CP_OFFLINE_ALERT_MINUTES` (30) of the restaurant's opening hours. A PC without opening hours counts every hour.                                                                                              | By itself, at the next heartbeat     |
+| Disk full            | Data drive more than `CP_DISK_ALERT_PERCENT` (90 %) full                                                                                                                                                                           | By itself, when space is freed       |
+| Backup failed        | The latest backup failed                                                                                                                                                                                                           | By itself, after a successful backup |
+| Audit chain mismatch | The PC's local audit log changed after it was reported (AUD-003)                                                                                                                                                                   | Only by a person, with a reason      |
+| Licence tampering    | The PC reported its licence file changed or put back, its licence record edited, the licence on another PC, a reactivation code the vendor never issued, or its clock set back or far off three times in a week (LIC-007, SEC-015) | Only by a person, with a reason      |
 
 - **Webhook:** set `CP_ALERT_WEBHOOK_URL` (a Slack or Microsoft Teams incoming webhook, from the
   secret manager). Each alert is then posted as it opens and as it closes. Posts that fail are
@@ -94,6 +95,29 @@ the application, or was restored from a backup.
    backup after a disk failure". The chain then counts from the PC's current head.
 6. No explanation: escalate to the Super Admin and leave the alert open. The audit log may have
    been tampered with (SEC-018).
+
+### Licence tampering
+
+A PC reports what looks like tampering with its licence (LIC-007) in its heartbeats, once a day
+per kind at most; every report is in the audit log (`licence.tamper`). The alert opens at once
+for a licence file changed or an older one put back, the PC's licence record edited, the licence
+on another PC, or a reactivation code that matches none the vendor issued
+(`licence.reactivation_unknown`; the code's day and number are on the alert). The clock (set
+back, held back more than an hour, or more than ten minutes from the Control Plane's) alerts only
+once reported three times within seven days: a flat clock battery is more common than a customer
+holding the clock back.
+
+1. Call the Owner. Ask whether the PC was restored from a backup, replaced, repaired, or its date
+   and time changed, and when.
+2. A clock alert: ask the Owner to set Windows to set the time automatically; a clock that loses
+   time after every restart needs a new CMOS battery.
+3. Another PC: a moved or cloned installation. A replaced PC is re-bound (`licence:rebind`) after
+   checking who is calling; otherwise escalate.
+4. A code never issued: someone made one with the PC's secret. Escalate to the Super Admin; the
+   Finance Admin checks the restaurant's payments.
+5. Note what you found as a support note, then close the alert with the reason, for example "Flat
+   clock battery, replaced on 12 Oct". Reports count afresh from then, so the same problem opens
+   a new alert.
 
 ## Cloud backups (DATA-003)
 

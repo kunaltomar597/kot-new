@@ -284,19 +284,20 @@ model Installation {
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id])
   heartbeats          Heartbeat[]
   nonces              RequestNonce[]
   menuExtractions     MenuExtraction[]
   licence             InstallationLicence?
   licenceFiles        LicenceFile[]
+  reactivationCodes   LicenceReactivationCode[]
   auditChainHeads     AuditChainHead[]
   fleetAlerts         FleetAlert[]
   diagnostics         DiagnosticsBundle[]
   diagnosticsRequests DiagnosticsRequest[]
   cloudBackups        CloudBackup[]
   backupKeyEscrows    BackupKeyEscrow[]
-  hotfixes            Release[]            @relation("Hotfixes")
+  hotfixes            Release[]                 @relation("Hotfixes")
   releaseInstalls     ReleaseInstall[]
   digitalBills        DigitalBill[]
   restoreCodes        RestoreCode[]
@@ -352,6 +353,23 @@ model LicenceFile {
 
   @@index([installationId, issuedAt])
   @@map("licence_files")
+}
+
+/// An offline reactivation code issued (LIC-006): its day and counter, never the code. A PC
+/// reports the code it took; one that matches none issued alerts (LIC-007, SEC-015).
+model LicenceReactivationCode {
+  installationId String    @map("installation_id") @db.Uuid
+  counter        Int
+  validUntil     DateTime  @map("valid_until") @db.Date
+  issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz(3)
+  issuedBy       String    @map("issued_by")
+  /// When a PC first reported taking it.
+  usedAt         DateTime? @map("used_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id])
+
+  @@id([installationId, counter])
+  @@map("licence_reactivation_codes")
 }
 
 /// Every heartbeat an installation sent (VCP-005). Retention and fleet views come in P7-03.
@@ -535,6 +553,7 @@ enum FleetAlertKind {
   BACKUP_FAILED
   AUDIT_CHAIN_MISMATCH
   UPDATE_FAILED
+  LICENCE_TAMPERING
 }
 
 /// A fleet alert (VCP-005): at most one open per PC and kind (a partial unique index).

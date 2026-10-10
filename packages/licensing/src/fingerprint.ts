@@ -53,6 +53,18 @@ export function fingerprintMatchCount(
   return matches;
 }
 
+/**
+ * Whether a read of the fingerprint says anything: at least three identifiers were read. A read
+ * with fewer (WMI or PowerShell failing for a moment) is unknown: it could never match, so it is
+ * neither kept nor judged, and the Control Plane binds no licence to it.
+ */
+export function fingerprintKnown(fingerprint: readonly (string | null)[]): boolean {
+  return (
+    fingerprint.slice(0, FINGERPRINT_SIZE).filter((entry) => entry !== null).length >=
+    FINGERPRINT_MATCHES_NEEDED
+  );
+}
+
 /** Whether this is still the licensed PC: three of five identifiers match (LIC-004). */
 export function isLicensedPc(
   licensed: readonly (string | null)[],

@@ -1,10 +1,24 @@
 {
   "input": {
     "type": "string",
-    "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH", "UPDATE_FAILED"]
+    "enum": [
+      "OFFLINE",
+      "DISK_FULL",
+      "BACKUP_FAILED",
+      "AUDIT_CHAIN_MISMATCH",
+      "UPDATE_FAILED",
+      "LICENCE_TAMPERING"
+    ]
   },
   "output": {
     "type": "string",
-    "enum": ["OFFLINE", "DISK_FULL", "BACKUP_FAILED", "AUDIT_CHAIN_MISMATCH", "UPDATE_FAILED"]
+    "enum": [
+      "OFFLINE",
+      "DISK_FULL",
+      "BACKUP_FAILED",
+      "AUDIT_CHAIN_MISMATCH",
+      "UPDATE_FAILED",
+      "LICENCE_TAMPERING"
+    ]
   }
 }

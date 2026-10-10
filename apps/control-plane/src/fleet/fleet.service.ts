@@ -22,8 +22,10 @@ import {
   diskUsedPercent,
   type FleetHealthInput,
   fleetAlertsDue,
+  CLOCK_TAMPER_WINDOW_DAYS,
   offlineMinutesDuringHours,
   SELF_RESOLVING_ALERTS,
+  tamperAlertDue,
 } from '@rp/domain';
 import { AuditService } from '../audit/audit.service.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
@@ -37,6 +39,12 @@ import { alertText } from './fleet-text.js';
 
 /** Who closes alerts the Control Plane closes by itself, in the audit log and on the alert. */
 export const FLEET_ACTOR = 'system:fleet';
+/** The alerts a person closes, with a reason. */
+const PERSON_CLOSES: readonly FleetAlertKind[] = [
+  'AUDIT_CHAIN_MISMATCH',
+  'UPDATE_FAILED',
+  'LICENCE_TAMPERING',
+];
 const HEADS_LISTED = 100;
 
 type AlertRow = FleetAlert & { installation: Installation & { tenant: Tenant } };
@@ -207,6 +215,56 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
       return { error: backup.lastError, failedAt: backup.lastFailureAt };
     }
     return {};
+  }
+
+  /**
+   * What looked like tampering on a PC (LIC-007), in the heartbeat's transaction once its tamper
+   * events are in the audit log: an alert for a person when `tamperAlertDue` says so (SEC-015).
+   * Reports count from when the last such alert was closed, so closing one starts afresh.
+   */
+  async licenceTampering(
+    tx: TransactionClient,
+    installationId: string,
+    report: {
+      /** How many tamper events the heartbeat carried. */
+      readonly events: number;
+      /** The reactivation code the PC took, when the vendor never issued it. */
+      readonly unissuedCode: { readonly counter: number; readonly validUntil: string } | null;
+    },
+    now: Date,
+  ): Promise<void> {
+    if (report.events === 0 && report.unissuedCode === null) return;
+    const closed = await tx.fleetAlert.findFirst({
+      where: { installationId, kind: 'LICENCE_TAMPERING', resolvedAt: { not: null } },
+      orderBy: { resolvedAt: 'desc' },
+      select: { resolvedAt: true },
+    });
+    const windowStart = new Date(now.getTime() - CLOCK_TAMPER_WINDOW_DAYS * 86_400_000);
+    const closedAt = closed?.resolvedAt ?? null;
+    const since = closedAt !== null && closedAt > windowStart ? closedAt : windowStart;
+    const rows = await tx.auditEntry.findMany({
+      where: {
+        action: 'licence.tamper',
+        targetType: 'installation',
+        targetId: installationId,
+        occurredAt: { gt: since },
+      },
+      select: { occurredAt: true, details: true },
+    });
+    const reports = rows.flatMap((row) => {
+      const details = row.details;
+      const kind =
+        details !== null && typeof details === 'object' && !Array.isArray(details)
+          ? details.kind
+          : undefined;
+      return typeof kind === 'string' ? [{ kind, at: row.occurredAt.toISOString() }] : [];
+    });
+    const kinds = tamperAlertDue(reports, now, report.unissuedCode !== null);
+    if (kinds.length === 0) return;
+    await this.open(tx, installationId, 'LICENCE_TAMPERING', now, {
+      kinds: [...kinds],
+      ...(report.unissuedCode !== null && { reactivation: { ...report.unissuedCode } }),
+    });
   }
 
   // ----------------------------------------------------------------- alerts
@@ -385,7 +443,9 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
   /**
    * Closes an audit chain alert once someone looked into it (AUD-003, SEC-018): the heads seen so
    * far are set aside, so the chain counts from the head the PC reports next (a restore from
-   * backup, say). The other kinds close by themselves.
+   * backup, say). A licence tampering alert, too, once someone spoke to the restaurant (SEC-015):
+   * its reports count afresh from then. A failed update when the PC will not run that version.
+   * The other kinds close by themselves.
    */
   async resolve(
     id: string,
@@ -399,9 +459,9 @@ export class FleetService implements OnApplicationBootstrap, OnModuleDestroy {
       if (alert.resolvedAt !== null) {
         throw new CpError(409, 'ALERT_CLOSED', 'This alert is already closed.');
       }
-      // A chain alert needs a person; a failed update may, when the PC will not run that version
-      // (held at an older one, or replaced). The others close by themselves.
-      if (alert.kind !== 'AUDIT_CHAIN_MISMATCH' && alert.kind !== 'UPDATE_FAILED') {
+      // A chain or tampering alert needs a person; a failed update may, when the PC will not run
+      // that version (held at an older one, or replaced). The others close by themselves.
+      if (!PERSON_CLOSES.includes(alert.kind)) {
         throw new CpError(
           409,
           'ALERT_CLOSES_ITSELF',

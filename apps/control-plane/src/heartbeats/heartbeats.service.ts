@@ -56,9 +56,12 @@ export class HeartbeatsService {
         where: { id: installation.id },
         data: { lastSeenAt: receivedAt, ...(count === 1 && { lastHeartbeat: payload }) },
       });
-      // LIC-007: what looked like tampering on the PC, once per heartbeat delivered.
+      // LIC-007: what looked like tampering on the PC, once per heartbeat delivered; the
+      // reactivation code it took, compared with those issued; an alert when it calls for a
+      // person (SEC-015).
       if (count === 1) {
-        for (const event of heartbeat.tamper ?? []) {
+        const events = heartbeat.tamper ?? [];
+        for (const event of events) {
           await this.audit.record(tx, {
             actor: `installation:${installation.id}`,
             action: 'licence.tamper',
@@ -67,6 +70,16 @@ export class HeartbeatsService {
             details: { kind: event.kind, at: event.at },
           });
         }
+        const code = heartbeat.licence?.reactivation ?? null;
+        const issued =
+          code === null ||
+          (await this.licences.checkReactivation(tx, installation.id, code, receivedAt));
+        await this.fleet.licenceTampering(
+          tx,
+          installation.id,
+          { events: events.length, unissuedCode: issued ? null : code },
+          receivedAt,
+        );
       }
       // UPD-003: how installing releases went, for the rollouts' health (P7-04a), and the pager
       // firmware the PC took or its pagers rolled back from (P2-04b).

@@ -9,7 +9,14 @@ import {
   type SignedLicence,
 } from '@rp/contracts/control-plane';
 import { canTransition, LICENSE_EVENTS, licenseMachine, transition } from '@rp/domain';
-import { isLicensedPc, reactivationCode, reactivationSecretOf } from '@rp/licensing';
+import {
+  fingerprintKnown,
+  isLicensedPc,
+  lastReactivationDay,
+  REACTIVATION_MAX_DAYS,
+  reactivationCode,
+  reactivationSecretOf,
+} from '@rp/licensing';
 import type { AuthenticatedInstallation } from '../auth/installation.guard.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CP_CONFIG, type CpConfig } from '../config/cp-config.js';
@@ -24,8 +31,6 @@ const DAY_MS = 86_400_000;
 const RENEW_AFTER_MS = DAY_MS;
 /** Device limits a new installation starts with, until the vendor sets its plan (P7-02). */
 const DEFAULT_LIMITS: DeviceLimits = { TABLE_TABLET: 30, PAGER: 15, WAITER_PHONE: 15, KDS: 6 };
-/** How far ahead an offline reactivation code may reach. */
-const REACTIVATION_MAX_DAYS = 60;
 
 type Report = NonNullable<HeartbeatRequest['licence']>;
 type Fingerprint = (string | null)[];
@@ -120,6 +125,15 @@ export class LicencesService {
       const terms = await this.lockedTerms(tx, installation.id);
       const heartbeatSeconds =
         terms.state === 'ACTIVE' ? null : this.config.licenceHeartbeatSeconds;
+      if (!fingerprintKnown(report.fingerprint)) {
+        // LIC-004: a read of fewer than three identifiers says nothing about the PC. Nothing is
+        // bound, compared or renewed until it reads its fingerprint again.
+        this.logger.warn(
+          { installationId: installation.id },
+          'A heartbeat with too few PC identifiers: no licence until the PC reads them',
+        );
+        return { licence: null, reactivationSecret, heartbeatSeconds };
+      }
       const bound = fingerprintOf(terms);
       let fingerprint = bound;
       if (bound === null) {
@@ -322,9 +336,7 @@ export class LicencesService {
       );
     }
     const today = now.toISOString().slice(0, 10);
-    const last = new Date(now.getTime() + REACTIVATION_MAX_DAYS * DAY_MS)
-      .toISOString()
-      .slice(0, 10);
+    const last = lastReactivationDay(now);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(until) || until < today || until > last) {
       throw new CpError(
         400,
@@ -345,6 +357,15 @@ export class LicencesService {
         where: { installationId },
         data: { reactivationCounter: counter },
       });
+      // Kept so the code a PC says it took can be checked (LIC-007); never the code itself.
+      await tx.licenceReactivationCode.create({
+        data: {
+          installationId,
+          counter,
+          validUntil: new Date(`${until}T00:00:00.000Z`),
+          issuedBy: actor,
+        },
+      });
       await this.audit.record(tx, {
         actor,
         action: 'licence.reactivation_code',
@@ -358,6 +379,49 @@ export class LicencesService {
         counter,
       };
     });
+  }
+
+  /**
+   * The offline reactivation code a PC says the Owner typed in (LIC-006, LIC-007), in the
+   * heartbeat's transaction: true when the vendor issued it, with that day (its first use is
+   * recorded); false when it matches no code issued, which only someone holding the PC's
+   * reactivation secret could have made. Audited either way.
+   */
+  async checkReactivation(
+    tx: TransactionClient,
+    installationId: string,
+    reported: { readonly counter: number; readonly validUntil: string },
+    now = new Date(),
+  ): Promise<boolean> {
+    const issued = await tx.licenceReactivationCode.findUnique({
+      where: { installationId_counter: { installationId, counter: reported.counter } },
+    });
+    const issuedUntil = issued?.validUntil.toISOString().slice(0, 10) ?? null;
+    const matches = issuedUntil === reported.validUntil;
+    if (matches && issued?.usedAt === null) {
+      await tx.licenceReactivationCode.update({
+        where: { installationId_counter: { installationId, counter: reported.counter } },
+        data: { usedAt: now },
+      });
+    }
+    await this.audit.record(tx, {
+      actor: `installation:${installationId}`,
+      action: matches ? 'licence.reactivation_used' : 'licence.reactivation_unknown',
+      targetType: 'installation',
+      targetId: installationId,
+      details: {
+        counter: reported.counter,
+        validUntil: reported.validUntil,
+        ...(!matches && { issuedValidUntil: issuedUntil }),
+      },
+    });
+    if (!matches) {
+      this.logger.warn(
+        { installationId, counter: reported.counter },
+        'A PC took a reactivation code the vendor never issued',
+      );
+    }
+    return matches;
   }
 
   private secretOf(installationId: string): Buffer | undefined {

@@ -8,6 +8,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
  * HMAC-SHA256, enough when the server limits attempts.
  */
 
+/** How far ahead an offline reactivation code may reach: the vendor issues none further. */
+export const REACTIVATION_MAX_DAYS = 60;
+
 /** Crockford's base 32: no I, L, O or U, so it reads well over the phone. */
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 /** Days are counted from here (16 bits: until the year 2205). */
@@ -89,6 +92,16 @@ export function reactivationCode(
     macOf(secret, installationId, day, counter),
   ]);
   return (encode(bytes).match(/.{4}/g) ?? []).join('-');
+}
+
+/**
+ * The last day a code issued at `now` may reach (YYYY-MM-DD, UTC): what the Control Plane allows.
+ * The PC allows a day more (`slackDays`), for a clock a little behind and the time zones.
+ */
+export function lastReactivationDay(now: Date, slackDays = 0): string {
+  return new Date(now.getTime() + (REACTIVATION_MAX_DAYS + slackDays) * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
 }
 
 /**

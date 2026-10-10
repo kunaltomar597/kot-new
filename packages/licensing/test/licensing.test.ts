@@ -3,11 +3,14 @@ import { clockSkewed, guardedNow } from '../src/clock.js';
 import { evaluateLicence, type LicenceInput } from '../src/evaluate.js';
 import {
   fingerprintHash,
+  fingerprintKnown,
   fingerprintMatchCount,
   fingerprintOf,
   isLicensedPc,
 } from '../src/fingerprint.js';
 import {
+  lastReactivationDay,
+  REACTIVATION_MAX_DAYS,
   reactivationCode,
   reactivationSecretOf,
   readReactivationCode,
@@ -85,6 +88,21 @@ describe('[LIC-004] the PC fingerprint', () => {
     // Identifiers the PC could not read never count, even when both sides lack them.
     const blank = [null, null, null, null, null];
     expect(isLicensedPc(blank, blank)).toBe(false);
+  });
+
+  it('takes a read of fewer than three identifiers for unknown, never for another PC', () => {
+    const failed = fingerprintOf(INSTALLATION, {
+      MACHINE_ID: IDENTIFIERS.MACHINE_ID,
+      CPU_ID: null,
+    });
+    expect(fingerprintKnown(failed)).toBe(false);
+    expect(fingerprintKnown(fingerprintOf(INSTALLATION, {}))).toBe(false);
+    expect(
+      fingerprintKnown(
+        fingerprintOf(INSTALLATION, { ...IDENTIFIERS, DISK_SERIAL: null, CPU_ID: null }),
+      ),
+    ).toBe(true);
+    expect(fingerprintKnown(FINGERPRINT)).toBe(true);
   });
 });
 
@@ -165,8 +183,42 @@ describe('[LIC-005] [LIC-002] the state the restaurant experiences', () => {
     expect(
       evaluateLicence(input({ installationId: '0199a0e0-0000-7000-8000-00000000a009' })).problem,
     ).toBe('OTHER_INSTALLATION');
-    const moved = fingerprintOf(INSTALLATION, { MACHINE_ID: 'new', BOARD_SERIAL: 'new' });
+    const moved = fingerprintOf(INSTALLATION, {
+      MACHINE_ID: 'new',
+      BOARD_SERIAL: 'new',
+      BIOS_UUID: 'new',
+    });
     expect(evaluateLicence(input({ fingerprint: moved })).problem).toBe('OTHER_PC');
+  });
+
+  it('[LIC-004] judges no PC by a read that failed: the licence stands until a read succeeds', () => {
+    const failed = fingerprintOf(INSTALLATION, { MACHINE_ID: 'new', BOARD_SERIAL: null });
+    expect(evaluateLicence(input({ fingerprint: failed }))).toMatchObject({
+      state: 'ACTIVE',
+      problem: null,
+    });
+    // Three identifiers read, none of them this PC's: another PC.
+    const other = fingerprintOf(INSTALLATION, {
+      MACHINE_ID: 'x',
+      BOARD_SERIAL: 'y',
+      BIOS_UUID: 'z',
+    });
+    expect(evaluateLicence(input({ fingerprint: other })).problem).toBe('OTHER_PC');
+  });
+
+  it('[LIC-007] counts a signed licence older than the newest accepted as tampered', () => {
+    const newest = new Date('2026-10-09T06:00:00.000Z');
+    const older = verified({ issuedAt: '2026-10-01T06:00:00.000Z' });
+    expect(evaluateLicence(input({ file: older, newestIssuedAt: newest }))).toMatchObject({
+      recorded: 'RESTRICTED',
+      problem: 'TAMPERED',
+    });
+    // The newest itself, or one newer still, is taken.
+    expect(
+      evaluateLicence(
+        input({ file: verified({ issuedAt: newest.toISOString() }), newestIssuedAt: newest }),
+      ).problem,
+    ).toBeNull();
   });
 
   it('follows the vendor: restricted or terminated, data never withheld', () => {
@@ -237,26 +289,79 @@ describe('[LIC-006] offline reactivation codes', () => {
     expect(() => reactivationCode(secret, INSTALLATION, '2026-11-15', 256)).toThrow(RangeError);
     expect(() => reactivationCode(secret, INSTALLATION, 'soon', 1)).toThrow(RangeError);
   });
+
+  it('reaches 60 days at most, as the vendor issues them', () => {
+    expect(REACTIVATION_MAX_DAYS).toBe(60);
+    const now = new Date('2026-10-10T20:00:00.000Z');
+    expect(lastReactivationDay(now)).toBe('2026-12-09');
+    expect(lastReactivationDay(now, 1)).toBe('2026-12-10');
+  });
 });
 
 describe('[LIC-007] the clock guard', () => {
+  const lastSeen = new Date('2026-10-10T09:00:00.000Z');
+  const last = { judged: lastSeen, clock: lastSeen };
+  const MINUTE = 60_000;
+
   it('never judges by a time earlier than the last seen, and reports a clock set back', () => {
-    const lastSeen = new Date('2026-10-10T09:00:00.000Z');
-    expect(guardedNow(new Date('2026-10-10T09:02:00.000Z'), lastSeen)).toEqual({
+    expect(guardedNow({ clock: new Date('2026-10-10T09:02:00.000Z'), last })).toEqual({
       now: new Date('2026-10-10T09:02:00.000Z'),
       rolledBack: false,
     });
     // A minute back: an NTP correction, judged by the last seen.
-    expect(guardedNow(new Date('2026-10-10T08:59:00.000Z'), lastSeen)).toEqual({
+    expect(guardedNow({ clock: new Date('2026-10-10T08:59:00.000Z'), last })).toEqual({
       now: lastSeen,
       rolledBack: false,
     });
-    expect(guardedNow(new Date('2026-10-01T09:00:00.000Z'), lastSeen)).toEqual({
+    expect(guardedNow({ clock: new Date('2026-10-01T09:00:00.000Z'), last })).toEqual({
       now: lastSeen,
       rolledBack: true,
     });
-    expect(guardedNow(lastSeen, undefined).rolledBack).toBe(false);
+    expect(guardedNow({ clock: lastSeen }).rolledBack).toBe(false);
     expect(clockSkewed(lastSeen, new Date('2026-10-10T09:05:00.000Z'))).toBe(false);
     expect(clockSkewed(lastSeen, new Date('2026-10-10T09:15:00.000Z'))).toBe(true);
+  });
+
+  it('moves on while the server runs, whatever the clock says, and reports a clock held back', () => {
+    // The clock stands still for an hour and a half, a minute's step at a time: the judged time
+    // moves on with the server's own running time.
+    let judged = lastSeen;
+    let previous = last;
+    let reported = false;
+    for (let minute = 1; minute <= 90; minute += 1) {
+      const step = guardedNow({ clock: lastSeen, last: previous, elapsedMs: MINUTE });
+      judged = step.now;
+      reported ||= step.rolledBack;
+      // Each step alone looks like nothing: the clock is where the last one read it, a minute on.
+      if (minute < 60) expect(step.rolledBack).toBe(false);
+      previous = { judged: step.now, clock: lastSeen };
+    }
+    expect(judged).toEqual(new Date(lastSeen.getTime() + 90 * MINUTE));
+    expect(reported).toBe(true);
+    // A clock set back while the server runs is caught at once.
+    expect(
+      guardedNow({ clock: new Date(lastSeen.getTime() - 10 * MINUTE), last, elapsedMs: MINUTE })
+        .rolledBack,
+    ).toBe(true);
+    // After a restart the time the server was stopped is unknown: the judged time waits there.
+    expect(guardedNow({ clock: new Date('2026-10-01T09:00:00.000Z'), last }).now).toEqual(lastSeen);
+  });
+
+  it('never falls behind the issue time of the licence held or the newest accepted', () => {
+    const issuedAt = new Date('2026-10-12T06:00:00.000Z');
+    const newestIssuedAt = new Date('2026-10-12T07:00:00.000Z');
+    const held = new Date('2026-10-11T09:00:00.000Z');
+    expect(
+      guardedNow({
+        clock: held,
+        last,
+        elapsedMs: MINUTE,
+        floors: [issuedAt, newestIssuedAt, undefined],
+      }),
+    ).toEqual({ now: newestIssuedAt, rolledBack: true });
+    // Floors behind the clock change nothing.
+    expect(
+      guardedNow({ clock: new Date('2026-10-13T00:00:00.000Z'), last, floors: [issuedAt] }),
+    ).toEqual({ now: new Date('2026-10-13T00:00:00.000Z'), rolledBack: false });
   });
 });

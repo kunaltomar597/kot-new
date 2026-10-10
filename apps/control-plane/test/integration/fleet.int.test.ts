@@ -246,7 +246,7 @@ describe('[AUD-003] the audit chain heads', () => {
     expect(await alertsOf(pc.id ?? '')).toEqual([]);
   });
 
-  it('closes only chain alerts by hand', async () => {
+  it('closes only chain, tampering and update alerts by hand', async () => {
     const pc = await enrolledInstallation(app);
     await beat(pc, { disk: { totalBytes: 100, freeBytes: 1 } });
     const [alert] = await alertsOf(pc.id ?? '');
@@ -258,6 +258,54 @@ describe('[AUD-003] the audit chain heads', () => {
       409,
       'ALERT_CLOSES_ITSELF',
     ]);
+  });
+});
+
+describe('[SEC-015] [LIC-007] licence tampering calls for a person', () => {
+  const tamper = (kind: string) => ({ tamper: [{ kind, at: new Date().toISOString() }] });
+
+  it('alerts at once for an edited licence or another PC, and Support closes it with a reason', async () => {
+    const pc = await enrolledInstallation(app);
+    await beat(pc, tamper('RECORD_TAMPERED'));
+    await beat(pc, tamper('OTHER_PC'));
+    // One alert, opened by the first report; the second is in the audit log.
+    const [alert, ...more] = await alertsOf(pc.id ?? '');
+    expect(more).toEqual([]);
+    expect(alert).toMatchObject({
+      kind: 'LICENCE_TAMPERING',
+      details: { kinds: ['RECORD_TAMPERED'] },
+    });
+    expect(notifier.sent.some((line) => line.includes('the PC’s licence record was edited'))).toBe(
+      true,
+    );
+    const resolved = await server()
+      .post(`/v1/vendor/fleet/alerts/${alert?.id ?? ''}/resolve`)
+      .set(as('SUPPORT'))
+      .send({ reason: 'Owner restored the database from a backup; checked by phone' });
+    expect(resolved.status, JSON.stringify(resolved.body)).toBe(200);
+    expect(await alertsOf(pc.id ?? '')).toEqual([]);
+    // A new report opens it again.
+    await beat(pc, tamper('LICENCE_TAMPERED'));
+    expect((await alertsOf(pc.id ?? ''))[0]?.details).toMatchObject({
+      kinds: ['LICENCE_TAMPERED'],
+    });
+  });
+
+  it('alerts for the clock only once it is reported again and again, counting afresh after', async () => {
+    const pc = await enrolledInstallation(app);
+    await beat(pc, tamper('CLOCK_SKEW'));
+    await beat(pc, tamper('CLOCK_ROLLBACK'));
+    expect(await alertsOf(pc.id ?? '')).toEqual([]);
+    await beat(pc, tamper('CLOCK_SKEW'));
+    const [alert] = await alertsOf(pc.id ?? '');
+    expect(alert).toMatchObject({
+      kind: 'LICENCE_TAMPERING',
+      details: { kinds: ['CLOCK_ROLLBACK', 'CLOCK_SKEW'] },
+    });
+    await fleet.resolve(alert?.id ?? '', 'The PC’s clock battery was flat; replaced', 'cli:test');
+    // The reports before closing no longer count.
+    await beat(pc, tamper('CLOCK_SKEW'));
+    expect(await alertsOf(pc.id ?? '')).toEqual([]);
   });
 });
 

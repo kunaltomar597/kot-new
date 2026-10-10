@@ -249,6 +249,80 @@ describe('[LIC-004] the PC the licence is bound to', () => {
     );
   });
 
+  it('[LIC-004] binds and renews nothing on a fingerprint read of fewer than three identifiers', async () => {
+    const fresh = await enrolledInstallation(app);
+    const beatAs = async (licence: object) => {
+      const response = await signedPost(app, fresh, '/v1/heartbeats', heartbeatBody({ licence }));
+      expect(response.status, JSON.stringify(response.body)).toBe(200);
+      return HeartbeatResponse.parse(response.body);
+    };
+    const full = fingerprintOf(fresh.id ?? '', identifiers);
+    const partial = fingerprintOf(fresh.id ?? '', { MACHINE_ID: 'm-1', CPU_ID: 'c-1' });
+    expect((await beatAs(report(null, partial))).licence).toBeNull();
+    expect(
+      (await prisma.installationLicence.findUniqueOrThrow({ where: { installationId: fresh.id } }))
+        .boundAt,
+    ).toBeNull();
+    const bound = payloadOf(await beatAs(report(null, full)));
+    expect(bound.fingerprint).toEqual(full);
+    // A failed read later: no licence for it, and the binding stays as it was.
+    expect((await beatAs(report(null, partial))).licence).toBeNull();
+    expect(
+      (await prisma.installationLicence.findUniqueOrThrow({ where: { installationId: fresh.id } }))
+        .fingerprint,
+    ).toEqual(full);
+  });
+
+  it('[LIC-006] [SEC-015] checks the code a PC took against those issued, and alerts on another', async () => {
+    const until = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
+    const issued = await licences.reactivationCode(pc.id ?? '', until, ACTOR);
+    const row = await prisma.licenceReactivationCode.findUniqueOrThrow({
+      where: { installationId_counter: { installationId: pc.id ?? '', counter: issued.counter } },
+    });
+    expect(row).toMatchObject({ issuedBy: ACTOR, usedAt: null });
+    await beat({ ...report(null), reactivation: { counter: issued.counter, validUntil: until } });
+    expect(
+      (
+        await prisma.licenceReactivationCode.findUniqueOrThrow({
+          where: {
+            installationId_counter: { installationId: pc.id ?? '', counter: issued.counter },
+          },
+        })
+      ).usedAt,
+    ).not.toBeNull();
+    expect(await prisma.auditEntry.count({ where: { action: 'licence.reactivation_used' } })).toBe(
+      1,
+    );
+    expect(
+      await prisma.fleetAlert.count({
+        where: { installationId: pc.id, kind: 'LICENCE_TAMPERING' },
+      }),
+    ).toBe(0);
+
+    // A code with a counter the vendor never gave, or another day: made with the PC's secret.
+    await beat({
+      ...report(null),
+      reactivation: { counter: issued.counter, validUntil: '2026-12-31' },
+    });
+    const alert = await prisma.fleetAlert.findFirstOrThrow({
+      where: { installationId: pc.id, kind: 'LICENCE_TAMPERING', resolvedAt: null },
+    });
+    expect(alert.details).toMatchObject({
+      kinds: ['REACTIVATION_CODE_NOT_ISSUED'],
+      reactivation: { counter: issued.counter, validUntil: '2026-12-31' },
+    });
+    expect(
+      await prisma.auditEntry.findFirstOrThrow({
+        where: { action: 'licence.reactivation_unknown' },
+      }),
+    ).toMatchObject({ details: { issuedValidUntil: until } });
+    // No code reaches past 60 days.
+    const tooFar = new Date(Date.now() + 61 * 86_400_000).toISOString().slice(0, 10);
+    await expect(licences.reactivationCode(pc.id ?? '', tooFar, ACTOR)).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+  });
+
   it('sends no licence to an installation too old to report one', async () => {
     const answer = await beat(undefined as unknown as object);
     expect(answer.licence).toBeNull();

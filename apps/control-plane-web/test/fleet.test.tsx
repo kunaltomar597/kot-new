@@ -192,6 +192,41 @@ describe('[UPD-003] a failed update', () => {
   });
 });
 
+describe('[SEC-015] [LIC-007] licence tampering', () => {
+  it('shows what the PC reported and lets Support close it with a reason', async () => {
+    const tampering = fleetAlert({
+      kind: 'LICENCE_TAMPERING',
+      details: { kinds: ['CLOCK_ROLLBACK', 'REACTIVATION_CODE_NOT_ISSUED'] },
+    });
+    const cp = controlPlane('SUPPORT')
+      .on('listFleetAlerts', () => ({ alerts: [tampering] }))
+      .on('resolveFleetAlert', ({ body }) => ({
+        ...tampering,
+        resolvedAt: '2026-10-10T05:00:00.000Z',
+        resolution: (body as { reason: string }).reason,
+      }));
+    const { user } = renderApp({ cp, path: '/fleet' });
+    expect(await screen.findByText('Licence tampering')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Reported: the clock set or held back, again and again, a reactivation code the vendor never issued',
+      ),
+    ).toBeVisible();
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Close the licence tampering alert for Main counter PC',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Close the licence tampering alert' });
+    await user.type(within(dialog).getByLabelText(/^Reason/), 'Flat clock battery, replaced');
+    await user.click(within(dialog).getByRole('button', { name: 'Close alert' }));
+    expect(await screen.findByText('Alert closed')).toBeVisible();
+    expect(cp.callsOf('resolveFleetAlert')[0]?.body).toEqual({
+      reason: 'Flat clock battery, replaced',
+    });
+  });
+});
+
 describe('fleet view helpers', () => {
   const t = createTranslator();
 

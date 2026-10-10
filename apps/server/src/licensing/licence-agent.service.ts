@@ -22,13 +22,17 @@ import {
 import {
   clockSkewed,
   evaluateLicence,
+  fingerprintKnown,
   fingerprintOf,
   guardedNow,
+  isOlderLicence,
+  lastReactivationDay,
   type LicenceStatus,
   readReactivationCode,
   VENDOR_LICENCE_KEYS,
   verifyLicence,
 } from '@rp/licensing';
+import { performance } from 'node:perf_hooks';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
@@ -50,6 +54,8 @@ const SECRET_KEY = 'licence.reactivation_secret';
 const CHECK_EVERY_MS = 60_000;
 /** Hardware rarely changes: the fingerprint is read again every few hours. */
 const FINGERPRINT_EVERY_MS = 6 * 60 * 60 * 1_000;
+/** A read that said too little (fewer than three identifiers) is tried again this much later. */
+const FINGERPRINT_RETRY_MS = 5 * 60 * 1_000;
 /** Reactivation codes a person may try in an hour (LIC-006: 56-bit codes, so a few is plenty). */
 const ATTEMPTS_PER_HOUR = 5;
 const HOUR_MS = 60 * 60 * 1_000;
@@ -61,12 +67,32 @@ type Limited = (typeof LIMITED)[number];
 
 /** What the agent keeps between checks, sealed so it cannot be edited unnoticed (LIC-007). */
 const LicenceRecord = z.object({
+  /** The time the last check judged by (LIC-007): never back, moving on as the server runs. */
   lastSeenAt: z.iso.datetime(),
+  /** The PC's clock at the last check, to see it set back; absent from records before P8-03b3a. */
+  clockAt: z.iso.datetime().optional(),
+  /**
+   * The newest licence issue time accepted (LIC-007): an older file, validly signed, was put back
+   * over a newer one, and counts as tampered. Null until a licence is kept.
+   */
+  newestIssuedAt: z.iso.datetime().nullable().default(null),
   restrictionDecidedAt: z.iso.datetime().nullable(),
   /** An offline reactivation in force (LIC-006): its day and when it ends. */
   reactivation: z.object({ validUntil: z.iso.date(), until: z.iso.datetime() }).nullable(),
   /** The last reactivation code's counter: an older or the same code is refused. */
   lastCounter: z.int().min(0).max(255),
+  /**
+   * The last reactivation code taken, for the Control Plane to compare with the codes it issued
+   * (LIC-006, LIC-007): sent with every heartbeat until one carrying it is answered.
+   */
+  lastCode: z
+    .object({
+      counter: z.int().min(1).max(255),
+      validUntil: z.iso.date(),
+      delivered: z.boolean(),
+    })
+    .nullable()
+    .default(null),
   /** Reactivation tries in the last hour. */
   attempts: z.array(z.iso.datetime()).max(50),
   /** Tamper events not yet delivered to the Control Plane. */
@@ -107,7 +133,15 @@ export type GatedCapability = keyof Pick<
 export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(LicenceAgentService.name);
   private status: LicenceStatus | undefined;
+  /** The last read of the fingerprint that said something (three identifiers or more). */
   private identifiers: { readonly at: number; readonly value: Identifiers } | undefined;
+  /** When the fingerprint was last read, and what an unknown read gave (LIC-004). */
+  private lastRead: { readonly at: number; readonly value: Identifiers } | undefined;
+  /**
+   * The judged time the last check wrote and when, by the monotonic clock: the next check moves
+   * it on by the time the server ran in between (LIC-007). Undefined after a restart.
+   */
+  private mark: { readonly lastSeenAt: string; readonly at: number } | undefined;
   private timer: NodeJS.Timeout | undefined;
   private readonly checkListeners = new Set<() => Promise<unknown>>();
   /** One check at a time: the record is read, judged and written as a whole. */
@@ -143,6 +177,9 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
   get enforced(): boolean {
     return this.config.licenceEnforce;
   }
+
+  /** The server's running time in ms, by a clock nobody can set (LIC-007); tests replace it. */
+  monotonicMs: () => number = () => performance.now();
 
   /**
    * Refuses what a restricted licence does not allow (LIC-005): new tables, orders and kitchen
@@ -203,25 +240,42 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     const file = await this.readFile();
     const verified = verifyLicence(file, this.vendorKeys());
     const { record } = await this.readRecord();
+    const code = record?.lastCode ?? null;
     return {
       licence: {
         licenceId: verified.ok ? verified.payload.licenceId : null,
         fingerprint: await this.fingerprintOf(enrolment?.installationId ?? ''),
         hasReactivationSecret: (await this.reactivationSecret()) !== undefined,
+        // The last code taken, until the Control Plane has compared it (LIC-006, LIC-007).
+        reactivation:
+          code === null || code.delivered
+            ? null
+            : { counter: code.counter, validUntil: code.validUntil },
       },
       ...(record !== undefined && record.tamper.length > 0 && { tamper: record.tamper }),
     };
   }
 
   /**
-   * Takes a heartbeat's answer: a new licence (kept only when it verifies for this installation),
-   * the reactivation secret, the Control Plane's clock; the tamper events sent are delivered.
+   * Takes a heartbeat's answer: a new licence (kept only when it verifies for this installation
+   * and is not older than the newest kept), the reactivation secret, the Control Plane's clock.
+   * What the heartbeat `sent` reported is delivered: its tamper events and reactivation code.
    */
-  async accept(answer: HeartbeatResponse, reported: readonly TamperEvent[] = []): Promise<void> {
+  async accept(
+    answer: HeartbeatResponse,
+    sent: Pick<HeartbeatRequest, 'tamper' | 'licence'> = {},
+  ): Promise<void> {
     const enrolment = await readEnrolment(this.prisma);
+    const reported: readonly TamperEvent[] = sent.tamper ?? [];
+    const sentCode = sent.licence?.reactivation ?? null;
     if (answer.licence !== null) {
       const verified = verifyLicence(answer.licence, this.vendorKeys());
-      if (verified.ok && verified.payload.installationId === enrolment?.installationId) {
+      const newest = (await this.readRecord()).record?.newestIssuedAt ?? null;
+      if (
+        verified.ok &&
+        verified.payload.installationId === enrolment?.installationId &&
+        !isOlderLicence(verified.payload, newest === null ? undefined : new Date(newest))
+      ) {
         await this.write(FILE_KEY, JSON.stringify(answer.licence));
       } else {
         this.logger.warn('The Control Plane sent a licence this PC does not accept');
@@ -244,6 +298,10 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
         ...record.reported,
         ...Object.fromEntries(reported.map((event) => [event.kind, event.at])),
       },
+      lastCode:
+        record.lastCode !== null && sentCode?.counter === record.lastCode.counter
+          ? { ...record.lastCode, delivered: true }
+          : record.lastCode,
     }));
     await this.refresh();
   }
@@ -281,6 +339,15 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     ) {
       throw new AppError(409, 'REACTIVATION_CODE_USED', 'That code was already used.');
     }
+    // The vendor gives codes for 60 days at most: one reaching further was not theirs (LIC-007).
+    const judged = new Date(Math.max(now.getTime(), Date.parse(record?.lastSeenAt ?? '') || 0));
+    if (read.validUntil > lastReactivationDay(judged, 1)) {
+      throw new AppError(
+        409,
+        'REACTIVATION_CODE_INVALID',
+        'That code reaches further ahead than the vendor gives codes. Ask the vendor for a new one.',
+      );
+    }
     const businessDay = await this.businessDay();
     // Active until the end of the code's business day: the next day's cut-off.
     const until = businessDayStart(addDays(read.validUntil, 1), businessDay);
@@ -292,6 +359,7 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
       lastCounter: read.counter,
       reactivation: { validUntil: read.validUntil, until: until.toISOString() },
       restrictionDecidedAt: null,
+      lastCode: { counter: read.counter, validUntil: read.validUntil, delivered: false },
     }));
     await this.prisma.transaction(async (tx) => {
       await this.audit.record(tx, {
@@ -337,11 +405,36 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     const verified = verifyLicence(file, this.vendorKeys());
     const { record, tampered } = await this.readRecord();
     const installationId = enrolment?.installationId ?? '';
-    const guard = guardedNow(clock, record === undefined ? undefined : new Date(record.lastSeenAt));
+    // LIC-007: the time judged moves on by the server's own running time since the last check,
+    // and never falls behind what the vendor signed (the newest licence's issue time).
+    const monotonic = this.monotonicMs();
+    const mark = this.mark;
+    const newestIssuedAt =
+      record?.newestIssuedAt === null || record === undefined
+        ? undefined
+        : new Date(record.newestIssuedAt);
+    const older = verified.ok && isOlderLicence(verified.payload, newestIssuedAt);
+    const issuedAt = verified.ok ? new Date(verified.payload.issuedAt) : undefined;
+    const guard = guardedNow({
+      clock,
+      last:
+        record === undefined
+          ? undefined
+          : {
+              judged: new Date(record.lastSeenAt),
+              clock: new Date(record.clockAt ?? record.lastSeenAt),
+            },
+      elapsedMs:
+        record !== undefined && mark?.lastSeenAt === record.lastSeenAt
+          ? monotonic - mark.at
+          : undefined,
+      floors: [issuedAt, newestIssuedAt],
+    });
     const status = evaluateLicence({
       file: verified,
       installationId,
       fingerprint: await this.fingerprintOf(installationId),
+      newestIssuedAt,
       now: guard.now,
       // An edited record cannot postpone a restriction: it applies at once.
       restrictionDecidedAt: tampered
@@ -359,12 +452,21 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     const at = guard.now.toISOString();
     if (guard.rolledBack) events.push({ kind: 'CLOCK_ROLLBACK', at });
     if (tampered) events.push({ kind: 'RECORD_TAMPERED', at });
-    if (file !== undefined && !verified.ok) events.push({ kind: 'LICENCE_TAMPERED', at });
+    if ((file !== undefined && !verified.ok) || older) {
+      events.push({ kind: 'LICENCE_TAMPERED', at });
+    }
     if (status.problem === 'OTHER_PC') events.push({ kind: 'OTHER_PC', at });
     await this.update(
       (current) => ({
         ...current,
         lastSeenAt: at,
+        clockAt: clock.toISOString(),
+        newestIssuedAt:
+          issuedAt !== undefined &&
+          !older &&
+          (newestIssuedAt === undefined || issuedAt > newestIssuedAt)
+            ? issuedAt.toISOString()
+            : current.newestIssuedAt,
         restrictionDecidedAt: status.restrictionDecidedAt?.toISOString() ?? null,
         reactivation:
           current.reactivation !== null &&
@@ -389,6 +491,7 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
       }),
       tampered,
     );
+    this.mark = { lastSeenAt: at, at: monotonic };
     const previous = this.status;
     this.status = status;
     if (
@@ -456,20 +559,37 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     return [...VENDOR_LICENCE_KEYS, ...this.config.licenceKeys];
   }
 
-  /** The fingerprint for this installation; the identifiers are read again every few hours. */
+  /**
+   * The fingerprint for this installation (LIC-004); the identifiers are read again every few
+   * hours. A read with fewer than three identifiers says nothing (`fingerprintKnown`): it is not
+   * kept, the last read that said something stays in use, and it is tried again a few minutes
+   * later. Until a read says something, the fingerprint is unknown and the licence does not judge
+   * the PC by it (nor does the Control Plane bind a licence to it).
+   */
   private async fingerprintOf(installationId: string): Promise<(string | null)[]> {
-    const cached = this.identifiers;
-    if (cached !== undefined && Date.now() - cached.at < FINGERPRINT_EVERY_MS) {
-      return fingerprintOf(installationId, cached.value);
+    const now = this.monotonicMs();
+    const known = this.identifiers;
+    const tried = this.lastRead;
+    const due =
+      (known === undefined || now - known.at >= FINGERPRINT_EVERY_MS) &&
+      (tried === undefined || now - tried.at >= FINGERPRINT_RETRY_MS);
+    if (due) {
+      let identifiers: Identifiers = {};
+      try {
+        identifiers = await this.reader.read();
+      } catch (error) {
+        this.logger.warn({ err: error }, 'The PC fingerprint could not be read');
+      }
+      this.lastRead = { at: now, value: identifiers };
+      if (fingerprintKnown(fingerprintOf(installationId, identifiers))) {
+        this.identifiers = { at: now, value: identifiers };
+      } else {
+        this.logger.warn(
+          'The PC fingerprint read gave fewer than three identifiers: not judged, tried again soon',
+        );
+      }
     }
-    let identifiers: Identifiers = {};
-    try {
-      identifiers = await this.reader.read();
-    } catch (error) {
-      this.logger.warn({ err: error }, 'The PC fingerprint could not be read');
-    }
-    this.identifiers = { at: Date.now(), value: identifiers };
-    return fingerprintOf(installationId, identifiers);
+    return fingerprintOf(installationId, this.identifiers?.value ?? this.lastRead?.value ?? {});
   }
 
   private async businessDay(): Promise<BusinessDayConfig> {
@@ -544,9 +664,11 @@ export class LicenceAgentService implements OnApplicationBootstrap, OnModuleDest
     const { record } = await this.readRecord();
     const base: LicenceRecord = record ?? {
       lastSeenAt: new Date().toISOString(),
+      newestIssuedAt: null,
       restrictionDecidedAt: tampered ? new Date(0).toISOString() : null,
       reactivation: null,
       lastCounter: 0,
+      lastCode: null,
       attempts: [],
       tamper: [],
       reported: {},

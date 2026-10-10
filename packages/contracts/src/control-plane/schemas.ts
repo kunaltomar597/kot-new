@@ -1,7 +1,7 @@
 import { LICENSE_STATES, WEEKDAYS } from '@rp/domain';
 import { z } from 'zod';
 import { VersionMatrix } from '../client-api.js';
-import { Id, Paise, Timestamp } from '../common.js';
+import { Id, IsoDate, Paise, Timestamp } from '../common.js';
 import { EscrowOffer, RestoreCodeNotice } from './cloud-backups.js';
 import { PendingDiagnosticsRequest } from './diagnostics.js';
 import { PushedSettings, SettingsDigest } from './remote-settings.js';
@@ -256,6 +256,15 @@ export const HeartbeatRequest = z.looseObject({
       fingerprint: z.array(Sha256Hex.nullable()).length(FINGERPRINT_SIZE),
       /** Whether it holds its offline reactivation secret (LIC-006). */
       hasReactivationSecret: z.boolean(),
+      /**
+       * The last offline reactivation code the Owner typed in (LIC-006, LIC-007), until the
+       * Control Plane has seen it: it compares the code with those it issued. Absent from PCs
+       * before P8-03b3a.
+       */
+      reactivation: z
+        .object({ counter: z.int().min(1).max(255), validUntil: IsoDate })
+        .nullable()
+        .optional(),
     })
     .optional(),
   /** What looked like tampering since the last heartbeat delivered (LIC-007). */

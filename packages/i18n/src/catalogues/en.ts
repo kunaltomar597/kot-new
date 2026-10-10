@@ -4642,6 +4642,10 @@ export const en = {
       closeUpdateTitle: 'Close the update alert',
       closeUpdateIntro:
         'Only when the PC will not run that version: held at an older one, or replaced. It closes by itself once the PC runs it.',
+      closeTamperingFor: 'Close the licence tampering alert for {pc}',
+      closeTamperingTitle: 'Close the licence tampering alert',
+      closeTamperingIntro:
+        'Only after you spoke to the Owner and know what happened, for example a restore from backup or a flat clock battery (see the runbook). Reports count afresh from then.',
       closeIntro:
         'Only after you checked with the Owner, for example a restore from backup (see the runbook). The PC’s log then counts from its newest entry.',
       closed: 'Alert closed',
@@ -4651,6 +4655,7 @@ export const en = {
         BACKUP_FAILED: 'Backup failed',
         AUDIT_CHAIN_MISMATCH: 'Audit log changed',
         UPDATE_FAILED: 'Update failed',
+        LICENCE_TAMPERING: 'Licence tampering',
       },
       detail: {
         offline: 'Silent for {minutes} minutes of opening hours',
@@ -4667,6 +4672,15 @@ export const en = {
           SILENT: 'Silent since it started installing {version}',
         },
         updateWithError: '{text}: {error}',
+        tampering: 'Reported: {list}',
+        tamper: {
+          LICENCE_TAMPERED: 'the licence file changed or an older one put back',
+          RECORD_TAMPERED: 'the PC’s licence record edited',
+          OTHER_PC: 'the licence on another PC',
+          CLOCK_ROLLBACK: 'the clock set or held back, again and again',
+          CLOCK_SKEW: 'the clock far off, again and again',
+          REACTIVATION_CODE_NOT_ISSUED: 'a reactivation code the vendor never issued',
+        },
       },
     },
     remote: {

@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b2c).
+Last updated: 2026-10-10 (P8-03b3a).
 
 What exists:
 
@@ -28,7 +28,8 @@ What exists:
   when the PC offers its pager firmware to a pager, and when it gives up (P2-04b1); the PINs
   guessed first, counting wrong secrets towards a lock, and the kind of record each approval is
   for (P8-03b2a); a pager's heartbeat too soon after the last, and firmware that would lower the
-  anti-rollback version (P8-03b2b). 405 tests.
+  anti-rollback version (P8-03b2b); which licence tampering reports call for a person at the
+  vendor (P8-03b3a). 407 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -61,7 +62,8 @@ What exists:
   settings `auth.deviceLockoutMaxFailures`, `auth.tabletLockoutMaxFailures` and
   `auth.refuseEasyPins` (P8-03b2a); a pager's sign-ins with a wrong secret on `PagerView`, and
   the firmware problem `SECURE_VERSION_LOWER` (P8-03b2b); the orders, bills and invoices an
-  erasure reached, on `EraseDinerContactResponse` (P8-03b2c). 964 tests.
+  erasure reached, on `EraseDinerContactResponse` (P8-03b2c); the reactivation code a PC took, on
+  its heartbeat, and the `LICENCE_TAMPERING` fleet alert (P8-03b3a). 964 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -142,14 +144,21 @@ What exists:
   menu workbook inflated by the server with a limit on what comes out and given to its reader
   stored, formulas neutralised in the data export's CSV files and the invoice register, and a
   diner's number erased on orders and bills too, with the invoices' consent withdrawn
-  (P8-03b2c). 1246 tests (28 skipped: Windows only, a real install, or the performance runs).
+  (P8-03b2c); the licence judged by the server's own running time and the issue times the vendor
+  signed, so a clock held back no longer holds the licence's end off, a clock held back reported,
+  an older licence put back counted as tampered, a fingerprint read of fewer than three
+  identifiers neither kept nor judged, and reactivation codes reaching 60 days at most, the last
+  one reported to the vendor (P8-03b3a). 1250 tests (28 skipped: Windows only, a real install, or
+  the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
   rollouts, backups, diagnostics and more (Phase 7); pager firmware is a release component with
   the same rollouts, and PCs report what their pagers did with it (P2-04b1); its routes checked
-  against the registry and its authorisation sweep (P8-03a). 149 tests. Not deployed yet (hosting
-  account pending).
+  against the registry and its authorisation sweep (P8-03a); licences bound and renewed only on a
+  fingerprint of three identifiers or more, the reactivation codes issued kept and the one a PC
+  took checked against them, and a licence tampering alert, in the vendor web app too, closed by
+  Support with a reason (P8-03b3a). 153 tests. Not deployed yet (hosting account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
@@ -318,7 +327,9 @@ What exists:
   (PIN guessing, lockouts, a tablet's PIN prompt, approvals used on another record, a phone left
   signed in), P8-03b2b seven of the pager channel's and the PC's part of an eighth, P8-03b2c four
   (large bodies before authentication, decompression bombs, formulas in exports, a diner's
-  number kept after erasure): 110 mitigated, 8 residual Highs, each planned.
+  number kept after erasure), P8-03b3a five of the licence's (the clock held back, an older
+  licence put back, a failed fingerprint read, forged reactivation codes, tampering nobody looks
+  at): 113 mitigated, 7 residual Highs, each planned.
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
 - BRD catalogue (318 requirements) and traceability report (`docs/build/TRACEABILITY.md`).
@@ -331,7 +342,8 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03b3 (the licence and the update pipeline) and P8-03b4 (the Control Plane and the QR relay):
+- P8-03b3b (the update pipeline and the builds: pinned Actions, the updater's version check,
+  unsigned updates reported, the release guard) and P8-03b4 (the Control Plane and the QR relay):
   the fixes the threat models planned, by their dates (the summary in
   `docs/security/threat-models/README.md` lists each threat).
 - Then P8-03c DAST, P8-03d the standards checklists (26 threats planned there), P8-03e the
@@ -564,7 +576,11 @@ Recommended next WPs (dependencies met):
             approvals bound to their record, the waiter phone's inactivity)
       - [x] P8-03b2b The pager broker's limits, acknowledgements and sign-in log
       - [x] P8-03b2c Bodies, uploads, exports and erasure
-    - [ ] P8-03b3 Threat-model fixes to the licence and the update pipeline
+    - [~] P8-03b3 Threat-model fixes to the licence and the update pipeline
+      - [x] P8-03b3a The licence (clock guard, older licences, fingerprint reads, reactivation
+            codes, the licence tampering alert)
+      - [ ] P8-03b3b The update pipeline and the builds (pinned Actions, the updater's version
+            check, unsigned updates reported, the release guard)
     - [ ] P8-03b4 Threat-model fixes in the Control Plane and the QR relay
   - [ ] P8-03c DAST of the QR site, relay and Control Plane
   - [ ] P8-03d Standards checklists, Electron review and MDM policy
@@ -814,6 +830,48 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03b3a):
+
+741. P8-03b3 is split into P8-03b3a (the licence: LICENCE-S3, T3, T4, D2, R3) and P8-03b3b (the
+     update pipeline and the builds: UPDATE-T1, T3, E3 and LICENCE-D3), by where the fix lives,
+     as P8-03b2 was.
+742. The licence is judged by the latest of the PC's clock, the last judged time moved on by the
+     server's monotonic running time since that check, and the issue times of the licence held and
+     of the newest accepted, which the vendor signed and renews daily while online. The heartbeat
+     answer's server time is not a floor: it is not signed, and a wrong or forged one would push
+     the PC's time years ahead and restrict the restaurant for good; it is still compared for
+     CLOCK_SKEW. While the server is stopped the judged time stands still (no clock nobody can set
+     runs then on a PC the customer administers): accepted in LICENCE-T3.
+743. A clock is reported (CLOCK_ROLLBACK) when it is more than 5 minutes behind where the last
+     check's reading says it should be by now, or more than an hour behind the judged time
+     (`CLOCK_HELD_BACK_TOLERANCE_MS`: the monotonic and an NTP-disciplined clock drift apart by
+     seconds a day). No new tamper kind, so Control Planes before this one still take the
+     heartbeats.
+744. A validly signed licence issued before the newest accepted counts as tampered (`TAMPERED`:
+     restricted from the next business day, LICENCE_TAMPERED reported), and the PC never keeps one
+     the Control Plane sends; the sealed record keeps the newest issue time (`newestIssuedAt`).
+     The heartbeat still names the file it holds, so online the Control Plane sends the newest
+     again. Putting back the whole sealed record with the file stays LICENCE-T2's accepted risk.
+745. A fingerprint read with fewer than three identifiers is unknown (`fingerprintKnown`): not
+     kept, the last read that said something stays in use, read again 5 minutes later; with none
+     since the server started, the licence does not judge the PC by it (no OTHER_PC). The Control
+     Plane binds, compares and renews nothing on an unknown fingerprint (no licence in the
+     answer), so a PC that never reads one runs out at its licence's end, as offline.
+746. Offline reactivation codes reach 60 days at most (`REACTIVATION_MAX_DAYS` in
+     `@rp/licensing`): the Control Plane issues none further, the PC takes none reaching more than
+     61 days past its judged today (a day for clocks and time zones) and refuses it as
+     `REACTIVATION_CODE_INVALID`. The PC reports the last code it took with each heartbeat until
+     one carrying it is answered; the Control Plane keeps each issued code's day and counter
+     (`licence_reactivation_codes`, backfilled from the audit log; never the code) and audits
+     `licence.reactivation_used` or `licence.reactivation_unknown`.
+747. A new fleet alert, `LICENCE_TAMPERING` (SEC-015's "repeated tamper events"): at once for
+     LICENCE_TAMPERED, RECORD_TAMPERED, OTHER_PC or a code never issued; for CLOCK_ROLLBACK and
+     CLOCK_SKEW once three are reported within seven days (`CLOCK_TAMPER_REPEATS`,
+     `CLOCK_TAMPER_WINDOW_DAYS` in `@rp/domain`; the PC reports each kind once a day at most, so
+     about three days in a week). Only a person closes it, with a reason (Support, like the audit
+     chain alert), and the reports count afresh from then. A PC whose clock is more than 10
+     minutes off therefore alerts after three days; the runbook says to have its clock fixed.
 
 Decided 2026-10-10 (P8-03b2c):
 
@@ -4032,6 +4090,59 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03b3a The licence
+
+Split P8-03b3 into P8-03b3a (this one) and P8-03b3b (the update pipeline and the builds).
+Decisions 741 to 747. Five threats of the licence mechanism answered: LICENCE-T3 (the residual
+High, now Low and accepted for the time the server is stopped), LICENCE-T4, LICENCE-D2 and
+LICENCE-R3 mitigated, LICENCE-S3 accepted with what remains (the secret on the PC).
+
+Built:
+
+- `@rp/licensing`: `guardedNow` takes a reading (the clock, the last judged time and clock, the
+  monotonic time since, the signed floors) and reports a clock set back or held back an hour;
+  `fingerprintKnown`; `isOlderLicence` and `newestIssuedAt` in `evaluateLicence`, which no longer
+  judges the PC by an unknown read; `REACTIVATION_MAX_DAYS` and `lastReactivationDay`.
+- `@rp/domain`: `LICENCE_TAMPERING` in `FLEET_ALERT_KINDS`, `tamperAlertDue` and its constants.
+- `@rp/contracts`: `HeartbeatRequest.licence.reactivation` (the last code taken).
+- Server (`LicenceAgentService`): the sealed record gains `clockAt`, `newestIssuedAt` and
+  `lastCode`; each check moves the judged time on by `monotonicMs()` since the last (`mark`) and
+  floors it at the signed issue times; an older file counts as tampered and is never kept from an
+  answer; fingerprint reads that say too little are not kept and retried after 5 minutes; codes
+  reaching past 61 days refused; the last code reported until a heartbeat carrying it is answered
+  (`accept(answer, sent)`, the heartbeat service passes what it sent).
+- Control Plane: migration `20261010150000_licence_tampering` (the alert kind, and
+  `licence_reactivation_codes` backfilled from the audit log); `forHeartbeat` binds, compares and
+  renews nothing on an unknown fingerprint; `reactivationCode` keeps the code's day and counter;
+  `checkReactivation`; `FleetService.licenceTampering` from the heartbeat's transaction; the alert
+  closed by a person; its chat text.
+- Vendor web app: the alert's badge, what was reported, and closing it with a reason.
+- Docs: the licence model's five threats (113 mitigated in all, 7 residual Highs), the plans of
+  the other four renamed P8-03b3b; the runbook's "Licence tampering"; manual task 23's codes;
+  `packages/licensing/README.md`; `phase-8.md`.
+
+Tests: licensing 19 (+4), domain 407 (+2), contracts 964 (6 schema snapshots), server 1250 (+4,
+28 skipped; `licence-agent.int`'s "tampering offline" block drives the monotonic clock), Control
+Plane 153 (+4), vendor web 74 (+1); all other test tasks green; lint, typecheck, format, docs,
+compat, `pnpm security:threats` and `pnpm ci:test` green. Traceability: Must 264/287.
+
+Not done or not verified:
+
+- P8-03b3b, as split.
+- On Windows, `performance.now()` is QueryPerformanceCounter; whether it runs on through sleep
+  does not matter (the clock then wins), but nobody has watched a PC held back for a day: the lab
+  rig can, at the pilot's security check.
+
+Gotchas:
+
+- `LicenceAgentService.monotonicMs` is the clock the judged time moves on by: a test that moves
+  time sets it (`agent.monotonicMs = () => running`) and moves `running`; passing a later `now` to
+  `refresh` still works as before.
+- A test's fingerprint "of another PC" needs three identifiers that differ: two are an unknown
+  read now and never OTHER_PC.
+- The Control Plane's `checkReactivation` and the tamper alert run only for a heartbeat stored for
+  the first time (`count === 1`), like the tamper audit.
 
 ### 2026-10-10: P8-03b2c Bodies, uploads, exports and erasure
 

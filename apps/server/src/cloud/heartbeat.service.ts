@@ -186,8 +186,9 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       this.errorsDelivered = errorsNow;
       this.auditCheck = answer.auditCheck;
       await this.offer(answer.update);
-      // A renewed licence, the reactivation secret and the clock check (LIC-002, LIC-007).
-      await this.licence.accept(answer, heartbeat.tamper ?? []);
+      // A renewed licence, the reactivation secret and the clock check (LIC-002, LIC-007); the
+      // tamper events and the reactivation code this heartbeat carried are delivered.
+      await this.licence.accept(answer, heartbeat);
       // The QR relay credential the vendor provisioned (VCP-002), kept sealed.
       if (answer.relayCredential !== null) {
         await saveRelayCredential(this.prisma, this.secrets, answer.relayCredential);
