@@ -2,6 +2,7 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'infra/supabase'
+  - 'infra/dast'
 
 # pnpm 10 blocks dependency install scripts unless listed here.
 onlyBuiltDependencies:

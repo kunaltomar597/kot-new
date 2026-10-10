@@ -26,11 +26,13 @@ describe('health and version endpoints', () => {
     expect(body.checks.database.status).toBe('up');
   });
 
-  it('reports the version and build', async () => {
+  it('reports the version and build, with only the major line of Node.js', async () => {
     const response = await request(httpServer(app)).get('/api/v1/version').expect(200);
     const body = VersionResponse.parse(response.body);
     expect(body).toMatchObject({ name: '@rp/server', apiVersion: 'v1', buildId: 'test-build' });
-    expect(body.node).toBe(process.version);
+    // PC-I2: public, so no patch level; the System page shows the exact version.
+    expect(body.node).toBe(process.version.split('.')[0]);
+    expect(JSON.stringify(response.body)).not.toContain(process.versions.node);
   });
 
   it('[NFR-O01] echoes or creates a correlation id', async () => {

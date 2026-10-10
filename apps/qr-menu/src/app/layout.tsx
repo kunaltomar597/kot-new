@@ -2,6 +2,7 @@ import '@rp/design-tokens/tokens.css';
 import '@rp/ui-web/styles.css';
 import './qr.css';
 import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
@@ -18,7 +19,13 @@ export const viewport: Viewport = {
   themeColor: '#ffffff',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/**
+ * Every page is rendered for its request (P8-03c1): Next.js puts the request's CSP nonce on its
+ * scripts only while rendering, so a page built ahead of time would have scripts the policy
+ * refuses (src/proxy.ts).
+ */
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  await connection();
   return (
     <html lang="en">
       <body>{children}</body>

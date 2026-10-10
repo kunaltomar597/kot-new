@@ -9,7 +9,7 @@ import { DishPhoto } from '../src/site/DishPhoto';
 import { I18nProvider } from '../src/site/i18n';
 import { Orders } from '../src/site/Orders';
 import { browserId, tableValue } from '../src/site/storage';
-import { contentSecurityPolicy } from '../src/proxy';
+import { contentSecurityPolicy, newNonce } from '../src/proxy';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -17,11 +17,26 @@ beforeEach(() => {
 
 describe('[QR-013] what the browser may load', () => {
   it('allows this site and the relay only', () => {
-    const csp = contentSecurityPolicy('https://abc.supabase.co');
+    const csp = contentSecurityPolicy('https://abc.supabase.co', newNonce());
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("connect-src 'self' https://abc.supabase.co");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).not.toMatch(/https:\/\/(?!abc\.supabase\.co)/);
+  });
+
+  it('[SEC-017] runs scripts with the request’s nonce only, never inline ones', () => {
+    const nonce = newNonce();
+    const csp = contentSecurityPolicy('https://abc.supabase.co', nonce);
+    expect(csp).toContain(`script-src 'self' 'nonce-${nonce}';`);
+    expect(csp).not.toContain('strict-dynamic');
+    expect(csp).toContain(`style-src 'self' 'nonce-${nonce}'`);
+    // Only style attributes (the accent colour) are inline, and they run nothing.
+    expect(csp.match(/'unsafe-inline'/g)).toEqual(["'unsafe-inline'"]);
+    expect(csp).toContain("style-src-attr 'unsafe-inline'");
+    expect(csp).not.toContain('unsafe-eval');
+    // A new nonce for each request: 128 random bits in base64, as Next.js reads it.
+    expect(nonce).toMatch(/^[A-Za-z0-9+/]{22}==$/);
+    expect(new Set(Array.from({ length: 50 }, newNonce)).size).toBe(50);
   });
 });
 

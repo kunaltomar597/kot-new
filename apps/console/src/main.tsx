@@ -1,3 +1,5 @@
+// First: before any module builds a Zod schema.
+import './app/zod-jitless.js';
 import '@rp/design-tokens/tokens.css';
 import '@rp/ui-web/styles.css';
 import './console.css';

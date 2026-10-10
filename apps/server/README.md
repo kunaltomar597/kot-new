@@ -193,8 +193,11 @@ backup, updates and diagnostics.
   one certificate (P0-15). `src/http/console-static.ts` answers every other page request with
   `index.html` (the console's routes), never answers `/api` or `/socket.io`, returns 404 for a
   missing file, caches hashed `/assets` for a year and sends a strict Content-Security-Policy
-  (same-origin scripts, styles and connections only; no framing) with `nosniff` and
-  `no-referrer`. A missing build stops the server at start-up.
+  (same-origin scripts, styles and connections only; no framing; Trusted Types with no policy,
+  P8-03c1) with `nosniff` and `no-referrer`. A missing build stops the server at start-up.
+  Every other answer carries `src/http/security-headers.ts`'s headers (`default-src 'none'`, no
+  framing, sniffing, caching or other sites; no HSTS on the LAN), and a path outside `/api/v1`
+  that nothing served is the API's JSON 404 (P8-03c1).
 - `GET /api/v1/auth/session` (signed in): the person and session without tokens; apps check a
   restored session with it, and it counts as activity (keep-alive for AUTH-005).
 - `GET /api/v1/devices/current` (paired device): the device's own type, name and binding.

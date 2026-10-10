@@ -9,6 +9,11 @@ import { clientApiRange } from '../http/client-version.js';
 
 const PACKAGE = SERVER_PACKAGE;
 
+/** `v24` from `v24.13.0`: public, so no patch level an attacker could match to a CVE (PC-I2). */
+function nodeMajor(version: string = process.version): string {
+  return version.split('.')[0] ?? version;
+}
+
 /**
  * Liveness, readiness and version endpoints. Public: the watchdog and devices call them before
  * anyone signs in, and they reveal no business data.
@@ -46,7 +51,7 @@ export class HealthController {
       version: PACKAGE.version,
       apiVersion: 'v1',
       clientApi: clientApiRange(),
-      node: process.version,
+      node: nodeMajor(),
       ...(this.config.buildId !== undefined && { buildId: this.config.buildId }),
     };
   }

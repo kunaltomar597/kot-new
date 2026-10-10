@@ -65,6 +65,19 @@ export function sqlStateOf(error: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
+/**
+ * Headers on every answer, preflights included (P8-03c1): JSON is never run as a page, framed or
+ * sniffed into another type, and a link out of it sends no address (which holds the table's code).
+ */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  // base-uri, form-action and frame-ancestors do not fall back to default-src: each is set.
+  'content-security-policy':
+    "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'no-referrer',
+};
+
 const ALLOWED_HEADERS = [
   'authorization',
   'apikey',
@@ -118,7 +131,7 @@ async function respond(
 ): Promise<Response> {
   const cors = browsers ? corsHeaders(request, context.allowedOrigins) : {};
   if (browsers && request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: cors });
+    return new Response(null, { status: 204, headers: { ...SECURITY_HEADERS, ...cors } });
   }
   let response: Response;
   try {
@@ -136,7 +149,9 @@ async function respond(
     };
     response = json(failure.status, body, failure.headers);
   }
-  for (const [name, value] of Object.entries(cors)) response.headers.set(name, value);
+  for (const [name, value] of Object.entries({ ...SECURITY_HEADERS, ...cors })) {
+    response.headers.set(name, value);
+  }
   return response;
 }
 

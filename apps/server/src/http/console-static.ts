@@ -19,6 +19,10 @@ export const CONSOLE_SECURITY_HEADERS: Readonly<Record<string, string>> = {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    // Trusted Types (P8-03c1): no string reaches an HTML or script sink (innerHTML, eval, a
+    // script's src), and no policy may be made to let one through. React never needs one.
+    "require-trusted-types-for 'script'",
+    "trusted-types 'none'",
   ].join('; '),
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
@@ -61,7 +65,13 @@ export function consoleMiddleware(directory: string): express.RequestHandler[] {
   if (!existsSync(index)) {
     throw new Error(`The console build is missing: ${index} not found`);
   }
-  const files = express.static(root, { index: false, fallthrough: true, setHeaders });
+  // No redirect from a folder (`/assets` to `/assets/`): its page would replace the CSP (P8-03c1).
+  const files = express.static(root, {
+    index: false,
+    fallthrough: true,
+    redirect: false,
+    setHeaders,
+  });
   const staticFiles: express.RequestHandler = (request, response, next) => {
     if (isServerPath(request.path)) {
       next();

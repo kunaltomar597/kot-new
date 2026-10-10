@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { billPage, escapeHtml } from '../../src/digital-bills/bill-page.js';
+import { BILL_PAGE_HEADERS, billPage, escapeHtml } from '../../src/digital-bills/bill-page.js';
 import {
   type BillMessage,
   BillSendError,
@@ -155,5 +156,23 @@ describe('[BILL-012] the bill page', () => {
     expect(html).not.toContain('<script>');
     expect(html).toContain('available until 03-11-2026');
     expect(escapeHtml(`a&b"c'`)).toBe('a&amp;b&quot;c&#39;');
+  });
+
+  it('[SEC-017] allows the page’s own styles by their hash, and no other inline style', () => {
+    const policy = BILL_PAGE_HEADERS['content-security-policy'] ?? '';
+    expect(policy).not.toContain('unsafe-inline');
+    const html = billPage({
+      restaurantName: 'Spice Route',
+      invoiceNumber: 'INV/1',
+      lines: ['Paneer Tikka        280.00'],
+      expiresOn: '03-11-2026',
+    });
+    const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((match) => match[1] ?? '');
+    expect(styles).toHaveLength(1);
+    const hash = createHash('sha256')
+      .update(styles[0] ?? '', 'utf8')
+      .digest('base64');
+    expect(policy).toContain(`style-src 'sha256-${hash}';`);
+    expect(html).not.toContain('style=');
   });
 });

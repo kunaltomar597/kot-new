@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10 (P8-03b4b).
+Last updated: 2026-10-10 (P8-03c1).
 
 What exists:
 
@@ -155,8 +155,9 @@ What exists:
   identifiers neither kept nor judged, and reactivation codes reaching 60 days at most, the last
   one reported to the vendor (P8-03b3a); an installer whose product version is not the release's
   refused with its signature after the download, and each heartbeat saying how the PC checks its
-  updates (P8-03b3b). 1252 tests (28 skipped: Windows only, a real install, or the performance
-  runs).
+  updates (P8-03b3b); security headers on every answer, the API's JSON 404 outside it, Trusted
+  Types in the console's CSP and only Node.js's major line on `/version` (P8-03c1). 1254 tests
+  (28 skipped: Windows only, a real install, or the performance runs).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. Later WPs added licences, the fleet,
@@ -172,8 +173,10 @@ What exists:
   by the days the Control Plane stored them, dated no later than its clock and 8 a day per PC,
   diagnostics deleted after 30 days, every outside service on https outside development, bill
   links and storage grants masked in the request log, daily limits counted under a lock, and a
-  test that calls every PC endpoint with another restaurant's ids (ADR-0021) (P8-03b4a). 180
-  tests. Not deployed yet (hosting account pending).
+  test that calls every PC endpoint with another restaurant's ids (ADR-0021) (P8-03b4a); security
+  headers on every answer, the API's JSON 404 outside it, Trusted Types in the vendor web app's
+  CSP and the bill page's one style allowed by its hash (P8-03c1). 183 tests. Not deployed yet
+  (hosting account pending).
 - `packages/mobile-core`: secure credential persistence, the persistent outbox and the menu cache
   for the React Native apps (P2-01a); `DeviceSession` and the `testing` entry point (P2-01c); the
   order outbox, with the device session owning the menu cache and the outbox (P2-02b); finding
@@ -253,13 +256,16 @@ What exists:
     nothing read without a token or credential of the right form); no CORS on `server`; the
     Control Plane's own login `relay_control_plane`, the functions' login no longer a
     provisioner; menu photos WebP only in `config.toml` and the photos table too.
-    156 tests in all, 4 of them under Deno and 2 only on Supabase.
+  - Security headers on every answer, preflights included (P8-03c1).
+    157 tests in all, 4 of them under Deno and 2 only on Supabase.
   - `@rp/relay/testing`: the relay in-process for other packages' tests (P5-03a).
 - `apps/qr-menu` (P5-05a): the public QR menu site on Next.js 16, a table's menu from the relay
   with search, filters, options, cart, sending and following orders, read-only when the restaurant
   is absent, and privacy and terms. Tested on a phone (Playwright, Pixel 7) against a real relay.
   An open page asks for the menu every 20 s and when the diner comes back to it, and stops
-  following an order once every dish is served (P8-01b).
+  following an order once every dish is served (P8-01b). A CSP with a nonce per request and no
+  inline script without it, every page rendered for its request, and HSTS (P8-03c1). 8 tests, 12
+  Playwright steps.
 - `apps/server/src/relay`: the QR relay sync agent's publishing side (P5-03a). It sends presence
   with the QR settings, and the tables and the QR menu by content hash. It backs off while offline
   and catches up after. The credential is sealed (`relay:credential`). The System page shows its
@@ -306,8 +312,9 @@ What exists:
   before the first touch, and a Playwright speed test of taps and screen changes (NFR-P07) on a
   restaurant of the design capacity's size (P8-01b); on the Devices page, a device that takes no
   PINs after too many wrong ones, until when, and "Take PINs again" (P8-03b2a); on the Pagers
-  page, a pager's sign-ins with a wrong secret and the last one (P8-03b2b). 385 tests, and 25
-  Playwright steps.
+  page, a pager's sign-ins with a wrong secret and the last one (P8-03b2b); every screen run
+  under Trusted Types, with Zod's compiled parsers off (P8-03c1). 385 tests, and 26 Playwright
+  steps.
 - `apps/desktop` (`@rp/desktop`): the Electron shell on the restaurant PC (P0-16a). It opens the
   console from the PC's own server with context isolation, the sandbox, no Node.js, no preload and
   no IPC, pins the installation's CA for the loopback address, and starts with Windows. It shows a
@@ -360,7 +367,17 @@ What exists:
   links, tenant isolation, daily limits), P8-03b4b six of the QR relay's (floods of orders and
   service requests, large bodies, the functions' login provisioning, CORS on the PCs' function,
   other files in the photo bucket): 129 mitigated, 5 residual Highs, each planned. P8-03b is
-  done: no threat is planned for it any more.
+  done: no threat is planned for it any more. `dast.md`: the OWASP ZAP scans of the four
+  surfaces (P8-03c1), with P8-03c1's four threats mitigated (internals in answers, script in the
+  console under Trusted Types, in the POS window, and on the QR site under a nonce): 133
+  mitigated.
+- `infra/dast` (`@rp/dast`, P8-03c1): the DAST harness. It starts the QR site with its relay, the
+  relay's functions, the Control Plane with the vendor web app and the local server over HTTPS
+  with the console, each from its build and signed in, runs OWASP ZAP's Automation Framework on
+  each (pages spidered, OpenAPI operations imported and attacked, credentials renewed while it
+  scans) and judges every finding against `src/triage.json` (a High is never accepted).
+  `pnpm security:dast` with `ZAP_PATH` or `ZAP_DOCKER_IMAGE`; the `dast` job of `security.yml`.
+  12 tests, and 4 scans (none open).
 - CI signs the Windows installer only for a push to `main`, in the `release-signing` environment;
   every other build is an unsigned test build (P8-03b1, `infra/ci/signing-policy.test.mjs`).
   Every GitHub Action is pinned to a commit with its version in a comment, one commit per Action
@@ -375,8 +392,8 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- P8-03c DAST of the QR site, the relay, the Control Plane and the local server, with the 7
-  threats planned there (the summary in `docs/security/threat-models/README.md` lists them).
+- P8-03c2 Floods and rate limits: the HTTPS server and the socket from the LAN (PC-D3), the
+  Control Plane (CP-D1) and the relay's reads (RELAY-D4), the three threats planned there.
 - Then P8-03d the standards checklists (26 threats planned there), P8-03e the incident response
   plan and the pack for the penetration testers (the external test needs the firm the Business
   Owner engages).
@@ -618,7 +635,11 @@ Recommended next WPs (dependencies met):
             Super Admin resets by two)
       - [x] P8-03b4b The QR relay (order and service-request floods, body limits, the provisioning
             login, the PCs' function without CORS, the photo bucket's types)
-  - [ ] P8-03c DAST of the QR site, relay and Control Plane
+  - [~] P8-03c DAST of the QR site, relay and Control Plane
+    - [x] P8-03c1 The ZAP scans of the four surfaces, security headers, the CSPs (nonces, Trusted
+          Types), `/version`
+    - [ ] P8-03c2 Floods and rate limits (the HTTPS server and socket, the Control Plane, the
+          relay's reads)
   - [ ] P8-03d Standards checklists, Electron review and MDM policy
   - [ ] P8-03e Incident response plan and penetration-test support (the external test [H])
 - [ ] P8-04 UX polish and accessibility audit
@@ -866,6 +887,48 @@ Decided 2026-09-26 (P1-08a):
 
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
+
+Decided 2026-10-10 (P8-03c1):
+
+768. P8-03c is split into P8-03c1 (the ZAP scans, the security headers and the CSPs: PC-I2, PC-I4,
+     DESKTOP-I1, RELAY-T5) and P8-03c2 (floods and rate limits: PC-D3, CP-D1, RELAY-D4).
+769. DAST runs OWASP ZAP 2.17.0's Automation Framework from `infra/dast`, which starts each surface
+     from its build, not ZAP's packaged baseline and API scripts: the surfaces need sign-in, a
+     paired device and data first. An installed ZAP (`ZAP_PATH`) on a developer's machine, the
+     container pinned by digest in CI. Credentials come from a request script reading a file the
+     run renews every half minute. Active scan at strength medium, with the rules for software
+     none of the surfaces has turned off (`RULES_OFF`). The CI job runs on `main`, weekly and by
+     hand, not on pull requests (the four scans take 10 to 50 minutes).
+770. Findings are judged against `infra/dast/src/triage.json`: a High is never accepted (fixed, or
+     a false positive with its reason); a Medium or Low needs an entry covering every place it
+     was seen; informational alerts are listed only.
+771. The local server sends no HSTS: its certificate comes from the installation's own CA, there is
+     no plain-http listener, and a browser that remembered HSTS could not open the console after a
+     replaced PC renews the CA (NFR-A01). Accepted in the triage. The cloud surfaces send it: the
+     Control Plane in staging and production (as before), the QR site now (`max-age=31536000`,
+     without `includeSubDomains`, which is the domain owner's to decide), the relay by Supabase.
+772. Every answer of the local server, the Control Plane and the relay carries `default-src 'none';
+base-uri 'none'; form-action 'none'; frame-ancestors 'none'`, `nosniff`, `X-Frame-Options:
+DENY` and `Referrer-Policy: no-referrer`; the server and the Control Plane also
+     `Cross-Origin-Resource-Policy: same-origin` and `Cache-Control: no-store`, as defaults the
+     handlers with files of their own replace. A path outside the API that nothing served is the
+     API's JSON 404 (not Express's page), and a folder of the web apps' files is not redirected.
+773. The QR site's CSP has a nonce per request: `script-src 'self' 'nonce-…'` with no
+     `'unsafe-inline'` and no `'strict-dynamic'` (in Chromium, `'strict-dynamic'` also runs an
+     inline script that running script creates; every script of the site is its own), `style-src
+'self' 'nonce-…'` and `style-src-attr 'unsafe-inline'` for the accent colour's style
+     attribute. Every page is rendered for its request (`connection()` in the root layout), and
+     the proxy runs on every request.
+774. The console and the vendor web app require Trusted Types with no policy (`trusted-types
+'none'`). Zod's compiled parsers are off in the three browser apps (`config({ jitless: true })`
+     before any schema is built): its `new Function` probe broke the CSP and Trusted Types on every
+     page load. The server and the Control Plane keep them.
+775. `/version` answers `node` as the major line only (`v24`); the field stays, since apps of client
+     API 1.0 require it.
+776. The digital bill page allows its one style block by its SHA-256 hash, not `'unsafe-inline'`.
+777. ZAP's "Private IP Disclosure" is a false positive on the web apps' scripts (example addresses in
+     the English catalogue) and on `/api/v1/printers` (the restaurant's own printers, for a person
+     who may manage them).
 
 Decided 2026-10-10 (P8-03b4b):
 
@@ -4242,6 +4305,77 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-10: P8-03c1 The ZAP scans, security headers and the CSPs
+
+Split P8-03c into P8-03c1 (this one) and P8-03c2 (floods and rate limits: PC-D3, CP-D1,
+RELAY-D4). Decisions 768 to 777. Four threats mitigated: PC-I2, PC-I4, DESKTOP-I1, RELAY-T5 (133
+mitigated in all, 5 residual Highs, 47 with a plan).
+
+Built:
+
+- `infra/dast` (`@rp/dast`, a new workspace package): starts the QR site with its relay (two
+  restaurants, Realtime on, the site's origin the only one allowed), the relay's functions, the
+  Control Plane with the vendor web app (a Super Admin set up by the CLI, password and
+  authenticator) and the local server over HTTPS with the console (seeded, a POS inserted with an
+  Ed25519 key and its device token by challenge, the Owner by PIN), each from its build; writes
+  an Automation Framework plan per surface (request script for credentials renewed every 30 s,
+  OpenAPI import with ids given an example, spider, passive scan, active scan at medium with
+  `RULES_OFF`, JSON and Markdown reports); runs ZAP (`ZAP_PATH` or `ZAP_DOCKER_IMAGE`); judges
+  every finding against `src/triage.json` (`judge`, `triageProblems`) and writes
+  `reports/summary.md`. `pnpm security:dast`; the scans are `test/scan.test.ts`, skipped without
+  `RP_DAST=1`.
+- CI: the `dast` job in `security.yml` (on `main`, weekly, by hand) with ZAP 2.17.0's container
+  pinned by digest (`ZAP_IMAGE`) and PostgreSQL as a service; the reports kept 30 days without
+  the credentials file.
+- Headers: `API_SECURITY_HEADERS` on every answer of the server and the Control Plane,
+  `SECURITY_HEADERS` on the relay's (preflights too); `notFoundOutsideApi` in both (Express's
+  HTML 404 replaced the CSP); `redirect: false` for the web apps' files; Trusted Types in the
+  console's and the vendor web app's CSP, with `zod-jitless.ts` first in their `main.tsx`; the
+  QR site's nonce CSP in `proxy.ts` on every request, `connection()` in the root layout,
+  `instrumentation-client.ts` (Zod without eval), HSTS in `next.config.ts`; the bill page's style
+  by hash; `/version`'s `node` the major line only. `@rp/relay/testing`'s `startRelay` takes
+  `allowedOrigins`.
+- Docs: `docs/security/dast.md` (what, how, the results, what is not covered); the four threats
+  and CP-I5's note in the models, the summary; `docs/security/README.md`; manual task 21's header
+  and TLS check; the READMEs of `infra/dast`, `infra/ci`, the server, the Control Plane and the
+  QR site; CLAUDE.md's map; `phase-8.md`.
+
+Tests: the final DAST run (all four surfaces, about nine minutes on this Mac): no finding open,
+no High or Medium, three Lows triaged, no 5xx. Server 1254 (+2, 28 skipped), Control Plane 183
+(+3), relay 157 (+1), QR site 8 (+1), dast 12 (and the 4 scans), contracts 965, console 385,
+vendor web 75; Playwright: console 26 (+1), QR site 12 (+1), vendor web 2; all 44 test tasks
+green; format, lint, typecheck, contract docs, compat, `pnpm security:threats` and `pnpm ci:test`
+green. Traceability: Must 264/287.
+
+Also fixed: the console's e2e added a waiter with PIN 7777 and a manager with 8888, which the
+easy-PIN rule of P8-03b2a refuses; that run had been failing since.
+
+Not done or not verified:
+
+- P8-03c2, as split.
+- The CI job has not run (GitHub is not reachable, manual task 1); the container's host
+  networking and file permissions are untested here (Docker is not running on this Mac). The scans
+  ran with an installed ZAP 2.17.0 (`~/.local/zap`, checked against the release's SHA-256).
+- The deployments (the QR site's host, Supabase, the Control Plane's hosting) are not scanned:
+  manual task 21 checks the site's headers and TLS; the others when they exist.
+
+Gotchas:
+
+- ZAP's OpenAPI import sends an empty value for a `format: uuid` parameter with a pattern
+  (`/menu/items//archive`); `forZap` gives each id an example.
+- Next.js puts the nonce on its scripts only while rendering; a page built ahead of time keeps
+  scripts the CSP refuses. Playwright's `addScriptTag` is refused too: evaluate instead.
+- `'strict-dynamic'` in Chromium also runs an inline script that running script creates; the
+  site's scripts are all its own, so `'self'` with the nonce is stricter.
+- Zod 4 probes `new Function` when it builds its first object schema; under a strict CSP or
+  Trusted Types that is a reported violation on every page. `config({ jitless: true })` must run
+  before any schema module is evaluated (first import of `main.tsx`; Next.js's
+  `instrumentation-client.ts`).
+- Nest answers unknown paths only under its global prefix; Express's finalhandler (HTML, its own
+  `default-src 'none'`) answers the rest unless a last middleware does.
+- The pager broker's timing test can fail when ZAP and the servers load the machine; it passes
+  alone.
 
 ### 2026-10-10: P8-03b4b The QR relay (P8-03b done)
 

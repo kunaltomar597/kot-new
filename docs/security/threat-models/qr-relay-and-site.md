@@ -206,15 +206,19 @@ A diner's note or name carries script for the site or the console, or control co
 kitchen printer.
 
 - Mitigation: React escapes every text on the site and the console; kitchen tickets print only
-  printable ASCII; the site's CSP allows its own scripts and the relay only, with `'unsafe-inline'`
-  for Next.js's own.
+  printable ASCII. The site's CSP runs a script only from the site itself or with the nonce made
+  for that request, which Next.js puts on its own: no `'unsafe-inline'` and no `'strict-dynamic'`
+  for scripts, so script that got into the page as text does not run. The console requires
+  Trusted Types (PC-I4).
 - Code: `apps/server/src/printing/escpos.ts` (`toPrintable`); `apps/qr-menu/src/proxy.ts`
-  (`contentSecurityPolicy`).
+  (`contentSecurityPolicy`, `proxy`); `apps/qr-menu/src/instrumentation-client.ts`.
 - Tests: `apps/server/test/unit/escpos.test.ts` "reduces text to printable ASCII so every printer
-  prints it"; `apps/qr-menu/test/site.test.tsx` "allows this site and the relay only".
+  prints it"; `apps/qr-menu/test/site.test.tsx` "allows this site and the relay only", "runs
+  scripts with the request’s nonce only, never inline ones"; `apps/qr-menu/e2e/qr-menu.e2e.ts`
+  "runs the page’s own scripts by their nonce, and no script slipped in";
+  `infra/dast/test/scan.test.ts` "leaves no finding open on the QR site".
 - Risk: likelihood Low, impact Medium: Low.
-- Status: Partly mitigated. Plan: P8-03c by 2026-10-19: a CSP with nonces instead of
-  `'unsafe-inline'`, checked by the DAST scan of the site.
+- Status: Mitigated (P8-03c1: a nonce per request instead of `'unsafe-inline'`).
 
 #### RELAY-T6 Framing the QR site
 
@@ -435,7 +439,7 @@ view of the site fetches the menu again, which costs the vendor and slows the re
 - Code: `infra/supabase/config.toml`; `apps/qr-menu/src/site/relay.ts`.
 - Tests: none, throttling belongs to the edge in front of the functions and the site.
 - Risk: likelihood Medium, impact Medium: Medium.
-- Status: Not mitigated. Plan: P8-03c by 2026-10-19: rate limits at the edge (the site's host and
+- Status: Not mitigated. Plan: P8-03c2 by 2026-10-19: rate limits at the edge (the site's host and
   Supabase), checked by the DAST run.
 
 #### RELAY-D5 The relay or the internet down

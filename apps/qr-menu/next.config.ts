@@ -19,6 +19,8 @@ const config: NextConfig = {
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
+          // SEC-001: the site is only ever on https; browsers ignore this on plain http (tests).
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), payment=()',

@@ -171,6 +171,8 @@ export async function startRelay(options: {
   readonly realtimeJwtSecret?: string;
   /** The project's public API key the Realtime socket asks for. */
   readonly realtimeApiKey?: string;
+  /** Origins the diners' functions answer from a browser (RELAY_ALLOWED_ORIGINS); any by default. */
+  readonly allowedOrigins?: readonly string[];
 }): Promise<TestRelay> {
   // The relay's roles are cluster-wide: test files that start a relay at the same time would race
   // to create them, so one at a time (a lock in the cluster's own database, held by this session).
@@ -219,7 +221,7 @@ export async function startRelay(options: {
   const context: FunctionContext = {
     db: pgRelayDatabase(admin),
     now: () => new Date(),
-    allowedOrigins: ['*'],
+    allowedOrigins: options.allowedOrigins ?? ['*'],
     realtimeJwtSecret: options.realtimeJwtSecret,
     realtimeApiKey: options.realtimeApiKey ?? 'test-publishable-key',
     photos,

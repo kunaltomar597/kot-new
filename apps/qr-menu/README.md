@@ -18,7 +18,10 @@ call waiter / request bill and the Lighthouse budget).
   - no third-party scripts, fonts, images or trackers;
   - `Referrer-Policy: no-referrer`, because the address holds the table's code;
   - a Content-Security-Policy that allows only this site and the relay, set per request in
-    `src/proxy.ts`;
+    `src/proxy.ts`, with a nonce of its own for Next.js's scripts and no inline script without it
+    (P8-03c1), so every page is rendered for its request; Zod's compiled parsers are off
+    (`src/instrumentation-client.ts`), since the policy allows no eval;
+  - `Strict-Transport-Security` (the site is only ever on https);
   - the browser keeps only a random id (for the rate limit), the cart and the orders sent from
     it;
   - the privacy notice and terms are at `/privacy` and `/terms` (drafts for legal review).

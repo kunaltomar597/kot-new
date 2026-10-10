@@ -28,6 +28,7 @@
     "secrets:scan": "bash infra/ci/gitleaks.sh",
     "ci:test": "node --test infra/ci/*.test.mjs",
     "security:threats": "node infra/ci/check-threat-models.mjs",
+    "security:dast": "pnpm --filter @rp/dast scan",
     "installer:test": "pwsh -NoProfile -File infra/installer/windows/Invoke-Tests.ps1",
     "clean": "turbo run clean && rm -rf node_modules/.cache"
   },

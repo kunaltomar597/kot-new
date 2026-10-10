@@ -9,10 +9,15 @@ import { createSecretStore } from './auth/secret-store.js';
 import { bodyParsers } from './http/body-limits.js';
 import { clientVersionMiddleware } from './http/client-version.js';
 import { consoleMiddleware } from './http/console-static.js';
+import { securityHeadersMiddleware } from './http/security-headers.js';
 import { caDownloadMiddleware } from './tls/ca-download.js';
 import { localServerNames, serverTlsOptions, TlsStore } from './tls/tls-store.js';
 import { tlsDirectory, TlsService } from './tls/tls.service.js';
-import { bodyParserErrorHandler, correlationMiddleware } from './http/request-pipeline.js';
+import {
+  bodyParserErrorHandler,
+  correlationMiddleware,
+  notFoundOutsideApi,
+} from './http/request-pipeline.js';
 
 export const API_PREFIX = 'api/v1';
 
@@ -32,10 +37,11 @@ export function configureApp(app: INestApplication): void {
   const express = app as NestExpressApplication;
   express.useLogger(app.get(Logger));
   express.disable('x-powered-by');
-  // Order matters: correlation ID first, then the apps the server no longer serves (UPD-006),
-  // then the CA download and the console's files, then the device check and the JSON parser it
-  // chooses (PC-D1), then the parser's error handler.
+  // Order matters: correlation ID first, then the security headers every answer carries, then
+  // the apps the server no longer serves (UPD-006), then the CA download and the console's files,
+  // then the device check and the JSON parser it chooses (PC-D1), then the parser's error handler.
   express.use(correlationMiddleware);
+  express.use(securityHeadersMiddleware);
   express.use(clientVersionMiddleware);
   express.use(caDownloadMiddleware(app.get(TlsService)));
   const { consoleDir } = app.get<AppConfig>(APP_CONFIG);
@@ -47,6 +53,7 @@ export function configureApp(app: INestApplication): void {
     }),
   );
   express.use(bodyParserErrorHandler);
+  express.use(notFoundOutsideApi(API_PREFIX));
   app.setGlobalPrefix(API_PREFIX);
   app.enableShutdownHooks();
 }

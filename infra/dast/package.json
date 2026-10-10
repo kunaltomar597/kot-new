@@ -1,0 +1,24 @@
+{
+  "name": "@rp/dast",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DAST (P8-03c1, SEC-017): OWASP ZAP scans of the QR site, the relay, the Control Plane and the local server as they run for real, with every finding triaged.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run",
+    "scan": "RP_DAST=1 vitest run test/scan.test.ts",
+    "clean": "rm -rf coverage reports"
+  },
+  "devDependencies": {
+    "@rp/contracts": "workspace:*",
+    "@rp/ordering": "workspace:*",
+    "@rp/relay": "workspace:*",
+    "@rp/test-postgres": "workspace:*",
+    "@rp/totp": "workspace:*",
+    "@types/node": "^22.20.4",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.0"
+  }
+}

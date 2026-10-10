@@ -49,7 +49,9 @@ const tablePage = (page: Page, table = 'T1') =>
   page.goto(`${state.site}/t/${state.tokens[table] ?? ''}`);
 
 async function expectAccessible(page: Page): Promise<void> {
-  await page.addScriptTag({ content: readFileSync(require.resolve('axe-core'), 'utf8') });
+  // Evaluated by the browser's tools, not added as a script: the page's CSP runs no script
+  // without its nonce (RELAY-T5).
+  await page.evaluate(readFileSync(require.resolve('axe-core'), 'utf8'));
   const violations = await page.evaluate(async () => {
     const axe = (
       window as unknown as {
@@ -255,11 +257,67 @@ test.describe('[QR-001] [QR-013] the rest of the site', () => {
   test('links the privacy notice and the terms, and sends no referrer', async ({ page }) => {
     const response = await tablePage(page);
     expect(response?.headers()['referrer-policy']).toBe('no-referrer');
+    expect(response?.headers()['strict-transport-security']).toBe('max-age=31536000');
     expect(response?.headers()['content-security-policy']).toContain("default-src 'self'");
     await page.getByRole('link', { name: en.qrSite.footer.privacy }).click();
     await expect(page.getByRole('heading', { name: s.privacy.title })).toBeVisible();
     await page.goto(`${state.site}/terms`);
     await expect(page.getByRole('heading', { name: s.terms.title })).toBeVisible();
+  });
+
+  test('[SEC-017] runs the page’s own scripts by their nonce, and no script slipped in', async ({
+    page,
+  }) => {
+    // Every refusal of the page's policy, as the page itself hears of it.
+    await page.addInitScript(() => {
+      const refused: string[] = [];
+      Object.assign(window, { refused });
+      document.addEventListener('securitypolicyviolation', (event) => {
+        refused.push(`${event.effectiveDirective} ${event.blockedURI}`);
+      });
+    });
+    const refused = () => page.evaluate(() => (window as unknown as { refused: string[] }).refused);
+    const first = await tablePage(page);
+    const nonce = /'nonce-([^']+)'/.exec(first?.headers()['content-security-policy'] ?? '')?.[1];
+    expect(nonce).toBeDefined();
+    // Next.js's scripts carry this request's nonce and ran: the menu answers taps, and an order
+    // goes to the relay and its answer is read, all within the policy.
+    await inMenu(page, 'Add Dal Makhani').click();
+    await page.getByRole('button', { name: /Your order · 1 item/ }).click();
+    const cart = page.getByRole('dialog', { name: s.cart.title });
+    await cart.getByLabel(s.cart.name).fill('Kiran');
+    await cart.getByRole('button', { name: s.cart.send }).click();
+    await expect(page.getByText(s.orders.SUBMITTED).first()).toBeVisible();
+    const nonces = await page.evaluate(() =>
+      Array.from(document.scripts, (script) => script.nonce),
+    );
+    expect(nonces.length).toBeGreaterThan(0);
+    expect(new Set(nonces)).toEqual(new Set([nonce]));
+    expect(await refused()).toEqual([]);
+
+    // A script that got into the page as text (a diner's note, say) does not run.
+    const outcome = await page.evaluate(async () => {
+      const violation = new Promise<string>((resolve) => {
+        document.addEventListener(
+          'securitypolicyviolation',
+          (event) => {
+            resolve(event.effectiveDirective);
+          },
+          { once: true },
+        );
+      });
+      const script = document.createElement('script');
+      script.textContent = 'window.slippedIn = true';
+      document.body.append(script);
+      const directive = await violation;
+      return { directive, ran: 'slippedIn' in window };
+    });
+    expect(outcome).toEqual({ directive: 'script-src-elem', ran: false });
+
+    // Every page has a nonce of its own.
+    const second = await page.goto(`${state.site}/privacy`);
+    expect(second?.headers()['content-security-policy']).toMatch(/'nonce-[^']+'/);
+    expect(second?.headers()['content-security-policy']).not.toContain(`'nonce-${nonce ?? ''}'`);
   });
 });
 

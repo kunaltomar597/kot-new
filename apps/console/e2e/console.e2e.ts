@@ -126,6 +126,24 @@ function authenticatorCode(key: string): string {
   return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
 }
 
+/**
+ * What the browser refused under the console's CSP and Trusted Types (P8-03c1), from every page
+ * of a context: a script or HTML sink given a string throws, and says so on the console.
+ */
+const policyViolations: string[] = [];
+function watchPolicy(context: BrowserContext): void {
+  const refused = /Content Security Policy|Trusted ?Type|TrustedHTML|TrustedScript/i;
+  context.on('console', (message) => {
+    if (refused.test(message.text())) {
+      const { url, lineNumber } = message.location();
+      policyViolations.push(`${message.text()} (${url}:${String(lineNumber)})`);
+    }
+  });
+  context.on('weberror', (error) => {
+    if (refused.test(error.error().message)) policyViolations.push(error.error().message);
+  });
+}
+
 test.describe.serial('the web console', () => {
   let server: RunningServer;
   // One browser profile: the device key it keeps is shared by every tab, like a POS terminal's.
@@ -135,6 +153,7 @@ test.describe.serial('the web console', () => {
   test.beforeAll(async ({ browser }) => {
     server = await startServer();
     context = await browser.newContext();
+    watchPolicy(context);
     page = await context.newPage();
   });
 
@@ -548,8 +567,8 @@ test.describe.serial('the web console', () => {
     const add = page.getByRole('dialog', { name: t('staff.form.addTitle') });
     await add.getByLabel(t('staff.form.name'), { exact: false }).first().fill('Sunil');
     await expect(add.getByLabel(t('staff.form.role'))).toHaveValue('WAITER');
-    await add.getByLabel(/^PIN( \*)?$/).fill('7777');
-    await add.getByLabel(/^PIN again( \*)?$/).fill('7777');
+    await add.getByLabel(/^PIN( \*)?$/).fill('7351');
+    await add.getByLabel(/^PIN again( \*)?$/).fill('7351');
     await expectAccessible(page);
     await add.getByRole('button', { name: t('staff.form.add') }).click();
     await expect(page.getByText(t('staff.added', { name: 'Sunil' }))).toBeVisible();
@@ -559,7 +578,7 @@ test.describe.serial('the web console', () => {
 
     // The new waiter shows on the other screen without a reload, and signs in with the new PIN.
     await sunilTile.click();
-    await other.keyboard.type('7777');
+    await other.keyboard.type('7351');
     await expect(other).toHaveURL(/\/pos$/);
 
     // A 360 px phone: the Staff page fits (MGR-011).
@@ -635,8 +654,8 @@ test.describe.serial('the web console', () => {
     const add = page.getByRole('dialog', { name: t('staff.form.addTitle') });
     await add.getByLabel(t('staff.form.name'), { exact: false }).first().fill('Farah');
     await add.getByLabel(t('staff.form.role')).selectOption({ label: t('roles.MANAGER') });
-    await add.getByLabel(/^PIN( \*)?$/).fill('8888');
-    await add.getByLabel(/^PIN again( \*)?$/).fill('8888');
+    await add.getByLabel(/^PIN( \*)?$/).fill('8264');
+    await add.getByLabel(/^PIN again( \*)?$/).fill('8264');
     await add.getByRole('button', { name: t('staff.form.add') }).click();
     const confirm = page.getByRole('dialog', { name: t('secondFactor.title') });
     await confirm.getByLabel(t('secondFactor.password'), { exact: false }).fill(password);
@@ -787,6 +806,7 @@ test.describe.serial('the web console', () => {
 
     // A new browser (its own device key) pairs with the code and opens the kitchen display.
     const kitchen = await browser.newContext();
+    watchPolicy(kitchen);
     const screenPage = await kitchen.newPage();
     await screenPage.goto(server.url);
     await expect(screenPage).toHaveURL(/\/pair$/);
@@ -1075,5 +1095,21 @@ test.describe.serial('the web console', () => {
     await page.goto(`${server.url}/manage/staff`);
     await expect(page.getByText(t('modes.notAllowed', { mode: t('modes.manage') }))).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: t('staff.title') })).toHaveCount(0);
+  });
+
+  test('[SEC-017] every screen ran within the CSP and Trusted Types (PC-I4)', async () => {
+    const response = await page.goto(`${server.url}/pos`);
+    expect(response?.headers()['content-security-policy']).toContain("trusted-types 'none'");
+    expect(policyViolations).toEqual([]);
+    // A string given to an HTML sink is refused: no script slips in through markup.
+    const refusal = await page.evaluate(() => {
+      try {
+        document.body.insertAdjacentHTML('beforeend', '<img src="x" onerror="alert(1)">');
+        return 'accepted';
+      } catch (error) {
+        return error instanceof TypeError ? 'refused' : String(error);
+      }
+    });
+    expect(refusal).toBe('refused');
   });
 });
