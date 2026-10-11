@@ -4481,6 +4481,9 @@ Mac code, and it failed in these places, all fixed in code:
     Progress is now the bytes the operating system took, and a cut needs two stalled sweeps in a
     row. A new test reads slowly, and it fails with the old rule.
   - The console's pager scan test waits for the camera to be turned off (an effect clean-up).
+  - The flood tests time the server under a full-speed flood, but ran beside every other server
+    test file on CI's four CPUs (one request took 1.4 s against a 1 s budget). They are now the
+    vitest project `integration-alone`, run after the others (`sequence.groupOrder`).
 - **CI:** a step checks that pnpm is the version `packageManager` names. The action installs v11
   first and only warns. The APK build prints Gradle's stack trace and the disk and memory when it
   fails, after one unexplained packaging failure.

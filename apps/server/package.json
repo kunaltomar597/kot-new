@@ -16,7 +16,7 @@
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:int": "vitest run --project integration",
+    "test:int": "vitest run --project integration --project integration-alone",
     "test:coverage": "vitest run --coverage",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
