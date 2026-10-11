@@ -45,6 +45,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # pnpm/action-setup installs its own pnpm first, then the version package.json names: the
+      # build must run with that one.
+      - name: pnpm is the version package.json names
+        run: test "pnpm@$(pnpm --version)" = "$(node -p "require('./package.json').packageManager")"
+
       - run: pnpm install --frozen-lockfile
 
       # React Native's sources are transformed by Babel for Jest; a warm cache keeps the first
