@@ -403,6 +403,32 @@ describe('[SEC-009] [SEC-017] a device’s live connections (PC-D3)', () => {
   const connected = (deviceId: string) =>
     server.get(RealtimeGateway).connectedDeviceIds(kit.restaurantId).has(deviceId);
 
+  /** The client's TCP connection, to read from it at another pace than Socket.io's. */
+  function rawSocketOf(client: RealtimeTestClient): Socket {
+    const { transport } = client.socket.io.engine as unknown as {
+      transport: { ws?: { _socket?: Socket } };
+    };
+    const raw = transport.ws?._socket;
+    if (raw === undefined) throw new Error('The client has no WebSocket to pause');
+    return raw;
+  }
+
+  /** Events of about 40 kB each, so a few hundred are more than the operating system holds. */
+  function bigEvents(count: number): ReturnType<typeof domainEvent>[] {
+    const keys = Array.from(
+      { length: 500 },
+      (_, index) => `flood.${String(index).padStart(70, '0')}`,
+    );
+    return Array.from({ length: count }, () =>
+      domainEvent('SettingsChanged', kit.restaurantId, { keys }),
+    );
+  }
+
+  const gotAll = (client: RealtimeTestClient, events: ReturnType<typeof domainEvent>[]) =>
+    events.every((event) =>
+      client.events.some((message) => message.event.eventId === event.eventId),
+    );
+
   it('refuses a device’s connections over its limit, and no other device’s', async () => {
     const tablet = await addDevice(server, kit, 'POS');
     const first = await connect(tablet);
@@ -443,31 +469,42 @@ describe('[SEC-009] [SEC-017] a device’s live connections (PC-D3)', () => {
     const reader = await connect(await addDevice(server, kit, 'POS'));
     const quiet = await connect(stalled);
     // The app stops reading but stays connected (a device that still answered pings would too).
-    const transport = (
-      quiet.socket.io.engine as unknown as { transport: { ws?: { _socket?: Socket } } }
-    ).transport;
-    const raw = transport.ws?._socket;
-    if (raw === undefined) throw new Error('The client has no WebSocket to pause');
-    raw.pause();
+    rawSocketOf(quiet).pause();
 
     // 300 events of about 40 kB: more than the operating system holds for a connection.
-    const keys = Array.from(
-      { length: 500 },
-      (_, index) => `flood.${String(index).padStart(70, '0')}`,
-    );
-    const events = Array.from({ length: 300 }, () =>
-      domainEvent('SettingsChanged', kit.restaurantId, { keys }),
-    );
+    const events = bigEvents(300);
     await produce(server, events);
 
     await until(() => !connected(stalled), 10_000, 'the stalled connection to be cut off');
-    await reader.waitFor(
-      () =>
-        events.every((event) =>
-          reader.events.some((message) => message.event.eventId === event.eventId),
-        ),
-      10_000,
-    );
+    await reader.waitFor(() => gotAll(reader, events), 10_000);
     expect(reader.disconnectReason).toBeUndefined();
+  });
+
+  it('keeps a connection that reads slowly, however long a flush takes to go out', async () => {
+    const reader = await connect(await addDevice(server, kit, 'POS'));
+    // About 512 kB every 100 ms: a tablet on weak Wi-Fi, or this PC busy with other work. The
+    // first flush of 100 events (4 MB) takes it most of a second, several sweeps, while the next
+    // 100 wait for it, over the limit.
+    const raw = rawSocketOf(reader);
+    let read = 0;
+    raw.on('data', (chunk: Buffer) => {
+      read += chunk.length;
+      if (read >= 512 * 1024) raw.pause();
+    });
+    const pace = setInterval(() => {
+      read = 0;
+      raw.resume();
+    }, 100);
+    try {
+      const first = bigEvents(100);
+      const second = bigEvents(100);
+      await produce(server, first);
+      await produce(server, second);
+
+      await reader.waitFor(() => gotAll(reader, [...first, ...second]), 10_000);
+      expect(reader.disconnectReason).toBeUndefined();
+    } finally {
+      clearInterval(pace);
+    }
   });
 });

@@ -709,8 +709,9 @@ updating during service.
   address (the POS window) is not limited. The socket is WebSocket only, with 16 KB messages, a
   10-second handshake and a rate limit on `resync`; a device has 16 live connections and 60
   handshakes a minute at most, counted after its token's signature and before the database is
-  asked, and a connection that stops reading is cut off once 1,000 messages wait for it with none
-  written since the last sweep (or 10,000 in any case). Pairing, sign-in and device
+  asked, and a connection that stops reading is cut off once over 1,000 messages wait for it at
+  two sweeps in a row with nothing sent to it in between (or 10,000 in any case); a slow reader
+  that keeps reading is kept, however long a large flush takes it. Pairing, sign-in and device
   authentication are rate-limited. In the flood test one host sent about 14,000 requests in 3 s
   and about 700 were answered (about 21,000 without the limits); meanwhile another device's event
   reached its screen in 12 ms and its request was answered in 2 ms (P8-03c2a, on a development
@@ -730,7 +731,8 @@ updating during service.
   "keeps another device’s screen live and its requests answered within a second", "refuses a
   device’s connections over its limit, and no other device’s", "refuses a device that opens
   connections too fast, and no other device", "cuts off a connection that stops reading, while
-  others get every event"; `apps/server/test/unit/flood-limits.test.ts` "never limits the PC’s
+  others get every event", "keeps a connection that reads slowly, however long a flush takes to go
+  out"; `apps/server/test/unit/flood-limits.test.ts` "never limits the PC’s
   own address when it is trusted"; `apps/server/test/integration/realtime.int.test.ts` "refuses
   plain HTTP polling; only WebSocket is offered", "replays on request, and limits how often a
   connection may ask".

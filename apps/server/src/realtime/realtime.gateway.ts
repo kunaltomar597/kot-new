@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'node:http';
 import { Server as HttpsServer } from 'node:https';
+import type { Socket as NetSocket } from 'node:net';
 import {
   Inject,
   Injectable,
@@ -54,9 +55,9 @@ export interface RealtimeOptions {
   /** Handshakes of one device per minute (PC-D3): each may replay events under the publish lock. */
   readonly handshakesPerMinutePerDevice: number;
   /**
-   * Messages waiting for a connection that stopped reading (PC-D3): past this with nothing
-   * written to it since the last sweep, or past ten times this, the sweep cuts it off; the app
-   * reconnects and resyncs when it reads again.
+   * Messages waiting for a connection that stopped reading (PC-D3): past this at two sweeps in a
+   * row with nothing sent to it in between, or past ten times this, the sweep cuts it off; the
+   * app reconnects and resyncs when it reads again.
    */
   readonly maxUnsentPerConnection: number;
 }
@@ -84,6 +85,11 @@ const REFUSAL_LOG_PERIOD_MS = 60_000;
 const REPLAY_BATCH = 500;
 const MAX_CLIENT_MESSAGE_BYTES = 16 * 1024;
 
+/** Bytes the operating system has taken from a connection (`bytesWritten` counts queued ones). */
+function bytesSent(tcp: NetSocket): number {
+  return tcp.bytesWritten - tcp.writableLength;
+}
+
 interface ServerToClient {
   [REALTIME_MESSAGES.event]: (message: RealtimeEvent) => void;
   [REALTIME_MESSAGES.sync]: (message: RealtimeSync) => void;
@@ -104,8 +110,10 @@ interface ConnectionData {
   resyncs: number[];
   /** Messages made for the connection and not yet handed to its transport (PC-D3). */
   unsent: number;
-  /** Whether messages were handed to its transport since the last sweep. */
-  flushed: boolean;
+  /** Bytes the operating system had taken from the connection at the last sweep. */
+  sent: number;
+  /** Sweeps in a row that found it over the limit with nothing sent since the one before. */
+  stalls: number;
 }
 
 type RealtimeServer = Server<ClientToServer, ServerToClient, Record<string, never>, ConnectionData>;
@@ -322,7 +330,8 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
         resume: { lastSequence: handshake.data.lastSequence, streamId: handshake.data.streamId },
         resyncs: [],
         unsent: 0,
-        flushed: false,
+        sent: 0,
+        stalls: 0,
       };
     } finally {
       if (reserved !== undefined) this.release(this.admittingByDevice, reserved);
@@ -403,7 +412,6 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
     });
     socket.conn.on('flush', (written: readonly unknown[]) => {
       socket.data.unsent -= written.length;
-      socket.data.flushed = true;
     });
     socket.on(REALTIME_MESSAGES.resync, (request: unknown, ack: unknown) => {
       void this.resync(socket, request, ack);
@@ -596,17 +604,23 @@ export class RealtimeGateway implements OnApplicationBootstrap, OnModuleDestroy 
 
   /**
    * Whether the connection still reads what it is sent; one that stopped while messages piled up
-   * is cut off (PC-D3): many waiting and none written since the last sweep, or far too many. A
+   * is cut off (PC-D3): many waiting and nothing sent to it for two sweeps, or far too many. A
    * paired device that stops reading but answers pings would otherwise keep the server buffering
    * for it all day. Its TCP connection is destroyed: closing it politely would wait for those
    * messages to go out first, which they never do.
    */
   private reading(socket: RealtimeSocket): boolean {
-    const { unsent, flushed } = socket.data;
-    socket.data.flushed = false;
+    const { unsent } = socket.data;
+    const sent = bytesSent(socket.request.socket);
+    const moved = sent !== socket.data.sent;
+    socket.data.sent = sent;
     const limit = this.options.maxUnsentPerConnection;
-    // A reading app may have many waiting just after a burst of events; it gets them out.
-    if (unsent <= limit || (flushed && unsent <= limit * 10)) return true;
+    // A reading app may have many waiting just after a burst of events, while engine.io holds
+    // them back until the previous flush is all written (megabytes after a replay, read at the
+    // app's pace), so progress is what the operating system took, not whole flushes. Two sweeps,
+    // as one can come straight after this PC was too busy to write to anyone.
+    socket.data.stalls = unsent > limit && !moved ? socket.data.stalls + 1 : 0;
+    if (unsent <= limit * 10 && socket.data.stalls < 2) return true;
     this.refusals.note(`stopped-reading|${socket.data.device.deviceId}`);
     socket.request.socket.destroy();
     return false;

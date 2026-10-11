@@ -629,9 +629,10 @@ the mechanisms in `src/common/flood-limits.ts`, shared with the pager broker) se
 The PC's own address is never limited (the POS window, the set-up checks, the load test, the DAST
 scan). On the socket (`RealtimeOptions`): 16 live connections and 60 handshakes a minute per device,
 counted after the token's signature is checked and before the database is asked, refused with
-`TOO_MANY_CONNECTIONS` (the apps retry); a connection with over 1,000 messages waiting and none
-written since the last sweep (3 s), or over 10,000, has its TCP connection destroyed. Refusals are
-logged once a minute per kind and address or device, with their count.
+`TOO_MANY_CONNECTIONS` (the apps retry); a connection with over 1,000 messages waiting at two
+sweeps in a row (every 3 s) and no bytes taken by the operating system in between, or over 10,000,
+has its TCP connection destroyed. Refusals are logged once a minute per kind and address or
+device, with their count.
 
 `test/integration/flood.int.test.ts` floods the server over HTTPS from two addresses of the machine
 (127.0.0.1 and ::1; the server listens on `::` and does not trust its own address there), with

@@ -992,10 +992,12 @@ Decided 2026-10-10 (P8-03c2a):
      of this build retry it with their backoff; apps of the previous build stop their live
      connection on a refusal they do not know until they restart, which no device within the
      limits meets (an addition to the protocol; the client API is unchanged).
-782. A connection that stops reading is cut off when the sweep (every 3 s) finds over 1,000
-     messages waiting for it with none written since the previous sweep, or over 10,000 in any
-     case. Its TCP connection is destroyed: Socket.io's polite close waits for the waiting
-     messages to go out first. The app reconnects and resyncs when it reads again.
+782. A connection that stops reading is cut off when two sweeps in a row (every 3 s) find over
+     1,000 messages waiting for it and the operating system took no bytes of it in between, or
+     over 10,000 in any case. Its TCP connection is destroyed: Socket.io's polite close waits for
+     the waiting messages to go out first. The app reconnects and resyncs when it reads again.
+     (Changed 2026-10-11: it was "no flush since the previous sweep", which cut off a slow reader
+     still reading a large flush; CI showed it.)
 783. The server closes every open connection when it stops (Nest's `forceCloseConnections`):
      Node stops timing out connections that never sent a request once its `close()` begins, so a
      host holding a few kept an update, a restore's restart or a service stop waiting for ever
