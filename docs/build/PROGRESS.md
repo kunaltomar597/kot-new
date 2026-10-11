@@ -4484,6 +4484,10 @@ Mac code, and it failed in these places, all fixed in code:
 - **CI:** a step checks that pnpm is the version `packageManager` names. The action installs v11
   first and only warns. The APK build prints Gradle's stack trace and the disk and memory when it
   fails, after one unexplained packaging failure.
+- **DAST on `main`** (it runs only there, so the merge was its first run): the plan turned off
+  rule 40024 (SQL injection, SQLite), which left ZAP's release rules in ascanrules 79; the CI
+  image does not have it, so every plan ended with a warning (exit 2). The Mac's ZAP has
+  ascanrules 78 and still had it. The rule is no longer named.
 
 Gotchas: makensis, icacls, Windows PowerShell 5.1, Supabase's reserved roles, Linux socket
 buffers and a busier CPU all behave differently from the Mac. Only the `windows-latest`, Supabase
