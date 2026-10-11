@@ -69,9 +69,16 @@ jobs:
       - name: Generate the Android project
         run: pnpm --filter @rp/${{ matrix.app }} prebuild
 
+      # --stacktrace: a packaging failure otherwise hides its cause (one waiter-app run, 2026-10-11).
       - name: Assemble the debug APK
         working-directory: apps/${{ matrix.app }}/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Disk and memory when the build failed
+        if: failure()
+        run: |
+          df -h
+          free -m
 
       # The waiter phone's background alerts (P2-06b) need notifications and a foreground service;
       # the table tablet alerts nobody and blocks them (SEC-002 least privilege).
