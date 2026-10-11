@@ -552,6 +552,37 @@ function Get-RPExplicitAceSid {
     @($found | Select-Object -Unique)
 }
 
+function Get-RPMissingServiceSid {
+    <# The virtual-account SIDs of the platform's services that do not exist yet (Windows). #>
+    [CmdletBinding()]
+    param()
+    @($script:Services.Values | Where-Object { $null -eq (Get-RPServiceInfo -Name $_) } | ForEach-Object { Get-RPServiceSid $_ })
+}
+
+function Select-RPExistingGrant {
+    <#
+    .SYNOPSIS
+        The plan without its grants to accounts that do not exist yet.
+
+    .DESCRIPTION
+        A service's virtual account (NT SERVICE\<name>) exists once its service does: before that
+        icacls refuses to name it (1332, "No mapping between account names and security IDs").
+        On a new PC the folders are set first without those accounts, so they are more closed,
+        never more open, and set in full once the services exist (SEC-006). A folder whose every
+        grant is to such an account, and that inherits, is left for then.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [object[]] $Plan,
+        [AllowEmptyCollection()] [string[]] $MissingSid = @()
+    )
+    foreach ($entry in $Plan) {
+        $grants = @($entry.Grants | Where-Object { $MissingSid -notcontains $_.Sid })
+        if ($grants.Count -eq 0 -and -not $entry.Protect) { continue }
+        [pscustomobject]@{ Path = $entry.Path; Protect = $entry.Protect; Grants = $grants }
+    }
+}
+
 function Set-RPFolderPermission {
     <#
     .SYNOPSIS
@@ -1063,8 +1094,9 @@ function Invoke-RPInstall {
     $plan = Get-RPFolderAclPlan -DataDir $DataDir -ProgramDataDir $programDataDir
     $early = @($plan | Where-Object { $_.Path -eq (Join-RPPath $DataDir 'secrets') -or $_.Path -eq $programDataDir.TrimEnd('\') })
 
-    # 2. The installation file and the maintenance flag.
-    Set-RPFolderPermission -Plan $early
+    # 2. The installation file and the maintenance flag. On a new PC the services' accounts do
+    # not exist yet: the folders are closed to them until step 6.
+    Set-RPFolderPermission -Plan (Select-RPExistingGrant -Plan $early -MissingSid (Get-RPMissingServiceSid))
     $options = @{}
     foreach ($key in $PSBoundParameters.Keys) { $options[$key] = $PSBoundParameters[$key] }
     $options.DataDir = $DataDir
@@ -1094,9 +1126,10 @@ function Invoke-RPInstall {
         # 5. The permissions, the database, the logins and the migrations.
         # The database is stopped while its account changes (PC-I6): an installation from before
         # ran it as Network Service, and the register step moves it to its own virtual account.
+        # Registering first makes the database's account, which its folders then name.
         Stop-RPService -Name $script:Services.Database
-        Set-RPFolderPermission -Plan $plan
         $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('postgres-register')
+        Set-RPFolderPermission -Plan (Select-RPExistingGrant -Plan $plan -MissingSid (Get-RPMissingServiceSid))
         Set-RPServiceRecovery -Name $script:Services.Database -Actions $script:DatabaseRecovery
         Start-RPService -Name $script:Services.Database
         $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('database')
@@ -1106,6 +1139,8 @@ function Invoke-RPInstall {
         $null = Invoke-RPSetupCli -Cli $cli -InstallationFile $InstallationFile -ArgumentList @('service-files')
         Install-RPWinSWService -Name $script:Services.Server -ServicesDir $paths.servicesDir -DependsOn $script:Services.Database -VirtualAccount
         Install-RPWinSWService -Name $script:Services.Watchdog -ServicesDir $paths.servicesDir
+        # Every account exists now: the folders get the plan in full before the server starts.
+        Set-RPFolderPermission -Plan $plan
         $rules = Get-RPFirewallRuleSpec -Port $paths.ports.server -MqttPort $paths.ports.mqtt -NodePath $paths.node -StaffSubnet $StaffSubnet
         Set-RPFirewallRule -Spec $rules
         Write-RPLog ('Opened ports {0} and {1} to {2}.' -f $paths.ports.server, $paths.ports.mqtt, (@($rules[0].RemoteAddress) -join ', '))
@@ -2187,6 +2222,8 @@ Export-ModuleMember -Function @(
     'Remove-RPService',
     'Set-RPFirewallRule',
     'Set-RPFolderPermission',
+    'Select-RPExistingGrant',
+    'Get-RPMissingServiceSid',
     'Set-RPServiceRecovery',
     'Start-RPLog',
     'Start-RPService',

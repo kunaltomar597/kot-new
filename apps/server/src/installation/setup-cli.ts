@@ -215,8 +215,8 @@ export async function runSetupCli(
         return 1;
       }
       if ((await new WindowsServiceControl().state(SERVICE_NAMES.database)) !== 'MISSING') {
-        // An installation from before PC-I6 ran it as Network Service: the installer has already
-        // given the new account its folders and stopped the service, so only the account changes.
+        // An installation from before PC-I6 ran it as Network Service: the installer has stopped
+        // the service, and gives the new account its folders after this; only the account changes.
         const moved = await runProgram('sc.exe', pgServiceAccountArgs());
         log(
           moved.code === 0

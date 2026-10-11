@@ -41,23 +41,49 @@ Describe 'on Windows' -Tag 'Windows' -Skip:(-not $OnWindows) {
     }
 
     It '[SEC-007] gives real folders exactly the planned entries, removing others' {
-        $data = Join-Path $TestDrive 'data'
-        $programData = Join-Path $TestDrive 'programdata'
-        $plan = Get-RPFolderAclPlan -DataDir $data -ProgramDataDir $programData
-        Set-RPFolderPermission -Plan $plan
-        # Someone opens the secrets to everyone; repair closes them again.
-        $secrets = Join-Path $data 'secrets'
-        & icacls.exe $secrets /grant '*S-1-1-0:(OI)(CI)R' /Q | Out-Null
-        Set-RPFolderPermission -Plan $plan
-
-        foreach ($entry in $plan) {
-            $acl = Get-Acl -LiteralPath $entry.Path
-            $acl.AreAccessRulesProtected | Should -Be ([bool]$entry.Protect)
-            $own = @(Get-RPExplicitAceSid -Path $entry.Path | Sort-Object)
-            $own | Should -Be @($entry.Grants.Sid | Sort-Object -Unique)
+        # A service's virtual account exists once its service does (the installer makes the
+        # services before it names their accounts): two throwaway services stand in for the
+        # server's and the database's here.
+        $names = @(('RPAclTestServer{0}' -f $PID), ('RPAclTestDatabase{0}' -f $PID))
+        $cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'
+        foreach ($name in $names) {
+            & sc.exe create $name binPath= ('"{0}" /c exit 0' -f $cmd) start= demand | Out-Null
+            $LASTEXITCODE | Should -Be 0
         }
-        $everyone = @((Get-Acl -LiteralPath $secrets).Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-1-0' })
-        $everyone | Should -HaveCount 0
+        try {
+            $data = Join-Path $TestDrive 'data'
+            $programData = Join-Path $TestDrive 'programdata'
+            $plan = Get-RPFolderAclPlan -DataDir $data -ProgramDataDir $programData `
+                -ServerSid (Get-RPServiceSid $names[0]) -DatabaseSid (Get-RPServiceSid $names[1])
+            Set-RPFolderPermission -Plan $plan
+            # Someone opens the secrets to everyone; repair closes them again.
+            $secrets = Join-Path $data 'secrets'
+            & icacls.exe $secrets /grant '*S-1-1-0:(OI)(CI)R' /Q | Out-Null
+            Set-RPFolderPermission -Plan $plan
+
+            foreach ($entry in $plan) {
+                $acl = Get-Acl -LiteralPath $entry.Path
+                $acl.AreAccessRulesProtected | Should -Be ([bool]$entry.Protect)
+                $own = @(Get-RPExplicitAceSid -Path $entry.Path | Sort-Object)
+                $own | Should -Be @($entry.Grants.Sid | Sort-Object -Unique)
+            }
+            $everyone = @((Get-Acl -LiteralPath $secrets).Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-1-0' })
+            $everyone | Should -HaveCount 0
+        } finally {
+            foreach ($name in $names) { & sc.exe delete $name | Out-Null }
+        }
+    }
+
+    It '[SEC-006] names no service account icacls cannot find yet, as on a new PC' {
+        $data = Join-Path $TestDrive 'new-pc'
+        $missing = @('RPAclTestMissing{0}' -f $PID)
+        $plan = Get-RPFolderAclPlan -DataDir $data -ProgramDataDir (Join-Path $TestDrive 'new-pc-programdata') `
+            -ServerSid (Get-RPServiceSid $missing[0]) -DatabaseSid (Get-RPServiceSid $missing[0])
+        # The whole plan cannot be set before the service exists ...
+        { Set-RPFolderPermission -Plan $plan } | Should -Throw '*1332*'
+        # ... what the installer sets first can, and is closed to everyone but the owners.
+        Set-RPFolderPermission -Plan (Select-RPExistingGrant -Plan $plan -MissingSid @(Get-RPServiceSid $missing[0]))
+        @(Get-RPExplicitAceSid -Path (Join-Path $data 'secrets') | Sort-Object) | Should -Be @('S-1-5-18', 'S-1-5-32-544')
     }
 
     It '[SEC-008] adds the firewall rules in their group and removes them' {

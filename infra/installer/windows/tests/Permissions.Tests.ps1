@@ -16,6 +16,25 @@ BeforeAll {
 }
 
 Describe '[SEC-006] [SEC-007] [AUD-004] the folders'' permissions' {
+    It 'leaves out the accounts of services that do not exist yet, never opening a folder further' {
+        $first = @(Select-RPExistingGrant -Plan $script:Plan -MissingSid @($script:Server, $script:Database))
+        # The secrets and the data folder: the owners only until the services exist.
+        @((($first | Where-Object Path -EQ 'D:\RestaurantPlatform\secrets').Grants.Sid) | Sort-Object) |
+            Should -Be @($script:System, $script:Admins | Sort-Object)
+        ($first | Where-Object Path -EQ 'D:\RestaurantPlatform\secrets').Protect | Should -BeTrue
+        # A folder that inherits and grants only to those accounts waits until they exist.
+        $first.Path | Should -Not -Contain 'D:\RestaurantPlatform\backups'
+        $first.Path | Should -Not -Contain 'D:\RestaurantPlatform\backups\wal-staging'
+        # Every grant left was in the plan.
+        foreach ($entry in $first) {
+            $planned = @((Get-Entry $entry.Path).Grants | ForEach-Object { '{0}={1}' -f $_.Sid, $_.Rights })
+            foreach ($grant in $entry.Grants) { $planned | Should -Contain ('{0}={1}' -f $grant.Sid, $grant.Rights) }
+        }
+        # With every account there, the plan is unchanged.
+        $all = @(Select-RPExistingGrant -Plan $script:Plan -MissingSid @())
+        ($all | ConvertTo-Json -Depth 4) | Should -Be (@($script:Plan | ForEach-Object { [pscustomobject]@{ Path = $_.Path; Protect = $_.Protect; Grants = @($_.Grants) } }) | ConvertTo-Json -Depth 4)
+    }
+
     It 'names the server''s own account by the SID Windows gives it' {
         # sc.exe showsid TrustedInstaller
         Get-RPServiceSid 'TrustedInstaller' | Should -Be 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464'

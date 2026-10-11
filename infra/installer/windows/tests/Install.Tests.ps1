@@ -102,9 +102,22 @@ Describe '[ONB-001] [NFR-I01] installing on a new PC' {
             'setup-cli status',
             'setup-cli maintenance off'
         )
-        # [SEC-006] The secrets' folder is closed before the secrets are made.
-        $secretsAcl = Get-CallIndex ('icacls.exe ' + ((Get-RPIcaclsArgument -Entry (Get-RPFolderAclPlan -DataDir 'D:\RestaurantPlatform' -ProgramDataDir 'C:\ProgramData\RestaurantPlatform' | Where-Object { $_.Path -like '*secrets' })) -join ' '))
-        $secretsAcl | Should -BeLessThan (Get-CallIndex 'setup-cli secrets')
+        # [SEC-006] The secrets' folder is closed before the secrets are made: to administrators and
+        # SYSTEM, since no service's account exists yet on a new PC (icacls refuses to name one
+        # before its service exists). The server's account is added once its service exists.
+        $plan = Get-RPFolderAclPlan -DataDir 'D:\RestaurantPlatform' -ProgramDataDir 'C:\ProgramData\RestaurantPlatform'
+        $acl = { param($Entries, $Like) 'icacls.exe ' + ((Get-RPIcaclsArgument -Entry ($Entries | Where-Object { $_.Path -like $Like })) -join ' ') }
+        $missing = @('RPDatabase', 'RPServer', 'RPWatchdog' | ForEach-Object { Get-RPServiceSid $_ })
+        $closed = Select-RPExistingGrant -Plan $plan -MissingSid $missing
+        (Get-CallIndex (& $acl $closed '*secrets')) | Should -BeLessThan (Get-CallIndex 'setup-cli secrets')
+        $secretsInFull = Get-CallIndex (& $acl $plan '*secrets')
+        $secretsInFull | Should -BeGreaterThan (Get-CallIndex "$($script:InstallDir)\services\RPServer.exe install")
+        $secretsInFull | Should -BeLessThan (Get-CallIndex 'sc.exe start RPServer')
+        # The database's account is made by registering its service, then given its folder.
+        $databaseOnly = Select-RPExistingGrant -Plan $plan -MissingSid @(Get-RPServiceSid 'RPServer'; Get-RPServiceSid 'RPWatchdog')
+        $postgresAcl = Get-CallIndex (& $acl $databaseOnly '*\postgres')
+        $postgresAcl | Should -BeGreaterThan (Get-CallIndex 'setup-cli postgres-register')
+        $postgresAcl | Should -BeLessThan (Get-CallIndex 'sc.exe start RPDatabase')
         # initdb runs with a restricted copy of the installer's account: it may write the folder until
         # the permissions are set in full, which then take that away again.
         $granted = Get-CallIndex "icacls.exe D:\RestaurantPlatform /grant:r *$($script:UserSid):(OI)(CI)F /Q"
