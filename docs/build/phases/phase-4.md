@@ -598,7 +598,7 @@ As built:
   he approves 1.1.0 and the page names him, then sends diagnostics, which reach the stand-in. The
   page passes axe with the dialog open and after, and fits a 360 px phone.
 
-## P4-05 Full report suite
+## P4-05 Full report suite (split)
 
 Requirements: RPT-003, RPT-004, RPT-007 to RPT-016, RPT-018, AUD-006 (data), REC-008 (data).
 Depends on: P1-13, P2-03, P3-04.
@@ -612,11 +612,105 @@ design capacity (indexes, pre-aggregated daily tables if needed).
 Acceptance: fixture data with known answers for every report; performance test on a generated
 12-month dataset at §7.2 capacity.
 
+Too big for one pull request, so it is built in five parts: two add the reports to the server,
+two show them in the console, and one proves them at a year of design capacity. Elsewhere:
+RPT-013 (S, customer feedback) waits for P3-05, which collects the feedback; RPT-014 (the
+suspicious-activity report) is P4-07; exporting the new reports (RPT-017) is P4-06; the order
+drill-down (RPT-015) exists since P1-13b.
+
+Every P4-05 report takes a business-date range (at most 366 days, as in P1-13) and the filters
+§6.15 names where they apply (waiter, station, source, order type, payment mode). Detail rows come
+newest first in pages (`limit`, `cursor`), while totals and summaries cover the whole range. Each
+figure set is one SQL aggregation in PostgreSQL, so a report never loads a year of rows into the
+server.
+
+### P4-05a Money and control reports
+
+Requirements: RPT-004, RPT-007, RPT-008, RPT-009, AUD-006 (data), RPT-015 (rows lead to orders
+and bills).
+Depends on: P1-13.
+Deliverables:
+
+- RPT-004 source and order-type sales: orders, quantity, gross, discounts and net (taxable value)
+  per source (POS, waiter app, table tablet, QR), per order type and in their cross table, from the
+  lines of live invoices at their current version, as RPT-002 counts them. Filters: waiter (the
+  table's waiter, or for an order without a table the person who took it, as on the live order
+  feed), station, source, order type.
+- RPT-007 discounts and complimentary items: every discount given and not taken back on a bill
+  with a live invoice: when, the dish or the whole bill, the kind (percent, flat, complimentary),
+  the value, the reason, who gave it, who approved it and the invoice numbers; totals, and per
+  person. Filters: staff (who gave it), source and order type.
+- RPT-008 cancellations and voids: dishes cancelled (before the kitchen started) or voided (after
+  it started, so wastage), each with the stage at which it happened, the value, who, the approver
+  and the reason; voided bills with their stage (issued, printed, paid), value and replacement.
+  Totals per kind and per stage, and per person. Filters: staff (who did it), station, source,
+  order type.
+- RPT-009 reprints and post-print bill edits: bill reprints (which copy), kitchen ticket reprints
+  with their reason, and printed bills edited (who asked, who approved, why, the total before and
+  after), from the audit log; totals per kind and per person. Filter: staff (who did it).
+- An index on `audit_log (restaurant_id, action, business_date)` for reports read from the audit
+  log (here and in P4-07).
+
+Acceptance: an integration fixture day with known answers for each report and each filter; paging
+returns every row once; a cashier (OWN) gets none of them.
+
+### P4-05b People, kitchen, tables and suggestions reports
+
+Requirements: RPT-003, RPT-010, RPT-011, RPT-012, REC-008 (data).
+Depends on: P4-05a, P2-03, P2-06d, P3-04.
+Deliverables:
+
+- RPT-003 waiter-wise: orders taken and customer orders approved, sales of their orders; the
+  average time to acknowledge service requests and alerts; escalations; cancellation and void
+  requests (done by the waiter with a manager's PIN).
+- RPT-010 kitchen performance: average preparation time by dish and by station, ready-to-pickup
+  time, "Notify manager" events.
+- RPT-011 table metrics: covers, turnover (seatings per table per day), average seated duration,
+  average spend per cover.
+- RPT-012 recommendation performance (the P3-04 data below): impressions, taps, add-to-cart and
+  ordered per layer; attach rate (tablet and QR orders with a suggested line ÷ tablet and QR orders,
+  BO-3: at least 8 %) and revenue from suggested lines.
+
+Acceptance: fixture data with known answers for every report and filter.
+
 Recommendation performance (P3-04 data): `recommendation_events` holds IMPRESSION, TAP and
 ADD_TO_CART from the apps and ORDERED from the order lines sent with a suggestion (unique
 `order_item_id`), per layer, item, rule, channel and business date. Attach rate and revenue join
 ORDERED to `order_items` for quantity, `line_total` and the final state (a rejected, cancelled or
 voided line is not revenue).
+
+### P4-05c Reports area: sales, items, payments and GST
+
+Requirements: RPT-016, RPT-001, RPT-002, RPT-005, RPT-006, RPT-015 (the drill-down on screen),
+RPT-017 (CSV where the server has it), MGR-009, MGR-011.
+Depends on: P1-13, P4-01.
+Deliverables: a Reports area in the manager dashboard for people with REPORTS_VIEW_EXPORT: a
+business-date range (today, yesterday, this week, this month, a chosen range); sales with charts by
+day and by hour (Recharts, ADR if the library needs one) and their tables; item and category sales;
+payment modes and shifts with cash variance; the GST summary and the invoice register; rows lead
+to the order drill-down and to the bill; CSV export of these reports (P1-13b).
+Acceptance: component tests per report with axe; Playwright: a manager opens today's sales, sees
+the known totals, opens an order and a bill from the rows and exports a CSV; 360 px.
+
+### P4-05d Control and people reports on screen
+
+Requirements: RPT-016, RPT-003, RPT-004, RPT-007 to RPT-012.
+Depends on: P4-05a, P4-05b, P4-05c.
+Deliverables: the P4-05a and P4-05b reports in the Reports area with their filters, charts, table
+views, pages of rows and drill-down to orders and bills.
+Acceptance: component tests with axe; Playwright from a cancelled and a voided dish, a discount and
+a reprint to their rows and on to the order.
+
+### P4-05e Reports at a year of design capacity
+
+Requirements: RPT-018, DATA-012 (sizing).
+Depends on: P4-05b.
+Deliverables: a generator for 12 months at §7.2 capacity (2,000 orders a day, 100 tables, 1,000
+dishes) and a performance test that runs every report over the year within 5 s; indexes, query
+changes or pre-aggregated daily tables where a report is slower; the P1-13 reports that load every
+invoice into the server rewritten as SQL aggregations where needed.
+Acceptance: the performance test passes (on demand and nightly in CI) and its timings are recorded
+in PROGRESS.
 
 ## P4-06 Report exports
 

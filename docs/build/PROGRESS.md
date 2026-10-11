@@ -327,7 +327,11 @@ Recommended next WPs (dependencies met):
 - [x] P4-03e Tax and invoice
 - [x] P4-04a Device and system alerts
 - [x] P4-04b System screen
-- [ ] P4-05 Full report suite
+- [ ] P4-05a Money and control reports
+- [ ] P4-05b People, kitchen, tables and suggestions reports
+- [ ] P4-05c Reports area: sales, items, payments and GST
+- [ ] P4-05d Control and people reports on screen
+- [ ] P4-05e Reports at a year of design capacity
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
 
