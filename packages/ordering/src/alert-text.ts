@@ -109,6 +109,31 @@ function detailOf(alert: AlertView, t: Translator): string | null {
       const percent = numberOf(payload.batteryPercent);
       return percent === null ? null : t('alerts.deviceBattery', { device, percent });
     }
+    case 'PRINTER_OFFLINE': {
+      const printer = textOf(payload.printerName);
+      if (printer === null) return null;
+      const error = textOf(payload.error);
+      return (
+        t('alerts.printerOffline', { printer, queued: numberOf(payload.queued) ?? 0 }) +
+        (error === null ? '' : t('alerts.printerOfflineError', { error }))
+      );
+    }
+    case 'DISK_OR_BACKUP': {
+      const percent = numberOf(payload.usedPercent);
+      if (percent !== null) {
+        const free = numberOf(payload.freeBytes);
+        const gb = free === null ? '' : `, ${(free / 1024 ** 3).toFixed(1)} GB free`;
+        return t('alerts.diskFull', { percent, free: gb });
+      }
+      const kind =
+        payload.cloudBackup !== undefined
+          ? 'CLOUD'
+          : payload.continuousBackup !== undefined
+            ? 'CONTINUOUS'
+            : 'NIGHTLY';
+      const error = textOf(payload.error);
+      return t('alerts.backupFailed', { kind, error: error === null ? '' : `: ${error}` });
+    }
     default:
       return null;
   }

@@ -189,3 +189,50 @@ describe('[WTR-006] [NFR-U04] what an alert says on the waiter app and the POS',
     expect(alertAge(raised, Date.parse('2026-09-26T09:45:00.000Z'), t)).toBe('1 h 05 min ago');
   });
 });
+
+describe('[NTF-006] words for printer and disk or backup alerts', () => {
+  const system = { tableId: null, tableLabel: null, pagerText: null };
+  it('names the printer, its error and the waiting prints', () => {
+    expect(
+      describeAlert(
+        alert({
+          ...system,
+          type: 'PRINTER_OFFLINE',
+          payload: { printerName: 'Kitchen', error: 'Out of paper', queued: 2 },
+        }),
+        t,
+      ).detail,
+    ).toBe(
+      'Kitchen is not responding. 2 prints are waiting. Check its power, paper and cable; waiting prints go out when it is back. (Out of paper)',
+    );
+    expect(
+      describeAlert(alert({ ...system, type: 'PRINTER_OFFLINE', payload: {} }), t).detail,
+    ).toBe(null);
+  });
+  it('says what is full or failing', () => {
+    const disk = describeAlert(
+      alert({
+        ...system,
+        type: 'DISK_OR_BACKUP',
+        payload: { usedPercent: 92, freeBytes: 2 * 1024 ** 3 },
+      }),
+      t,
+    );
+    expect(disk.title).toBe('Disk or backup needs attention');
+    expect(disk.detail).toContain('92% full, 2.0 GB free');
+    expect(
+      describeAlert(
+        alert({
+          ...system,
+          type: 'DISK_OR_BACKUP',
+          payload: { cloudBackup: 'FAILING', error: 'x' },
+        }),
+        t,
+      ).detail,
+    ).toContain('The cloud backup is failing: x');
+    expect(
+      describeAlert(alert({ ...system, type: 'DISK_OR_BACKUP', payload: { backup: 'FAILED' } }), t)
+        .detail,
+    ).toContain('The nightly backup is failing.');
+  });
+});
