@@ -1,0 +1,645 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "checkedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "versions": {
+        "type": "object",
+        "properties": {
+          "product": { "type": "string", "minLength": 1 },
+          "server": { "type": "string", "minLength": 1 },
+          "node": { "type": "string", "minLength": 1 },
+          "postgres": { "type": ["string", "null"] },
+          "buildId": { "type": ["string", "null"] }
+        },
+        "required": ["product", "server", "node", "postgres", "buildId"]
+      },
+      "services": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "object",
+            "properties": {
+              "up": { "type": "boolean" },
+              "latencyMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["up", "latencyMs"]
+          },
+          "pagerBroker": {
+            "type": "object",
+            "properties": {
+              "running": { "type": "boolean" },
+              "port": {
+                "anyOf": [
+                  { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "secure": { "type": "boolean" },
+              "connectedPagers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["running", "port", "secure", "connectedPagers"]
+          },
+          "printers": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "offline": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "waiting": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["total", "offline", "waiting"]
+          },
+          "controlPlane": {
+            "type": "object",
+            "properties": {
+              "configured": { "type": "boolean" },
+              "enrolled": { "type": "boolean" },
+              "lastReportAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "lastError": { "type": ["string", "null"] }
+            },
+            "required": ["configured", "enrolled", "lastReportAt", "lastError"]
+          }
+        },
+        "required": ["database", "pagerBroker", "printers", "controlPlane"]
+      },
+      "devices": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
+            },
+            "paired": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "connected": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["type", "paired", "connected"]
+        }
+      },
+      "storage": {
+        "type": "object",
+        "properties": {
+          "totalBytes": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "freeBytes": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "usedPercent": {
+            "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+          },
+          "warnPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "criticalPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "level": {
+            "anyOf": [
+              { "type": "string", "enum": ["OK", "WARNING", "CRITICAL"] },
+              { "type": "null" }
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": ["TRANSACTIONS", "AUDIT", "PHOTOS", "LOGS", "BACKUPS"]
+                },
+                "bytes": {
+                  "anyOf": [
+                    { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": ["category", "bytes"]
+            }
+          }
+        },
+        "required": [
+          "totalBytes",
+          "freeBytes",
+          "usedPercent",
+          "warnPercent",
+          "criticalPercent",
+          "level",
+          "categories"
+        ]
+      },
+      "backups": {
+        "type": "object",
+        "properties": {
+          "walMode": { "type": "string", "enum": ["CONTINUOUS", "HOURLY"] },
+          "secondLocation": { "type": ["string", "null"] },
+          "keepDaily": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "keepWeekly": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "cloudEnabled": { "type": "boolean" },
+          "lastBackupAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "walMode",
+          "secondLocation",
+          "keepDaily",
+          "keepWeekly",
+          "cloudEnabled",
+          "lastBackupAt"
+        ]
+      },
+      "licence": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": ["ACTIVE", "PAYMENT_DUE", "GRACE", "RESTRICTED", "TERMINATED"]
+              },
+              "daysLeft": {
+                "anyOf": [
+                  { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "validUntil": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              }
+            },
+            "required": ["state", "daysLeft", "validUntil"]
+          },
+          { "type": "null" }
+        ]
+      },
+      "updates": {
+        "type": "object",
+        "properties": {
+          "current": { "type": "string", "minLength": 1 },
+          "channel": {
+            "anyOf": [{ "type": "string", "enum": ["STABLE", "PILOT"] }, { "type": "null" }]
+          },
+          "offered": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                  },
+                  "channel": { "type": "string", "enum": ["STABLE", "PILOT"] },
+                  "notes": { "type": ["string", "null"] },
+                  "sizeBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "publishedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "securityCritical": { "type": "boolean" }
+                },
+                "required": [
+                  "version",
+                  "channel",
+                  "notes",
+                  "sizeBytes",
+                  "publishedAt",
+                  "securityCritical"
+                ]
+              },
+              { "type": "null" }
+            ]
+          },
+          "maintenanceWindow": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+              "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+            },
+            "required": ["start", "end"],
+            "additionalProperties": false
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                  },
+                  "approvedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "approvedBy": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "name"]
+                  },
+                  "reason": { "type": ["string", "null"] }
+                },
+                "required": ["version", "approvedAt", "approvedBy", "reason"]
+              },
+              { "type": "null" }
+            ]
+          },
+          "openTables": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": ["current", "channel", "offered", "maintenanceWindow", "approval", "openTables"]
+      }
+    },
+    "required": [
+      "checkedAt",
+      "uptimeSeconds",
+      "versions",
+      "services",
+      "devices",
+      "storage",
+      "backups",
+      "licence",
+      "updates"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "checkedAt": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+      "versions": {
+        "type": "object",
+        "properties": {
+          "product": { "type": "string", "minLength": 1 },
+          "server": { "type": "string", "minLength": 1 },
+          "node": { "type": "string", "minLength": 1 },
+          "postgres": { "type": ["string", "null"] },
+          "buildId": { "type": ["string", "null"] }
+        },
+        "required": ["product", "server", "node", "postgres", "buildId"],
+        "additionalProperties": false
+      },
+      "services": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "object",
+            "properties": {
+              "up": { "type": "boolean" },
+              "latencyMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["up", "latencyMs"],
+            "additionalProperties": false
+          },
+          "pagerBroker": {
+            "type": "object",
+            "properties": {
+              "running": { "type": "boolean" },
+              "port": {
+                "anyOf": [
+                  { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "secure": { "type": "boolean" },
+              "connectedPagers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["running", "port", "secure", "connectedPagers"],
+            "additionalProperties": false
+          },
+          "printers": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "offline": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "waiting": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["total", "offline", "waiting"],
+            "additionalProperties": false
+          },
+          "controlPlane": {
+            "type": "object",
+            "properties": {
+              "configured": { "type": "boolean" },
+              "enrolled": { "type": "boolean" },
+              "lastReportAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              },
+              "lastError": { "type": ["string", "null"] }
+            },
+            "required": ["configured", "enrolled", "lastReportAt", "lastError"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["database", "pagerBroker", "printers", "controlPlane"],
+        "additionalProperties": false
+      },
+      "devices": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["POS", "KDS", "WAITER_PHONE", "TABLE_TABLET", "PAGER", "MANAGER_BROWSER"]
+            },
+            "paired": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "connected": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          },
+          "required": ["type", "paired", "connected"],
+          "additionalProperties": false
+        }
+      },
+      "storage": {
+        "type": "object",
+        "properties": {
+          "totalBytes": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "freeBytes": {
+            "anyOf": [
+              { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "usedPercent": {
+            "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+          },
+          "warnPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "criticalPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "level": {
+            "anyOf": [
+              { "type": "string", "enum": ["OK", "WARNING", "CRITICAL"] },
+              { "type": "null" }
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": ["TRANSACTIONS", "AUDIT", "PHOTOS", "LOGS", "BACKUPS"]
+                },
+                "bytes": {
+                  "anyOf": [
+                    { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": ["category", "bytes"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "totalBytes",
+          "freeBytes",
+          "usedPercent",
+          "warnPercent",
+          "criticalPercent",
+          "level",
+          "categories"
+        ],
+        "additionalProperties": false
+      },
+      "backups": {
+        "type": "object",
+        "properties": {
+          "walMode": { "type": "string", "enum": ["CONTINUOUS", "HOURLY"] },
+          "secondLocation": { "type": ["string", "null"] },
+          "keepDaily": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "keepWeekly": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "cloudEnabled": { "type": "boolean" },
+          "lastBackupAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "walMode",
+          "secondLocation",
+          "keepDaily",
+          "keepWeekly",
+          "cloudEnabled",
+          "lastBackupAt"
+        ],
+        "additionalProperties": false
+      },
+      "licence": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": ["ACTIVE", "PAYMENT_DUE", "GRACE", "RESTRICTED", "TERMINATED"]
+              },
+              "daysLeft": {
+                "anyOf": [
+                  { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "validUntil": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  { "type": "null" }
+                ]
+              }
+            },
+            "required": ["state", "daysLeft", "validUntil"],
+            "additionalProperties": false
+          },
+          { "type": "null" }
+        ]
+      },
+      "updates": {
+        "type": "object",
+        "properties": {
+          "current": { "type": "string", "minLength": 1 },
+          "channel": {
+            "anyOf": [{ "type": "string", "enum": ["STABLE", "PILOT"] }, { "type": "null" }]
+          },
+          "offered": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                  },
+                  "channel": { "type": "string", "enum": ["STABLE", "PILOT"] },
+                  "notes": { "type": ["string", "null"] },
+                  "sizeBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "publishedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "securityCritical": { "type": "boolean" }
+                },
+                "required": [
+                  "version",
+                  "channel",
+                  "notes",
+                  "sizeBytes",
+                  "publishedAt",
+                  "securityCritical"
+                ],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "maintenanceWindow": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+              "end": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+            },
+            "required": ["start", "end"],
+            "additionalProperties": false
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+                  },
+                  "approvedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "approvedBy": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "name"],
+                    "additionalProperties": false
+                  },
+                  "reason": { "type": ["string", "null"] }
+                },
+                "required": ["version", "approvedAt", "approvedBy", "reason"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "openTables": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "current",
+          "channel",
+          "offered",
+          "maintenanceWindow",
+          "approval",
+          "openTables"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "checkedAt",
+      "uptimeSeconds",
+      "versions",
+      "services",
+      "devices",
+      "storage",
+      "backups",
+      "licence",
+      "updates"
+    ],
+    "additionalProperties": false
+  }
+}

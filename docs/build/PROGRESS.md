@@ -55,7 +55,7 @@ What exists:
   the dishes' suggestion preferences, their routes and the PINNED and BOOSTED layers (P4-03c);
   the grace before a kitchen screen or table tablet is reported offline (P4-04a); the System
   page, "Install now" and "Send diagnostics", and a release's security-critical flag (P4-04b).
-  566 tests.
+  572 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -1571,7 +1571,7 @@ Built:
 - Console: the System page (`src/manage/system/`) after Settings in the dashboard's navigation,
   and its "Install now" dialog.
 - i18n: `dashboard.section.system` and the `system` namespace.
-- Tests: 6 domain, 7 contracts, 8 server integration (the whole view; who may open it and
+- Tests: 6 domain, 13 contracts (8 of them schema snapshots), 8 server integration (the whole view; who may open it and
   install; diagnostics before enrolment, accepted, unreachable and refused; "Install now" waiting
   for the tables, approved once, a security update with a reason; a stale "not enrolled"), 27
   console (the page in words, live, every minute, the dialog with and without a reason, the
