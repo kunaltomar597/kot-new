@@ -38,6 +38,7 @@ import { installationKey } from '../../src/cloud/installation-key.js';
 import { APP_CONFIG, type AppConfig } from '../../src/config/app-config.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
 import { LicenceAgentService } from '../../src/licensing/licence-agent.service.js';
+import { FINGERPRINT_READER } from '../../src/licensing/pc-fingerprint.js';
 import { SettingsService } from '../../src/settings/settings.service.js';
 import { readRelayCredential } from '../../src/relay/relay-credential.js';
 import { authHeaders, createAuthKit, signIn } from '../helpers/auth-kit.js';
@@ -59,6 +60,13 @@ vi.mock('../../src/integrity/server-files.js', async (importOriginal) => ({
  */
 
 const ACTOR = 'ci:acceptance';
+const IDENTIFIERS = {
+  MACHINE_ID: 'm-1',
+  BOARD_SERIAL: 'b-1',
+  BIOS_UUID: 'u-1',
+  DISK_SERIAL: 'd-1',
+  CPU_ID: 'c-1',
+};
 const OPTIONS: ControlPlaneOptions = {
   firstHeartbeatDelayMs: 50,
   // Long enough that only the test's own calls send heartbeats after the first.
@@ -130,7 +138,12 @@ beforeAll(async () => {
       productVersion: '1.0.0',
       licenceKeys: [VENDOR_KEY],
     },
-    overrides: [{ provide: CONTROL_PLANE_OPTIONS, useValue: OPTIONS }],
+    overrides: [
+      { provide: CONTROL_PLANE_OPTIONS, useValue: OPTIONS },
+      // The PC's identifiers (LIC-004) as a restaurant PC reads them, whatever this machine lets a
+      // test read: a CI runner's DMI files are root's, and too few identifiers mean no licence.
+      { provide: FINGERPRINT_READER, useValue: { read: () => Promise.resolve(IDENTIFIERS) } },
+    ],
   });
   heartbeats = server.get(HeartbeatService);
   prisma = server.get(PrismaService);
