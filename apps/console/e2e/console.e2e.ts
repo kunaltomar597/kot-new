@@ -199,11 +199,15 @@ test.describe.serial('the web console', () => {
     await page.getByRole('button', { name: /^Neha \(Cashier\)/ }).click();
     await page.keyboard.type('3333');
     await expect(page).toHaveURL(/\/pos$/);
-    // Connected and in sync: no banner.
+    // Connected and in sync, with the floor read: no banner, and no read cut short by the stop.
+    await expect(page.getByRole('region', { name: 'Main Hall' })).toBeVisible();
     await expect(page.getByText(t('connection.connecting'))).toHaveCount(0);
 
     await server.stop();
-    await expect(page.getByRole('alert')).toContainText(t('connection.offline'));
+    // The banner; a screen that asks the server meanwhile shows its own error too.
+    await expect(
+      page.getByRole('alert').filter({ hasText: t('connection.offline') }),
+    ).toBeVisible();
 
     const started = Date.now();
     server = await startServer(server.port);

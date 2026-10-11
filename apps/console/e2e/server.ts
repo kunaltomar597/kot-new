@@ -75,7 +75,8 @@ export async function startServer(
     port: listenPort,
     stop: () =>
       new Promise((resolve) => {
-        if (child.exitCode !== null) {
+        // Ended by a signal, it has no exit code; waiting for its exit again would never end.
+        if (child.exitCode !== null || child.signalCode !== null) {
           resolve();
           return;
         }
