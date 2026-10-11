@@ -43,6 +43,19 @@ test('[VCP-001] [SEC-018] the first Super Admin sets up MFA, signs in and runs t
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Restaurants', level: 1 })).toBeVisible();
 
+  // Sensitive actions ask for the authenticator again (CP-S2), with a code never used before,
+  // not even by the sign-in: as a person would, wait for the app's next code when need be.
+  let usedStep = step + 1;
+  const freshCode = async (): Promise<string> => {
+    const next = usedStep + 1;
+    // Accepted from one step early (the window is a step either side).
+    await expect
+      .poll(() => totpStep(new Date()), { timeout: 35_000, intervals: [1_000] })
+      .toBeGreaterThanOrEqual(next - 1);
+    usedStep = next;
+    return hotp(secret, next);
+  };
+
   // A restaurant, its first PC and a support note.
   await page.getByRole('button', { name: 'Add restaurant' }).click();
   const add = page.getByRole('dialog', { name: 'Add a restaurant' });
@@ -88,6 +101,9 @@ test('[VCP-001] [SEC-018] the first Super Admin sets up MFA, signs in and runs t
   await staff.getByLabel('Name').fill('Ravi Kumar');
   await staff.getByLabel(/^Role/).selectOption('SUPPORT');
   await staff.getByRole('button', { name: 'Add staff member' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Confirm with your authenticator' });
+  await confirm.getByLabel('Authenticator code').fill(await freshCode());
+  await confirm.getByRole('button', { name: 'Confirm' }).click();
   await expect(
     page.getByRole('dialog', { name: 'Setup link for Ravi Kumar' }).getByLabel('Setup link'),
   ).toHaveText(new RegExp(`^${baseUrl}/setup#[A-Za-z0-9_-]{43}$`));
