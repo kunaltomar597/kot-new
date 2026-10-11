@@ -17,9 +17,18 @@ describe('[QR-008] the first view shares one read of the relay per table (RELAY-
       sharedMenu('https://r', 't1', 100, load),
       sharedMenu('https://r', 't1', MENU_SHARE_MS - 1, load),
     ]);
-    expect(first).toEqual([menu, menu, menu]);
+    // Only the first visitor's page was made from its own read; the others were shared, so their
+    // pages ask the relay for themselves at once.
+    expect(first).toEqual([
+      { menu, shared: false },
+      { menu, shared: true },
+      { menu, shared: true },
+    ]);
     expect(load).toHaveBeenCalledTimes(1);
-    await sharedMenu('https://r', 't1', MENU_SHARE_MS, load);
+    expect(await sharedMenu('https://r', 't1', MENU_SHARE_MS, load)).toEqual({
+      menu,
+      shared: false,
+    });
     expect(load).toHaveBeenCalledTimes(2);
   });
 

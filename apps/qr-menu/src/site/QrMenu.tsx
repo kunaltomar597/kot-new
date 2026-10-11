@@ -60,7 +60,13 @@ const NO_ORDERS: readonly string[] = [];
  * dishes with their options, the cart and sending the order, and where each order is. Read-only
  * with a banner while the restaurant is not heard from.
  */
-export function QrMenu(props: { token: string; relayUrl: string; initial: LoadedMenu }) {
+export function QrMenu(props: {
+  token: string;
+  relayUrl: string;
+  initial: LoadedMenu;
+  /** The first view was shared with an earlier visitor: ask the relay for itself at once. */
+  refreshAtOnce?: boolean;
+}) {
   return (
     <ThemeRoot theme="light" accent={props.initial.document.accentColor} className="qr-root">
       <I18nProvider>
@@ -74,10 +80,12 @@ function MenuPage({
   token,
   relayUrl,
   initial,
+  refreshAtOnce = false,
 }: {
   token: string;
   relayUrl: string;
   initial: LoadedMenu;
+  refreshAtOnce?: boolean;
 }) {
   const t = useT();
   // What was just added, for screen readers; the cart bar shows it to everyone else. (A toast
@@ -172,6 +180,7 @@ function MenuPage({
 
   // QR-008, NFR-P05: the menu, availability and the restaurant's presence, kept fresh, and asked
   // for at once when the diner comes back to the page (the phone's screen was off).
+  const firstRefresh = useRef(refreshAtOnce);
   useEffect(() => {
     const refresh = () => {
       // The page's clock moves with the menu (combo hours, best sellers by time of day).
@@ -190,6 +199,11 @@ function MenuPage({
     const back = () => {
       if (page.visibilityState === 'visible') refresh();
     };
+    // A first view shared with an earlier visitor may be a few seconds old (RELAY-D4).
+    if (firstRefresh.current) {
+      firstRefresh.current = false;
+      refresh();
+    }
     const timer = setInterval(refresh, QR_MENU_REFRESH_MS);
     page.addEventListener('visibilitychange', back);
     return () => {

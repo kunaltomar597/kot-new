@@ -27,8 +27,9 @@ export default async function TablePage({ params }: { params: Promise<{ token: s
   if (!TableToken.safeParse(token).success) notFound();
   const relay = relayUrl();
   let menu;
+  let shared;
   try {
-    menu = await sharedMenu(relay, token);
+    ({ menu, shared } = await sharedMenu(relay, token));
   } catch (error) {
     if (error instanceof RelayCallError && error.status === 404) notFound();
     if (error instanceof RelayCallError && error.code === 'MENU_NOT_PUBLISHED') {
@@ -45,7 +46,12 @@ export default async function TablePage({ params }: { params: Promise<{ token: s
   if (menu.document === null) throw new Error('The relay sent no menu');
   return (
     <>
-      <QrMenu token={token} relayUrl={relay} initial={{ ...menu, document: menu.document }} />
+      <QrMenu
+        token={token}
+        relayUrl={relay}
+        initial={{ ...menu, document: menu.document }}
+        refreshAtOnce={shared}
+      />
       <Footer />
     </>
   );
