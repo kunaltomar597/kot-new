@@ -290,6 +290,99 @@ describe('[TBL-005] moving a table', () => {
   });
 });
 
+describe('[TBL-004] freeing a table opened by mistake', () => {
+  const freeTable = (table: string) => t('pos.free.title', { table });
+
+  it('frees a table where nothing was ordered, with a reason for the audit log', async () => {
+    const fake = posServer(
+      overview(entry(T1, 'T1', HALL, { amountSoFar: 0 }), entry(T2, 'T2', HALL)),
+      overview(entry(T1, 'T1', HALL), entry(T2, 'T2', HALL)),
+    ).on('POST', `/api/v1/table-sessions/${SESSION}/close-without-bill`, () => ({
+      status: 200,
+      body: {
+        ...sessionView(T1, 'T1'),
+        state: 'FREE',
+        status: 'CLOSED',
+        closedAt: NOW,
+        closeReason: 'Wrong table',
+      },
+    }));
+    const { user, container } = await renderConsole({
+      fake,
+      signedIn: 'CASHIER',
+      path: '/pos',
+    });
+    await user.click(await tile(/^T1, Occupied/));
+    const details = await screen.findByRole('dialog', {
+      name: t('pos.table.title', { table: 'T1' }),
+    });
+    await user.click(within(details).getByRole('button', { name: t('pos.table.free') }));
+
+    const dialog = await screen.findByRole('dialog', { name: freeTable('T1') });
+    expect(within(dialog).getByText(t('pos.free.description'))).toBeInTheDocument();
+    const confirm = within(dialog).getByRole('button', { name: t('pos.free.confirm') });
+    expect(confirm).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(t('pos.free.reason')), 'Wrong table');
+    await expectNoAxeViolations(container);
+    await user.click(confirm);
+
+    expect(await screen.findByText(t('pos.free.freed', { table: 'T1' }))).toBeInTheDocument();
+    expect(
+      fake.callsTo('POST', `/api/v1/table-sessions/${SESSION}/close-without-bill`)[0]?.body,
+    ).toEqual({ reason: 'Wrong table' });
+    expect(await tile(/^T1, Free$/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('is offered only while nothing has been ordered or waits for approval', async () => {
+    const fake = posServer(
+      overview(
+        entry(T1, 'T1', HALL, {}),
+        entry(T2, 'T2', HALL, { amountSoFar: 0, pendingApprovals: 1 }),
+      ),
+    );
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos' });
+    for (const label of ['T1', 'T2']) {
+      await user.click(await tile(new RegExp(`^${label}, Occupied`)));
+      const details = await screen.findByRole('dialog', {
+        name: t('pos.table.title', { table: label }),
+      });
+      expect(within(details).getByRole('button', { name: t('pos.table.move') })).toBeVisible();
+      expect(within(details).queryByRole('button', { name: t('pos.table.free') })).toBeNull();
+      await user.click(within(details).getByRole('button', { name: t('ui.dialog.close') }));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).toBeNull();
+      });
+    }
+  });
+
+  it('shows the server’s refusal in the dialog', async () => {
+    const fake = posServer(overview(entry(T1, 'T1', HALL, { amountSoFar: 0 }))).on(
+      'POST',
+      `/api/v1/table-sessions/${SESSION}/close-without-bill`,
+      () => ({
+        status: 409,
+        body: {
+          code: 'TABLE_HAS_ITEMS',
+          message: 'Items have been ordered at this table. Bill it instead.',
+        },
+      }),
+    );
+    const { user } = await renderConsole({ fake, signedIn: 'CASHIER', path: '/pos' });
+    await user.click(await tile(/^T1, Occupied/));
+    const details = await screen.findByRole('dialog');
+    await user.click(within(details).getByRole('button', { name: t('pos.table.free') }));
+    const dialog = await screen.findByRole('dialog', { name: freeTable('T1') });
+    await user.type(within(dialog).getByLabelText(t('pos.free.reason')), 'Wrong table');
+    await user.click(within(dialog).getByRole('button', { name: t('pos.free.confirm') }));
+    expect(
+      await within(dialog).findByText('Items have been ordered at this table. Bill it instead.'),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('[TBL-007] when the floor cannot be read', () => {
   it('says what went wrong and retries', async () => {
     const fake = signsInAs(server(), 'CASHIER')

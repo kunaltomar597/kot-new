@@ -9,6 +9,7 @@ import { messageOf } from '../app/messages.js';
 import { useNow } from '../app/use-now.js';
 import { useOpenBill } from '../billing/use-open-bill.js';
 import { floorSections, tileAlert, tileDetails } from '@rp/ordering';
+import { FreeTableDialog } from './FreeTableDialog.js';
 import { MoveTableDialog } from './MoveTableDialog.js';
 import { OpenTableDialog } from './OpenTableDialog.js';
 import { useFloor } from './use-floor.js';
@@ -16,12 +17,14 @@ import { useFloor } from './use-floor.js';
 type Panel =
   | { readonly kind: 'open'; readonly tableId: string }
   | { readonly kind: 'details'; readonly tableId: string }
-  | { readonly kind: 'move'; readonly tableId: string };
+  | { readonly kind: 'move'; readonly tableId: string }
+  | { readonly kind: 'free'; readonly tableId: string };
 
 /**
  * The POS floor (TBL-007): every table by section with its state, guests, time seated, waiter and
  * amount so far, kept live by events. A free table opens (TBL-003); an occupied one shows its
- * details and can move to a free table (TBL-005).
+ * details and can move to a free table (TBL-005), or be freed again while nothing has been
+ * ordered (opened by mistake, TBL-004).
  */
 export function TableOverview() {
   const t = useT();
@@ -46,6 +49,7 @@ export function TableOverview() {
   const free = tables.filter((table) => table.state === 'FREE');
   const selected = tables.find((table) => table.tableId === panel?.tableId);
   const canMove = person !== undefined && grantOf(person, 'TABLE_MOVE_MERGE') !== 'DENY';
+  const canFree = person !== undefined && grantOf(person, 'ORDER_CREATE') !== 'DENY';
   const canCloseDay = person !== undefined && grantOf(person, 'DAY_END_CLOSE') !== 'DENY';
   const close = () => {
     setPanel(undefined);
@@ -128,9 +132,13 @@ export function TableOverview() {
           table={selected}
           now={now}
           canMove={canMove}
+          canFree={canFree}
           onClose={close}
           onMove={() => {
             setPanel({ kind: 'move', tableId: selected.tableId });
+          }}
+          onFree={() => {
+            setPanel({ kind: 'free', tableId: selected.tableId });
           }}
           onTakeOrder={(sessionId) => {
             void navigate(`table/${sessionId}?label=${encodeURIComponent(selected.label)}`);
@@ -140,6 +148,14 @@ export function TableOverview() {
       {selected !== undefined && panel?.kind === 'move' ? (
         <MoveTableDialog table={selected} freeTables={free} onClose={close} onMoved={done} />
       ) : null}
+      {selected !== undefined && selected.session !== null && panel?.kind === 'free' ? (
+        <FreeTableDialog
+          table={selected}
+          sessionId={selected.session.id}
+          onClose={close}
+          onFreed={done}
+        />
+      ) : null}
     </div>
   );
 }
@@ -148,20 +164,31 @@ function TableDetails({
   table,
   now,
   canMove,
+  canFree,
   onClose,
   onMove,
+  onFree,
   onTakeOrder,
 }: {
   table: TableOverviewEntry;
   now: number;
   canMove: boolean;
+  canFree: boolean;
   onClose: () => void;
   onMove: () => void;
+  onFree: () => void;
   onTakeOrder: (sessionId: string) => void;
 }) {
   const t = useT();
   const session = table.session;
   const { openBill, opening } = useOpenBill();
+  // Opened by mistake: nothing billable ordered and nothing waiting for approval (the server checks).
+  const freeable =
+    canFree &&
+    session !== null &&
+    table.state === 'OCCUPIED' &&
+    session.amountSoFar === 0 &&
+    session.pendingApprovals === 0;
   return (
     <Dialog
       open
@@ -172,6 +199,11 @@ function TableDetails({
       footer={
         session === null ? null : (
           <>
+            {freeable ? (
+              <Button variant="secondary" onClick={onFree}>
+                {t('pos.table.free')}
+              </Button>
+            ) : null}
             {canMove ? (
               <Button variant="secondary" onClick={onMove}>
                 {t('pos.table.move')}

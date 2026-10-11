@@ -6,7 +6,7 @@ person, `[B]` blocked (reason given).
 
 ## Current state
 
-Last updated: 2026-10-10.
+Last updated: 2026-10-11.
 
 What exists:
 
@@ -159,7 +159,8 @@ What exists:
 - `apps/console`: the web console shell (pairing with a WebCrypto key, staff tiles and PIN login,
   role modes `/pos`, `/kds`, `/manage`, connection banner, inactivity sign-out), served by the
   local server, with a Playwright end-to-end test in CI (P0-14b); the live POS floor with open and
-  move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b); the
+  move table (P1-08a); order entry with options, combos, cart, send and takeaway (P1-08b); freeing
+  a table opened by mistake, with a reason (P1-08c); the
   kitchen display with steps, bump, recall, notify manager, sounds and resync (P1-09b); bills,
   discounts with manager approval, payments and shifts on the POS (P1-12a); split bills, void,
   edit after print and the day-end screen (P1-12b); the alert centre on the POS and the
@@ -193,7 +194,7 @@ What exists:
   (invoice particulars with the GSTIN checked, tax groups with rates as percentages, invoice
   series with their first number as it is typed), changed by the Owner after the second factor
   and read only for managers (P4-03e); the alert centre with a kitchen screen gone offline,
-  printer and disk alerts in words (P4-04a). 412 tests, and 25 Playwright steps.
+  printer and disk alerts in words (P4-04a). 415 tests, and 25 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -262,6 +263,7 @@ Recommended next WPs (dependencies met):
 - [x] P1-07b Print queue, offline alert, redirect and reprint
 - [x] P1-08a POS floor: live table overview, open and move table
 - [x] P1-08b POS order entry, send KOT, takeaway, live item status
+- [x] P1-08c Free a table opened by mistake (POS)
 - [x] P1-09a KDS server support (station mode, tickets, bump, recall, notify manager)
 - [x] P1-09b KDS screen
 - [x] P1-10a Bill preview, discounts and invoice issue
@@ -645,6 +647,19 @@ Decided 2026-10-05 (P4-03b):
      too.
 261. The page's heading is "Notification rules" (its link says "Notifications"), because the
      toasts' landmark is already called "Notifications".
+
+Decided 2026-10-11 (P1-08c):
+
+296. A table opened by mistake is freed from its details on the POS ("Free the table"), with a
+     reason for the audit log, through the close-without-bill route P1-02 built. The POS had no
+     way to do it, and the System page's "Install now" (P4-04b) needs every table closed.
+297. The action shows only while the table's amount so far is zero and nothing waits for approval,
+     to anyone whose role does not deny `ORDER_CREATE`, the route's own capability. Whoever can
+     open a table and order can free one opened by mistake; with nothing ordered there is no
+     money at stake, so no manager step is added, and the audit entry keeps who did it and why
+     (ADR-0006). The server stays the judge: a free dish leaves the amount at zero, and its
+     refusal (`TABLE_HAS_ITEMS`) shows in the dialog.
+298. Like the other reasons on the POS, the reason is 3 to 200 characters, as the route requires.
 
 Decided 2026-10-10 (P4-04a):
 
@@ -1495,6 +1510,31 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P1-08c Free a table opened by mistake (POS)
+
+Merged #83 (P4-04a) once CI, CodeQL and e2e were green. Planning P4-04b showed that its "Install
+now" check (every table closed) could not be met on the POS without billing a table, because the
+POS had no way to free a table opened by mistake. P1-08c adds it, as a small POS WP.
+
+Built:
+
+- Console: `FreeTableDialog` (a reason dialog calling `closeTableWithoutBill`), offered as "Free
+  the table" in an occupied table's details while nothing billable has been ordered and nothing
+  waits for approval; a toast and the floor reads again.
+- i18n: `pos.table.free` and `pos.free.*`.
+- Tests: 3 console tests (freeing with a reason, with axe; not offered once something is ordered
+  or waits for approval; the server's refusal shown in the dialog). P4-04b's Playwright step will
+  use it to close the table it opens.
+
+Gotchas for the next session:
+
+- In jsdom, `user.keyboard('{Escape}')` does not close the native `<dialog>`; click the dialog's
+  close button (`ui.dialog.close`) instead.
+- A `TableOverviewEntry` with `session: null` is a free table whatever its `state` says to the
+  floor helpers; give an occupied table a session object in test data.
+
+Decisions: 296 to 298.
 
 ### 2026-10-10: P4-04a Device and system alerts
 

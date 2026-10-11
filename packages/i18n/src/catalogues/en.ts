@@ -2476,6 +2476,7 @@ export const en = {
       waiter: 'Waiter: {name}',
       move: 'Move table',
       takeOrder: 'Take order',
+      free: 'Free the table',
     },
     takeaway: 'Takeaway',
     shift: 'Shift',
@@ -2568,6 +2569,15 @@ export const en = {
       description: 'Choose a free table. Kitchen tickets follow the guests.',
       noFreeTable: 'There is no free table to move to.',
       moved: 'Moved {from} to {to}',
+    },
+    /** A table opened by mistake, freed before anything is ordered (TBL-004, ADR-0006). */
+    free: {
+      title: 'Free table {table}',
+      description:
+        'For a table opened by mistake. Nothing has been ordered, so there is no bill, and the table shows as free again.',
+      reason: 'Why it was opened by mistake',
+      confirm: 'Free the table',
+      freed: 'Table {table} is free again.',
     },
   },
   billing: {
