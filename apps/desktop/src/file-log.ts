@@ -1,4 +1,13 @@
-import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, renameSync } from 'node:fs';
+import {
+  appendFileSync,
+  closeSync,
+  fstatSync,
+  ftruncateSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname } from 'node:path';
 
 /** The log is renamed to `<file>.1` at this size, so it never fills the disk. */
@@ -24,13 +33,14 @@ export function fileLog(
     deps.write ??
     ((path: string, text: string) => {
       mkdirSync(dirname(path), { recursive: true });
-      // The size is read from the open file, not looked up by name first (no check-then-use).
-      let fd = openSync(path, 'a');
+      // The size is read from the open file and the rotation goes through it too, so the file is
+      // never looked up by name between the check and the write (CWE-367): its contents become
+      // `<file>.1` and it starts again empty.
+      const fd = openSync(path, 'a+');
       try {
         if (fstatSync(fd).size > MAX_BYTES) {
-          closeSync(fd);
-          renameSync(path, `${path}.1`);
-          fd = openSync(path, 'a');
+          writeFileSync(`${path}.1`, readFileSync(fd));
+          ftruncateSync(fd, 0);
         }
         appendFileSync(fd, text);
       } finally {
