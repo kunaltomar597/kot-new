@@ -11,4 +11,6 @@ export const ADVISORY_LOCKS = {
   outboxSequence: 7_261_000_003n,
   /** Serialises changes to the restaurant's setup: unique names and one default series (P1-01b). */
   restaurantSetup: 7_261_000_004n,
+  /** Serialises "Install now" so one approval per release is recorded (P4-04b). */
+  installApproval: 7_261_000_005n,
 } as const;

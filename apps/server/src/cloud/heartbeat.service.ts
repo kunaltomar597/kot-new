@@ -1,4 +1,3 @@
-import { statfs } from 'node:fs/promises';
 import {
   Inject,
   Injectable,
@@ -9,6 +8,7 @@ import {
 import type { HeartbeatRequest, ReleaseInfo } from '@rp/contracts/control-plane';
 import { AuditService } from '../audit/audit.service.js';
 import { SECRET_STORE, type SecretStore } from '../auth/secret-store.js';
+import { readDataDrive } from '../common/data-drive.js';
 import { newId } from '../common/ids.js';
 import { SERVER_PACKAGE } from '../common/package-version.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
@@ -176,7 +176,7 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
     const [head, devices, disk, postgres] = await Promise.all([
       this.audit.chainHead(),
       this.deviceCounts(),
-      this.disk(),
+      readDataDrive(this.config.dataDir),
       this.postgresVersion(),
     ]);
     return {
@@ -201,19 +201,6 @@ export class HeartbeatService implements OnApplicationBootstrap, OnModuleDestroy
       _count: { _all: true },
     });
     return Object.fromEntries(groups.map((group) => [group.type, group._count._all]));
-  }
-
-  /** Size and free space of the data drive (ONB-002); null when it cannot be read. */
-  private async disk(): Promise<HeartbeatRequest['disk']> {
-    try {
-      const stats = await statfs(this.config.dataDir);
-      return {
-        totalBytes: stats.blocks * stats.bsize,
-        freeBytes: stats.bavail * stats.bsize,
-      };
-    } catch {
-      return null;
-    }
   }
 
   private async postgresVersion(): Promise<string | null> {

@@ -97,6 +97,11 @@ export const ReleaseInfo = z.object({
   sizeBytes: z.int().positive(),
   notes: z.string().max(2_000).nullable(),
   publishedAt: Timestamp,
+  /**
+   * A security fix that may install while tables are open, once a manager approves (UPD-004).
+   * Releases set it from P7-04; a missing flag means it is not.
+   */
+  securityCritical: z.boolean().optional(),
 });
 export type ReleaseInfo = z.infer<typeof ReleaseInfo>;
 

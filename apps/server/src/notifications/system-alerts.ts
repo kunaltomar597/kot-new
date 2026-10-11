@@ -1,4 +1,3 @@
-import { statfs } from 'node:fs/promises';
 import {
   Inject,
   Injectable,
@@ -6,15 +5,14 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common';
+import { usedPercentOf } from '@rp/domain';
+import { type DriveSpace, readDataDrive } from '../common/data-drive.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { NOTIFICATION_OPTIONS, type NotificationOptions } from './clock.js';
 import { NotificationsService } from './notifications.service.js';
 
-export interface DiskUsage {
-  readonly totalBytes: number;
-  readonly freeBytes: number;
-}
+export type DiskUsage = DriveSpace;
 
 /**
  * Alerts about the server PC itself (NTF-003, Appendix C): the data drive filling up goes to the
@@ -50,9 +48,9 @@ export class SystemAlerts implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Raises or clears the disk alert for every restaurant on this server. */
   async checkDisk(usage?: DiskUsage): Promise<{ usedPercent: number } | null> {
-    const disk = usage ?? (await this.readDisk());
+    const disk = usage ?? (await readDataDrive(this.config.dataDir));
     if (disk === null || disk.totalBytes <= 0) return null;
-    const usedPercent = Math.round(((disk.totalBytes - disk.freeBytes) / disk.totalBytes) * 100);
+    const usedPercent = usedPercentOf(disk.totalBytes, disk.freeBytes);
     const restaurants = await this.prisma.restaurant.findMany({ select: { id: true } });
     for (const { id } of restaurants) {
       const settings = await this.notifications.settingsOf(id);
@@ -71,14 +69,5 @@ export class SystemAlerts implements OnApplicationBootstrap, OnModuleDestroy {
       });
     }
     return { usedPercent };
-  }
-
-  private async readDisk(): Promise<DiskUsage | null> {
-    try {
-      const stats = await statfs(this.config.dataDir);
-      return { totalBytes: stats.blocks * stats.bsize, freeBytes: stats.bavail * stats.bsize };
-    } catch {
-      return null;
-    }
   }
 }

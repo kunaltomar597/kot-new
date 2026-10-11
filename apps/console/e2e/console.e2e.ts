@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { type AddressInfo, createServer } from 'node:net';
 import { crc32, deflateSync } from 'node:zlib';
@@ -13,7 +14,8 @@ import { type RunningServer, startServer } from './server.js';
  * P0-14b acceptance: a real browser pairs with the real server, people sign in with their PIN and
  * land in their mode, and the offline banner shows while the server is down (NFR-P11). Later work
  * packages add their flows: the POS floor, orders, the kitchen display, the manager dashboard on a
- * desktop and a phone, billing, alerts, staff, devices, the menu editor, custom roles and settings.
+ * desktop and a phone, billing, alerts, staff, devices, the menu editor, custom roles, settings
+ * and the System page.
  */
 
 const t = createTranslator();
@@ -155,6 +157,108 @@ async function seedAlerts(): Promise<void> {
   }
 }
 
+/** This PC at the stand-in Control Plane, once the vendor linked it to support (ADR-0012). */
+const INSTALLATION_ID = '0199a0e0-0000-7000-8000-000000000c01';
+
+/** The release the stand-in Control Plane offers this PC (UPD-002): 50 MB, not security-critical. */
+const OFFERED_RELEASE = {
+  component: 'RESTAURANT_PC',
+  channel: 'STABLE',
+  version: '1.1.0',
+  url: 'https://updates.example.com/restaurant-pc/1.1.0/setup.exe',
+  sha256: 'a'.repeat(64),
+  sizeBytes: 50 * 1_024 * 1_024,
+  notes: 'Faster bill printing',
+  publishedAt: '2026-10-10T12:00:00.000Z',
+};
+
+/** A stand-in for the Vendor Control Plane on this machine: it keeps who sent a heartbeat. */
+interface StandInControlPlane {
+  readonly url: string;
+  /** The installation of each heartbeat, in order. */
+  readonly heartbeats: string[];
+  close(): Promise<void>;
+}
+
+/**
+ * Starts the stand-in Control Plane on a free port. It accepts every heartbeat without checking
+ * its signature (the Control Plane's own tests do that) and always offers `OFFERED_RELEASE`, as the
+ * real one does until a newer release is published.
+ */
+async function standInControlPlane(): Promise<StandInControlPlane> {
+  const heartbeats: string[] = [];
+  const listener = createHttpServer((request, response) => {
+    request.resume();
+    request.on('end', () => {
+      if (request.method === 'POST' && request.url === '/v1/heartbeats') {
+        heartbeats.push(String(request.headers['x-rp-installation']));
+        const now = new Date().toISOString();
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            receivedAt: now,
+            serverTime: now,
+            nextHeartbeatSeconds: 300,
+            update: OFFERED_RELEASE,
+          }),
+        );
+        return;
+      }
+      response.writeHead(404, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ code: 'NOT_FOUND', message: 'No such route' }));
+    });
+  });
+  await new Promise<void>((resolve) => {
+    listener.listen(0, '127.0.0.1', resolve);
+  });
+  return {
+    url: `http://127.0.0.1:${String((listener.address() as AddressInfo).port)}`,
+    heartbeats,
+    close: () =>
+      new Promise((resolve) => {
+        listener.close(() => {
+          resolve();
+        });
+      }),
+  };
+}
+
+/**
+ * Links this PC to the stand-in Control Plane and records the release it offers, as activation
+ * (P7-01) and the last heartbeat would have left them.
+ */
+async function linkToSupport(controlPlaneUrl: string): Promise<void> {
+  const client = new pg.Client({ connectionString: process.env.RP_E2E_DATABASE_URL });
+  await client.connect();
+  try {
+    const enrolment = {
+      installationId: INSTALLATION_ID,
+      tenantId: '0199a0e0-0000-7000-8000-000000000c02',
+      name: 'Counter PC',
+      channel: 'STABLE',
+      enrolledAt: new Date().toISOString(),
+      controlPlaneUrl,
+    };
+    const { rowCount } = await client.query(
+      `INSERT INTO system_meta (key, value, updated_at)
+       VALUES ('control_plane.enrolment', $1, now()), ('control_plane.offered_update', $2, now())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+      [JSON.stringify(enrolment), JSON.stringify(OFFERED_RELEASE)],
+    );
+    expect(rowCount).toBe(2);
+  } finally {
+    await client.end();
+  }
+}
+
+/** Stands for the time of day in a message, so `anyTime` can match whatever the time is. */
+const TIME = '{time}';
+
+/** A message with a time of day in it (`TIME`), at any time. */
+function anyTime(message: string): RegExp {
+  return new RegExp(`^${escape(message).replace(escape(TIME), '\\d{2}:\\d{2}')}$`);
+}
+
 /**
  * The code an authenticator app shows now for a base32 key (RFC 6238: HMAC-SHA1, 30 s steps,
  * 6 digits), as the Owner's phone would.
@@ -251,7 +355,13 @@ test.describe.serial('the web console', () => {
   // The Owner's one-time recovery codes, shown once when the authenticator is set up.
   let recoveryCodes: string[] = [];
 
+  // Support (VCP-005) for the System page; this PC is linked to it only in the last step.
+  let controlPlane: StandInControlPlane;
+
   test.beforeAll(async ({ browser }) => {
+    controlPlane = await standInControlPlane();
+    // Every start of the server below inherits it.
+    process.env.RP_CONTROL_PLANE_URL = controlPlane.url;
     server = await startServer();
     context = await browser.newContext();
     page = await context.newPage();
@@ -260,6 +370,7 @@ test.describe.serial('the web console', () => {
   test.afterAll(async () => {
     await context.close();
     await server.stop();
+    await controlPlane.close();
   });
 
   test('[AUTH-007] [AUTH-004] [MGR-001] [KDS-001] pairs, signs each role in by PIN and lands in the right mode', async () => {
@@ -2003,5 +2114,93 @@ test.describe.serial('the web console', () => {
       await acknowledge(title).click();
       await expect(acknowledge(title)).toHaveCount(0);
     }
+  });
+
+  test('[MGR-010] [NFR-I03] [UPD-004] [UPD-008] a manager sees the System page, cannot install an update while a table is open, installs it once the table is freed, and sends diagnostics to support', async () => {
+    const nav = page.getByRole('navigation', { name: t('dashboard.navigation') });
+    const modes = page.getByRole('navigation', { name: t('modes.navigation') });
+    const part = (name: string) => page.getByRole('region', { name, exact: true });
+    const services = part(t('system.services.title'));
+    const updates = part(t('system.updates.title'));
+    const installNow = updates.getByRole('button', {
+      name: t('system.updates.installNow'),
+      exact: true,
+    });
+    const hall = page.getByRole('region', { name: 'Main Hall' });
+    const openTable = t('system.updates.openTables', { count: 1 });
+
+    // The vendor has linked this PC to support, and the Control Plane offers version 1.1.0.
+    await linkToSupport(controlPlane.url);
+    await nav.getByRole('link', { name: t('dashboard.section.system') }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('system.title') })).toBeVisible();
+    await expect(services.getByText(/^Answers in \d+ ms$/)).toBeVisible();
+    await expect(part(t('system.storage.title')).getByRole('meter')).toBeVisible();
+    await expect(updates.getByText(t('system.updates.channel.STABLE'))).toBeVisible();
+    await expect(
+      updates.getByText(t('system.updates.offered', { version: '1.1.0', size: '50 MB' })),
+    ).toBeVisible();
+    await expect(installNow).toBeEnabled();
+
+    // A table opens on the POS: the update cannot install while it is open.
+    await modes.getByRole('link', { name: t('modes.pos'), exact: true }).click();
+    await hall.getByRole('button', { name: '3, Free' }).click();
+    const open = page.getByRole('dialog', { name: t('pos.open.title', { table: '3' }) });
+    await open.getByLabel(t('pos.open.guests'), { exact: true }).fill('2');
+    await open.getByRole('button', { name: t('pos.open.submit') }).click();
+    await expect(page.getByText(t('pos.open.opened', { table: '3' }))).toBeVisible();
+    await modes.getByRole('link', { name: t('modes.manage'), exact: true }).click();
+    await nav.getByRole('link', { name: t('dashboard.section.system') }).click();
+    await expect(updates.getByText(openTable)).toBeVisible();
+    await expect(installNow).toBeDisabled();
+
+    // It was opened by mistake: freed on the POS, the update can install.
+    await modes.getByRole('link', { name: t('modes.pos'), exact: true }).click();
+    await hall.getByRole('button', { name: /^3, Occupied/ }).click();
+    await page
+      .getByRole('dialog', { name: t('pos.table.title', { table: '3' }), exact: true })
+      .getByRole('button', { name: t('pos.table.free') })
+      .click();
+    const free = page.getByRole('dialog', {
+      name: t('pos.free.title', { table: '3' }),
+      exact: true,
+    });
+    await free.getByLabel(t('pos.free.reason')).fill('Opened by mistake');
+    await free.getByRole('button', { name: t('pos.free.confirm') }).click();
+    await expect(page.getByText(t('pos.free.freed', { table: '3' }))).toBeVisible();
+    await expect(hall.getByRole('button', { name: '3, Free' })).toBeVisible();
+
+    await modes.getByRole('link', { name: t('modes.manage'), exact: true }).click();
+    await nav.getByRole('link', { name: t('dashboard.section.system') }).click();
+    await expect(installNow).toBeEnabled();
+    await expect(updates.getByText(openTable)).toHaveCount(0);
+    await installNow.click();
+    const install = page.getByRole('dialog', {
+      name: t('system.install.title', { version: '1.1.0' }),
+    });
+    await expect(install.getByText(t('system.install.description'))).toBeVisible();
+    await expectAccessible(page);
+    await install.getByRole('button', { name: t('system.install.confirm'), exact: true }).click();
+    await expect(page.getByText(t('system.install.approved', { version: '1.1.0' }))).toBeVisible();
+    await expect(
+      updates.getByText(
+        anyTime(t('system.updates.approvedToday', { name: 'Vikram (Manager)', time: TIME })),
+      ),
+    ).toBeVisible();
+    await expect(installNow).toHaveCount(0);
+
+    // The health report goes to support now, not at the next heartbeat.
+    await page.getByRole('button', { name: t('system.diagnostics.send') }).click();
+    await expect(
+      page.getByText(anyTime(t('system.diagnostics.sent', { time: TIME }))),
+    ).toBeVisible();
+    await expect(
+      services.getByText(anyTime(t('system.services.supportToday', { time: TIME }))),
+    ).toBeVisible();
+    expect(controlPlane.heartbeats).toContain(INSTALLATION_ID);
+
+    await expectAccessible(page);
+    await page.setViewportSize({ width: 360, height: 780 });
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
   });
 });

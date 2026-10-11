@@ -108,6 +108,12 @@ describe('[UPD-002] [UPD-007] releases', () => {
     expect(ReleaseInfo.safeParse({ ...RELEASE, sha256: 'B'.repeat(64) }).success).toBe(false);
   });
 
+  it('[UPD-004] may flag a release as security-critical; without the flag it is not', () => {
+    expect(ReleaseInfo.parse({ ...RELEASE, securityCritical: true }).securityCritical).toBe(true);
+    expect(ReleaseInfo.parse(RELEASE).securityCritical).toBeUndefined();
+    expect(ReleaseInfo.safeParse({ ...RELEASE, securityCritical: 'yes' }).success).toBe(false);
+  });
+
   it('asks for updates of the Windows installer by default', () => {
     expect(UpdatesQuery.parse({ version: '1.0.0' })).toEqual({
       component: 'RESTAURANT_PC',

@@ -19,6 +19,8 @@ within 1 minute online and signed offline reactivation codes; clock-rollback det
 enforcement at pairing; tamper events reported. The signing key lives only in the cloud KMS.
 Acceptance: tests for every state transition and capability, tampered file, expired offline,
 clock rollback, next-business-day restriction, offline reactivation code.
+Note from P4-04b: the System page shows `licence: null` ("Not activated on this PC yet") until this
+WP fills `licence { state, daysLeft, validUntil }` in `SystemService.view` (LIC-008).
 
 ## P7-02 Control Plane: tenants, subscriptions, licences, vendor access
 
@@ -55,6 +57,13 @@ rollback of app and database; component version matrix and N-1 client compatibil
 Update channels for mobile and APK push via MDM/in-app updater; pager firmware distribution.
 Acceptance: scenario S9 (forced failed health check → rollback) automated on Windows CI; staged
 rollout halt test.
+Note from P4-04b: "Install now" is built. A manager's approval is kept in `system_meta`
+`updates.install_approval` (`{ version, approvedAt, approvedBy, reason }`); the agent installs only
+that version, and checks again for open tables (every table on the installation) just before it
+installs: a table opened after the approval waits for the window or a new approval, unless the
+release is security-critical and the approval has a reason. Releases must store
+`securityCritical` (the Control Plane's `ReleaseInfo` has it as an optional field; `PublishRelease`
+leaves it out until then).
 
 ## P7-05 Backup and restore
 
@@ -67,6 +76,8 @@ Owner's authenticated restore request; opt-out recorded in audit; one-click rest
 a new PC after licence re-binding; backup failure alerts; restore runbook and rehearsal checklist.
 A restore must delete `system_meta` key `events.stream_id` before the server starts, so every
 device does a full refresh instead of resuming from sequences of the lost timeline (P0-12).
+Local backups go under `<data folder>/backups`, where the System page measures them (P4-04b), and
+`SystemView.backups.lastBackupAt` (null until this WP) reports the last successful backup.
 Acceptance: automated backup → wipe → restore test with RPO/RTO measured; tampered backup detected.
 
 ## P7-06 Data lifecycle
@@ -80,6 +91,9 @@ write a purge record; statutory-period warning); archive viewer (S); full data e
 at any time including restricted mode; personal-data erasure/anonymisation; data-volume test for the
 100 GB / 5 years sizing target.
 Acceptance: scenario S10 parts: archive-then-purge with verification; erasure keeps invoices.
+Already built: storage by category on the System page (P4-04b, `StorageUsage`, with the drive's
+level against both percentages) and the 80 % data-drive alert (`SystemAlerts.checkDisk`,
+`storage.warnPercent`); the 90 % alert (`storage.criticalPercent`) is still this WP's.
 
 ## P7-07 Onboarding wizard completion and go-live check
 
@@ -101,6 +115,9 @@ vendor-controlled remote settings and feature flags visible to the manager and a
 reporting wired to the vendor service (Sentry or equivalent) with PII and secret scrubbing; no remote
 shell.
 Acceptance: diagnostics bundle contains no secrets (test scans for known secret patterns).
+Already built: the support screen is the dashboard's System page (P4-04b, NFR-I03), and its "Send
+diagnostics to support" sends a heartbeat now (audited `DIAGNOSTICS_SENT`); this WP adds the bundle
+to that button.
 
 ## P7-09 Digital bills (WhatsApp/SMS)
 

@@ -541,7 +541,7 @@ As built:
   the managers, Kitchen, and Devices and system, with their words; the page passes axe and fits a
   360 px phone, and each is acknowledged.
 
-### P4-04b System screen
+### P4-04b System screen (done)
 
 Requirements: MGR-010, NFR-I03, DATA-006 (display), LIC-008 (display), UPD-004 ("Install now").
 Deliverables: the dashboard's System page (`/manage/system`) as the single support screen
@@ -555,6 +555,48 @@ open), and "Send diagnostics to support" (sends the health report to the Control
 log bundle is P7-08).
 Acceptance: Playwright with a seeded offered update: a manager sees the System page, cannot
 install while a table is open, installs once tables are closed, and sends diagnostics.
+
+As built:
+
+- Routes: `GET /api/v1/system` (OPERATIONS_CONFIGURE) returns `SystemView`;
+  `POST /api/v1/system/updates/install-now` (UPDATE_INSTALL_NOW, body `{ version, reason? }`)
+  returns the updates part; `POST /api/v1/system/diagnostics` (OPERATIONS_CONFIGURE) returns
+  `{ sentAt }`. `SystemService` (`apps/server/src/system/`) gathers what other modules already
+  know: the database ping and PostgreSQL version, `PagerBroker.status()` (running, port,
+  encrypted, connected pagers), printers (offline, tickets waiting), `HeartbeatService.status()`
+  and the stored enrolment for the support link, paired devices by type with how many are
+  connected, the data drive (`readDataDrive`, shared with the disk alert and the heartbeat) against
+  `storage.warnPercent` and `storage.criticalPercent`, the backup settings, and updates.
+- Storage by category (`StorageUsage`): TRANSACTIONS is the database without the audit log
+  (`pg_database_size` minus `pg_total_relation_size('audit_log')`), AUDIT is the audit log, and
+  PHOTOS, LOGS and BACKUPS are the `photos`, `logs` and `backups` folders under the data folder.
+  Measured at most once a minute; a category that cannot be measured says so.
+- "Install now" (UPD-004, `installNowRefusal` in `@rp/domain`): refused when the version is not
+  the one offered, and while any table on the installation is open, unless the release is
+  security-critical and the manager gives a reason of 3 characters or more. The approval
+  (`{ version, approvedAt, approvedBy, reason }`) is kept in `system_meta`
+  `updates.install_approval` for the update agent (P7-04) and counts only while that release is
+  offered; approving the same release again changes nothing and is not audited twice. Approvals
+  are serialised with an advisory lock and audited as `UPDATE_INSTALL_APPROVED`. The release's
+  `securityCritical` flag is an optional field of the Control Plane's `ReleaseInfo` (missing means
+  not); the Control Plane sets it from P7-04.
+- "Send diagnostics to support" (UPD-008): sends a heartbeat now; audited as `DIAGNOSTICS_SENT`
+  only once the Control Plane accepted it. Not linked (409), unreachable (503) and refused (502,
+  with the Control Plane's code) are said in words, and the button is disabled until this PC is
+  set up and enrolled. The log bundle is P7-08.
+- Console: the System page (`apps/console/src/manage/system/`) for people with
+  OPERATIONS_CONFIGURE, linked after Settings. Each service has a state in words (Working, Needs
+  attention, Off) beside its detail; the drive has a level in words and a meter; the licence and
+  the last backup show placeholders until P7-01 and P7-05. The page reads again on table, device,
+  printer and restaurant events and every minute. "Install now" shows for people with
+  UPDATE_INSTALL_NOW; it is disabled while tables are open, with the count in words, and its
+  dialog asks for a reason only for a security update while tables are open. The dialog approves
+  the release it was opened for, and the server's refusal shows in it.
+- Playwright: a stand-in Control Plane answers heartbeats with release 1.1.0. Vikram (Manager)
+  opens System once this PC is linked; a table opened on the POS keeps "Install now" disabled
+  ("1 table is open, so it cannot install now."); once it is freed as opened by mistake (P1-08c)
+  he approves 1.1.0 and the page names him, then sends diagnostics, which reach the stand-in. The
+  page passes axe with the dialog open and after, and fits a 360 px phone.
 
 ## P4-05 Full report suite
 

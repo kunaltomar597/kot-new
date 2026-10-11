@@ -1623,6 +1623,28 @@ body {
   object-fit: contain;
 }
 
+/* The System page (P4-04b): a state in words beside each fact, and the data drive's use. */
+.system-fact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rp-space-2);
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.system-meter {
+  width: 100%;
+  height: 1rem;
+}
+
+.system-subheading {
+  margin: var(--rp-space-2) 0 0;
+  font-size: var(--rp-font-size-md);
+  font-weight: var(--rp-font-weight-semibold);
+}
+
 /* A day of opening hours in the hours dialog. */
 .settings-day {
   display: flex;

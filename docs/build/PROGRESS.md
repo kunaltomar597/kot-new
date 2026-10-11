@@ -27,7 +27,8 @@ What exists:
   `checkCustomRole`, a custom role that manages staff counting as a manager's, and discounts that
   follow it (P4-02e), each notification rule's pager vibration, what a manager may choose for
   each alert, what stops a rule from working and a change kept to what differs from the factory
-  rule (P4-03b), and pinned, boosted and blocked dishes in the suggestions (P4-03c). 245 tests.
+  rule (P4-03b), pinned, boosted and blocked dishes in the suggestions (P4-03c), and the data
+  drive's level and when "Install now" is refused (P4-04b). 251 tests.
 - `packages/contracts`: common scalars/enums, menu, orders, KOT, API error, domain events, auth,
   devices, the real-time protocol, health, version and the LAN CA; route registry with generated
   OpenAPI/AsyncAPI docs; the Vendor Control Plane API as a separate entry point
@@ -52,8 +53,9 @@ What exists:
   with one pager heartbeat (set by the vendor) and one disk warning level (P4-03a); notification
   rules with each alert's pager vibration, and a rule change that cannot work refused (P4-03b);
   the dishes' suggestion preferences, their routes and the PINNED and BOOSTED layers (P4-03c);
-  the grace before a kitchen screen or table tablet is reported offline (P4-04a).
-  559 tests.
+  the grace before a kitchen screen or table tablet is reported offline (P4-04a); the System
+  page, "Install now" and "Send diagnostics", and a release's security-critical flag (P4-04b).
+  566 tests.
 - `apps/server`: NestJS 12 skeleton with config, request pipeline, JSON logging with correlation
   IDs, error mapping, validation pipe, health/version, Prisma 7 + PostgreSQL, integration-test
   harness; core data model (64 tables after the later migrations), least-privilege roles,
@@ -104,7 +106,9 @@ What exists:
   from each notification rule (P4-03b); pinned, boosted and blocked dishes, audited and applied
   to the next suggestions at once (P4-03c); kitchen screens and table tablets reported offline
   once away longer than a grace and online as soon as they connect, also after a restart
-  (P4-04a). 758 tests (4 skipped without a real install).
+  (P4-04a); the System page's view (services, devices, the drive and storage by category,
+  backups, updates), "Install now" kept for the update agent and audited, and "Send diagnostics"
+  as a heartbeat sent at once (P4-04b). 766 tests (4 skipped without a real install).
 - `apps/control-plane`: the Vendor Control Plane service (P0-17a, ADR-0012): installation
   enrolment with one-time codes, Ed25519-signed requests with replay protection, heartbeat ingest,
   release channels and update offers, audited admin CLI. 34 tests. Not deployed yet (hosting
@@ -194,7 +198,10 @@ What exists:
   (invoice particulars with the GSTIN checked, tax groups with rates as percentages, invoice
   series with their first number as it is typed), changed by the Owner after the second factor
   and read only for managers (P4-03e); the alert centre with a kitchen screen gone offline,
-  printer and disk alerts in words (P4-04a). 415 tests, and 25 Playwright steps.
+  printer and disk alerts in words (P4-04a); the System page with versions, services in words,
+  connected devices, the data drive and what uses it, backups, the licence and updates, "Install
+  now" (refused while tables are open, with a reason for a security update) and "Send
+  diagnostics to support" (P4-04b). 442 tests, and 26 Playwright steps.
 - `packages/i18n` (typed English catalogue, `t()` with ICU plural/select, lint rule against JSX text
   literals) and `packages/api-client` (REST client typed from the contracts with token renewal and
   error mapping, and the resuming Socket.io connection) (P0-14a).
@@ -209,8 +216,6 @@ What exists:
 
 Recommended next WPs (dependencies met):
 
-- P4-04b System screen (P4-04a done; backups, the licence and the update agent arrive in P7 and
-  show placeholders until then).
 - P4-05 Full report suite (P1-13, P2-03 and P3-04 done).
 - P3-01 Table tablet app (P2-01 done; its kiosk check needs P0-H3 on the chosen tablet, the rest can
   be built).
@@ -321,7 +326,7 @@ Recommended next WPs (dependencies met):
 - [x] P4-03d Floor, stations and printers
 - [x] P4-03e Tax and invoice
 - [x] P4-04a Device and system alerts
-- [ ] P4-04b System screen
+- [x] P4-04b System screen
 - [ ] P4-05 Full report suite
 - [ ] P4-06 Report exports
 - [ ] P4-07 Audit viewer, verification, suspicious-activity report
@@ -647,6 +652,45 @@ Decided 2026-10-05 (P4-03b):
      too.
 261. The page's heading is "Notification rules" (its link says "Notifications"), because the
      toasts' landmark is already called "Notifications".
+
+Decided 2026-10-11 (P4-04b):
+
+299. The System page is for people who configure operations (`OPERATIONS_CONFIGURE`: the Owner,
+     managers and custom roles that have it), like Settings, and "Install now" for
+     `UPDATE_INSTALL_NOW`. The server refuses both to everyone else.
+300. Storage by category (DATA-006): transactions are the database without the audit log
+     (orders, bills, the menu and every other record), the audit trail is the audit log, and
+     photos, logs and backups are the `photos`, `logs` and `backups` folders under the data
+     folder. Sized at most once a minute, since walking folders and sizing the database is not
+     free. P0-16 writes logs and P7-05 local backups into those folders (noted in their specs).
+301. "Install now" is refused while any table on the installation is open (an update restarts the
+     server for every table), counted when the manager presses it. A table opened after the
+     approval does not undo it; the update agent checks the tables again just before it installs
+     (P7-04, noted in its spec).
+302. The security-critical exception of UPD-004 is built now: the Control Plane's release carries
+     an optional `securityCritical` flag (missing means not), and a manager approves through open
+     tables with a reason of 3 to 200 characters, audited. The Control Plane stores and sets the
+     flag from P7-04.
+303. The approval is kept in `system_meta` (`updates.install_approval`) and counts only while that
+     release is the one offered: a newer release needs a new approval. Approving the same release
+     again changes nothing and is audited once.
+304. While tables are open, "Install now" stays on the page but disabled, with the number of open
+     tables in words, so the manager knows why; the page follows tables opening and closing live.
+     The dialog approves the release it was opened for, so a release offered meanwhile is refused
+     by the server rather than approved unseen.
+305. "Send diagnostics to support" sends the health report (a heartbeat) now and is audited only
+     once the Control Plane accepted it; a failure is said in words and records nothing. It is
+     disabled until the installer has set up the support link and this PC is enrolled. The log
+     bundle with the configuration and the device list is P7-08.
+306. The licence and the backup runs say "Not activated on this PC yet" and "No backup has run on
+     this PC yet" until P7-01 and P7-05 provide them; the backups part already shows how backups
+     are set up, from the settings.
+307. Connected devices lists only the device types that have paired devices, each as "N of M
+     connected", in the Devices page's order.
+308. A heartbeat that failed because this PC was not enrolled says nothing once it is: the support
+     link then reads "Linked, no report sent yet" until the next report.
+309. The page reads itself again every minute (connections, database latency and the drive are not
+     announced) and at once on table, device, printer and restaurant events.
 
 Decided 2026-10-11 (P1-08c):
 
@@ -1510,6 +1554,50 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: P4-04b System page (P4-04 done)
+
+Merged #84 (P1-08c) once CI, CodeQL and e2e were green, then built the System page.
+
+Built:
+
+- Domain: `usedPercentOf`, `storageLevelOf` and `installNowRefusal` (`src/system.ts`).
+- Contracts: `SystemView`, `SystemUpdates`, `OfferedUpdate`, `InstallApproval`,
+  `InstallNowRequest`, `DiagnosticsResponse`, three routes, and `securityCritical` on the Control
+  Plane's `ReleaseInfo` (the Control Plane's `PublishRelease` leaves it out until P7-04).
+- Server: the `system` module (`SystemService`, `StorageUsage`, `SystemController`);
+  `readDataDrive` shared by the disk alert, the heartbeat and the page; `PagerBroker.status()`;
+  the approval kept in `system_meta` under a new advisory lock (`installApproval`).
+- Console: the System page (`src/manage/system/`) after Settings in the dashboard's navigation,
+  and its "Install now" dialog.
+- i18n: `dashboard.section.system` and the `system` namespace.
+- Tests: 6 domain, 7 contracts, 8 server integration (the whole view; who may open it and
+  install; diagnostics before enrolment, accepted, unreachable and refused; "Install now" waiting
+  for the tables, approved once, a security update with a reason; a stale "not enrolled"), 27
+  console (the page in words, live, every minute, the dialog with and without a reason, the
+  server's refusal, custom roles, diagnostics), and a Playwright step with a stand-in Control
+  Plane.
+
+Deferred:
+
+- The licence (P7-01), backup runs (P7-05), the update agent that installs an approved release and
+  the Control Plane's security flag (P7-04), the diagnostics bundle (P7-08), and the 90 % disk
+  alert (P7-06).
+
+Gotchas for the next session:
+
+- The e2e sets `RP_CONTROL_PLANE_URL` to a stand-in Control Plane (node:http) before the first
+  `startServer`, so every start has the support link; the server logs one `NOT_ENROLLED` warning
+  per start until the last step links it. The stand-in must always offer the same release: each
+  heartbeat answer replaces `control_plane.offered_update` when the version or channel differs.
+- Run the queries of an interactive transaction one at a time (`await` each), never with
+  `Promise.all` on the transaction client: it has one connection, and pg warns that concurrent
+  queries on a client will stop working in pg 9.
+- Playwright matches a role's name as a case-insensitive substring unless `exact: true`:
+  "Table 3" also matches the "Free table 3" dialog, and the install dialog's confirm button has
+  the same name as the page's "Install now".
+
+Decisions: 299 to 309.
 
 ### 2026-10-11: P1-08c Free a table opened by mistake (POS)
 

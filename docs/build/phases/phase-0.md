@@ -339,6 +339,11 @@ People needed: someone runs the installer on a clean Windows 11 PC and reports r
 Acceptance: installer builds in CI; on a clean PC it installs, services start at boot before login,
 killing the server process is recovered ≤ 10 s, and an update from the channel installs.
 
+Note from P4-04b: the services write their log files under `<data folder>/logs`, where the System
+page measures the space logs use (DATA-006); a different folder means changing `STORAGE_FOLDERS` in
+`apps/server/src/system/storage-usage.ts`. The installer sets `RP_PRODUCT_VERSION`, the version the
+System page shows and releases are compared with.
+
 ## P0-17 Minimal Vendor Control Plane
 
 Goal: the smallest cloud service needed for Phase 0: heartbeats and update channels.

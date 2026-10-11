@@ -214,7 +214,15 @@ import {
   SettingView,
   UpdateSettingRequest,
 } from './settings.js';
-import { HealthResponse, TlsCaResponse, VersionResponse } from './system.js';
+import {
+  DiagnosticsResponse,
+  HealthResponse,
+  InstallNowRequest,
+  SystemUpdates,
+  SystemView,
+  TlsCaResponse,
+  VersionResponse,
+} from './system.js';
 import {
   ArchiveRoleRequest,
   CreateStaffRequest,
@@ -497,6 +505,66 @@ export const ROUTES = [
     responses: {
       200: { description: 'The CA certificate.', schema: TlsCaResponse },
       404: { description: 'This server does not use TLS.', schema: ApiError },
+    },
+  },
+  {
+    operationId: 'getSystem',
+    method: 'GET',
+    path: '/api/v1/system',
+    summary: 'The System page: versions, services, devices, storage, backups, licence and updates',
+    description:
+      'The single support screen (NFR-I03): versions and whether the database, the pager broker, ' +
+      'the printers and the Control Plane link work; paired and connected devices by type; the ' +
+      'data drive against the warning levels and by category; how backups are set up; the ' +
+      'licence; the installed and offered releases, the maintenance window and any approval.',
+    tags: ['system'],
+    requirements: ['MGR-010', 'NFR-I03', 'DATA-006', 'LIC-008', 'UPD-004'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The state of the system now.', schema: SystemView },
+      ...standardErrors,
+    },
+  },
+  {
+    operationId: 'approveUpdateInstall',
+    method: 'POST',
+    path: '/api/v1/system/updates/install-now',
+    summary: '"Install now": approve installing the offered release outside the window',
+    description:
+      'Records the approval for the update agent (P7-04), audited. Never while tables are open, ' +
+      'unless the release is security-critical and a reason is given (UPD-004). Approving the ' +
+      'same release again changes nothing.',
+    tags: ['system'],
+    requirements: ['UPD-004', 'MGR-010', 'AUD-001'],
+    capability: 'UPDATE_INSTALL_NOW',
+    request: { body: InstallNowRequest },
+    responses: {
+      200: { description: 'The updates, with the approval.', schema: SystemUpdates },
+      ...standardErrors,
+      409: {
+        description:
+          'That release is not offered now, tables are open, or a security update needs a reason.',
+        schema: ApiError,
+      },
+    },
+  },
+  {
+    operationId: 'sendDiagnostics',
+    method: 'POST',
+    path: '/api/v1/system/diagnostics',
+    summary: '"Send diagnostics to support": report this PC\'s health to the Control Plane now',
+    description:
+      'Sends the health report (versions, disk, devices, the audit chain head) at once instead ' +
+      'of at the next heartbeat; audited. The log bundle arrives with P7-08 (UPD-008).',
+    tags: ['system'],
+    requirements: ['UPD-008', 'MGR-010', 'AUD-001'],
+    capability: 'OPERATIONS_CONFIGURE',
+    responses: {
+      200: { description: 'The Control Plane received the report.', schema: DiagnosticsResponse },
+      ...standardErrors,
+      409: { description: 'This PC is not linked to the Control Plane yet.', schema: ApiError },
+      502: { description: 'The Control Plane refused the report.', schema: ApiError },
+      503: { description: 'The Control Plane could not be reached.', schema: ApiError },
     },
   },
   {

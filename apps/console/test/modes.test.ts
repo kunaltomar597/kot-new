@@ -42,7 +42,7 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
     expect(homeFor(expediter)).toBe('manage');
   });
 
-  it('[MGR-001] [MGR-007] [AUTH-012] opens the dashboard pages a person may use', () => {
+  it('[MGR-001] [MGR-007] [MGR-010] [AUTH-012] opens the dashboard pages a person may use', () => {
     expect(managePagesFor({ role: 'OWNER' })).toEqual([
       'overview',
       'orders',
@@ -51,6 +51,7 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
       'staff',
       'devices',
       'settings',
+      'system',
       'security',
     ]);
     expect(managePagesFor({ role: 'MANAGER' })).toEqual([
@@ -61,6 +62,7 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
       'staff',
       'devices',
       'settings',
+      'system',
     ]);
     expect(manageLandingOf(managePagesFor({ role: 'MANAGER' }))).toBe('overview');
     // A head cashier manages staff, but the order feed is not theirs: Manage opens on Staff.
@@ -80,8 +82,9 @@ describe('[MGR-001] [KDS-001] console modes by role (BRD §4.2)', () => {
       'alerts',
       'staff',
       'settings',
+      'system',
     ]);
-    // Without OPERATIONS_CONFIGURE, no live feed and no settings.
+    // Without OPERATIONS_CONFIGURE, no live feed, no settings and no System page.
     const menuManager = {
       role: 'MANAGER',
       customRole: { added: [], removed: ['OPERATIONS_CONFIGURE'] },

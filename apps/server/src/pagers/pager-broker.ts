@@ -82,6 +82,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
   private stopRenewals: (() => void) | undefined;
   private timer: NodeJS.Timeout | undefined;
   private stopPresence: (() => void) | undefined;
+  private secure = false;
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -172,6 +173,7 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
       });
     });
     this.server = server;
+    this.secure = tlsOptions !== undefined;
     this.unsubscribe = this.bus.onPublished((events) => {
       for (const published of events)
         void this.deliver(published).catch((error: unknown) => {
@@ -220,6 +222,17 @@ export class PagerBroker implements OnApplicationBootstrap, OnModuleDestroy {
     return address !== undefined && address !== null && typeof address !== 'string'
       ? address.port
       : null;
+  }
+
+  /** The broker on the System page (MGR-010): listening or not, where, and how many pagers. */
+  status(): { running: boolean; port: number | null; secure: boolean; connectedPagers: number } {
+    const port = this.port();
+    return {
+      running: port !== null,
+      port,
+      secure: port !== null && this.secure,
+      connectedPagers: this.connected.size,
+    };
   }
 
   /** MGR-006: whether the pager is connected to the broker now (it can be located). */

@@ -1,3 +1,4 @@
+import { InstallApproval, type OfferedUpdate } from '@rp/contracts';
 import { ReleaseChannel, ReleaseInfo } from '@rp/contracts/control-plane';
 import { z } from 'zod';
 import type { PrismaService, TransactionClient } from '../database/prisma.service.js';
@@ -6,6 +7,7 @@ type Client = PrismaService | TransactionClient;
 
 const ENROLMENT_KEY = 'control_plane.enrolment';
 const OFFERED_UPDATE_KEY = 'control_plane.offered_update';
+const INSTALL_APPROVAL_KEY = 'updates.install_approval';
 
 /** This PC's identity at the Control Plane, saved when it enrolled (ADR-0012). */
 export const Enrolment = z.object({
@@ -60,4 +62,28 @@ export function saveOfferedUpdate(
   update: ReleaseInfo | null,
 ): Promise<void> {
   return writeJson(prisma, OFFERED_UPDATE_KEY, update);
+}
+
+/** The offered release as the System page shows it; a missing flag means not security-critical. */
+export function offeredUpdateOf(release: ReleaseInfo): OfferedUpdate {
+  return {
+    version: release.version,
+    channel: release.channel,
+    notes: release.notes,
+    sizeBytes: release.sizeBytes,
+    publishedAt: release.publishedAt,
+    securityCritical: release.securityCritical ?? false,
+  };
+}
+
+/**
+ * A manager's "Install now" (UPD-004), kept across restarts for the update agent (P7-04), which
+ * installs only the approved version and checks for open tables again before it does.
+ */
+export async function readInstallApproval(prisma: Client): Promise<InstallApproval | null> {
+  return (await readJson(prisma, INSTALL_APPROVAL_KEY, InstallApproval)) ?? null;
+}
+
+export function saveInstallApproval(prisma: Client, approval: InstallApproval): Promise<void> {
+  return writeJson(prisma, INSTALL_APPROVAL_KEY, approval);
 }

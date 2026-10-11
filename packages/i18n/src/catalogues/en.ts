@@ -324,6 +324,7 @@ export const en = {
       devices: 'Devices',
       menu: 'Menu',
       settings: 'Settings',
+      system: 'System',
       security: 'Security',
     },
     overview: {
@@ -2371,6 +2372,155 @@ export const en = {
       title: 'Make {name} the default series?',
       description: 'New bills get numbers from {name} from now on, such as {example}.',
       confirm: 'Make default',
+    },
+  },
+  /**
+   * The System page (P4-04b, MGR-010, NFR-I03): the one screen support asks about, with versions,
+   * services, devices, storage (DATA-006), backups, the licence (LIC-008), updates and "Install
+   * now" (UPD-004), and "Send diagnostics to support" (UPD-008).
+   */
+  system: {
+    title: 'System',
+    intro:
+      'What support asks about, in one place: versions, services, devices, storage, backups, the licence and updates.',
+    loadFailed: 'The system details could not be read.',
+    uptime: {
+      minutes: 'Running for {minutes} min',
+      hours: 'Running for {hours} h {minutes} min',
+      days: 'Running for {days, plural, one {# day} other {# days}} {hours} h',
+    },
+    status: {
+      ok: 'Working',
+      problem: 'Needs attention',
+      off: 'Off',
+    },
+    versions: {
+      title: 'Versions',
+      product: 'Restaurant system',
+      server: 'Local server',
+      node: 'Node.js',
+      postgres: 'PostgreSQL',
+      build: 'Build',
+      unknown: 'Unknown',
+    },
+    services: {
+      title: 'Services',
+      database: 'Database',
+      databaseUp: 'Answers in {ms} ms',
+      databaseDown: 'Not answering. Restart the server PC; if that does not help, call support.',
+      pagers: 'Pager link',
+      pagersOn:
+        '{count, plural, =0 {No pagers connected} one {# pager connected} other {# pagers connected}}, on port {port}{secure, select, yes {, encrypted} other {}}',
+      pagersOff: 'Switched off on this PC',
+      printers: 'Printers',
+      printersNone: 'No printers are set up',
+      printersOk:
+        '{total, plural, one {# printer, printing} other {# printers, all printing}}; {waiting, plural, =0 {nothing waiting} one {# ticket waiting} other {# tickets waiting}}',
+      printersOffline:
+        '{offline} of {total} not printing; {waiting, plural, =0 {nothing waiting} one {# ticket waiting} other {# tickets waiting}}',
+      support: 'Support link',
+      supportNotSetUp: 'Not set up on this PC',
+      supportNotLinked: 'Not linked yet. It is linked when the licence is activated.',
+      supportNoReport: 'Linked, no report sent yet',
+      supportToday: 'Last report at {time}',
+      supportEarlier: 'Last report on {date} at {time}',
+      supportFailed:
+        '{reason, select, UNREACHABLE {Support could not be reached the last time} NOT_ENROLLED {Not linked yet} other {Support refused the last report ({reason})}}',
+    },
+    devices: {
+      title: 'Connected devices',
+      none: 'No devices are paired yet.',
+      count: '{connected} of {paired} connected',
+    },
+    storage: {
+      title: 'Storage',
+      drive: 'The data drive is {percent}% full, with {free} free of {total}.',
+      unreadable: 'The data drive could not be read.',
+      meter: 'Data drive use',
+      levels: 'Managers are warned at {warn}% and {critical}%.',
+      level: {
+        OK: 'Enough space',
+        WARNING: 'Getting full',
+        CRITICAL: 'Almost full',
+      },
+      byCategory: 'What uses the space',
+      category: {
+        TRANSACTIONS: 'Orders, bills and other records',
+        AUDIT: 'Audit trail',
+        PHOTOS: 'Menu photos',
+        LOGS: 'Logs',
+        BACKUPS: 'Backups',
+      },
+      notMeasured: 'Could not be measured',
+    },
+    backups: {
+      title: 'Backups',
+      never: 'No backup has run on this PC yet.',
+      lastToday: 'Last backup at {time}.',
+      lastEarlier: 'Last backup on {date} at {time}.',
+      log: 'Database log',
+      walMode: {
+        CONTINUOUS: 'Backed up continuously',
+        HOURLY: 'Backed up every hour',
+      },
+      nightly: 'Nightly full backup',
+      secondLocation: 'Copied to {folder}',
+      noSecondLocation: 'No second location set yet',
+      kept: 'Kept',
+      keptCount: '{daily} daily and {weekly} weekly backups',
+      cloud: 'Cloud backup',
+      cloudOn: 'Every night, encrypted on this PC first',
+      cloudOff: 'Off: the Owner opted out',
+      ownerChanges: 'The Owner changes these under Settings.',
+    },
+    licence: {
+      title: 'Licence',
+      none: 'Not activated on this PC yet.',
+      state: {
+        ACTIVE: 'Active',
+        PAYMENT_DUE: 'Payment due',
+        GRACE: 'Grace period',
+        RESTRICTED: 'Restricted',
+        TERMINATED: 'Ended',
+      },
+      daysLeft: '{days, plural, one {# day left} other {# days left}}',
+    },
+    updates: {
+      title: 'Updates',
+      installed: 'Installed',
+      version: 'Version {version}',
+      channelLabel: 'Release channel',
+      channel: {
+        STABLE: 'Stable',
+        PILOT: 'Pilot (early releases)',
+      },
+      upToDate: 'No update is waiting.',
+      offered: 'Version {version} is ready to install ({size}).',
+      security: 'Security update',
+      notes: 'What is new: {notes}',
+      window: 'Updates install between {start} and {end}, while every table is closed.',
+      openTables:
+        '{count, plural, one {# table is open} other {# tables are open}}, so it cannot install now.',
+      openTablesSecurity:
+        '{count, plural, one {# table is open} other {# tables are open}}. A security update can install anyway once you say why.',
+      approvedToday: 'Installation approved by {name} at {time}.',
+      approvedEarlier: 'Installation approved by {name} on {date} at {time}.',
+      installNow: 'Install now',
+    },
+    install: {
+      title: 'Install version {version} now?',
+      description:
+        'The system restarts to install it, so every screen disconnects for a few minutes. Afterwards everything carries on as before.',
+      security:
+        'This security update installs while tables are open, so every screen disconnects for a few minutes during service.',
+      reason: 'Why it cannot wait',
+      reasonShort: 'Say why in at least 3 characters.',
+      confirm: 'Install now',
+      approved: 'Installation of version {version} approved.',
+    },
+    diagnostics: {
+      send: 'Send diagnostics to support',
+      sent: 'Sent to support at {time}.',
     },
   },
   secondFactor: {

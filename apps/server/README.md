@@ -259,7 +259,7 @@ backup, updates and diagnostics.
     logged once. A `CLOCK_SKEW` answer corrects the clock offset and the request is sent again.
   - Failures (`NOT_ENROLLED`, `UNREACHABLE`, `INSTALLATION_REVOKED`, ...) are logged once per
     change and never affect local work (NFR-A01).
-  - `HeartbeatService.status()` and `beat()` are for the support screen (P7-08).
+  - `HeartbeatService.status()` and `beat()` feed the System page (P4-04b).
 - Tests: `test/integration/control-plane.int.test.ts` runs a real Control Plane
   (`@rp/control-plane/testing`) beside the server.
 
@@ -605,6 +605,31 @@ To try a real printer on a PC: add it under Printers with its IP address and por
   Pagers page and the wearer's own pager card follow; the list carries `pager.lowBatteryPercent`.
 - Tests start the broker with `config: { mqtt: 'on', mqttPort: 0 }`. See
   `test/integration/pagers.int.test.ts`.
+
+## System page (P4-04b)
+
+- `src/system/system.service.ts` serves `GET /api/v1/system` (`OPERATIONS_CONFIGURE`), the
+  single support screen (MGR-010, NFR-I03):
+  - Versions: the product (`RP_PRODUCT_VERSION`), server, Node, PostgreSQL and build.
+  - Services: a database ping, the pager broker (`PagerBroker.status()`), printers offline and
+    tickets waiting, and the Control Plane link (`HeartbeatService.status()`, enrolment).
+  - Devices: paired and connected by type, as the Devices page counts them.
+  - Storage: the data drive (`src/common/data-drive.ts`, shared with the disk alert and the
+    heartbeat) against `storage.warnPercent` and `storage.criticalPercent`, and by category
+    (`src/system/storage-usage.ts`, measured at most once a minute): the database without its
+    audit trail, `audit_log`, and the `photos`, `logs` and `backups` folders under `RP_DATA_DIR`.
+  - Backups as set up (the runs arrive with P7-05), the licence (null until P7-01) and updates.
+- `POST /api/v1/system/updates/install-now` (`UPDATE_INSTALL_NOW`, UPD-004) records the approval
+  in `system_meta` (`updates.install_approval`) for the update agent (P7-04), audited as
+  `UPDATE_INSTALL_APPROVED`. It is refused for a release that is not offered now and while
+  tables are open, unless the release is security-critical and a reason is given (409
+  `UPDATE_NOT_OFFERED`, `TABLES_OPEN`, `REASON_REQUIRED`). Approving the same release again
+  changes nothing; an approval counts only while its release is the one offered.
+- `POST /api/v1/system/diagnostics` (UPD-008) sends a heartbeat now and audits
+  `DIAGNOSTICS_SENT` once it arrived; 409 `SUPPORT_NOT_SET_UP` or `NOT_ENROLLED`, 503
+  `SUPPORT_UNREACHABLE`, 502 `SUPPORT_REFUSED` otherwise. The log bundle arrives with P7-08.
+- Tests: `test/integration/system.int.test.ts`, with a stand-in Control Plane passed as
+  `ControlPlaneOptions.fetch`.
 
 ## Phase 1 exit scenario (P1-14)
 

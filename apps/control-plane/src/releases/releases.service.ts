@@ -12,8 +12,15 @@ import type { Release } from '../generated/prisma/client.js';
 import { newId } from '../ids.js';
 import { compareVersions, parseVersion } from './semver.js';
 
-/** What the vendor publishes (the admin CLI or, from P7-04, the release pipeline). */
-export const PublishRelease = ReleaseInfo.omit({ publishedAt: true, notes: true }).extend({
+/**
+ * What the vendor publishes (the admin CLI or, from P7-04, the release pipeline). Releases do not
+ * store the security-critical flag yet (P7-04), so it cannot be published and is never sent.
+ */
+export const PublishRelease = ReleaseInfo.omit({
+  publishedAt: true,
+  notes: true,
+  securityCritical: true,
+}).extend({
   notes: z.string().max(2_000).optional(),
 });
 export type PublishRelease = z.infer<typeof PublishRelease>;

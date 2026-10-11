@@ -8325,6 +8325,146 @@
         "x-requirements": ["KDS-002", "KDS-008", "ONB-004", "AUD-001"]
       }
     },
+    "/api/v1/system": {
+      "get": {
+        "operationId": "getSystem",
+        "summary": "The System page: versions, services, devices, storage, backups, licence and updates",
+        "description": "The single support screen (NFR-I03): versions and whether the database, the pager broker, the printers and the Control Plane link work; paired and connected devices by type; the data drive against the warning levels and by category; how backups are set up; the licence; the installed and offered releases, the maintenance window and any approval.",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The state of the system now.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SystemView" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["MGR-010", "NFR-I03", "DATA-006", "LIC-008", "UPD-004"]
+      }
+    },
+    "/api/v1/system/diagnostics": {
+      "post": {
+        "operationId": "sendDiagnostics",
+        "summary": "\"Send diagnostics to support\": report this PC's health to the Control Plane now",
+        "description": "Sends the health report (versions, disk, devices, the audit chain head) at once instead of at the next heartbeat; audited. The log bundle arrives with P7-08 (UPD-008).",
+        "tags": ["system"],
+        "responses": {
+          "200": {
+            "description": "The Control Plane received the report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DiagnosticsResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "This PC is not linked to the Control Plane yet.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "502": {
+            "description": "The Control Plane refused the report.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "503": {
+            "description": "The Control Plane could not be reached.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "OPERATIONS_CONFIGURE",
+        "x-requirements": ["UPD-008", "MGR-010", "AUD-001"]
+      }
+    },
+    "/api/v1/system/updates/install-now": {
+      "post": {
+        "operationId": "approveUpdateInstall",
+        "summary": "\"Install now\": approve installing the offered release outside the window",
+        "description": "Records the approval for the update agent (P7-04), audited. Never while tables are open, unless the release is security-critical and a reason is given (UPD-004). Approving the same release again changes nothing.",
+        "tags": ["system"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/InstallNowRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updates, with the approval.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SystemUpdates" } }
+            }
+          },
+          "400": {
+            "description": "The request does not match the contract.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "401": {
+            "description": "No valid session or device credential.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "403": {
+            "description": "The signed-in role lacks the required capability.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          },
+          "409": {
+            "description": "That release is not offered now, tables are open, or a security update needs a reason.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } }
+            }
+          }
+        },
+        "x-capability": "UPDATE_INSTALL_NOW",
+        "x-requirements": ["UPD-004", "MGR-010", "AUD-001"]
+      }
+    },
     "/api/v1/table-sessions/{sessionId}/close-without-bill": {
       "post": {
         "operationId": "closeTableWithoutBill",
@@ -10829,6 +10969,12 @@
         ],
         "additionalProperties": false
       },
+      "DiagnosticsResponse": {
+        "type": "object",
+        "properties": { "sentAt": { "$ref": "#/components/schemas/Timestamp" } },
+        "required": ["sentAt"],
+        "additionalProperties": false
+      },
       "DiscountRequest": {
         "type": "object",
         "properties": {
@@ -11009,6 +11155,42 @@
         "type": "string",
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "InstallApproval": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+          },
+          "approvedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "approvedBy": {
+            "type": "object",
+            "properties": {
+              "id": { "$ref": "#/components/schemas/Id" },
+              "name": { "type": "string" }
+            },
+            "required": ["id", "name"],
+            "additionalProperties": false
+          },
+          "reason": { "type": ["string", "null"] }
+        },
+        "required": ["version", "approvedAt", "approvedBy", "reason"],
+        "additionalProperties": false
+      },
+      "InstallNowRequest": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 200 }
+        },
+        "required": ["version"],
+        "additionalProperties": false
       },
       "InvoiceLineView": {
         "type": "object",
@@ -12565,6 +12747,23 @@
           "alertIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }
         },
         "required": ["alertIds"],
+        "additionalProperties": false
+      },
+      "OfferedUpdate": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+          },
+          "channel": { "type": "string", "enum": ["STABLE", "PILOT"] },
+          "notes": { "type": ["string", "null"] },
+          "sizeBytes": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "publishedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "securityCritical": { "type": "boolean" }
+        },
+        "required": ["version", "channel", "notes", "sizeBytes", "publishedAt", "securityCritical"],
         "additionalProperties": false
       },
       "OpenBillRequest": {
@@ -15658,6 +15857,11 @@
         "required": ["secondFactorValidUntil"],
         "additionalProperties": false
       },
+      "StorageCategory": {
+        "type": "string",
+        "enum": ["TRANSACTIONS", "AUDIT", "PHOTOS", "LOGS", "BACKUPS"]
+      },
+      "StorageLevel": { "type": "string", "enum": ["OK", "WARNING", "CRITICAL"] },
       "SubmitOrderRequest": {
         "type": "object",
         "properties": {
@@ -15730,6 +15934,232 @@
             "additionalProperties": false
           }
         ]
+      },
+      "SystemUpdates": {
+        "type": "object",
+        "properties": {
+          "current": { "type": "string", "minLength": 1 },
+          "channel": {
+            "anyOf": [{ "type": "string", "enum": ["STABLE", "PILOT"] }, { "type": "null" }]
+          },
+          "offered": {
+            "anyOf": [{ "$ref": "#/components/schemas/OfferedUpdate" }, { "type": "null" }]
+          },
+          "maintenanceWindow": { "$ref": "#/components/schemas/TimeWindow" },
+          "approval": {
+            "anyOf": [{ "$ref": "#/components/schemas/InstallApproval" }, { "type": "null" }]
+          },
+          "openTables": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        },
+        "required": [
+          "current",
+          "channel",
+          "offered",
+          "maintenanceWindow",
+          "approval",
+          "openTables"
+        ],
+        "additionalProperties": false
+      },
+      "SystemView": {
+        "type": "object",
+        "properties": {
+          "checkedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "versions": {
+            "type": "object",
+            "properties": {
+              "product": { "type": "string", "minLength": 1 },
+              "server": { "type": "string", "minLength": 1 },
+              "node": { "type": "string", "minLength": 1 },
+              "postgres": { "type": ["string", "null"] },
+              "buildId": { "type": ["string", "null"] }
+            },
+            "required": ["product", "server", "node", "postgres", "buildId"],
+            "additionalProperties": false
+          },
+          "services": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "object",
+                "properties": {
+                  "up": { "type": "boolean" },
+                  "latencyMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["up", "latencyMs"],
+                "additionalProperties": false
+              },
+              "pagerBroker": {
+                "type": "object",
+                "properties": {
+                  "running": { "type": "boolean" },
+                  "port": {
+                    "anyOf": [
+                      { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                      { "type": "null" }
+                    ]
+                  },
+                  "secure": { "type": "boolean" },
+                  "connectedPagers": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["running", "port", "secure", "connectedPagers"],
+                "additionalProperties": false
+              },
+              "printers": {
+                "type": "object",
+                "properties": {
+                  "total": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "offline": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "waiting": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["total", "offline", "waiting"],
+                "additionalProperties": false
+              },
+              "controlPlane": {
+                "type": "object",
+                "properties": {
+                  "configured": { "type": "boolean" },
+                  "enrolled": { "type": "boolean" },
+                  "lastReportAt": {
+                    "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                  },
+                  "lastError": { "type": ["string", "null"] }
+                },
+                "required": ["configured", "enrolled", "lastReportAt", "lastError"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["database", "pagerBroker", "printers", "controlPlane"],
+            "additionalProperties": false
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "$ref": "#/components/schemas/DeviceType" },
+                "paired": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "connected": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["type", "paired", "connected"],
+              "additionalProperties": false
+            }
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "totalBytes": {
+                "anyOf": [
+                  { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "freeBytes": {
+                "anyOf": [
+                  { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  { "type": "null" }
+                ]
+              },
+              "usedPercent": {
+                "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "null" }]
+              },
+              "warnPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "criticalPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "level": {
+                "anyOf": [{ "$ref": "#/components/schemas/StorageLevel" }, { "type": "null" }]
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": { "$ref": "#/components/schemas/StorageCategory" },
+                    "bytes": {
+                      "anyOf": [
+                        { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        { "type": "null" }
+                      ]
+                    }
+                  },
+                  "required": ["category", "bytes"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "totalBytes",
+              "freeBytes",
+              "usedPercent",
+              "warnPercent",
+              "criticalPercent",
+              "level",
+              "categories"
+            ],
+            "additionalProperties": false
+          },
+          "backups": {
+            "type": "object",
+            "properties": {
+              "walMode": { "type": "string", "enum": ["CONTINUOUS", "HOURLY"] },
+              "secondLocation": { "type": ["string", "null"] },
+              "keepDaily": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "keepWeekly": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "cloudEnabled": { "type": "boolean" },
+              "lastBackupAt": {
+                "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+              }
+            },
+            "required": [
+              "walMode",
+              "secondLocation",
+              "keepDaily",
+              "keepWeekly",
+              "cloudEnabled",
+              "lastBackupAt"
+            ],
+            "additionalProperties": false
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "state": { "$ref": "#/components/schemas/LicenseState" },
+                  "daysLeft": {
+                    "anyOf": [
+                      { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      { "type": "null" }
+                    ]
+                  },
+                  "validUntil": {
+                    "anyOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                  }
+                },
+                "required": ["state", "daysLeft", "validUntil"],
+                "additionalProperties": false
+              },
+              { "type": "null" }
+            ]
+          },
+          "updates": { "$ref": "#/components/schemas/SystemUpdates" }
+        },
+        "required": [
+          "checkedAt",
+          "uptimeSeconds",
+          "versions",
+          "services",
+          "devices",
+          "storage",
+          "backups",
+          "licence",
+          "updates"
+        ],
+        "additionalProperties": false
       },
       "TableClosed": {
         "type": "object",
