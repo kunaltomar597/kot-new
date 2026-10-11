@@ -473,7 +473,8 @@ table; takeaway with token; live item status chips.
 Acceptance: Playwright flows: open table → order with variant + modifiers + combo → send → status
 updates live; move table; takeaway order.
 
-P1-08 is split in two.
+P1-08 is split in three. P1-08c was added during Phase 4, when the System page's "Install now"
+needed every table closed and the POS had no way to free a table opened by mistake.
 
 ### P1-08a POS floor
 
@@ -513,6 +514,27 @@ As built: `@rp/ui-web` `MenuItemCard`, `ChoiceGroup`, `ItemOptions`, `ComboChoic
   Playwright flows run at any time of day.
 - Deferred to P1-09: the cross-device check that a kitchen status change shows on the POS (the
   screen test covers it with a socket event).
+
+### P1-08c Free a table opened by mistake (POS)
+
+Requirements: TBL-004, AUD-001 (ADR-0006).
+Depends on: P1-02 (the close-without-bill route), P1-08a.
+Deliverables: a "Free the table" action in the POS table details that closes the session without
+a bill, with a reason for the audit log.
+Acceptance: a table opened by mistake is freed with a reason and shows as free again; the action
+is not offered once something billable has been ordered or waits for approval; the server's
+refusal shows in the dialog.
+
+As built: `apps/console/src/pos/FreeTableDialog.tsx`, `TableOverview.tsx`.
+
+- The details of an occupied table offer "Free the table" while its amount so far is zero and
+  nothing waits for approval, to anyone whose role does not deny `ORDER_CREATE` (the route's own
+  capability).
+- The dialog asks why the table was opened by mistake (3 to 200 characters, as the route
+  requires) and calls `POST /api/v1/table-sessions/:sessionId/close-without-bill`. The server
+  stays the judge: it refuses with `TABLE_HAS_ITEMS` when a billable item exists (a free dish
+  leaves the amount at zero), and the dialog shows its words.
+- On success a toast says the table is free again and the floor reads again.
 
 ## P1-09 KDS UI
 
