@@ -156,14 +156,31 @@ describe('[SEC-005] roles', () => {
   });
 
   it('[QR-009] lets Realtime take on the local server’s role only, to apply its RLS', async () => {
+    // Realtime logs in as `supabase_admin` on Supabase, a superuser that may take on any role;
+    // where that login does not exist (plain PostgreSQL standing in), Realtime's role is the one
+    // that must be able to.
+    const [realtime] = await query<{ login: string; superuser: boolean }>(
+      `SELECT rolname AS login, rolsuper AS superuser FROM pg_roles
+       WHERE rolname IN ('supabase_admin', 'supabase_realtime_admin')
+       ORDER BY rolname = 'supabase_admin' DESC LIMIT 1`,
+    );
+    expect(realtime).toBeDefined();
+    const [canServe] = await query<{ member: boolean }>(
+      `SELECT pg_has_role($1, 'relay_server', 'MEMBER') AS member`,
+      [realtime?.login],
+    );
+    expect(canServe?.member).toBe(true);
+    if (realtime?.login === 'supabase_admin') expect(realtime.superuser).toBe(true);
+    // The reserved Realtime role is given nothing else of the relay's, wherever it may be given
+    // something: never a writer's, a diner's or the provisioner's rights.
     const memberships = await query<{ role: string; member: boolean }>(
       `SELECT r AS role, pg_has_role('supabase_realtime_admin', r, 'MEMBER') AS member
        FROM unnest($1::text[]) AS r ORDER BY r`,
       [[...RELAY_ROLES]],
     );
-    expect(memberships.filter((row) => row.member).map((row) => row.role)).toEqual([
-      'relay_server',
-    ]);
+    expect(
+      memberships.filter((row) => row.member && row.role !== 'relay_server').map((row) => row.role),
+    ).toEqual([]);
   });
 
   it('lets the edge functions switch to a writer or a diner, never the provisioner, inheriting nothing', async () => {
