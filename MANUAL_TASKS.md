@@ -10,13 +10,14 @@ can be updated. Never paste secrets, keys or passwords into a Claude session or 
 
 ## 1. Now (unblocks pushing the local build)
 
-- [ ] **Log in to GitHub on this Mac** so the local build can be pushed and merged:
+- [x] **Log in to GitHub on this Mac** so the local build can be pushed and merged (done:
+      the Mac build was merged through PR #85 on 2026-10-11):
       `gh auth login` (GitHub.com, HTTPS, "authenticate Git with your GitHub credentials").
       Steps: [`manual-tasks/01-github-access.md`](manual-tasks/01-github-access.md).
 - [x] `main` is the repository's default branch.
-- [ ] Protect `main` (pull requests, the CI checks), require 2FA for everyone with access, and
-      create the `release-signing` environment for the code-signing certificate (SEC-013). Same
-      file.
+- [ ] Protect `main` (pull requests, the CI checks) and require 2FA for everyone with access.
+      Same file. Checked 2026-10-11: `main` is not protected yet; the `release-signing`
+      environment for the code-signing certificate (SEC-013) exists.
 
 ## 2. Accounts and keys (Business Owner)
 

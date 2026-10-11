@@ -4439,6 +4439,64 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
 
 ## Session log (newest first)
 
+### 2026-10-11: PR #85, the Mac build's first CI runs on GitHub
+
+PR #85 (`build/mac-sync-2026-10-11`) brought the Mac build onto GitHub. CI had never run on the
+Mac code, and it failed in these places, all fixed in code:
+
+- **Secret scan:** 7 gitleaks findings, all planted test values (JWTs with plain-word signatures,
+  a truncated "private key", a placeholder recovery key, a public firmware key digest). Each was
+  checked and added to `.gitleaksignore` with a reason.
+- **CodeQL gate:** 15 alerts. Update downloads now follow redirects over HTTPS only. The vendor
+  step-up refuses a missing code first. Backtracking regexes became linear parsers. File checks
+  no longer come before the file is used, and the shell's log rotates through its open file. Temp
+  folders are private, and the test key is RSA 2048.
+- **Windows installer:** makensis on Windows does not read `/` in `!include` or `File` paths, so
+  they now use backslashes. electron-builder drops a `node_modules` folder at the root of each
+  per-folder copy, so the server lost its packages. It is now one copy, and the build checks that
+  every staged file reached the app. Windows PowerShell 5.1 started from PowerShell 7 loaded 7's
+  modules (`Get-Acl` failed), so the module now resets its module path.
+- **Windows set-up scripts:** icacls refuses a service's virtual account before the service
+  exists (1332). This was a real bug: a fresh install on a new PC would have failed. Folders are
+  set without missing accounts first, the database's after `postgres-register`, and in full once
+  both services exist. The Pester test uses throwaway services.
+- **QR relay on Supabase:** Supabase now reserves `supabase_realtime_admin` (42501 on the grant).
+  The grant is skipped there with a notice, because Realtime logs in as `supabase_admin`. The
+  Deno smoke test streams 64 MiB, because Linux socket buffers held all of the old 8 MiB. CI had
+  taken the newest Deno (2.9.7), whose own server reads a refused body to its end whatever the
+  function does. It now uses Deno 2.1.4, the Deno of Supabase's edge runtime (decision 793). The
+  relay's test database now waits for its pool's connections to close before the forced drop.
+- **End-to-end:** QR-008: the site's 5 s shared menu read kept a page saying "away" for up to
+  25 s after the restaurant came back. A page built from a shared read now asks the relay at
+  once. The vendor web test now answers the step-up dialog with a fresh code; the test was older
+  than the step-up (P8-03d2b1). The offline-banner test waits for the floor before stopping the
+  server, and `stop()` counts an exit by a signal. The NFR-P07 speed test slowed the browser 4
+  times relative to its machine, so CI measured a device 12-16 times slower than the Mac. It now
+  scales the slowdown by a benchmark score, as Lighthouse does (CI: 2.49 times, tap p95 32 ms).
+- **Unit and integration tests on Linux:**
+  - The managed PostgreSQL sets `unix_socket_directories = ''`, since Ubuntu's build wanted
+    `/var/run/postgresql`.
+  - The control-plane test gives a fixed PC fingerprint, since the runner cannot read DMI.
+  - PC-D3 (decision 782 changed): the sweep cut off a slow reader still taking a large flush.
+    Progress is now the bytes the operating system took, and a cut needs two stalled sweeps in a
+    row. A new test reads slowly, and it fails with the old rule.
+  - The console's pager scan test waits for the camera to be turned off (an effect clean-up).
+  - The flood tests time the server under a full-speed flood, but ran beside every other server
+    test file on CI's four CPUs (one request took 1.4 s against a 1 s budget). They are now the
+    vitest project `integration-alone`, run after the others (`sequence.groupOrder`).
+- **CI:** a step checks that pnpm is the version `packageManager` names. The action installs v11
+  first and only warns. The APK build prints Gradle's stack trace and the disk and memory when it
+  fails, after one unexplained packaging failure.
+- **DAST on `main`** (it runs only there, so the merge was its first run): the plan turned off
+  rule 40024 (SQL injection, SQLite), which left ZAP's release rules in ascanrules 79; the CI
+  image does not have it, so every plan ended with a warning (exit 2). The Mac's ZAP has
+  ascanrules 78 and still had it. The rule is no longer named.
+
+Gotchas: makensis, icacls, Windows PowerShell 5.1, Supabase's reserved roles, Linux socket
+buffers and a busier CPU all behave differently from the Mac. Only the `windows-latest`, Supabase
+and Linux jobs catch them, so push work on the installer, relay or real-time code early. `pnpm
+check` does not run `pnpm trace`; CI does, so run it after adding a test with requirement IDs.
+
 ### 2026-10-11: syncing the Mac build with GitHub
 
 GitHub's `main` and the local Mac build had diverged from `40890a4` (2026-10-01): a Claude Code on

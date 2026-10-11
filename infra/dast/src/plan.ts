@@ -21,7 +21,9 @@ export interface ScanTarget {
 
 /**
  * Active scan rules turned off, with why: they look for software none of the surfaces has, or
- * need what the scan does not give ZAP (a browser, callbacks over the internet). ZAP's rule ids.
+ * need what the scan does not give ZAP (a browser, callbacks over the internet). ZAP's rule ids,
+ * only of rules ZAP has: naming one it lacks is a plan warning, and the scan fails on it. (SQL
+ * injection, SQLite, 40024, left the release rules in ascanrules 79 and is not in the image.)
  */
 export const RULES_OFF: Readonly<Record<string, string>> = {
   '30001': 'Buffer overflow: no native code reads requests (Node.js and Deno)',
@@ -30,7 +32,6 @@ export const RULES_OFF: Readonly<Record<string, string>> = {
   '40019': 'SQL injection, MySQL: every database is PostgreSQL',
   '40020': 'SQL injection, Hypersonic: every database is PostgreSQL',
   '40021': 'SQL injection, Oracle: every database is PostgreSQL',
-  '40024': 'SQL injection, SQLite: every database is PostgreSQL',
   '40027': 'SQL injection, MsSQL: every database is PostgreSQL',
   '40026':
     'Cross-site scripting (DOM based) drives a browser inside ZAP; the console and the QR site are checked in Playwright under their CSP and Trusted Types instead',

@@ -125,6 +125,15 @@ export function vendorUserView(
   };
 }
 
+/** The authenticator asked for again (CP-S2): a new code is needed to go on. */
+function stepUpRequired(): CpError {
+  return new CpError(
+    403,
+    'STEP_UP_REQUIRED',
+    'Enter a new code from your authenticator app to do this.',
+  );
+}
+
 /**
  * Vendor staff accounts and sessions (VCP-001, SEC-018). An account is created with a one-time
  * setup token, given to the person out of band; they choose a password and add an authenticator,
@@ -137,15 +146,6 @@ export function vendorUserView(
  * account that is disabled or not set up, get the same answers as a wrong password, locks
  * included (threat CP-S1). A Super Admin's reset takes two other Super Admins (threat CP-E3).
  */
-/** The authenticator asked for again (CP-S2): a new code is needed to go on. */
-function stepUpRequired(): CpError {
-  return new CpError(
-    403,
-    'STEP_UP_REQUIRED',
-    'Enter a new code from your authenticator app to do this.',
-  );
-}
-
 @Injectable()
 export class VendorAuthService {
   private readonly key: Buffer;

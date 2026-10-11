@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config';
 
 // SWC compiles tests so NestJS gets decorator metadata (emitDecoratorMetadata is read from
 // tsconfig.json). Integration tests start PostgreSQL once per run (test/setup/global-setup.ts).
+
+/** Integration tests that time the server under load, run on their own. */
+const ALONE = 'test/integration/flood.int.test.ts';
 export default defineConfig({
   plugins: [swc.vite({ module: { type: 'es6' } })],
   test: {
@@ -17,9 +20,24 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['test/integration/**/*.int.test.ts'],
+          exclude: [ALONE],
           globalSetup: ['test/setup/global-setup.ts'],
           testTimeout: 30_000,
           hookTimeout: 60_000,
+        },
+      },
+      {
+        extends: true,
+        // Floods at full speed with time budgets (PC-D3, NFR-P01). They run after the other
+        // projects, not beside them, so they time this server and not the other test files on
+        // the same CPUs (CI has four).
+        test: {
+          name: 'integration-alone',
+          include: [ALONE],
+          globalSetup: ['test/setup/global-setup.ts'],
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+          sequence: { groupOrder: 1 },
         },
       },
       {

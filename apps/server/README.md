@@ -637,7 +637,9 @@ device, with their count.
 `test/integration/flood.int.test.ts` floods the server over HTTPS from two addresses of the machine
 (127.0.0.1 and ::1; the server listens on `::` and does not trust its own address there), with
 small limits per test, and once with the production limits from a worker thread while another
-device's screen and requests are timed.
+device's screen and requests are timed. It is the vitest project `integration-alone`, which runs
+after the other projects rather than beside them, so its timings are the server's and not those of
+other test files sharing the CPUs.
 
 ## Windows services (P0-16b)
 
