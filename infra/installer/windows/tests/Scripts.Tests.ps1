@@ -40,6 +40,27 @@ Describe 'the script files' {
     }
 }
 
+Describe '[ONB-001] Windows PowerShell started from PowerShell 7' {
+    It 'drops PowerShell 7''s module folders, keeping its own with the system''s first' {
+        $inherited = @(
+            'C:\Users\asha\Documents\PowerShell\Modules',
+            'C:\Program Files\PowerShell\Modules',
+            'c:\program files\powershell\7\Modules',
+            'C:\Program Files\WindowsPowerShell\Modules',
+            'C:\Windows\system32\WindowsPowerShell\v1.0\Modules',
+            'D:\Tools\Modules',
+            ''
+        ) -join ';'
+        Get-RPWindowsPowerShellModulePath -Path $inherited -SystemRoot 'C:\Windows' | Should -Be (@(
+                'C:\Windows\System32\WindowsPowerShell\v1.0\Modules',
+                'C:\Program Files\WindowsPowerShell\Modules',
+                'D:\Tools\Modules'
+            ) -join ';')
+        Get-RPWindowsPowerShellModulePath -Path '' -SystemRoot 'C:\Windows' |
+            Should -Be 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules'
+    }
+}
+
 Describe 'the scripts the installer runs' {
     It '[ONB-001] Install-RestaurantPlatform.ps1 logs a failure and ends with exit code 1' {
         $log = Join-Path $TestDrive 'install.log'

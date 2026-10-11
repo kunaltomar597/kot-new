@@ -22,6 +22,36 @@
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = 'Stop'
 
+function Get-RPWindowsPowerShellModulePath {
+    <#
+    .SYNOPSIS
+        A module path for Windows PowerShell without PowerShell 7's folders.
+
+    .DESCRIPTION
+        Windows PowerShell 5.1 started from PowerShell 7 (a support person's terminal, the CI
+        runner) inherits PowerShell 7's module folders first. It then finds Get-Acl and the like
+        in PowerShell 7's Microsoft.PowerShell.Security, which it cannot load ("found in the
+        module ... but the module could not be loaded"). Its own folders are kept, the system's
+        first; PowerShell 7's (...\PowerShell\... but not ...\WindowsPowerShell\...) are dropped.
+    #>
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()] [string] $Path,
+        [Parameter(Mandatory)] [string] $SystemRoot
+    )
+    # A plain join: this runs as the module loads, before Join-RPPath exists, and on any OS in tests.
+    $system = $SystemRoot.TrimEnd('\') + '\System32\WindowsPowerShell\v1.0\Modules'
+    $kept = @($Path -split ';' | Where-Object {
+            $_ -and ($_ -match '\\WindowsPowerShell\\' -or $_ -notmatch '\\PowerShell\\')
+        })
+    $ordered = @($system) + @($kept | Where-Object { $_.TrimEnd('\') -ne $system })
+    ($ordered | Select-Object -Unique) -join ';'
+}
+
+if ($PSVersionTable.PSEdition -eq 'Desktop') {
+    $env:PSModulePath = Get-RPWindowsPowerShellModulePath -Path $env:PSModulePath -SystemRoot $env:SystemRoot
+}
+
 # ------------------------------------------------------------------------------------- constants
 
 # The services (the server's SERVICE_NAMES).
@@ -2222,6 +2252,7 @@ Export-ModuleMember -Function @(
     'Remove-RPService',
     'Set-RPFirewallRule',
     'Set-RPFolderPermission',
+    'Get-RPWindowsPowerShellModulePath',
     'Select-RPExistingGrant',
     'Get-RPMissingServiceSid',
     'Set-RPServiceRecovery',

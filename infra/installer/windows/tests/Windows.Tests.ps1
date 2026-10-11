@@ -40,6 +40,23 @@ Describe 'on Windows' -Tag 'Windows' -Skip:(-not $OnWindows) {
         $text | Should -Match 'EligibleCount=[1-9]'
     }
 
+    It '[ONB-001] runs in Windows PowerShell started from PowerShell 7, with its own Get-Acl' {
+        # The installer started from a PowerShell 7 terminal: Windows PowerShell inherits PowerShell
+        # 7's module folders first, as on the CI runner.
+        $module = Join-Path (Split-Path -Parent $PSScriptRoot) 'RestaurantPlatform.Setup.psm1'
+        $seven = @(Get-ChildItem -Path (Join-Path $env:ProgramFiles 'PowerShell') -Filter 'Modules' -Recurse -Depth 1 -Directory -ErrorAction SilentlyContinue).FullName
+        $saved = $env:PSModulePath
+        try {
+            $env:PSModulePath = (@($seven) + @($saved -split ';')) -join ';'
+            $command = "Import-Module '$module'; (Get-Acl -LiteralPath `$env:SystemRoot).Owner"
+            $owner = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $command
+            $LASTEXITCODE | Should -Be 0
+            $owner | Should -Not -BeNullOrEmpty
+        } finally {
+            $env:PSModulePath = $saved
+        }
+    }
+
     It '[SEC-007] gives real folders exactly the planned entries, removing others' {
         # A service's virtual account exists once its service does (the installer makes the
         # services before it names their accounts): two throwaway services stand in for the
