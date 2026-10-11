@@ -931,6 +931,15 @@ Decided 2026-09-26 (P1-08a):
 Standing instruction (2026-09-26, the Business Owner): build everything without stopping; Claude
 decides, records decisions here and moves straight to the next WP. Recorded in CLAUDE.md.
 
+Decided 2026-10-11 (PR #85, the Mac build's CI):
+
+793. The relay's Deno smoke tests run on Deno 2.1.4 in CI, the Deno of the edge runtime Supabase
+     runs the functions on (v1.77.4: deno_core 0.324, deno_http 0.180), not the newest 2.x. Deno
+     2.9's own HTTP/1 server reads a refused request body to its end whatever the handler does
+     (cancel before or after the answer, `connection: close`), so under it the body-cap test failed
+     on Linux now and then. When Supabase's edge runtime moves to Deno 2.9 or later, RELAY-D3 must be
+     checked again there (threat model).
+
 Decided 2026-10-10 (P8-03d2a):
 
 790. P8-03d2 is split again: d2a the phones and tablets, d2b the checklists and the other threats.

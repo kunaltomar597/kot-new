@@ -419,7 +419,10 @@ checked.
   functions take 512 KB at most (the largest order a diner could send is well under it), the
   `server` function 8 MB, a photo 2 MB; a call without a table code or a credential of the right
   form has nothing of its body read. Bodies are read before the database transaction opens, so a
-  slow sender holds no connection (P8-03b4b).
+  slow sender holds no connection (P8-03b4b). Supabase's edge runtime (Deno 2.1, `deno_http`
+  0.180) then closes the connection, and the sender stops after about 2 MB. Deno 2.9's own server
+  would read a refused body to its end, so check this again when the edge runtime moves to it
+  (decision 793).
 - Code: `infra/supabase/src/http.ts` (`readCapped`, `DINER_BODY_MAX_BYTES`, `MAX_BODY_BYTES`);
   `infra/supabase/src/diner.ts` (`tableTokenOf`); `infra/supabase/src/server.ts`
   (`credentialOf`).

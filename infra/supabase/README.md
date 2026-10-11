@@ -32,7 +32,9 @@ the Mumbai region. Design: [ADR-0015](../../docs/adr/0015-qr-relay-on-supabase.m
 - `test/`: Vitest suites, which run on a throwaway PostgreSQL 16.
   - The function tests call each handler with a `Request`, on a connection logged in as
     `relay_edge`.
-  - `deno-smoke.test.ts` runs the real bundles under Deno when `deno` is installed.
+  - `deno-smoke.test.ts` runs the real bundles under Deno when `deno` is installed (or `DENO_BIN`).
+    CI uses Deno 2.1.4, the Deno of Supabase's edge runtime; Deno 2.9 and later read a refused
+    body to its end whatever the function does, so the body-cap test can fail there.
   - `startRelay` (`@rp/relay/testing`) runs the functions over HTTP for other packages' tests,
     with an in-memory photo bucket and, given a JWT secret, a stand-in for Realtime (P5-03d).
   - `test/setup/supabase-prelude.sql` stands in for Supabase's own roles and publication.

@@ -396,9 +396,12 @@ jobs:
         with:
           version: latest
 
+      # The Deno of Supabase's edge runtime (v1.77.4: deno_core 0.324, deno_http 0.180), where the
+      # functions run. Deno 2.9's own HTTP/1 server reads a refused body to its end whatever the
+      # function does, so a newer Deno does not show how production answers (RELAY-D3).
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          deno-version: v2.x
+          deno-version: v2.1.4
 
       - name: Build the relay functions and what they use
         run: pnpm turbo run build --filter=@rp/relay...
