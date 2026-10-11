@@ -5,8 +5,9 @@ import { type RunningServer, startServer } from './server.js';
 /**
  * NFR-P07 (P8-01b): a tap shows its answer within 100 ms and a screen changes within 300 ms. The
  * console runs on a restaurant of the design capacity's size (1,000 dishes, 100 tables; global
- * setup), on a browser slowed down four times, through a cashier's order, the kitchen's ticket and
- * a manager's walk through the dashboard. The browser measures itself:
+ * setup), on a browser slowed down to the reference device (the build Mac four times slower; see
+ * `REFERENCE_SCORE`), through a cashier's order, the kitchen's ticket and a manager's walk through
+ * the dashboard. The browser measures itself:
  *
  * - a tap: the longest event of the interaction (pointerdown, pointerup, click), from the input
  *   until the next frame was painted (Event Timing). Under 16 ms the browser does not report it;
@@ -19,8 +20,15 @@ import { type RunningServer, startServer } from './server.js';
 
 const t = createTranslator();
 
-/** How many times slower than this machine the browser runs (Lighthouse's mobile setting). */
-const CPU_SLOWDOWN = 4;
+/**
+ * The reference device's speed in `benchmark` rounds a second: the build Mac, where the budgets
+ * were first measured, with its CPU slowed down 4 times (Lighthouse's mobile setting; the
+ * restaurant PC and kitchen screens are slower than the Mac). Measured 2026-10-11: about 8,600
+ * unthrottled on the Mac, 2,118 slowed down 4 times. Each machine slows the browser by its own
+ * score over this one, as Lighthouse scales its slowdown by its benchmark index, so a CI runner
+ * three times slower than the Mac measures the same device rather than one twelve times slower.
+ */
+const REFERENCE_SCORE = 2_150;
 const TAP_BUDGET_MS = 100;
 const SCREEN_BUDGET_MS = 300;
 
@@ -29,6 +37,27 @@ interface SpeedProbe {
   readonly events: { name: string; duration: number }[];
   /** When the last pointerdown happened (`event.timeStamp`). */
   downAt: number;
+}
+
+/** Runs in the page: rounds a second of fixed work (strings, an array, a sort), median of five. */
+function benchmark(): number {
+  const scores: number[] = [];
+  for (let run = 0; run < 5; run += 1) {
+    const start = performance.now();
+    let rounds = 0;
+    while (performance.now() - start < 100) {
+      let text = '';
+      for (let i = 0; i < 2000; i += 1) text += String.fromCharCode(97 + (i % 26));
+      const numbers: number[] = [];
+      for (let i = 0; i < 2000; i += 1) numbers.push((i * 7919) % 2003);
+      numbers.sort((a, b) => a - b);
+      if (text.length + (numbers[0] ?? 0) < 0) throw new Error('unreachable');
+      rounds += 1;
+    }
+    scores.push((rounds * 1000) / (performance.now() - start));
+  }
+  scores.sort((a, b) => a - b);
+  return scores[2] ?? 0;
 }
 
 /** Runs in the page before its own scripts: records the input and the browser's Event Timing. */
@@ -190,8 +219,11 @@ test.describe.serial('[NFR-P07] taps and screen changes at the design capacityâ€
     await signOut.click();
     await expect(page.getByRole('heading', { name: t('login.title') })).toBeVisible();
 
+    // The reference device on every machine; one slower than it runs unthrottled.
+    const score = await page.evaluate(benchmark);
+    const slowdown = Math.max(1, score / REFERENCE_SCORE);
     const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: slowdown });
     const speed = new Speed(page);
     const signIn = async (name: RegExp, pin: string, mode: string) => {
       await speed.tap('sign-in tile', page.getByRole('button', { name }));
@@ -269,7 +301,7 @@ test.describe.serial('[NFR-P07] taps and screen changes at the design capacityâ€
     // eslint-disable-next-line no-console -- the measured figures, for the CI log and performance.md.
     console.log(
       [
-        `NFR-P07 at ${String(CPU_SLOWDOWN)}x CPU slowdown`,
+        `NFR-P07 on the reference device: this machine scores ${String(Math.round(score))} (the reference ${String(REFERENCE_SCORE)}), CPU slowed down ${slowdown.toFixed(2)} times`,
         `taps: ${line(taps)}; slowest ${slowest.map((entry) => `${entry.what} ${String(Math.round(entry.ms))} ms`).join(', ')}`,
         `screens shown: ${line(shown)}`,
         `screens ready: ${line(ready)}`,

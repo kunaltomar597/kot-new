@@ -230,9 +230,12 @@ of it on the ten twelve-month reports (`pg_stat_statements`).
 `apps/console/e2e/speed.e2e.ts` (P8-01b) runs the built console and server in Chromium on a
 restaurant of the design capacity's size (the development seed grown to 1,000 dishes and 100
 tables), with the browser's CPU slowed down 4 times (Lighthouse's mobile setting: the restaurant
-PC and the kitchen screens are slower than the build Mac). A cashier seats table 11 and sends ten
-dishes from five sections of the menu; the kitchen starts, readies and bumps the ticket; a manager
-walks through ten pages of the dashboard. The browser measures itself:
+PC and the kitchen screens are slower than the build Mac). Since 2026-10-11 the slowdown is scaled
+to the machine, as Lighthouse does with its benchmark index: a fixed piece of work in the page
+gives the machine's score, and the browser is slowed by that score over the reference device's
+(the Mac 4 times slower), so a slower CI runner measures the same device. A cashier seats table 11
+and sends ten dishes from five sections of the menu; the kitchen starts, readies and bumps the
+ticket; a manager walks through ten pages of the dashboard. The browser measures itself:
 
 - **a tap**: the longest event of the interaction (pointerdown, pointerup, click) from the input
   to the next painted frame (Event Timing). Under 16 ms the browser does not report it; it counts
