@@ -73,6 +73,18 @@ export async function openRelayDb(): Promise<RelayDb> {
     drop = () => database.drop();
   }
   const admin = new pg.Pool({ connectionString: url, max: 4 });
+  // The pool's end() resolves before its connections have closed. Dropping the database first
+  // would end them from the server's side: an uncaught error on a client the pool has let go.
+  const closed: Promise<void>[] = [];
+  admin.on('connect', (client) => {
+    closed.push(
+      new Promise((resolve) => {
+        client.once('end', () => {
+          resolve();
+        });
+      }),
+    );
+  });
   return {
     url,
     admin,
@@ -98,6 +110,7 @@ export async function openRelayDb(): Promise<RelayDb> {
     },
     async close() {
       await admin.end();
+      await Promise.all(closed);
       await drop();
     },
   };
