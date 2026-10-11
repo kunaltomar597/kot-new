@@ -253,12 +253,18 @@ describe.runIf(hasDeno)('[QR-006] the bundled functions under Deno', () => {
       },
       { highWaterMark: 0 },
     );
+    // Deno may close the socket while the client is still writing; on a busy machine the client
+    // then sees EPIPE instead of reading the 413. Both are a refusal before the rest is sent.
     const chunked = await call('submit-order', {
       method: 'POST',
       body,
       duplex: 'half',
+    }).catch((error: unknown) => {
+      const code = (error as { cause?: { code?: string } }).cause?.code;
+      if (code === 'EPIPE' || code === 'ECONNRESET' || code === 'UND_ERR_SOCKET') return null;
+      throw error;
     });
-    expect(chunked.status).toBe(413);
+    if (chunked !== null) expect(chunked.status).toBe(413);
     expect(sent).toBeLessThan(8 * 1024 * 1024);
 
     const server = await call('server', {

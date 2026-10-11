@@ -412,6 +412,10 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
+- Port from GitHub's main, dropped in the 2026-10-11 sync (see the session log): "free a table
+  opened by mistake" on the POS (GitHub commit `9dc5680`, PR #84), and the on-screen words for the
+  `PRINTER_OFFLINE` and `DISK_OR_BACKUP` alerts in `@rp/ordering` alert text (GitHub commit
+  `1b7c380`; device-offline alerts themselves already exist here).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -4423,6 +4427,19 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: syncing the Mac build with GitHub
+
+GitHub's `main` and the local Mac build had diverged from `40890a4` (2026-10-01): a Claude Code on
+the web session merged 50 commits on GitHub (73 WPs done, mostly a second build of P4-02c to P4-04),
+while the Mac built 255 commits locally (117 WPs) with no GitHub login. A trial merge conflicted in
+116 files. Decided by the Business Owner: keep the Mac build. GitHub's `main` is merged with the
+`ours` strategy, so its history stays and its code is not taken. Ported from it: the SEC-013
+dependency fixes (overrides for `shell-quote` and `source-map-js`, `sharp` 0.35.5 everywhere
+including the QR menu's `next`) and the two reviewed audit exceptions (`node-forge`, `braces`, no
+fixed release; reasons in `infra/ci/README.md`). Not ported, listed under "Recommended next WPs":
+free a table opened by mistake (P1-08c there) and the printer-offline and disk alert words.
+Gotcha: stop any other session building on GitHub before the next sync, or the two diverge again.
 
 ### 2026-10-11: P8-06b pilot KPI views
 

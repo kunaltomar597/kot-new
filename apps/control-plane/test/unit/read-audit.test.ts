@@ -22,6 +22,7 @@ const RECORDS_OF_THE_CONTROL_PLANE = new Set([
   'listSupportNotes',
   'getRelayProvisioning',
   'getFleet',
+  'getInstallationAvailability',
   'listFleetAlerts',
   'listAuditHeads',
   'listVendorCloudBackups',
