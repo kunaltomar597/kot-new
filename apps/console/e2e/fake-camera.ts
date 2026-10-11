@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encode } from 'uqr';
@@ -28,7 +28,8 @@ export function fakeCameraShowing(text: string): string {
   }
   // 4:2:0 chroma at the neutral value: a black and white picture.
   const chroma = Buffer.alloc((WIDTH / 2) * (HEIGHT / 2) * 2, 128);
-  const file = join(tmpdir(), 'rp-console-e2e-camera.y4m');
+  // A folder of its own (mkdtemp), so nobody else on the machine can put a file there first.
+  const file = join(mkdtempSync(join(tmpdir(), 'rp-console-e2e-camera-')), 'camera.y4m');
   writeFileSync(
     file,
     Buffer.concat([

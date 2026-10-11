@@ -137,6 +137,23 @@ describe('[NFR-O02] error reports', () => {
       ['inner', '/srv/app/dist/a.js', true],
     ]);
     expect(stackFrames(undefined)).toEqual([]);
+    // Windows paths, frames without a place, and a line built to make a regular expression
+    // backtrack: read in time, and only the real frames kept.
+    const odd = stackFrames(
+      [
+        'Error: y',
+        '    at C:\\Users\\asha\\app\\c.js:7:8',
+        '    at async Promise.all (index 0)',
+        `    at ${'a ('.repeat(20_000)}`,
+        '    at new Foo (bar) (/srv/app/dist/d.js:9:10)',
+      ].join('\n'),
+    );
+    expect(odd.map((frame) => [frame.function, frame.filename, frame.lineno, frame.colno])).toEqual(
+      [
+        ['new Foo (bar)', '/srv/app/dist/d.js', 9, 10],
+        ['?', '~\\app\\c.js', 7, 8],
+      ],
+    );
     const event = buildEvent(
       'plain',
       {},

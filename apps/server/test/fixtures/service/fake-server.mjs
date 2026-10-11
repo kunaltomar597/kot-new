@@ -5,16 +5,23 @@
 //   degraded       answers 503, as when the database is down
 //   ignore-stop    does not close when asked
 // Each start appends its PID to FAKE_DIR/starts.log; a stop writes FAKE_DIR/closed-<pid>.
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 
 const dir = process.env.FAKE_DIR ?? '.';
 const behaviour = (process.env.FAKE_BEHAVIOUR ?? '').split(',');
 const startsFile = join(dir, 'starts.log');
-const earlier = existsSync(startsFile)
-  ? readFileSync(startsFile, 'utf8').split('\n').filter(Boolean).length
-  : 0;
+/** Starts before this one; no file yet is none (read at once, not checked first). */
+function earlierStarts() {
+  try {
+    return readFileSync(startsFile, 'utf8').split('\n').filter(Boolean).length;
+  } catch (error) {
+    if (error.code === 'ENOENT') return 0;
+    throw error;
+  }
+}
+const earlier = earlierStarts();
 const first = earlier === 0;
 appendFileSync(startsFile, `${String(process.pid)}\n`);
 

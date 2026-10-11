@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const manifest = readFileSync(
+const manifestText = readFileSync(
   join(
     dirname(fileURLToPath(import.meta.url)),
     '..',
@@ -13,7 +13,19 @@ const manifest = readFileSync(
     'AndroidManifest.xml',
   ),
   'utf8',
-).replace(/<!--[\s\S]*?-->/g, '');
+);
+
+/** The manifest without its comments, removed until none is left (a nested "<!--" too). */
+function withoutComments(xml: string): string {
+  let text = xml;
+  for (;;) {
+    const start = text.indexOf('<!--');
+    if (start < 0) return text;
+    const end = text.indexOf('-->', start + 4);
+    text = end < 0 ? text.slice(0, start) : text.slice(0, start) + text.slice(end + 3);
+  }
+}
+const manifest = withoutComments(manifestText);
 
 /** Every component element with its attributes. */
 function components() {

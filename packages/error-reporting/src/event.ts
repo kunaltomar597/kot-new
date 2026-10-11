@@ -35,19 +35,50 @@ export function stackFrames(stack: string | undefined): SentryFrame[] {
   if (stack === undefined) return [];
   const frames: SentryFrame[] = [];
   for (const line of stack.split('\n')) {
-    const match = /^\s*at (?:(.+?) \()?(.+?):(\d+):(\d+)\)?$/.exec(line);
-    if (match === null) continue;
-    const [, fn, file = '', lineno, colno] = match;
-    const filename = file.replace(HOME, '~');
+    const frame = frameOf(line);
+    if (frame === undefined) continue;
+    const filename = frame.file.replace(HOME, '~');
     frames.push({
       filename,
-      function: fn ?? '?',
-      lineno: Number(lineno),
-      colno: Number(colno),
+      function: frame.fn ?? '?',
+      lineno: frame.lineno,
+      colno: frame.colno,
       in_app: !filename.includes('node_modules') && !filename.startsWith('node:'),
     });
   }
   return frames.reverse();
+}
+
+const DIGITS = /^\d+$/;
+
+/**
+ * One V8 stack line, `at fn (file:line:col)` or `at file:line:col`, read by its last separators
+ * rather than a backtracking regular expression, so a long or odd line costs no more than its
+ * length (an error's message is not ours to trust).
+ */
+function frameOf(
+  line: string,
+): { fn: string | undefined; file: string; lineno: number; colno: number } | undefined {
+  const trimmed = line.trimStart();
+  if (!trimmed.startsWith('at ')) return undefined;
+  let place = trimmed.slice(3).trimEnd();
+  let fn: string | undefined;
+  if (place.endsWith(')')) {
+    const open = place.lastIndexOf(' (');
+    if (open > 0) {
+      fn = place.slice(0, open);
+      place = place.slice(open + 2, -1);
+    } else {
+      place = place.slice(0, -1);
+    }
+  }
+  const colon = place.lastIndexOf(':');
+  const lineColon = colon > 0 ? place.lastIndexOf(':', colon - 1) : -1;
+  if (lineColon <= 0) return undefined;
+  const lineno = place.slice(lineColon + 1, colon);
+  const colno = place.slice(colon + 1);
+  if (!DIGITS.test(lineno) || !DIGITS.test(colno)) return undefined;
+  return { fn, file: place.slice(0, lineColon), lineno: Number(lineno), colno: Number(colno) };
 }
 
 function describe(error: unknown): { type: string; message: string; stack: string | undefined } {

@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { appendFileSync, closeSync, fstatSync, mkdirSync, openSync, renameSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 /** The log is renamed to `<file>.1` at this size, so it never fills the disk. */
@@ -24,12 +24,18 @@ export function fileLog(
     deps.write ??
     ((path: string, text: string) => {
       mkdirSync(dirname(path), { recursive: true });
+      // The size is read from the open file, not looked up by name first (no check-then-use).
+      let fd = openSync(path, 'a');
       try {
-        if (statSync(path).size > MAX_BYTES) renameSync(path, `${path}.1`);
-      } catch {
-        // No file yet.
+        if (fstatSync(fd).size > MAX_BYTES) {
+          closeSync(fd);
+          renameSync(path, `${path}.1`);
+          fd = openSync(path, 'a');
+        }
+        appendFileSync(fd, text);
+      } finally {
+        closeSync(fd);
       }
-      appendFileSync(path, text);
     });
   return (message) => {
     // One line per event, whatever the message holds.

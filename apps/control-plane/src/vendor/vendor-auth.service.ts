@@ -137,6 +137,15 @@ export function vendorUserView(
  * account that is disabled or not set up, get the same answers as a wrong password, locks
  * included (threat CP-S1). A Super Admin's reset takes two other Super Admins (threat CP-E3).
  */
+/** The authenticator asked for again (CP-S2): a new code is needed to go on. */
+function stepUpRequired(): CpError {
+  return new CpError(
+    403,
+    'STEP_UP_REQUIRED',
+    'Enter a new code from your authenticator app to do this.',
+  );
+}
+
 @Injectable()
 export class VendorAuthService {
   private readonly key: Buffer;
@@ -299,10 +308,9 @@ export class VendorAuthService {
     const user = await this.prisma.vendorUser.findUnique({ where: { id: principal.userId } });
     if (!canSignIn(user)) throw unauthorised();
     if (user.lockedUntil !== null && user.lockedUntil > now) throw lockedError(user.lockedUntil);
-    const step =
-      code === undefined
-        ? null
-        : verifyTotp(open(this.key, user.totpSecret), code, now, user.totpLastStep);
+    // No code: asked for one, and nothing counts against the lock.
+    if (code === undefined) throw stepUpRequired();
+    const step = verifyTotp(open(this.key, user.totpSecret), code, now, user.totpLastStep);
     const spent =
       step === null
         ? 0
@@ -313,29 +321,24 @@ export class VendorAuthService {
             })
           ).count;
     if (spent === 1) return;
-    if (code !== undefined) {
-      const tries = await this.prisma.$queryRaw<{ failures: number }[]>`
-        UPDATE vendor_users SET failed_sign_ins = failed_sign_ins + 1, updated_at = ${now}
-        WHERE id = ${user.id}::uuid RETURNING failed_sign_ins AS failures`;
-      const counted = tries[0]?.failures;
-      if (counted !== undefined && counted >= MAX_FAILURES) {
-        await this.lockIfOver(user.id, counted, now);
-      }
-      await this.prisma.transaction((tx) =>
-        this.audit.record(tx, {
-          actor: principal.actor,
-          action: 'vendor.step_up_failed',
-          targetType: 'vendor_user',
-          targetId: user.id,
-          details: {},
-        }),
-      );
+    // A wrong or used code counts towards the lock, like a wrong sign-in.
+    const tries = await this.prisma.$queryRaw<{ failures: number }[]>`
+      UPDATE vendor_users SET failed_sign_ins = failed_sign_ins + 1, updated_at = ${now}
+      WHERE id = ${user.id}::uuid RETURNING failed_sign_ins AS failures`;
+    const counted = tries[0]?.failures;
+    if (counted !== undefined && counted >= MAX_FAILURES) {
+      await this.lockIfOver(user.id, counted, now);
     }
-    throw new CpError(
-      403,
-      'STEP_UP_REQUIRED',
-      'Enter a new code from your authenticator app to do this.',
+    await this.prisma.transaction((tx) =>
+      this.audit.record(tx, {
+        actor: principal.actor,
+        action: 'vendor.step_up_failed',
+        targetType: 'vendor_user',
+        targetId: user.id,
+        details: {},
+      }),
     );
+    throw stepUpRequired();
   }
 
   /** The session behind a bearer token, kept alive; refused when ended, expired or idle. */

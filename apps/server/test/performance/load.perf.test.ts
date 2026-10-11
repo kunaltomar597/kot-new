@@ -55,7 +55,10 @@ const shape: LoadShape = {
   ordersPerHour: numberFrom('RP_LOAD_ORDERS_PER_HOUR', DESIGN_CAPACITY.ordersPerHour),
   historyDays: numberFrom('RP_LOAD_HISTORY_DAYS', DESIGN_CAPACITY.historyDays),
 };
-const REPORT = process.env.RP_LOAD_REPORT ?? join(tmpdir(), 'rp-load-report.md');
+// A folder of its own (mkdtemp) unless a path is given: nobody else can put a file there first.
+const REPORT =
+  process.env.RP_LOAD_REPORT ??
+  join(mkdtempSync(join(tmpdir(), 'rp-load-report-')), 'load-report.md');
 const ADMIN_URL = process.env.RP_LOAD_ADMIN_URL;
 const BASE = process.env.RP_LOAD_BASE;
 const BASE_DATABASE = 'rp_load_base';

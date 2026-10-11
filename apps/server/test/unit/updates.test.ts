@@ -34,12 +34,17 @@ const INSTALLER = Buffer.from('MZ pretend installer '.repeat(1_000));
 const SHA = createHash('sha256').update(INSTALLER).digest('hex');
 const URL_ = 'https://downloads.example.com/RestaurantPlatform-Setup-1.2.0.exe';
 
+/** The address a fetch was given, whatever form it came in. */
+const addressOf = (input: string | URL | Request): string =>
+  typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
 /** A fetch that answers with `body`, in chunks, from the address it ended at. */
 function fakeFetch(
   body: Buffer,
-  options: { status?: number; url?: string; chunk?: number } = {},
+  options: { status?: number; url?: string; chunk?: number; asked?: string[] } = {},
 ): typeof fetch {
-  return () => {
+  return (input) => {
+    options.asked?.push(addressOf(input));
     const chunk = options.chunk ?? 4_096;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -124,6 +129,46 @@ describe('[UPD-004] [UPD-007] downloading an update', () => {
       ),
     ).toBe('NETWORK');
     expect(existsSync(target)).toBe(false);
+  });
+
+  it('follows redirects by itself, to HTTPS only, never asking anything over HTTP', async () => {
+    const target = join(folder(), 'a.exe');
+    const asked: string[] = [];
+    const redirects = (to: string): typeof fetch => {
+      const file = fakeFetch(INSTALLER, { asked });
+      return (input, init) => {
+        expect(init?.redirect).toBe('manual');
+        if (addressOf(input) === URL_) {
+          asked.push(addressOf(input));
+          return Promise.resolve(new Response(null, { status: 302, headers: { location: to } }));
+        }
+        return file(input, init);
+      };
+    };
+    await downloadInstaller({
+      url: URL_,
+      sha256: SHA,
+      sizeBytes: INSTALLER.length,
+      target,
+      fetch: redirects('https://cdn.example.com/a.exe'),
+    });
+    expect(asked).toEqual([URL_, 'https://cdn.example.com/a.exe']);
+    expect(readFileSync(target).equals(INSTALLER)).toBe(true);
+
+    asked.length = 0;
+    const refused = await downloadInstaller({
+      url: URL_,
+      sha256: SHA,
+      sizeBytes: INSTALLER.length,
+      target: join(folder(), 'b.exe'),
+      fetch: redirects('http://mirror.example.com/a.exe'),
+    }).then(
+      () => 'none',
+      (error: unknown) => (error instanceof UpdateDownloadError ? error.problem : 'other'),
+    );
+    expect(refused).toBe('NOT_HTTPS');
+    // The plain HTTP address was never asked.
+    expect(asked).toEqual([URL_]);
   });
 
   it('refuses a download that is too long, too short or not the release', async () => {

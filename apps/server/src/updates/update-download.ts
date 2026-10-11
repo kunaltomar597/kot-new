@@ -43,6 +43,48 @@ function isHttps(url: string): boolean {
   }
 }
 
+/** Redirects followed at most (a CDN sends one or two). */
+const MAX_REDIRECTS = 5;
+
+/**
+ * The download's first answer. Redirects are followed here, one by one and to HTTPS addresses
+ * only, so no request ever goes out over plain HTTP (UPD-007).
+ */
+async function requestOverHttps(
+  url: string,
+  fetchFile: typeof fetch,
+  signal: AbortSignal,
+): Promise<Response> {
+  let address = url;
+  for (let hops = 0; ; hops += 1) {
+    const target = new URL(address);
+    if (target.protocol !== 'https:') {
+      throw new UpdateDownloadError(
+        'NOT_HTTPS',
+        hops === 0
+          ? 'Updates are downloaded over HTTPS only.'
+          : 'The download was redirected away from HTTPS.',
+      );
+    }
+    let response: Response;
+    try {
+      response = await fetchFile(target.href, { redirect: 'manual', signal });
+    } catch (error) {
+      throw new UpdateDownloadError(
+        'NETWORK',
+        `The download could not start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const location = response.headers.get('location');
+    if (response.status < 300 || response.status > 399 || location === null) return response;
+    await response.body?.cancel();
+    if (hops >= MAX_REDIRECTS) {
+      throw new UpdateDownloadError('HTTP_STATUS', 'The download was redirected too many times.');
+    }
+    address = new URL(location, target).href;
+  }
+}
+
 export async function downloadInstaller(options: DownloadOptions): Promise<void> {
   if (!isHttps(options.url)) {
     throw new UpdateDownloadError('NOT_HTTPS', 'Updates are downloaded over HTTPS only.');
@@ -50,16 +92,8 @@ export async function downloadInstaller(options: DownloadOptions): Promise<void>
   const signals = [AbortSignal.timeout(options.timeoutMs ?? 30 * 60_000)];
   if (options.signal !== undefined) signals.push(options.signal);
   const signal = AbortSignal.any(signals);
-  let response: Response;
-  try {
-    response = await (options.fetch ?? fetch)(options.url, { redirect: 'follow', signal });
-  } catch (error) {
-    throw new UpdateDownloadError(
-      'NETWORK',
-      `The download could not start: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  // Redirects are followed; where they ended must be HTTPS too.
+  const response = await requestOverHttps(options.url, options.fetch ?? fetch, signal);
+  // Where the answer says it came from must be HTTPS too (a fetch that follows on its own).
   if (response.url !== '' && !isHttps(response.url)) {
     await response.body?.cancel();
     throw new UpdateDownloadError('NOT_HTTPS', 'The download was redirected away from HTTPS.');
