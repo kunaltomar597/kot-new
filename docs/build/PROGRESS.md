@@ -412,9 +412,6 @@ S1 on the lab rig with real devices is P8-01c [H].
 
 Recommended next WPs (dependencies met):
 
-- Port from GitHub's main, dropped in the 2026-10-11 sync (see the session log): the on-screen
-  words for the `PRINTER_OFFLINE` and `DISK_OR_BACKUP` alerts in `@rp/ordering` alert text (GitHub
-  commit `1b7c380`; device-offline alerts themselves already exist here).
 - P0-H1 Pager battery prototype firmware (Claude can write it, a person must run it).
 
 ## Work packages
@@ -4438,6 +4435,10 @@ Owner actions that only a person can do (see also `docs/owner/OWNER_CHECKLIST.md
   add branch protection requiring the CI check.
 
 ## Session log (newest first)
+
+### 2026-10-11: alert words for printer and disk or backup
+
+`describeAlert` (`@rp/ordering`) now gives a detail line for `PRINTER_OFFLINE` (printer name, its error, prints waiting) and `DISK_OR_BACKUP` (disk percent full and free GB, or which backup is failing: cloud, continuous or nightly, from the payload the server already raises). New `alerts.printerOffline`, `diskFull` and `backupFailed` strings in `@rp/i18n`. Tests tagged NTF-006. This closes the port left from the 2026-10-11 sync. Nothing buildable is left except `[H]` items (P0-H1 firmware needs a person to run it).
 
 ### 2026-10-11: P1-08c, free a table opened by mistake
 

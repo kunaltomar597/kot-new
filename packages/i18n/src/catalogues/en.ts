@@ -177,6 +177,13 @@ export const en = {
       '{name} from the vendor issued a restore code for your cloud backups: “{reason}”. If you did not ask for a restore onto a new PC, call the vendor now.',
     personLocked:
       '{name} cannot sign in until {time}: too many wrong {method, select, OWNER_PASSWORD {passwords} STEP_UP {passwords} other {PINs}} on {device}. If it was not them, someone may be guessing. Unlock it on the Staff page.',
+    printerOffline:
+      '{printer} is not responding{queued, plural, =0 {} one {. # print is waiting} other {. # prints are waiting}}. Check its power, paper and cable; waiting prints go out when it is back.',
+    printerOfflineError: ' ({error})',
+    diskFull:
+      'The PC\u2019s disk is {percent}% full{free}. Free some space or backups and billing may stop.',
+    backupFailed:
+      '{kind, select, CLOUD {The cloud backup} CONTINUOUS {The continuous backup} other {The nightly backup}} is failing{error}. Open the System page to check it.',
     devicePinsLocked:
       '{device} takes no PINs until {time}: too many wrong ones were typed on it. If staff did not mistype them, someone may be guessing. Let it take PINs again on the Devices page.',
     /** Android notifications on the waiter phone (P2-06b, WTR-005). */
